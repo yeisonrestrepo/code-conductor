@@ -111,3 +111,4 @@ let client = HttpClient::builder()
 ## Detector Files
 
 - `Cargo.toml`
+- `Cargo.lock`

@@ -124,3 +124,4 @@ func TestParseDate(t *testing.T) {
 ## Detector Files
 
 - `go.mod`
+- `go.sum`

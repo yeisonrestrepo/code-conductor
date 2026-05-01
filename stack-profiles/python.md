@@ -107,4 +107,5 @@ with open("data.json") as f:
 
 - `requirements.txt`
 - `pyproject.toml`
+- `setup.py`
 - `Pipfile`
