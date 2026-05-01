@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(chmod +x \"c:\\\\Users\\\\yeiso\\\\Documentos\\\\Projects\\\\Personal\\\\claude agents\\\\project-template\\\\.claude\\\\hooks\\\\pre-tool-use.sh\" \"c:\\\\Users\\\\yeiso\\\\Documentos\\\\Projects\\\\Personal\\\\claude agents\\\\project-template\\\\.claude\\\\hooks\\\\post-compact.sh\")",
+      "Bash(chmod +x project-template/.claude/hooks/pre-tool-use.sh project-template/.claude/hooks/post-compact.sh)",
+      "Bash(chmod +x \"/c/Users/yeiso/Documentos/Projects/Personal/claude agents/install.sh\")"
+    ]
+  }
+}
