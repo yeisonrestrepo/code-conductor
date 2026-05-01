@@ -1,6 +1,19 @@
 # code-conductor
 
-A structured, token-efficient Claude Code configuration for every project.
+A spec-first, token-efficient Claude Code configuration that turns AI-assisted coding into a disciplined, repeatable engineering workflow.
+
+---
+
+## The Problem
+
+AI coding assistants are only as good as the structure you put around them. Without it, sessions drift: the agent overwrites files it shouldn't, skips the spec, reads entire codebases line by line, and produces code that solves the wrong problem efficiently. The result is fast output with slow outcomes — more rewrites, more context lost, more tokens burned. code-conductor is the structure.
+
+| Without code-conductor | With code-conductor |
+|---|---|
+| Free-form prompt → agent guesses, overwrites, drifts | `/spec` → approved spec → `/plan` → confirmed steps → implement |
+| Full files read on every turn | grep/find before read — targeted tool calls only |
+| Conventions reset every session | Stack profile + memory loaded at session start |
+| Frontend code with no UX consideration | UI/UX skill activated automatically for frontend stacks |
 
 ---
 
@@ -28,10 +41,12 @@ irm https://raw.githubusercontent.com/YOUR_ORG/code-conductor/main/install.ps1 |
 
 ### Flags
 
+By default, the installer installs only the global core files. Use flags to extend this behavior.
+
 | Flag | Description |
 |------|-------------|
-| `--project` / `-Project` | Also install project template into current directory |
-| `--no-deps` | Skip dependency installation, agent files only |
+| `--project` / `-Project` | Also install the project template into the current directory |
+| `--no-deps` | Skip dependency installation (Node tooling, Playwright MCP, plugins); copy agent files only |
 
 ### Update
 
@@ -39,17 +54,15 @@ Re-run the same install command. User-configured files are never overwritten; ag
 
 ---
 
-## What This Solves
+## How It Works
 
-| Problem | Solution |
-|---------|----------|
-| Claude rewrites existing files without checking | `pre-tool-use` hook blocks overwrites, shows 3 options |
-| No consistent workflow across projects | Global CLAUDE.md enforces `/spec → /plan → confirm → implement` |
-| Token waste from reading whole files | Mandatory grep-before-read rule in global CLAUDE.md |
-| Context lost after `/compact` | `post-compact` hook reminds to `/checkpoint` |
-| Different conventions per developer | Team `project.md` in git; personal `personal.md` local only |
-| Starting from scratch with each stack | `/stack` detects and loads language/framework profiles |
-| Responses in wrong language | `/lang` switches response language per session |
+code-conductor operates at three layers:
+
+**Global core** (`~/.claude/`) — applies to every project on your machine. Enforces the spec-first workflow, token efficiency rules, safety checks, code simplicity rules, and memory conventions. Installed once; always active.
+
+**Project template** (`.claude/`) — lives in your repo and is shared with your team via git. Adds project-specific slash commands, hooks that guard file writes, and a shared memory file for decisions, conventions, and technical debt.
+
+**Dynamic profiles + skills** — loaded at session start by `/stack` based on your detected framework. Each profile defines naming conventions, project structure, standard tooling, idiomatic patterns, and anti-patterns for your specific stack. Skills extend the agent's behavior for cross-cutting concerns like code simplicity and UI/UX.
 
 ---
 
@@ -59,40 +72,68 @@ Re-run the same install command. User-configured files are never overwritten; ag
 
 | Command | Description |
 |---------|-------------|
-| `/checkpoint` | Save decisions, conventions, and debt from this session to memory |
-| `/stack` | Detect project stack and load matching profiles |
-| `/lang [code]` | Switch response language for this session |
+| `/checkpoint` | Read the current session, extract decisions, conventions, and debt, then write them to `project.md` and `personal.md` with a timestamp. Run before `/compact`, after completing a feature, and after key architectural decisions. |
+| `/stack` | Scan manifest files to detect your framework, confirm before loading the matching profile, and cache the result in `project.md` to avoid re-detection next session. |
+| `/lang [code]` | Switch response language for this session. Code identifiers, filenames, and commit messages remain English regardless. |
 
 ### Project (requires `--project` install)
 
 | Command | Description |
 |---------|-------------|
-| `/spec [name]` | Define a feature spec and get approval before planning |
-| `/plan` | Generate an ordered implementation plan with file paths |
-| `/review [file\|dir]` | Review code in three layers: Critical / Important / Suggestion |
-| `/debug [problem]` | Characterize, hypothesize, investigate, fix |
-| `/refactor [file\|module]` | Diagnose complexity and refactor one step at a time |
-| `/test [scope]` | Analyze coverage gaps and write + run tests |
-| `/docs [scope]` | Audit and write inline documentation |
+| `/spec [name]` | Search the codebase first, ask only for missing context, generate a full feature spec, and wait for your approval before any plan is made. |
+| `/plan` | Require an approved spec, map the codebase, and generate an ordered implementation plan with exact file paths, a test list, a commit order, and identified risks. |
+| `/review [file\|dir]` | Review code in three layers — Critical / Important / Suggestion — then deliver a verdict and offer to auto-fix. |
+| `/debug [problem]` | Generate hypotheses ordered by probability, confirm before investigating, use Playwright MCP for visual bugs, and report the root cause with a targeted fix. |
+| `/refactor [file\|module]` | Diagnose complexity, plan ordered changes, apply one step at a time, and verify tests pass after each step. |
+| `/test [scope]` | Analyze coverage gaps, write tests in AAA pattern, add Playwright E2E where applicable, run after confirmation, and report results. |
+| `/docs [scope]` | Audit existing documentation, write inline docs in the correct format for your stack (JSDoc / docstrings / JavaDoc / GoDoc), and preview before writing. |
 
 ---
 
-## Language Support
+## Skills
 
-| Priority | Source | How to set |
-|----------|--------|------------|
-| 1 (highest) | Session | `/lang [code]` |
-| 2 | Project | `language:` in project `CLAUDE.md` |
-| 3 | Personal | `response_language:` in `personal.md` |
-| 4 (default) | Global | English |
+Skills extend agent behavior for cross-cutting concerns that apply regardless of stack.
 
-**Supported codes:** `en` `es` `pt` `fr` `de` `it` `zh` `ja` `ko`
+### code-simplifier — always active
 
-Code identifiers, file names, and commit messages are always English.
+Applied to every piece of code written or reviewed in every session. Enforces:
+
+- No speculative abstractions — solve today's problem only
+- Functions ≤30 lines, doing one thing
+- Flat over nested — guard clauses and early returns
+- Descriptive names — no `Base`, `Abstract`, `Manager`, `Handler`
+- Comments explain why, never what
+
+### ui-ux — frontend projects
+
+Activated automatically when `/stack` loads a frontend stack profile (React, Angular, Next.js, and similar). Enforces:
+
+- Visual hierarchy — every screen has one primary action
+- 4px spacing grid with named tokens (`xs` / `sm` / `md` / `lg` / `xl`)
+- Semantic color tokens as the source of truth
+- Required component states: default, hover, active, disabled, loading, error, empty
+- WCAG AA accessibility baseline (4.5:1 contrast, keyboard nav, focus indicators)
+- Tailwind conventions: design tokens in config, `cva()` for variants, `gap-*` over margin
+
+---
+
+## Hooks
+
+Hooks run automatically at specific points in a Claude Code session. They require no manual setup.
+
+### pre-tool-use
+
+Fires before any file write or create operation. If the target file already exists, it prints a warning showing the file path, line count, and last-modified timestamp, then presents three options: overwrite, edit in place, or cancel. This prevents the agent from silently replacing files you've already configured.
+
+### post-compact
+
+Fires after `/compact`. Reads `project.md`, shows the timestamp of the last `/checkpoint`, and reminds you to run `/checkpoint` if context from this session hasn't been saved yet. Prevents losing decisions and conventions when the context window is compressed.
 
 ---
 
 ## Stack Profiles
+
+Running `/stack` detects your framework from manifest files and loads the matching profile. Each profile defines naming conventions, standard project structure, tooling, idiomatic patterns with examples, and anti-patterns — so the agent never applies Python conventions to a TypeScript file.
 
 | Profile | Detected by |
 |---------|-------------|
@@ -102,7 +143,7 @@ Code identifiers, file names, and commit messages are always English.
 | `java` | `pom.xml`, `build.gradle` |
 | `go` | `go.mod` |
 | `rust` | `Cargo.toml` |
-| `react` | `package.json` → `react` dep (no `next`) |
+| `react` | `package.json` with `react` dependency but no `next` |
 | `angular` | `angular.json` |
 | `nextjs` | `next.config.js` / `next.config.ts` |
 | `nestjs` | `package.json` → `@nestjs/core` |
@@ -123,10 +164,27 @@ project-root/
   .claude/
     memory/
       project.md    ← in git, shared with team
-                       decisions, conventions, debt
+                       decisions, conventions, debt, workarounds
 ```
 
-`/checkpoint` writes to both. `/stack` reads `project.md` to skip re-detection.
+`/checkpoint` writes to both. Run it before `/compact`, after completing a feature, and after any key architectural decision.
+
+`/stack` reads `project.md` to skip re-detection on subsequent sessions.
+
+---
+
+## Language Support
+
+| Priority | Source | How to set |
+|----------|--------|------------|
+| 1 (highest) | Session | `/lang [code]` |
+| 2 | Project | `language:` in project `CLAUDE.md` |
+| 3 | Personal | `response_language:` in `personal.md` |
+| 4 (default) | Global | English |
+
+**Supported codes:** `en` `es` `pt` `fr` `de` `it` `zh` `ja` `ko`
+
+Code identifiers, file names, and commit messages are always English.
 
 ---
 
