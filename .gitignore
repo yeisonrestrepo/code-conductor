@@ -2,3 +2,6 @@
 *.local
 .DS_Store
 Thumbs.db
+.claude/
+docs/
+initial_prompt.xml
