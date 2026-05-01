@@ -21,22 +21,22 @@ AI coding assistants are only as good as the structure you put around them. With
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YOUR_ORG/code-conductor/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.sh | bash
 ```
 
 **Windows (PowerShell):**
 ```powershell
-irm https://raw.githubusercontent.com/YOUR_ORG/code-conductor/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.ps1 | iex
 ```
 
 ### Add to a project
 
 ```bash
 # macOS / Linux
-curl -fsSL https://raw.githubusercontent.com/YOUR_ORG/code-conductor/main/install.sh | bash -s -- --project
+curl -fsSL https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.sh | bash -s -- --project
 
 # Windows
-irm https://raw.githubusercontent.com/YOUR_ORG/code-conductor/main/install.ps1 | iex; .\install.ps1 -Project
+irm https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.ps1 | iex; .\install.ps1 -Project
 ```
 
 ### Flags
