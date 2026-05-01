@@ -1,0 +1,212 @@
+# code-conductor installer — Windows (PowerShell)
+# Usage: irm https://raw.githubusercontent.com/YOUR_ORG/code-conductor/main/install.ps1 | iex
+#        .\install.ps1 -Project        (also install project template)
+#        .\install.ps1 -NoDeps         (skip dependency installation)
+
+param(
+  [switch]$Project,
+  [switch]$NoDeps
+)
+
+$REPO       = "YOUR_ORG/code-conductor"
+$BRANCH     = "main"
+$BASE_URL   = "https://raw.githubusercontent.com/$REPO/$BRANCH"
+$GLOBAL_DIR = "$env:USERPROFILE\.claude"
+$FailedDeps = @()
+
+function Write-Ok   { param($msg) Write-Host "  [OK] $msg" -ForegroundColor Green }
+function Write-Warn { param($msg) Write-Host "  [!!] $msg" -ForegroundColor Yellow }
+function Write-Err  { param($msg) Write-Host "  [XX] $msg" -ForegroundColor Red }
+function Write-Info { param($msg) Write-Host "   ->  $msg" -ForegroundColor Cyan }
+
+Write-Host ""
+Write-Host "  code-conductor installer" -ForegroundColor Cyan
+Write-Host "  ─────────────────────────"
+Write-Host ""
+
+# ── Runtime detection ──────────────────────────────────────────────────────────
+$HasNode   = $false
+$HasPython = $false
+
+$nodePath = Get-Command node -ErrorAction SilentlyContinue
+if ($nodePath) {
+  $nodeVersion = (node --version).TrimStart('v')
+  $major = [int]($nodeVersion.Split('.')[0])
+  if ($major -ge 18) {
+    $HasNode = $true
+    Write-Ok "Node.js $nodeVersion detected"
+  } else {
+    Write-Warn "Node.js $nodeVersion found but version 18+ is required"
+  }
+}
+
+if (Get-Command python3 -ErrorAction SilentlyContinue) {
+  $HasPython = $true
+  Write-Ok "Python 3 detected"
+} elseif (Get-Command python -ErrorAction SilentlyContinue) {
+  $v = (python --version 2>&1)
+  if ($v -match '^Python 3') {
+    $HasPython = $true
+    Write-Ok "Python 3 detected"
+  }
+}
+
+# ── Auto-install Node if missing ────────────────────────────────────────────────
+if (-not $HasNode) {
+  Write-Info "Node.js 18+ not found. Attempting to install via winget..."
+  if (Get-Command winget -ErrorAction SilentlyContinue) {
+    winget install OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements
+    if (Get-Command node -ErrorAction SilentlyContinue) { $HasNode = $true }
+  } else {
+    Write-Warn "winget not found. Install Node.js 18+ manually: https://nodejs.org"
+  }
+}
+
+if (-not $HasNode -and -not $HasPython) {
+  Write-Err "Neither Node.js 18+ nor Python 3 could be installed."
+  Write-Host ""
+  Write-Host "  Please install at least one:"
+  Write-Host "  - Node.js 18+: https://nodejs.org"
+  Write-Host "  - Python 3:    https://python.org"
+  exit 1
+}
+
+# ── Dependency installation ────────────────────────────────────────────────────
+function Install-Dep {
+  param([string]$Name, [string]$Cmd)
+  Write-Info "Installing $Name..."
+  try {
+    Invoke-Expression $Cmd 2>&1 | Out-Null
+    Write-Ok "$Name installed"
+  } catch {
+    Write-Warn "$Name failed — manual install: $Cmd"
+    $script:FailedDeps += "${Name}: ${Cmd}"
+  }
+}
+
+if (-not $NoDeps) {
+  Write-Host ""
+  Write-Info "Installing dependencies..."
+  Write-Host ""
+
+  if ($HasNode) { Install-Dep "claude-mem" "npx claude-mem install" }
+
+  if ($HasNode -and $HasPython) {
+    Install-Dep "ui-ux-pro-max-skill" "npm install -g uipro-cli; uipro init --ai claude --global"
+  } else {
+    Write-Warn "ui-ux-pro-max-skill requires both Node and Python — skipped"
+    $FailedDeps += "ui-ux-pro-max-skill: npm install -g uipro-cli; uipro init --ai claude --global"
+  }
+
+  if (Get-Command claude -ErrorAction SilentlyContinue) {
+    Install-Dep "Playwright MCP" "claude mcp add playwright npx @playwright/mcp@latest"
+    Install-Dep "Superpowers"    "claude plugin install superpowers@claude-plugins-official"
+    Install-Dep "code-simplifier" "claude plugin install code-simplifier@claude-plugins-official"
+  } else {
+    Write-Warn "claude CLI not found — Playwright MCP, Superpowers, and code-simplifier need the Claude Code CLI"
+    $FailedDeps += "Playwright MCP: claude mcp add playwright npx @playwright/mcp@latest"
+    $FailedDeps += "Superpowers: claude plugin install superpowers@claude-plugins-official"
+    $FailedDeps += "code-simplifier: claude plugin install code-simplifier@claude-plugins-official"
+  }
+}
+
+# ── Download helper ────────────────────────────────────────────────────────────
+function Download-File {
+  param([string]$Src, [string]$Dest, [bool]$Overwrite = $true)
+
+  if (-not $Overwrite -and (Test-Path $Dest)) {
+    Write-Info "Skipped (already exists): $Dest"
+    return
+  }
+
+  $dir = Split-Path $Dest -Parent
+  if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+
+  try {
+    Invoke-WebRequest -Uri "$BASE_URL/$Src" -OutFile $Dest -UseBasicParsing
+    Write-Ok "Downloaded: $Dest"
+  } catch {
+    Write-Warn "Failed to download: $Src"
+  }
+}
+
+# ── Install global files ───────────────────────────────────────────────────────
+Write-Host ""
+Write-Info "Installing global Claude files to $GLOBAL_DIR..."
+Write-Host ""
+
+foreach ($sub in "commands", "memory", "skills", "stack-profiles") {
+  New-Item -ItemType Directory -Path "$GLOBAL_DIR\$sub" -Force | Out-Null
+}
+
+# User-configured — skip if exist
+Download-File "global/CLAUDE.md"         "$GLOBAL_DIR\CLAUDE.md"         $false
+Download-File "global/settings.json"      "$GLOBAL_DIR\settings.json"      $false
+Download-File "global/memory/personal.md" "$GLOBAL_DIR\memory\personal.md" $false
+
+# Agent-managed — always overwrite
+Download-File "global/commands/checkpoint.md" "$GLOBAL_DIR\commands\checkpoint.md"
+Download-File "global/commands/stack.md"      "$GLOBAL_DIR\commands\stack.md"
+Download-File "global/commands/lang.md"       "$GLOBAL_DIR\commands\lang.md"
+Download-File "skills/code-simplifier.md"    "$GLOBAL_DIR\skills\code-simplifier.md"
+Download-File "skills/ui-ux.md"              "$GLOBAL_DIR\skills\ui-ux.md"
+
+foreach ($profile in @("_base","_multi-stack","_template","javascript","typescript","python","java","go","rust","react","angular","nextjs","nestjs","django","flask")) {
+  Download-File "stack-profiles/$profile.md" "$GLOBAL_DIR\stack-profiles\$profile.md"
+}
+
+# ── Install project template ───────────────────────────────────────────────────
+if ($Project) {
+  Write-Host ""
+  Write-Info "Installing project template into current directory..."
+  Write-Host ""
+
+  $projDir = ".claude"
+  foreach ($sub in "commands", "hooks", "memory") {
+    New-Item -ItemType Directory -Path "$projDir\$sub" -Force | Out-Null
+  }
+
+  Download-File "project-template/CLAUDE.md"                 "CLAUDE.md"                      $false
+  Download-File "project-template/.claude/settings.json"     "$projDir\settings.json"          $false
+  Download-File "project-template/.claude/memory/project.md" "$projDir\memory\project.md"      $false
+
+  foreach ($cmd in @("spec","plan","review","debug","refactor","test","docs")) {
+    Download-File "project-template/.claude/commands/$cmd.md" "$projDir\commands\$cmd.md"
+  }
+
+  Download-File "project-template/.claude/hooks/pre-tool-use.sh"  "$projDir\hooks\pre-tool-use.sh"
+  Download-File "project-template/.claude/hooks/post-compact.sh"  "$projDir\hooks\post-compact.sh"
+
+  # Update .gitignore
+  $gitignore = ".gitignore"
+  $entry = ".claude/memory/personal.md"
+  if (-not (Test-Path $gitignore) -or -not (Select-String -Path $gitignore -Pattern ([regex]::Escape($entry)) -Quiet)) {
+    Add-Content -Path $gitignore -Value $entry
+    Write-Ok "Added $entry to .gitignore"
+  }
+}
+
+# ── Final report ───────────────────────────────────────────────────────────────
+Write-Host ""
+Write-Host "  ─────────────────────────────────────────"
+Write-Host "  code-conductor installed" -ForegroundColor Green
+Write-Host "  ─────────────────────────────────────────"
+Write-Host ""
+Write-Host "  Global commands (all projects):"
+Write-Host "    /checkpoint  /stack  /lang"
+Write-Host ""
+if ($Project) {
+  Write-Host "  Project commands (this project):"
+  Write-Host "    /spec  /plan  /review  /debug  /refactor  /test  /docs"
+  Write-Host ""
+}
+
+if ($FailedDeps.Count -gt 0) {
+  Write-Host ""
+  Write-Warn "Some items need manual installation:"
+  foreach ($item in $FailedDeps) {
+    Write-Host "    $item"
+  }
+}
+
+Write-Host ""
