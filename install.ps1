@@ -75,10 +75,10 @@ if (-not $HasNode -and -not $HasPython) {
 function Install-Dep {
   param([string]$Name, [string]$Cmd)
   Write-Info "Installing $Name..."
-  try {
-    Invoke-Expression $Cmd 2>&1 | Out-Null
+  Invoke-Expression $Cmd
+  if ($LASTEXITCODE -eq 0) {
     Write-Ok "$Name installed"
-  } catch {
+  } else {
     Write-Warn "$Name failed — manual install: $Cmd"
     $script:FailedDeps += "${Name}: ${Cmd}"
   }
@@ -89,7 +89,7 @@ if (-not $NoDeps) {
   Write-Info "Installing dependencies..."
   Write-Host ""
 
-  if ($HasNode) { Install-Dep "claude-mem" "npx claude-mem install" }
+  if ($HasNode) { Install-Dep "claude-mem" "npx --yes claude-mem install" }
 
   if ($HasNode -and $HasPython) {
     Install-Dep "ui-ux-pro-max-skill" "npm install -g uipro-cli; uipro init --ai claude --global"
@@ -111,7 +111,7 @@ if (-not $NoDeps) {
 }
 
 # ── Download helper ────────────────────────────────────────────────────────────
-function Download-File {
+function Save-RemoteFile {
   param([string]$Src, [string]$Dest, [bool]$Overwrite = $true)
 
   if (-not $Overwrite -and (Test-Path $Dest)) {
@@ -140,19 +140,19 @@ foreach ($sub in "commands", "memory", "skills", "stack-profiles") {
 }
 
 # User-configured — skip if exist
-Download-File "global/CLAUDE.md"         "$GLOBAL_DIR\CLAUDE.md"         $false
-Download-File "global/settings.json"      "$GLOBAL_DIR\settings.json"      $false
-Download-File "global/memory/personal.md" "$GLOBAL_DIR\memory\personal.md" $false
+Save-RemoteFile "global/CLAUDE.md"         "$GLOBAL_DIR\CLAUDE.md"         $false
+Save-RemoteFile "global/settings.json"      "$GLOBAL_DIR\settings.json"      $false
+Save-RemoteFile "global/memory/personal.md" "$GLOBAL_DIR\memory\personal.md" $false
 
 # Agent-managed — always overwrite
-Download-File "global/commands/checkpoint.md" "$GLOBAL_DIR\commands\checkpoint.md"
-Download-File "global/commands/stack.md"      "$GLOBAL_DIR\commands\stack.md"
-Download-File "global/commands/lang.md"       "$GLOBAL_DIR\commands\lang.md"
-Download-File "skills/code-simplifier.md"    "$GLOBAL_DIR\skills\code-simplifier.md"
-Download-File "skills/ui-ux.md"              "$GLOBAL_DIR\skills\ui-ux.md"
+Save-RemoteFile "global/commands/checkpoint.md" "$GLOBAL_DIR\commands\checkpoint.md"
+Save-RemoteFile "global/commands/stack.md"      "$GLOBAL_DIR\commands\stack.md"
+Save-RemoteFile "global/commands/lang.md"       "$GLOBAL_DIR\commands\lang.md"
+Save-RemoteFile "skills/code-simplifier.md"    "$GLOBAL_DIR\skills\code-simplifier.md"
+Save-RemoteFile "skills/ui-ux.md"              "$GLOBAL_DIR\skills\ui-ux.md"
 
-foreach ($profile in @("_base","_multi-stack","_template","javascript","typescript","python","java","go","rust","react","angular","nextjs","nestjs","django","flask")) {
-  Download-File "stack-profiles/$profile.md" "$GLOBAL_DIR\stack-profiles\$profile.md"
+foreach ($stackProfile in @("_base","_multi-stack","_template","javascript","typescript","python","java","go","rust","react","angular","nextjs","nestjs","django","flask")) {
+  Save-RemoteFile "stack-profiles/$stackProfile.md" "$GLOBAL_DIR\stack-profiles\$stackProfile.md"
 }
 
 # ── Install project template ───────────────────────────────────────────────────
@@ -166,16 +166,16 @@ if ($Project) {
     New-Item -ItemType Directory -Path "$projDir\$sub" -Force | Out-Null
   }
 
-  Download-File "project-template/CLAUDE.md"                 "CLAUDE.md"                      $false
-  Download-File "project-template/.claude/settings.json"     "$projDir\settings.json"          $false
-  Download-File "project-template/.claude/memory/project.md" "$projDir\memory\project.md"      $false
+  Save-RemoteFile "project-template/CLAUDE.md"                 "CLAUDE.md"                      $false
+  Save-RemoteFile "project-template/.claude/settings.json"     "$projDir\settings.json"          $false
+  Save-RemoteFile "project-template/.claude/memory/project.md" "$projDir\memory\project.md"      $false
 
   foreach ($cmd in @("spec","plan","review","debug","refactor","test","docs")) {
-    Download-File "project-template/.claude/commands/$cmd.md" "$projDir\commands\$cmd.md"
+    Save-RemoteFile "project-template/.claude/commands/$cmd.md" "$projDir\commands\$cmd.md"
   }
 
-  Download-File "project-template/.claude/hooks/pre-tool-use.sh"  "$projDir\hooks\pre-tool-use.sh"
-  Download-File "project-template/.claude/hooks/post-compact.sh"  "$projDir\hooks\post-compact.sh"
+  Save-RemoteFile "project-template/.claude/hooks/pre-tool-use.sh"  "$projDir\hooks\pre-tool-use.sh"
+  Save-RemoteFile "project-template/.claude/hooks/post-compact.sh"  "$projDir\hooks\post-compact.sh"
 
   # Update .gitignore
   $gitignore = ".gitignore"

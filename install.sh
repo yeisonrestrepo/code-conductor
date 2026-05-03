@@ -102,7 +102,7 @@ install_dep() {
   local name="$1"
   local cmd="$2"
   info "Installing ${name}..."
-  if eval "$cmd" &>/dev/null; then
+  if eval "$cmd"; then
     ok "${name} installed"
   else
     warn "${name} failed — manual install: ${cmd}"
@@ -115,7 +115,7 @@ if [ "$SKIP_DEPS" = false ]; then
   info "Installing dependencies..."
   echo ""
 
-  [ "$HAS_NODE" = true ] && install_dep "claude-mem" "npx claude-mem install"
+  [ "$HAS_NODE" = true ] && install_dep "claude-mem" "npx --yes claude-mem install"
 
   if [ "$HAS_NODE" = true ] && [ "$HAS_PYTHON" = true ]; then
     install_dep "ui-ux-pro-max-skill" "npm install -g uipro-cli && uipro init --ai claude --global"
