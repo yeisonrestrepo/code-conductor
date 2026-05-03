@@ -6,7 +6,7 @@
 
 set -euo pipefail
 
-REPO="YOUR_ORG/code-conductor"
+REPO="yeisonrestrepo/code-conductor"
 BRANCH="main"
 BASE_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
 GLOBAL_DIR="${HOME}/.claude"
