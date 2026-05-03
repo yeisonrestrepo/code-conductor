@@ -36,7 +36,7 @@ irm https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install
 curl -fsSL https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.sh | bash -s -- --project
 
 # Windows
-irm https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.ps1 | iex; .\install.ps1 -Project
+& ([ScriptBlock]::Create((irm https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.ps1))) -Project
 ```
 
 ### Flags

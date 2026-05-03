@@ -1,7 +1,7 @@
 # code-conductor installer — Windows (PowerShell)
-# Usage: irm https://raw.githubusercontent.com/YOUR_ORG/code-conductor/main/install.ps1 | iex
-#        .\install.ps1 -Project        (also install project template)
-#        .\install.ps1 -NoDeps         (skip dependency installation)
+# Usage: irm https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.ps1 | iex
+#        & ([ScriptBlock]::Create((irm https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.ps1))) -Project
+#        & ([ScriptBlock]::Create((irm https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.ps1))) -NoDeps
 
 param(
   [switch]$Project,
