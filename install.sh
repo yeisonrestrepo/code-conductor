@@ -118,10 +118,10 @@ if [ "$SKIP_DEPS" = false ]; then
   [ "$HAS_NODE" = true ] && install_dep "claude-mem" "npx --yes claude-mem install"
 
   if [ "$HAS_NODE" = true ] && [ "$HAS_PYTHON" = true ]; then
-    install_dep "ui-ux-pro-max-skill" "npm install -g uipro-cli && uipro init --ai claude --global"
+    install_dep "ui-ux-pro-max-skill" "npm install -g uipro-cli && uipro init --ai claude"
   else
     warn "ui-ux-pro-max-skill requires both Node and Python — skipped"
-    FAILED_DEPS+=("ui-ux-pro-max-skill: npm install -g uipro-cli && uipro init --ai claude --global")
+    FAILED_DEPS+=("ui-ux-pro-max-skill: npm install -g uipro-cli && uipro init --ai claude")
   fi
 
   if command -v claude &>/dev/null; then
