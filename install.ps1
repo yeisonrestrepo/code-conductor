@@ -89,13 +89,15 @@ if (-not $NoDeps) {
   Write-Info "Installing dependencies..."
   Write-Host ""
 
-  if ($HasNode) { Install-Dep "claude-mem" "npx --yes claude-mem install" }
+  # claude-mem uses tree-sitter which requires native compilation — fails on Windows without build tools
+  Write-Warn "claude-mem skipped on Windows (tree-sitter native build fails without Visual C++ Build Tools)"
+  $FailedDeps += "claude-mem: install in WSL or run: npm install -g windows-build-tools, then: npx --yes claude-mem install"
 
   if ($HasNode -and $HasPython) {
-    Install-Dep "ui-ux-pro-max-skill" "npm install -g uipro-cli; uipro init --ai claude --global"
+    Install-Dep "ui-ux-pro-max-skill" "npm install -g uipro-cli; uipro init --ai claude"
   } else {
     Write-Warn "ui-ux-pro-max-skill requires both Node and Python — skipped"
-    $FailedDeps += "ui-ux-pro-max-skill: npm install -g uipro-cli; uipro init --ai claude --global"
+    $FailedDeps += "ui-ux-pro-max-skill: npm install -g uipro-cli; uipro init --ai claude"
   }
 
   if (Get-Command claude -ErrorAction SilentlyContinue) {
