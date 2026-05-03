@@ -89,9 +89,39 @@ if (-not $NoDeps) {
   Write-Info "Installing dependencies..."
   Write-Host ""
 
-  # claude-mem uses tree-sitter which requires native compilation — fails on Windows without build tools
-  Write-Warn "claude-mem skipped on Windows (tree-sitter native build fails without Visual C++ Build Tools)"
-  $FailedDeps += "claude-mem: install in WSL or run: npm install -g windows-build-tools, then: npx --yes claude-mem install"
+  if ($HasNode) {
+    Write-Info "Installing claude-mem..."
+
+    # Attempt 1 — run via cmd.exe to bypass PowerShell job-object restrictions that break bun
+    cmd /c "npx --yes claude-mem install"
+    if ($LASTEXITCODE -eq 0) {
+      Write-Ok "claude-mem installed"
+    } else {
+      # Attempt 2 — auto-install Visual C++ Build Tools (required by tree-sitter) then retry
+      Write-Info "claude-mem needs Visual C++ Build Tools — installing via winget (this may take a few minutes)..."
+      if (Get-Command winget -ErrorAction SilentlyContinue) {
+        winget install Microsoft.VisualStudio.2022.BuildTools `
+          --silent --accept-source-agreements --accept-package-agreements `
+          --override "--quiet --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
+        if ($LASTEXITCODE -eq 0) {
+          Write-Info "Retrying claude-mem install..."
+          cmd /c "npx --yes claude-mem install"
+          if ($LASTEXITCODE -eq 0) {
+            Write-Ok "claude-mem installed"
+          } else {
+            Write-Warn "claude-mem failed after build tools install — manual install: npx --yes claude-mem install"
+            $script:FailedDeps += "claude-mem: npx --yes claude-mem install"
+          }
+        } else {
+          Write-Warn "Visual C++ Build Tools install failed — manual install: npx --yes claude-mem install"
+          $script:FailedDeps += "claude-mem: npx --yes claude-mem install"
+        }
+      } else {
+        Write-Warn "winget not found — manual install: npx --yes claude-mem install"
+        $script:FailedDeps += "claude-mem: npx --yes claude-mem install"
+      }
+    }
+  }
 
   if ($HasNode -and $HasPython) {
     Install-Dep "ui-ux-pro-max-skill" "npm install -g uipro-cli; uipro init --ai claude"
