@@ -8,6 +8,7 @@ Keep the main context clean. Raw file contents, grep output, and intermediate da
 **Condition:** Task requires reading 3+ files to answer one question, or codebase exploration precedes implementation.
 
 ```javascript
+// Use the Agent tool with these parameters:
 Agent({
   subagent_type: "Explore",
   description: "<10-word description of the lookup>",
@@ -21,8 +22,9 @@ Agent({
 Send both Agent calls in a single message so they run in parallel:
 
 ```javascript
-Agent({ description: "Task A", prompt: "..." })
-Agent({ description: "Task B", prompt: "..." })
+// Use the Agent tool twice in the same message — they run in parallel:
+Agent({ description: "Task A", prompt: "... Return a summary of ≤200 words." })
+Agent({ description: "Task B", prompt: "... Return a summary of ≤200 words." })
 ```
 
 ## Output Contract

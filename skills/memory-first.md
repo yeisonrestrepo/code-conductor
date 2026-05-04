@@ -7,12 +7,13 @@ Follow this lookup chain in strict order before reading any file, running any se
 ### 1. Project Memory
 Check `.claude/memory/project.md` and the `claude-mem` index.
 
-Use Grep on project.md first:
+Use the Grep tool to check project.md first:
+
 ```
-Grep "<keyword>" ".claude/memory/project.md"
+Grep pattern="<keyword>" path=".claude/memory/project.md"
 ```
 
-If the answer is there, use it. Do not proceed to step 2.
+If Grep returns matches, use that information and stop. If no matches, proceed to step 2.
 
 ### 2. Graphify Graph
 For structural or relational questions, query the code graph.
@@ -27,7 +28,7 @@ For structural or relational questions, query the code graph.
 graphify query "<your question>"
 ```
 
-Skip this step if `graphify` is not installed or returns an error. Fall through to step 3.
+Skip this step if `graphify` is not installed or the command returns no results. Proceed to step 3.
 
 **Do not use for:** literal string patterns, variable names, import statements.
 
