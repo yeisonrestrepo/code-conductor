@@ -18,6 +18,19 @@ Never write code without an approved spec. Never start implementing without an a
 - Never read a full file over 150 lines — use line offsets and limits
 - One tool call, one purpose — no exploratory reads during implementation
 
+## Orchestrator Protocol
+
+Before reading any file or spawning any search, classify the task and walk this chain. Stop at the first step that answers the question.
+
+1. **Memory** — check `claude-mem` / `.claude/memory/project.md`. If the answer is there, stop.
+2. **Graph** — structural question? Run `graphify query "<question>"` if `graphify` is installed. Stop.
+3. **Grep / Glob** — pattern search? Use `Grep` or `Glob` inline. Stop.
+4. **Explore sub-agent** — need 3+ files to answer one question? Spawn an `Explore` sub-agent. It returns a ≤200-word summary. Main context receives only the summary. Stop.
+5. **Parallel agents** — 2+ independent implementation tasks? Spawn parallel agents in worktrees. Each returns a ≤200-word summary.
+6. **Targeted read** — last resort. Always use `offset` + `limit`. Max 150 lines per call.
+
+Never jump to a later step if an earlier one can answer the question.
+
 ## Safety
 
 - Check file exists before creating — use the pre-tool-use hook
@@ -71,6 +84,9 @@ Always tag responses:
 
 - `code-simplifier` — always active, loaded automatically
 - `ui-ux` — activate via `/stack` when frontend frameworks are detected
+- `verbosity` — always active; reads level from `memory/verbosity.md` (default: MIN)
+- `memory-first` — always active; enforces the orchestrator lookup chain
+- `agent-delegation` — always active; governs when and how to spawn sub-agents
 
 ## Loaded Profiles
 
