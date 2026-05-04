@@ -1,3 +1,4 @@
+.worktrees/
 .claude/memory/personal.md
 *.local
 .DS_Store
