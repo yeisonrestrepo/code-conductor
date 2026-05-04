@@ -3,6 +3,7 @@
 # Usage: curl -fsSL https://raw.githubusercontent.com/YOUR_ORG/code-conductor/main/install.sh | bash
 #        bash install.sh --project     (also install project template)
 #        bash install.sh --no-deps     (skip dependency installation)
+#        bash install.sh --verbosity MIN|INFO|VERBOSE  (response verbosity, default: MIN)
 
 set -euo pipefail
 
@@ -13,12 +14,21 @@ GLOBAL_DIR="${HOME}/.claude"
 INSTALL_PROJECT=false
 SKIP_DEPS=false
 FAILED_DEPS=()
+VERBOSITY="MIN"
 
 # ── Parse flags ──────────────────────────────────────────────────────────────
 for arg in "$@"; do
   case $arg in
     --project|-project) INSTALL_PROJECT=true ;;
     --no-deps)           SKIP_DEPS=true ;;
+    --verbosity=*)       VERBOSITY="${arg#*=}" ;;
+    --verbosity)         _NEXT_VERB=true ;;
+    *)
+      if [ "${_NEXT_VERB:-false}" = true ]; then
+        VERBOSITY="$arg"
+        _NEXT_VERB=false
+      fi
+      ;;
   esac
 done
 
@@ -28,6 +38,11 @@ ok()   { echo -e "${GREEN}✓${NC} $1"; }
 warn() { echo -e "${YELLOW}⚠${NC}  $1"; }
 err()  { echo -e "${RED}✗${NC} $1"; }
 info() { echo -e "${BLUE}→${NC} $1"; }
+
+case $VERBOSITY in
+  MIN|INFO|VERBOSE) ;;
+  *) warn "Unknown verbosity '${VERBOSITY}', defaulting to MIN"; VERBOSITY="MIN" ;;
+esac
 
 echo ""
 echo "  code-conductor installer"
@@ -53,6 +68,18 @@ fi
 if command -v python3 &>/dev/null; then
   HAS_PYTHON=true
   ok "Python 3 detected"
+fi
+
+HAS_PYTHON310=false
+if [ "$HAS_PYTHON" = true ]; then
+  _PY_MINOR=$(python3 -c "import sys; print(sys.version_info.minor)" 2>/dev/null || echo "0")
+  _PY_MAJOR=$(python3 -c "import sys; print(sys.version_info.major)" 2>/dev/null || echo "3")
+  if [ "$_PY_MAJOR" -ge 3 ] && [ "$_PY_MINOR" -ge 10 ]; then
+    HAS_PYTHON310=true
+    ok "Python 3.${_PY_MINOR} (>=3.10) — Graphify eligible"
+  else
+    warn "Python 3.${_PY_MINOR} found but Graphify requires 3.10+"
+  fi
 fi
 
 # ── Auto-install Node if missing ───────────────────────────────────────────────
@@ -128,7 +155,20 @@ if [ "$SKIP_DEPS" = false ]; then
     install_dep "Playwright MCP" "claude mcp add playwright npx @playwright/mcp@latest"
     install_dep "Superpowers" "claude plugin install superpowers@claude-plugins-official"
     install_dep "code-simplifier" "claude plugin install code-simplifier@claude-plugins-official"
+  fi
+
+  if [ "$HAS_PYTHON310" = true ]; then
+    if command -v pipx &>/dev/null; then
+      install_dep "Graphify" "pipx install graphifyy && graphify install"
+    else
+      install_dep "Graphify" "pip install graphifyy && graphify install"
+    fi
   else
+    warn "Graphify requires Python 3.10+ — skipped"
+    FAILED_DEPS+=("Graphify: pipx install graphifyy && graphify install")
+  fi
+
+  if ! command -v claude &>/dev/null; then
     warn "claude CLI not found — Playwright MCP, Superpowers, and code-simplifier need the Claude Code CLI"
     FAILED_DEPS+=(
       "Playwright MCP: claude mcp add playwright npx @playwright/mcp@latest"
@@ -175,10 +215,16 @@ download "global/commands/stack.md"      "${GLOBAL_DIR}/commands/stack.md"
 download "global/commands/lang.md"       "${GLOBAL_DIR}/commands/lang.md"
 download "skills/code-simplifier.md"    "${GLOBAL_DIR}/skills/code-simplifier.md"
 download "skills/ui-ux.md"              "${GLOBAL_DIR}/skills/ui-ux.md"
+download "skills/verbosity.md"        "${GLOBAL_DIR}/skills/verbosity.md"
+download "skills/memory-first.md"     "${GLOBAL_DIR}/skills/memory-first.md"
+download "skills/agent-delegation.md" "${GLOBAL_DIR}/skills/agent-delegation.md"
 
 for profile in _base _multi-stack _template javascript typescript python java go rust react angular nextjs nestjs django flask; do
   download "stack-profiles/${profile}.md" "${GLOBAL_DIR}/stack-profiles/${profile}.md"
 done
+
+echo "VERBOSITY: ${VERBOSITY}" > "${GLOBAL_DIR}/memory/verbosity.md"
+ok "Verbosity set to ${VERBOSITY}"
 
 # ── Install project template ───────────────────────────────────────────────────
 if [ "$INSTALL_PROJECT" = true ]; then
@@ -201,6 +247,11 @@ if [ "$INSTALL_PROJECT" = true ]; then
   download "project-template/.claude/hooks/post-compact.sh"  "${PROJ_DIR}/hooks/post-compact.sh"
 
   chmod +x "${PROJ_DIR}/hooks/pre-tool-use.sh" "${PROJ_DIR}/hooks/post-compact.sh"
+
+  if command -v graphify &>/dev/null && command -v claude &>/dev/null; then
+    install_dep "Graphify project graph" \
+      "graphify . && graphify hook install && claude mcp add graphify 'python -m graphify.serve graphify-out/graph.json'"
+  fi
 
   # Update .gitignore
   GITIGNORE=".gitignore"
