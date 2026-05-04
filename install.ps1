@@ -2,10 +2,13 @@
 # Usage: irm https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.ps1 | iex
 #        & ([ScriptBlock]::Create((irm https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.ps1))) -Project
 #        & ([ScriptBlock]::Create((irm https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.ps1))) -NoDeps
+#        & ([ScriptBlock]::Create((irm https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.ps1))) -Verbosity INFO
 
 param(
   [switch]$Project,
-  [switch]$NoDeps
+  [switch]$NoDeps,
+  [ValidateSet("MIN","INFO","VERBOSE")]
+  [string]$Verbosity = "MIN"
 )
 
 $REPO       = "yeisonrestrepo/code-conductor"
@@ -48,6 +51,21 @@ if (Get-Command python3 -ErrorAction SilentlyContinue) {
   if ($v -match '^Python 3') {
     $HasPython = $true
     Write-Ok "Python 3 detected"
+  }
+}
+
+$HasPython310 = $false
+if ($HasPython) {
+  $pyCmd = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
+  $pyVer = & $pyCmd -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>$null
+  if ($pyVer) {
+    $parts = $pyVer.Split('.')
+    if ([int]$parts[0] -ge 3 -and [int]$parts[1] -ge 10) {
+      $HasPython310 = $true
+      Write-Ok "Python $pyVer (>=3.10) — Graphify eligible"
+    } else {
+      Write-Warn "Python $pyVer found but Graphify requires 3.10+"
+    }
   }
 }
 
@@ -140,6 +158,17 @@ if (-not $NoDeps) {
     $FailedDeps += "Superpowers: claude plugin install superpowers@claude-plugins-official"
     $FailedDeps += "code-simplifier: claude plugin install code-simplifier@claude-plugins-official"
   }
+
+  if ($HasPython310) {
+    if (Get-Command pipx -ErrorAction SilentlyContinue) {
+      Install-Dep "Graphify" "pipx install graphifyy; if (`$LASTEXITCODE -eq 0) { graphify install }"
+    } else {
+      Install-Dep "Graphify" "pip install graphifyy; if (`$LASTEXITCODE -eq 0) { graphify install }"
+    }
+  } else {
+    Write-Warn "Graphify requires Python 3.10+ — skipped"
+    $FailedDeps += "Graphify: pipx install graphifyy; graphify install"
+  }
 }
 
 # ── Download helper ────────────────────────────────────────────────────────────
@@ -182,10 +211,16 @@ Save-RemoteFile "global/commands/stack.md"      "$GLOBAL_DIR\commands\stack.md"
 Save-RemoteFile "global/commands/lang.md"       "$GLOBAL_DIR\commands\lang.md"
 Save-RemoteFile "skills/code-simplifier.md"    "$GLOBAL_DIR\skills\code-simplifier.md"
 Save-RemoteFile "skills/ui-ux.md"              "$GLOBAL_DIR\skills\ui-ux.md"
+Save-RemoteFile "skills/verbosity.md"        "$GLOBAL_DIR\skills\verbosity.md"
+Save-RemoteFile "skills/memory-first.md"     "$GLOBAL_DIR\skills\memory-first.md"
+Save-RemoteFile "skills/agent-delegation.md" "$GLOBAL_DIR\skills\agent-delegation.md"
 
 foreach ($stackProfile in @("_base","_multi-stack","_template","javascript","typescript","python","java","go","rust","react","angular","nextjs","nestjs","django","flask")) {
   Save-RemoteFile "stack-profiles/$stackProfile.md" "$GLOBAL_DIR\stack-profiles\$stackProfile.md"
 }
+
+"VERBOSITY: $Verbosity" | Set-Content "$GLOBAL_DIR\memory\verbosity.md" -Encoding utf8
+Write-Ok "Verbosity set to $Verbosity"
 
 # ── Install project template ───────────────────────────────────────────────────
 if ($Project) {
@@ -208,6 +243,10 @@ if ($Project) {
 
   Save-RemoteFile "project-template/.claude/hooks/pre-tool-use.sh"  "$projDir\hooks\pre-tool-use.sh"
   Save-RemoteFile "project-template/.claude/hooks/post-compact.sh"  "$projDir\hooks\post-compact.sh"
+
+  if ((Get-Command graphify -ErrorAction SilentlyContinue) -and (Get-Command claude -ErrorAction SilentlyContinue)) {
+    Install-Dep "Graphify project graph" "graphify .; graphify hook install; claude mcp add graphify 'python -m graphify.serve graphify-out/graph.json'"
+  }
 
   # Update .gitignore
   $gitignore = ".gitignore"
