@@ -56,8 +56,9 @@ if (Get-Command python3 -ErrorAction SilentlyContinue) {
 
 $HasPython310 = $false
 if ($HasPython) {
-  $pyCmd = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
-  $pyVer = & $pyCmd -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>$null
+  $pyCmd = "python"
+  if (Get-Command python3 -ErrorAction SilentlyContinue) { $pyCmd = "python3" }
+  $pyVer = & $pyCmd -c "import sys; print(str(sys.version_info.major) + '.' + str(sys.version_info.minor))" 2>$null
   if ($pyVer) {
     $parts = $pyVer.Split('.')
     if ([int]$parts[0] -ge 3 -and [int]$parts[1] -ge 10) {
