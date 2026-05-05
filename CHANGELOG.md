@@ -7,6 +7,15 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.2.0] - 2026-05-05
+
+### Changed
+
+- **Command rename:** all 10 commands now use a `cc-` prefix (`/cc-spec`, `/cc-plan`, `/cc-review`, `/cc-debug`, `/cc-refactor`, `/cc-test`, `/cc-docs`, `/cc-checkpoint`, `/cc-stack`, `/cc-lang`) to avoid conflicts with built-in Claude Code commands that share the same names (`/plan`, `/review`, `/debug`, etc.)
+- All internal cross-references, both installers, `global/CLAUDE.md`, and `README.md` updated to reflect the new names
+
+---
+
 ## [1.1.1] - 2026-05-04
 
 ### Fixed

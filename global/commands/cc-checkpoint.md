@@ -22,4 +22,4 @@ Identify and extract:
 - What was saved to project.md (2–3 bullets)
 - What was saved to personal.md (1–2 bullets)
 
-Suggest running `/checkpoint` automatically: before `/compact`, after completing a feature, after any key architectural decision.
+Suggest running `/cc-checkpoint` automatically: before `/compact`, after completing a feature, after any key architectural decision.

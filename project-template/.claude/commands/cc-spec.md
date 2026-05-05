@@ -46,7 +46,7 @@ Generate a spec with these sections:
 
 ---
 
-Wait for explicit approval before proceeding to `/plan`.
+Wait for explicit approval before proceeding to `/cc-plan`.
 
 Once approved, append a summary to `.claude/memory/project.md` under:
 `## Spec: [name] [YYYY-MM-DD]`

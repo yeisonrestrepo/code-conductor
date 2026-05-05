@@ -3,7 +3,7 @@ description: "(Conductor) Map implementation steps from an approved spec"
 ---
 
 Require an approved spec before starting. If no spec is in `.claude/memory/project.md` or in the recent conversation, stop and say:
-"No approved spec found. Run `/spec [name]` first."
+"No approved spec found. Run `/cc-spec [name]` first."
 
 Read `.claude/memory/project.md` and this project's `CLAUDE.md` before doing anything else.
 

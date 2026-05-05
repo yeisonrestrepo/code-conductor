@@ -224,9 +224,9 @@ Save-RemoteFile "global/settings.json"      "$GLOBAL_DIR\settings.json"      $fa
 Save-RemoteFile "global/memory/personal.md" "$GLOBAL_DIR\memory\personal.md" $false
 
 # Agent-managed -- always overwrite
-Save-RemoteFile "global/commands/checkpoint.md" "$GLOBAL_DIR\commands\checkpoint.md"
-Save-RemoteFile "global/commands/stack.md"      "$GLOBAL_DIR\commands\stack.md"
-Save-RemoteFile "global/commands/lang.md"       "$GLOBAL_DIR\commands\lang.md"
+Save-RemoteFile "global/commands/cc-checkpoint.md" "$GLOBAL_DIR\commands\cc-checkpoint.md"
+Save-RemoteFile "global/commands/cc-stack.md"      "$GLOBAL_DIR\commands\cc-stack.md"
+Save-RemoteFile "global/commands/cc-lang.md"       "$GLOBAL_DIR\commands\cc-lang.md"
 Save-RemoteFile "skills/code-simplifier.md"    "$GLOBAL_DIR\skills\code-simplifier.md"
 Save-RemoteFile "skills/ui-ux.md"              "$GLOBAL_DIR\skills\ui-ux.md"
 Save-RemoteFile "skills/verbosity.md"        "$GLOBAL_DIR\skills\verbosity.md"
@@ -255,7 +255,7 @@ if ($Project) {
   Save-RemoteFile "project-template/.claude/settings.json"     "$projDir\settings.json"          $false
   Save-RemoteFile "project-template/.claude/memory/project.md" "$projDir\memory\project.md"      $false
 
-  foreach ($cmd in @("spec","plan","review","debug","refactor","test","docs")) {
+  foreach ($cmd in @("cc-spec","cc-plan","cc-review","cc-debug","cc-refactor","cc-test","cc-docs")) {
     Save-RemoteFile "project-template/.claude/commands/$cmd.md" "$projDir\commands\$cmd.md"
   }
 
@@ -290,11 +290,11 @@ Write-Host "  To update: re-run the install command"
 Write-Host "  Changelog: https://github.com/yeisonrestrepo/code-conductor/blob/main/CHANGELOG.md"
 Write-Host ""
 Write-Host "  Global commands (all projects):"
-Write-Host "    /checkpoint  /stack  /lang"
+Write-Host "    /cc-checkpoint  /cc-stack  /cc-lang"
 Write-Host ""
 if ($Project) {
   Write-Host "  Project commands (this project):"
-  Write-Host "    /spec  /plan  /review  /debug  /refactor  /test  /docs"
+  Write-Host "    /cc-spec  /cc-plan  /cc-review  /cc-debug  /cc-refactor  /cc-test  /cc-docs"
   Write-Host ""
 }
 

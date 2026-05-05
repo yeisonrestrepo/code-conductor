@@ -220,9 +220,9 @@ download "global/settings.json"        "${GLOBAL_DIR}/settings.json"        fals
 download "global/memory/personal.md"   "${GLOBAL_DIR}/memory/personal.md"   false
 
 # Agent-managed files — always overwrite
-download "global/commands/checkpoint.md" "${GLOBAL_DIR}/commands/checkpoint.md"
-download "global/commands/stack.md"      "${GLOBAL_DIR}/commands/stack.md"
-download "global/commands/lang.md"       "${GLOBAL_DIR}/commands/lang.md"
+download "global/commands/cc-checkpoint.md" "${GLOBAL_DIR}/commands/cc-checkpoint.md"
+download "global/commands/cc-stack.md"      "${GLOBAL_DIR}/commands/cc-stack.md"
+download "global/commands/cc-lang.md"       "${GLOBAL_DIR}/commands/cc-lang.md"
 download "skills/code-simplifier.md"    "${GLOBAL_DIR}/skills/code-simplifier.md"
 download "skills/ui-ux.md"              "${GLOBAL_DIR}/skills/ui-ux.md"
 download "skills/verbosity.md"        "${GLOBAL_DIR}/skills/verbosity.md"
@@ -249,7 +249,7 @@ if [ "$INSTALL_PROJECT" = true ]; then
   download "project-template/.claude/settings.json"      "${PROJ_DIR}/settings.json"            false
   download "project-template/.claude/memory/project.md"  "${PROJ_DIR}/memory/project.md"        false
 
-  for cmd in spec plan review debug refactor test docs; do
+  for cmd in cc-spec cc-plan cc-review cc-debug cc-refactor cc-test cc-docs; do
     download "project-template/.claude/commands/${cmd}.md" "${PROJ_DIR}/commands/${cmd}.md"
   done
 
@@ -282,11 +282,11 @@ echo "  code-conductor installed"
 echo "  ─────────────────────────────────────────"
 echo ""
 echo "  Global commands (all projects):"
-echo "    /checkpoint  /stack  /lang"
+echo "    /cc-checkpoint  /cc-stack  /cc-lang"
 echo ""
 if [ "$INSTALL_PROJECT" = true ]; then
   echo "  Project commands (this project):"
-  echo "    /spec  /plan  /review  /debug  /refactor  /test  /docs"
+  echo "    /cc-spec  /cc-plan  /cc-review  /cc-debug  /cc-refactor  /cc-test  /cc-docs"
   echo ""
 fi
 

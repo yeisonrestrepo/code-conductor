@@ -6,8 +6,8 @@ Applies to every project on this machine. Project CLAUDE.md adds project-specifi
 
 Always follow this sequence. No exceptions.
 
-1. `/spec` — define the problem and wait for approval
-2. `/plan` — map the implementation and wait for approval
+1. `/cc-spec` — define the problem and wait for approval
+2. `/cc-plan` — map the implementation and wait for approval
 3. Implement — one step at a time, confirm between steps unless told otherwise
 
 Never write code without an approved spec. Never start implementing without an approved plan.
@@ -51,19 +51,19 @@ The code-simplifier skill is always active. Apply its rules to every change:
 ## Language
 
 - Default: English (responses + code comments + identifiers)
-- Switch: `/lang [code]` changes response language for the session
+- Switch: `/cc-lang [code]` changes response language for the session
 - Code identifiers, file names, and commit messages are always English
 - Supported codes: en es pt fr de it zh ja ko
 
 ## Stack Detection
 
-Auto-run `/stack` at the start of every session. Confirm before loading any stack profile. If the stack is already in project.md memory, load from there and ask if anything changed.
+Auto-run `/cc-stack` at the start of every session. Confirm before loading any stack profile. If the stack is already in project.md memory, load from there and ask if anything changed.
 
 ## Memory
 
 - `project.md` — in git, shared with the team. Decisions, conventions, debt, workarounds.
 - `personal.md` — local only, never committed. Developer preferences, personal shortcuts.
-- Run `/checkpoint` before `/compact`, after feature completion, after key architectural decisions.
+- Run `/cc-checkpoint` before `/compact`, after feature completion, after key architectural decisions.
 
 ## Delegation
 
@@ -83,11 +83,11 @@ Always tag responses:
 ## Active Skills
 
 - `code-simplifier` — always active, loaded automatically
-- `ui-ux` — activate via `/stack` when frontend frameworks are detected
+- `ui-ux` — activate via `/cc-stack` when frontend frameworks are detected
 - `verbosity` — always active; reads level from `memory/verbosity.md` (default: MIN)
 - `memory-first` — always active; enforces the orchestrator lookup chain
 - `agent-delegation` — always active; governs when and how to spawn sub-agents
 
 ## Loaded Profiles
 
-Stack profiles are loaded dynamically by `/stack`. They define conventions for your specific language and framework. Never apply one language's conventions to another.
+Stack profiles are loaded dynamically by `/cc-stack`. They define conventions for your specific language and framework. Never apply one language's conventions to another.
