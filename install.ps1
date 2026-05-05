@@ -1,4 +1,4 @@
-﻿# code-conductor installer — Windows (PowerShell)
+# code-conductor installer -- Windows (PowerShell)
 # Usage: irm https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.ps1 | iex
 #        & ([ScriptBlock]::Create((irm https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.ps1))) -Project
 #        & ([ScriptBlock]::Create((irm https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.ps1))) -NoDeps
@@ -24,7 +24,7 @@ function Write-Info { param($msg) Write-Host "   ->  $msg" -ForegroundColor Cyan
 
 Write-Host ""
 Write-Host "  code-conductor installer" -ForegroundColor Cyan
-Write-Host "  ─────────────────────────"
+Write-Host "  -------------------------"
 Write-Host ""
 
 $LocalVersionFile = "$GLOBAL_DIR\memory\conductor-version.md"
@@ -34,11 +34,11 @@ catch { $RemoteVersion = $null }
 
 if ($RemoteVersion) { Write-Info "v$RemoteVersion" }
 if ($LocalVersion -and $RemoteVersion -and $LocalVersion -ne $RemoteVersion) {
-  Write-Warn "Updating $LocalVersion → $RemoteVersion"
+  Write-Warn "Updating $LocalVersion -> $RemoteVersion"
 }
 if ($RemoteVersion -or $LocalVersion) { Write-Host "" }
 
-# ── Runtime detection ──────────────────────────────────────────────────────────
+# -- Runtime detection ----------------------------------------------------------
 $HasNode   = $false
 $HasPython = $false
 
@@ -74,14 +74,14 @@ if ($HasPython) {
     $parts = $pyVer.Split('.')
     if ([int]$parts[0] -ge 3 -and [int]$parts[1] -ge 10) {
       $HasPython310 = $true
-      Write-Ok "Python $pyVer (>=3.10) — Graphify eligible"
+      Write-Ok "Python $pyVer (>=3.10) -- Graphify eligible"
     } else {
       Write-Warn "Python $pyVer found but Graphify requires 3.10+"
     }
   }
 }
 
-# ── Auto-install Node if missing ────────────────────────────────────────────────
+# -- Auto-install Node if missing ------------------------------------------------
 if (-not $HasNode) {
   Write-Info "Node.js 18+ not found. Attempting to install via winget..."
   if (Get-Command winget -ErrorAction SilentlyContinue) {
@@ -101,7 +101,7 @@ if (-not $HasNode -and -not $HasPython) {
   exit 1
 }
 
-# ── Dependency installation ────────────────────────────────────────────────────
+# -- Dependency installation ----------------------------------------------------
 function Install-Dep {
   param([string]$Name, [string]$Cmd)
   Write-Info "Installing $Name..."
@@ -109,7 +109,7 @@ function Install-Dep {
   if ($LASTEXITCODE -eq 0) {
     Write-Ok "$Name installed"
   } else {
-    Write-Warn "$Name failed — manual install: $Cmd"
+    Write-Warn "$Name failed -- manual install: $Cmd"
     $script:FailedDeps += "${Name}: ${Cmd}"
   }
 }
@@ -122,7 +122,7 @@ if (-not $NoDeps) {
   if ($HasNode) {
     Write-Info "Installing claude-mem..."
 
-    # Attempt 1 — run via cmd.exe; legacy-peer-deps resolves tree-sitter version conflict
+    # Attempt 1 -- run via cmd.exe; legacy-peer-deps resolves tree-sitter version conflict
     npm config set legacy-peer-deps true
     cmd /c "npx --yes claude-mem install"
     $claudeMemResult = $LASTEXITCODE
@@ -130,8 +130,8 @@ if (-not $NoDeps) {
     if ($claudeMemResult -eq 0) {
       Write-Ok "claude-mem installed"
     } else {
-      # Attempt 2 — auto-install Visual C++ Build Tools (required by tree-sitter) then retry
-      Write-Info "claude-mem needs Visual C++ Build Tools — installing via winget (this may take a few minutes)..."
+      # Attempt 2 -- auto-install Visual C++ Build Tools (required by tree-sitter) then retry
+      Write-Info "claude-mem needs Visual C++ Build Tools -- installing via winget (this may take a few minutes)..."
       if (Get-Command winget -ErrorAction SilentlyContinue) {
         winget install Microsoft.VisualStudio.2022.BuildTools `
           --silent --accept-source-agreements --accept-package-agreements `
@@ -145,15 +145,15 @@ if (-not $NoDeps) {
           if ($claudeMemResult -eq 0) {
             Write-Ok "claude-mem installed"
           } else {
-            Write-Warn "claude-mem failed after build tools install — manual install: npx --yes claude-mem install"
+            Write-Warn "claude-mem failed after build tools install -- manual install: npx --yes claude-mem install"
             $script:FailedDeps += "claude-mem: npx --yes claude-mem install"
           }
         } else {
-          Write-Warn "Visual C++ Build Tools install failed — manual install: npx --yes claude-mem install"
+          Write-Warn "Visual C++ Build Tools install failed -- manual install: npx --yes claude-mem install"
           $script:FailedDeps += "claude-mem: npx --yes claude-mem install"
         }
       } else {
-        Write-Warn "winget not found — manual install: npx --yes claude-mem install"
+        Write-Warn "winget not found -- manual install: npx --yes claude-mem install"
         $script:FailedDeps += "claude-mem: npx --yes claude-mem install"
       }
     }
@@ -162,7 +162,7 @@ if (-not $NoDeps) {
   if ($HasNode -and $HasPython) {
     Install-Dep "ui-ux-pro-max-skill" "npm install -g uipro-cli; uipro init --ai claude"
   } else {
-    Write-Warn "ui-ux-pro-max-skill requires both Node and Python — skipped"
+    Write-Warn "ui-ux-pro-max-skill requires both Node and Python -- skipped"
     $FailedDeps += "ui-ux-pro-max-skill: npm install -g uipro-cli; uipro init --ai claude"
   }
 
@@ -171,7 +171,7 @@ if (-not $NoDeps) {
     Install-Dep "Superpowers"    "claude plugin install superpowers@claude-plugins-official"
     Install-Dep "code-simplifier" "claude plugin install code-simplifier@claude-plugins-official"
   } else {
-    Write-Warn "claude CLI not found — Playwright MCP, Superpowers, and code-simplifier need the Claude Code CLI"
+    Write-Warn "claude CLI not found -- Playwright MCP, Superpowers, and code-simplifier need the Claude Code CLI"
     $FailedDeps += "Playwright MCP: claude mcp add playwright npx @playwright/mcp@latest"
     $FailedDeps += "Superpowers: claude plugin install superpowers@claude-plugins-official"
     $FailedDeps += "code-simplifier: claude plugin install code-simplifier@claude-plugins-official"
@@ -184,12 +184,12 @@ if (-not $NoDeps) {
       Install-Dep "Graphify" "pip install graphifyy; if (`$LASTEXITCODE -eq 0) { python -m graphify install }"
     }
   } else {
-    Write-Warn "Graphify requires Python 3.10+ — skipped"
+    Write-Warn "Graphify requires Python 3.10+ -- skipped"
     $FailedDeps += "Graphify: pipx install graphifyy; graphify install"
   }
 }
 
-# ── Download helper ────────────────────────────────────────────────────────────
+# -- Download helper ------------------------------------------------------------
 function Save-RemoteFile {
   param([string]$Src, [string]$Dest, [bool]$Overwrite = $true)
 
@@ -209,7 +209,7 @@ function Save-RemoteFile {
   }
 }
 
-# ── Install global files ───────────────────────────────────────────────────────
+# -- Install global files -------------------------------------------------------
 Write-Host ""
 Write-Info "Installing global Claude files to $GLOBAL_DIR..."
 Write-Host ""
@@ -218,12 +218,12 @@ foreach ($sub in "commands", "memory", "skills", "stack-profiles") {
   New-Item -ItemType Directory -Path "$GLOBAL_DIR\$sub" -Force | Out-Null
 }
 
-# User-configured — skip if exist
+# User-configured -- skip if exist
 Save-RemoteFile "global/CLAUDE.md"         "$GLOBAL_DIR\CLAUDE.md"         $false
 Save-RemoteFile "global/settings.json"      "$GLOBAL_DIR\settings.json"      $false
 Save-RemoteFile "global/memory/personal.md" "$GLOBAL_DIR\memory\personal.md" $false
 
-# Agent-managed — always overwrite
+# Agent-managed -- always overwrite
 Save-RemoteFile "global/commands/checkpoint.md" "$GLOBAL_DIR\commands\checkpoint.md"
 Save-RemoteFile "global/commands/stack.md"      "$GLOBAL_DIR\commands\stack.md"
 Save-RemoteFile "global/commands/lang.md"       "$GLOBAL_DIR\commands\lang.md"
@@ -240,7 +240,7 @@ foreach ($stackProfile in @("_base","_multi-stack","_template","javascript","typ
 "VERBOSITY: $Verbosity" | Set-Content "$GLOBAL_DIR\memory\verbosity.md" -Encoding utf8
 Write-Ok "Verbosity set to $Verbosity"
 
-# ── Install project template ───────────────────────────────────────────────────
+# -- Install project template ---------------------------------------------------
 if ($Project) {
   Write-Host ""
   Write-Info "Installing project template into current directory..."
@@ -275,16 +275,16 @@ if ($Project) {
   }
 }
 
-# ── Final report ───────────────────────────────────────────────────────────────
+# -- Final report ---------------------------------------------------------------
 Write-Host ""
 if ($RemoteVersion) {
   $RemoteVersion | Set-Content $LocalVersionFile -Encoding utf8
 }
 
-Write-Host "  ─────────────────────────────────────────"
+Write-Host "  -----------------------------------------"
 Write-Host "  code-conductor installed" -ForegroundColor Green
 if ($RemoteVersion) { Write-Host "  v$RemoteVersion" -ForegroundColor DarkGray }
-Write-Host "  ─────────────────────────────────────────"
+Write-Host "  -----------------------------------------"
 Write-Host ""
 Write-Host "  To update: re-run the install command"
 Write-Host "  Changelog: https://github.com/yeisonrestrepo/code-conductor/blob/main/CHANGELOG.md"
