@@ -18,7 +18,6 @@ VERBOSITY="MIN"
 
 LOCAL_VERSION_FILE="${GLOBAL_DIR}/memory/conductor-version.md"
 LOCAL_VERSION=$([ -f "$LOCAL_VERSION_FILE" ] && cat "$LOCAL_VERSION_FILE" || echo "")
-REMOTE_VERSION=$(curl -fsSL "${BASE_URL}/VERSION" 2>/dev/null || echo "")
 
 # ── Parse flags ──────────────────────────────────────────────────────────────
 for arg in "$@"; do
@@ -50,14 +49,15 @@ esac
 
 echo ""
 echo "  code-conductor installer"
-[ -n "$REMOTE_VERSION" ] && echo "  v${REMOTE_VERSION}"
 echo "  ─────────────────────────"
 echo ""
 
+REMOTE_VERSION=$(curl -fsSL --max-time 5 "${BASE_URL}/VERSION" 2>/dev/null || echo "")
+[ -n "$REMOTE_VERSION" ] && info "v${REMOTE_VERSION}"
 if [ -n "$LOCAL_VERSION" ] && [ -n "$REMOTE_VERSION" ] && [ "$LOCAL_VERSION" != "$REMOTE_VERSION" ]; then
   warn "Updating ${LOCAL_VERSION} → ${REMOTE_VERSION}"
-  echo ""
 fi
+{ [ -n "$REMOTE_VERSION" ] || [ -n "$LOCAL_VERSION" ]; } && echo ""
 
 # ── Runtime detection ─────────────────────────────────────────────────────────
 HAS_NODE=false

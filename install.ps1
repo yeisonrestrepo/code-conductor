@@ -17,11 +17,6 @@ $BASE_URL   = "https://raw.githubusercontent.com/$REPO/$BRANCH"
 $GLOBAL_DIR = "$env:USERPROFILE\.claude"
 $FailedDeps = @()
 
-$LocalVersionFile = "$GLOBAL_DIR\memory\conductor-version.md"
-$LocalVersion     = if (Test-Path $LocalVersionFile) { (Get-Content $LocalVersionFile -Raw).Trim() } else { $null }
-try   { $RemoteVersion = (Invoke-WebRequest -Uri "$BASE_URL/VERSION" -UseBasicParsing).Content.Trim() }
-catch { $RemoteVersion = $null }
-
 function Write-Ok   { param($msg) Write-Host "  [OK] $msg" -ForegroundColor Green }
 function Write-Warn { param($msg) Write-Host "  [!!] $msg" -ForegroundColor Yellow }
 function Write-Err  { param($msg) Write-Host "  [XX] $msg" -ForegroundColor Red }
@@ -29,14 +24,19 @@ function Write-Info { param($msg) Write-Host "   ->  $msg" -ForegroundColor Cyan
 
 Write-Host ""
 Write-Host "  code-conductor installer" -ForegroundColor Cyan
-if ($RemoteVersion) { Write-Host "  v$RemoteVersion" -ForegroundColor DarkGray }
 Write-Host "  ─────────────────────────"
 Write-Host ""
 
+$LocalVersionFile = "$GLOBAL_DIR\memory\conductor-version.md"
+$LocalVersion     = if (Test-Path $LocalVersionFile) { (Get-Content $LocalVersionFile -Raw).Trim() } else { $null }
+try   { $RemoteVersion = (Invoke-WebRequest -Uri "$BASE_URL/VERSION" -UseBasicParsing -TimeoutSec 5).Content.Trim() }
+catch { $RemoteVersion = $null }
+
+if ($RemoteVersion) { Write-Info "v$RemoteVersion" }
 if ($LocalVersion -and $RemoteVersion -and $LocalVersion -ne $RemoteVersion) {
   Write-Warn "Updating $LocalVersion → $RemoteVersion"
-  Write-Host ""
 }
+if ($RemoteVersion -or $LocalVersion) { Write-Host "" }
 
 # ── Runtime detection ──────────────────────────────────────────────────────────
 $HasNode   = $false

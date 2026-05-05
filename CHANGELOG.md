@@ -7,6 +7,14 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.1.1] - 2026-05-04
+
+### Fixed
+
+- **Installer hang on blank screen** — version fetch (`VERSION` file lookup) was running before any output, causing a blank terminal if the request was slow or the file didn't exist yet. Moved the banner print before the fetch and added a 5-second timeout (`-TimeoutSec 5` / `--max-time 5`) to both `install.ps1` and `install.sh`.
+
+---
+
 ## [1.1.0] - 2026-05-04
 
 ### Fixed
