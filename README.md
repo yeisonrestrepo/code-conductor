@@ -6,12 +6,12 @@ A spec-first, token-efficient Claude Code configuration that turns AI-assisted c
 
 ## The Problem
 
-AI coding assistants are only as good as the structure you put around them. Without it, sessions drift: the agent overwrites files it shouldn't, skips the spec, reads entire codebases line by line, and produces code that solves the wrong problem efficiently. The result is fast output with slow outcomes â€” more rewrites, more context lost, more tokens burned. code-conductor is the structure.
+AI coding assistants are only as good as the structure you put around them. Without it, sessions drift: the agent overwrites files it shouldn't, skips the spec, reads entire codebases line by line, and produces code that solves the wrong problem efficiently. The result is fast output with slow outcomes — more rewrites, more context lost, more tokens burned. code-conductor is the structure.
 
 | Without code-conductor | With code-conductor |
 |---|---|
-| Free-form prompt â†’ agent guesses, overwrites, drifts | `/cc-spec` â†’ approved spec â†’ `/cc-plan` â†’ confirmed steps â†’ implement |
-| Full files read on every turn | grep/find before read â€” targeted tool calls only |
+| Free-form prompt → agent guesses, overwrites, drifts | `/cc-spec` → approved spec → `/cc-plan` → confirmed steps → implement |
+| Full files read on every turn | grep/find before read — targeted tool calls only |
 | Conventions reset every session | Stack profile + memory loaded at session start |
 | Frontend code with no UX consideration | UI/UX skill activated automatically for frontend stacks |
 
@@ -59,11 +59,11 @@ Re-run the same install command. User-configured files are never overwritten; ag
 
 code-conductor operates at three layers:
 
-**Global core** (`~/.claude/`) â€” applies to every project on your machine. Enforces the spec-first workflow, token efficiency rules, safety checks, code simplicity rules, and memory conventions. Installed once; always active.
+**Global core** (`~/.claude/`) — applies to every project on your machine. Enforces the spec-first workflow, token efficiency rules, safety checks, code simplicity rules, and memory conventions. Installed once; always active.
 
-**Project template** (`.claude/`) â€” lives in your repo and is shared with your team via git. Adds project-specific slash commands, hooks that guard file writes, and a shared memory file for decisions, conventions, and technical debt.
+**Project template** (`.claude/`) — lives in your repo and is shared with your team via git. Adds project-specific slash commands, hooks that guard file writes, and a shared memory file for decisions, conventions, and technical debt.
 
-**Dynamic profiles + skills** â€” loaded at session start by `/cc-stack` based on your detected framework. Each profile defines naming conventions, project structure, standard tooling, idiomatic patterns, and anti-patterns for your specific stack. Skills extend the agent's behavior for cross-cutting concerns like code simplicity and UI/UX.
+**Dynamic profiles + skills** — loaded at session start by `/cc-stack` based on your detected framework. Each profile defines naming conventions, project structure, standard tooling, idiomatic patterns, and anti-patterns for your specific stack. Skills extend the agent's behavior for cross-cutting concerns like code simplicity and UI/UX.
 
 ---
 
@@ -77,19 +77,19 @@ All commands are tagged `(Conductor)` in the Claude Code command palette so they
 |---------|-------------|
 | `/cc-checkpoint` | Read the current session, extract decisions, conventions, and debt, then write them to `project.md` and `personal.md` with a timestamp. Run before `/compact`, after completing a feature, and after key architectural decisions. |
 | `/cc-stack` | Scan manifest files to detect your framework, confirm before loading the matching profile, and cache the result in `project.md` to avoid re-detection next session. |
-| `/lang [code]` | Switch response language for this session. Code identifiers, filenames, and commit messages remain English regardless. |
+| `/cc-lang [code]` | Switch response language for this session. Code identifiers, filenames, and commit messages remain English regardless. |
 
 ### Project (requires `--project` install)
 
 | Command | Description |
 |---------|-------------|
-| `/spec [name]` | Search the codebase first, ask only for missing context, generate a full feature spec, and wait for your approval before any plan is made. |
+| `/cc-spec [name]` | Search the codebase first, ask only for missing context, generate a full feature spec, and wait for your approval before any plan is made. |
 | `/cc-plan` | Require an approved spec, map the codebase, and generate an ordered implementation plan with exact file paths, a test list, a commit order, and identified risks. |
-| `/review [file\|dir]` | Review code in three layers â€” Critical / Important / Suggestion â€” then deliver a verdict and offer to auto-fix. |
-| `/debug [problem]` | Generate hypotheses ordered by probability, confirm before investigating, use Playwright MCP for visual bugs, and report the root cause with a targeted fix. |
-| `/refactor [file\|module]` | Diagnose complexity, plan ordered changes, apply one step at a time, and verify tests pass after each step. |
-| `/test [scope]` | Analyze coverage gaps, write tests in AAA pattern, add Playwright E2E where applicable, run after confirmation, and report results. |
-| `/docs [scope]` | Audit existing documentation, write inline docs in the correct format for your stack (JSDoc / docstrings / JavaDoc / GoDoc), and preview before writing. |
+| `/cc-review [file\|dir]` | Review code in three layers — Critical / Important / Suggestion — then deliver a verdict and offer to auto-fix. |
+| `/cc-debug [problem]` | Generate hypotheses ordered by probability, confirm before investigating, use Playwright MCP for visual bugs, and report the root cause with a targeted fix. |
+| `/cc-refactor [file\|module]` | Diagnose complexity, plan ordered changes, apply one step at a time, and verify tests pass after each step. |
+| `/cc-test [scope]` | Analyze coverage gaps, write tests in AAA pattern, add Playwright E2E where applicable, run after confirmation, and report results. |
+| `/cc-docs [scope]` | Audit existing documentation, write inline docs in the correct format for your stack (JSDoc / docstrings / JavaDoc / GoDoc), and preview before writing. |
 
 ---
 
@@ -97,28 +97,28 @@ All commands are tagged `(Conductor)` in the Claude Code command palette so they
 
 Skills extend agent behavior for cross-cutting concerns that apply regardless of stack.
 
-### code-simplifier â€” always active
+### code-simplifier — always active
 
 Applied to every piece of code written or reviewed in every session. Enforces:
 
-- No speculative abstractions â€” solve today's problem only
-- Functions â‰¤30 lines, doing one thing
-- Flat over nested â€” guard clauses and early returns
-- Descriptive names â€” no `Base`, `Abstract`, `Manager`, `Handler`
+- No speculative abstractions — solve today's problem only
+- Functions ≤30 lines, doing one thing
+- Flat over nested — guard clauses and early returns
+- Descriptive names — no `Base`, `Abstract`, `Manager`, `Handler`
 - Comments explain why, never what
 
-### ui-ux â€” frontend projects
+### ui-ux — frontend projects
 
 Activated automatically when `/cc-stack` loads a frontend stack profile (React, Angular, Next.js, and similar). Enforces:
 
-- Visual hierarchy â€” every screen has one primary action
+- Visual hierarchy — every screen has one primary action
 - 4px spacing grid with named tokens (`xs` / `sm` / `md` / `lg` / `xl`)
 - Semantic color tokens as the source of truth
 - Required component states: default, hover, active, disabled, loading, error, empty
 - WCAG AA accessibility baseline (4.5:1 contrast, keyboard nav, focus indicators)
 - Tailwind conventions: design tokens in config, `cva()` for variants, `gap-*` over margin
 
-### verbosity â€” always active
+### verbosity — always active
 
 Controls how much Claude writes per turn. The level is set at install time via `--verbosity` and stored in `~/.claude/memory/verbosity.md`. Default: `MIN`.
 
@@ -128,18 +128,18 @@ Controls how much Claude writes per turn. The level is set at install time via `
 | `INFO` | Bullet list of what changed and why. Max 5 bullets. `[CHANGES]` + `[REASON]`. |
 | `VERBOSE` | Full explanation, prose allowed. All response tags. |
 
-### memory-first â€” always active
+### memory-first — always active
 
 Before reading any file, Claude walks a priority lookup chain and stops at the first step that answers the question:
 
-1. **Project memory** â€” `claude-mem` / `project.md`
-2. **Graphify graph** â€” structural/relational queries (`what calls X`, `what depends on Y`)
-3. **Grep / Glob** â€” pattern searches
-4. **Targeted read** â€” last resort, always with `offset` + `limit`, max 150 lines
+1. **Project memory** — `claude-mem` / `project.md`
+2. **Graphify graph** — structural/relational queries (`what calls X`, `what depends on Y`)
+3. **Grep / Glob** — pattern searches
+4. **Targeted read** — last resort, always with `offset` + `limit`, max 150 lines
 
-### agent-delegation â€” always active
+### agent-delegation — always active
 
-Keeps the main context clean. Sub-agents handle exploration and parallel work; they return a â‰¤200-word summary to the main context. Raw file contents and intermediate data never enter the main context.
+Keeps the main context clean. Sub-agents handle exploration and parallel work; they return a ≤200-word summary to the main context. Raw file contents and intermediate data never enter the main context.
 
 ---
 
@@ -151,9 +151,9 @@ Hooks run automatically at specific points in a Claude Code session. They requir
 
 Fires before every tool call. Two guards:
 
-**Large-file Read guard** â€” if Claude tries to read a file with more than 150 lines without specifying an `offset` and `limit`, the call is blocked and Claude is redirected to the orchestrator lookup chain (memory â†’ graph â†’ grep â†’ targeted read). Prevents reading entire codebases when a targeted search would do.
+**Large-file Read guard** — if Claude tries to read a file with more than 150 lines without specifying an `offset` and `limit`, the call is blocked and Claude is redirected to the orchestrator lookup chain (memory → graph → grep → targeted read). Prevents reading entire codebases when a targeted search would do.
 
-**Duplicate file guard** â€” if Claude tries to write or create a file that already exists, it prints a warning showing the file path, line count, and last-modified timestamp, then presents three options: overwrite, edit in place, or cancel. Prevents silently replacing files you've already configured.
+**Duplicate file guard** — if Claude tries to write or create a file that already exists, it prints a warning showing the file path, line count, and last-modified timestamp, then presents three options: overwrite, edit in place, or cancel. Prevents silently replacing files you've already configured.
 
 ### post-compact
 
@@ -163,7 +163,7 @@ Fires after `/compact`. Reads `project.md`, shows the timestamp of the last `/cc
 
 ## Stack Profiles
 
-Running `/cc-stack` detects your framework from manifest files and loads the matching profile. Each profile defines naming conventions, standard project structure, tooling, idiomatic patterns with examples, and anti-patterns â€” so the agent never applies Python conventions to a TypeScript file.
+Running `/cc-stack` detects your framework from manifest files and loads the matching profile. Each profile defines naming conventions, standard project structure, tooling, idiomatic patterns with examples, and anti-patterns — so the agent never applies Python conventions to a TypeScript file.
 
 | Profile | Detected by |
 |---------|-------------|
@@ -176,7 +176,7 @@ Running `/cc-stack` detects your framework from manifest files and loads the mat
 | `react` | `package.json` with `react` dependency but no `next` |
 | `angular` | `angular.json` |
 | `nextjs` | `next.config.js` / `next.config.ts` |
-| `nestjs` | `package.json` â†’ `@nestjs/core` |
+| `nestjs` | `package.json` → `@nestjs/core` |
 | `django` | `manage.py` + `django` in deps |
 | `flask` | `flask` in deps |
 
@@ -187,15 +187,15 @@ Running `/cc-stack` detects your framework from manifest files and loads the mat
 ```
 ~/.claude/
   memory/
-    personal.md     â† local only, never committed
+    personal.md     ← local only, never committed
                        dev preferences, shortcuts
-    verbosity.md    â† agent-managed, set by installer
+    verbosity.md    ← agent-managed, set by installer
                        active verbosity level (MIN/INFO/VERBOSE)
 
 project-root/
   .claude/
     memory/
-      project.md    â† in git, shared with team
+      project.md    ← in git, shared with team
                        decisions, conventions, debt, workarounds
 ```
 
@@ -224,58 +224,58 @@ Code identifiers, file names, and commit messages are always English.
 
 ```
 code-conductor/
-â”œâ”€â”€ README.md
-â”œâ”€â”€ .gitignore
-â”œâ”€â”€ install.sh                    macOS/Linux
-â”œâ”€â”€ install.ps1                   Windows
-â”œâ”€â”€ global/
-â”‚   â”œâ”€â”€ CLAUDE.md                 Global agent behavior (all projects)
-â”‚   â”œâ”€â”€ settings.json
-â”‚   â”œâ”€â”€ commands/
-â”‚   â”‚   â”œâ”€â”€ cc-checkpoint.md      /cc-checkpoint
-â”‚   â”‚   â”œâ”€â”€ cc-stack.md           /cc-stack
-â”‚   â”‚   â””â”€â”€ cc-lang.md            /cc-lang
-â”‚   â””â”€â”€ memory/
-â”‚       â””â”€â”€ personal.md           Template (never committed)
-â”œâ”€â”€ project-template/
-â”‚   â”œâ”€â”€ CLAUDE.md
-â”‚   â””â”€â”€ .claude/
-â”‚       â”œâ”€â”€ settings.json
-â”‚       â”œâ”€â”€ commands/
-â”‚       â”‚   â”œâ”€â”€ cc-spec.md        /cc-spec
-â”‚       â”‚   â”œâ”€â”€ cc-plan.md        /cc-plan
-â”‚       â”‚   â”œâ”€â”€ cc-review.md      /cc-review
-â”‚       â”‚   â”œâ”€â”€ cc-debug.md       /cc-debug
-â”‚       â”‚   â”œâ”€â”€ cc-refactor.md    /cc-refactor
-â”‚       â”‚   â”œâ”€â”€ cc-test.md        /cc-test
-â”‚       â”‚   â””â”€â”€ cc-docs.md        /cc-docs
-â”‚       â”œâ”€â”€ hooks/
-â”‚       â”‚   â”œâ”€â”€ pre-tool-use.sh   Blocks duplicate file creation
-â”‚       â”‚   â””â”€â”€ post-compact.sh   Checkpoint reminder after `/compact`
-â”‚       â””â”€â”€ memory/
-â”‚           â””â”€â”€ project.md        Shared team memory (in git)
-â”œâ”€â”€ stack-profiles/
-â”‚   â”œâ”€â”€ _base.md
-â”‚   â”œâ”€â”€ _multi-stack.md
-â”‚   â”œâ”€â”€ _template.md
-â”‚   â”œâ”€â”€ javascript.md
-â”‚   â”œâ”€â”€ typescript.md
-â”‚   â”œâ”€â”€ python.md
-â”‚   â”œâ”€â”€ java.md
-â”‚   â”œâ”€â”€ go.md
-â”‚   â”œâ”€â”€ rust.md
-â”‚   â”œâ”€â”€ react.md
-â”‚   â”œâ”€â”€ angular.md
-â”‚   â”œâ”€â”€ nextjs.md
-â”‚   â”œâ”€â”€ nestjs.md
-â”‚   â”œâ”€â”€ django.md
-â”‚   â””â”€â”€ flask.md
-â””â”€â”€ skills/
-    â”œâ”€â”€ code-simplifier.md        Always active
-    â”œâ”€â”€ ui-ux.md                  Activatable for frontend projects
-    â”œâ”€â”€ verbosity.md              Always active â€” MIN/INFO/VERBOSE response rules
-    â”œâ”€â”€ memory-first.md           Always active â€” memory â†’ graph â†’ grep â†’ read chain
-    â””â”€â”€ agent-delegation.md       Always active â€” sub-agent spawn rules
+├── README.md
+├── .gitignore
+├── install.sh                    macOS/Linux
+├── install.ps1                   Windows
+├── global/
+│   ├── CLAUDE.md                 Global agent behavior (all projects)
+│   ├── settings.json
+│   ├── commands/
+│   │   ├── cc-checkpoint.md      /cc-checkpoint
+│   │   ├── cc-stack.md           /cc-stack
+│   │   └── cc-lang.md            /cc-lang
+│   └── memory/
+│       └── personal.md           Template (never committed)
+├── project-template/
+│   ├── CLAUDE.md
+│   └── .claude/
+│       ├── settings.json
+│       ├── commands/
+│       │   ├── cc-spec.md        /cc-spec
+│       │   ├── cc-plan.md        /cc-plan
+│       │   ├── cc-review.md      /cc-review
+│       │   ├── cc-debug.md       /cc-debug
+│       │   ├── cc-refactor.md    /cc-refactor
+│       │   ├── cc-test.md        /cc-test
+│       │   └── cc-docs.md        /cc-docs
+│       ├── hooks/
+│       │   ├── pre-tool-use.sh   Blocks duplicate file creation
+│       │   └── post-compact.sh   Checkpoint reminder after `/compact`
+│       └── memory/
+│           └── project.md        Shared team memory (in git)
+├── stack-profiles/
+│   ├── _base.md
+│   ├── _multi-stack.md
+│   ├── _template.md
+│   ├── javascript.md
+│   ├── typescript.md
+│   ├── python.md
+│   ├── java.md
+│   ├── go.md
+│   ├── rust.md
+│   ├── react.md
+│   ├── angular.md
+│   ├── nextjs.md
+│   ├── nestjs.md
+│   ├── django.md
+│   └── flask.md
+└── skills/
+    ├── code-simplifier.md        Always active
+    ├── ui-ux.md                  Activatable for frontend projects
+    ├── verbosity.md              Always active — MIN/INFO/VERBOSE response rules
+    ├── memory-first.md           Always active — memory → graph → grep → read chain
+    └── agent-delegation.md       Always active — sub-agent spawn rules
 ```
 
 ---
