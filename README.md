@@ -46,7 +46,8 @@ By default, the installer installs only the global core files. Use flags to exte
 | Flag | Description |
 |------|-------------|
 | `--project` / `-Project` | Also install the project template into the current directory |
-| `--no-deps` | Skip dependency installation (Node tooling, Playwright MCP, plugins); copy agent files only |
+| `--no-deps` / `-NoDeps` | Skip dependency installation (Node tooling, Playwright MCP, plugins); copy agent files only |
+| `--verbosity MIN\|INFO\|VERBOSE` / `-Verbosity` | Set the default response verbosity (default: `MIN`). `MIN` = one sentence per response. `INFO` = bullet list. `VERBOSE` = full explanation. Re-run the installer to change it. |
 
 ### Update
 
@@ -115,6 +116,29 @@ Activated automatically when `/stack` loads a frontend stack profile (React, Ang
 - WCAG AA accessibility baseline (4.5:1 contrast, keyboard nav, focus indicators)
 - Tailwind conventions: design tokens in config, `cva()` for variants, `gap-*` over margin
 
+### verbosity — always active
+
+Controls how much Claude writes per turn. The level is set at install time via `--verbosity` and stored in `~/.claude/memory/verbosity.md`. Default: `MIN`.
+
+| Level | Behavior |
+|-------|----------|
+| `MIN` | One declarative sentence. `[CHANGES]` tag with file list only. |
+| `INFO` | Bullet list of what changed and why. Max 5 bullets. `[CHANGES]` + `[REASON]`. |
+| `VERBOSE` | Full explanation, prose allowed. All response tags. |
+
+### memory-first — always active
+
+Before reading any file, Claude walks a priority lookup chain and stops at the first step that answers the question:
+
+1. **Project memory** — `claude-mem` / `project.md`
+2. **Graphify graph** — structural/relational queries (`what calls X`, `what depends on Y`)
+3. **Grep / Glob** — pattern searches
+4. **Targeted read** — last resort, always with `offset` + `limit`, max 150 lines
+
+### agent-delegation — always active
+
+Keeps the main context clean. Sub-agents handle exploration and parallel work; they return a ≤200-word summary to the main context. Raw file contents and intermediate data never enter the main context.
+
 ---
 
 ## Hooks
@@ -123,7 +147,11 @@ Hooks run automatically at specific points in a Claude Code session. They requir
 
 ### pre-tool-use
 
-Fires before any file write or create operation. If the target file already exists, it prints a warning showing the file path, line count, and last-modified timestamp, then presents three options: overwrite, edit in place, or cancel. This prevents the agent from silently replacing files you've already configured.
+Fires before every tool call. Two guards:
+
+**Large-file Read guard** — if Claude tries to read a file with more than 150 lines without specifying an `offset` and `limit`, the call is blocked and Claude is redirected to the orchestrator lookup chain (memory → graph → grep → targeted read). Prevents reading entire codebases when a targeted search would do.
+
+**Duplicate file guard** — if Claude tries to write or create a file that already exists, it prints a warning showing the file path, line count, and last-modified timestamp, then presents three options: overwrite, edit in place, or cancel. Prevents silently replacing files you've already configured.
 
 ### post-compact
 
@@ -159,6 +187,8 @@ Running `/stack` detects your framework from manifest files and loads the matchi
   memory/
     personal.md     ← local only, never committed
                        dev preferences, shortcuts
+    verbosity.md    ← agent-managed, set by installer
+                       active verbosity level (MIN/INFO/VERBOSE)
 
 project-root/
   .claude/
@@ -240,7 +270,10 @@ code-conductor/
 │   └── flask.md
 └── skills/
     ├── code-simplifier.md        Always active
-    └── ui-ux.md                  Activatable for frontend projects
+    ├── ui-ux.md                  Activatable for frontend projects
+    ├── verbosity.md              Always active — MIN/INFO/VERBOSE response rules
+    ├── memory-first.md           Always active — memory → graph → grep → read chain
+    └── agent-delegation.md       Always active — sub-agent spawn rules
 ```
 
 ---
