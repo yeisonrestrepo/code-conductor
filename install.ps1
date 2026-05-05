@@ -1,4 +1,4 @@
-# code-conductor installer — Windows (PowerShell)
+﻿# code-conductor installer — Windows (PowerShell)
 # Usage: irm https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.ps1 | iex
 #        & ([ScriptBlock]::Create((irm https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.ps1))) -Project
 #        & ([ScriptBlock]::Create((irm https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.ps1))) -NoDeps
@@ -17,6 +17,11 @@ $BASE_URL   = "https://raw.githubusercontent.com/$REPO/$BRANCH"
 $GLOBAL_DIR = "$env:USERPROFILE\.claude"
 $FailedDeps = @()
 
+$LocalVersionFile = "$GLOBAL_DIR\memory\conductor-version.md"
+$LocalVersion     = if (Test-Path $LocalVersionFile) { (Get-Content $LocalVersionFile -Raw).Trim() } else { $null }
+try   { $RemoteVersion = (Invoke-WebRequest -Uri "$BASE_URL/VERSION" -UseBasicParsing).Content.Trim() }
+catch { $RemoteVersion = $null }
+
 function Write-Ok   { param($msg) Write-Host "  [OK] $msg" -ForegroundColor Green }
 function Write-Warn { param($msg) Write-Host "  [!!] $msg" -ForegroundColor Yellow }
 function Write-Err  { param($msg) Write-Host "  [XX] $msg" -ForegroundColor Red }
@@ -24,8 +29,14 @@ function Write-Info { param($msg) Write-Host "   ->  $msg" -ForegroundColor Cyan
 
 Write-Host ""
 Write-Host "  code-conductor installer" -ForegroundColor Cyan
+if ($RemoteVersion) { Write-Host "  v$RemoteVersion" -ForegroundColor DarkGray }
 Write-Host "  ─────────────────────────"
 Write-Host ""
+
+if ($LocalVersion -and $RemoteVersion -and $LocalVersion -ne $RemoteVersion) {
+  Write-Warn "Updating $LocalVersion → $RemoteVersion"
+  Write-Host ""
+}
 
 # ── Runtime detection ──────────────────────────────────────────────────────────
 $HasNode   = $false
@@ -111,9 +122,12 @@ if (-not $NoDeps) {
   if ($HasNode) {
     Write-Info "Installing claude-mem..."
 
-    # Attempt 1 — run via cmd.exe to bypass PowerShell job-object restrictions that break bun
+    # Attempt 1 — run via cmd.exe; legacy-peer-deps resolves tree-sitter version conflict
+    npm config set legacy-peer-deps true
     cmd /c "npx --yes claude-mem install"
-    if ($LASTEXITCODE -eq 0) {
+    $claudeMemResult = $LASTEXITCODE
+    npm config set legacy-peer-deps false
+    if ($claudeMemResult -eq 0) {
       Write-Ok "claude-mem installed"
     } else {
       # Attempt 2 — auto-install Visual C++ Build Tools (required by tree-sitter) then retry
@@ -124,8 +138,11 @@ if (-not $NoDeps) {
           --override "--quiet --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
         if ($LASTEXITCODE -eq 0) {
           Write-Info "Retrying claude-mem install..."
+          npm config set legacy-peer-deps true
           cmd /c "npx --yes claude-mem install"
-          if ($LASTEXITCODE -eq 0) {
+          $claudeMemResult = $LASTEXITCODE
+          npm config set legacy-peer-deps false
+          if ($claudeMemResult -eq 0) {
             Write-Ok "claude-mem installed"
           } else {
             Write-Warn "claude-mem failed after build tools install — manual install: npx --yes claude-mem install"
@@ -162,9 +179,9 @@ if (-not $NoDeps) {
 
   if ($HasPython310) {
     if (Get-Command pipx -ErrorAction SilentlyContinue) {
-      Install-Dep "Graphify" "pipx install graphifyy; if (`$LASTEXITCODE -eq 0) { graphify install }"
+      Install-Dep "Graphify" "pipx install graphifyy; if (`$LASTEXITCODE -eq 0) { python -m graphify install }"
     } else {
-      Install-Dep "Graphify" "pip install graphifyy; if (`$LASTEXITCODE -eq 0) { graphify install }"
+      Install-Dep "Graphify" "pip install graphifyy; if (`$LASTEXITCODE -eq 0) { python -m graphify install }"
     }
   } else {
     Write-Warn "Graphify requires Python 3.10+ — skipped"
@@ -260,9 +277,17 @@ if ($Project) {
 
 # ── Final report ───────────────────────────────────────────────────────────────
 Write-Host ""
+if ($RemoteVersion) {
+  $RemoteVersion | Set-Content $LocalVersionFile -Encoding utf8
+}
+
 Write-Host "  ─────────────────────────────────────────"
 Write-Host "  code-conductor installed" -ForegroundColor Green
+if ($RemoteVersion) { Write-Host "  v$RemoteVersion" -ForegroundColor DarkGray }
 Write-Host "  ─────────────────────────────────────────"
+Write-Host ""
+Write-Host "  To update: re-run the install command"
+Write-Host "  Changelog: https://github.com/yeisonrestrepo/code-conductor/blob/main/CHANGELOG.md"
 Write-Host ""
 Write-Host "  Global commands (all projects):"
 Write-Host "    /checkpoint  /stack  /lang"

@@ -16,6 +16,10 @@ SKIP_DEPS=false
 FAILED_DEPS=()
 VERBOSITY="MIN"
 
+LOCAL_VERSION_FILE="${GLOBAL_DIR}/memory/conductor-version.md"
+LOCAL_VERSION=$([ -f "$LOCAL_VERSION_FILE" ] && cat "$LOCAL_VERSION_FILE" || echo "")
+REMOTE_VERSION=$(curl -fsSL "${BASE_URL}/VERSION" 2>/dev/null || echo "")
+
 # ── Parse flags ──────────────────────────────────────────────────────────────
 for arg in "$@"; do
   case $arg in
@@ -46,8 +50,14 @@ esac
 
 echo ""
 echo "  code-conductor installer"
+[ -n "$REMOTE_VERSION" ] && echo "  v${REMOTE_VERSION}"
 echo "  ─────────────────────────"
 echo ""
+
+if [ -n "$LOCAL_VERSION" ] && [ -n "$REMOTE_VERSION" ] && [ "$LOCAL_VERSION" != "$REMOTE_VERSION" ]; then
+  warn "Updating ${LOCAL_VERSION} → ${REMOTE_VERSION}"
+  echo ""
+fi
 
 # ── Runtime detection ─────────────────────────────────────────────────────────
 HAS_NODE=false
@@ -159,13 +169,13 @@ if [ "$SKIP_DEPS" = false ]; then
 
   if [ "$HAS_PYTHON310" = true ]; then
     if command -v pipx &>/dev/null; then
-      install_dep "Graphify" "pipx install graphifyy && graphify install"
+      install_dep "Graphify" "pipx install graphifyy && python3 -m graphify install"
     else
-      install_dep "Graphify" "pip install graphifyy && graphify install"
+      install_dep "Graphify" "pip install graphifyy && python3 -m graphify install"
     fi
   else
     warn "Graphify requires Python 3.10+ — skipped"
-    FAILED_DEPS+=("Graphify: pipx install graphifyy && graphify install")
+    FAILED_DEPS+=("Graphify: pipx install graphifyy && python3 -m graphify install")
   fi
 
   if ! command -v claude &>/dev/null; then
@@ -263,9 +273,12 @@ if [ "$INSTALL_PROJECT" = true ]; then
 fi
 
 # ── Final report ───────────────────────────────────────────────────────────────
+[ -n "$REMOTE_VERSION" ] && echo "$REMOTE_VERSION" > "$LOCAL_VERSION_FILE"
+
 echo ""
 echo "  ─────────────────────────────────────────"
 echo "  code-conductor installed"
+[ -n "$REMOTE_VERSION" ] && echo "  v${REMOTE_VERSION}"
 echo "  ─────────────────────────────────────────"
 echo ""
 echo "  Global commands (all projects):"
@@ -285,4 +298,7 @@ if [ ${#FAILED_DEPS[@]} -gt 0 ]; then
   done
 fi
 
+echo ""
+echo "  To update: re-run the install command"
+echo "  Changelog: https://github.com/yeisonrestrepo/code-conductor/blob/main/CHANGELOG.md"
 echo ""

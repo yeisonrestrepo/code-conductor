@@ -1,3 +1,7 @@
+---
+description: "(Conductor) Review code changes against spec and standards"
+---
+
 Determine what to review:
 - No argument → `git diff HEAD`
 - File path → review that file

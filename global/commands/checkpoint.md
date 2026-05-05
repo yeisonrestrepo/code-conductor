@@ -1,3 +1,7 @@
+---
+description: "(Conductor) Save session decisions, conventions, and debt to memory"
+---
+
 Read the conversation history from the current session.
 
 Identify and extract:

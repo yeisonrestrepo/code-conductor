@@ -1,3 +1,7 @@
+---
+description: "(Conductor) Systematically diagnose and fix a bug"
+---
+
 Characterize the problem before investigating:
 
 **Symptom:** [what is observed]

@@ -1,3 +1,7 @@
+---
+description: "(Conductor) Detect project stack and load the matching profile"
+---
+
 Detect the project stack by scanning for manifest files in the current directory:
 
 - `package.json` → Node.js/JavaScript/TypeScript

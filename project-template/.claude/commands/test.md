@@ -1,3 +1,7 @@
+---
+description: "(Conductor) Analyze coverage gaps and write missing tests"
+---
+
 Analyze coverage gaps first. Run:
 ```bash
 # language-specific coverage command

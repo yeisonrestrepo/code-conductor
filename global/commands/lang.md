@@ -1,3 +1,7 @@
+---
+description: "(Conductor) Switch response language for this session"
+---
+
 Switch the response language for this session.
 
 **With argument** (`/lang es`, `/lang pt`, etc.):
