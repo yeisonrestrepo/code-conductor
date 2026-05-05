@@ -69,6 +69,8 @@ code-conductor operates at three layers:
 
 ## Available Commands
 
+All commands are tagged `(Conductor)` in the Claude Code command palette so they're easy to spot alongside commands from other sources.
+
 ### Global (all projects)
 
 | Command | Description |

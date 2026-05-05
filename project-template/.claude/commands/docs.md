@@ -1,3 +1,7 @@
+---
+description: "(Conductor) Audit and update project documentation"
+---
+
 Audit existing docs first:
 - Run: `grep -r "TODO\|FIXME\|@deprecated" src/ --include="*.{ts,js,py,java,go,rs}" -l`
 - Check if public functions and classes already have doc comments

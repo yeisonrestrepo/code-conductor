@@ -1,3 +1,7 @@
+---
+description: "(Conductor) Map implementation steps from an approved spec"
+---
+
 Require an approved spec before starting. If no spec is in `.claude/memory/project.md` or in the recent conversation, stop and say:
 "No approved spec found. Run `/spec [name]` first."
 

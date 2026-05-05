@@ -1,3 +1,7 @@
+---
+description: "(Conductor) Define the problem and generate an approved spec"
+---
+
 Search the codebase for existing code related to `$ARGUMENTS` before asking any questions.
 
 Run: `grep -r "$ARGUMENTS" src/ --include="*.{ts,js,py,java,go,rs}" -l 2>/dev/null | head -20`
