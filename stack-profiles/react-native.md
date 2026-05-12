@@ -225,6 +225,8 @@ export default config;
 
 ### Custom Hook Encapsulates Data Fetching (Both Workflows)
 
+> For production apps, prefer TanStack Query (`@tanstack/react-query`) over manual `useEffect` data fetching — it handles caching, deduplication, and background refresh automatically.
+
 ```tsx
 function useUser(id: string) {
   const [user, setUser] = useState<User | null>(null);

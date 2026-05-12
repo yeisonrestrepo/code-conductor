@@ -281,6 +281,7 @@ dependency_overrides:
 
 ### Single Package and Monorepo
 
+- Manual data classes without `freezed` — use the `freezed` package for immutable models and Bloc/Riverpod states; avoids handwriting `copyWith`, `==`, and `hashCode`
 - `setState` in deeply nested widgets — extract state to Bloc/Riverpod
 - Business logic inside `build()` — move to a Bloc, notifier, or service class
 - Using `BuildContext` after an `await` without checking `mounted` — causes runtime crash
