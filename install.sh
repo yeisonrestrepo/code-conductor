@@ -205,12 +205,13 @@ echo ""
 info "Installing global Claude files to ${GLOBAL_DIR}..."
 echo ""
 
-mkdir -p "${GLOBAL_DIR}/commands" "${GLOBAL_DIR}/memory"
+mkdir -p "${GLOBAL_DIR}/commands" "${GLOBAL_DIR}/hooks" "${GLOBAL_DIR}/memory"
 
 # User-configured files — skip if exist
 download "global/CLAUDE.md"           "${GLOBAL_DIR}/CLAUDE.md"           false
 download "global/settings.json"        "${GLOBAL_DIR}/settings.json"        false
 download "global/memory/personal.md"   "${GLOBAL_DIR}/memory/personal.md"   false
+download "global/hooks/graphify-ast-refresh.py" "${GLOBAL_DIR}/hooks/graphify-ast-refresh.py" false
 
 # Agent-managed files — always overwrite
 download "global/commands/cc-checkpoint.md" "${GLOBAL_DIR}/commands/cc-checkpoint.md"

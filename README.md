@@ -150,6 +150,12 @@ Keeps the main context clean. Sub-agents handle exploration and parallel work; t
 
 Hooks run automatically at specific points in a Claude Code session. They require no manual setup.
 
+### graphify-ast-refresh *(global)*
+
+Fires on every `UserPromptSubmit`. Checks whether `graphify-out/.graphify_ast_done` is fresh (default: 60 min, override with `GRAPHIFY_STALE_MINUTES`). If stale or missing, spawns a non-blocking background Python process that runs file detection and AST extraction — no LLM calls, no tokens. The main session inherits a ready graph without paying the generation cost.
+
+Works on Windows, Linux, and macOS. Exits in under 5ms when the graph is current.
+
 ### pre-tool-use
 
 Fires before every tool call. Two guards:
@@ -243,6 +249,8 @@ code-conductor/
 │   │   ├── cc-checkpoint.md      /cc-checkpoint
 │   │   ├── cc-stack.md           /cc-stack
 │   │   └── cc-lang.md            /cc-lang
+│   ├── hooks/
+│   │   └── graphify-ast-refresh.py  Background AST refresh on UserPromptSubmit
 │   └── memory/
 │       └── personal.md           Template (never committed)
 ├── project-template/
