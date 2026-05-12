@@ -7,6 +7,21 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.4.0] - 2026-05-12
+
+### Added
+
+- **`global/hooks/graphify-ast-refresh.py`** — cross-platform `UserPromptSubmit` hook that checks whether the graphify AST output is stale (default threshold: 60 min, configurable via `GRAPHIFY_STALE_MINUTES`) and spawns a non-blocking background process to run file detection + AST extraction. Exits in under 5ms when the graph is fresh. Works on Windows (`CREATE_NO_WINDOW`), Linux, and macOS (`start_new_session=True`). Deployed by both installers to `~/.claude/hooks/` (skip-if-exists, so user customizations are preserved).
+
+### Changed
+
+- **`global/settings.json`** — added `UserPromptSubmit` hook registration for `graphify-ast-refresh.py` so the hook fires automatically every session.
+- **Graphify skill mode dispatch** — `/graphify .` (no flags) now enters **STATUS mode**: reads `graph.json` metadata and prints a compact summary (age, node/edge/community counts, AST vs semantic coverage, uncached file count) without triggering any extraction or subagents. `/graphify query "..."` enters **QUERY mode**: traverses the existing graph; runs targeted semantic extraction only when needed (≤5 uncached files inline, >5 asks first). Full rebuild now requires explicit `/graphify --rebuild`. All other flags (`--mcp`, `--watch`, `add`, `explain`, `path`, etc.) are unchanged.
+- **`install.sh` / `install.ps1`** — added `hooks/` to the global directory scaffold and deploy `graphify-ast-refresh.py` to `~/.claude/hooks/` during install.
+- **`.gitignore`** — added `graphify-out/` to prevent the per-project knowledge graph cache from appearing in git status.
+
+---
+
 ## [1.3.1] - 2026-05-12
 
 ### Added

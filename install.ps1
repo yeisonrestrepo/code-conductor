@@ -207,7 +207,7 @@ Write-Host ""
 Write-Info "Installing global Claude files to $GLOBAL_DIR..."
 Write-Host ""
 
-foreach ($sub in "commands", "memory", "skills", "stack-profiles") {
+foreach ($sub in "commands", "hooks", "memory", "skills", "stack-profiles") {
   New-Item -ItemType Directory -Path "$GLOBAL_DIR\$sub" -Force | Out-Null
 }
 
@@ -215,6 +215,7 @@ foreach ($sub in "commands", "memory", "skills", "stack-profiles") {
 Save-RemoteFile "global/CLAUDE.md"         "$GLOBAL_DIR\CLAUDE.md"         $false
 Save-RemoteFile "global/settings.json"      "$GLOBAL_DIR\settings.json"      $false
 Save-RemoteFile "global/memory/personal.md" "$GLOBAL_DIR\memory\personal.md" $false
+Save-RemoteFile "global/hooks/graphify-ast-refresh.py" "$GLOBAL_DIR\hooks\graphify-ast-refresh.py" $false
 
 # Agent-managed -- always overwrite
 Save-RemoteFile "global/commands/cc-checkpoint.md" "$GLOBAL_DIR\commands\cc-checkpoint.md"
