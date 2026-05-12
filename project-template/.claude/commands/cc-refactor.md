@@ -2,6 +2,19 @@
 description: "(Conductor) Refactor a file or module for clarity and simplicity"
 ---
 
+## Phase 0 — Skill activation
+
+Invoke both skills before doing anything else:
+
+```
+Skill({ skill: "code-simplifier", args: "$ARGUMENTS" })
+Skill({ skill: "subagent-driven-development", args: "$ARGUMENTS" })
+```
+
+`code-simplifier` defines the refactoring rules to apply. `subagent-driven-development` governs how to delegate each step to sub-agents — one per change, keeping the main context clean.
+
+---
+
 Diagnose the target file or module:
 
 **Complexity issues found:**

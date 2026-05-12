@@ -6,3 +6,4 @@ Thumbs.db
 .claude/
 docs/
 initial_prompt.xml
+!project-template/*

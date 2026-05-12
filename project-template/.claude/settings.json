@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/pre-tool-use.sh"
+            "command": "bash -c 'h=\".claude/hooks/pre-tool-use.sh\"; [ -f \"$h\" ] && bash \"$h\" || { echo \"⚠ Hook missing — run /cc-init to repair\"; exit 0; }'"
           }
         ]
       }
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/post-compact.sh"
+            "command": "bash -c 'h=\".claude/hooks/post-compact.sh\"; [ -f \"$h\" ] && bash \"$h\" || exit 0'"
           }
         ]
       }

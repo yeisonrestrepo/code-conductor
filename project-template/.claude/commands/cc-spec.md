@@ -2,6 +2,19 @@
 description: "(Conductor) Define the problem and generate an approved spec"
 ---
 
+## Phase 0 — Skill activation
+
+Before doing anything else, invoke both skills in order:
+
+```
+Skill({ skill: "brainstorming", args: "$ARGUMENTS" })
+Skill({ skill: "critical-review" })
+```
+
+`brainstorming` explores the problem space and surfaces unknowns. `critical-review` Phase 1 then runs the Pre-Flight Analysis (Happy Path / Failure Points / Boundary Conditions) on the proposed solution before the spec is written. Do not write the spec until both have completed.
+
+---
+
 Search the codebase for existing code related to `$ARGUMENTS` before asking any questions.
 
 Run: `grep -r "$ARGUMENTS" src/ --include="*.{ts,js,py,java,go,rs}" -l 2>/dev/null | head -20`

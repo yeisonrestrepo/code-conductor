@@ -29,3 +29,41 @@ language: [optional override, e.g., "es" for Spanish responses]
 - nextjs
 - _multi-stack (if applicable)
 -->
+
+## Execution Rules
+
+### Graph-First
+
+Before modifying any file, query the project graph:
+
+```
+Agent({
+  subagent_type: "Explore",
+  description: "Graph lookup: <symbol or file>",
+  prompt: "Using the graphify knowledge graph for this project, find all callers, dependents, and related nodes for <target>. Return ≤150 words."
+})
+```
+
+Skip only when: the change is isolated to a new file with no existing callers.
+
+### Verbosity
+
+VERBOSITY: MIN
+
+- One declarative sentence per response.
+- `[CHANGES]` tag: list modified files only.
+- On ambiguity: one clarifying question, nothing else.
+
+### Sub-Agent Delegation
+
+Invoke the matching skill via the `Skill` tool before starting each domain task:
+
+| Task | Skill |
+|------|-------|
+| Refactor | `code-simplifier` |
+| Tests | `cc-test` command |
+| Docs | `cc-docs` command |
+| Debug | `cc-debug` command |
+| Frontend | `ui-ux-pro-max` |
+
+Use the `Explore` sub-agent for any lookup requiring 3+ file reads.

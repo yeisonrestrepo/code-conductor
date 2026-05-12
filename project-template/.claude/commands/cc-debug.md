@@ -2,6 +2,19 @@
 description: "(Conductor) Systematically diagnose and fix a bug"
 ---
 
+## Phase 0 — Skill activation
+
+Before doing anything else, invoke both skills in order:
+
+```
+Skill({ skill: "subagent-driven-development", args: "$ARGUMENTS" })
+Skill({ skill: "critical-review" })
+```
+
+`subagent-driven-development` delegates investigation to sub-agents (graph query + git log — no inline file reads). `critical-review` Phase 2 RESILIENCE check then runs on the proposed fix before it is applied — confirm the fix doesn't introduce a silent failure or new boundary condition. The fix must pass Phase 3 self-correction before being committed. End with `[VALIDATION]`.
+
+---
+
 Characterize the problem before investigating:
 
 **Symptom:** [what is observed]

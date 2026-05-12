@@ -2,6 +2,18 @@
 description: "(Conductor) Analyze coverage gaps and write missing tests"
 ---
 
+## Phase 0 — Skill activation
+
+Before doing anything else, invoke the `subagent-driven-development` Superpowers skill:
+
+```
+Skill({ skill: "subagent-driven-development", args: "$ARGUMENTS" })
+```
+
+Delegate coverage analysis to an `Explore` sub-agent. Delegate each test file to a separate sub-agent. The main context receives summaries and final file paths only.
+
+---
+
 Analyze coverage gaps first. Run:
 ```bash
 # language-specific coverage command

@@ -83,7 +83,7 @@ Always tag responses:
 ## Active Skills
 
 - `code-simplifier` — always active, loaded automatically
-- `ui-ux` — activate via `/cc-stack` when frontend frameworks are detected
+- `ui-ux-pro-max` — activate via `/cc-stack` when frontend frameworks are detected
 - `verbosity` — always active; reads level from `memory/verbosity.md` (default: MIN)
 - `memory-first` — always active; enforces the orchestrator lookup chain
 - `agent-delegation` — always active; governs when and how to spawn sub-agents

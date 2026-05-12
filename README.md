@@ -83,6 +83,7 @@ All commands are tagged `(Conductor)` in the Claude Code command palette so they
 
 | Command | Description |
 |---------|-------------|
+| `/cc-init` | Initialize or re-sync the project environment: detect stack, checkpoint memory, refresh the project graph, and verify hook integrity. Run at the start of every session. |
 | `/cc-spec [name]` | Search the codebase first, ask only for missing context, generate a full feature spec, and wait for your approval before any plan is made. |
 | `/cc-plan` | Require an approved spec, map the codebase, and generate an ordered implementation plan with exact file paths, a test list, a commit order, and identified risks. |
 | `/cc-review [file\|dir]` | Review code in three layers — Critical / Important / Suggestion — then deliver a verdict and offer to auto-fix. |
@@ -107,16 +108,18 @@ Applied to every piece of code written or reviewed in every session. Enforces:
 - Descriptive names — no `Base`, `Abstract`, `Manager`, `Handler`
 - Comments explain why, never what
 
-### ui-ux — frontend projects
+### ui-ux-pro-max — frontend projects
 
-Activated automatically when `/cc-stack` loads a frontend stack profile (React, Angular, Next.js, and similar). Enforces:
+Activated automatically when `/cc-stack` loads a frontend stack profile (React, Angular, Next.js, and similar). Installed from [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) — the installer downloads it directly from GitHub. Enforces visual hierarchy, spacing grids, semantic color tokens, component states, WCAG AA accessibility, and framework-specific UI conventions.
 
-- Visual hierarchy — every screen has one primary action
-- 4px spacing grid with named tokens (`xs` / `sm` / `md` / `lg` / `xl`)
-- Semantic color tokens as the source of truth
-- Required component states: default, hover, active, disabled, loading, error, empty
-- WCAG AA accessibility baseline (4.5:1 contrast, keyboard nav, focus indicators)
-- Tailwind conventions: design tokens in config, `cva()` for variants, `gap-*` over margin
+### critical-review — always active during implementation
+
+Applied to every implementation task via a 4-phase adversarial protocol:
+
+1. **Pre-Flight** — Happy Path, Failure Points, and Boundary Conditions identified before any code is written
+2. **Adversarial Review** — RESILIENCE (silent failures), EFFICIENCY (code smells), FRICTION (happy-path friction)
+3. **Self-Correction** — each weakness refactored and re-verified in isolation
+4. **`[VALIDATION]`** — required closing section on every implementation: edge cases covered, best-outcome justification, residual risks
 
 ### verbosity — always active
 
@@ -225,6 +228,7 @@ Code identifiers, file names, and commit messages are always English.
 ```
 code-conductor/
 ├── README.md
+├── VERSION
 ├── .gitignore
 ├── install.sh                    macOS/Linux
 ├── install.ps1                   Windows
@@ -240,8 +244,10 @@ code-conductor/
 ├── project-template/
 │   ├── CLAUDE.md
 │   └── .claude/
-│       ├── settings.json
+│       ├── settings.json         Hooks wiring (pre-tool-use, post-compact)
+│       ├── system-prompt.md      Managed Agent system prompt (agents.create)
 │       ├── commands/
+│       │   ├── cc-init.md        /cc-init — session initialization
 │       │   ├── cc-spec.md        /cc-spec
 │       │   ├── cc-plan.md        /cc-plan
 │       │   ├── cc-review.md      /cc-review
@@ -250,7 +256,7 @@ code-conductor/
 │       │   ├── cc-test.md        /cc-test
 │       │   └── cc-docs.md        /cc-docs
 │       ├── hooks/
-│       │   ├── pre-tool-use.sh   Blocks duplicate file creation
+│       │   ├── pre-tool-use.sh   Large-file read guard + duplicate file guard
 │       │   └── post-compact.sh   Checkpoint reminder after `/compact`
 │       └── memory/
 │           └── project.md        Shared team memory (in git)
@@ -271,11 +277,12 @@ code-conductor/
 │   ├── django.md
 │   └── flask.md
 └── skills/
-    ├── code-simplifier.md        Always active
-    ├── ui-ux.md                  Activatable for frontend projects
+    ├── code-simplifier.md        Always active — complexity and simplicity rules
+    ├── critical-review.md        Always active — 4-phase adversarial review protocol
     ├── verbosity.md              Always active — MIN/INFO/VERBOSE response rules
     ├── memory-first.md           Always active — memory → graph → grep → read chain
     └── agent-delegation.md       Always active — sub-agent spawn rules
+    # ui-ux-pro-max installed from github.com/nextlevelbuilder/ui-ux-pro-max-skill
 ```
 
 ---

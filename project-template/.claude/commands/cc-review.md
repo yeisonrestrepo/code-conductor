@@ -2,6 +2,19 @@
 description: "(Conductor) Review code changes against spec and standards"
 ---
 
+## Phase 0 — Skill activation
+
+Before doing anything else, invoke both skills in order:
+
+```
+Skill({ skill: "subagent-driven-development", args: "$ARGUMENTS" })
+Skill({ skill: "critical-review" })
+```
+
+`subagent-driven-development` spawns one `Explore` sub-agent per review layer (Critical / Important / Suggestions) — each returns findings, the main context aggregates only. `critical-review` then runs Phases 2–4: Adversarial Review (RESILIENCE / EFFICIENCY / FRICTION checks), Self-Correction Loop for any weakness found, and the mandatory `[VALIDATION]` section at the end.
+
+---
+
 Determine what to review:
 - No argument → `git diff HEAD`
 - File path → review that file

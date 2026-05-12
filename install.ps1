@@ -159,13 +159,6 @@ if (-not $NoDeps) {
     }
   }
 
-  if ($HasNode -and $HasPython) {
-    Install-Dep "ui-ux-pro-max-skill" "npm install -g uipro-cli; uipro init --ai claude"
-  } else {
-    Write-Warn "ui-ux-pro-max-skill requires both Node and Python -- skipped"
-    $FailedDeps += "ui-ux-pro-max-skill: npm install -g uipro-cli; uipro init --ai claude"
-  }
-
   if (Get-Command claude -ErrorAction SilentlyContinue) {
     Install-Dep "Playwright MCP" "claude mcp add playwright npx @playwright/mcp@latest"
     Install-Dep "Superpowers"    "claude plugin install superpowers@claude-plugins-official"
@@ -228,10 +221,21 @@ Save-RemoteFile "global/commands/cc-checkpoint.md" "$GLOBAL_DIR\commands\cc-chec
 Save-RemoteFile "global/commands/cc-stack.md"      "$GLOBAL_DIR\commands\cc-stack.md"
 Save-RemoteFile "global/commands/cc-lang.md"       "$GLOBAL_DIR\commands\cc-lang.md"
 Save-RemoteFile "skills/code-simplifier.md"    "$GLOBAL_DIR\skills\code-simplifier.md"
-Save-RemoteFile "skills/ui-ux.md"              "$GLOBAL_DIR\skills\ui-ux.md"
-Save-RemoteFile "skills/verbosity.md"        "$GLOBAL_DIR\skills\verbosity.md"
-Save-RemoteFile "skills/memory-first.md"     "$GLOBAL_DIR\skills\memory-first.md"
-Save-RemoteFile "skills/agent-delegation.md" "$GLOBAL_DIR\skills\agent-delegation.md"
+Save-RemoteFile "skills/critical-review.md"    "$GLOBAL_DIR\skills\critical-review.md"
+Save-RemoteFile "skills/verbosity.md"          "$GLOBAL_DIR\skills\verbosity.md"
+Save-RemoteFile "skills/memory-first.md"       "$GLOBAL_DIR\skills\memory-first.md"
+Save-RemoteFile "skills/agent-delegation.md"   "$GLOBAL_DIR\skills\agent-delegation.md"
+
+$uiUxProMaxUrl  = "https://raw.githubusercontent.com/nextlevelbuilder/ui-ux-pro-max-skill/main/SKILL.md"
+$uiUxProMaxDest = "$GLOBAL_DIR\skills\ui-ux-pro-max.md"
+New-Item -ItemType Directory -Path (Split-Path $uiUxProMaxDest) -Force | Out-Null
+try {
+  Invoke-WebRequest -Uri $uiUxProMaxUrl -OutFile $uiUxProMaxDest -UseBasicParsing -TimeoutSec 10
+  Write-Ok "Downloaded: ui-ux-pro-max skill"
+} catch {
+  Write-Warn "ui-ux-pro-max skill download failed -- install manually from https://github.com/nextlevelbuilder/ui-ux-pro-max-skill"
+  $FailedDeps += "ui-ux-pro-max: Invoke-WebRequest -Uri $uiUxProMaxUrl -OutFile $uiUxProMaxDest"
+}
 
 foreach ($stackProfile in @("_base","_multi-stack","_template","javascript","typescript","python","java","go","rust","react","angular","nextjs","nestjs","django","flask")) {
   Save-RemoteFile "stack-profiles/$stackProfile.md" "$GLOBAL_DIR\stack-profiles\$stackProfile.md"
@@ -255,9 +259,11 @@ if ($Project) {
   Save-RemoteFile "project-template/.claude/settings.json"     "$projDir\settings.json"          $false
   Save-RemoteFile "project-template/.claude/memory/project.md" "$projDir\memory\project.md"      $false
 
-  foreach ($cmd in @("cc-spec","cc-plan","cc-review","cc-debug","cc-refactor","cc-test","cc-docs")) {
+  foreach ($cmd in @("cc-init","cc-spec","cc-plan","cc-review","cc-debug","cc-refactor","cc-test","cc-docs")) {
     Save-RemoteFile "project-template/.claude/commands/$cmd.md" "$projDir\commands\$cmd.md"
   }
+
+  Save-RemoteFile "project-template/.claude/system-prompt.md" "$projDir\system-prompt.md"
 
   Save-RemoteFile "project-template/.claude/hooks/pre-tool-use.sh"  "$projDir\hooks\pre-tool-use.sh"
   Save-RemoteFile "project-template/.claude/hooks/post-compact.sh"  "$projDir\hooks\post-compact.sh"
@@ -294,7 +300,7 @@ Write-Host "    /cc-checkpoint  /cc-stack  /cc-lang"
 Write-Host ""
 if ($Project) {
   Write-Host "  Project commands (this project):"
-  Write-Host "    /cc-spec  /cc-plan  /cc-review  /cc-debug  /cc-refactor  /cc-test  /cc-docs"
+  Write-Host "    /cc-init  /cc-spec  /cc-plan  /cc-review  /cc-debug  /cc-refactor  /cc-test  /cc-docs"
   Write-Host ""
 }
 

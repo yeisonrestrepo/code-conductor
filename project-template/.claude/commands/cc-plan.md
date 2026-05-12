@@ -2,6 +2,19 @@
 description: "(Conductor) Map implementation steps from an approved spec"
 ---
 
+## Phase 0 — Skill activation
+
+Before doing anything else, invoke both skills in order:
+
+```
+Skill({ skill: "writing-plans", args: "$ARGUMENTS" })
+Skill({ skill: "critical-review" })
+```
+
+`writing-plans` structures the format and sequencing strategy. `critical-review` Phase 1 then runs the Pre-Flight Analysis on the implementation approach — surface failure points and boundary conditions before committing to an ordered step list. Do not generate steps until both have completed.
+
+---
+
 Require an approved spec before starting. If no spec is in `.claude/memory/project.md` or in the recent conversation, stop and say:
 "No approved spec found. Run `/cc-spec [name]` first."
 

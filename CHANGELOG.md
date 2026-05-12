@@ -7,6 +7,30 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.3.0] - 2026-05-12
+
+### Added
+
+- **`/cc-init` command** — new session initialization command that chains `/cc-stack` → `/cc-checkpoint` → `/graphify .` → hook integrity check → confirmation report. Run at the start of every session.
+- **`system-prompt.md`** — portable Managed Agent system prompt for `agents.create({ system })`. Defines persona, dynamic stack specialization (BACKEND_ONLY / FRONTEND_ONLY / FULLSTACK), graph-first discovery protocol, dependency integrity enforcement, sub-agent delegation table, response tags, and verbosity protocol.
+- **`critical-review` skill** — 4-phase adversarial review protocol: Pre-Flight Analysis (Happy Path / Failure Points / Boundary Conditions), Adversarial Review (RESILIENCE / EFFICIENCY / FRICTION), Self-Correction Loop, and mandatory `[VALIDATION]` report. Wired into `/cc-spec`, `/cc-plan`, `/cc-review`, and `/cc-debug`.
+- **`[VALIDATION]` response tag** — required closing section on every implementation. Exempt from MIN one-sentence rule; uses compact three-field format at MIN verbosity.
+- **Superpowers skill wiring** — all project commands now activate domain-specific skills in Phase 0: `brainstorming` (`/cc-spec`), `writing-plans` (`/cc-plan`), `subagent-driven-development` (`/cc-review`, `/cc-debug`, `/cc-test`), `code-simplifier` + `subagent-driven-development` (`/cc-refactor`).
+
+### Changed
+
+- **`ui-ux` skill replaced by `ui-ux-pro-max`** — the bundled `skills/ui-ux.md` is removed. Both installers now download the skill directly from [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill). All internal references updated.
+- **Hook command hardened** — `settings.json` hook commands now use an existence guard: if the hook file is absent, a warning is printed and the operation proceeds (exit 0) rather than blocking with a cryptic shell error.
+- **GraphNavigator fallback made actionable** — when `graphify-out/graph.json` is absent, the system prompt now instructs the agent to run `/cc-init` first, then fall back to a defined `Explore` sub-agent search pattern.
+
+### Removed
+
+- `skills/ui-ux.md` — replaced by external `ui-ux-pro-max` skill.
+- `initial_prompt.xml` — bootstrapping artifact with no runtime role.
+- `.worktrees/feat/token-orchestrator` — stale abandoned worktree from pre-v1.2.0.
+
+---
+
 ## [1.2.0] - 2026-05-05
 
 ### Changed

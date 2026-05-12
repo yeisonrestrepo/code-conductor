@@ -154,13 +154,6 @@ if [ "$SKIP_DEPS" = false ]; then
 
   [ "$HAS_NODE" = true ] && install_dep "claude-mem" "npx --yes claude-mem install"
 
-  if [ "$HAS_NODE" = true ] && [ "$HAS_PYTHON" = true ]; then
-    install_dep "ui-ux-pro-max-skill" "npm install -g uipro-cli && uipro init --ai claude"
-  else
-    warn "ui-ux-pro-max-skill requires both Node and Python — skipped"
-    FAILED_DEPS+=("ui-ux-pro-max-skill: npm install -g uipro-cli && uipro init --ai claude")
-  fi
-
   if command -v claude &>/dev/null; then
     install_dep "Playwright MCP" "claude mcp add playwright npx @playwright/mcp@latest"
     install_dep "Superpowers" "claude plugin install superpowers@claude-plugins-official"
@@ -224,10 +217,20 @@ download "global/commands/cc-checkpoint.md" "${GLOBAL_DIR}/commands/cc-checkpoin
 download "global/commands/cc-stack.md"      "${GLOBAL_DIR}/commands/cc-stack.md"
 download "global/commands/cc-lang.md"       "${GLOBAL_DIR}/commands/cc-lang.md"
 download "skills/code-simplifier.md"    "${GLOBAL_DIR}/skills/code-simplifier.md"
-download "skills/ui-ux.md"              "${GLOBAL_DIR}/skills/ui-ux.md"
-download "skills/verbosity.md"        "${GLOBAL_DIR}/skills/verbosity.md"
-download "skills/memory-first.md"     "${GLOBAL_DIR}/skills/memory-first.md"
-download "skills/agent-delegation.md" "${GLOBAL_DIR}/skills/agent-delegation.md"
+download "skills/critical-review.md"    "${GLOBAL_DIR}/skills/critical-review.md"
+download "skills/verbosity.md"          "${GLOBAL_DIR}/skills/verbosity.md"
+download "skills/memory-first.md"       "${GLOBAL_DIR}/skills/memory-first.md"
+download "skills/agent-delegation.md"   "${GLOBAL_DIR}/skills/agent-delegation.md"
+
+UI_UX_PRO_MAX_URL="https://raw.githubusercontent.com/nextlevelbuilder/ui-ux-pro-max-skill/main/SKILL.md"
+UI_UX_PRO_MAX_DEST="${GLOBAL_DIR}/skills/ui-ux-pro-max.md"
+mkdir -p "$(dirname "$UI_UX_PRO_MAX_DEST")"
+if curl -fsSL --max-time 10 "$UI_UX_PRO_MAX_URL" -o "$UI_UX_PRO_MAX_DEST"; then
+  ok "Downloaded: ui-ux-pro-max skill"
+else
+  warn "ui-ux-pro-max skill download failed — install manually from https://github.com/nextlevelbuilder/ui-ux-pro-max-skill"
+  FAILED_DEPS+=("ui-ux-pro-max: curl -fsSL ${UI_UX_PRO_MAX_URL} -o ${UI_UX_PRO_MAX_DEST}")
+fi
 
 for profile in _base _multi-stack _template javascript typescript python java go rust react angular nextjs nestjs django flask; do
   download "stack-profiles/${profile}.md" "${GLOBAL_DIR}/stack-profiles/${profile}.md"
@@ -249,9 +252,11 @@ if [ "$INSTALL_PROJECT" = true ]; then
   download "project-template/.claude/settings.json"      "${PROJ_DIR}/settings.json"            false
   download "project-template/.claude/memory/project.md"  "${PROJ_DIR}/memory/project.md"        false
 
-  for cmd in cc-spec cc-plan cc-review cc-debug cc-refactor cc-test cc-docs; do
+  for cmd in cc-init cc-spec cc-plan cc-review cc-debug cc-refactor cc-test cc-docs; do
     download "project-template/.claude/commands/${cmd}.md" "${PROJ_DIR}/commands/${cmd}.md"
   done
+
+  download "project-template/.claude/system-prompt.md" "${PROJ_DIR}/system-prompt.md"
 
   download "project-template/.claude/hooks/pre-tool-use.sh"  "${PROJ_DIR}/hooks/pre-tool-use.sh"
   download "project-template/.claude/hooks/post-compact.sh"  "${PROJ_DIR}/hooks/post-compact.sh"
@@ -286,7 +291,7 @@ echo "    /cc-checkpoint  /cc-stack  /cc-lang"
 echo ""
 if [ "$INSTALL_PROJECT" = true ]; then
   echo "  Project commands (this project):"
-  echo "    /cc-spec  /cc-plan  /cc-review  /cc-debug  /cc-refactor  /cc-test  /cc-docs"
+  echo "    /cc-init  /cc-spec  /cc-plan  /cc-review  /cc-debug  /cc-refactor  /cc-test  /cc-docs"
   echo ""
 fi
 
