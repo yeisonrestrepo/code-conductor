@@ -182,6 +182,10 @@ Running `/cc-stack` detects your framework from manifest files and loads the mat
 | `nestjs` | `package.json` → `@nestjs/core` |
 | `django` | `manage.py` + `django` in deps |
 | `flask` | `flask` in deps |
+| `flutter` (single package) | `pubspec.yaml` |
+| `flutter` (Melos monorepo) | `pubspec.yaml` + `melos.yaml` |
+| `react-native` (Bare) | `package.json` with `react-native` (no `expo`) |
+| `react-native` (Expo Managed) | `package.json` with `react-native` + `expo` |
 
 ---
 

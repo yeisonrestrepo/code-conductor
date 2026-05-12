@@ -7,6 +7,20 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.3.1] - 2026-05-12
+
+### Added
+
+- **`stack-profiles/flutter.md`** — Flutter/Dart profile covering two workspace variants: **single package** (`pubspec.yaml` only — feature-slice structure, Bloc and Riverpod patterns, `dart format`/`flutter analyze`/`flutter test` tooling) and **Melos monorepo** (`melos.yaml` present — `packages/` structure, `melos bootstrap`, `melos run` scripts, `melos.yaml` config pattern, monorepo-specific anti-patterns). `freezed` anti-pattern added per critical review.
+- **`stack-profiles/react-native.md`** — React Native/TypeScript profile covering two workflow variants: **Bare** (`react-native` only — Metro bundler, `android/`+`ios/` native folders, React Navigation v6 typed screens, `pnpm android`/`ios`) and **Expo Managed** (`react-native` + `expo` — Expo Router file-based navigation, `npx expo install`, `app.config.ts` env config, EAS Build + EAS Update). TanStack Query recommendation added per critical review.
+- **Critical Review Protocol applied** — Happy Path validated for all four project types (Flutter single, Flutter Melos, Bare RN, Expo Managed). Failure Points cover variant co-detection, hybrid Flutter/RN monorepo, plain Dart CLI, single-package Melos repos, and Expo transitive dep. Two corrections applied: `freezed` anti-pattern in Flutter, TanStack Query note in React Native.
+
+### Changed
+
+- **`/cc-stack` command** — added `react-native` and `expo` detection with variant announcement; added `melos.yaml` detection for Flutter monorepo variant; `flutter` and `react-native` added to the Available profiles list with variant footnotes.
+
+---
+
 ## [1.3.0] - 2026-05-12
 
 ### Added

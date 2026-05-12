@@ -15,7 +15,11 @@ Detect the project stack by scanning for manifest files in the current directory
 - `pubspec.yaml` → Dart/Flutter
 
 **Infer framework from dependency contents**, not just file existence:
-- `package.json`: check for react, next, angular, vue, nest, express, etc.
+- `package.json`: check for react, next, angular, vue, nest, express, react-native, expo, etc.
+  - `react-native` + `expo` both present → React Native profile, **Expo Managed** variant (announce to user)
+  - `react-native` without `expo` → React Native profile, **Bare** variant
+  - `react-native` takes precedence over plain `react` in all cases
+- `pubspec.yaml`: if `melos.yaml` also exists at root → Flutter profile, **Melos monorepo** variant (announce to user)
 - `requirements.txt` / `pyproject.toml`: check for django, flask, fastapi
 - `pom.xml`: check for spring-boot, quarkus
 
@@ -28,4 +32,7 @@ Load `_multi-stack.md` as coordinator first, then each language/framework profil
 **Before loading any profile:**
 List detected stack(s) and confirm: "I'll load the [profile] profile. Proceed?"
 
-**Available profiles:** javascript, typescript, python, java, go, rust, react, angular, nextjs, nestjs, django, flask
+**Available profiles:** javascript, typescript, python, java, go, rust, react, angular, nextjs, nestjs, django, flask, flutter, react-native
+
+**Flutter workspace variants:** single-package (`pubspec.yaml` only) · melos-monorepo (`melos.yaml` present)
+**React Native workflow variants:** bare (`react-native` only) · expo (`react-native` + `expo`)
