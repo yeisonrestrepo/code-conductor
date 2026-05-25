@@ -58,6 +58,8 @@ git status --short
 git branch --show-current
 ```
 
+Count the lines in the `git status --short` output — each line represents one uncommitted file. If the output is empty, the count is `"none"`.
+
 If not inside a git repository, skip silently.
 
 ## Step 8 — Render report
@@ -89,3 +91,7 @@ Branch: [branch name]  ·  Uncommitted: [count, or "none"]
 ## Step 9 — Load stack profile
 
 Run `/cc-stack` to detect and load the matching stack profile.
+
+If `/cc-stack` cannot detect a stack or reports an error, append this line to the report:
+`"⚠ Stack could not be detected — run /cc-stack manually."`
+Do not stop the session.
