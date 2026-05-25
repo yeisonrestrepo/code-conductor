@@ -7,6 +7,14 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.6.0] - 2026-05-25
+
+### Changed
+
+- **`/cc-resume` update check** (`project-template/.claude/commands/cc-resume.md`) — added Step 8 that fetches the remote `VERSION` file and compares it to the locally installed version in `~/.claude/memory/conductor-version.md`. If a newer version is available, an `⚡` notice is included at the top of the Session Resume report with the update command. Network failures are silently ignored. Previous Steps 8–9 renumbered to 9–10.
+
+---
+
 ## [1.5.1] - 2026-05-25
 
 ### Added
