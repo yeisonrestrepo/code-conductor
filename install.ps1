@@ -260,7 +260,7 @@ if ($Project) {
   Save-RemoteFile "project-template/.claude/settings.json"     "$projDir\settings.json"          $false
   Save-RemoteFile "project-template/.claude/memory/project.md" "$projDir\memory\project.md"      $false
 
-  foreach ($cmd in @("cc-init","cc-spec","cc-plan","cc-review","cc-debug","cc-refactor","cc-test","cc-docs")) {
+  foreach ($cmd in @("cc-init","cc-resume","cc-spec","cc-plan","cc-review","cc-debug","cc-refactor","cc-test","cc-docs")) {
     Save-RemoteFile "project-template/.claude/commands/$cmd.md" "$projDir\commands\$cmd.md"
   }
 
@@ -301,7 +301,7 @@ Write-Host "    /cc-checkpoint  /cc-stack  /cc-lang"
 Write-Host ""
 if ($Project) {
   Write-Host "  Project commands (this project):"
-  Write-Host "    /cc-init  /cc-spec  /cc-plan  /cc-review  /cc-debug  /cc-refactor  /cc-test  /cc-docs"
+  Write-Host "    /cc-init  /cc-resume  /cc-spec  /cc-plan  /cc-review  /cc-debug  /cc-refactor  /cc-test  /cc-docs"
   Write-Host ""
 }
 
