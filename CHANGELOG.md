@@ -7,6 +7,34 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.5.1] - 2026-05-25
+
+### Added
+
+- **`LICENSE`** — Apache 2.0 license (copyright 2026 Yeison Restrepo). GitHub detects and displays it automatically on the repo page.
+- **`CONTRIBUTING.md`** — contributor guide covering issue reporting (link to GitHub Issues tab), PR workflow (fork, branch from `main`, one feature per PR, link the issue), code style conventions, and license notice.
+- **`.github/pull_request_template.md`** — PR template that auto-fills every new GitHub PR with: Description, Type of change (checkboxes), Related issue field, and Checklist (tested locally, docs updated, changelog entry).
+
+### Fixed
+
+- **`install.sh` / `install.ps1`** — replaced the broken curl/Invoke-WebRequest download of a raw `SKILL.md` file with the correct `uipro-cli` npm package: `npm install -g uipro-cli` is now installed globally (gated on Node.js presence, alongside `claude-mem`), and `uipro init --ai claude` runs in the project block when `--project` is passed. Both scripts include a PATH guard and a `FAILED_DEPS` fallback hint showing the full two-command sequence.
+
+---
+
+## [1.5.0] - 2026-05-25
+
+### Added
+
+- **`/cc-resume` command** (`project-template/.claude/commands/cc-resume.md`) — new command that restores full session context in a single invocation. Reads `CLAUDE.md` (project identity), `.claude/memory/project.md` (latest checkpoint, conventions, debt), `.claude/memory/personal.md` (preferences), the most recently modified spec from `docs/superpowers/specs/` and plan from `docs/superpowers/plans/` (mtime tiebreaker for same-day files), and git log + status. Renders a structured **Session Resume** report then runs `/cc-stack` to fully warm the session. Guards: stops with a clear message if `CLAUDE.md` is absent; continues with a warning if `## Project Identity` is incomplete. Both installers updated to download the command; README command table and file tree updated.
+
+### Fixed
+
+- **`/cc-init` project identity intake** (`project-template/.claude/commands/cc-init.md`) — command now opens with a project-state detection step (`IS_NEW` flag) and a project identity intake step that asks the user for name, description, stack, and language in a single prompt, then writes the answers into `CLAUDE.md`. Previously the command copied an empty template and never populated it.
+- **`/cc-init` empty-project guard** — stack detection (`/cc-stack`), memory checkpoint (`/cc-checkpoint`), and graph sync (`/graphify .`) are now skipped when the project directory contains no source files, preventing errors and wasted steps on brand-new repos.
+- **`project-template/CLAUDE.md` identity section** — replaced the dead HTML comment placeholder (`<!-- Fill in when installing: ... -->`) with actual fillable fields (`- **Name:**`, `- **Description:**`, `- **Stack:**`, `- **Language:** en`) that `/cc-init` can locate and populate.
+
+---
+
 ## [1.4.0] - 2026-05-12
 
 ### Added

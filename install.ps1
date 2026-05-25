@@ -159,6 +159,8 @@ if (-not $NoDeps) {
     }
   }
 
+  if ($HasNode) { Install-Dep "uipro-cli" "npm install -g uipro-cli" }
+
   if (Get-Command claude -ErrorAction SilentlyContinue) {
     Install-Dep "Playwright MCP" "claude mcp add playwright npx @playwright/mcp@latest"
     Install-Dep "Superpowers"    "claude plugin install superpowers@claude-plugins-official"
@@ -227,16 +229,6 @@ Save-RemoteFile "skills/verbosity.md"          "$GLOBAL_DIR\skills\verbosity.md"
 Save-RemoteFile "skills/memory-first.md"       "$GLOBAL_DIR\skills\memory-first.md"
 Save-RemoteFile "skills/agent-delegation.md"   "$GLOBAL_DIR\skills\agent-delegation.md"
 
-$uiUxProMaxUrl  = "https://raw.githubusercontent.com/nextlevelbuilder/ui-ux-pro-max-skill/main/SKILL.md"
-$uiUxProMaxDest = "$GLOBAL_DIR\skills\ui-ux-pro-max.md"
-New-Item -ItemType Directory -Path (Split-Path $uiUxProMaxDest) -Force | Out-Null
-try {
-  Invoke-WebRequest -Uri $uiUxProMaxUrl -OutFile $uiUxProMaxDest -UseBasicParsing -TimeoutSec 10
-  Write-Ok "Downloaded: ui-ux-pro-max skill"
-} catch {
-  Write-Warn "ui-ux-pro-max skill download failed -- install manually from https://github.com/nextlevelbuilder/ui-ux-pro-max-skill"
-  $FailedDeps += "ui-ux-pro-max: Invoke-WebRequest -Uri $uiUxProMaxUrl -OutFile $uiUxProMaxDest"
-}
 
 foreach ($stackProfile in @("_base","_multi-stack","_template","javascript","typescript","python","java","go","rust","react","angular","nextjs","nestjs","django","flask")) {
   Save-RemoteFile "stack-profiles/$stackProfile.md" "$GLOBAL_DIR\stack-profiles\$stackProfile.md"
@@ -260,7 +252,7 @@ if ($Project) {
   Save-RemoteFile "project-template/.claude/settings.json"     "$projDir\settings.json"          $false
   Save-RemoteFile "project-template/.claude/memory/project.md" "$projDir\memory\project.md"      $false
 
-  foreach ($cmd in @("cc-init","cc-spec","cc-plan","cc-review","cc-debug","cc-refactor","cc-test","cc-docs")) {
+  foreach ($cmd in @("cc-init","cc-resume","cc-spec","cc-plan","cc-review","cc-debug","cc-refactor","cc-test","cc-docs")) {
     Save-RemoteFile "project-template/.claude/commands/$cmd.md" "$projDir\commands\$cmd.md"
   }
 
@@ -271,6 +263,13 @@ if ($Project) {
 
   if ((Get-Command graphify -ErrorAction SilentlyContinue) -and (Get-Command claude -ErrorAction SilentlyContinue)) {
     Install-Dep "Graphify project graph" "graphify .; graphify hook install; claude mcp add graphify 'python -m graphify.serve graphify-out/graph.json'"
+  }
+
+  if (Get-Command uipro -ErrorAction SilentlyContinue) {
+    Install-Dep "ui-ux-pro-max" "uipro init --ai claude"
+  } else {
+    Write-Warn "uipro not found -- skipped"
+    $FailedDeps += "ui-ux-pro-max: npm install -g uipro-cli; uipro init --ai claude"
   }
 
   # Update .gitignore
@@ -301,7 +300,7 @@ Write-Host "    /cc-checkpoint  /cc-stack  /cc-lang"
 Write-Host ""
 if ($Project) {
   Write-Host "  Project commands (this project):"
-  Write-Host "    /cc-init  /cc-spec  /cc-plan  /cc-review  /cc-debug  /cc-refactor  /cc-test  /cc-docs"
+  Write-Host "    /cc-init  /cc-resume  /cc-spec  /cc-plan  /cc-review  /cc-debug  /cc-refactor  /cc-test  /cc-docs"
   Write-Host ""
 }
 
