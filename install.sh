@@ -153,6 +153,7 @@ if [ "$SKIP_DEPS" = false ]; then
   echo ""
 
   [ "$HAS_NODE" = true ] && install_dep "claude-mem" "npx --yes claude-mem install"
+  [ "$HAS_NODE" = true ] && install_dep "uipro-cli"  "npm install -g uipro-cli"
 
   if command -v claude &>/dev/null; then
     install_dep "Playwright MCP" "claude mcp add playwright npx @playwright/mcp@latest"
@@ -223,15 +224,6 @@ download "skills/verbosity.md"          "${GLOBAL_DIR}/skills/verbosity.md"
 download "skills/memory-first.md"       "${GLOBAL_DIR}/skills/memory-first.md"
 download "skills/agent-delegation.md"   "${GLOBAL_DIR}/skills/agent-delegation.md"
 
-UI_UX_PRO_MAX_URL="https://raw.githubusercontent.com/nextlevelbuilder/ui-ux-pro-max-skill/main/SKILL.md"
-UI_UX_PRO_MAX_DEST="${GLOBAL_DIR}/skills/ui-ux-pro-max.md"
-mkdir -p "$(dirname "$UI_UX_PRO_MAX_DEST")"
-if curl -fsSL --max-time 10 "$UI_UX_PRO_MAX_URL" -o "$UI_UX_PRO_MAX_DEST"; then
-  ok "Downloaded: ui-ux-pro-max skill"
-else
-  warn "ui-ux-pro-max skill download failed — install manually from https://github.com/nextlevelbuilder/ui-ux-pro-max-skill"
-  FAILED_DEPS+=("ui-ux-pro-max: curl -fsSL ${UI_UX_PRO_MAX_URL} -o ${UI_UX_PRO_MAX_DEST}")
-fi
 
 for profile in _base _multi-stack _template javascript typescript python java go rust react angular nextjs nestjs django flask; do
   download "stack-profiles/${profile}.md" "${GLOBAL_DIR}/stack-profiles/${profile}.md"
@@ -267,6 +259,13 @@ if [ "$INSTALL_PROJECT" = true ]; then
   if command -v graphify &>/dev/null && command -v claude &>/dev/null; then
     install_dep "Graphify project graph" \
       "graphify . && graphify hook install && claude mcp add graphify 'python -m graphify.serve graphify-out/graph.json'"
+  fi
+
+  if command -v uipro &>/dev/null; then
+    install_dep "ui-ux-pro-max" "uipro init --ai claude"
+  else
+    warn "uipro not found — skipped"
+    FAILED_DEPS+=("ui-ux-pro-max: npm install -g uipro-cli && uipro init --ai claude")
   fi
 
   # Update .gitignore
