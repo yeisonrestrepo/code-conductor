@@ -4,11 +4,10 @@ Extends global CLAUDE.md. Project-specific rules take precedence over global one
 
 ## Project Identity
 
-<!-- Fill in when installing:
-name: [project name]
-stack: [detected by /stack]
-language: [optional override, e.g., "es" for Spanish responses]
--->
+- **Name:** 
+- **Description:** 
+- **Stack:** 
+- **Language:** en
 
 ## Architecture Notes
 
