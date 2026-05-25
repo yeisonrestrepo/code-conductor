@@ -253,7 +253,7 @@ if [ "$INSTALL_PROJECT" = true ]; then
   download "project-template/.claude/settings.json"      "${PROJ_DIR}/settings.json"            false
   download "project-template/.claude/memory/project.md"  "${PROJ_DIR}/memory/project.md"        false
 
-  for cmd in cc-init cc-spec cc-plan cc-review cc-debug cc-refactor cc-test cc-docs; do
+  for cmd in cc-init cc-resume cc-spec cc-plan cc-review cc-debug cc-refactor cc-test cc-docs; do
     download "project-template/.claude/commands/${cmd}.md" "${PROJ_DIR}/commands/${cmd}.md"
   done
 
@@ -292,7 +292,7 @@ echo "    /cc-checkpoint  /cc-stack  /cc-lang"
 echo ""
 if [ "$INSTALL_PROJECT" = true ]; then
   echo "  Project commands (this project):"
-  echo "    /cc-init  /cc-spec  /cc-plan  /cc-review  /cc-debug  /cc-refactor  /cc-test  /cc-docs"
+  echo "    /cc-init  /cc-resume  /cc-spec  /cc-plan  /cc-review  /cc-debug  /cc-refactor  /cc-test  /cc-docs"
   echo ""
 fi
 
