@@ -7,6 +7,20 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.5.1] - 2026-05-25
+
+### Added
+
+- **`LICENSE`** — Apache 2.0 license (copyright 2026 Yeison Restrepo). GitHub detects and displays it automatically on the repo page.
+- **`CONTRIBUTING.md`** — contributor guide covering issue reporting (link to GitHub Issues tab), PR workflow (fork, branch from `main`, one feature per PR, link the issue), code style conventions, and license notice.
+- **`.github/pull_request_template.md`** — PR template that auto-fills every new GitHub PR with: Description, Type of change (checkboxes), Related issue field, and Checklist (tested locally, docs updated, changelog entry).
+
+### Fixed
+
+- **`install.sh` / `install.ps1`** — replaced the broken curl/Invoke-WebRequest download of a raw `SKILL.md` file with the correct `uipro-cli` npm package: `npm install -g uipro-cli` is now installed globally (gated on Node.js presence, alongside `claude-mem`), and `uipro init --ai claude` runs in the project block when `--project` is passed. Both scripts include a PATH guard and a `FAILED_DEPS` fallback hint showing the full two-command sequence.
+
+---
+
 ## [1.5.0] - 2026-05-25
 
 ### Added
