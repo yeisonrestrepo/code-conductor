@@ -83,6 +83,7 @@ All commands are tagged `(Conductor)` in the Claude Code command palette so they
 
 | Command | Description |
 |---------|-------------|
+| `/cc-resume` | Restore full session context in one command: reads project identity, memory, latest spec and plan, git state, and loads the stack profile. Run at the start of every session after initialization. |
 | `/cc-init` | Initialize or re-sync the project environment: detect stack, checkpoint memory, refresh the project graph, and verify hook integrity. Run at the start of every session. |
 | `/cc-spec [name]` | Search the codebase first, ask only for missing context, generate a full feature spec, and wait for your approval before any plan is made. |
 | `/cc-plan` | Require an approved spec, map the codebase, and generate an ordered implementation plan with exact file paths, a test list, a commit order, and identified risks. |
@@ -260,6 +261,7 @@ code-conductor/
 │       ├── system-prompt.md      Managed Agent system prompt (agents.create)
 │       ├── commands/
 │       │   ├── cc-init.md        /cc-init — session initialization
+│       │   ├── cc-resume.md      /cc-resume — session context restore
 │       │   ├── cc-spec.md        /cc-spec
 │       │   ├── cc-plan.md        /cc-plan
 │       │   ├── cc-review.md      /cc-review
