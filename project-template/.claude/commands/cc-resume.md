@@ -62,7 +62,22 @@ Count the lines in the `git status --short` output — each line represents one 
 
 If not inside a git repository, skip silently.
 
-## Step 8 — Render report
+## Step 8 — Check for updates
+
+Read the local installed version from `~/.claude/memory/conductor-version.md`.
+
+Fetch the remote version:
+
+```bash
+curl -fsSL --max-time 5 https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/VERSION 2>/dev/null
+```
+
+If the remote version differs from the local version, store this notice for the report:
+`"⚡ code-conductor [remote version] available — run: bash install.sh to update"`
+
+If the fetch fails or times out, skip silently. Do not stop the session.
+
+## Step 9 — Render report
 
 Output this report, populating each field from the steps above:
 
@@ -70,6 +85,7 @@ Output this report, populating each field from the steps above:
 ## Session Resume — [Name] · [YYYY-MM-DD]
 
 [⚠ Project identity incomplete — run /cc-init to fill it in.]  ← include only if applicable
+[⚡ code-conductor X.Y.Z available — run: bash install.sh to update]  ← include only if applicable
 
 ### Active Work
 Spec:  [spec filename] — [spec title]
@@ -88,7 +104,7 @@ Branch: [branch name]  ·  Uncommitted: [count, or "none"]
 [personal.md relevant lines]
 ```
 
-## Step 9 — Load stack profile
+## Step 10 — Load stack profile
 
 Run `/cc-stack` to detect and load the matching stack profile.
 
