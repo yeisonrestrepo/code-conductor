@@ -8,3 +8,4 @@ Thumbs.db
 docs/
 initial_prompt.xml
 !project-template/*
+.claude/memory/session-snapshot.md
