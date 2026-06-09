@@ -159,6 +159,17 @@ if (-not $NoDeps) {
     }
   }
 
+  if ($HasNode) {
+    $claudeMemPluginDir = Get-ChildItem "$env:USERPROFILE\.claude\plugins\cache\thedotmack\claude-mem" -Directory -ErrorAction SilentlyContinue |
+      Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
+    if ($claudeMemPluginDir) {
+      Write-Info "Installing claude-mem dependencies..."
+      npm install --prefix $claudeMemPluginDir --ignore-scripts --silent
+      if ($LASTEXITCODE -eq 0) { Write-Ok "claude-mem dependencies installed" }
+      else { Write-Warn "claude-mem dependencies failed -- run: npm install --prefix `"$claudeMemPluginDir`" --ignore-scripts" }
+    }
+  }
+
   if ($HasNode) { Install-Dep "uipro-cli" "npm install -g uipro-cli" }
 
   if (Get-Command claude -ErrorAction SilentlyContinue) {
@@ -223,6 +234,7 @@ Save-RemoteFile "global/hooks/graphify-ast-refresh.py" "$GLOBAL_DIR\hooks\graphi
 Save-RemoteFile "global/commands/cc-checkpoint.md" "$GLOBAL_DIR\commands\cc-checkpoint.md"
 Save-RemoteFile "global/commands/cc-stack.md"      "$GLOBAL_DIR\commands\cc-stack.md"
 Save-RemoteFile "global/commands/cc-lang.md"       "$GLOBAL_DIR\commands\cc-lang.md"
+Save-RemoteFile "global/commands/cc-compact.md"    "$GLOBAL_DIR\commands\cc-compact.md"
 Save-RemoteFile "skills/code-simplifier.md"    "$GLOBAL_DIR\skills\code-simplifier.md"
 Save-RemoteFile "skills/critical-review.md"    "$GLOBAL_DIR\skills\critical-review.md"
 Save-RemoteFile "skills/verbosity.md"          "$GLOBAL_DIR\skills\verbosity.md"
@@ -252,7 +264,7 @@ if ($Project) {
   Save-RemoteFile "project-template/.claude/settings.json"     "$projDir\settings.json"          $false
   Save-RemoteFile "project-template/.claude/memory/project.md" "$projDir\memory\project.md"      $false
 
-  foreach ($cmd in @("cc-init","cc-resume","cc-spec","cc-plan","cc-review","cc-debug","cc-refactor","cc-test","cc-docs")) {
+  foreach ($cmd in @("cc-init","cc-resume","cc-spec","cc-plan","cc-implement","cc-review","cc-debug","cc-refactor","cc-test","cc-docs")) {
     Save-RemoteFile "project-template/.claude/commands/$cmd.md" "$projDir\commands\$cmd.md"
   }
 
@@ -296,7 +308,7 @@ Write-Host "  To update: re-run the install command"
 Write-Host "  Changelog: https://github.com/yeisonrestrepo/code-conductor/blob/main/CHANGELOG.md"
 Write-Host ""
 Write-Host "  Global commands (all projects):"
-Write-Host "    /cc-checkpoint  /cc-stack  /cc-lang"
+Write-Host "    /cc-checkpoint  /cc-stack  /cc-lang  /cc-compact"
 Write-Host ""
 if ($Project) {
   Write-Host "  Project commands (this project):"
