@@ -153,6 +153,19 @@ if [ "$SKIP_DEPS" = false ]; then
   echo ""
 
   [ "$HAS_NODE" = true ] && install_dep "claude-mem" "npx --yes claude-mem install"
+
+  if [ "$HAS_NODE" = true ]; then
+    _cm_dir=$(find "${HOME}/.claude/plugins/cache/thedotmack/claude-mem" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | sort -rV | head -1)
+    if [ -n "$_cm_dir" ] && [ -f "$_cm_dir/package.json" ]; then
+      info "Installing claude-mem dependencies..."
+      if npm install --prefix "$_cm_dir" --ignore-scripts --silent; then
+        ok "claude-mem dependencies installed"
+      else
+        warn "claude-mem dependencies failed -- run: npm install --prefix \"$_cm_dir\" --ignore-scripts"
+      fi
+    fi
+  fi
+
   [ "$HAS_NODE" = true ] && install_dep "uipro-cli"  "npm install -g uipro-cli"
 
   if command -v claude &>/dev/null; then
@@ -218,6 +231,7 @@ download "global/hooks/graphify-ast-refresh.py" "${GLOBAL_DIR}/hooks/graphify-as
 download "global/commands/cc-checkpoint.md" "${GLOBAL_DIR}/commands/cc-checkpoint.md"
 download "global/commands/cc-stack.md"      "${GLOBAL_DIR}/commands/cc-stack.md"
 download "global/commands/cc-lang.md"       "${GLOBAL_DIR}/commands/cc-lang.md"
+download "global/commands/cc-compact.md"    "${GLOBAL_DIR}/commands/cc-compact.md"
 download "skills/code-simplifier.md"    "${GLOBAL_DIR}/skills/code-simplifier.md"
 download "skills/critical-review.md"    "${GLOBAL_DIR}/skills/critical-review.md"
 download "skills/verbosity.md"          "${GLOBAL_DIR}/skills/verbosity.md"
@@ -245,7 +259,7 @@ if [ "$INSTALL_PROJECT" = true ]; then
   download "project-template/.claude/settings.json"      "${PROJ_DIR}/settings.json"            false
   download "project-template/.claude/memory/project.md"  "${PROJ_DIR}/memory/project.md"        false
 
-  for cmd in cc-init cc-resume cc-spec cc-plan cc-review cc-debug cc-refactor cc-test cc-docs; do
+  for cmd in cc-init cc-resume cc-spec cc-plan cc-implement cc-review cc-debug cc-refactor cc-test cc-docs; do
     download "project-template/.claude/commands/${cmd}.md" "${PROJ_DIR}/commands/${cmd}.md"
   done
 
@@ -287,7 +301,7 @@ echo "  code-conductor installed"
 echo "  ─────────────────────────────────────────"
 echo ""
 echo "  Global commands (all projects):"
-echo "    /cc-checkpoint  /cc-stack  /cc-lang"
+echo "    /cc-checkpoint  /cc-stack  /cc-lang  /cc-compact"
 echo ""
 if [ "$INSTALL_PROJECT" = true ]; then
   echo "  Project commands (this project):"
