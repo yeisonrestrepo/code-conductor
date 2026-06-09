@@ -2,6 +2,17 @@
 description: "(Conductor) Define the problem and generate an approved spec"
 ---
 
+## Phase entry - Destructive Read Invariant
+
+If `.claude/memory/session-snapshot.md` exists:
+1. Read its full contents into context.
+2. Delete the file immediately.
+3. Use the snapshot contents as the starting context for this phase.
+
+If the file cannot be deleted after reading, report the error and halt.
+
+---
+
 ## Phase 0 — Skill activation
 
 Before doing anything else, invoke both skills in order:
@@ -63,3 +74,13 @@ Wait for explicit approval before proceeding to `/cc-plan`.
 
 Once approved, append a summary to `.claude/memory/project.md` under:
 `## Spec: [name] [YYYY-MM-DD]`
+
+---
+
+## Phase exit
+
+Once the spec is approved and the summary has been appended to `.claude/memory/project.md`, instruct the user:
+
+> "Spec complete. Run `/cc-compact` now before starting `/cc-plan`."
+
+Do not proceed to plan phase without user confirmation that `/cc-compact` has been run.

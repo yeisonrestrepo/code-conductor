@@ -7,6 +7,26 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.7.0] - 2026-06-09
+
+### Added
+
+- **`/cc-compact` command** (`global/commands/cc-compact.md`) — new phase-boundary slash command that serializes the current phase's essential state into a ≤300-token snapshot file (`.claude/memory/session-snapshot.md`) and prompts the user to run `/compact`. Fixes BUG-001: context accumulation was growing at O(N²) as Superpowers skills re-injected instructions into history on every turn, exhausting the Claude Pro context window within an hour of continuous development.
+- **`/cc-implement` command** (`project-template/.claude/commands/cc-implement.md`) — new command for the implementation phase, carrying the Phase Handoff Enforcement check and the Destructive Read Invariant at entry.
+
+### Changed
+
+- **`/cc-spec`** (`project-template/.claude/commands/cc-spec.md`) — added **Destructive Read Invariant** at phase entry (reads then immediately deletes `session-snapshot.md` if present) and a **Phase exit** block that prompts the user to run `/cc-compact` before starting `/cc-plan`.
+- **`/cc-plan`** (`project-template/.claude/commands/cc-plan.md`) — added **Phase Handoff Enforcement** check (halts with standby prompt if turn count exceeds 5) and **Destructive Read Invariant** at phase entry; added **Phase exit** block prompting `/cc-compact` before implementation.
+- **`/cc-review`** (`project-template/.claude/commands/cc-review.md`) — added **Phase Handoff Enforcement** check and **Destructive Read Invariant** at phase entry.
+- **`.gitignore`** — added `.claude/memory/session-snapshot.md` (session-local file, must not be committed).
+
+### Fixed
+
+- **BUG-001: Context overflow via Superpowers redundancy** — phase boundary mechanism eliminates O(N²) context growth by snapshotting and clearing history at each phase transition instead of carrying the full conversation forward.
+
+---
+
 ## [1.6.0] - 2026-05-25
 
 ### Changed

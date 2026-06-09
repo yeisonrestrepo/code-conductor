@@ -87,7 +87,9 @@ All commands are tagged `(Conductor)` in the Claude Code command palette so they
 | `/cc-init` | Initialize or re-sync the project environment: detect stack, checkpoint memory, refresh the project graph, and verify hook integrity. Run at the start of every session. |
 | `/cc-spec [name]` | Search the codebase first, ask only for missing context, generate a full feature spec, and wait for your approval before any plan is made. |
 | `/cc-plan` | Require an approved spec, map the codebase, and generate an ordered implementation plan with exact file paths, a test list, a commit order, and identified risks. |
-| `/cc-review [file\|dir]` | Review code in three layers — Critical / Important / Suggestion — then deliver a verdict and offer to auto-fix. |
+| `/cc-compact` | Phase-boundary command. Serializes the current phase's essential state (decisions, pending steps, files touched, constraints) into a ≤300-token snapshot at `.claude/memory/session-snapshot.md`, then prompts you to run `/compact` to clear conversation history. Run at the end of every phase to prevent context overflow. |
+| `/cc-implement` | Execute implementation tasks from an approved plan. Enforces the phase-boundary check at entry and reads the session snapshot if present. |
+| `/cc-review [file\|dir]` | Review code in three layers - Critical / Important / Suggestion - then deliver a verdict and offer to auto-fix. |
 | `/cc-debug [problem]` | Generate hypotheses ordered by probability, confirm before investigating, use Playwright MCP for visual bugs, and report the root cause with a targeted fix. |
 | `/cc-refactor [file\|module]` | Diagnose complexity, plan ordered changes, apply one step at a time, and verify tests pass after each step. |
 | `/cc-test [scope]` | Analyze coverage gaps, write tests in AAA pattern, add Playwright E2E where applicable, run after confirmation, and report results. |
@@ -264,7 +266,9 @@ code-conductor/
 │       │   ├── cc-resume.md      /cc-resume — session context restore
 │       │   ├── cc-spec.md        /cc-spec
 │       │   ├── cc-plan.md        /cc-plan
+│       │   ├── cc-implement.md   /cc-implement
 │       │   ├── cc-review.md      /cc-review
+│       │   ├── cc-compact.md     /cc-compact — phase boundary compaction
 │       │   ├── cc-debug.md       /cc-debug
 │       │   ├── cc-refactor.md    /cc-refactor
 │       │   ├── cc-test.md        /cc-test
