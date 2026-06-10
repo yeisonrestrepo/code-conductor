@@ -7,6 +7,21 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.8.0] - 2026-06-10
+
+### Changed
+
+- **`/cc-implement`** (`project-template/.claude/commands/cc-implement.md`) — replaced the 2-line execution stub with a full **Surgical Plan State Ritual**. The agent now locates pending tasks via a targeted `Grep` scan (pattern `\[ \] \[T-\d{3,}(-[A-Z0-9]+)*\]`, `head_limit: 20`, `offset`-based loop with 10-iteration hard cap), verifies each line with a single-line `Read`, pre-flips the checkbox to `[>]` before executing, and post-flips to `[X]` or `[!]` after. Full plan file reads and full file rewrites are eliminated. Includes: 4-state checkbox protocol (`[ ]` / `[>]` / `[X]` / `[!]`), separate comparison-normalization and `old_string`-construction rules (Unicode invisible stripping is comparison-only), dependency evaluation with `PREREQUISITE_IN_PROGRESS` / `DEPENDENCY_FAILED` / `SCAN_LIMIT_EXCEEDED` halts, drift cap (5 mismatches → `VERIFY_DRIFT_EXCEEDED`), pre-flip retry cap (3 failures → mark `[!]` and halt), and a Step 6 hook (no-op conditional on `.conductor/cache.db`).
+- **`/cc-plan`** (`project-template/.claude/commands/cc-plan.md`) — added **Task ID Requirements** section to the plan generation rules. Every generated task checkbox line must carry a unique alphanumeric ID with at least three digits (`T-001`) and unlimited suffix depth (`T-NNN(-[A-Z0-9]+)*`). IDs must be unique within the file; checkbox brackets must use plain ASCII `[ ]` (U+0020 only, no Unicode invisible characters). Applies to newly generated plans only; no retroactive addition to existing files.
+- **`/cc-resume`** (`project-template/.claude/commands/cc-resume.md`) — added **Step 6a** between the plan-file discovery step and the git-state step. If a plan file was found, Step 6a scans it for `[>]` (in-progress) and `[!]` (failed) markers, extracts task IDs, and stores counts for the report. The Step 9 **Active Work** block now includes optional `In-progress` and `Failed` lines (omitted when no matches are found).
+- All three commands mirrored identically to `project-template/.claude/commands/`.
+
+### Fixed
+
+- **BUG-003: Inefficient Plan State Persistence** — the full-file read/write loop in `/cc-implement` caused O(N²) token growth for long plans (one full read + one full rewrite per step). The surgical ritual reduces each step to a constant number of targeted tool calls regardless of plan length.
+
+---
+
 ## [1.7.0] - 2026-06-09
 
 ### Added

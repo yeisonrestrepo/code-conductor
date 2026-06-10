@@ -83,12 +83,12 @@ All commands are tagged `(Conductor)` in the Claude Code command palette so they
 
 | Command | Description |
 |---------|-------------|
-| `/cc-resume` | Restore full session context in one command: reads project identity, memory, latest spec and plan, git state, and loads the stack profile. Run at the start of every session after initialization. |
+| `/cc-resume` | Restore full session context in one command: reads project identity, memory, latest spec and plan, git state, and loads the stack profile. Scans the active plan for `[>]` (interrupted) and `[!]` (failed) task markers and surfaces them in the session report. Run at the start of every session after initialization. |
 | `/cc-init` | Initialize or re-sync the project environment: detect stack, checkpoint memory, refresh the project graph, and verify hook integrity. Run at the start of every session. |
 | `/cc-spec [name]` | Search the codebase first, ask only for missing context, generate a full feature spec, and wait for your approval before any plan is made. |
-| `/cc-plan` | Require an approved spec, map the codebase, and generate an ordered implementation plan with exact file paths, a test list, a commit order, and identified risks. |
+| `/cc-plan` | Require an approved spec, map the codebase, and generate an ordered implementation plan with exact file paths, a test list, a commit order, and identified risks. Every generated task line carries a unique `[T-NNN]` ID (min 3 digits, unlimited suffix depth) using plain ASCII checkboxes — enforced at generation time. |
 | `/cc-compact` | Phase-boundary command. Serializes the current phase's essential state (decisions, pending steps, files touched, constraints) into a ≤300-token snapshot at `.claude/memory/session-snapshot.md`, then prompts you to run `/compact` to clear conversation history. Run at the end of every phase to prevent context overflow. |
-| `/cc-implement` | Execute implementation tasks from an approved plan. Enforces the phase-boundary check at entry and reads the session snapshot if present. |
+| `/cc-implement` | Execute implementation tasks from an approved plan using a surgical 5-step ritual: Grep-locate pending tasks → single-line Read verify → pre-flip `[ ]` to `[>]` → execute → post-flip to `[X]` or `[!]`. Never reads or rewrites the full plan file. Includes dependency evaluation, drift detection, and a hook point for future SQLite state recording. |
 | `/cc-review [file\|dir]` | Review code in three layers - Critical / Important / Suggestion - then deliver a verdict and offer to auto-fix. |
 | `/cc-debug [problem]` | Generate hypotheses ordered by probability, confirm before investigating, use Playwright MCP for visual bugs, and report the root cause with a targeted fix. |
 | `/cc-refactor [file\|module]` | Diagnose complexity, plan ordered changes, apply one step at a time, and verify tests pass after each step. |
