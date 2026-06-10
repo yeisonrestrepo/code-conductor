@@ -25,7 +25,7 @@ Ambiguous files (not in either list) default to capped. Extensionless files are 
 
 **`.env` dotfile classification:** `.env.example` is exempt (safe template, no secrets). `.env`, `.env.local`, `.env.production`, `.env.*` variants containing real values are **not exempt** — they are neither source files nor config manifests the agent needs to read during spec; treat them as capped. In practice the agent should have no reason to read them at all during spec phase.
 
-**Cap semantics — absolute per file, per phase:** The 30-line limit is a total budget for a given source file across the entire spec phase. Multiple sequential Read calls targeting different line offsets of the same file are forbidden and count as a single violation. If 30 lines are insufficient, the file must be deferred — not re-read in slices.
+**Cap semantics — first 30 lines, absolute per file, per phase:** Read starts at line 1 (`offset` must be omitted or 0). The 30-line limit is a total budget for a given source file across the entire spec phase. Multiple Read calls on the same file at any offset are forbidden. If the first 30 lines are insufficient, the file must be deferred — not re-read starting at a later offset.
 
 ---
 
@@ -58,11 +58,14 @@ Ambiguous files (not in either list) default to capped. Extensionless files are 
 ## Acceptance Criteria
 
 - [ ] `cc-spec.md` contains a "Spec Read Budget" block that mandates Grep/Glob before any Read call, with an explicit exception: if the user's prompt names the exact file path, the Grep/Glob step is waived for that file (30-line cap still applies if it is a source file)
-- [ ] The budget block lists the 30-line cap and names the source file extensions it applies to
-- [ ] The budget block lists the exempt file types (config, manifest, docs) that may be read in full
+- [ ] The budget block specifies the cap as the **first 30 lines** (`offset` omitted, `limit: 30`); reading from any non-zero offset is explicitly forbidden
+- [ ] The budget block lists the source file extensions the 30-line cap applies to
+- [ ] The budget block lists the exempt file types (config, manifest, docs) that may be read in full, including the `*.json` qualifier "(config/manifest root files only)"
+- [ ] The budget block contains an explicit extensionless-file rule: exempt only when the exact filename appears in the named exempt list; all other extensionless files default to capped
 - [ ] The budget block defines the deferred-read fallback: record in System Impact instead of reading
 - [ ] The `## System Impact` section of the spec template includes a `### Files Requiring Full Read (deferred to /cc-plan)` subsection with the exact placeholder text: `_None. List any source files that could not be understood within the 30-line cap. /cc-plan will perform full reads of these files before task breakdown._`
 - [ ] The deferred subsection placeholder makes clear that `/cc-plan` is responsible for consuming those reads
+- [ ] Running the four bash commands in the `## Verification` section against the modified `cc-spec.md` produces no FAIL output
 
 ---
 
@@ -88,7 +91,7 @@ Before reading any file:
 1. Run Grep or Glob to locate relevant files. Skip this step only if the user's prompt names the exact file path.
 2. Apply the correct read rule based on file type:
 
-**Capped source files** — read at most 30 lines total per file for the entire phase (`limit: 30`). Multiple reads of different line offsets on the same file are forbidden; defer instead.
+**Capped source files** — read the first 30 lines only (`offset` omitted, `limit: 30`). Starting at any offset other than the beginning is forbidden; if the first 30 lines are insufficient, defer the file. Multiple reads of the same file at any offset are forbidden.
 Extensions: `.ts` `.tsx` `.js` `.jsx` `.mjs` `.cjs` `.py` `.go` `.rs` `.java` `.rb` `.cs` `.cpp` `.c` `.h` `.swift` `.kt` `.php` `.sh`
 
 **Exempt files** — may be read in full:
@@ -128,7 +131,8 @@ grep -n "Spec Read Budget" project-template/.claude/commands/cc-spec.md
 
 **2. Budget block appears before the existing grep search line:**
 ```bash
-awk '/Spec Read Budget/{b=NR} /grep -r "\$ARGUMENTS"/{g=NR} END{if(b && g && b<g) print "OK: budget before grep (lines " b " and " g ")"; else print "FAIL: order wrong or missing"}' project-template/.claude/commands/cc-spec.md
+awk '/Spec Read Budget/{b=NR} /head -20/{g=NR} END{if(b && g && b<g) print "OK: budget before grep (lines " b " and " g ")"; else print "FAIL: order wrong or missing"}' project-template/.claude/commands/cc-spec.md
+# Matches the literal string "head -20" which is unique to the codebase grep instruction on line 31 of cc-spec.md
 ```
 
 **3. Deferred-reads subsection present in the spec template section of cc-spec.md:**
