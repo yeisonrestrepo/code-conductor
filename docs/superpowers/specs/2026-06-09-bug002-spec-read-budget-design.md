@@ -93,10 +93,12 @@ Extensions: `.ts` `.tsx` `.js` `.jsx` `.mjs` `.cjs` `.py` `.go` `.rs` `.java` `.
 
 **Exempt files** — may be read in full:
 Named manifests/config: `package.json` `package-lock.json` `yarn.lock` `pnpm-lock.yaml` `bun.lockb` `go.mod` `go.sum` `Cargo.toml` `Cargo.lock` `pyproject.toml` `requirements.txt` `Pipfile` `Gemfile` `Gemfile.lock` `tsconfig.json` `tsconfig.*.json` `.gitignore` `.eslintrc.*` `.prettierrc.*` `.env.example` `.nvmrc` `.node-version` `.python-version` `.tool-versions`
-Patterns: `*.yaml` `*.yml` `*.toml` `*.md` `Makefile` `Dockerfile` `Dockerfile.*` `*.dockerfile` `Jenkinsfile` `Procfile` `Brewfile`
+Patterns: `*.yaml` `*.yml` `*.toml` `*.json` `*.md` `CLAUDE.md` `Makefile` `Dockerfile` `Dockerfile.*` `*.dockerfile` `Jenkinsfile` `Procfile` `Brewfile`
 Note: `.env`, `.env.local`, `.env.*` (real values) are **not exempt** — the agent should not read them during spec phase.
 
-**Default** — any file not in either list defaults to capped.
+**Extensionless files** — exempt only when the exact name appears in the Named manifests/config list or Patterns above. All other extensionless files (including unknown dotfiles) default to capped.
+
+**Default** — any file not matched by the above rules defaults to capped.
 
 **Deferred reads** — if a capped source file cannot be understood from 30 lines, record it in `### Files Requiring Full Read (deferred to /cc-plan)` and move on. Do not slice-read it.
 ```
