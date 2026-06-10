@@ -50,19 +50,19 @@ Before reading any file:
 1. Run Grep or Glob to locate relevant files. Skip this step only if the user's prompt names the exact file path.
 2. Apply the correct read rule based on file type:
 
-**Capped source files** — read the first 30 lines only (`offset` omitted, `limit: 30`). Starting at any offset other than the beginning is forbidden; if the first 30 lines are insufficient, defer the file. Multiple reads of the same file at any offset are forbidden.
+**Capped source files** - read the first 30 lines only (`offset` omitted, `limit: 30`). Starting at any offset other than the beginning is forbidden; if the first 30 lines are insufficient, defer the file. Multiple reads of the same file at any offset are forbidden.
 Extensions: `.ts` `.tsx` `.js` `.jsx` `.mjs` `.cjs` `.py` `.go` `.rs` `.java` `.rb` `.cs` `.cpp` `.c` `.h` `.swift` `.kt` `.php` `.sh` `.html` `.css` `.scss` `.sass` `.less` `.svelte` `.vue`
 
-**Exempt files** — may be read in full:
+**Exempt files** - may be read in full:
 Named manifests/config: `package.json` `package-lock.json` `yarn.lock` `pnpm-lock.yaml` `bun.lockb` `go.mod` `go.sum` `Cargo.toml` `Cargo.lock` `pyproject.toml` `requirements.txt` `Pipfile` `Gemfile` `Gemfile.lock` `tsconfig.json` `tsconfig.*.json` `.gitignore` `.eslintrc.*` `.prettierrc.*` `.env.example` `.nvmrc` `.node-version` `.python-version` `.tool-versions`
-Patterns: `*.yaml` `*.yml` `*.toml` `*.json` (config/manifest root files only — do not apply to data or generated JSON) `*.md` `CLAUDE.md` `Makefile` `Dockerfile` `Dockerfile.*` `*.dockerfile` `Jenkinsfile` `Procfile` `Brewfile`
-Note: `.env`, `.env.local`, `.env.*` (real values) are **not exempt** — the agent should not read them during spec phase.
+Patterns: `*.yaml` `*.yml` `*.toml` `*.json` (config/manifest root files only - do not apply to data or generated JSON) `*.md` `CLAUDE.md` `Makefile` `Dockerfile` `Dockerfile.*` `*.dockerfile` `Jenkinsfile` `Procfile` `Brewfile`
+Note: `.env`, `.env.local`, `.env.*` (real values) are **not exempt** - the agent should not read them during spec phase.
 
-**Extensionless files** — exempt only when the exact name appears in the Named manifests/config list or Patterns above. All other extensionless files (including unknown dotfiles) default to capped.
+**Extensionless files** - exempt only when the exact name appears in the Named manifests/config list or Patterns above. All other extensionless files (including unknown dotfiles) default to capped.
 
-**Default** — any file not matched by the above rules defaults to capped.
+**Default** - any file not matched by the above rules defaults to capped.
 
-**Deferred reads** — if a capped source file cannot be understood from 30 lines, record it in `### Files Requiring Full Read (deferred to /cc-plan)` and move on. Do not slice-read it.
+**Deferred reads** - if a capped source file cannot be understood from 30 lines, record it in `### Files Requiring Full Read (deferred to /cc-plan)` and move on. Do not slice-read it.
 
 ---
 
@@ -89,7 +89,7 @@ Expected output: `OK: budget before grep (lines X and Y)` where X < Y.
 
 ```bash
 git add project-template/.claude/commands/cc-spec.md
-git commit -m "feat(cc-spec): add Spec Read Budget block — 30-line cap on source files"
+git commit -m "feat(cc-spec): add Spec Read Budget block - 30-line cap on source files"
 ```
 
 ---
@@ -178,7 +178,15 @@ git commit -m "feat(cc-spec): add deferred-reads subsection to System Impact tem
 **Files:**
 - Modify: `AGENT-READABLE BACKLOG.md`
 
-- [ ] **Step 1: Check the BUG-002 checkbox**
+- [ ] **Step 1: Verify the target string exists**
+
+Run:
+```bash
+grep -c "### \[ \] \`\[BUG-002\]\`" "AGENT-READABLE BACKLOG.md"
+```
+Expected: `1`. If the result is `0`, the string is absent or already changed — do not proceed; investigate the file before continuing.
+
+- [ ] **Step 2: Check the BUG-002 checkbox**
 
 In `AGENT-READABLE BACKLOG.md`, change:
 
@@ -192,7 +200,7 @@ to:
 ### [X] `[BUG-002]` Lack of Context Pruning in Specification Phase
 ```
 
-- [ ] **Step 2: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
 git add "AGENT-READABLE BACKLOG.md"
