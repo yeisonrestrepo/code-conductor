@@ -23,6 +23,8 @@ Add a **Spec Read Budget** block to `cc-spec.md` that constrains all file reads 
 
 Ambiguous files (not in either list) default to capped. Extensionless files are treated as exempt only when their name appears explicitly in the exempt list above; all other extensionless files default to capped.
 
+**`.env` dotfile classification:** `.env.example` is exempt (safe template, no secrets). `.env`, `.env.local`, `.env.production`, `.env.*` variants containing real values are **not exempt** — they are neither source files nor config manifests the agent needs to read during spec; treat them as capped. In practice the agent should have no reason to read them at all during spec phase.
+
 **Cap semantics — absolute per file, per phase:** The 30-line limit is a total budget for a given source file across the entire spec phase. Multiple sequential Read calls targeting different line offsets of the same file are forbidden and count as a single violation. If 30 lines are insufficient, the file must be deferred — not re-read in slices.
 
 ---
@@ -55,7 +57,7 @@ Ambiguous files (not in either list) default to capped. Extensionless files are 
 
 ## Acceptance Criteria
 
-- [ ] `cc-spec.md` contains a "Spec Read Budget" block that mandates Grep/Glob before any Read call
+- [ ] `cc-spec.md` contains a "Spec Read Budget" block that mandates Grep/Glob before any Read call, with an explicit exception: if the user's prompt names the exact file path, the Grep/Glob step is waived for that file (30-line cap still applies if it is a source file)
 - [ ] The budget block lists the 30-line cap and names the source file extensions it applies to
 - [ ] The budget block lists the exempt file types (config, manifest, docs) that may be read in full
 - [ ] The budget block defines the deferred-read fallback: record in System Impact instead of reading
@@ -77,7 +79,27 @@ Ambiguous files (not in either list) default to capped. Extensionless files are 
 
 One file changes: `project-template/.claude/commands/cc-spec.md`
 
-- Insert Spec Read Budget block between Phase 0 (skill activation) and the existing grep search instruction
+- Insert the following Spec Read Budget block verbatim between Phase 0 (skill activation) and the existing grep search instruction:
+
+```markdown
+## Spec Read Budget
+
+Before reading any file:
+1. Run Grep or Glob to locate relevant files. Skip this step only if the user's prompt names the exact file path.
+2. Apply the correct read rule based on file type:
+
+**Capped source files** — read at most 30 lines total per file for the entire phase (`limit: 30`). Multiple reads of different line offsets on the same file are forbidden; defer instead.
+Extensions: `.ts` `.tsx` `.js` `.jsx` `.mjs` `.cjs` `.py` `.go` `.rs` `.java` `.rb` `.cs` `.cpp` `.c` `.h` `.swift` `.kt` `.php` `.sh`
+
+**Exempt files** — may be read in full:
+Named manifests/config: `package.json` `package-lock.json` `yarn.lock` `pnpm-lock.yaml` `bun.lockb` `go.mod` `go.sum` `Cargo.toml` `Cargo.lock` `pyproject.toml` `requirements.txt` `Pipfile` `Gemfile` `Gemfile.lock` `tsconfig.json` `tsconfig.*.json` `.gitignore` `.eslintrc.*` `.prettierrc.*` `.env.example` `.nvmrc` `.node-version` `.python-version` `.tool-versions`
+Patterns: `*.yaml` `*.yml` `*.toml` `*.md` `Makefile` `Dockerfile` `Dockerfile.*` `*.dockerfile` `Jenkinsfile` `Procfile` `Brewfile`
+Note: `.env`, `.env.local`, `.env.*` (real values) are **not exempt** — the agent should not read them during spec phase.
+
+**Default** — any file not in either list defaults to capped.
+
+**Deferred reads** — if a capped source file cannot be understood from 30 lines, record it in `### Files Requiring Full Read (deferred to /cc-plan)` and move on. Do not slice-read it.
+```
 - Update the `## System Impact` spec template section to add the deferred-reads subsection with this exact text:
 
 ```markdown
