@@ -16,7 +16,7 @@ During `/cc-spec`, the agent reads full source files to gather context even when
 Add a **Spec Read Budget** block to `cc-spec.md` that constrains all file reads during the specification phase. Source files are capped at 30 lines (enough to see exports and function signatures). Config and manifest files are exempt and may be read in full. Any source file that genuinely requires a full read to understand is recorded in the spec's `## System Impact` section under a dedicated deferred-reads subsection instead of being read immediately. The spec template itself is updated to pre-render that subsection so the agent always has a named slot to fill in.
 
 **Capped source extensions** (30-line limit applies):
-`.ts` `.tsx` `.js` `.jsx` `.mjs` `.cjs` `.py` `.go` `.rs` `.java` `.rb` `.cs` `.cpp` `.c` `.h` `.swift` `.kt` `.php` `.sh`
+`.ts` `.tsx` `.js` `.jsx` `.mjs` `.cjs` `.py` `.go` `.rs` `.java` `.rb` `.cs` `.cpp` `.c` `.h` `.swift` `.kt` `.php` `.sh` `.html` `.css` `.scss` `.sass` `.less` `.svelte` `.vue`
 
 **Exempt files** (may be read in full):
 `package.json` `package-lock.json` `yarn.lock` `pnpm-lock.yaml` `bun.lockb` `go.mod` `go.sum` `Cargo.toml` `Cargo.lock` `pyproject.toml` `requirements.txt` `Pipfile` `Gemfile` `Gemfile.lock` `tsconfig.json` `tsconfig.*.json` `*.yaml` `*.yml` `*.toml` `*.json` (config/manifest root files only) `CLAUDE.md` `*.md` `.env.example` `.gitignore` `.eslintrc.*` `.prettierrc.*` `Makefile` `Dockerfile` `Dockerfile.*` `*.dockerfile` `Jenkinsfile` `Procfile` `Brewfile` `.nvmrc` `.node-version` `.python-version` `.tool-versions`
@@ -92,7 +92,7 @@ Before reading any file:
 2. Apply the correct read rule based on file type:
 
 **Capped source files** — read the first 30 lines only (`offset` omitted, `limit: 30`). Starting at any offset other than the beginning is forbidden; if the first 30 lines are insufficient, defer the file. Multiple reads of the same file at any offset are forbidden.
-Extensions: `.ts` `.tsx` `.js` `.jsx` `.mjs` `.cjs` `.py` `.go` `.rs` `.java` `.rb` `.cs` `.cpp` `.c` `.h` `.swift` `.kt` `.php` `.sh`
+Extensions: `.ts` `.tsx` `.js` `.jsx` `.mjs` `.cjs` `.py` `.go` `.rs` `.java` `.rb` `.cs` `.cpp` `.c` `.h` `.swift` `.kt` `.php` `.sh` `.html` `.css` `.scss` `.sass` `.less` `.svelte` `.vue`
 
 **Exempt files** — may be read in full:
 Named manifests/config: `package.json` `package-lock.json` `yarn.lock` `pnpm-lock.yaml` `bun.lockb` `go.mod` `go.sum` `Cargo.toml` `Cargo.lock` `pyproject.toml` `requirements.txt` `Pipfile` `Gemfile` `Gemfile.lock` `tsconfig.json` `tsconfig.*.json` `.gitignore` `.eslintrc.*` `.prettierrc.*` `.env.example` `.nvmrc` `.node-version` `.python-version` `.tool-versions`
@@ -132,7 +132,7 @@ grep -n "Spec Read Budget" project-template/.claude/commands/cc-spec.md
 **2. Budget block appears before the existing grep search line:**
 ```bash
 awk '/Spec Read Budget/{b=NR} /head -20/{g=NR} END{if(b && g && b<g) print "OK: budget before grep (lines " b " and " g ")"; else print "FAIL: order wrong or missing"}' project-template/.claude/commands/cc-spec.md
-# Matches the literal string "head -20" which is unique to the codebase grep instruction on line 31 of cc-spec.md
+# Anchor "head -20" verified present on line 31 of cc-spec.md (2026-06-09). Update this anchor if that line ever changes.
 ```
 
 **3. Deferred-reads subsection present in the spec template section of cc-spec.md:**
