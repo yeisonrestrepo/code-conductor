@@ -93,7 +93,7 @@ Extensions: `.ts` `.tsx` `.js` `.jsx` `.mjs` `.cjs` `.py` `.go` `.rs` `.java` `.
 
 **Exempt files** — may be read in full:
 Named manifests/config: `package.json` `package-lock.json` `yarn.lock` `pnpm-lock.yaml` `bun.lockb` `go.mod` `go.sum` `Cargo.toml` `Cargo.lock` `pyproject.toml` `requirements.txt` `Pipfile` `Gemfile` `Gemfile.lock` `tsconfig.json` `tsconfig.*.json` `.gitignore` `.eslintrc.*` `.prettierrc.*` `.env.example` `.nvmrc` `.node-version` `.python-version` `.tool-versions`
-Patterns: `*.yaml` `*.yml` `*.toml` `*.json` `*.md` `CLAUDE.md` `Makefile` `Dockerfile` `Dockerfile.*` `*.dockerfile` `Jenkinsfile` `Procfile` `Brewfile`
+Patterns: `*.yaml` `*.yml` `*.toml` `*.json` (config/manifest root files only — do not apply to data or generated JSON) `*.md` `CLAUDE.md` `Makefile` `Dockerfile` `Dockerfile.*` `*.dockerfile` `Jenkinsfile` `Procfile` `Brewfile`
 Note: `.env`, `.env.local`, `.env.*` (real values) are **not exempt** — the agent should not read them during spec phase.
 
 **Extensionless files** — exempt only when the exact name appears in the Named manifests/config list or Patterns above. All other extensionless files (including unknown dotfiles) default to capped.
@@ -113,6 +113,35 @@ _None. List any source files that could not be understood within the 30-line cap
 ### Files Requiring Full Read (deferred to /cc-plan)
 
 None — this change is confined to a single markdown command file.
+
+---
+
+## Verification
+
+Run after implementation to confirm both edits are present and correctly placed.
+
+**1. Budget block inserted before the grep instruction:**
+```bash
+grep -n "Spec Read Budget" project-template/.claude/commands/cc-spec.md
+# Expected: one match on a line that precedes the grep search instruction line
+```
+
+**2. Budget block appears before the existing grep search line:**
+```bash
+awk '/Spec Read Budget/{b=NR} /grep -r "\$ARGUMENTS"/{g=NR} END{if(b && g && b<g) print "OK: budget before grep (lines " b " and " g ")"; else print "FAIL: order wrong or missing"}' project-template/.claude/commands/cc-spec.md
+```
+
+**3. Deferred-reads subsection present in the spec template section of cc-spec.md:**
+```bash
+grep -n "Files Requiring Full Read" project-template/.claude/commands/cc-spec.md
+# Expected: one match inside the ## System Impact template block
+```
+
+**4. Placeholder text is verbatim:**
+```bash
+grep -c "cc-plan will perform full reads of these files before task breakdown" project-template/.claude/commands/cc-spec.md
+# Expected: 1
+```
 
 ---
 
