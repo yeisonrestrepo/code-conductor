@@ -15,6 +15,14 @@ During `/cc-spec`, the agent reads full source files to gather context even when
 
 Add a **Spec Read Budget** block to `cc-spec.md` that constrains all file reads during the specification phase. Source files are capped at 30 lines (enough to see exports and function signatures). Config and manifest files are exempt and may be read in full. Any source file that genuinely requires a full read to understand is recorded in the spec's `## System Impact` section under a dedicated deferred-reads subsection instead of being read immediately. The spec template itself is updated to pre-render that subsection so the agent always has a named slot to fill in.
 
+**Capped source extensions** (30-line limit applies):
+`.ts` `.tsx` `.js` `.jsx` `.mjs` `.cjs` `.py` `.go` `.rs` `.java` `.rb` `.cs` `.cpp` `.c` `.h` `.swift` `.kt` `.php` `.sh`
+
+**Exempt files** (may be read in full):
+`package.json` `package-lock.json` `yarn.lock` `pnpm-lock.yaml` `bun.lockb` `go.mod` `go.sum` `Cargo.toml` `Cargo.lock` `pyproject.toml` `requirements.txt` `Pipfile` `Gemfile` `Gemfile.lock` `tsconfig.json` `tsconfig.*.json` `*.yaml` `*.yml` `*.toml` `*.json` (config/manifest root files only) `CLAUDE.md` `*.md` `.env.example` `.gitignore` `.eslintrc.*` `.prettierrc.*` `Makefile`
+
+Ambiguous files (not in either list) default to capped.
+
 ---
 
 ## Behavior
@@ -28,7 +36,7 @@ Add a **Spec Read Budget** block to `cc-spec.md` that constrains all file reads 
 5. For source files, agent reads at most 30 lines per file using `limit: 30`.
 6. If a source file cannot be understood from 30 lines, agent records it in `### Files Requiring Full Read (deferred to /cc-plan)` and moves on.
 7. Agent writes the spec; the `## System Impact` section includes the deferred-reads list.
-8. `/cc-plan` reads the deferred list and performs full reads before task breakdown.
+8. `/cc-plan` reads the approved spec (standard behavior) and finds the deferred list already populated — no change to cc-plan.md required.
 
 ### Alternative paths
 
@@ -57,7 +65,7 @@ Add a **Spec Read Budget** block to `cc-spec.md` that constrains all file reads 
 ## Out of Scope
 
 - Mechanical enforcement via hooks (belongs to FEAT-018)
-- Changes to `/cc-plan`, `/cc-implement`, or `/cc-review` read behavior
+- Edits to `cc-plan.md`, `cc-implement.md`, or `cc-review.md` — the deferred list is consumed by the agent when it reads the approved spec, which is already part of `/cc-plan`'s normal entry; no command file changes needed
 - Token counting or budget tracking tooling
 - Any changes to how non-spec phases read files
 
