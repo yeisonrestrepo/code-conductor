@@ -31,7 +31,7 @@ Ambiguous files (not in either list) default to capped.
 
 1. Agent enters `/cc-spec` and processes the Destructive Read Invariant.
 2. Agent reads the Spec Read Budget rules before touching any file.
-3. Agent runs Grep or Glob to discover relevant files — no Read calls yet.
+3. Agent runs Grep or Glob to discover relevant files — no Read calls yet. Exception: if the user's prompt explicitly names the exact file path, the Grep/Glob step is waived for that file and the agent may Read it directly (still subject to the 30-line cap if it is a source file).
 4. Agent reads config/manifest files (e.g., `package.json`, `CLAUDE.md`) in full as needed.
 5. For source files, agent reads at most 30 lines per file using `limit: 30`.
 6. If a source file cannot be understood from 30 lines, agent records it in `### Files Requiring Full Read (deferred to /cc-plan)` and moves on.
@@ -46,7 +46,7 @@ Ambiguous files (not in either list) default to capped.
 
 ### Error cases
 
-- **Agent reads a source file without a prior Grep/Glob** — the Read Budget instruction explicitly blocks this. If the agent violates it mid-session (context drift), the next turn's reinforcement from the skill block corrects behavior.
+- **Agent reads a source file without a prior Grep/Glob** — blocked unless the user's prompt named the exact path. If the agent violates this mid-session (context drift), the next turn's reinforcement from the skill block corrects behavior.
 - **Agent cannot determine file type** — default to applying the cap. The exempt list is explicit; ambiguous files are capped.
 
 ---
@@ -57,7 +57,7 @@ Ambiguous files (not in either list) default to capped.
 - [ ] The budget block lists the 30-line cap and names the source file extensions it applies to
 - [ ] The budget block lists the exempt file types (config, manifest, docs) that may be read in full
 - [ ] The budget block defines the deferred-read fallback: record in System Impact instead of reading
-- [ ] The `## System Impact` section of the spec template includes a `### Files Requiring Full Read (deferred to /cc-plan)` subsection with a placeholder
+- [ ] The `## System Impact` section of the spec template includes a `### Files Requiring Full Read (deferred to /cc-plan)` subsection with the exact placeholder text: `_None. List any source files that could not be understood within the 30-line cap. /cc-plan will perform full reads of these files before task breakdown._`
 - [ ] The deferred subsection placeholder makes clear that `/cc-plan` is responsible for consuming those reads
 
 ---
@@ -76,7 +76,13 @@ Ambiguous files (not in either list) default to capped.
 One file changes: `project-template/.claude/commands/cc-spec.md`
 
 - Insert Spec Read Budget block between Phase 0 (skill activation) and the existing grep search instruction
-- Update the `## System Impact` spec template section to add the deferred-reads subsection
+- Update the `## System Impact` spec template section to add the deferred-reads subsection with this exact text:
+
+```markdown
+### Files Requiring Full Read (deferred to /cc-plan)
+
+_None. List any source files that could not be understood within the 30-line cap. /cc-plan will perform full reads of these files before task breakdown._
+```
 
 ### Files Requiring Full Read (deferred to /cc-plan)
 
