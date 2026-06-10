@@ -18,7 +18,7 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Components Affected:** Context gathering middleware, file scanning system.
 * **Acceptance Criteria:** Force the agent to read only file maps, structural interfaces, or export definitions during the specification stage, postponing full file reads until implementation.
 
-### [ ] `[BUG-003]` Inefficient Plan State Persistence
+### [X] `[BUG-003]` Inefficient Plan State Persistence
 * **Description:** The agent continuously edits and re-processes the entire `plan.md` or `spec.md` files on disk. For extensive plans, every minor checklist change forces the LLM to re-read and re-write thousands of redundant tokens.
 * **Impact:** Skyrocketing output token costs and redundant input re-processing overhead.
 * **Components Affected:** State persistence modules, markdown generation engine.
@@ -77,16 +77,16 @@ This document is the single source of truth for the evolutionary engineering of 
 ## PILLAR 2: LOCAL PERSISTENCE AND STATE ENGINE
 
 ### [ ] `[FEAT-005]` Local Persistence Layer (SQLite Context Engine)
-* **Description:** Establish an embedded local database file (`.conductor/cache.db`) to serve as the persistent "bird's-eye view" of the target workspace, caching file structures, interface hashes, method signatures, and task tracking records.
-* **Impact:** Eliminates the need to inject the full repository file map into the LLM prompt, reducing planning input tokens by 60% to 80%.
-* **Components Affected:** Core framework storage layer, repository indexing scripts.
-* **Acceptance Criteria:** Maintain an independent local SQLite instance capable of handling schema updates, fast metadata lookups, and task state tracking without querying the LLM context.
+* **Description:** Establish an embedded local database file (`.conductor/cache.db`) to serve as the persistent "bird's-eye view" of the target workspace, caching file structures, interface hashes, method signatures, and task tracking records. This core engine implementation initiates the deprecation phase for the legacy `claude-mem` system.
+* **Impact:** Eliminates the need to inject the full repository file map into the LLM prompt, reducing planning input tokens by 60% to 80%, and prepares the codebase to cut ties with external memory utilities.
+* **Components Affected:** Core framework storage layer, repository indexing scripts, installer configuration templates, project dependency manifests.
+* **Acceptance Criteria:** Maintain an independent local SQLite instance capable of handling schema updates, fast metadata lookups, and task state tracking without querying the LLM context. Verify that dependency files and installers are mapped out to drop the legacy memory tool.
 
 ### [ ] `[ARCH-008]` Relational Persistence for Agent Memory
-* **Description:** Detail and implement the local SQLite schema across three distinct git-linked operational tables: `sessions` (global tracking), `raw_history` (raw developer execution logs kept out of the active prompt, reserved for local RAG/audits), and `snapshots` (compacted state timelines indexed directly by `git_commit_hash`).
-* **Impact:** Enables instant agent session resumption with clean context bounds and adds support for agent "time-travel" rollbacks.
-* **Components Affected:** Cache database schema, state serialization engines.
-* **Acceptance Criteria:** Successfully reload full agent awareness across branch switches or project rollbacks by matching database state records to the current Git commit identifier.
+* **Description:** Detail and implement the local SQLite schema across three distinct git-linked operational tables: `sessions` (global tracking), `raw_history` (raw developer execution logs kept out of the active prompt, reserved for local RAG/audits), and `snapshots` (compacted state timelines indexed directly by `git_commit_hash`). This milestone marks the final, absolute removal of `claude-mem`.
+* **Impact:** Enables instant agent session resumption with clean context bounds, adds support for agent "time-travel" rollbacks, and eliminates the `claude-mem` footprint entirely from the setup overhead.
+* **Components Affected:** Cache database schema, state serialization engines, core installation scripts (`install.sh`, `install.ps1`), dependency manifest files.
+* **Acceptance Criteria:** Successfully reload full agent awareness across branch switches or project rollbacks by matching database state records to the current Git commit identifier. Completely purge all `claude-mem` binary references, installation steps, and environment dependencies from every setup script and project manifest.
 
 ---
 
