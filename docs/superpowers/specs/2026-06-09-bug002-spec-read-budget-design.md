@@ -19,9 +19,11 @@ Add a **Spec Read Budget** block to `cc-spec.md` that constrains all file reads 
 `.ts` `.tsx` `.js` `.jsx` `.mjs` `.cjs` `.py` `.go` `.rs` `.java` `.rb` `.cs` `.cpp` `.c` `.h` `.swift` `.kt` `.php` `.sh`
 
 **Exempt files** (may be read in full):
-`package.json` `package-lock.json` `yarn.lock` `pnpm-lock.yaml` `bun.lockb` `go.mod` `go.sum` `Cargo.toml` `Cargo.lock` `pyproject.toml` `requirements.txt` `Pipfile` `Gemfile` `Gemfile.lock` `tsconfig.json` `tsconfig.*.json` `*.yaml` `*.yml` `*.toml` `*.json` (config/manifest root files only) `CLAUDE.md` `*.md` `.env.example` `.gitignore` `.eslintrc.*` `.prettierrc.*` `Makefile`
+`package.json` `package-lock.json` `yarn.lock` `pnpm-lock.yaml` `bun.lockb` `go.mod` `go.sum` `Cargo.toml` `Cargo.lock` `pyproject.toml` `requirements.txt` `Pipfile` `Gemfile` `Gemfile.lock` `tsconfig.json` `tsconfig.*.json` `*.yaml` `*.yml` `*.toml` `*.json` (config/manifest root files only) `CLAUDE.md` `*.md` `.env.example` `.gitignore` `.eslintrc.*` `.prettierrc.*` `Makefile` `Dockerfile` `Dockerfile.*` `*.dockerfile` `Jenkinsfile` `Procfile` `Brewfile` `.nvmrc` `.node-version` `.python-version` `.tool-versions`
 
-Ambiguous files (not in either list) default to capped.
+Ambiguous files (not in either list) default to capped. Extensionless files are treated as exempt only when their name appears explicitly in the exempt list above; all other extensionless files default to capped.
+
+**Cap semantics — absolute per file, per phase:** The 30-line limit is a total budget for a given source file across the entire spec phase. Multiple sequential Read calls targeting different line offsets of the same file are forbidden and count as a single violation. If 30 lines are insufficient, the file must be deferred — not re-read in slices.
 
 ---
 
