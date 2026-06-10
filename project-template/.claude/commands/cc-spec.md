@@ -87,6 +87,10 @@ Generate a spec with these sections:
 ## System Impact
 [What existing code will be affected or needs to be reviewed]
 
+### Files Requiring Full Read (deferred to /cc-plan)
+
+_None. List any source files that could not be understood within the 30-line cap. /cc-plan will perform full reads of these files before task breakdown._
+
 ## Complexity Estimate
 [S / M / L — with one sentence justification]
 
