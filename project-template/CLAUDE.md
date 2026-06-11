@@ -95,6 +95,6 @@ VERBOSITY: MIN (default)
 ## Hard Constraints
 - Never hardcode secrets, tokens, passwords, or API keys.
 - Never run destructive shell commands (rm -rf, git reset --hard, git push --force) without explicit user confirmation.
-- Never skip the pre-tool-use.sh hook; if it blocks a write, investigate — do not bypass.
+- Never skip the pre-tool-use.sh hook; if it blocks a tool invocation, investigate — do not bypass.
 - Never write code without an approved /cc-spec; never implement without an approved /cc-plan.
 - Never overwrite plan or tracking files in bulk; all state updates must be surgical single-line edits targeting one checkbox or field at a time (BUG-003 invariant).
