@@ -73,6 +73,22 @@ New `/cc-resume` command that restores full session context in a single invocati
 ### Workarounds
 - `.claude/` and `docs/` are in `.gitignore`; committing files in those paths requires `git add -f`; applies to every future BUG/FEAT that touches `.claude/commands/`, `.claude/memory/`, or `docs/superpowers/`
 
+## Checkpoint 2026-06-11 16:30 (BUG-004 + BUG-020)
+
+### Decisions
+- BUG-004 + BUG-020 implemented: `system-prompt.md` deleted from both locations; all behavior merged into `CLAUDE.md` as Zone 1 (project identity + dev commands) + Zone 2 (compacted agent rules)
+- Live `CLAUDE.md` Zone 1 populated with actual project data; template retains blank placeholders
+- Both files landed at 81 lines — well within 120-line ceiling; no trim passes required
+- `install.sh` and `install.ps1` both had a `system-prompt.md` download step removed; README file tree updated to match
+- Version bumped to 1.9.0; separate chore commit per personal.md preference
+
+### Conventions
+- `writing-plans` skill generates checkboxes without `[T-NNN]` IDs; `cc-implement` surgical ritual requires adapting to grep for `- [ ] **Step` instead of the T-NNN pattern when executing plans from that skill
+- Live `.claude/system-prompt.md` was untracked (gitignored); deleted via filesystem only, not `git rm`
+
+### Technical Debt
+- `AGENT-READABLE BACKLOG.md` BUG-004 description still references "Superpowers" as the component; the actual fix targeted `CLAUDE.md` / `system-prompt.md` — description is now historically inaccurate but left as-is
+
 ## Spec: BUG-004 + BUG-020 CLAUDE.md Consolidation 2026-06-11
 
 Merge `system-prompt.md` (127 lines, never read by Claude Code) into `CLAUDE.md` (currently empty placeholders) in one pass across both live workspace and `project-template/`. Delete both orphan `system-prompt.md` files.
