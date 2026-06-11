@@ -260,7 +260,6 @@ code-conductor/
 │   ├── CLAUDE.md
 │   └── .claude/
 │       ├── settings.json         Hooks wiring (pre-tool-use, post-compact)
-│       ├── system-prompt.md      Managed Agent system prompt (agents.create)
 │       ├── commands/
 │       │   ├── cc-init.md        /cc-init — session initialization
 │       │   ├── cc-resume.md      /cc-resume — session context restore

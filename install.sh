@@ -263,8 +263,6 @@ if [ "$INSTALL_PROJECT" = true ]; then
     download "project-template/.claude/commands/${cmd}.md" "${PROJ_DIR}/commands/${cmd}.md"
   done
 
-  download "project-template/.claude/system-prompt.md" "${PROJ_DIR}/system-prompt.md"
-
   download "project-template/.claude/hooks/pre-tool-use.sh"  "${PROJ_DIR}/hooks/pre-tool-use.sh"
   download "project-template/.claude/hooks/post-compact.sh"  "${PROJ_DIR}/hooks/post-compact.sh"
 

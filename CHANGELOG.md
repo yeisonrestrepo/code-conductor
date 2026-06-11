@@ -7,6 +7,26 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.9.0] - 2026-06-11
+
+### Changed
+
+- **`project-template/CLAUDE.md`** — full rewrite. Merged all agent behavior from the orphan `system-prompt.md` (127 lines, never read by Claude Code) directly into `CLAUDE.md` as Zone 2. Added Zone 1 **`## Development Commands`** section with five mandatory labels (`Build`, `Test`, `Lint`, `Format`, `Setup`; value `N/A` when no script exists). Zone 2 now contains: Agent Identity (2-sentence persona), Session Initialization, Dynamic Specialization table, Operational Philosophy, Graph-First numbered steps, Dependency Integrity, Sub-Agent Delegation table, Response Tags table, Verbosity Protocol (MIN default, explicit `[VALIDATION]`/`[BUG]` rules), and Hard Constraints (5 bullets including BUG-003 anti-regression invariant). File is 81 lines — well within the 120-line ceiling.
+- **`CLAUDE.md`** (live workspace) — same Zone 2 as template; Zone 1 populated with actual project data: `Name: code-conductor`, `Description: A spec-first, token-efficient…`, `Stack: markdown/shell`, `Setup: bash install.sh (Unix) / .\install.ps1 (Windows)`, `Build/Test/Lint/Format: N/A`.
+- **`install.sh` / `install.ps1`** — removed the `system-prompt.md` download step from the project-template install block; the file no longer exists in the repo.
+- **`README.md`** — removed `system-prompt.md` entry from the File Structure tree.
+
+### Removed
+
+- **`project-template/.claude/system-prompt.md`** — deleted. Its content is now consolidated into `project-template/CLAUDE.md`. Claude Code reads `CLAUDE.md` at runtime; `system-prompt.md` was never loaded and had no runtime effect.
+
+### Fixed
+
+- **BUG-020: Static System Prompt Invisibility** — `system-prompt.md` was never read by Claude Code at runtime (only `CLAUDE.md` is loaded). All agent behavior rules were being silently ignored on every session. Fixed by merging the content into `CLAUDE.md`.
+- **BUG-004: System Prompt Base Overhead** — the previously split content contained redundant prose and duplicated sections. The consolidated `CLAUDE.md` is 81 lines (was 69 lines of near-empty placeholders + 127 lines of ignored rules).
+
+---
+
 ## [1.8.0] - 2026-06-10
 
 ### Changed

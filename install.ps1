@@ -268,8 +268,6 @@ if ($Project) {
     Save-RemoteFile "project-template/.claude/commands/$cmd.md" "$projDir\commands\$cmd.md"
   }
 
-  Save-RemoteFile "project-template/.claude/system-prompt.md" "$projDir\system-prompt.md"
-
   Save-RemoteFile "project-template/.claude/hooks/pre-tool-use.sh"  "$projDir\hooks\pre-tool-use.sh"
   Save-RemoteFile "project-template/.claude/hooks/post-compact.sh"  "$projDir\hooks\post-compact.sh"
 
