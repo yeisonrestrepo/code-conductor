@@ -31,9 +31,11 @@ Add **Guard 3** to `pre-tool-use.sh` — a Bash-tool interceptor that pattern-ma
 1. Claude Code invokes the Bash tool with a command string.
 2. The `PreToolUse` hook fires; `pre-tool-use.sh` is executed.
 3. Guard 3 checks: is `CLAUDE_TOOL_NAME == "Bash"`? If not, skip Guard 3.
-4. Guard 3 strips shell comments from the command string: everything from the first unquoted `#` to end-of-line is removed. This produces the **comment-stripped string**, which is the base for all subsequent steps.
+4. Guard 3 preprocesses the command string in two sequential normalization steps before any pattern evaluation:
+   - **4a — Line continuation joining:** Replace each trailing backslash-newline sequence (`\<newline>`) with a single space, collapsing multi-line commands into one continuous string.
+   - **4b — Comment stripping:** Remove everything from the first unquoted, non-backslash-escaped `#` to end-of-line. A `\#` sequence is a literal hash and does not begin a comment (e.g., a regex argument of `\#foo` is preserved intact). This produces the **comment-stripped string**, which is the base for all subsequent steps.
 5. Guard 3 runs each blocked-pattern check against the comment-stripped string (see Blocked Patterns table). Patterns 4 and 7 (glob/multi-file expansion detection) additionally apply **per-pattern quote normalization** — single and double quotes are stripped from the token under inspection before checking for expansion characters, so `cat '*.md'` is caught identically to `cat *.md`. Pattern 9 (loop keyword detection) operates on the comment-stripped string only, preserving quote context to distinguish unquoted shell keywords from literal string arguments. All other patterns also operate on the comment-stripped string. If no pattern matches, exit 0 (allow).
-6. If a pattern matches, Guard 3 checks the comment-stripped command string for allowlist tokens. Each entry in `BASH_SCAN_ALLOWLIST` is checked as a whole token — the character immediately preceding the entry must be whitespace, `;`, `|`, `(`, `)`, `}`, `]`, `'`, `"`, or start-of-string; the character immediately following must be whitespace, `;`, `|`, `(`, `)`, `}`, `]`, `'`, `"`, or end-of-string. The forward slash is **not** a delimiter, so that path-based entries like `"docs/"` are matched as complete tokens including their trailing slash. Pure substring matching is not used.
+6. If a pattern matches, Guard 3 checks the comment-stripped command string for allowlist tokens. Each entry in `BASH_SCAN_ALLOWLIST` is checked as a whole token — the character immediately preceding the entry must be whitespace, `;`, `|`, `(`, `)`, `{`, `[`, `}`, `]`, `'`, `"`, or start-of-string; the character immediately following must be whitespace, `;`, `|`, `(`, `)`, `{`, `[`, `}`, `]`, `'`, `"`, or end-of-string. The forward slash is **not** a delimiter, so that path-based entries like `"docs/"` are matched as complete tokens including their trailing slash. Pure substring matching is not used.
 7. If any allowlist token matches, exit 0 (allow).
 8. Otherwise: print the standard block message to stderr and exit 1.
 
@@ -60,7 +62,8 @@ All pattern checks run against the **comment-stripped** command string (quote no
 
 **Binary name word boundaries and command position:** All binary name matches (`cat`, `find`, `ls`, `grep`, `egrep`, `fgrep`, `less`, `more`, `head`, `tail`, `sed`, `awk`) must satisfy two conditions simultaneously:
 1. **Word boundary** — the name must not be a substring of a longer word (e.g., `lsblk`, `concatenate`, `findall` must not trigger).
-2. **Command execution position** — the name must appear as an executed command token: at the start of the command string, or immediately following a shell operator (`|`, `&&`, `||`, `;`, `$(`, or newline). A binary name appearing as a path component (preceded by `/`) or as a plain argument is not in command position and must not trigger a block (e.g., `grep -r pattern /path/to/find/results` must not block on `find`).
+2. **Command execution position** — the name must appear as an executed command token: at the start of the command string, or immediately following a shell operator (`|`, `&&`, `||`, `;`, `$(`, `` ` ``, `{`, `[`, or newline). A binary name appearing as a path component (preceded by `/`) or as a plain argument is not in command position and must not trigger a block (e.g., `grep -r pattern /path/to/find/results` must not block on `find`).
+3. **Command prefix modifiers** — a binary name also satisfies command execution position when it immediately follows a recognized runner prefix: `env`, `exec`, `time`, or `nohup` (e.g., `nohup cat *.ts`, `time find .`, `exec less *.md` must all trigger the guard as if the utility were in bare command position).
 
 | # | Category | Blocked examples | Detection rule |
 |---|---|---|---|
@@ -88,7 +91,7 @@ BASH_SCAN_ALLOWLIST=()
 - **Default is empty.** No paths are permitted for broad scans out of the box.
 - Operators add entries as needed (e.g., `"docs/"`, `".claude/"`).
 - **Agents must never modify this array.** See Hard Constraints.
-- Token check: each entry is matched against the **comment-stripped** command string (quotes are preserved) using boundary delimiters (whitespace, `;`, `|`, `(`, `)`, `}`, `]`, `'`, `"`) on both sides. The forward slash is **not** a delimiter, so path-based entries like `"docs/"` match as complete tokens including their trailing slash. A substring-only match is not sufficient.
+- Token check: each entry is matched against the **comment-stripped** command string (quotes are preserved) using boundary delimiters (whitespace, `;`, `|`, `(`, `)`, `{`, `[`, `}`, `]`, `'`, `"`) on both sides. The forward slash is **not** a delimiter, so path-based entries like `"docs/"` match as complete tokens including their trailing slash. A substring-only match is not sufficient.
 
 ---
 
@@ -115,9 +118,13 @@ When Guard 3 blocks a command, it prints to stderr:
 
 - [ ] Guard 3 fires only when `CLAUDE_TOOL_NAME == "Bash"`.
 - [ ] All nine blocked-pattern categories from the table above are intercepted and hard-blocked (exit 1).
-- [ ] Shell comments are stripped globally before any pattern check or allowlist evaluation.
+- [ ] Multi-line commands joined by trailing backslash-newline (`\<newline>`) are collapsed into a single string before comment stripping and pattern evaluation.
+- [ ] Shell comments are stripped globally before any pattern check or allowlist evaluation; `\#` is treated as a literal hash and does not begin a comment.
 - [ ] Quote normalization (stripping single and double quotes) is applied only per-pattern for patterns 4 and 7; the comment-stripped string retains quotes for pattern 9 keyword detection and allowlist token boundary matching.
 - [ ] All binary name matches satisfy both word boundary and command execution position requirements; a binary name appearing as a path component or string argument does not trigger a block (e.g., `grep -r x /path/to/find/results` must not block on `find`).
+- [ ] Command execution position recognises `{`, `[`, and backtick `` ` `` as valid preceding operators alongside `|`, `&&`, `||`, `;`, `$(`, and newline.
+- [ ] A blocked utility preceded by `env`, `exec`, `time`, or `nohup` is treated as being in command execution position and triggers the guard (e.g., `nohup cat *.ts` blocks on `cat`).
+- [ ] Allowlist boundary delimiters include `{` and `[` on both sides of each token for symmetry with the execution-position operator set.
 - [ ] Patterns 4 and 7 detect brace expansions (`{a,b}`) and bracket sets (`[abc]`) in addition to `*`, `**`, and `?`.
 - [ ] For the grep family (Pattern 6), an empty or whitespace-only pattern argument after quote stripping is treated as a match-all and triggers the block.
 - [ ] The block message is written to stderr; it explicitly names `skills/memory-first.md` and lists the three authorized alternatives (Grep, Glob, Read with offset+limit).
