@@ -33,7 +33,7 @@ Add **Guard 3** to `pre-tool-use.sh` — a Bash-tool interceptor that pattern-ma
 3. Guard 3 checks: is `CLAUDE_TOOL_NAME == "Bash"`? If not, skip Guard 3.
 4. Guard 3 strips shell comments from the command string: everything from the first unquoted `#` to end-of-line is removed. This produces the **comment-stripped string**, which is the base for all subsequent steps.
 5. Guard 3 runs each blocked-pattern check against the comment-stripped string (see Blocked Patterns table). Patterns 4 and 7 (glob/multi-file expansion detection) additionally apply **per-pattern quote normalization** — single and double quotes are stripped from the token under inspection before checking for expansion characters, so `cat '*.md'` is caught identically to `cat *.md`. Pattern 9 (loop keyword detection) operates on the comment-stripped string only, preserving quote context to distinguish unquoted shell keywords from literal string arguments. All other patterns also operate on the comment-stripped string. If no pattern matches, exit 0 (allow).
-6. If a pattern matches, Guard 3 checks the comment-stripped command string for allowlist tokens. Each entry in `BASH_SCAN_ALLOWLIST` is checked as a whole token — delimited by whitespace, `/`, `;`, `|`, `(`, `)`, `}`, `]`, `'`, or `"` on both sides. Quotes are preserved in this string (not stripped globally), so they serve as valid token boundaries. Pure substring matching is not used.
+6. If a pattern matches, Guard 3 checks the comment-stripped command string for allowlist tokens. Each entry in `BASH_SCAN_ALLOWLIST` is checked as a whole token — the character immediately preceding the entry must be whitespace, `;`, `|`, `(`, `)`, `}`, `]`, `'`, `"`, or start-of-string; the character immediately following must be whitespace, `;`, `|`, `(`, `)`, `}`, `]`, `'`, `"`, or end-of-string. The forward slash is **not** a delimiter, so that path-based entries like `"docs/"` are matched as complete tokens including their trailing slash. Pure substring matching is not used.
 7. If any allowlist token matches, exit 0 (allow).
 8. Otherwise: print the standard block message to stderr and exit 1.
 
@@ -42,11 +42,14 @@ Add **Guard 3** to `pre-tool-use.sh` — a Bash-tool interceptor that pattern-ma
 - **Allowlisted path:** If the command targets a path in `BASH_SCAN_ALLOWLIST`, the guard exits 0 and the command runs normally.
 - **Non-Bash tool:** Guard 3 is skipped entirely; Guards 1 and 2 (existing) apply as before.
 - **Empty or missing `CLAUDE_TOOL_INPUT`:** Guard 3 exits 0 (safe default, no false positives on empty input).
+- **Chained safe + blocked command** (`ls -l && cat *.ts`, `echo ok; find . -maxdepth 2`): Guard 3 evaluates the **entire command string** as a unit. If any segment anywhere in the chain matches a blocked pattern, the entire tool invocation is blocked. The guard does not split on shell operators to evaluate segments independently — doing so would allow blocked commands to be smuggled after a safe prefix.
 
 ### Error cases
 
 - **Comment-based bypass attempt** (`cat *.ts # docs/`): comment is stripped before allowlist check; `docs/` is never evaluated as an allowlist match.
 - **Partial substring bypass** (`cat doc_files.ts` when allowlist contains `docs`): word-boundary check prevents `docs` from matching inside `doc_files`.
+- **Chained safe + blocked command** (`ls -l && cat *.ts`): the entire command string is evaluated as a unit; the presence of a safe prefix does not exempt the blocked segment from triggering exit 1.
+- **Backtick substitution bypass** (`` cat `ls` ``): Pattern 5 detects backtick form identically to `$(` form.
 - **Agent attempts to modify `BASH_SCAN_ALLOWLIST`:** This is a strict constraint violation (see Hard Constraints). The agent must not alter the array.
 
 ---
@@ -65,10 +68,10 @@ All pattern checks run against the **comment-stripped** command string (quote no
 | 2 | `find` exec content dump | `find . -exec cat {} \;`, `find . -exec less {} \;` | Command contains `find` + `-exec` + any reading/viewing utility |
 | 3 | `xargs` pipe to viewer/pager | `ls \| xargs cat`, `find . \| xargs -0 less`, `echo f \| xargs -I{} head {}` | Command contains `xargs` followed by any reading utility, with optional intermediate flags (`-0`, `-I`, `-n`, `-P`, etc.) permitted between `xargs` and the utility name — globally, regardless of what precedes the pipe |
 | 4 | `cat` + multi-file expansion | `cat *.md`, `cat src/**/*.ts`, `cat dir/??.sh`, `cat {a,b}.ts`, `cat [abc].md` | `cat` at command execution position followed by a token containing a glob or multi-file expansion character: `*`, `**`, `?`, `{…,…}` (brace expansion), or `[…]` (bracket set); per-pattern quote normalization applied before this check |
-| 5 | Command substitution + reading | `cat $(ls)`, `less $(find .)`, `head $(grep -r .)` | Command contains any reading utility (`cat`, `less`, `more`, `head`, `tail`, `sed`, `awk`) followed by `$(` with zero or more spaces between them |
-| 6 | `grep` family match-all | `grep -r '.*' .`, `egrep -R "" .`, `fgrep -r . src/`, `git grep '.*' --` | `grep`, `egrep`, `fgrep`, or `git grep` at command execution position, with a recursive flag (`-r`, `-R`, or `--all`) and a match-all pattern (`.*`, `""`, `"."`, `.+`, `^`); additionally, if stripping quotes from the pattern argument produces an empty or whitespace-only string, treat it as a match-all (e.g., `grep -r '' .` after quote stripping yields an empty pattern → block) |
+| 5 | Command substitution + reading | `cat $(ls)`, `` cat `ls` ``, `less $(find .)`, `` head `grep -r .` `` | Command contains any reading utility (`cat`, `less`, `more`, `head`, `tail`, `sed`, `awk`) followed by a command substitution expression — either `$(` (POSIX form) or a backtick `` ` `` (legacy form) — with zero or more spaces between the utility and the substitution |
+| 6 | `grep` family match-all | `grep -r '.*' .`, `egrep -R "" .`, `fgrep -r . src/`, `git grep '.*'`, `git grep ''` | Two sub-rules: (a) `grep`, `egrep`, or `fgrep` at command execution position with a recursive flag (`-r`, `-R`, or `--all`) and a match-all pattern (`.*`, `"."`, `.+`, `^`) — recursive flag required because these tools are not recursive by default; (b) `git grep` at command execution position with a match-all pattern only — no recursive flag required because `git grep` inherently searches the entire repository by default; for both sub-rules, if stripping quotes from the pattern argument produces an empty or whitespace-only string, treat it as a match-all (e.g., `git grep ''` after quote stripping → block) |
 | 7 | Streaming/paging + multi-file expansion | `less *.ts`, `head *.log`, `awk '{print}' *.ts`, `sed -n p *.md`, `less {a,b}.log`, `head [0-9].txt` | `less`, `more`, `head`, `tail`, `sed`, or `awk` at command execution position, followed by a token containing a glob or multi-file expansion character: `*`, `**`, `?`, `{…,…}` (brace expansion), or `[…]` (bracket set); per-pattern quote normalization applied before this check |
-| 8 | `ls -R` | `ls -R .`, `ls --recursive src/` | Command contains `ls` as an invoked command token and also contains `-R` or `--recursive`; must not fire for other commands that accept those flags (e.g., `rsync -R`, `git diff -R`) |
+| 8 | `ls -R` | `ls -R .`, `ls -laR`, `ls -lR src/`, `ls --recursive src/` | Command contains `ls` as an invoked command token and also contains: `--recursive`, a standalone `-R` flag, or a short-flag cluster that includes the letter `R` (e.g., `-laR`, `-lR`, `-Rla`); must not fire for other commands that happen to use those flags (e.g., `rsync -R`, `git diff -R`) |
 | 9 | Shell loop + reading | `for f in *.ts; do cat $f; done`, `while true; do less $f; done`, `until false; do grep -r . ; done` | Command contains `for`, `while`, or `until` as an unquoted shell keyword (not as a literal argument to `echo`, `printf`, `grep`, or similar — e.g., `echo "while true"` must not fire) co-occurring with any reading utility in the same command string |
 
 **Reading/viewing utilities** (used across multiple rules): `cat`, `less`, `more`, `head`, `tail`, `sed`, `awk`, `grep`, `egrep`, `fgrep`.
@@ -85,7 +88,7 @@ BASH_SCAN_ALLOWLIST=()
 - **Default is empty.** No paths are permitted for broad scans out of the box.
 - Operators add entries as needed (e.g., `"docs/"`, `".claude/"`).
 - **Agents must never modify this array.** See Hard Constraints.
-- Token check: each entry is matched against the **comment-stripped** command string (quotes are preserved) using word-boundary delimiters (whitespace, `/`, `;`, `|`, `(`, `)`, `}`, `]`, `'`, `"`) on both sides of the token. A substring-only match is not sufficient.
+- Token check: each entry is matched against the **comment-stripped** command string (quotes are preserved) using boundary delimiters (whitespace, `;`, `|`, `(`, `)`, `}`, `]`, `'`, `"`) on both sides. The forward slash is **not** a delimiter, so path-based entries like `"docs/"` match as complete tokens including their trailing slash. A substring-only match is not sufficient.
 
 ---
 
@@ -118,7 +121,11 @@ When Guard 3 blocks a command, it prints to stderr:
 - [ ] Patterns 4 and 7 detect brace expansions (`{a,b}`) and bracket sets (`[abc]`) in addition to `*`, `**`, and `?`.
 - [ ] For the grep family (Pattern 6), an empty or whitespace-only pattern argument after quote stripping is treated as a match-all and triggers the block.
 - [ ] The block message is written to stderr; it explicitly names `skills/memory-first.md` and lists the three authorized alternatives (Grep, Glob, Read with offset+limit).
-- [ ] Allowlist token matching operates on the comment-stripped string (quotes preserved) using word-boundary delimiters (whitespace, `/`, `;`, `|`, `(`, `)`, `}`, `]`, `'`, `"`); pure substring matching is not used.
+- [ ] Allowlist token matching operates on the comment-stripped string (quotes preserved) using boundary delimiters (whitespace, `;`, `|`, `(`, `)`, `}`, `]`, `'`, `"`); the forward slash is NOT a delimiter so that path-based entries like `"docs/"` match as whole tokens; pure substring matching is not used.
+- [ ] Pattern 5 detects both `$(` (POSIX) and backtick (legacy) command substitution forms.
+- [ ] `git grep` with a match-all pattern is blocked without requiring a recursive flag; `grep`/`egrep`/`fgrep` require a recursive flag in addition to a match-all pattern.
+- [ ] Pattern 8 intercepts clustered short flags containing `R` (e.g., `-laR`, `-lR`) as well as standalone `-R` and `--recursive`, anchored to `ls` at command execution position.
+- [ ] A Bash command string containing a blocked pattern in any segment is blocked in full, regardless of safe commands chained before or after it via `&&`, `||`, `|`, or `;`.
 - [ ] An empty `BASH_SCAN_ALLOWLIST` blocks all matching commands with no exceptions.
 - [ ] A non-empty `BASH_SCAN_ALLOWLIST` allows commands whose comment-stripped string contains a matching whole token.
 - [ ] `BASH_SCAN_ALLOWLIST` remains `()` in the committed hook; any agent modification to this array is a constraint violation and must be caught in review.
