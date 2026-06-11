@@ -63,3 +63,23 @@ New `/cc-resume` command that restores full session context in a single invocati
 
 ### Technical Debt
 - SQLite hook in cc-implement.md Step 6 is a no-op until FEAT-005 is implemented
+
+## Checkpoint 2026-06-10 18:42 (implement phase)
+
+### Decisions
+- Version bumped to 1.8.0; CHANGELOG and README updated in a separate chore commit after the feature commit
+- Read tool `offset` parameter is 1-based (offset: N returns line N); plan spec said `offset: N-1` but runtime behavior confirmed 1-based
+
+### Workarounds
+- `.claude/` and `docs/` are in `.gitignore`; committing files in those paths requires `git add -f`; applies to every future BUG/FEAT that touches `.claude/commands/`, `.claude/memory/`, or `docs/superpowers/`
+
+## Spec: BUG-004 + BUG-020 CLAUDE.md Consolidation 2026-06-11
+
+Merge `system-prompt.md` (127 lines, never read by Claude Code) into `CLAUDE.md` (currently empty placeholders) in one pass across both live workspace and `project-template/`. Delete both orphan `system-prompt.md` files.
+
+- Zone 1: Project Identity, Development Commands (5 labels: Build/Test/Lint/Format/Setup), Architecture Notes, Conventions, Out of Scope, Active Stack Profiles
+- Zone 2: Agent Identity (literal 2-sentence persona), Session Initialization, Dynamic Specialization, Operational Philosophy, Graph-First, Dependency Integrity, Sub-Agent Delegation, Response Tags, Verbosity MIN (with [VALIDATION]/[BUG] rules), Hard Constraints (5 bullets incl. BUG-003 invariant)
+- Target: ≤120 lines; TERMINAL FAILURE halt if exceeded after 3 trim passes
+- Step order: (1) diff live vs template, (2) delete template file, (3) delete live file, (4) rewrite template CLAUDE.md, (5) rewrite live CLAUDE.md with actual project data, (6) commit all four paths together
+- Spec: `docs/superpowers/specs/2026-06-10-bug004-bug020-claude-md-consolidation-design.md`
+- Complexity: S
