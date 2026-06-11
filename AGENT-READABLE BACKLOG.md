@@ -24,7 +24,7 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Components Affected:** State persistence modules, markdown generation engine.
 * **Acceptance Criteria:** Move active step execution tracking away from monolithic markdown processing and synchronize execution states dynamically through precise block updates or atomic status flags.
 
-### [ ] `[BUG-004]` System Prompt Base Overhead in Superpowers
+### [X] `[BUG-004]` System Prompt Base Overhead in Superpowers
 * **Description:** Injection of highly dense, text-heavy system instructions on every single turn of the conversation to enforce agent behavior, charging a costly base token fee even for single-word or short answers.
 * **Impact:** Drastically reduces the amount of useful context space available for code logic within the session.
 * **Components Affected:** Core prompt manager templates.
@@ -66,7 +66,7 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Components Affected:** `skills/memory-first.md`, `.claude/hooks/pre-tool-use.sh`
 * **Acceptance Criteria:** Block general file reading tools unless the agent has previously executed a targeted search query or can supply explicit line offsets.
 
-### [ ] `[BUG-020]` Static System Prompt Invisibility (Invisible System Prompt Defect)
+### [X] `[BUG-020]` Static System Prompt Invisibility (Invisible System Prompt Defect)
 * **Description:** The static `system-prompt` file inside internal configuration directories remains invisible to Claude Code because the native Anthropic binary only targets `CLAUDE.md` at runtime.
 * **Impact:** Unused orphan configuration files that clutter the repository structure without exercising any real control over agent behavior.
 * **Components Affected:** `.claude/system-prompt` (Removal), `project-template/CLAUDE.md` (Merger)
