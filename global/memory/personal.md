@@ -21,3 +21,4 @@ response_language: en
 
 ## Notes
 - Prefers version bump + CHANGELOG + README as a separate chore commit after the feature commit, not bundled together.
+- Confirms between tasks during `/cc-implement` execution (does not use "proceed without confirmation" mode).
