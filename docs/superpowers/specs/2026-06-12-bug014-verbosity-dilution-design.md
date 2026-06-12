@@ -23,7 +23,7 @@ VERBOSITY: MIN
 Parsing rules:
 - Raw text only — no Markdown bold, no backticks, no extra punctuation around the value.
 - One or more spaces after the colon are accepted; the extraction script strips all leading spaces from the extracted value. The "exactly one space" phrasing in the canonical format above is the recommended authoring style, not a parsing requirement.
-- `grep -m1 '^VERBOSITY:'` is frontmatter-safe because frontmatter keys are lowercase (`name:`, `type:`, etc.) and never start with `VERBOSITY:`.
+- The pure bash extraction loop is frontmatter-safe: YAML frontmatter keys (`name:`, `type:`, `description:`, etc.) are always lowercase and never match the `VERBOSITY:*` case pattern. No `grep` call is made; all parsing is performed by the `while IFS= read -r` loop.
 - **UTF-8 BOM handling**: Windows editors (Notepad, VS Code with certain settings) may prepend a UTF-8 Byte Order Mark (`\xEF\xBB\xBF`) to the file. If the `VERBOSITY:` line is the very first line with no frontmatter, the BOM appears before the `V` and causes the `VERBOSITY:*` case pattern to fail. The extraction loop strips the BOM from the first line read before any pattern matching.
 - **Final line without trailing newline**: `while IFS= read -r _line` exits when `read` returns non-zero — which happens both at EOF after a newline and at EOF without a newline, but only processes the line in the first case. The trailing-newline-free case leaves `_line` populated but the loop body unexecuted. Fix: use `|| [ -n "$_line" ]` as the loop condition so the final partial line is always processed.
 - **Code block false-positive prevention**: A `VERBOSITY:` line inside a Markdown code fence (` ``` `) must not be matched. The extraction loop tracks a `_in_fence` flag (toggled by lines starting with ` ``` `). Any `^VERBOSITY:` match while `_in_fence=1` is discarded. This is implemented as a bash `while IFS= read -r` loop over the file — no external awk or sed call.
@@ -132,19 +132,27 @@ _logdir="$HOME/.claude/logs"
 _logfile="$_logdir/verbosity-hook.log"
 _log_ok=0
 if [ -e "$_logdir" ] && [ ! -d "$_logdir" ]; then
-    # Path exists but is not a directory (e.g., a regular file named "logs")
+    # Log directory path exists but is not a directory
     echo "[verbosity-remind] log dir blocked by non-directory: $_logdir" >&2
 elif mkdir -p "$_logdir" 2>/dev/null && [ -w "$_logdir" ]; then
-    _log_ok=1
+    # Directory exists and is writable — now check the log file itself
+    if [ -e "$_logfile" ] && [ ! -f "$_logfile" ]; then
+        # Log file path exists but is a directory (e.g., a dir named verbosity-hook.log)
+        echo "[verbosity-remind] log file path blocked by directory: $_logfile" >&2
+    else
+        _log_ok=1
+    fi
 fi
 # Subsequent log writes use: (( _log_ok )) && printf '...\n' >> "$_logfile" 2>/dev/null
 ```
 
-Step 1: if the path exists but is not a directory, emit a one-time stderr warning and disable file logging for this invocation — `mkdir -p` would silently succeed (no-op) but the `>>` write would fail with a confusing error.
+Step 1: if the log directory path exists but is not a directory, emit a stderr warning and disable file logging.
 
 Step 2: attempt `mkdir -p 2>/dev/null`. Suppresses permission errors from stdout.
 
-Step 3: verify the directory is writable (`-w`). If creation succeeded but the directory is mode 000 or owned by another user, the `>>` write would fail silently. Checking `-w` first avoids the attempt entirely.
+Step 3: verify the directory is writable (`-w`).
+
+Step 4: verify the log file path is not already occupied by a directory entry (`! -f` when `-e` is true). A directory named `verbosity-hook.log` would cause `>>` to fail with "Is a directory".
 
 If any step fails, `_log_ok` remains 0 and all log writes are skipped silently. The hook always exits 0 regardless.
 
@@ -340,25 +348,43 @@ New-Item -ItemType Directory -Force "$env:USERPROFILE\.claude\memory" | Out-Null
 
 These calls must precede any `cp` / `Save-RemoteFile` invocations. If directory creation fails (e.g., insufficient permissions), the installer must print an error and halt — silently copying into a non-existent path would produce no file and no feedback.
 
+**Primitive `hooks` type fallback**: if `settings.json` contains `"hooks"` as a non-object type (string, number, array, boolean, or null), the value is structurally incompatible with the hook registration schema. All three merge paths (jq, python3, PowerShell) must reset `hooks` to an empty object `{}` when its type is not an object, emit a warning, and continue:
+
+- `jq`: `if (.hooks | type) != "object" then .hooks = {} else . end`
+- `python3`: `if not isinstance(d.get("hooks"), dict): d["hooks"] = {}`
+- PowerShell: `if ($null -eq $existing.hooks -or $existing.hooks -isnot [PSCustomObject]) { $existing | Add-Member -Force -NotePropertyName 'hooks' -NotePropertyValue ([PSCustomObject]@{}) }`
+
 **install.sh merge procedure** — when `jq` is available:
 1. Read the existing target `settings.json` (start from `{}` if absent).
-2. Remove all entries in `hooks.UserPromptSubmit` whose command contains `verbosity-remind.sh` (stale variant cleanup).
-3. Append the current verbosity hook entry.
-4. Write the merged result back with 2-space indentation.
+2. If `hooks` is a primitive type, reset to `{}` with a warning.
+3. Remove all entries in `hooks.UserPromptSubmit` whose command contains `verbosity-remind.sh` (stale variant cleanup).
+4. Append the current verbosity hook entry.
+5. Write the merged result back with 2-space indentation.
 
 **install.sh fallback** — when `jq` is not available:
 1. Check for `python3` as a non-destructive alternative JSON processor:
    ```bash
    if command -v python3 >/dev/null 2>&1; then
-       # Perform merge via python3 json module
-       python3 - <<'PYEOF'
+       # Pass path and command as positional arguments; here-doc provides the script body.
+       # python3 - arg1 arg2 <<'EOF' reads script from stdin; sys.argv = ['-', arg1, arg2].
+       python3 - "$_settings_path" "$_verbosity_hook_cmd" <<'PYEOF'
    import json, sys, os
-   path = sys.argv[1]; cmd = sys.argv[2]
-   d = json.load(open(path)) if os.path.exists(path) else {}
-   arr = d.setdefault("hooks", {}).setdefault("UserPromptSubmit", [])
-   arr[:] = [e for e in arr if "verbosity-remind.sh" not in e.get("command", "")]
+   path = sys.argv[1]
+   cmd  = sys.argv[2]
+   d = {}
+   if os.path.exists(path):
+       try:
+           with open(path) as f: d = json.load(f)
+       except json.JSONDecodeError:
+           pass  # treat as empty; installer prints warning separately
+   hooks = d.get("hooks", {})
+   if not isinstance(hooks, dict):
+       hooks = {}          # primitive type for hooks key — reset to empty object
+   d["hooks"] = hooks
+   arr = hooks.setdefault("UserPromptSubmit", [])
+   arr[:] = [e for e in arr if "verbosity-remind.sh" not in str(e.get("command", ""))]
    arr.append({"type": "command", "command": cmd})
-   json.dump(d, open(path, "w"), indent=2); print(json.dumps(d, indent=2))
+   with open(path, "w") as f: json.dump(d, f, indent=2)
    PYEOF
    fi
    ```
@@ -392,10 +418,11 @@ These calls must precede any `cp` / `Save-RemoteFile` invocations. If directory 
    if ($null -eq $existing) { $existing = [PSCustomObject]@{} }
    ```
    If `ConvertFrom-Json` throws (malformed JSON), the corrupted file is backed up with a timestamp, and the merge starts from an empty object. This prevents script termination and prevents configuration loss.
-2. Ensure `hooks.UserPromptSubmit` exists as an array (`@()`).
-3. Remove all entries whose `command` property contains `verbosity-remind.sh` (stale variant cleanup).
-4. Append the current verbosity hook entry.
-5. Serialize back with `ConvertTo-Json -Depth 10` and `Set-Content -Encoding utf8`.
+2. If `$existing.hooks` is not a `PSCustomObject` (primitive type, null, or array), reset it to an empty `PSCustomObject` and emit a warning.
+3. Ensure `hooks.UserPromptSubmit` exists as an array (`@()`).
+4. Remove all entries whose `command` property contains `verbosity-remind.sh` (stale variant cleanup).
+5. Append the current verbosity hook entry.
+6. Serialize back with `ConvertTo-Json -Depth 10` and `Set-Content -Encoding utf8`.
 
 No backup is needed on the success path because `ConvertFrom-Json` / `ConvertTo-Json` performs a non-destructive in-memory merge — existing entries are preserved before the file is written. Backup only occurs in the `catch` block (malformed input).
 
@@ -454,7 +481,18 @@ No backup is needed on the success path because `ConvertFrom-Json` / `ConvertTo-
 
 ### Performance ceiling
 
-- [ ] Both hooks complete within **50ms** on a warm local filesystem (second or later invocation). Includes full pipeline: bypass check, null guard, both traversal stages, file read, normalization, output. Excludes cold OS filesystem cache misses on the very first invocation.
+- [ ] Both hooks complete within **50ms** (median) on a warm local filesystem. Measured using the following standardized procedure:
+  1. Ensure `$HOME/.claude/memory/verbosity.md` exists with `VERBOSITY: MIN`.
+  2. Run the hook script once (cold cache discard run): `bash global/hooks/verbosity-remind.sh > /dev/null`
+  3. Measure 10 consecutive warm runs using bash's built-in timing:
+     ```bash
+     for i in $(seq 1 10); do
+         { time bash global/hooks/verbosity-remind.sh > /dev/null; } 2>&1 | grep real
+     done
+     ```
+  4. Extract the 10 `real` values in milliseconds. Compute the median.
+  5. Pass condition: **median ≤ 50ms** and **no individual run exceeds 150ms**.
+  6. Repeat for `project-template/.claude/hooks/verbosity-remind.sh` with `$PWD` set to a project directory 3 levels deep from the project root.
 - [ ] The hook introduces zero network I/O.
 
 ### Cascading verification matrix
