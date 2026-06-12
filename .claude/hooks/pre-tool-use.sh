@@ -155,6 +155,23 @@ _g3_scan() {
   return 0
 }
 
+# ── Guard 3 regex constants ────────────────────────────────────────────────────
+# All patterns below are POSIX ERE (GNU libc implementation).
+# Rules: no \b (use ([[:space:]]|^|$) word boundaries), no backreferences,
+#        no non-greedy quantifiers, no named groups, POSIX bracket expressions only.
+
+# Command-execution-position operator or keyword — used as prefix before utility names.
+# Note: | in character class is literal; no escaping needed inside [...].
+_G3_POS='(^|[|;{([!&]|`|&&|\|\||;;|\$\(|<\(|>\(|(then|else|elif|do)[[:space:]]|![[:space:]])[[:space:]]*'
+# Optional prefix-modifier chain (env, exec, time, nohup, coproc, command, builtin)
+_G3_MOD='((env|exec|time|nohup|coproc|command|builtin)([[:space:]]+[^[:space:]]+)*[[:space:]]+)?'
+# Optional path prefix before binary name (e.g. /bin/, ./scripts/)
+_G3_PATH='([A-Za-z0-9_./@%-]*/)?'
+# Monitored reading/viewing utilities
+_G3_READERS='(cat|less|more|head|tail|sed|awk|grep|egrep|fgrep|mapfile|readarray)'
+# Shell interpreters blocked in find -exec and xargs
+_G3_SHELLS='(sh|bash|dash|zsh|ksh|fish)'
+
 # ── Guard 3: Bash command scan ─────────────────────────────────────────────────
 # BASH_SCAN_ALLOWLIST: exact literal path tokens the guard permits.
 # Operators add entries here. Agents must NEVER modify this array.
