@@ -44,32 +44,61 @@ The warning fires at most once per hour regardless of how many prompts are submi
 Extraction sequence (pure bash, bash 3.2 compatible):
 
 ```bash
-_in_fence=0; _in_fm=0; LEVEL=""; _first=1
+_in_fence=0; _in_fm=0; LEVEL=""; _lineno=0
 while IFS= read -r _line || [ -n "$_line" ]; do
-    if [ "$_first" = "1" ]; then
-        _line="${_line#$'\xef\xbb\xbf'}"   # strip UTF-8 BOM on first line
-        _first=0
-        [ "$_line" = "---" ] && { _in_fm=1; continue; }
+    _lineno=$(( _lineno + 1 ))
+    [ "$_lineno" = "1" ] && _line="${_line#$'\xef\xbb\xbf'}"  # strip UTF-8 BOM on line 1
+    _line="${_line%$'\r'}"                  # strip trailing CR (CRLF compat, all lines)
+    if [ "$_lineno" = "1" ] && [ "$_line" = "---" ]; then
+        _in_fm=1; continue                  # frontmatter block opens on line 1 only
     fi
     if [ "$_in_fm" = "1" ]; then
         case "$_line" in
-            ---|\.\.\.) _in_fm=0 ;;  # frontmatter closing delimiter
+            ---|\.\.\.) _in_fm=0 ;;         # frontmatter closing delimiter (CR already stripped)
         esac
-        continue  # skip all frontmatter lines including the closing delimiter
+        continue                            # skip all frontmatter lines including the closing delimiter
     fi
     case "$_line" in
-        '```'*) (( _in_fence = 1 - _in_fence )) || true ;;
+        '```'*|'~~~'*) (( _in_fence = 1 - _in_fence )) || true ;;  # backtick and tilde fences
         VERBOSITY:*)
             (( _in_fence )) && continue
             LEVEL="${_line#VERBOSITY:}"           # strip key prefix
             LEVEL="${LEVEL#"${LEVEL%%[! ]*}"}"    # strip leading spaces
-            LEVEL="${LEVEL%$'\r'}"                # strip trailing CR
-            LEVEL="${LEVEL%% *}"                  # strip trailing spaces
+            LEVEL="${LEVEL%% *}"                  # strip trailing spaces (CR already stripped)
             break
             ;;
     esac
 done < "$_mem_file"
 ```
+
+**Recovery pass — execution position and control flow**: the recovery pass executes immediately after `done < "$_mem_file"` on the main loop, before normalization or the sanity guard. Its trigger condition is `LEVEL` still empty AND `_in_fence` is 1 (indicating an unclosed fence was the cause). The warning throttle fires first; then the recovery loop runs; then control falls through to normalization regardless of whether the recovery succeeded. If `LEVEL` is empty after recovery, the sanity guard sets `MIN`.
+
+```bash
+# --- executed after the main extraction loop above ---
+if [ -z "$LEVEL" ] && [ "$_in_fence" = "1" ]; then
+    # Throttled warning: fires at most once per 60 minutes
+    mkdir -p "$HOME/.claude/logs" 2>/dev/null
+    find "$HOME/.claude/logs/.verbosity-fence-warned" -mmin -60 2>/dev/null | grep -q . || {
+        echo "[verbosity-remind] unclosed fence in $_mem_file; using recovery pass" >&2
+        touch "$HOME/.claude/logs/.verbosity-fence-warned" 2>/dev/null
+    }
+    # Recovery loop: omits '```'/'~~~' case arm entirely — no fence tracking
+    while IFS= read -r _line || [ -n "$_line" ]; do
+        _line="${_line%$'\r'}"              # CRLF compat
+        case "$_line" in
+            VERBOSITY:*)
+                LEVEL="${_line#VERBOSITY:}"
+                LEVEL="${LEVEL#"${LEVEL%%[! ]*}"}"
+                LEVEL="${LEVEL%% *}"
+                break
+                ;;
+        esac
+    done < "$_mem_file"
+fi
+# --- normalization and sanity guard follow ---
+```
+
+The recovery loop re-reads the same `$_mem_file` from the beginning. It does not inherit `_lineno`, `_in_fm`, or any state from the first pass — those variables are irrelevant when fence tracking is disabled. If recovery yields no match, `LEVEL` remains empty and the Stage 2 cascade falls through to the next memory source (or sanity guard if no source remains).
 
 ### Uppercase normalization (bash 3.2 compatible)
 
@@ -128,7 +157,7 @@ esac
 
 The `CC_VERBOSITY_SKIP` flag accepts any of the standard truthy values: `1`, `true`, `yes`, `on` (and their uppercase and title-case variants). Any other value — including `false`, `0`, or absent — is treated as disabled. This broadens compatibility with CI environments that set boolean flags as `true` (e.g., GitHub Actions `${{ true }}`), not just `1`. The flag is not persisted; it must be exported in the environment per-invocation.
 
-**CI/CD and non-interactive shell behavior**: in automated pipelines the hook runs in a non-interactive shell where `$HOME` may point to a read-only path, `/tmp`, or an ephemeral workspace. The four-step log validation already handles unwritable log directories silently; no additional guard is needed for that case. The canonical recommendation for all CI systems is to set `CC_VERBOSITY_SKIP=1` in the pipeline environment so the hook exits immediately before any file I/O is attempted. For pipelines that do not set `CC_VERBOSITY_SKIP`, the hook completes its full pipeline (memory traversal, level extraction, reminder output) and silently skips the log write if the log directory is not writable — the hook still exits 0 and still emits the reminder to stdout.
+**CI/CD and non-interactive shell behavior**: in automated pipelines the hook runs in a non-interactive shell where `$HOME` may point to a read-only path, `/tmp`, or an ephemeral workspace. The four-step log validation (defined in the Diagnostic logging section) already handles unwritable log directories silently; no additional guard is needed for that case. The canonical recommendation for all CI systems is to set `CC_VERBOSITY_SKIP=1` in the pipeline environment so the hook exits immediately before any file I/O is attempted. For pipelines that do not set `CC_VERBOSITY_SKIP`, the hook completes its full pipeline (memory traversal, level extraction, reminder output) and silently skips the log write if the log directory is not writable — the hook still exits 0 and still emits the reminder to stdout.
 
 ### Exit-status guarantee
 
@@ -142,7 +171,7 @@ This trap fires on every exit path — an explicit `exit N`, an uncaught `ERR` s
 
 The `ERR` trap fires on any command that returns non-zero when `set -e` is active; it is set here as defense-in-depth against future `set -e` additions. The `EXIT` trap alone is sufficient for the current scripts; both are set at no cost.
 
-The embedded project-hook traversal registered in `settings.json` (`bash -c '...'`) does not use `trap` — it is a one-liner. Its exit-status guarantee is provided by the terminal `exit 0` already present at the end of the command string.
+The embedded project-hook traversal registered in `settings.json` (`bash -c '...'`) does not use `trap` — it is a one-liner. Its exit-status guarantee is provided by the terminal `exit 0` already present at the end of the command string. Because the project hook script itself carries the same `trap 'exit 0' EXIT ERR` declaration, `bash "$_h"` always returns 0 regardless of internal failures; the subsequent `exit $?` in the compound command therefore propagates 0, and the embedded one-liner's own terminal `exit 0` remains reachable for the no-hook-found path.
 
 ### Diagnostic logging
 
@@ -261,6 +290,32 @@ Loop invariants:
 - **Permission-denied directories**: the `-f` test evaluates false when the parent directory lacks execute permission; no error is emitted to stderr. Traversal continues upward transparently.
 
 **Symlink note**: The traversal uses `"$PWD"` (logical shell-assigned path). Do not substitute `$(pwd -P)` — doing so breaks setups where `.claude/` is accessible exclusively via a symlink path.
+
+### Three-stage pipeline
+
+Each hook invocation runs a sequential three-stage pipeline. Stages are numbered by execution order; no stage may be skipped unless an earlier exit condition is met (CI bypass, `$HOME` null guard).
+
+**Stage 1 — Upward project-hook detection** *(global hook only; project hook skips this stage)*
+
+Starting from `$PWD`, traverse ancestor directories toward the filesystem root (cap 40). At each directory, test for a readable `.claude/hooks/verbosity-remind.sh` (both `-f` and `-r` must pass). If found, exit 0 immediately with no stdout output — authority is delegated to the project hook, which Claude Code will invoke separately via the registered `settings.json` command. If the traversal cap is reached or `_skip_traversal=1`, Stage 1 produces no output and Stage 2 begins immediately.
+
+**Stage 2 — Cascading memory resolution** *(both hooks)*
+
+Starting from `$PWD` (or `$HOME` directly if `_skip_traversal=1`), traverse ancestor directories toward the root (cap 40). At each directory, test for a readable `.claude/memory/verbosity.md`. The first file found is used; `read` populates `_mem_file` and traversal stops. If the cap is reached with no file found, `_mem_file` is set to `"$HOME/.claude/memory/verbosity.md"` (the machine-level fallback). If that file is also absent, `_mem_file` points to a non-existent path; the extraction loop produces empty `LEVEL`, and Stage 3's sanity guard handles it. A traversal-cap event at this stage is logged to the diagnostic log.
+
+**Stage 3 — Sanity guard and emission** *(both hooks)*
+
+After extraction and `case`-normalization, enforce the invariant: if `LEVEL` is not exactly `MIN`, `INFO`, or `VERBOSE`, set `LEVEL="MIN"`. Then emit exactly one reminder line to stdout, preceded by a leading newline:
+
+```bash
+case "$LEVEL" in
+    MIN)     printf '\n[VERBOSITY:MIN] One sentence. [CHANGES] file list only. No prose.\n' ;;
+    INFO)    printf '\n[VERBOSITY:INFO] Bullet list max 5. [CHANGES]+[REASON] tags.\n' ;;
+    VERBOSE) printf '\n[VERBOSITY:VERBOSE] Full explanation. All tags active.\n' ;;
+esac
+```
+
+Stage 3 always emits one line. It cannot be bypassed by a missing or corrupt `_mem_file`; Stage 3 runs after all memory sources are exhausted and the sanity guard has applied.
 
 ### Stage 1 readability check
 
