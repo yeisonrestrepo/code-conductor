@@ -4,9 +4,21 @@
 
 **Goal:** Add Guard 3 to `.claude/hooks/pre-tool-use.sh` to hard-block mass content-dump Bash commands, extend `skills/memory-first.md` with a "Hook enforcement" section, and mirror both files in `project-template/`.
 
-**Architecture:** Guard 3 is a self-contained Bash block embedded in the existing hook file, inserted after Guard 1. It preprocesses the command string (CRLF-normalisation → line-continuation joining → 5-state comment-stripping scanner), then runs 12 pattern checks with regex on the preprocessed string, finally checks the static `BASH_SCAN_ALLOWLIST` array, and exits 1 with a standard block message if blocked. The 5-state scanner (`_g3_strip_comments`) is reused as `_g3_has_unquoted_glob` for glob-character detection in Patterns 4 and 7.
+**Architecture:** Guard 3 is a self-contained Bash block embedded in the existing hook file, inserted after Guard 1. It preprocesses the command string (CRLF-normalisation → line-continuation joining → 5-state scanner), then runs 12 pattern checks with regex on the preprocessed string, finally checks the static `BASH_SCAN_ALLOWLIST` array, and exits 1 with a standard block message if blocked.
 
-**Tech Stack:** Bash 5.x; Claude Code `PreToolUse` hook environment variables `CLAUDE_TOOL_NAME` and `CLAUDE_TOOL_INPUT` (JSON string).
+**Key design constraints resolved before implementation:**
+
+1. **JSON extraction — pure Bash, no external tools.** `CLAUDE_TOOL_INPUT` is JSON. The plan formerly used python3/jq with a grep fallback; both are replaced by `_g3_extract_command()` — a pure-Bash character-walking function that finds `"command":` and unescapes the JSON string value (`\"` → `"`, `\\` → `\`, `\n` → newline, etc.) without any subprocess. No python3, jq, or complex `sed` patterns are required or permitted.
+
+2. **Unified scanner — one function, two modes.** `_g3_strip_comments` and `_g3_has_unquoted_glob` share an identical state machine. They are implemented as a single `_g3_scan MODE INPUT` function: `"strip"` mode outputs the comment-stripped string to stdout; `"glob"` mode returns 1 (found) / 0 (not found) with no stdout. The `#`-stripping branch and the glob-detection return are the only mode-specific lines.
+
+3. **Fail-closed on malformed input.** If `_g3_scan "strip"` exits the state machine with `state != "UNQUOTED"` (unclosed quote), it returns exit code 2 and the Guard 3 main block treats this as a block (exit 1). If `_g3_scan "glob"` exits with an unclosed quote, it returns 1 (treat as glob present — conservative). Legitimate agent commands never have unclosed quotes; ambiguous input is blocked, not passed.
+
+4. **Length guard.** Commands longer than 8 192 characters are blocked immediately before any scanning begins (exit 1, message: "command string exceeds maximum scan length"). This prevents the O(n) character loop from freezing the hook on a megabyte-sized injection attempt.
+
+5. **Bash ERE compatibility.** All `[[ =~ ]]` patterns must conform to POSIX ERE as implemented by GNU libc (Linux default). Prohibited constructs: `\b` word boundaries (not in POSIX ERE — use explicit `([[:space:]]|^|$)` boundaries instead), backreferences (`\1`), non-greedy quantifiers (`*?`), named groups (`(?P<name>...)`). Always use `[[:space:]]`, `[[:alnum:]]`, `[[:alpha:]]` POSIX bracket expressions — never bare `\s`, `\w`, `\d`. All patterns in this plan comply with these rules.
+
+**Tech Stack:** Bash 5.x (minimum 5.0); Claude Code `PreToolUse` hook environment variables `CLAUDE_TOOL_NAME` and `CLAUDE_TOOL_INPUT` (JSON string).
 
 ---
 
@@ -19,6 +31,7 @@
 | Modify | `skills/memory-first.md` | Add "Hook enforcement" section |
 | Modify | `project-template/.claude/hooks/pre-tool-use.sh` | Exact mirror of live hook |
 | Create | `project-template/skills/memory-first.md` | Exact mirror of `skills/memory-first.md` |
+| Create | `scripts/check-mirrors.sh` | Validates project-template mirrors are in sync |
 | Modify | `AGENT-READABLE BACKLOG.md` | Mark BUG-006 and FEAT-018 `[X]` |
 
 ---
@@ -34,22 +47,49 @@
 Insert the following block between the closing `fi` of Guard 1 (line 27) and the `# ── Guard 2` comment (line 29):
 
 ```bash
+# ── Guard 3 helpers (defined before Guard 3 block; added incrementally per task) ─
+
+# Pure-Bash JSON string extractor. Finds "command":<value> in CLAUDE_TOOL_INPUT
+# and unescapes the JSON string without any external tools.
+# Outputs the raw shell command string to stdout.
+_g3_extract_command() {
+  local json="$1"
+  # Find the start of the "command" value: skip to after "command":"
+  local after="${json#*\"command\"}"    # everything after the key name
+  after="${after#*:}"                   # skip colon (and any whitespace before it is gone)
+  after="${after#[[:space:]]}"          # trim leading whitespace
+  after="${after#\"}"                   # consume opening "
+  # Walk character-by-character to the closing unescaped "
+  local result="" i=0 len=${#after} ch="" next=""
+  while (( i < len )); do
+    ch="${after:i:1}"
+    if [[ "$ch" == '\' ]]; then
+      next="${after:i+1:1}"
+      case "$next" in
+        '"')  result+='"';    i=$((i+2)) ;;
+        '\')  result+='\\';   i=$((i+2)) ;;
+        'n')  result+=$'\n';  i=$((i+2)) ;;
+        't')  result+=$'\t';  i=$((i+2)) ;;
+        'r')  result+=$'\r';  i=$((i+2)) ;;
+        '/')  result+='/';    i=$((i+2)) ;;
+        *)    result+="$next"; i=$((i+2)) ;;  # other \X: keep X
+      esac
+    elif [[ "$ch" == '"' ]]; then
+      break   # closing double-quote
+    else
+      result+="$ch"; i=$((i+1))
+    fi
+  done
+  printf '%s' "$result"
+}
+
 # ── Guard 3: Bash command scan ─────────────────────────────────────────────────
 # BASH_SCAN_ALLOWLIST: exact literal path tokens the guard permits.
 # Operators add entries here. Agents must NEVER modify this array.
 BASH_SCAN_ALLOWLIST=()
 
 if [ "${CLAUDE_TOOL_NAME:-}" = "Bash" ]; then
-  # Extract the 'command' field from CLAUDE_TOOL_INPUT JSON
-  if command -v python3 >/dev/null 2>&1; then
-    _G3_CMD=$(printf '%s' "${CLAUDE_TOOL_INPUT:-}" \
-      | python3 -c "import sys,json; d=json.loads(sys.stdin.read()); print(d.get('command',''))" \
-      2>/dev/null || true)
-  else
-    _G3_CMD=$(printf '%s' "${CLAUDE_TOOL_INPUT:-}" \
-      | grep -o '"command"[[:space:]]*:[[:space:]]*"[^"]*"' \
-      | head -1 | sed 's/.*"command"[[:space:]]*:[[:space:]]*"//;s/"$//')
-  fi
+  _G3_CMD=$(_g3_extract_command "${CLAUDE_TOOL_INPUT:-}")
 
   if [ -z "${_G3_CMD:-}" ]; then
     unset _G3_CMD; exit 0
@@ -71,13 +111,21 @@ set -euo pipefail
 HOOK=".claude/hooks/pre-tool-use.sh"
 PASS=0; FAIL=0
 
+# Pure-Bash JSON string builder: escapes a raw shell command for embedding in JSON.
+_json_cmd() {
+  local s="$1"
+  s="${s//\\/\\\\}"    # \ -> \\
+  s="${s//\"/\\\"}"    # " -> \"
+  s="${s//$'\n'/\\n}"  # newline -> \n
+  s="${s//$'\t'/\\t}"  # tab -> \t
+  s="${s//$'\r'/\\r}"  # CR -> \r
+  printf '{"command":"%s"}' "$s"
+}
+
 run() {
   local label="$1" cmd="$2" expect="$3"
-  local json
-  json=$(printf '%s' "$cmd" \
-    | python3 -c 'import sys,json; print(json.dumps({"command":sys.stdin.read()}))')
   export CLAUDE_TOOL_NAME="Bash"
-  export CLAUDE_TOOL_INPUT="$json"
+  export CLAUDE_TOOL_INPUT="$(_json_cmd "$cmd")"
   bash "$HOOK" >/dev/null 2>&1; local rc=$?
   unset CLAUDE_TOOL_NAME CLAUDE_TOOL_INPUT
   if { [[ "$expect" == "block" ]] && (( rc != 0 )); } \
@@ -156,20 +204,19 @@ run "backslash-hash in UNQUOTED is literal"    'grep \#pat file.txt'       "pass
 bash tests/guard3-test.sh
 ```
 
-- [ ] **Step 3: Implement `_g3_join_continuations` and `_g3_strip_comments`**
+- [ ] **Step 3: Implement `_g3_join_continuations` and unified `_g3_scan`**
 
-Add both functions to `pre-tool-use.sh` immediately before the `# ── Guard 3` comment. They must appear before they are called.
+`_g3_strip_comments` and `_g3_has_unquoted_glob` share an identical state machine; they are implemented as one function. Add all helpers to `pre-tool-use.sh` immediately before the `# ── Guard 3` comment (the `_g3_extract_command` function added in Task 1 lives here too).
 
 ```bash
-# ── Guard 3 helpers ────────────────────────────────────────────────────────────
 _g3_join_continuations() {
   local input="$1" result="" line=""
   while IFS= read -r line || [[ -n "$line" ]]; do
-    line="${line%$'\r'}"           # strip trailing CR
+    line="${line%$'\r'}"           # strip trailing CR (CRLF normalisation)
     local tmp="$line" bs=0
     while [[ "$tmp" == *\\ ]]; do tmp="${tmp%\\}"; bs=$((bs+1)); done
     if (( bs % 2 == 1 )); then
-      result+="${line%\\} "        # odd backslashes: continuation
+      result+="${line%\\} "        # odd backslashes: line continuation
     else
       result+="$line"$'\n'         # even backslashes: real newline
     fi
@@ -177,51 +224,114 @@ _g3_join_continuations() {
   printf '%s' "$result"
 }
 
-_g3_strip_comments() {
-  # Five-state scanner: UNQUOTED / SINGLE_QUOTED / DOUBLE_QUOTED /
-  #                     ANSI_C_QUOTED ($'...') / LOCALE_QUOTED ($"...")
-  local input="$1" result="" state="UNQUOTED"
+_g3_scan() {
+  # Unified 5-state scanner (UNQUOTED / SINGLE_QUOTED / DOUBLE_QUOTED /
+  #   ANSI_C_QUOTED / LOCALE_QUOTED).  Two modes:
+  #   "strip" — outputs comment-stripped string to stdout; returns 0 (ok) or 2 (malformed).
+  #   "glob"  — returns 1 if an unquoted glob char found, 0 if not, 1 on malformed (fail-closed).
+  # Malformed = state != UNQUOTED at end of input (unclosed quote).
+  # SINGLE_QUOTED: \ is literal; ANY ' exits (including directly after \).
+  local mode="$1" input="$2"
+  local state="UNQUOTED" result=""
   local i=0 len=${#input} ch="" two=""
   while (( i < len )); do
     ch="${input:i:1}"; two="${input:i:2}"
     case "$state" in
       UNQUOTED)
-        if   [[ "$two" == "\$'" ]];  then result+="$two"; i=$((i+2)); state="ANSI_C_QUOTED"
-        elif [[ "$two" == '$"' ]];   then result+="$two"; i=$((i+2)); state="LOCALE_QUOTED"
-        elif [[ "$ch"  == '\' ]];    then result+="${input:i:2}"; i=$((i+2))
-        elif [[ "$ch"  == "'" ]];    then result+="$ch";  i=$((i+1)); state="SINGLE_QUOTED"
-        elif [[ "$ch"  == '"' ]];    then result+="$ch";  i=$((i+1)); state="DOUBLE_QUOTED"
-        elif [[ "$ch"  == '#' ]];    then
+        if   [[ "$two" == "\$'" ]]; then
+          [[ "$mode" == "strip" ]] && result+="$two"
+          i=$((i+2)); state="ANSI_C_QUOTED"
+        elif [[ "$two" == '$"' ]]; then
+          [[ "$mode" == "strip" ]] && result+="$two"
+          i=$((i+2)); state="LOCALE_QUOTED"
+        elif [[ "$ch" == '\' ]]; then
+          [[ "$mode" == "strip" ]] && result+="${input:i:2}"
+          i=$((i+2))
+        elif [[ "$ch" == "'" ]]; then
+          [[ "$mode" == "strip" ]] && result+="$ch"
+          i=$((i+1)); state="SINGLE_QUOTED"
+        elif [[ "$ch" == '"' ]]; then
+          [[ "$mode" == "strip" ]] && result+="$ch"
+          i=$((i+1)); state="DOUBLE_QUOTED"
+        elif [[ "$ch" == '#' ]] && [[ "$mode" == "strip" ]]; then
+          # Comment: discard to end of line (preserve \n as separator)
           while (( i < len )) && [[ "${input:i:1}" != $'\n' ]]; do i=$((i+1)); done
-        else result+="$ch"; i=$((i+1))
+        else
+          # Regular UNQUOTED character
+          if [[ "$mode" == "glob" ]] && [[ "$ch" =~ [*?{[] ]]; then
+            return 1  # unquoted glob found
+          fi
+          [[ "$mode" == "strip" ]] && result+="$ch"
+          i=$((i+1))
         fi ;;
       SINGLE_QUOTED)
-        # \ is literal here; ANY ' exits (including after \)
-        if [[ "$ch" == "'" ]]; then result+="$ch"; i=$((i+1)); state="UNQUOTED"
-        else result+="$ch"; i=$((i+1)); fi ;;
+        # \ is literal; any ' exits (there is no escape mechanism here)
+        [[ "$mode" == "strip" ]] && result+="$ch"
+        [[ "$ch" == "'" ]] && state="UNQUOTED"
+        i=$((i+1)) ;;
       DOUBLE_QUOTED|LOCALE_QUOTED)
-        if   [[ "$ch" == '\' ]]; then result+="${input:i:2}"; i=$((i+2))
-        elif [[ "$ch" == '"' ]]; then result+="$ch"; i=$((i+1)); state="UNQUOTED"
-        else result+="$ch"; i=$((i+1)); fi ;;
+        if [[ "$ch" == '\' ]]; then
+          [[ "$mode" == "strip" ]] && result+="${input:i:2}"
+          i=$((i+2))
+        elif [[ "$ch" == '"' ]]; then
+          [[ "$mode" == "strip" ]] && result+="$ch"
+          i=$((i+1)); state="UNQUOTED"
+        else
+          [[ "$mode" == "strip" ]] && result+="$ch"
+          i=$((i+1))
+        fi ;;
       ANSI_C_QUOTED)
-        if   [[ "$ch" == '\' ]]; then result+="${input:i:2}"; i=$((i+2))
-        elif [[ "$ch" == "'" ]]; then result+="$ch"; i=$((i+1)); state="UNQUOTED"
-        else result+="$ch"; i=$((i+1)); fi ;;
+        if [[ "$ch" == '\' ]]; then
+          [[ "$mode" == "strip" ]] && result+="${input:i:2}"
+          i=$((i+2))
+        elif [[ "$ch" == "'" ]]; then
+          [[ "$mode" == "strip" ]] && result+="$ch"
+          i=$((i+1)); state="UNQUOTED"
+        else
+          [[ "$mode" == "strip" ]] && result+="$ch"
+          i=$((i+1))
+        fi ;;
     esac
   done
-  printf '%s' "$result"
+  # Fail-closed: unclosed quote is malformed input
+  if [[ "$state" != "UNQUOTED" ]]; then
+    [[ "$mode" == "strip" ]] && { printf '%s' "$result"; return 2; }
+    return 1   # glob mode: fail-closed on malformed input
+  fi
+  [[ "$mode" == "strip" ]] && printf '%s' "$result"
+  return 0
 }
 ```
 
-- [ ] **Step 4: Wire preprocessing into Guard 3**
+- [ ] **Step 4: Wire length guard + preprocessing into Guard 3**
 
 Replace the `# ── Preprocessing and pattern checks...` placeholder comment (and the `unset _G3_CMD` line) with:
 
 ```bash
-  # Step 4a: join line continuations; 4b: strip comments
-  local _G3_PRE
-  _G3_PRE=$(_g3_strip_comments "$(_g3_join_continuations "$_G3_CMD")")
+  # Length guard: fail-closed on oversized input to protect the scanner from abuse
+  if (( ${#_G3_CMD} > 8192 )); then
+    printf '\n⛔ BASH SCAN BLOCKED\n' >&2
+    printf '   Command string exceeds maximum scan length (8192 chars).\n\n' >&2
+    unset _G3_CMD; exit 1
+  fi
+
+  # Step 4a: join line continuations
+  local _G3_JOINED
+  _G3_JOINED=$(_g3_join_continuations "$_G3_CMD")
   unset _G3_CMD
+
+  # Step 4b: strip comments via unified scanner (mode="strip")
+  local _G3_PRE _G3_SCAN_RC=0
+  _G3_PRE=$(_g3_scan "strip" "$_G3_JOINED") || _G3_SCAN_RC=$?
+  unset _G3_JOINED
+
+  # Fail-closed: malformed input (rc=2 means unclosed quote)
+  if (( _G3_SCAN_RC == 2 )); then
+    printf '\n⛔ BASH SCAN BLOCKED\n' >&2
+    printf '   Malformed shell syntax (unclosed quote) — blocked as a precaution.\n\n' >&2
+    unset _G3_PRE; exit 1
+  fi
+
   # Normalise real newlines to semicolons (simplifies all pattern regexes)
   _G3_PRE="${_G3_PRE//$'\n'/;}"
 
@@ -253,68 +363,43 @@ git commit -m "feat(guard3): preprocessing helpers (4a line-join, 4b comment-str
 **Files:**
 - Modify: `.claude/hooks/pre-tool-use.sh`
 
-- [ ] **Step 1: Add `_g3_has_unquoted_glob` helper and regex constants**
+- [ ] **Step 1: Add shared regex constants**
 
-Add the following immediately after the two preprocessing functions (still inside the `# ── Guard 3 helpers` section):
+`_g3_has_unquoted_glob` no longer exists as a separate function — use `_g3_scan "glob" "$input"` wherever glob detection is needed (Task 5). Add only the regex-constant variables immediately after the `_g3_scan` function in `pre-tool-use.sh`:
 
 ```bash
-# Regex fragment matching a command-execution-position operator or keyword.
-# Used as a prefix before utility names in all pattern regexes.
-_G3_POS='(^|[|;{(\[!&]|`|&&|\|\||;;|\$\(|<\(|>\(|(then|else|elif|do)[[:space:]]|![[:space:]])[[:space:]]*'
+# ── Guard 3 regex constants ────────────────────────────────────────────────────
+# All patterns below are POSIX ERE (GNU libc implementation).
+# Rules: no \b (use ([[:space:]]|^|$) word boundaries), no backreferences,
+#        no non-greedy quantifiers, no named groups, POSIX bracket expressions only.
+
+# Command-execution-position operator or keyword — used as prefix before utility names.
+# Note: | in character class is literal; no escaping needed inside [...].
+_G3_POS='(^|[|;{([!&]|`|&&|\|\||;;|\$\(|<\(|>\(|(then|else|elif|do)[[:space:]]|![[:space:]])[[:space:]]*'
 # Optional prefix-modifier chain (env, exec, time, nohup, coproc, command, builtin)
-# followed by optional flags/VAR=val tokens before the real utility name.
 _G3_MOD='((env|exec|time|nohup|coproc|command|builtin)([[:space:]]+[^[:space:]]+)*[[:space:]]+)?'
-# Path-prefixed token: optional directory components before the binary name.
+# Optional path prefix before binary name (e.g. /bin/, ./scripts/)
 _G3_PATH='([A-Za-z0-9_./@%-]*/)?'
 # Monitored reading/viewing utilities
 _G3_READERS='(cat|less|more|head|tail|sed|awk|grep|egrep|fgrep|mapfile|readarray)'
-# Shell interpreters (blocked in find -exec and xargs)
+# Shell interpreters blocked in find -exec and xargs
 _G3_SHELLS='(sh|bash|dash|zsh|ksh|fish)'
-
-_g3_has_unquoted_glob() {
-  # Returns 1 (blocked) if input contains *, ?, {, or [ in UNQUOTED state.
-  local input="$1" state="UNQUOTED"
-  local i=0 len=${#input} ch="" two=""
-  while (( i < len )); do
-    ch="${input:i:1}"; two="${input:i:2}"
-    case "$state" in
-      UNQUOTED)
-        if   [[ "$two" == "\$'" ]];   then i=$((i+2)); state="ANSI_C_QUOTED"
-        elif [[ "$two" == '$"' ]];    then i=$((i+2)); state="LOCALE_QUOTED"
-        elif [[ "$ch"  == '\' ]];     then i=$((i+2))
-        elif [[ "$ch"  == "'" ]];     then i=$((i+1)); state="SINGLE_QUOTED"
-        elif [[ "$ch"  == '"' ]];     then i=$((i+1)); state="DOUBLE_QUOTED"
-        elif [[ "$ch"  =~ [*?{\[] ]]; then return 1
-        else i=$((i+1)); fi ;;
-      SINGLE_QUOTED)
-        [[ "$ch" == "'" ]] && state="UNQUOTED"; i=$((i+1)) ;;
-      DOUBLE_QUOTED|LOCALE_QUOTED)
-        if   [[ "$ch" == '\' ]]; then i=$((i+2))
-        elif [[ "$ch" == '"' ]]; then state="UNQUOTED"; i=$((i+1))
-        else i=$((i+1)); fi ;;
-      ANSI_C_QUOTED)
-        if   [[ "$ch" == '\' ]]; then i=$((i+2))
-        elif [[ "$ch" == "'" ]]; then state="UNQUOTED"; i=$((i+1))
-        else i=$((i+1)); fi ;;
-    esac
-  done
-  return 0  # no unquoted glob found
-}
 ```
 
-- [ ] **Step 2: No test needed yet – these are shared infrastructure. Verify hook still loads cleanly.**
+- [ ] **Step 2: Verify syntax and that all prior tests still pass**
 
 ```bash
 bash -n .claude/hooks/pre-tool-use.sh && echo "syntax OK"
+bash tests/guard3-test.sh
 ```
 
-Expected: `syntax OK`
+Expected: `syntax OK`; no new failures.
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add -f .claude/hooks/pre-tool-use.sh
-git commit -m "feat(guard3): shared regex constants and _g3_has_unquoted_glob helper"
+git commit -m "feat(guard3): shared POSIX-ERE regex constants (no _g3_has_unquoted_glob)"
 ```
 
 ---
@@ -366,7 +451,7 @@ bash tests/guard3-test.sh
 
 - [ ] **Step 3: Implement `_g3_p1_find_depth`**
 
-Add after the `_g3_has_unquoted_glob` function:
+Add after the `_g3_scan` function and regex constants:
 
 ```bash
 _g3_p1_find_depth() {
@@ -424,31 +509,39 @@ _g3_p3_xargs() {
 }
 ```
 
-- [ ] **Step 6: Wire patterns 1–3 into Guard 3 and add the block message**
+- [ ] **Step 6: Wire patterns 1–3 into Guard 3 with pattern-ID tracking and debug logging**
 
 Replace the entire `# ── Pattern checks...` placeholder block inside Guard 3 with:
 
 ```bash
-  # Step 5: Run pattern checks
-  local _G3_HIT=0
-  _g3_p1_find_depth "$_G3_PRE" || _G3_HIT=1
-  _g3_p2_find_exec  "$_G3_PRE" || _G3_HIT=1
-  _g3_p3_xargs      "$_G3_PRE" || _G3_HIT=1
+  # Step 5: Run pattern checks; accumulate triggered pattern IDs for diagnostics
+  local _G3_HIT=0 _G3_IDS=""
+  _g3_p1_find_depth "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P1 "; }
+  _g3_p2_find_exec  "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P2 "; }
+  _g3_p3_xargs      "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P3 "; }
   # (patterns 4-12 appended in later tasks)
 
   if (( _G3_HIT )); then
     # Step 6: Allowlist check (Task 7 replaces this stub)
+
+    # Debug logging: export GUARD3_DEBUG=1 in the terminal to diagnose false positives
+    if [[ "${GUARD3_DEBUG:-0}" == "1" ]]; then
+      printf '[Guard3 DEBUG] preprocessed: %s\n' "$_G3_PRE"            >&2
+      printf '[Guard3 DEBUG] matched patterns: %s\n' "${_G3_IDS%" "}"  >&2
+    fi
+
     printf '\n⛔ BASH SCAN BLOCKED\n'                                                 >&2
-    printf '   Command triggered a mass content-dump pattern.\n\n'                    >&2
+    printf '   Command triggered a mass content-dump pattern.\n'                      >&2
+    printf '   Pattern IDs: %s\n\n' "${_G3_IDS%" "}"                                 >&2
     printf '   Authorized search alternatives (see skills/memory-first.md):\n'       >&2
     printf '   1. Grep tool  — targeted content search with file/pattern scope\n'    >&2
     printf '   2. Glob tool  — path listing only, no file content\n'                 >&2
     printf '   3. Read tool  — with explicit offset + limit (max 150 lines)\n\n'     >&2
     printf '   If this path must be scanned broadly, add it to BASH_SCAN_ALLOWLIST\n' >&2
     printf '   in .claude/hooks/pre-tool-use.sh (operator action only).\n\n'         >&2
-    unset _G3_PRE _G3_HIT; exit 1
+    unset _G3_PRE _G3_HIT _G3_IDS; exit 1
   fi
-  unset _G3_PRE _G3_HIT
+  unset _G3_PRE _G3_HIT _G3_IDS
 fi
 ```
 
@@ -536,7 +629,7 @@ _g3_p4_cat_glob() {
     [[ "${pathpart}cat" == *"/"* ]] && [[ "${pathpart}cat" != */cat ]] \
       && { rest="${rest:mlen}"; continue; }
     local after="${rest:mlen}"
-    _g3_has_unquoted_glob "$after" && return 1
+    _g3_scan "glob" "$after" && return 1
     rest="$after"
     [[ -z "$rest" ]] && break
   done
@@ -631,7 +724,7 @@ _g3_p7_pager_glob() {
   while [[ "$rest" =~ $pager_re ]]; do
     local mlen=${#BASH_REMATCH[0]}
     local after="${rest:mlen}"
-    _g3_has_unquoted_glob "$after" && return 1
+    _g3_scan "glob" "$after" && return 1
     rest="$after"
     [[ -z "$rest" ]] && break
   done
@@ -644,10 +737,10 @@ _g3_p7_pager_glob() {
 In the pattern-check section inside Guard 3, append after the `_g3_p3_xargs` call:
 
 ```bash
-  _g3_p4_cat_glob   "$_G3_PRE" || _G3_HIT=1
-  _g3_p5_cmdsubst   "$_G3_PRE" || _G3_HIT=1
-  _g3_p6_grep_matchall "$_G3_PRE" || _G3_HIT=1
-  _g3_p7_pager_glob "$_G3_PRE" || _G3_HIT=1
+  _g3_p4_cat_glob      "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P4 "; }
+  _g3_p5_cmdsubst      "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P5 "; }
+  _g3_p6_grep_matchall "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P6 "; }
+  _g3_p7_pager_glob    "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P7 "; }
 ```
 
 - [ ] **Step 8: Run tests**
@@ -711,7 +804,64 @@ run "OBF \$\"cat\" prefix blocked"         '$"cat" *.ts'                       "
 run "OBF c'a't (internal quote)"           "c'a't *.ts"                        "block"
 ```
 
-- [ ] **Step 2: Fix the duplicate `cat for` test (remove the first erroneous entry)**
+- [ ] **Step 2: Add edge-case test vectors (multi-line, nested subshells, complex escapes)**
+
+Append to `tests/guard3-test.sh` immediately after the P8–P12 / obfuscation tests:
+
+```bash
+# ── Edge cases: multi-line scripts ────────────────────────────────────────────
+# Blocked pattern in second line of a two-line script
+run "multi-line: cat glob on line 2"       $'echo start\ncat *.ts'        "block"
+# All-safe multi-line script
+run "multi-line: all safe"                 $'ls -l .\necho done'           "pass"
+# Loop keyword starts on second line
+run "multi-line: for loop on line 2"       $'echo prep\nfor f in *.ts; do echo $f; done' "block"
+# Line continuation joins two lines into one 'cat *.ts'
+run "multi-line: continuation joins cat"   $'cat \\\n*.ts'                "block"
+# Two-line find with continuation: depth check must still apply to the joined form
+run "multi-line: find continuation valid"  $'find . \\\n-maxdepth 1'     "pass"
+
+# ── Edge cases: nested subshells and process substitution ─────────────────────
+# Command substitution at argument position triggers P5
+run "nested: echo \$(cat *.ts)"            'echo $(cat *.ts)'             "block"
+# Safe command substitution (no reading utility inside)
+run "nested: echo \$(git log)"             'echo $(git log --oneline)'    "pass"
+# Process substitution with reading utility triggers pattern (cat after <()
+run "nested: sort < <(cat *.ts)"           'sort < <(cat *.ts)'           "block"
+# Arithmetic context: $((…)) does NOT create command position
+run "nested: x=\$((1+2)) safe"             'x=$((1+2)); echo $x'          "pass"
+# Double-nested: outer safe, inner blocked
+run "nested: wc -l \$(grep -r '.*' .)"     "wc -l \$(grep -r '.*' .)"    "block"
+
+# ── Edge cases: complex quote / escape combinations ───────────────────────────
+# \\* in UNQUOTED state = literal backslash + active glob → blocked
+run "escape: double-backslash-star glob"   'cat \\*.ts'                   "block"
+# \* in UNQUOTED state = escaped star (literal) → must NOT block
+run "escape: single-backslash-star safe"   'cat \*.ts'                    "pass"
+# ANSI-C quoted: $'cat' as argument is fine; as command name at position is obfuscation
+run "ansi-c: $'cat' arg is fine"           "echo \$'cat'"                 "pass"
+# Single-quoted backslash: '\' is a literal backslash; immediately following ' exits
+run "single-quote: backslash then quote"   "grep 'can'\\''t' file"        "pass"
+# Deeply nested quotes: outer double, inner single
+run "nested-quote: outer-dq inner-sq"      'grep "it'\''s fine" file'     "pass"
+# JSON-escaped quote inside command value (tested via \x22 in input)
+run "json escape: embedded quote"          'echo "hello \"world\""'       "pass"
+# Regex metachar in grep pattern that is NOT match-all
+run "regex: grep -r specific-re"           'grep -r "fo[o]" src/'         "pass"
+# Path-looking token with dot: src/main.ts is path-looking, NOT a match-all pattern
+run "path-looking: dot in path is allowed" 'grep -r pattern src/main.ts'  "pass"
+# Length boundary: exactly 8192 chars passes; 8193 chars blocks
+run "length: 8192-char command (boundary passes)" \
+  "$(printf '%0.s#' {1..8192})" "pass"
+run "length: 8193-char command (blocked)" \
+  "$(printf '%0.s#' {1..8193})" "block"
+# Malformed shell: unclosed single quote → fail-closed
+run "malformed: unclosed single quote"     "cat '*.ts"                    "block"
+# Malformed shell: unclosed double quote → fail-closed
+run "malformed: unclosed double quote"     'grep -r "pat .'               "block"
+```
+
+- [ ] **Step 3: Fix the duplicate `cat for` test (remove the first erroneous entry)**
 
 The test file now has two `cat for` entries; the second (`"pass"`) is correct. Remove the first (`"block"`) from `tests/guard3-test.sh` — edit out the line:
 ```
@@ -791,12 +941,12 @@ _g3_obfuscation() {
 Append after the `_g3_p7_pager_glob` call:
 
 ```bash
-  _g3_p8_ls_recursive  "$_G3_PRE" || _G3_HIT=1
-  _g3_p9_shell_loop    "$_G3_PRE" || _G3_HIT=1
-  _g3_p10_slurp_builtins "$_G3_PRE" || _G3_HIT=1
-  _g3_p11_dynamic_exec "$_G3_PRE" || _G3_HIT=1
-  _g3_p12_alias        "$_G3_PRE" || _G3_HIT=1
-  _g3_obfuscation      "$_G3_PRE" || _G3_HIT=1
+  _g3_p8_ls_recursive    "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P8 "; }
+  _g3_p9_shell_loop      "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P9 "; }
+  _g3_p10_slurp_builtins "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P10 "; }
+  _g3_p11_dynamic_exec   "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P11 "; }
+  _g3_p12_alias          "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P12 "; }
+  _g3_obfuscation        "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="OBF "; }
 ```
 
 - [ ] **Step 6: Run tests**
@@ -1001,24 +1151,63 @@ mkdir -p project-template/skills
 cp skills/memory-first.md project-template/skills/memory-first.md
 ```
 
-- [ ] **Step 5: Verify mirrors are identical**
+- [ ] **Step 5: Create `scripts/check-mirrors.sh`**
+
+This script is the canonical mirror-validation tool. Any future update to the live files must be followed by running this script and committing the result.
+
+```bash
+#!/usr/bin/env bash
+# Validates that project-template mirror files are byte-for-byte identical to
+# their live counterparts. Run from repo root: bash scripts/check-mirrors.sh
+set -euo pipefail
+
+FAIL=0
+
+check() {
+  local src="$1" dst="$2"
+  if diff -q "$src" "$dst" >/dev/null 2>&1; then
+    echo "  OK: $dst"
+  else
+    echo "  DRIFT: $dst differs from $src"
+    diff "$src" "$dst" || true
+    FAIL=$((FAIL+1))
+  fi
+}
+
+check ".claude/hooks/pre-tool-use.sh"  "project-template/.claude/hooks/pre-tool-use.sh"
+check "skills/memory-first.md"         "project-template/skills/memory-first.md"
+
+if (( FAIL > 0 )); then
+  echo ""
+  echo "Mirror drift detected ($FAIL file(s)). Run: cp <src> <dst> to resync."
+  exit 1
+fi
+echo ""
+echo "All mirrors in sync."
+```
+
+- [ ] **Step 6: Verify mirrors are identical and check-mirrors passes**
 
 ```bash
 diff .claude/hooks/pre-tool-use.sh project-template/.claude/hooks/pre-tool-use.sh \
   && echo "hook mirror OK"
 diff skills/memory-first.md project-template/skills/memory-first.md \
   && echo "skills mirror OK"
+bash scripts/check-mirrors.sh
 ```
 
-Expected: both `diff` commands output nothing (identical files) and print the confirmation messages.
+Expected: all `diff` commands output nothing; `check-mirrors.sh` prints `All mirrors in sync.`
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit all documentation and mirror files**
 
 ```bash
+mkdir -p scripts
+chmod +x scripts/check-mirrors.sh
 git add -f skills/memory-first.md \
           project-template/.claude/hooks/pre-tool-use.sh \
-          project-template/skills/memory-first.md
-git commit -m "feat(guard3): hook enforcement docs + project-template mirrors"
+          project-template/skills/memory-first.md \
+          scripts/check-mirrors.sh
+git commit -m "feat(guard3): hook enforcement docs, project-template mirrors, check-mirrors.sh"
 ```
 
 ---
@@ -1076,7 +1265,7 @@ Append the following section to `.claude/memory/project.md`:
 ### Decisions
 - Guard 3 implemented as a self-contained Bash block in `pre-tool-use.sh`, inserted after Guard 1
 - 12 blocked patterns: find-depth, find-exec, xargs, cat+glob, cmd-subst, grep-matchall, pager+glob, ls-R, shell-loop, mapfile/readarray, eval/source/dot, alias
-- 5-state scanner (`_g3_strip_comments`, `_g3_has_unquoted_glob`) handles SINGLE_QUOTED/DOUBLE_QUOTED/ANSI_C_QUOTED/LOCALE_QUOTED
+- Unified 5-state scanner `_g3_scan MODE INPUT` handles SINGLE_QUOTED/DOUBLE_QUOTED/ANSI_C_QUOTED/LOCALE_QUOTED; fail-closed on unclosed quotes (rc=2 → blocked)
 - `BASH_SCAN_ALLOWLIST=()` — empty array, agent-immutable, path-traversal-guarded
 - Allowlist check operates on comment-stripped preprocessed string (not raw input)
 - `project-template/skills/` directory created; `memory-first.md` mirrored there for the first time
@@ -1111,7 +1300,7 @@ git commit -m "chore: checkpoint 2026-06-12 (BUG-006+FEAT-018 complete)"
 | Step 4a line-continuation joining + CRLF | Task 2 |
 | Step 4b 5-state scanner (SINGLE_QUOTED has no escaping) | Task 2 |
 | `$'...'` and `$"..."` states | Task 3 |
-| `_g3_has_unquoted_glob` for Patterns 4 and 7 | Task 3 |
+| Unified `_g3_scan "glob"` for Patterns 4 and 7 | Task 3 |
 | Pattern 1 (find depth, +N normalisation) | Task 4 |
 | Pattern 2 (find -exec with shell interpreter) | Task 4 |
 | Pattern 3 (xargs flag taxonomy, lowercase -i boolean) | Task 4 |
@@ -1119,7 +1308,15 @@ git commit -m "chore: checkpoint 2026-06-12 (BUG-006+FEAT-018 complete)"
 | Pattern 6 `-F` exemption, `-e`/`--regexp` isolation | Task 5 |
 | Patterns 8–12, obfuscation | Task 6 |
 | Allowlist on preprocessed string, path-traversal guard, structural placement | Task 7 |
-| Standard block message | Task 4 (introduced), unchanged thereafter |
+| Standard block message + Pattern IDs line | Task 4 |
+| `GUARD3_DEBUG=1` debug logging (preprocessed string + IDs) | Task 4 |
+| Pure-Bash JSON extraction (`_g3_extract_command`) | Task 1 |
+| Length guard: 8192-char limit, fail-closed | Task 2 |
+| Fail-closed on unclosed quotes (malformed input → block) | Task 2 |
+| No external deps (no python3, jq, or non-standard tools) | Task 1 |
+| POSIX ERE only — no `\b`, no backrefs, POSIX bracket classes | Task 3 |
+| Edge-case test vectors (multi-line, subshells, escapes) | Task 6 |
+| `scripts/check-mirrors.sh` mirror validation | Task 8 |
 | `skills/memory-first.md` Hook enforcement section | Task 8 |
 | `project-template` mirrors | Task 8 |
 | Backlog BUG-006 + FEAT-018 marked complete | Task 9 |
