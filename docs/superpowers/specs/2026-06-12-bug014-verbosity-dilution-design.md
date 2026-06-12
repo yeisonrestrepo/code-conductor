@@ -10,6 +10,8 @@ Add a `UserPromptSubmit` hook — deployed at two scopes (global and project-lev
 
 Bracket tokens in the reminder output (e.g., `[VERBOSITY:MIN]`, `[CHANGES]`) are purely descriptive natural language instructions. They are not parsed by any regex engine in the system prompt. The agent interprets them as behavioral directives via training and the CLAUDE.md rules. No code-level token matching is triggered by their presence.
 
+**Bracket token echo risk and defensive phrasing** (item 15): the model may occasionally repeat the bracket token literally in its response (e.g., writing `[VERBOSITY:MIN]` as part of an explanation) rather than treating it as a silent behavioral directive. To minimize this, the reminder text uses imperative phrasing that describes behavior rather than labels a mode: "One sentence. [CHANGES] file list only. No prose." — not "You are in MIN mode." The bracket prefix (`[VERBOSITY:MIN]`) is kept short and followed immediately by the behavioral instruction so the model's output patterns are anchored to the instruction text, not the label. If the model echoes the token literally in a response, this is a model behavior issue, not a hook bug; no hook-level mitigation is possible beyond concise phrasing. Developers who observe persistent literal repetition should add an explicit "Do not repeat the bracket token itself in your response" line to `CLAUDE.md`.
+
 ## Behavior
 
 ### `verbosity.md` file format and parsing
@@ -39,6 +41,10 @@ find "$HOME/.claude/logs/.verbosity-fence-warned" -mmin -60 2>/dev/null | grep -
 ```
 
 The warning fires at most once per hour regardless of how many prompts are submitted. Warning goes to stderr only — not to the append-only log file. If recovery also yields no match, fall through to the next memory source.
+- **Default fallback level** (items 1): if the file exists and is readable but contains no line matching `VERBOSITY:*` outside code fences and frontmatter — whether the body is empty, the token is misspelled, or every candidate line is guarded — extraction yields empty `LEVEL`. The Stage 3 sanity guard sets `LEVEL="MIN"`. This is the canonical default for any file without a valid token; it is not a loggable error event.
+- **First-occurrence precedence** (item 2): the extraction loop `break`s on the first successful match. If a file body contains multiple `VERBOSITY:` lines outside fences and frontmatter, only the first is used; subsequent occurrences are silently ignored. Installers always write exactly one `VERBOSITY:` line. Authors must not write more than one; the first wins regardless of value.
+- **Trailing whitespace and inline comments** (item 3): after colon-prefix removal and leading-space stripping, `LEVEL="${LEVEL%% *}"` removes everything from the first space character onward. `VERBOSITY: MIN   ` extracts `MIN`; `VERBOSITY: MIN # a note` extracts `MIN` (the hash, note text, and the preceding space are all stripped). Hash characters without a preceding space (e.g., `VERBOSITY: #MIN`) are not stripped and produce `#MIN`, which fails normalization and falls back to the sanity guard's `MIN`. Windows CRLF is handled by the per-line `_line="${_line%$'\r'}"` strip applied before any extraction, so `\r` never appears in the extracted value.
+- **Frontmatter false-positive guarantee** (item 4): the `_in_fm` flag is set to 1 when line 1 is exactly `---` (after BOM and CR stripping). While `_in_fm=1`, every iteration of the loop executes `continue` unconditionally — the `VERBOSITY:*` case arm is never reached. A file with `VERBOSITY: VERBOSE` inside the frontmatter block is parsed as if that line does not exist; only the `VERBOSITY:` line in the body (after the closing `---` or `...` delimiter) is matched. The guarantee holds because `continue` is the last statement in the `_in_fm=1` branch and the case arm that matches `VERBOSITY:*` lives in a separate `case` block that is only reached after the frontmatter branch's `continue` or exit.
 - After extraction, the value is normalized using a `case` statement before the sanity guard (see Uppercase normalization below).
 
 Extraction sequence (pure bash, bash 3.2 compatible):
@@ -167,7 +173,7 @@ Both hook scripts must declare a global exit-status trap as the **very first exe
 trap 'exit 0' EXIT ERR
 ```
 
-This trap fires on every exit path — an explicit `exit N`, an uncaught `ERR` signal (when `set -e` is active), or an unhandled termination — and unconditionally overrides the exit status to 0. Claude Code treats any non-zero hook exit as a fatal prompt-blocking error; this trap ensures that internal parsing failures, unexpected I/O errors, and logging failures never surface to the user as a blocked prompt.
+This trap fires on every exit path — an explicit `exit N`, an uncaught `ERR` signal (when `set -e` is active), or an unhandled termination — and unconditionally overrides the exit status to 0. **A non-zero hook exit code causes Claude Code to treat the hook as failed and blocks prompt submission for that turn** (item 13); the user sees a hook error and cannot proceed until the hook is fixed or removed. This trap is therefore not a nicety — it is the only mechanism preventing internal hook failures from becoming user-visible prompt blocks. Internal parsing failures, unexpected I/O errors, and logging failures must never propagate as non-zero exit codes.
 
 The `ERR` trap fires on any command that returns non-zero when `set -e` is active; it is set here as defense-in-depth against future `set -e` additions. The `EXIT` trap alone is sufficient for the current scripts; both are set at no cost.
 
@@ -230,7 +236,9 @@ Example:
 
 Log writes use `>>` append redirect. If the log write itself fails (disk full, permissions), the failure is silently ignored.
 
-**Concurrent write behavior**: the log file is shared across all Claude Code sessions on the same machine. No explicit file-locking mechanism is used. On local POSIX filesystems (ext4, APFS, HFS+), `write()` calls smaller than `PIPE_BUF` (minimum 512 bytes; typically 4096 bytes on Linux) are atomic at the kernel level — individual log lines (well under 200 bytes) will not interleave mid-line between concurrent sessions. On networked or virtual filesystems (NFS, CIFS, tmpfs overlays) this atomicity guarantee does not hold; log lines from different sessions may interleave. In those environments, set `CC_VERBOSITY_SKIP=1` to suppress all hook I/O. Log corruption from concurrent appends does not affect hook correctness — the log is diagnostic-only and the hook always exits 0 regardless.
+**Log file size safety threshold** (item 17): the log file is append-only with no automatic rotation. Before each log write, the hook must check whether the log file has exceeded 1 MB (1,048,576 bytes). If the threshold is exceeded, the hook emits a one-time stderr warning (`"[verbosity-remind] log file exceeds 1 MB; skipping write. Run: truncate -s 0 "$_logfile" to reset."`) and skips the write for that invocation. The check uses `[ -f "$_logfile" ] && _logsize=$(wc -c < "$_logfile" 2>/dev/null) && [ "${_logsize:-0}" -gt 1048576 ]`. If `wc -c` fails, `_logsize` defaults to 0 and the write proceeds. This prevents unbounded growth while keeping the threshold check at near-zero cost. The stderr warning fires on every invocation until the log is manually truncated or rotated — there is no throttle on the size warning because the condition is persistent, not transient.
+
+**Concurrent write behavior** (item 12): the log file is shared across all Claude Code sessions on the same machine. No explicit file-locking mechanism is used. On local POSIX filesystems (ext4, APFS, HFS+), `write()` calls smaller than `PIPE_BUF` (minimum 512 bytes; typically 4096 bytes on Linux) are atomic at the kernel level — individual log lines (well under 200 bytes) will not interleave mid-line between concurrent sessions. On networked or virtual filesystems (NFS, CIFS, tmpfs overlays) this atomicity guarantee does not hold; log lines from different sessions may interleave. In those environments, set `CC_VERBOSITY_SKIP=1` to suppress all hook I/O. Log corruption from concurrent appends does not affect hook correctness — the log is diagnostic-only and the hook always exits 0 regardless.
 
 ### `$PWD` null guard
 
@@ -291,6 +299,10 @@ Loop invariants:
 
 **Symlink note**: The traversal uses `"$PWD"` (logical shell-assigned path). Do not substitute `$(pwd -P)` — doing so breaks setups where `.claude/` is accessible exclusively via a symlink path.
 
+**Symlink cycle immunity** (item 8): `${_dir%/*}` is a pure parameter expansion on the string — it does not stat, dereference, or follow symlinks. A directory tree with circular symlinks (A → B → A) does not cause the traversal to loop, because the loop operates on the path string as reported by `$PWD`, not on the inode graph. Change-detection terminates when the string stops changing. The 40-iteration cap provides a second safety net for degenerate or deeply nested structures.
+
+**No Claude Code project-root environment variable** (item 16): Claude Code does not currently expose a dedicated environment variable (e.g., `CLAUDE_PROJECT_ROOT`) that identifies the project root at hook invocation time. The upward directory traversal is therefore the only portable mechanism for locating the project hook script and memory file. If a future Claude Code release adds such a variable, the traversal can be replaced with a single direct lookup, but the fallback traversal must remain for compatibility with versions that do not set the variable.
+
 ### Three-stage pipeline
 
 Each hook invocation runs a sequential three-stage pipeline. Stages are numbered by execution order; no stage may be skipped unless an earlier exit condition is met (CI bypass, `$HOME` null guard).
@@ -326,6 +338,8 @@ The global hook's Stage 1 traversal must confirm both existence and readability 
 ```
 
 If the file exists but fails the `-r` test, the traversal continues upward as if the file were absent. The global hook remains the authority for that prompt.
+
+**Execution permission not required** (item 10): Stage 1 tests `-r` (readable), not `-x` (executable). The hook is invoked via `bash "$_h"` — bash reads and interprets the file; the file does not need the executable bit set. A project hook with mode `644` (readable, not executable) passes the Stage 1 readability check and is invoked successfully. An unreadable hook (`000`) fails the `-r` test and causes the global hook to retain authority. This behavior is consistent with the embedded one-liner's check (`[ -f "$_h" ] && [ -r "$_h" ]`) and the Windows installer model where hooks are always invoked via explicit `bash` rather than as direct executables.
 
 ### Main path
 
@@ -435,6 +449,9 @@ The hook fires on the `UserPromptSubmit` event regardless of prompt content. It 
 - **`mkdir -p` for log dir fails** — `2>/dev/null` suppresses the error from stdout; subsequent log write fails silently; hook continues and exits 0.
 - **Hook script missing or not executable** — Claude Code logs a hook error; session continues. `CLAUDE.md` and `skills/verbosity.md` serve as soft fallbacks.
 - **Git Bash drive-root edge case** — change-detection loop terminates correctly; no infinite loop.
+- **`verbosity.md` is a symlink to an unavailable or network-isolated target** (item 20) — `-f` on a dangling symlink returns false; the Stage 2 traversal treats the file as absent at that level and continues upward. If the global `$HOME/.claude/memory/verbosity.md` is itself a dangling symlink, `-f` returns false, `_mem_file` points to a non-existent path, the extraction loop reads nothing, `LEVEL` remains empty, and the sanity guard sets `MIN`. This is the correct behavior: a broken symlink is operationally equivalent to a missing file. No log entry is written for this condition (it is a non-loggable expected path); the hook exits 0 and emits `\n[VERBOSITY:MIN]`.
+- **Non-interactive or automated test environment without `CC_VERBOSITY_SKIP`** (item 19) — the hook does not detect whether the calling shell is interactive. It emits the verbosity reminder to stdout regardless. In automated test runners, CI pipelines, or terminal multiplexers where the hook fires but `CC_VERBOSITY_SKIP` is not set, the reminder text appears in captured stdout alongside other hook output. This is by design; the recommended suppression mechanism for all non-interactive contexts is `CC_VERBOSITY_SKIP=1`. No heuristic detection of non-interactive mode is implemented.
+- **`bash` not in PATH on Windows** (item 11) — Claude Code reports a hook execution error; no reminder is injected; the session continues. `CLAUDE.md` and `skills/verbosity.md` serve as soft fallbacks. Users must install Git for Windows to restore hook functionality.
 
 ### Settings JSON array-append strategy
 
@@ -446,7 +463,19 @@ Both installers currently overwrite `settings.json` wholesale. This is replaced 
 
 Minified input is intentionally re-indented. This is documented behavior, not a side effect.
 
-**`settings.json` absent or parent directory absent**: if the `settings.json` file does not exist, both installers treat it as an empty object (`{}`) and write the merged result as a new file. If the parent directory of `settings.json` (e.g., `$HOME/.claude/` for the global file, `.claude/` for the project file) does not exist, the directory pre-flight step below creates it before any file is read or written. Writing the merged JSON to a path whose parent directory does not exist is a fatal error — the installer must halt with an explicit message. Silently writing to a non-existent path would produce no file and no diagnostic.
+**`settings.json` absent or parent directory absent** (item 6): if the `settings.json` file does not exist, both installers treat it as an empty object (`{}`) and write the merged result as a new file. The written skeleton is the minimal valid JSON structure that satisfies the hook registration schema:
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {"type": "command", "command": "<resolved-hook-command>"}
+    ]
+  }
+}
+```
+
+No other keys are written into the skeleton. If additional top-level keys (e.g., `"permissions"`, `"model"`) are needed, the user must add them manually after installation; the installer must not fabricate config keys it does not own. If the parent directory of `settings.json` (e.g., `$HOME/.claude/` for the global file, `.claude/` for the project file) does not exist, the directory pre-flight step below creates it before any file is read or written. Writing the merged JSON to a path whose parent directory does not exist is a fatal error — the installer must halt with an explicit message. Silently writing to a non-existent path would produce no file and no diagnostic.
 
 **Directory pre-flight** — before copying any asset, both installers must verify and create all target parent directories:
 
@@ -470,8 +499,8 @@ These calls must precede any `cp` / `Save-RemoteFile` invocations. If directory 
 - `python3`: `if not isinstance(d.get("hooks"), dict): d["hooks"] = {}`
 - PowerShell: `if ($null -eq $existing.hooks -or $existing.hooks -isnot [PSCustomObject]) { $existing | Add-Member -Force -NotePropertyName 'hooks' -NotePropertyValue ([PSCustomObject]@{}) }`
 
-**install.sh merge procedure** — when `jq` is available:
-1. Read the existing target `settings.json` (start from `{}` if absent).
+**install.sh merge procedure** — when `jq` is available (item 18 — jq invalid JSON handling):
+1. Read the existing target `settings.json` (start from `{}` if absent). If the file exists but `jq` returns a non-zero exit code (malformed JSON), back up the file with a timestamped name (`<path>.bak.$(date +%Y%m%d%H%M%S)`) before overwriting. Print a warning. Start the merge from `{}`. Do not abort — the hook files have already been copied; only the settings.json merge is affected.
 2. If `hooks` is a primitive type, reset to `{}` with a warning.
 3. Remove all entries in `hooks.UserPromptSubmit` whose command contains `verbosity-remind.sh` (stale variant cleanup).
 4. Append the current verbosity hook entry.
@@ -504,7 +533,7 @@ These calls must precede any `cp` / `Save-RemoteFile` invocations. If directory 
    PYEOF
    fi
    ```
-   `python3` is universally available on macOS (via Xcode tools) and common on Linux. It performs the same stale-variant removal and append as the `jq` path, outputting 2-space indented JSON, with no destructive fallback.
+   **Malformed JSON backup for python3 path** (item 7): if `json.load()` raises `json.JSONDecodeError`, the python3 script must back up the corrupt file before starting from `{}`. The backup is performed by the outer bash caller (not inside the python here-doc) using `cp "$_settings_path" "${_settings_path}.bak.$(date +%Y%m%d%H%M%S)"` before invoking `python3`. The caller prints: `"settings.json is malformed — backed up to ${_settings_path}.bak.<timestamp>; starting fresh."` The python script itself treats `json.JSONDecodeError` as `d = {}` without taking further action. `python3` is universally available on macOS (via Xcode tools) and common on Linux. It performs the same stale-variant removal and append as the `jq` path, outputting 2-space indented JSON, with no destructive fallback.
 
 2. If neither `jq` nor `python3` is available: **do not overwrite `settings.json`**. Print instructions for manual addition and exit with a non-zero code:
    ```
@@ -544,13 +573,15 @@ These calls must precede any `cp` / `Save-RemoteFile` invocations. If directory 
 
 No backup is needed on the success path because `ConvertFrom-Json` / `ConvertTo-Json` performs a non-destructive in-memory merge — existing entries are preserved before the file is written. Backup only occurs in the `catch` block (malformed input).
 
-**Idempotency key and stale variant cleanup**: the substring `verbosity-remind.sh` serves as the hook fingerprint. Before appending the new entry, the installer removes ALL existing entries in the `UserPromptSubmit` array whose command string contains `verbosity-remind.sh` — regardless of how the command was previously phrased (relative path, old absolute path, previous script version). The current command string is then appended. This ensures that only one verbosity-remind hook exists at any time and that structural renames or path changes from earlier spec versions do not leave orphaned entries.
+**Idempotency key and stale variant cleanup** (item 5): the substring `verbosity-remind.sh` serves as the hook fingerprint. Before appending the new entry, the installer removes ALL existing entries in the `UserPromptSubmit` array whose command string contains `verbosity-remind.sh` — regardless of how the command was previously phrased (relative path, old absolute path, previous script version). The current command string is then appended. This ensures that only one verbosity-remind hook exists at any time and that structural renames or path changes from earlier spec versions do not leave orphaned entries. **Re-running `install.sh` or `install.ps1` any number of times is therefore safe and idempotent** — each run produces the same single-entry result in `UserPromptSubmit`, with no duplicate accumulation.
 
 **Third-party hook preservation invariant**: the filter applied to `UserPromptSubmit` is strictly fingerprint-scoped. Entries whose command string does not contain `verbosity-remind.sh` are preserved untouched in their original order. The operation is a set-union append, not a replacement: the installer never reassigns or truncates the `UserPromptSubmit` array as a whole. After the merge, the array contains all pre-existing third-party entries (unchanged) plus exactly one verbosity-remind entry (appended last). This invariant must hold for all three merge paths (jq, python3, PowerShell).
 
 ### Windows installer and execution permissions
 
 `install.ps1` copies hook scripts using `Save-RemoteFile` (raw content write via `Set-Content`). No `icacls`, `chmod`, or permission-setting call is needed. All hooks are invoked via explicit `bash path/to/script.sh` — not as direct executables. The new hooks must be registered following the same patterns as existing hooks (see Project hook command registration above).
+
+**Bash environment dependency on Windows** (item 11): Claude Code does not natively guarantee a bash environment on Windows. Hook scripts are executed by passing the registered `command` string to the system shell. The `bash -c '...'` command in the project hook registration and the standalone `bash /path/to/hook.sh` in the global hook registration both require `bash` to be available in the system `PATH`. On Windows, this means Git for Windows (Git Bash) must be installed and its `bash.exe` must be reachable from the PATH that Claude Code uses. If `bash` is not found, Claude Code will log a hook execution error; the hook will not fire, and no verbosity reminder is injected for that prompt. The installer documentation must state this dependency explicitly. Users on Windows who do not have Git for Windows installed must install it before the hooks will function. This is not a limitation of the hook design; it is a prerequisite of the deployment platform.
 
 **PowerShell execution policy**: Windows environments with a restricted execution policy (`Restricted` or `AllSigned`) will block `install.ps1` from running. The installer documentation must instruct users to invoke the script with a process-scoped policy override:
 
@@ -645,13 +676,13 @@ Using `-Scope Process` limits the policy change to the current PowerShell proces
 ## Out of Scope
 
 - Changing the verbosity level — re-run the installer with `--verbosity` or directly edit `"$HOME/.claude/memory/verbosity.md"`; no command wrapper is in scope.
-- Enforcing verbosity inside subagent responses — subagents inherit the system prompt but not hook output.
+- Enforcing verbosity inside subagent responses via hook injection — subagents are spawned by the main agent as separate API calls and do not receive `UserPromptSubmit` hook output; the hook fires only for human-submitted prompts in the main Claude Code session. However, subagents DO inherit the full system prompt including `CLAUDE.md` content and `skills/verbosity.md` — this is the correct enforcement channel for subagent verbosity. Teams that observe subagent verbosity dilution should add an explicit verbosity directive to `CLAUDE.md` (e.g., under "Agent Identity") rather than relying on hook output. An environment variable approach (setting `CC_VERBOSITY_LEVEL=MIN` in the spawning context) is not currently supported by the subagent execution model. This item (item 14) remains out of scope for the hook mechanism but is a known gap addressed via `CLAUDE.md` inheritance.
 - Detecting verbosity drift in past responses and auto-correcting — enforcement is prospective only (next prompt).
 - Adding a project-level `verbosity.md` template to the project template — teams override by creating `.claude/memory/verbosity.md` manually.
 - Windows native PowerShell hook execution — hooks run under bash (Git Bash on Windows); no PowerShell port needed.
 - Suppressing hook output from `.jsonl` session transcripts — hook output is visible in history by design.
 - Symlinked `.claude/` directories (`.claude/` is itself a symlink pointing elsewhere) — only standard layout is supported.
-- Log rotation or size management for the log file — append-only; no rotation.
+- Automatic log rotation — the hook enforces a 1 MB write-skip threshold (defined in Diagnostic logging) but does not implement rotation, compression, or archival; manual truncation is the expected management path.
 - Merging `settings.json` formatting differences between installer runs beyond the defined normalization (2-space jq / 4-space PS).
 
 ## System Impact
