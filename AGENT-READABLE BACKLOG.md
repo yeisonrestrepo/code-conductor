@@ -30,7 +30,7 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Components Affected:** Core prompt manager templates.
 * **Acceptance Criteria:** Streamline and compact the global system prompt, moving static rule constraints to dedicated local reference files that the agent only reads when needed.
 
-### [ ] `[BUG-006]` Loose Read-Tool Filtering Restrictions
+### [X] `[BUG-006]` Loose Read-Tool Filtering Restrictions
 * **Description:** Superpowers grants unrestricted access to native Claude Code tools that read entire directory trees without precise scoping, allowing megabytes of non-essential data into the session.
 * **Impact:** Increases LLM noise, degrades attention mechanisms, and leads to code hallucinations.
 * **Components Affected:** File system access hooks, read tool configuration.
@@ -60,7 +60,7 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Components Affected:** Initialization hooks, workspace scanning policies.
 * **Acceptance Criteria:** Prevent direct reading of raw massive JSON dependency graphs by enforcing strict resource isolation and verifying their inclusion in the `.gitignore` setup.
 
-### [ ] `[FEAT-018]` Surgical Search Tools (Ripgrep / Find Wrappers)
+### [X] `[FEAT-018]` Surgical Search Tools (Ripgrep / Find Wrappers)
 * **Description:** Build wrapper utilities around native system search tools like `ripgrep` or `find` to enforce highly localized searches before allowing file reading tools.
 * **Impact:** Lowers token consumption by requiring the agent to identify exact line coordinates or code symbols before reading full files.
 * **Components Affected:** `skills/memory-first.md`, `.claude/hooks/pre-tool-use.sh`

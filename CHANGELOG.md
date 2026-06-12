@@ -7,6 +7,41 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.10.0] - 2026-06-12
+
+### Added
+
+- **Guard 3: Bash scan guard** (`.claude/hooks/pre-tool-use.sh`) — new interceptor that fires on every Bash tool call. Preprocesses the command string (joins line continuations, strips comments via a 5-state quote-aware scanner, normalises newlines to semicolons) then runs 12 pattern checks:
+  - **P1** `find` without `-maxdepth 1`
+  - **P2** `find -exec/-execdir/-ok` with a reader or shell interpreter
+  - **P3** `xargs` with a reader or shell interpreter
+  - **P4** `cat` / reader with an unquoted glob (`*`, `?`, `{,}`, `[...]`)
+  - **P5** command substitution (`$(...)` / backtick) passed to a reader
+  - **P6** `grep`/`egrep`/`fgrep`/`git grep` with match-all patterns (`.*`, `.`, `""`, etc.) and `-r`/`-R`
+  - **P7** pager/filter utilities (`less`, `more`, `head`, `tail`, `sed`, `awk`) with unquoted globs
+  - **P8** `ls -R` / `ls --recursive`
+  - **P9** shell loops (`for`, `while`, `until`)
+  - **P10** `mapfile` / `readarray`
+  - **P11** `eval`, `source`, bare dot operator (`. file`)
+  - **P12** `alias` remapping to a reader/interpreter
+  - **OBF** obfuscation sequences (`$"..."`, backslash-chains, internal-quote splits)
+  - Fail-closed: commands >8192 chars or with unclosed quotes are always blocked.
+  - Allowlist: `BASH_SCAN_ALLOWLIST=()` array (operator-managed, agents must never modify) permits specific directory prefixes (with `../` traversal rejection) or exact token literals.
+  - `GUARD3_DEBUG=1` prints the preprocessed string and matched pattern IDs to stderr for false-positive diagnosis.
+- **`tests/guard3-test.sh`** — 107-test pure-bash harness covering all 12 patterns, obfuscation, preprocessing (line continuations, comment stripping, CRLF), edge cases (nested subshells, complex escapes, length boundary, malformed input), and allowlist behaviour.
+
+### Changed
+
+- **`project-template/.claude/hooks/pre-tool-use.sh`** — Guard 3 added between the existing Large-file Read guard and the Duplicate file guard.
+- **`README.md`** — pre-tool-use hook section updated from "Two guards" to "Three guards"; Guard 3 described; file tree comment updated.
+
+### Fixed
+
+- **BUG-006: Loose Read-Tool Filtering Restrictions** — agents could previously invoke `cat *.ts`, `find . -exec cat {} \;`, `grep -r '.*' .`, and similar mass content-dump Bash commands without any interception. Guard 3 blocks these at the hook layer before execution.
+- **FEAT-018: Surgical Search Tools** — `skills/memory-first.md` lookup chain enforced at the hook level: agents that attempt broad Bash reads are blocked and redirected to the Grep / Glob / targeted-Read chain.
+
+---
+
 ## [1.9.0] - 2026-06-11
 
 ### Changed

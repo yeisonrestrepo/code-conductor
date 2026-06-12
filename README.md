@@ -161,11 +161,13 @@ Works on Windows, Linux, and macOS. Exits in under 5ms when the graph is current
 
 ### pre-tool-use
 
-Fires before every tool call. Two guards:
+Fires before every tool call. Three guards:
 
 **Large-file Read guard** — if Claude tries to read a file with more than 150 lines without specifying an `offset` and `limit`, the call is blocked and Claude is redirected to the orchestrator lookup chain (memory → graph → grep → targeted read). Prevents reading entire codebases when a targeted search would do.
 
 **Duplicate file guard** — if Claude tries to write or create a file that already exists, it prints a warning showing the file path, line count, and last-modified timestamp, then presents three options: overwrite, edit in place, or cancel. Prevents silently replacing files you've already configured.
+
+**Bash scan guard (Guard 3)** — intercepts every Bash tool call and pattern-matches the command string against 12 mass content-dump patterns before execution: deep `find` without `maxdepth 1`, `find -exec` with readers/shells, `xargs` with readers, `cat`/pager/grep with unquoted globs, command substitution with readers, shell loops, `mapfile`/`readarray`, `eval`/`source`/dot operator, alias remapping to readers, and obfuscation sequences. Commands over 8192 characters and unclosed quotes are blocked fail-closed. Operators can whitelist specific directory prefixes or exact tokens via `BASH_SCAN_ALLOWLIST` in the hook file.
 
 ### post-compact
 
@@ -273,7 +275,7 @@ code-conductor/
 │       │   ├── cc-test.md        /cc-test
 │       │   └── cc-docs.md        /cc-docs
 │       ├── hooks/
-│       │   ├── pre-tool-use.sh   Large-file read guard + duplicate file guard
+│       │   ├── pre-tool-use.sh   Large-file read guard + duplicate file guard + bash scan guard
 │       │   └── post-compact.sh   Checkpoint reminder after `/compact`
 │       └── memory/
 │           └── project.md        Shared team memory (in git)
