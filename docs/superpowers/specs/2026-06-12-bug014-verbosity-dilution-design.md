@@ -111,6 +111,22 @@ esac
 
 The `CC_VERBOSITY_SKIP` flag accepts any of the standard truthy values: `1`, `true`, `yes`, `on` (and their uppercase and title-case variants). Any other value — including `false`, `0`, or absent — is treated as disabled. This broadens compatibility with CI environments that set boolean flags as `true` (e.g., GitHub Actions `${{ true }}`), not just `1`. The flag is not persisted; it must be exported in the environment per-invocation.
 
+**CI/CD and non-interactive shell behavior**: in automated pipelines the hook runs in a non-interactive shell where `$HOME` may point to a read-only path, `/tmp`, or an ephemeral workspace. The four-step log validation already handles unwritable log directories silently; no additional guard is needed for that case. The canonical recommendation for all CI systems is to set `CC_VERBOSITY_SKIP=1` in the pipeline environment so the hook exits immediately before any file I/O is attempted. For pipelines that do not set `CC_VERBOSITY_SKIP`, the hook completes its full pipeline (memory traversal, level extraction, reminder output) and silently skips the log write if the log directory is not writable — the hook still exits 0 and still emits the reminder to stdout.
+
+### Exit-status guarantee
+
+Both hook scripts must declare a global exit-status trap as the **very first executable line** — immediately after the shebang, before the CI bypass check, before any `set` preamble:
+
+```bash
+trap 'exit 0' EXIT ERR
+```
+
+This trap fires on every exit path — an explicit `exit N`, an uncaught `ERR` signal (when `set -e` is active), or an unhandled termination — and unconditionally overrides the exit status to 0. Claude Code treats any non-zero hook exit as a fatal prompt-blocking error; this trap ensures that internal parsing failures, unexpected I/O errors, and logging failures never surface to the user as a blocked prompt.
+
+The `ERR` trap fires on any command that returns non-zero when `set -e` is active; it is set here as defense-in-depth against future `set -e` additions. The `EXIT` trap alone is sufficient for the current scripts; both are set at no cost.
+
+The embedded project-hook traversal registered in `settings.json` (`bash -c '...'`) does not use `trap` — it is a one-liner. Its exit-status guarantee is provided by the terminal `exit 0` already present at the end of the command string.
+
 ### Diagnostic logging
 
 Silent extraction failures (conditions beyond expected sanity-guard fallbacks) must not be silently dropped.
@@ -167,6 +183,8 @@ Example:
 ```
 
 Log writes use `>>` append redirect. If the log write itself fails (disk full, permissions), the failure is silently ignored.
+
+**Concurrent write behavior**: the log file is shared across all Claude Code sessions on the same machine. No explicit file-locking mechanism is used. On local POSIX filesystems (ext4, APFS, HFS+), `write()` calls smaller than `PIPE_BUF` (minimum 512 bytes; typically 4096 bytes on Linux) are atomic at the kernel level — individual log lines (well under 200 bytes) will not interleave mid-line between concurrent sessions. On networked or virtual filesystems (NFS, CIFS, tmpfs overlays) this atomicity guarantee does not hold; log lines from different sessions may interleave. In those environments, set `CC_VERBOSITY_SKIP=1` to suppress all hook I/O. Log corruption from concurrent appends does not affect hook correctness — the log is diagnostic-only and the hook always exits 0 regardless.
 
 ### `$PWD` null guard
 
@@ -251,7 +269,7 @@ The project hook cannot be registered with a static relative path (`.claude/hook
 The registration command must embed a self-contained upward traversal loop that locates the project's hook script regardless of invocation CWD:
 
 ```json
-"command": "bash -c '_dir=\"${PWD:-}\"; _prev=\"\"; _iters=0; while [ \"$_dir\" != \"$_prev\" ] && [ $_iters -lt 40 ]; do _h=\"$_dir/.claude/hooks/verbosity-remind.sh\"; [ -f \"$_h\" ] && [ -r \"$_h\" ] && { bash \"$_h\"; exit $?; }; _prev=\"$_dir\"; _dir=\"${_dir%/*}\"; [ -z \"$_dir\" ] && _dir=/; _iters=$((_iters+1)); done; exit 0'"
+"command": "bash -c '_dir=\"${PWD:-}\"; _prev=\"\"; _iters=0; while [ \"$_dir\" != \"$_prev\" ] && [ \"$_iters\" -lt 40 ]; do _h=\"$_dir/.claude/hooks/verbosity-remind.sh\"; [ -f \"$_h\" ] && [ -r \"$_h\" ] && { bash \"$_h\"; exit $?; }; _prev=\"$_dir\"; _dir=\"${_dir%/*}\"; [ -z \"$_dir\" ] && _dir=/; _iters=$((_iters+1)); done; exit 0'"
 ```
 
 This command:
@@ -269,7 +287,9 @@ This command:
 | `/` (forward-slash) | `/` (no escape needed in JSON) | yes — paths |
 | newline | `\n` | no — command is one line |
 
-The inner `\"` pairs around variable references (e.g., `\"$_d\"`) are **JSON escapes for the double-quote character**; when the JSON is parsed they become literal `"` in the command string. The bash `-c '...'` single-quoted context then receives them as literal `"` characters that act as shell quoting within the script. This is the same escaping pattern already used by the existing `pre-tool-use.sh` registration in `project-template/.claude/settings.json`.
+**All shell variable expansions inside the embedded command string must be double-quoted** — including non-path variables such as `\"$_iters\"`. A project root or home directory containing spaces, parentheses, or dollar signs would cause an unquoted expansion to word-split and produce a silent no-op traversal. No variable in the embedded command may appear unquoted, without exception.
+
+The inner `\"` pairs around variable references (e.g., `\"$_dir\"`) are **JSON escapes for the double-quote character**; when the JSON is parsed they become literal `"` in the command string. The bash `-c '...'` single-quoted context then receives them as literal `"` characters that act as shell quoting within the script. This is the same escaping pattern already used by the existing `pre-tool-use.sh` registration in `project-template/.claude/settings.json`.
 
 Installers must use `jq` / `ConvertTo-Json` to serialize the command string into JSON rather than hand-constructing the JSON — these tools handle all escaping automatically and prevent corruption.
 
@@ -402,6 +422,8 @@ These calls must precede any `cp` / `Save-RemoteFile` invocations. If directory 
    ```
    This eliminates the destructive fallback entirely. User-configured hooks are never at risk from a missing tool dependency.
 
+   **Global installation scope**: this fallback applies identically to the global `settings.json` (`$HOME/.claude/settings.json`) and to the project `settings.json` (`.claude/settings.json`). Hook script files (`.sh`) are copied to their destinations regardless of tool availability — the copy step is independent of the JSON merge step. If the JSON merge cannot proceed, the hook files are present and functional; only the registration entry is missing. The installer must complete all file copies before printing the manual-addition instructions, so that the printed path and command string reflect the already-installed hook location. The installer exits non-zero after printing, signaling that manual follow-up is required, but does not abort mid-install.
+
 **install.ps1 merge procedure** — using `ConvertFrom-Json` / `ConvertTo-Json` (always available in PS 5.1+):
 1. Attempt to read and parse existing `settings.json` inside a `try/catch` block:
    ```powershell
@@ -430,9 +452,19 @@ No backup is needed on the success path because `ConvertFrom-Json` / `ConvertTo-
 
 **Idempotency key and stale variant cleanup**: the substring `verbosity-remind.sh` serves as the hook fingerprint. Before appending the new entry, the installer removes ALL existing entries in the `UserPromptSubmit` array whose command string contains `verbosity-remind.sh` — regardless of how the command was previously phrased (relative path, old absolute path, previous script version). The current command string is then appended. This ensures that only one verbosity-remind hook exists at any time and that structural renames or path changes from earlier spec versions do not leave orphaned entries.
 
+**Third-party hook preservation invariant**: the filter applied to `UserPromptSubmit` is strictly fingerprint-scoped. Entries whose command string does not contain `verbosity-remind.sh` are preserved untouched in their original order. The operation is a set-union append, not a replacement: the installer never reassigns or truncates the `UserPromptSubmit` array as a whole. After the merge, the array contains all pre-existing third-party entries (unchanged) plus exactly one verbosity-remind entry (appended last). This invariant must hold for all three merge paths (jq, python3, PowerShell).
+
 ### Windows installer and execution permissions
 
 `install.ps1` copies hook scripts using `Save-RemoteFile` (raw content write via `Set-Content`). No `icacls`, `chmod`, or permission-setting call is needed. All hooks are invoked via explicit `bash path/to/script.sh` — not as direct executables. The new hooks must be registered following the same patterns as existing hooks (see Project hook command registration above).
+
+**PowerShell execution policy**: Windows environments with a restricted execution policy (`Restricted` or `AllSigned`) will block `install.ps1` from running. The installer documentation must instruct users to invoke the script with a process-scoped policy override:
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -Scope Process -File .\install.ps1
+```
+
+Using `-Scope Process` limits the policy change to the current PowerShell process only — it does not persist to the machine or user scope and does not require administrator elevation. The installer script itself must not attempt to call `Set-ExecutionPolicy` or modify the machine-level policy; doing so would require elevation and silently fail for non-admin users. If the script is invoked without the `-ExecutionPolicy Bypass` flag and the policy blocks execution, PowerShell prints a native error message that makes the root cause clear — no additional handling inside the script is required for that case.
 
 ## Acceptance Criteria
 
