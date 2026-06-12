@@ -22,10 +22,10 @@ VERBOSITY: MIN
 
 Parsing rules:
 - Raw text only — no Markdown bold, no backticks, no extra punctuation around the value.
-- Exactly one space after the colon. Trailing whitespace and `\r` (CRLF from Windows editors) are stripped before validation.
+- One or more spaces after the colon are accepted; the extraction script strips all leading spaces from the extracted value. The "exactly one space" phrasing in the canonical format above is the recommended authoring style, not a parsing requirement.
 - `grep -m1 '^VERBOSITY:'` is frontmatter-safe because frontmatter keys are lowercase (`name:`, `type:`, etc.) and never start with `VERBOSITY:`.
 - **Code block false-positive prevention**: A `VERBOSITY:` line inside a Markdown code fence (` ``` `) must not be matched. The extraction loop tracks a `_in_fence` flag (toggled by lines starting with ` ``` `). Any `^VERBOSITY:` match while `_in_fence=1` is discarded. This is implemented as a bash `while IFS= read -r` loop over the file — no external awk or sed call.
-- **Unclosed fence recovery**: If the first pass completes with `LEVEL` still empty and `_in_fence=1`, the file contains an unclosed code fence that has permanently suppressed all body-level `VERBOSITY:` lines. In this case, a recovery pass is run that reads the file a second time ignoring fence state entirely: the first `^VERBOSITY:` line found (regardless of fence position) is used. The unclosed-fence condition is logged to the diagnostic log. If the recovery pass also yields no match, fall through to the next memory source as normal.
+- **Unclosed fence recovery**: If the first pass completes with `LEVEL` still empty and `_in_fence=1`, the file contains an unclosed code fence that has permanently suppressed all body-level `VERBOSITY:` lines. In this case, a recovery pass is run that reads the file a second time ignoring fence state entirely: the first `^VERBOSITY:` line found (regardless of fence position) is used. The unclosed-fence warning is emitted to **stderr** (not to the append-only log file) to prevent per-prompt log accumulation: an unclosed fence is a persistent file corruption that would trigger the warning on every single prompt turn, making append-only log entries inappropriate. Stderr output is captured separately from hook stdout and does not pollute the injected context. If the recovery pass also yields no match, fall through to the next memory source as normal.
 - After extraction, the value is normalized using a `case` statement before the sanity guard (see Uppercase normalization below).
 
 Extraction sequence (pure bash, bash 3.2 compatible):
@@ -173,6 +173,7 @@ Loop invariants:
 - **Iteration cap**: 40 iterations maximum. Handles virtual filesystems, bind mounts, or degenerate path structures where `${_dir%/*}` does not converge. If the cap is reached without finding the target, the loop exits and the stage falls through to its next fallback. A cap-reached event at Stage 2 is logged.
 - **No subshells inside the loop**: `${_dir%/*}` is a pure parameter expansion. No `dirname`, no `$(...)`, no fork per iteration.
 - **Git Bash drive roots** (`/c`, `/d`): `${"/c"%/*}` yields `""`, which is set to `/`. Next iteration: `"/" == "/"` → exits. No infinite loop.
+- **Windows UNC network paths** (`//server/share/...` under Git Bash): `${dir%/*}` on `//server/share/project` yields `//server/share`; on `//server/share` yields `//server`; on `//server` yields `""` → set to `/`. The traversal then checks `/` and terminates via change-detection. Checks at `//server` and `/` are safe because `-f` evaluates false for non-existent paths at those roots. The loop does NOT traverse into the UNC namespace (`//server` is not the UNC root `\\server`); the POSIX `/` root is reached instead. No `.claude/` directory exists at these roots in any normal deployment, so the fallback to `$HOME/.claude/memory/verbosity.md` applies. The iteration cap (40) prevents any runaway traversal on degenerate UNC mount structures.
 - **Permission-denied directories**: the `-f` test evaluates false when the parent directory lacks execute permission; no error is emitted to stderr. Traversal continues upward transparently.
 
 **Symlink note**: The traversal uses `"$PWD"` (logical shell-assigned path). Do not substitute `$(pwd -P)` — doing so breaks setups where `.claude/` is accessible exclusively via a symlink path.
@@ -278,7 +279,7 @@ The hook fires on the `UserPromptSubmit` event regardless of prompt content. It 
 - **`verbosity.md` is empty or has no `VERBOSITY:` line** — extraction yields empty `LEVEL`; sanity guard sets `MIN`. Hook exits 0.
 - **`verbosity.md` has Windows CRLF line endings** — `\r` stripped during extraction; `VERBOSE\r` normalizes correctly. Hook exits 0.
 - **`VERBOSITY:` line is inside a Markdown code fence** — `_in_fence` flag discards the match; traversal continues for a body-level match. Falls back to next memory source if none found.
-- **Unclosed code fence in `verbosity.md`** — first pass yields empty `LEVEL` with `_in_fence=1`; recovery pass re-reads the file ignoring fence state; first `^VERBOSITY:` line found is used. Unclosed-fence condition logged. If recovery also yields no match, falls through to next memory source.
+- **Unclosed code fence in `verbosity.md`** — first pass yields empty `LEVEL` with `_in_fence=1`; recovery pass re-reads the file ignoring fence state; first `^VERBOSITY:` line found is used. Warning emitted to stderr (not the log file) to prevent per-prompt log accumulation. If recovery also yields no match, falls through to next memory source.
 - **Traversal cap reached (40 iterations)** — loop exits; falls back to `"$HOME/.claude/memory/verbosity.md"`. Cap-reached event logged.
 - **Project hook exists but is not readable (`-r` fails)** — global hook Stage 1 does not defer; continues traversal upward. Global hook remains the authority for that prompt.
 - **Permission-denied directory in traversal path** — `-f` returns false silently; traversal continues upward. No stderr output.
@@ -296,24 +297,55 @@ Both installers currently overwrite `settings.json` wholesale. This is replaced 
 
 Minified input is intentionally re-indented. This is documented behavior, not a side effect.
 
+**Directory pre-flight** — before copying any asset, both installers must verify and create all target parent directories:
+
+```bash
+# install.sh
+mkdir -p "${HOME}/.claude/hooks"  2>/dev/null
+mkdir -p "${HOME}/.claude/memory" 2>/dev/null
+```
+
+```powershell
+# install.ps1
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.claude\hooks"  | Out-Null
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.claude\memory" | Out-Null
+```
+
+These calls must precede any `cp` / `Save-RemoteFile` invocations. If directory creation fails (e.g., insufficient permissions), the installer must print an error and halt — silently copying into a non-existent path would produce no file and no feedback.
+
 **install.sh merge procedure** — when `jq` is available:
 1. Read the existing target `settings.json` (start from `{}` if absent).
-2. Extract the current `hooks.UserPromptSubmit` array (default `[]` if absent).
-3. If the verbosity hook command string is not already present in the array, append the new hook entry.
+2. Remove all entries in `hooks.UserPromptSubmit` whose command contains `verbosity-remind.sh` (stale variant cleanup).
+3. Append the current verbosity hook entry.
 4. Write the merged result back with 2-space indentation.
 
 **install.sh fallback** — when `jq` is not available:
-1. If the target `settings.json` exists, create a timestamped backup with the shell PID appended before any write:
+1. Check for `python3` as a non-destructive alternative JSON processor:
    ```bash
-   cp "$_settings_path" "${_settings_path}.bak.$(date +%Y%m%d%H%M%S).$$"
+   if command -v python3 >/dev/null 2>&1; then
+       # Perform merge via python3 json module
+       python3 - <<'PYEOF'
+   import json, sys, os
+   path = sys.argv[1]; cmd = sys.argv[2]
+   d = json.load(open(path)) if os.path.exists(path) else {}
+   arr = d.setdefault("hooks", {}).setdefault("UserPromptSubmit", [])
+   arr[:] = [e for e in arr if "verbosity-remind.sh" not in e.get("command", "")]
+   arr.append({"type": "command", "command": cmd})
+   json.dump(d, open(path, "w"), indent=2); print(json.dumps(d, indent=2))
+   PYEOF
+   fi
    ```
-   Appending `$$` (shell process ID) to the timestamp eliminates the risk of backup file collisions during rapid or parallelised automated executions that complete within the same second.
-2. Print a warning that includes the backup path:
+   `python3` is universally available on macOS (via Xcode tools) and common on Linux. It performs the same stale-variant removal and append as the `jq` path, outputting 2-space indented JSON, with no destructive fallback.
+
+2. If neither `jq` nor `python3` is available: **do not overwrite `settings.json`**. Print instructions for manual addition and exit with a non-zero code:
    ```
-   ⚠ jq not found — settings.json overwritten. Backup saved to <path>.bak.TIMESTAMP.
-     Re-add any custom UserPromptSubmit hooks manually.
+   ⚠ Neither jq nor python3 found. settings.json was NOT modified.
+     Add the following entry manually to the hooks.UserPromptSubmit array in:
+       <path to settings.json>
+
+     {"type": "command", "command": "<resolved-absolute-hook-path>"}
    ```
-3. Overwrite with the repo version.
+   This eliminates the destructive fallback entirely. User-configured hooks are never at risk from a missing tool dependency.
 
 **install.ps1 merge procedure** — using `ConvertFrom-Json` / `ConvertTo-Json` (always available in PS 5.1+):
 1. Attempt to read and parse existing `settings.json` inside a `try/catch` block:
@@ -324,8 +356,9 @@ Minified input is intentionally re-indented. This is documented behavior, not a 
            $existing = Get-Content $_settingsPath -Raw -Encoding utf8 | ConvertFrom-Json
        } catch {
            Write-Warning "settings.json is malformed — creating backup and starting fresh."
-           $ts = Get-Date -Format "yyyyMMddHHmmss"
-           Copy-Item $_settingsPath "${_settingsPath}.bak.$ts"
+           $ts  = Get-Date -Format "yyyyMMddHHmmss"
+           $rnd = [System.Guid]::NewGuid().ToString('N').Substring(0, 8)
+           Copy-Item $_settingsPath "${_settingsPath}.bak.${ts}.${rnd}"
            $existing = $null
        }
    }
@@ -333,12 +366,13 @@ Minified input is intentionally re-indented. This is documented behavior, not a 
    ```
    If `ConvertFrom-Json` throws (malformed JSON), the corrupted file is backed up with a timestamp, and the merge starts from an empty object. This prevents script termination and prevents configuration loss.
 2. Ensure `hooks.UserPromptSubmit` exists as an array (`@()`).
-3. If the verbosity hook command string is not already present, append the new entry.
-4. Serialize back with `ConvertTo-Json -Depth 10` and `Set-Content -Encoding utf8`.
+3. Remove all entries whose `command` property contains `verbosity-remind.sh` (stale variant cleanup).
+4. Append the current verbosity hook entry.
+5. Serialize back with `ConvertTo-Json -Depth 10` and `Set-Content -Encoding utf8`.
 
 No backup is needed on the success path because `ConvertFrom-Json` / `ConvertTo-Json` performs a non-destructive in-memory merge — existing entries are preserved before the file is written. Backup only occurs in the `catch` block (malformed input).
 
-**Idempotency key**: the exact command string registered in `settings.json` is used as the idempotency check. Re-running the installer does not create duplicate entries.
+**Idempotency key and stale variant cleanup**: the substring `verbosity-remind.sh` serves as the hook fingerprint. Before appending the new entry, the installer removes ALL existing entries in the `UserPromptSubmit` array whose command string contains `verbosity-remind.sh` — regardless of how the command was previously phrased (relative path, old absolute path, previous script version). The current command string is then appended. This ensures that only one verbosity-remind hook exists at any time and that structural renames or path changes from earlier spec versions do not leave orphaned entries.
 
 ### Windows installer and execution permissions
 
@@ -373,13 +407,16 @@ No backup is needed on the success path because `ConvertFrom-Json` / `ConvertTo-
 - [ ] `global/settings.json` registers global hook; graphify entry preserved; re-run does not duplicate.
 - [ ] `project-template/.claude/settings.json` registers project hook with embedded traversal; existing `PreToolUse` and `PostCompact` entries preserved; re-run does not duplicate.
 - [ ] Installer merge: pre-existing `UserPromptSubmit` hooks from other sources are preserved after install.
-- [ ] install.sh `jq`-unavailable fallback: backup named `<path>.bak.YYYYMMDDHHMMSS.$$` (timestamp + PID) created before overwrite; backup path included in warning.
-- [ ] install.sh merge: output normalized to 2-space indentation via `jq`.
-- [ ] install.ps1 `ConvertFrom-Json` call is wrapped in `try/catch`; malformed input triggers backup + fresh start without script termination.
-- [ ] install.ps1 merge: output normalized to 4-space indentation via `ConvertTo-Json -Depth 10`.
-- [ ] Global hook command in `settings.json` contains the literal resolved absolute path (no `$HOME` variable); install-time resolution confirmed for both `install.sh` and `install.ps1`.
-- [ ] Project hook command in `settings.json` uses `jq`/`ConvertTo-Json` for serialization; no manual string concatenation for JSON encoding.
-- [ ] Unclosed code fence in `verbosity.md` triggers recovery pass; first `^VERBOSITY:` line found (fence-state ignored) is used; condition is logged.
+- [ ] install.sh with `jq`: stale `verbosity-remind.sh` variants removed from `UserPromptSubmit` array before appending current entry; output 2-space indented.
+- [ ] install.sh with `python3` (jq absent): same stale-variant removal and append via `json` module; no destructive overwrite.
+- [ ] install.sh with neither `jq` nor `python3`: `settings.json` is NOT modified; user receives exact JSON fragment to add manually; installer exits non-zero.
+- [ ] install.ps1 merge: stale `verbosity-remind.sh` variants removed before appending current entry; output 4-space indented via `ConvertTo-Json -Depth 10`.
+- [ ] install.ps1 `ConvertFrom-Json` wrapped in `try/catch`; malformed input triggers backup named `<path>.bak.YYYYMMDDHHMMSS.<8-char-GUID>` without script termination.
+- [ ] Both installers run directory pre-flight (`mkdir -p` / `New-Item -Force`) for `hooks/` and `memory/` before copying assets; halt with error if creation fails.
+- [ ] Global hook command in `settings.json` contains literal resolved absolute path (no `$HOME` variable); confirmed for both installers.
+- [ ] Project hook command serialized via `jq`/`ConvertTo-Json`; no manual string concatenation.
+- [ ] Unclosed code fence in `verbosity.md`: recovery pass finds first `^VERBOSITY:` line ignoring fences; warning emitted to stderr (not the append-only log file); per-prompt log accumulation prevented.
+- [ ] UNC path (`//server/share/project`) traversal terminates correctly; falls back to `$HOME` global memory file.
 - [ ] `skills/verbosity.md` Application section updated to describe hook-driven enforcement.
 - [ ] `install.sh` and `install.ps1` copy `global/hooks/verbosity-remind.sh` to `"$HOME/.claude/hooks/"`.
 
