@@ -1281,7 +1281,7 @@ Append the following section to `.claude/memory/project.md`:
 - Indirect variable dispatch (`$cmd *.ts`) is a documented static-analysis blind spot — cannot be detected by Guard 3
 ```
 
-- [>] **Step 5: Commit checkpoint**
+- [X] **Step 5: Commit checkpoint**
 
 ```bash
 git add -f .claude/memory/project.md
