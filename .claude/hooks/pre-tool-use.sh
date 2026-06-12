@@ -46,12 +46,12 @@ _g3_extract_command() {
       next="${after:i+1:1}"
       case "$next" in
         '"')  result+='"';    i=$((i+2)) ;;
-        '\')  result+='\\';   i=$((i+2)) ;;
+        '\')  result+='\';    i=$((i+2)) ;;
         'n')  result+=$'\n';  i=$((i+2)) ;;
         't')  result+=$'\t';  i=$((i+2)) ;;
         'r')  result+=$'\r';  i=$((i+2)) ;;
         '/')  result+='/';    i=$((i+2)) ;;
-        *)    result+="$next"; i=$((i+2)) ;;  # other \X: keep X
+        *)    result+="\\$next"; i=$((i+2)) ;;  # other \X: keep \X (preserve escape info)
       esac
     elif [[ "$ch" == '"' ]]; then
       break   # closing double-quote
@@ -152,6 +152,94 @@ _g3_scan() {
     return 1   # glob mode: fail-closed on malformed input
   fi
   [[ "$mode" == "strip" ]] && printf '%s' "$result"
+  return 0
+}
+
+# ── Guard 3 pattern functions (P4–P7) ─────────────────────────────────────────
+
+_g3_p4_cat_glob() {
+  local s="$1"
+  local cat_re="${_G3_POS}${_G3_MOD}${_G3_PATH}cat([[:space:]]|$)"
+  local rest="$s"
+  while [[ "$rest" =~ $cat_re ]]; do
+    local mlen=${#BASH_REMATCH[0]}
+    local after="${rest:mlen}"
+    _g3_scan "glob" "$after" || return 1   # rc=1 means glob found → block
+    rest="$after"
+    [[ -z "$rest" ]] && break
+  done
+  return 0
+}
+
+_g3_p5_cmdsubst() {
+  local s="$1"
+  local util_re="${_G3_POS}${_G3_MOD}${_G3_PATH}${_G3_READERS}([[:space:]]|$)"
+  [[ "$s" =~ $util_re ]] || return 0
+  local after="${s#*${BASH_REMATCH[0]}}"
+  # Exempt: argument is exactly "$(cmd)"/literal-path  (with or without surrounding quotes)
+  local exempt_re='^"?\$\(([^)]+)\)"?(/[A-Za-z0-9_./@%-]+)"?$'
+  [[ "$after" =~ $exempt_re ]] && return 0
+  local _p5_dp='\$\('
+  [[ "$after" =~ $_p5_dp ]] && return 1   # unquoted var → ERE; matches literal $(
+  [[ "$after" == *'`'* ]]   && return 1   # glob match for backtick
+  return 0
+}
+
+_g3_grep_has_matchall_pattern() {
+  local s="$1"
+  local matchall_re='(\.\*|\.|\.\+|\^|"")'
+  # Check every -e pattern (loop to handle multiple -e flags)
+  local rest="$s"
+  while [[ "$rest" =~ [[:space:]]-e[[:space:]]+([^[:space:]]+) ]]; do
+    local pat="${BASH_REMATCH[1]//\'/}"; pat="${pat//\"/}"
+    [[ "$pat" =~ ^($matchall_re)$ ]] && return 0
+    rest="${rest#*${BASH_REMATCH[0]}}"
+  done
+  if [[ "$s" =~ --regexp[=[:space:]]+([^[:space:]]+) ]]; then
+    local pat="${BASH_REMATCH[1]//\'/}"; pat="${pat//\"/}"
+    [[ "$pat" =~ ^($matchall_re)$ ]] && return 0
+  fi
+  local -a toks; read -ra toks <<< "$s"
+  local seen_cmd=0 pat=""
+  for tok in "${toks[@]}"; do
+    [[ "$tok" =~ ^(git|grep|egrep|fgrep|-r|-R|--recursive|-[a-zA-Z]+)$ ]] && { seen_cmd=1; continue; }
+    (( seen_cmd == 0 )) && continue
+    [[ "$tok" =~ ^- ]] && continue
+    [[ "$tok" =~ ^(/|./|../|~/) ]] && continue
+    [[ "$tok" =~ [/] ]] && [[ ! "$tok" =~ [*+?[\](){}^\$|\\] ]] && continue
+    pat="${tok//\'/}"; pat="${pat//\"/}"
+    break
+  done
+  [[ -z "$pat" ]] && return 0
+  [[ "$pat" =~ ^($matchall_re)$ ]] && return 0
+  return 1
+}
+
+_g3_p6_grep_matchall() {
+  local s="$1"
+  [[ "$s" =~ [[:space:]]-F([[:space:]]|$) ]]             && return 0
+  [[ "$s" =~ [[:space:]]--fixed-strings([[:space:]]|$) ]] && return 0
+  if [[ "$s" =~ ${_G3_POS}${_G3_MOD}(grep|egrep|fgrep)([[:space:]]|$) ]]; then
+    [[ "$s" =~ [[:space:]](-r|-R|--recursive)([[:space:]]|$) ]] || return 0
+    _g3_grep_has_matchall_pattern "$s" && return 1
+  fi
+  if [[ "$s" =~ ${_G3_POS}git[[:space:]]+grep([[:space:]]|$) ]]; then
+    _g3_grep_has_matchall_pattern "$s" && return 1
+  fi
+  return 0
+}
+
+_g3_p7_pager_glob() {
+  local s="$1"
+  local pager_re="${_G3_POS}${_G3_MOD}${_G3_PATH}(less|more|head|tail|sed|awk)([[:space:]]|$)"
+  local rest="$s"
+  while [[ "$rest" =~ $pager_re ]]; do
+    local mlen=${#BASH_REMATCH[0]}
+    local after="${rest:mlen}"
+    _g3_scan "glob" "$after" || return 1   # rc=1 means glob found → block
+    rest="$after"
+    [[ -z "$rest" ]] && break
+  done
   return 0
 }
 
@@ -261,7 +349,11 @@ if [ "${CLAUDE_TOOL_NAME:-}" = "Bash" ]; then
   _g3_p1_find_depth "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P1 "; }
   _g3_p2_find_exec  "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P2 "; }
   _g3_p3_xargs      "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P3 "; }
-  # (patterns 4-12 appended in later tasks)
+  _g3_p4_cat_glob      "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P4 "; }
+  _g3_p5_cmdsubst      "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P5 "; }
+  _g3_p6_grep_matchall "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P6 "; }
+  _g3_p7_pager_glob    "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P7 "; }
+  # (patterns 8-12 appended in later tasks)
 
   if (( _G3_HIT )); then
     # Debug logging: export GUARD3_DEBUG=1 in the terminal to diagnose false positives

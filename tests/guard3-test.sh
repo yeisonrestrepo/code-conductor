@@ -77,6 +77,39 @@ run "P3 xargs -i boolean (no extra token)"    'xargs -i cat'                  "b
 run "P3 xargs sh (shell interpreter)"         'find . | xargs sh -c cat'      "block"
 run "P3 xargs echo (not a reader)"            'ls | xargs echo'               "pass"
 
+# ── Pattern 4: cat + glob ──────────────────────────────────────────────────────
+run "P4 cat *.md"                          'cat *.md'                  "block"
+run "P4 cat src/**/*.ts"                   'cat src/**/*.ts'           "block"
+run "P4 cat dir/??.sh"                     'cat dir/??.sh'             "block"
+run "P4 cat {a,b}.ts"                      'cat {a,b}.ts'              "block"
+run "P4 cat [abc].md"                      'cat [abc].md'              "block"
+run "P4 cat '*.md' (quoted passes)"        "cat '*.md'"                "pass"
+run "P4 cat \"*.ts\" (quoted passes)"      'cat "*.ts"'                "pass"
+run "P4 cat \\*.ts (escaped passes)"       'cat \*.ts'                 "pass"
+run "P4 cat \\\\*.ts (double-bs blocks)"   'cat \\*.ts'                "block"
+run "P4 /bin/cat *.md (path-invoked)"      '/bin/cat *.md'             "block"
+run "P4 concatenate *.md (word boundary)"  'concatenate *.md'          "pass"
+# ── Pattern 5: cmd-subst + reading ────────────────────────────────────────────
+run "P5 cat \$(ls)"                        'cat $(ls)'                 "block"
+run "P5 cat with backtick"                 'cat `ls`'                  "block"
+run "P5 cat src/\$(dir)/main.ts (prefix)"  'cat src/$(dir)/main.ts'   "block"
+run "P5 cat \$(root)/pkg.json (exempt)"    'cat "$(git rev-parse --show-toplevel)"/package.json' "pass"
+# ── Pattern 6: grep match-all ─────────────────────────────────────────────────
+run "P6 grep -r '.*' ."                    "grep -r '.*' ."            "block"
+run "P6 egrep -R '' ."                     "egrep -R '' ."             "block"
+run "P6 git grep '.*'"                     "git grep '.*'"             "block"
+run "P6 git grep '' (empty)"               "git grep ''"               "block"
+run "P6 grep -r -F '.*' (fixed-strings)"   "grep -r -F '.*' ."         "pass"
+run "P6 grep -r -e foo -e '.*' ."          "grep -r -e foo -e '.*' ."  "block"
+run "P6 grep -r --regexp='.*' ."           "grep -r --regexp='.*' ."   "block"
+run "P6 grep -r pattern src/ (targeted)"   'grep -r pattern src/'      "pass"
+# ── Pattern 7: pager + glob ───────────────────────────────────────────────────
+run "P7 less *.ts"                         'less *.ts'                 "block"
+run "P7 head *.log"                        'head *.log'                "block"
+run "P7 awk '{p}' *.ts"                    "awk '{p}' *.ts"            "block"
+run "P7 sed -n p *.md"                     'sed -n p *.md'             "block"
+run "P7 less 'file.ts' (quoted passes)"    "less 'file.ts'"            "pass"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 (( FAIL == 0 ))
