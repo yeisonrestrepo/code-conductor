@@ -24,17 +24,24 @@ Parsing rules:
 - Raw text only — no Markdown bold, no backticks, no extra punctuation around the value.
 - One or more spaces after the colon are accepted; the extraction script strips all leading spaces from the extracted value. The "exactly one space" phrasing in the canonical format above is the recommended authoring style, not a parsing requirement.
 - `grep -m1 '^VERBOSITY:'` is frontmatter-safe because frontmatter keys are lowercase (`name:`, `type:`, etc.) and never start with `VERBOSITY:`.
+- **UTF-8 BOM handling**: Windows editors (Notepad, VS Code with certain settings) may prepend a UTF-8 Byte Order Mark (`\xEF\xBB\xBF`) to the file. If the `VERBOSITY:` line is the very first line with no frontmatter, the BOM appears before the `V` and causes the `VERBOSITY:*` case pattern to fail. The extraction loop strips the BOM from the first line read before any pattern matching.
+- **Final line without trailing newline**: `while IFS= read -r _line` exits when `read` returns non-zero — which happens both at EOF after a newline and at EOF without a newline, but only processes the line in the first case. The trailing-newline-free case leaves `_line` populated but the loop body unexecuted. Fix: use `|| [ -n "$_line" ]` as the loop condition so the final partial line is always processed.
 - **Code block false-positive prevention**: A `VERBOSITY:` line inside a Markdown code fence (` ``` `) must not be matched. The extraction loop tracks a `_in_fence` flag (toggled by lines starting with ` ``` `). Any `^VERBOSITY:` match while `_in_fence=1` is discarded. This is implemented as a bash `while IFS= read -r` loop over the file — no external awk or sed call.
-- **Unclosed fence recovery**: If the first pass completes with `LEVEL` still empty and `_in_fence=1`, the file contains an unclosed code fence that has permanently suppressed all body-level `VERBOSITY:` lines. In this case, a recovery pass is run that reads the file a second time ignoring fence state entirely: the first `^VERBOSITY:` line found (regardless of fence position) is used. The unclosed-fence warning is emitted to **stderr** (not to the append-only log file) to prevent per-prompt log accumulation: an unclosed fence is a persistent file corruption that would trigger the warning on every single prompt turn, making append-only log entries inappropriate. Stderr output is captured separately from hook stdout and does not pollute the injected context. If the recovery pass also yields no match, fall through to the next memory source as normal.
+- **Fence toggle under `set -e`**: `(( expr ))` returns exit code 1 when the arithmetic result is 0. In `set -e` environments (or scripts that inherit strict error mode), toggling `_in_fence` from 1 to 0 terminates the script. The toggle expression must be guarded: `(( _in_fence = 1 - _in_fence )) || true`.
+- **Unclosed fence recovery**: If the first pass completes with `LEVEL` still empty and `_in_fence=1`, the file contains an unclosed code fence. A recovery pass re-reads the file ignoring fence state; the first `^VERBOSITY:` line found is used. The warning is throttled using a 60-minute marker file (`$HOME/.claude/logs/.verbosity-fence-warned`) so it fires at most once per hour regardless of how many prompts are submitted: `find "$HOME/.claude/logs/.verbosity-fence-warned" -mmin -60 2>/dev/null | grep -q . || { echo "..." >&2; touch "$HOME/.claude/logs/.verbosity-fence-warned" 2>/dev/null; }`. Warning goes to stderr only — not to the append-only log file. If recovery also yields no match, fall through to the next memory source.
 - After extraction, the value is normalized using a `case` statement before the sanity guard (see Uppercase normalization below).
 
 Extraction sequence (pure bash, bash 3.2 compatible):
 
 ```bash
-_in_fence=0; LEVEL=""
-while IFS= read -r _line; do
+_in_fence=0; LEVEL=""; _first=1
+while IFS= read -r _line || [ -n "$_line" ]; do
+    if [ "$_first" = "1" ]; then
+        _line="${_line#$'\xef\xbb\xbf'}"   # strip UTF-8 BOM on first line
+        _first=0
+    fi
     case "$_line" in
-        '```'*) (( _in_fence = 1 - _in_fence )) ;;
+        '```'*) (( _in_fence = 1 - _in_fence )) || true ;;
         VERBOSITY:*)
             (( _in_fence )) && continue
             LEVEL="${_line#VERBOSITY:}"           # strip key prefix
@@ -118,13 +125,28 @@ Non-loggable conditions (expected defensive paths; no log entry written):
 - Unrecognized level value → sanity guard sets MIN (normal)
 - `verbosity.md` absent at all levels → sanity guard sets MIN (normal)
 
-Log target: `"$HOME/.claude/logs/verbosity-hook.log"`. Directory created on first write:
+Log target: `"$HOME/.claude/logs/verbosity-hook.log"`. Before any log write, the directory path must pass a three-step defensive validation:
 
 ```bash
-mkdir -p "$HOME/.claude/logs" 2>/dev/null
+_logdir="$HOME/.claude/logs"
+_logfile="$_logdir/verbosity-hook.log"
+_log_ok=0
+if [ -e "$_logdir" ] && [ ! -d "$_logdir" ]; then
+    # Path exists but is not a directory (e.g., a regular file named "logs")
+    echo "[verbosity-remind] log dir blocked by non-directory: $_logdir" >&2
+elif mkdir -p "$_logdir" 2>/dev/null && [ -w "$_logdir" ]; then
+    _log_ok=1
+fi
+# Subsequent log writes use: (( _log_ok )) && printf '...\n' >> "$_logfile" 2>/dev/null
 ```
 
-The `2>/dev/null` suppresses any permission error or environment error from `mkdir -p` so it cannot bleed into the hook's stdout (which is captured as prompt context). If the directory creation fails silently, the subsequent `>>` log write also fails silently — both are acceptable; the hook always exits 0 and emits the MIN fallback reminder.
+Step 1: if the path exists but is not a directory, emit a one-time stderr warning and disable file logging for this invocation — `mkdir -p` would silently succeed (no-op) but the `>>` write would fail with a confusing error.
+
+Step 2: attempt `mkdir -p 2>/dev/null`. Suppresses permission errors from stdout.
+
+Step 3: verify the directory is writable (`-w`). If creation succeeded but the directory is mode 000 or owned by another user, the `>>` write would fail silently. Checking `-w` first avoids the attempt entirely.
+
+If any step fails, `_log_ok` remains 0 and all log writes are skipped silently. The hook always exits 0 regardless.
 
 Log line format:
 ```
@@ -279,7 +301,12 @@ The hook fires on the `UserPromptSubmit` event regardless of prompt content. It 
 - **`verbosity.md` is empty or has no `VERBOSITY:` line** — extraction yields empty `LEVEL`; sanity guard sets `MIN`. Hook exits 0.
 - **`verbosity.md` has Windows CRLF line endings** — `\r` stripped during extraction; `VERBOSE\r` normalizes correctly. Hook exits 0.
 - **`VERBOSITY:` line is inside a Markdown code fence** — `_in_fence` flag discards the match; traversal continues for a body-level match. Falls back to next memory source if none found.
-- **Unclosed code fence in `verbosity.md`** — first pass yields empty `LEVEL` with `_in_fence=1`; recovery pass re-reads the file ignoring fence state; first `^VERBOSITY:` line found is used. Warning emitted to stderr (not the log file) to prevent per-prompt log accumulation. If recovery also yields no match, falls through to next memory source.
+- **Unclosed code fence in `verbosity.md`** — first pass yields empty `LEVEL` with `_in_fence=1`; recovery pass re-reads ignoring fences; first `^VERBOSITY:` line used. Throttled stderr warning emitted at most once per 60 minutes via marker file; does not appear on every prompt.
+- **`verbosity.md` has no trailing newline** — `|| [ -n "$_line" ]` loop condition ensures the final line is processed; last line matched and `LEVEL` extracted correctly.
+- **`verbosity.md` starts with UTF-8 BOM** — BOM bytes (`\xef\xbb\xbf`) stripped from first line before pattern matching; `VERBOSITY:` on line 1 matches correctly without frontmatter.
+- **Arithmetic fence toggle yields 0 under `set -e`** — `|| true` prevents script termination when `_in_fence` transitions from 1 to 0.
+- **Log directory is a non-directory file** — stderr warning emitted; file logging disabled for that invocation; hook continues.
+- **Log directory exists but is not writable** — `-w` check prevents a failed `>>` attempt; file logging silently disabled; hook continues.
 - **Traversal cap reached (40 iterations)** — loop exits; falls back to `"$HOME/.claude/memory/verbosity.md"`. Cap-reached event logged.
 - **Project hook exists but is not readable (`-r` fails)** — global hook Stage 1 does not defer; continues traversal upward. Global hook remains the authority for that prompt.
 - **Permission-denied directory in traversal path** — `-f` returns false silently; traversal continues upward. No stderr output.
@@ -397,9 +424,14 @@ No backup is needed on the success path because `ConvertFrom-Json` / `ConvertTo-
 - [ ] Permission-denied directory in traversal path is handled silently (no stderr output, traversal continues).
 - [ ] Reminder output begins with a leading `\n` character.
 - [ ] Extraction strips leading spaces, trailing spaces, and `\r` using pure bash parameter expansion.
+- [ ] Extraction loop uses `|| [ -n "$_line" ]` condition; files without a trailing newline are parsed correctly.
+- [ ] UTF-8 BOM (`\xef\xbb\xbf`) stripped from first line before pattern matching; `VERBOSITY:` on line 1 without frontmatter matches correctly.
+- [ ] Fence toggle uses `(( ... )) || true`; no script termination when toggling from 1 to 0 under `set -e`.
 - [ ] Level normalization uses `case` bracket expressions, not `${LEVEL^^}`; `min`, `Min`, `MIN` all resolve to `MIN` on bash 3.2.
 - [ ] Sanity guard falls back to `MIN` for any value outside `{MIN, INFO, VERBOSE}` after normalization.
 - [ ] Code-fence tracking prevents a `VERBOSITY:` line inside a Markdown code block from being matched.
+- [ ] Unclosed fence warning throttled via `$HOME/.claude/logs/.verbosity-fence-warned` marker with 60-minute TTL; fires at most once per hour per hook scope.
+- [ ] Log directory validation: non-directory path at log dir → stderr warning + logging disabled; unwritable directory → logging silently disabled; both cases leave hook exit 0.
 - [ ] `$PWD` null guard skips traversal and falls back to `"$HOME/.claude/memory/verbosity.md"`.
 - [ ] Project-local `.claude/memory/verbosity.md` overrides `"$HOME/.claude/memory/verbosity.md"` when found in ancestor chain.
 - [ ] Reminder text is level-aware: three distinct messages for MIN / INFO / VERBOSE.
