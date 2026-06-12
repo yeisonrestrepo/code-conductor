@@ -28,7 +28,7 @@ Parsing rules:
 - **Final line without trailing newline**: `while IFS= read -r _line` exits when `read` returns non-zero — which happens both at EOF after a newline and at EOF without a newline, but only processes the line in the first case. The trailing-newline-free case leaves `_line` populated but the loop body unexecuted. Fix: use `|| [ -n "$_line" ]` as the loop condition so the final partial line is always processed.
 - **Code block false-positive prevention**: A `VERBOSITY:` line inside a Markdown code fence (` ``` `) must not be matched. The extraction loop tracks a `_in_fence` flag (toggled by lines starting with ` ``` `). Any `^VERBOSITY:` match while `_in_fence=1` is discarded. This is implemented as a bash `while IFS= read -r` loop over the file — no external awk or sed call.
 - **Fence toggle under `set -e`**: `(( expr ))` returns exit code 1 when the arithmetic result is 0. In `set -e` environments (or scripts that inherit strict error mode), toggling `_in_fence` from 1 to 0 terminates the script. The toggle expression must be guarded: `(( _in_fence = 1 - _in_fence )) || true`.
-- **Unclosed fence recovery**: If the first pass completes with `LEVEL` still empty and `_in_fence=1`, the file contains an unclosed code fence. A recovery pass re-reads the file ignoring fence state; the first `^VERBOSITY:` line found is used. The warning is throttled using a 60-minute marker file (`$HOME/.claude/logs/.verbosity-fence-warned`) so it fires at most once per hour regardless of how many prompts are submitted: `find "$HOME/.claude/logs/.verbosity-fence-warned" -mmin -60 2>/dev/null | grep -q . || { echo "..." >&2; touch "$HOME/.claude/logs/.verbosity-fence-warned" 2>/dev/null; }`. Warning goes to stderr only — not to the append-only log file. If recovery also yields no match, fall through to the next memory source.
+- **Unclosed fence recovery**: If the first pass completes with `LEVEL` still empty and `_in_fence=1`, the file contains an unclosed code fence. A recovery pass re-reads the file using a simplified loop that completely omits the `` '```'* `` case arm — no `_in_fence` variable, no toggle, no fence tracking. The loop contains only the `VERBOSITY:*` arm; the first matching line is used. This eliminates the redundant fence-toggle operations that were the source of the original miss and keeps the recovery path minimally complex. The warning is throttled using a 60-minute marker file (`$HOME/.claude/logs/.verbosity-fence-warned`) so it fires at most once per hour regardless of how many prompts are submitted: `find "$HOME/.claude/logs/.verbosity-fence-warned" -mmin -60 2>/dev/null | grep -q . || { echo "..." >&2; touch "$HOME/.claude/logs/.verbosity-fence-warned" 2>/dev/null; }`. Warning goes to stderr only — not to the append-only log file. If recovery also yields no match, fall through to the next memory source.
 - After extraction, the value is normalized using a `case` statement before the sanity guard (see Uppercase normalization below).
 
 Extraction sequence (pure bash, bash 3.2 compatible):
@@ -125,7 +125,7 @@ Non-loggable conditions (expected defensive paths; no log entry written):
 - Unrecognized level value → sanity guard sets MIN (normal)
 - `verbosity.md` absent at all levels → sanity guard sets MIN (normal)
 
-Log target: `"$HOME/.claude/logs/verbosity-hook.log"`. Before any log write, the directory path must pass a three-step defensive validation:
+Log target: `"$HOME/.claude/logs/verbosity-hook.log"`. Before any log write, the directory path must pass a four-step defensive validation:
 
 ```bash
 _logdir="$HOME/.claude/logs"
@@ -203,7 +203,7 @@ Loop invariants:
 - **Iteration cap**: 40 iterations maximum. Handles virtual filesystems, bind mounts, or degenerate path structures where `${_dir%/*}` does not converge. If the cap is reached without finding the target, the loop exits and the stage falls through to its next fallback. A cap-reached event at Stage 2 is logged.
 - **No subshells inside the loop**: `${_dir%/*}` is a pure parameter expansion. No `dirname`, no `$(...)`, no fork per iteration.
 - **Git Bash drive roots** (`/c`, `/d`): `${"/c"%/*}` yields `""`, which is set to `/`. Next iteration: `"/" == "/"` → exits. No infinite loop.
-- **Windows UNC network paths** (`//server/share/...` under Git Bash): `${dir%/*}` on `//server/share/project` yields `//server/share`; on `//server/share` yields `//server`; on `//server` yields `""` → set to `/`. The traversal then checks `/` and terminates via change-detection. Checks at `//server` and `/` are safe because `-f` evaluates false for non-existent paths at those roots. The loop does NOT traverse into the UNC namespace (`//server` is not the UNC root `\\server`); the POSIX `/` root is reached instead. No `.claude/` directory exists at these roots in any normal deployment, so the fallback to `$HOME/.claude/memory/verbosity.md` applies. The iteration cap (40) prevents any runaway traversal on degenerate UNC mount structures.
+- **Windows UNC network paths** (`//server/share/...` under Git Bash): `${_dir%/*}` on `//server/share/project` yields `//server/share`; on `//server/share` yields `//server`; on `//server` yields `""` → set to `/`. The traversal then checks `/` and terminates via change-detection. Checks at `//server` and `/` are safe because `-f` evaluates false for non-existent paths at those roots. The loop does NOT traverse into the UNC namespace (`//server` is not the UNC root `\\server`); the POSIX `/` root is reached instead. No `.claude/` directory exists at these roots in any normal deployment, so the fallback to `$HOME/.claude/memory/verbosity.md` applies. The iteration cap (40) prevents any runaway traversal on degenerate UNC mount structures.
 - **Permission-denied directories**: the `-f` test evaluates false when the parent directory lacks execute permission; no error is emitted to stderr. Traversal continues upward transparently.
 
 **Symlink note**: The traversal uses `"$PWD"` (logical shell-assigned path). Do not substitute `$(pwd -P)` — doing so breaks setups where `.claude/` is accessible exclusively via a symlink path.
@@ -251,7 +251,7 @@ The project hook cannot be registered with a static relative path (`.claude/hook
 The registration command must embed a self-contained upward traversal loop that locates the project's hook script regardless of invocation CWD:
 
 ```json
-"command": "bash -c '_d=\"${PWD:-}\"; _p=\"\"; _i=0; while [ \"$_d\" != \"$_p\" ] && [ $_i -lt 40 ]; do h=\"$_d/.claude/hooks/verbosity-remind.sh\"; [ -f \"$h\" ] && [ -r \"$h\" ] && { bash \"$h\"; exit $?; }; _p=\"$_d\"; _d=\"${_d%/*}\"; [ -z \"$_d\" ] && _d=/; _i=$((_i+1)); done; exit 0'"
+"command": "bash -c '_dir=\"${PWD:-}\"; _prev=\"\"; _iters=0; while [ \"$_dir\" != \"$_prev\" ] && [ $_iters -lt 40 ]; do _h=\"$_dir/.claude/hooks/verbosity-remind.sh\"; [ -f \"$_h\" ] && [ -r \"$_h\" ] && { bash \"$_h\"; exit $?; }; _prev=\"$_dir\"; _dir=\"${_dir%/*}\"; [ -z \"$_dir\" ] && _dir=/; _iters=$((_iters+1)); done; exit 0'"
 ```
 
 This command:
@@ -264,7 +264,7 @@ This command:
 
 | Character in bash command | JSON encoding | Appears in this command |
 |--------------------------|---------------|------------------------|
-| `"` (double-quote) | `\"` | yes — all inner `"$_d"`, `"$h"` etc. |
+| `"` (double-quote) | `\"` | yes — all inner `"$_dir"`, `"$_h"` etc. |
 | `\` (backslash) | `\\` | no — no literal backslashes in the traversal loop |
 | `/` (forward-slash) | `/` (no escape needed in JSON) | yes — paths |
 | newline | `\n` | no — command is one line |
@@ -291,7 +291,7 @@ The resulting `settings.json` entry contains a literal path such as `bash /home/
 
 ### Empty or binary-only prompt behavior
 
-The hook fires on the `UserPromptSubmit` event regardless of prompt content. It does not inspect or read the prompt string. When the user submits an empty string or a prompt consisting exclusively of binary attachments (images, files), the hook runs its full pipeline identically and emits the verbosity reminder normally. No special handling or suppression is required.
+The hook fires on the `UserPromptSubmit` event regardless of prompt content. It does not inspect or read the prompt string. When the user submits an empty string or a prompt consisting exclusively of binary attachments (images, files), the hook runs its full pipeline identically and emits the verbosity reminder normally. No special handling or suppression is required; the hook has no mechanism to inspect prompt content and its pipeline executes identically regardless of what the user submitted.
 
 ### Alternative paths
 
@@ -331,6 +331,8 @@ Both installers currently overwrite `settings.json` wholesale. This is replaced 
 - **install.ps1** (`ConvertTo-Json`): 4-space indentation (`ConvertTo-Json -Depth 10` default). This divergence from the bash output is acceptable because the files are platform-specific; the PowerShell installer only runs on Windows.
 
 Minified input is intentionally re-indented. This is documented behavior, not a side effect.
+
+**`settings.json` absent or parent directory absent**: if the `settings.json` file does not exist, both installers treat it as an empty object (`{}`) and write the merged result as a new file. If the parent directory of `settings.json` (e.g., `$HOME/.claude/` for the global file, `.claude/` for the project file) does not exist, the directory pre-flight step below creates it before any file is read or written. Writing the merged JSON to a path whose parent directory does not exist is a fatal error — the installer must halt with an explicit message. Silently writing to a non-existent path would produce no file and no diagnostic.
 
 **Directory pre-flight** — before copying any asset, both installers must verify and create all target parent directories:
 
