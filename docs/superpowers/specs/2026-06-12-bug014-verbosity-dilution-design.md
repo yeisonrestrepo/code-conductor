@@ -25,6 +25,7 @@ Parsing rules:
 - Exactly one space after the colon. Trailing whitespace and `\r` (CRLF from Windows editors) are stripped before validation.
 - `grep -m1 '^VERBOSITY:'` is frontmatter-safe because frontmatter keys are lowercase (`name:`, `type:`, etc.) and never start with `VERBOSITY:`.
 - **Code block false-positive prevention**: A `VERBOSITY:` line inside a Markdown code fence (` ``` `) must not be matched. The extraction loop tracks a `_in_fence` flag (toggled by lines starting with ` ``` `). Any `^VERBOSITY:` match while `_in_fence=1` is discarded. This is implemented as a bash `while IFS= read -r` loop over the file — no external awk or sed call.
+- **Unclosed fence recovery**: If the first pass completes with `LEVEL` still empty and `_in_fence=1`, the file contains an unclosed code fence that has permanently suppressed all body-level `VERBOSITY:` lines. In this case, a recovery pass is run that reads the file a second time ignoring fence state entirely: the first `^VERBOSITY:` line found (regardless of fence position) is used. The unclosed-fence condition is logged to the diagnostic log. If the recovery pass also yields no match, fall through to the next memory source as normal.
 - After extraction, the value is normalized using a `case` statement before the sanity guard (see Uppercase normalization below).
 
 Extraction sequence (pure bash, bash 3.2 compatible):
@@ -96,10 +97,12 @@ The global hook's deferral decision is based on filesystem state (Stage 1 traver
 At hook entry — before any guard, traversal, or file read — check for the bypass flag:
 
 ```bash
-[ "${CC_VERBOSITY_SKIP:-0}" = "1" ] && exit 0
+case "${CC_VERBOSITY_SKIP:-0}" in
+    1|true|yes|on|TRUE|YES|ON|True|Yes|On) exit 0 ;;
+esac
 ```
 
-Setting `CC_VERBOSITY_SKIP=1` in the environment causes both hooks to exit immediately with no output. This flag is intended for automated test suite execution, CI/CD pipelines, and any context where reminder output would pollute structured logs. The flag is not persisted; it must be exported in the environment per-invocation.
+The `CC_VERBOSITY_SKIP` flag accepts any of the standard truthy values: `1`, `true`, `yes`, `on` (and their uppercase and title-case variants). Any other value — including `false`, `0`, or absent — is treated as disabled. This broadens compatibility with CI environments that set boolean flags as `true` (e.g., GitHub Actions `${{ true }}`), not just `1`. The flag is not persisted; it must be exported in the environment per-invocation.
 
 ### Diagnostic logging
 
@@ -226,21 +229,34 @@ This command:
 - Passes `$?` through so a non-zero exit from the hook script propagates correctly
 - Falls through with `exit 0` (no output) if no project hook is found — this case should not occur in a properly installed project, but is harmless
 
-The global hook command registration uses `$HOME` (not `~`):
+**JSON escaping constraints**: the command string above is the exact value that must appear inside the JSON `"command"` field. Escaping rules that apply to this string:
 
-```json
-"command": "bash \"$HOME/.claude/hooks/verbosity-remind.sh\""
-```
+| Character in bash command | JSON encoding | Appears in this command |
+|--------------------------|---------------|------------------------|
+| `"` (double-quote) | `\"` | yes — all inner `"$_d"`, `"$h"` etc. |
+| `\` (backslash) | `\\` | no — no literal backslashes in the traversal loop |
+| `/` (forward-slash) | `/` (no escape needed in JSON) | yes — paths |
+| newline | `\n` | no — command is one line |
 
-Wait — `$HOME` in a JSON string is not expanded by JSON parsers; it is expanded by the shell that interprets the `command` value. Claude Code passes the command string to the OS shell, which does expand `$HOME`. Verify that Claude Code uses shell expansion (not raw exec) when invoking hook commands. If raw exec is used, the command must be registered with an absolute path determined at install time instead.
+The inner `\"` pairs around variable references (e.g., `\"$_d\"`) are **JSON escapes for the double-quote character**; when the JSON is parsed they become literal `"` in the command string. The bash `-c '...'` single-quoted context then receives them as literal `"` characters that act as shell quoting within the script. This is the same escaping pattern already used by the existing `pre-tool-use.sh` registration in `project-template/.claude/settings.json`.
 
-**Install-time resolution** (fallback if shell expansion is not guaranteed): During `install.sh`/`install.ps1` execution, resolve `$HOME` to its literal value and write the absolute path directly into `settings.json`:
+Installers must use `jq` / `ConvertTo-Json` to serialize the command string into JSON rather than hand-constructing the JSON — these tools handle all escaping automatically and prevent corruption.
+
+**Global hook command — install-time absolute path resolution**: Claude Code's shell expansion behaviour for `$HOME` inside `settings.json` command strings is unverified and must not be relied upon. The global hook command must be written with the absolute path resolved at install time:
 
 ```bash
-# install.sh
-_hook_path="${HOME}/.claude/hooks/verbosity-remind.sh"
-# write literal /home/user/.claude/hooks/verbosity-remind.sh into settings.json
+# install.sh — write literal resolved path, not $HOME variable
+_global_hook_cmd="bash ${HOME}/.claude/hooks/verbosity-remind.sh"
+# pass $_global_hook_cmd to jq for JSON serialization
 ```
+
+```powershell
+# install.ps1 — resolve $HOME at install time
+$globalHookCmd = "bash $env:USERPROFILE/.claude/hooks/verbosity-remind.sh"
+# pass $globalHookCmd to ConvertTo-Json serialization
+```
+
+The resulting `settings.json` entry contains a literal path such as `bash /home/alice/.claude/hooks/verbosity-remind.sh` — no runtime variable expansion is required. If the user's home directory changes after installation, they must re-run the installer.
 
 ### Empty or binary-only prompt behavior
 
@@ -255,13 +271,14 @@ The hook fires on the `UserPromptSubmit` event regardless of prompt content. It 
 
 ### Error cases
 
-- **`CC_VERBOSITY_SKIP=1` set** — hook exits 0 immediately, no output.
+- **`CC_VERBOSITY_SKIP` set to a truthy value** (`1`, `true`, `yes`, `on`, any case) — hook exits 0 immediately, no output.
 - **`$PWD` is null or unset** — traversal skipped; hook reads `"$HOME/.claude/memory/verbosity.md"` directly. Sanity guard handles bad state. Hook exits 0.
 - **`verbosity.md` is missing at all levels** — extraction yields empty `LEVEL`; sanity guard sets `MIN`. Hook exits 0, emits `\n[VERBOSITY:MIN]`. Installers always provision `"$HOME/.claude/memory/verbosity.md"` at install time; sanity guard is a corruption defense.
 - **`verbosity.md` contains an unrecognized value** — `case` normalization attempted; if still not in `{MIN, INFO, VERBOSE}`, sanity guard sets `MIN`. Hook exits 0.
 - **`verbosity.md` is empty or has no `VERBOSITY:` line** — extraction yields empty `LEVEL`; sanity guard sets `MIN`. Hook exits 0.
 - **`verbosity.md` has Windows CRLF line endings** — `\r` stripped during extraction; `VERBOSE\r` normalizes correctly. Hook exits 0.
 - **`VERBOSITY:` line is inside a Markdown code fence** — `_in_fence` flag discards the match; traversal continues for a body-level match. Falls back to next memory source if none found.
+- **Unclosed code fence in `verbosity.md`** — first pass yields empty `LEVEL` with `_in_fence=1`; recovery pass re-reads the file ignoring fence state; first `^VERBOSITY:` line found is used. Unclosed-fence condition logged. If recovery also yields no match, falls through to next memory source.
 - **Traversal cap reached (40 iterations)** — loop exits; falls back to `"$HOME/.claude/memory/verbosity.md"`. Cap-reached event logged.
 - **Project hook exists but is not readable (`-r` fails)** — global hook Stage 1 does not defer; continues traversal upward. Global hook remains the authority for that prompt.
 - **Permission-denied directory in traversal path** — `-f` returns false silently; traversal continues upward. No stderr output.
@@ -286,10 +303,11 @@ Minified input is intentionally re-indented. This is documented behavior, not a 
 4. Write the merged result back with 2-space indentation.
 
 **install.sh fallback** — when `jq` is not available:
-1. If the target `settings.json` exists, create a timestamped backup before any write:
+1. If the target `settings.json` exists, create a timestamped backup with the shell PID appended before any write:
    ```bash
-   cp "$_settings_path" "${_settings_path}.bak.$(date +%Y%m%d%H%M%S)"
+   cp "$_settings_path" "${_settings_path}.bak.$(date +%Y%m%d%H%M%S).$$"
    ```
+   Appending `$$` (shell process ID) to the timestamp eliminates the risk of backup file collisions during rapid or parallelised automated executions that complete within the same second.
 2. Print a warning that includes the backup path:
    ```
    ⚠ jq not found — settings.json overwritten. Backup saved to <path>.bak.TIMESTAMP.
@@ -298,12 +316,27 @@ Minified input is intentionally re-indented. This is documented behavior, not a 
 3. Overwrite with the repo version.
 
 **install.ps1 merge procedure** — using `ConvertFrom-Json` / `ConvertTo-Json` (always available in PS 5.1+):
-1. Read existing `settings.json` as a `PSCustomObject` (or start from `'{}'`).
+1. Attempt to read and parse existing `settings.json` inside a `try/catch` block:
+   ```powershell
+   $existing = $null
+   if (Test-Path $_settingsPath) {
+       try {
+           $existing = Get-Content $_settingsPath -Raw -Encoding utf8 | ConvertFrom-Json
+       } catch {
+           Write-Warning "settings.json is malformed — creating backup and starting fresh."
+           $ts = Get-Date -Format "yyyyMMddHHmmss"
+           Copy-Item $_settingsPath "${_settingsPath}.bak.$ts"
+           $existing = $null
+       }
+   }
+   if ($null -eq $existing) { $existing = [PSCustomObject]@{} }
+   ```
+   If `ConvertFrom-Json` throws (malformed JSON), the corrupted file is backed up with a timestamp, and the merge starts from an empty object. This prevents script termination and prevents configuration loss.
 2. Ensure `hooks.UserPromptSubmit` exists as an array (`@()`).
 3. If the verbosity hook command string is not already present, append the new entry.
 4. Serialize back with `ConvertTo-Json -Depth 10` and `Set-Content -Encoding utf8`.
 
-No backup is needed for the PowerShell installer because `ConvertFrom-Json` / `ConvertTo-Json` performs a non-destructive merge — existing entries are preserved in memory before the file is written.
+No backup is needed on the success path because `ConvertFrom-Json` / `ConvertTo-Json` performs a non-destructive in-memory merge — existing entries are preserved before the file is written. Backup only occurs in the `catch` block (malformed input).
 
 **Idempotency key**: the exact command string registered in `settings.json` is used as the idempotency check. Re-running the installer does not create duplicate entries.
 
@@ -318,7 +351,7 @@ No backup is needed for the PowerShell installer because `ConvertFrom-Json` / `C
 - [ ] `global/hooks/verbosity-remind.sh` exists; emits exactly one reminder line per invocation when no readable project hook is found via upward traversal.
 - [ ] `project-template/.claude/hooks/verbosity-remind.sh` exists; emits exactly one reminder line per invocation.
 - [ ] When both hooks are registered, exactly one reminder appears per prompt (global defers via upward traversal with `-f` and `-r` checks).
-- [ ] `CC_VERBOSITY_SKIP=1` causes both hooks to exit 0 with no output.
+- [ ] `CC_VERBOSITY_SKIP` with value `1`, `true`, `yes`, or `on` (any case) causes both hooks to exit 0 with no output; `false`, `0`, or absent does not.
 - [ ] All path variable expansions are double-quoted; hook functions correctly with a CWD containing spaces and parentheses.
 - [ ] All home-directory paths use `"$HOME"` — no bare `~` in any script or settings.json command string.
 - [ ] Upward traversal uses only pure bash `${_dir%/*}` — no `dirname`, no `$(...)` subshells inside the loop.
@@ -340,9 +373,13 @@ No backup is needed for the PowerShell installer because `ConvertFrom-Json` / `C
 - [ ] `global/settings.json` registers global hook; graphify entry preserved; re-run does not duplicate.
 - [ ] `project-template/.claude/settings.json` registers project hook with embedded traversal; existing `PreToolUse` and `PostCompact` entries preserved; re-run does not duplicate.
 - [ ] Installer merge: pre-existing `UserPromptSubmit` hooks from other sources are preserved after install.
-- [ ] install.sh `jq`-unavailable fallback: timestamped backup created before overwrite; backup path included in warning.
+- [ ] install.sh `jq`-unavailable fallback: backup named `<path>.bak.YYYYMMDDHHMMSS.$$` (timestamp + PID) created before overwrite; backup path included in warning.
 - [ ] install.sh merge: output normalized to 2-space indentation via `jq`.
+- [ ] install.ps1 `ConvertFrom-Json` call is wrapped in `try/catch`; malformed input triggers backup + fresh start without script termination.
 - [ ] install.ps1 merge: output normalized to 4-space indentation via `ConvertTo-Json -Depth 10`.
+- [ ] Global hook command in `settings.json` contains the literal resolved absolute path (no `$HOME` variable); install-time resolution confirmed for both `install.sh` and `install.ps1`.
+- [ ] Project hook command in `settings.json` uses `jq`/`ConvertTo-Json` for serialization; no manual string concatenation for JSON encoding.
+- [ ] Unclosed code fence in `verbosity.md` triggers recovery pass; first `^VERBOSITY:` line found (fence-state ignored) is used; condition is logged.
 - [ ] `skills/verbosity.md` Application section updated to describe hook-driven enforcement.
 - [ ] `install.sh` and `install.ps1` copy `global/hooks/verbosity-remind.sh` to `"$HOME/.claude/hooks/"`.
 
