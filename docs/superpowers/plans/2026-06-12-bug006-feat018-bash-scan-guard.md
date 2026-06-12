@@ -1080,7 +1080,7 @@ bash tests/guard3-test.sh
 
 Expected: all allowlist tests pass.
 
-- [>] **Step 6: Commit**
+- [X] **Step 6: Commit**
 
 ```bash
 git add -f .claude/hooks/pre-tool-use.sh tests/guard3-test.sh
@@ -1218,7 +1218,7 @@ git commit -m "feat(guard3): hook enforcement docs, project-template mirrors, ch
 - Modify: `AGENT-READABLE BACKLOG.md`
 - Modify: `.claude/memory/project.md`
 
-- [ ] **Step 1: Mark BUG-006 and FEAT-018 complete in backlog**
+- [X] **Step 1: Mark BUG-006 and FEAT-018 complete in backlog**
 
 In `AGENT-READABLE BACKLOG.md`:
 
@@ -1240,7 +1240,7 @@ to:
 ### [X] `[FEAT-018]` Surgical Search Tools (Ripgrep / Find Wrappers)
 ```
 
-- [ ] **Step 2: Run the full test suite one final time**
+- [X] **Step 2: Run the full test suite one final time**
 
 ```
 bash tests/guard3-test.sh
@@ -1248,14 +1248,14 @@ bash tests/guard3-test.sh
 
 Expected: 0 failures.
 
-- [ ] **Step 3: Commit backlog update**
+- [X] **Step 3: Commit backlog update**
 
 ```bash
 git add "AGENT-READABLE BACKLOG.md"
 git commit -m "chore: mark BUG-006 and FEAT-018 complete in backlog"
 ```
 
-- [ ] **Step 4: Append checkpoint to `.claude/memory/project.md`**
+- [X] **Step 4: Append checkpoint to `.claude/memory/project.md`**
 
 Append the following section to `.claude/memory/project.md`:
 
@@ -1281,7 +1281,7 @@ Append the following section to `.claude/memory/project.md`:
 - Indirect variable dispatch (`$cmd *.ts`) is a documented static-analysis blind spot — cannot be detected by Guard 3
 ```
 
-- [ ] **Step 5: Commit checkpoint**
+- [>] **Step 5: Commit checkpoint**
 
 ```bash
 git add -f .claude/memory/project.md

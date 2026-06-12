@@ -110,3 +110,26 @@ Add Guard 3 to `.claude/hooks/pre-tool-use.sh`: a Bash-tool interceptor that pat
 - Static `BASH_SCAN_ALLOWLIST=()` — never agent-modified; path-based entries with `/`-terminated entries use path traversal guard for `..` components
 - Spec: `docs/superpowers/specs/2026-06-11-bug006-feat018-bash-scan-guard-design.md`
 - Complexity: M
+
+## Checkpoint 2026-06-12 (BUG-006 + FEAT-018)
+
+### Decisions
+- Guard 3 fully implemented in `pre-tool-use.sh`: 12 patterns + obfuscation + allowlist check
+- Unified 5-state scanner `_g3_scan MODE INPUT` (UNQUOTED/SINGLE_QUOTED/DOUBLE_QUOTED/ANSI_C_QUOTED/LOCALE_QUOTED); fail-closed on unclosed quotes (rc=2 → blocked)
+- `BASH_SCAN_ALLOWLIST=()` — empty array, agent-immutable; directory entries use `[A-Za-z0-9_./@%*?-]*` suffix class with `../` traversal rejection; exact-token entries use whole-token boundary match
+- ERE bracket expression quoting: `delim` uses `(^|[[:space:]|;()])` (named POSIX class) to avoid `\]` closing-bracket bug
+- `_g3_grep_has_matchall_pattern` fixed: tokens containing `(` or `)` are skipped to prevent `$(grep` being misidentified as the pattern argument
+- Test harness: `tests/guard3-test.sh`, 107 tests, run with `bash tests/guard3-test.sh`
+
+### Conventions
+- Guard 3 helpers named `_g3_*`; all take the preprocessed string as `$1`
+- Pattern functions return 0 = pass, 1 = block (consistent with bash convention)
+- `_g3_check_allowlist` called only when `_G3_HIT=1`; returns 0 = allow, 1 = block
+
+### Technical Debt
+- P5 (cmd-subst) exemption is heuristic; complex nested substitutions may produce false positives
+- P3 (xargs) uses `read -ra` space-split; tab-separated args not parsed correctly
+- Indirect variable dispatch (`$cmd *.ts`) is a documented blind spot — cannot be detected statically
+
+### Version
+1.10.0 released 2026-06-12
