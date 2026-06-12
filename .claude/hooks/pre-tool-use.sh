@@ -172,6 +172,52 @@ _G3_READERS='(cat|less|more|head|tail|sed|awk|grep|egrep|fgrep|mapfile|readarray
 # Shell interpreters blocked in find -exec and xargs
 _G3_SHELLS='(sh|bash|dash|zsh|ksh|fish)'
 
+_g3_p1_find_depth() {
+  local s="$1"
+  [[ "$s" =~ ${_G3_POS}${_G3_MOD}${_G3_PATH}find([[:space:]]|$) ]] || return 0
+  if [[ "$s" =~ -(-)?maxdepth[=[:space:]]+([+]?)([0-9]+) ]]; then
+    [[ "${BASH_REMATCH[3]}" == "1" ]] && return 0
+    return 1  # depth != 1 -> block
+  fi
+  return 1    # no depth flag -> block
+}
+
+_g3_p2_find_exec() {
+  local s="$1"
+  [[ "$s" =~ ${_G3_POS}${_G3_MOD}${_G3_PATH}find([[:space:]]|$) ]] || return 0
+  [[ "$s" =~ -(exec|execdir|ok|okdir)[[:space:]] ]]              || return 0
+  [[ "$s" =~ -(exec|execdir|ok|okdir)[[:space:]]+(${_G3_READERS}|${_G3_SHELLS})([[:space:]]|$) ]] \
+    && return 1
+  return 0
+}
+
+_g3_p3_xargs() {
+  local s="$1"
+  [[ "$s" =~ ${_G3_POS}${_G3_MOD}xargs([[:space:]]|$) ]] || return 0
+  # Walk tokens after 'xargs', skip flags/option-args, check the utility token.
+  local after="${s#*xargs}"
+  local -a toks; read -ra toks <<< "$after"
+  local opt_re='^(-I|--replace|-n|--max-args|-P|--max-procs|-s|--max-chars|-a|--arg-file|-d|--delimiter|-E|--eof)$'
+  local i=0
+  while (( i < ${#toks[@]} )); do
+    local t="${toks[i]}"
+    if [[ "$t" =~ $opt_re ]]; then
+      # Option-taking: consume next token only if it doesn't look like a flag
+      if (( i+1 < ${#toks[@]} )) && [[ ! "${toks[i+1]}" =~ ^-[A-Za-z] ]]; then
+        i=$((i+2))
+      else
+        i=$((i+1))
+      fi
+    elif [[ "$t" =~ ^- ]]; then
+      i=$((i+1))  # boolean flag
+    else
+      [[ "$t" =~ ^(${_G3_READERS}|${_G3_SHELLS})$ ]] && return 1
+      return 0  # non-reader utility – pass
+    fi
+  done
+  return 0
+}
+
 # ── Guard 3: Bash command scan ─────────────────────────────────────────────────
 # BASH_SCAN_ALLOWLIST: exact literal path tokens the guard permits.
 # Operators add entries here. Agents must NEVER modify this array.
@@ -210,9 +256,32 @@ if [ "${CLAUDE_TOOL_NAME:-}" = "Bash" ]; then
   # Normalise real newlines to semicolons (simplifies all pattern regexes)
   _G3_PRE="${_G3_PRE//$'\n'/;}"
 
-  # ── Pattern checks added in subsequent tasks ──
-  # Placeholder: pass through.
-  unset _G3_PRE
+  # Run pattern checks; accumulate triggered pattern IDs for diagnostics
+  _G3_HIT=0; _G3_IDS=""
+  _g3_p1_find_depth "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P1 "; }
+  _g3_p2_find_exec  "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P2 "; }
+  _g3_p3_xargs      "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P3 "; }
+  # (patterns 4-12 appended in later tasks)
+
+  if (( _G3_HIT )); then
+    # Debug logging: export GUARD3_DEBUG=1 in the terminal to diagnose false positives
+    if [[ "${GUARD3_DEBUG:-0}" == "1" ]]; then
+      printf '[Guard3 DEBUG] preprocessed: %s\n' "$_G3_PRE"            >&2
+      printf '[Guard3 DEBUG] matched patterns: %s\n' "${_G3_IDS%" "}"  >&2
+    fi
+
+    printf '\n⛔ BASH SCAN BLOCKED\n'                                                 >&2
+    printf '   Command triggered a mass content-dump pattern.\n'                      >&2
+    printf '   Pattern IDs: %s\n\n' "${_G3_IDS%" "}"                                 >&2
+    printf '   Authorized search alternatives (see skills/memory-first.md):\n'       >&2
+    printf '   1. Grep tool  — targeted content search with file/pattern scope\n'    >&2
+    printf '   2. Glob tool  — path listing only, no file content\n'                 >&2
+    printf '   3. Read tool  — with explicit offset + limit (max 150 lines)\n\n'     >&2
+    printf '   If this path must be scanned broadly, add it to BASH_SCAN_ALLOWLIST\n' >&2
+    printf '   in .claude/hooks/pre-tool-use.sh (operator action only).\n\n'         >&2
+    unset _G3_PRE _G3_HIT _G3_IDS; exit 1
+  fi
+  unset _G3_PRE _G3_HIT _G3_IDS
 fi
 
 # ── Guard 2: Duplicate file creation ──────────────────────────────────────────

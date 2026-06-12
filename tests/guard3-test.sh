@@ -17,10 +17,10 @@ _json_cmd() {
 }
 
 run() {
-  local label="$1" cmd="$2" expect="$3"
+  local label="$1" cmd="$2" expect="$3" rc=0
   export CLAUDE_TOOL_NAME="Bash"
   export CLAUDE_TOOL_INPUT="$(_json_cmd "$cmd")"
-  bash "$HOOK" >/dev/null 2>&1; local rc=$?
+  bash "$HOOK" >/dev/null 2>&1 && rc=0 || rc=$?
   unset CLAUDE_TOOL_NAME CLAUDE_TOOL_INPUT
   if { [[ "$expect" == "block" ]] && (( rc != 0 )); } \
   || { [[ "$expect" == "pass"  ]] && (( rc == 0 )); }; then
@@ -51,6 +51,31 @@ run "unquoted hash stripped; cat *.ts blocked" 'cat *.ts # safe comment'  "block
 run "hash in double quotes is literal"         'grep "#pat" file.txt'      "pass"
 run "hash in single quotes is literal"         "grep '#pat' file.txt"      "pass"
 run "backslash-hash in UNQUOTED is literal"    'grep \#pat file.txt'       "pass"
+
+# ── Pattern 1: find without/wrong depth ───────────────────────────────────────
+run "P1 find . (no depth)"                    'find .'                        "block"
+run "P1 find -maxdepth 2"                     'find src/ -maxdepth 2'         "block"
+run "P1 find --maxdepth=5"                    'find / --maxdepth=5'           "block"
+run "P1 find -maxdepth 1 passes"              'find . -maxdepth 1'            "pass"
+run "P1 find --maxdepth=1 passes"             'find . --maxdepth=1'           "pass"
+run "P1 find -maxdepth +1 (+ stripped)"       'find . -maxdepth +1'           "pass"
+run "P1 find -maxdepth +2 blocked"            'find . -maxdepth +2'           "block"
+run "P1 findall not triggered (word-boundary)"  'findall . -maxdepth 5'       "pass"
+# ── Pattern 2: find -exec content dump ────────────────────────────────────────
+run "P2 find -exec cat"                       'find . -exec cat {} \;'        "block"
+run "P2 find -execdir grep"                   'find . -maxdepth 1 -execdir grep -r . {} \;' "block"
+run "P2 find -ok sh -c"                       "find . -ok sh -c 'cat {}' \\;" "block"
+run "P2 find -exec echo (not a reader)"       'find . -maxdepth 1 -exec echo {} \;' "pass"
+# ── Pattern 3: xargs + viewer ─────────────────────────────────────────────────
+run "P3 xargs cat"                            'ls | xargs cat'                "block"
+run "P3 xargs -0 less"                        'find . | xargs -0 less'        "block"
+run "P3 xargs -I {} cat {}"                   'xargs -I {} cat {}'            "block"
+run "P3 xargs -d - cat (bare - consumed)"     'xargs -d - cat'                "block"
+run "P3 xargs -d -- cat (-- consumed)"        'xargs -d -- cat'               "block"
+run "P3 xargs -d -x cat (-x not consumed)"    'xargs -d -x cat'               "block"
+run "P3 xargs -i boolean (no extra token)"    'xargs -i cat'                  "block"
+run "P3 xargs sh (shell interpreter)"         'find . | xargs sh -c cat'      "block"
+run "P3 xargs echo (not a reader)"            'ls | xargs echo'               "pass"
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
