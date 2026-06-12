@@ -204,6 +204,7 @@ _g3_grep_has_matchall_pattern() {
   for tok in "${toks[@]}"; do
     [[ "$tok" =~ ^(git|grep|egrep|fgrep|-r|-R|--recursive|-[a-zA-Z]+)$ ]] && { seen_cmd=1; continue; }
     (( seen_cmd == 0 )) && continue
+    [[ "$tok" == *'('* || "$tok" == *')'* ]] && continue  # skip subshell/process-subst tokens
     [[ "$tok" =~ ^- ]] && continue
     [[ "$tok" =~ ^(/|./|../|~/) ]] && continue
     [[ "$tok" =~ [/] ]] && [[ ! "$tok" =~ [*+?[\](){}^\$|\\] ]] && continue
@@ -240,6 +241,56 @@ _g3_p7_pager_glob() {
     rest="$after"
     [[ -z "$rest" ]] && break
   done
+  return 0
+}
+
+_g3_p8_ls_recursive() {
+  local s="$1"
+  [[ "$s" =~ ${_G3_POS}${_G3_MOD}${_G3_PATH}ls([[:space:]]|$) ]] || return 0
+  [[ "$s" =~ [[:space:]]--recursive([[:space:]]|$) ]]                    && return 1
+  [[ "$s" =~ [[:space:]]-R([[:space:]]|$) ]]                             && return 1
+  [[ "$s" =~ [[:space:]]-[a-zA-Z]*R[a-zA-Z]*([[:space:]]|$) ]]          && return 1
+  return 0
+}
+
+_g3_p9_shell_loop() {
+  local s="$1"
+  [[ "$s" =~ ${_G3_POS}(for|while|until)[[:space:]] ]] && return 1
+  return 0
+}
+
+_g3_p10_slurp_builtins() {
+  local s="$1"
+  [[ "$s" =~ ${_G3_POS}(mapfile|readarray)([[:space:]]|$) ]] && return 1
+  return 0
+}
+
+_g3_p11_dynamic_exec() {
+  local s="$1"
+  [[ "$s" =~ ${_G3_POS}(eval|source)([[:space:]]|$) ]] && return 1
+  [[ "$s" =~ ${_G3_POS}\.[[:space:]] ]]                && return 1
+  [[ "$s" =~ ${_G3_POS}\.$  ]]                         && return 1
+  return 0
+}
+
+_g3_p12_alias() {
+  local s="$1"
+  [[ "$s" =~ ${_G3_POS}alias[[:space:]] ]] || return 0
+  if [[ "$s" =~ alias[[:space:]]+[A-Za-z_][A-Za-z_0-9]*=(.+) ]]; then
+    local val="${BASH_REMATCH[1]}"
+    val="${val#\'}"; val="${val%\'}"; val="${val#\"}"; val="${val%\"}"
+    [[ "$val" =~ ^(${_G3_READERS}|eval|source|\.)[[:space:]] ]] && return 1
+    [[ "$val" =~ ^(${_G3_READERS}|eval|source|\.)$ ]]           && return 1
+  fi
+  return 0
+}
+
+_g3_obfuscation() {
+  local s="$1"
+  local _obf_dollar_dq='^\$"'
+  [[ "$s" =~ $_obf_dollar_dq ]]                              && return 1
+  [[ "$s" =~ ${_G3_POS}(\\.)+([[:space:]]|$) ]]             && return 1
+  [[ "$s" =~ ${_G3_POS}[a-zA-Z]\'[a-zA-Z]+\'[a-zA-Z] ]]    && return 1
   return 0
 }
 
@@ -353,7 +404,12 @@ if [ "${CLAUDE_TOOL_NAME:-}" = "Bash" ]; then
   _g3_p5_cmdsubst      "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P5 "; }
   _g3_p6_grep_matchall "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P6 "; }
   _g3_p7_pager_glob    "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P7 "; }
-  # (patterns 8-12 appended in later tasks)
+  _g3_p8_ls_recursive    "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P8 "; }
+  _g3_p9_shell_loop      "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P9 "; }
+  _g3_p10_slurp_builtins "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P10 "; }
+  _g3_p11_dynamic_exec   "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P11 "; }
+  _g3_p12_alias          "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P12 "; }
+  _g3_obfuscation        "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="OBF "; }
 
   if (( _G3_HIT )); then
     # Debug logging: export GUARD3_DEBUG=1 in the terminal to diagnose false positives

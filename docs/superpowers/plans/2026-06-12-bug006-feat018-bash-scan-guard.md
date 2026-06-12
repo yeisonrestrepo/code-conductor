@@ -42,7 +42,7 @@
 - Modify: `.claude/hooks/pre-tool-use.sh` (insert block after line 27, before `# ── Guard 2`)
 - Create: `tests/guard3-test.sh`
 
-- [ ] **Step 1: Insert Guard 3 skeleton into `pre-tool-use.sh`**
+- [X] **Step 1: Insert Guard 3 skeleton into `pre-tool-use.sh`**
 
 Insert the following block between the closing `fi` of Guard 1 (line 27) and the `# ── Guard 2` comment (line 29):
 
@@ -101,7 +101,7 @@ if [ "${CLAUDE_TOOL_NAME:-}" = "Bash" ]; then
 fi
 ```
 
-- [ ] **Step 2: Create `tests/guard3-test.sh`**
+- [X] **Step 2: Create `tests/guard3-test.sh`**
 
 ```bash
 #!/usr/bin/env bash
@@ -151,7 +151,7 @@ echo "Results: $PASS passed, $FAIL failed"
 (( FAIL == 0 ))
 ```
 
-- [ ] **Step 3: Run the test harness**
+- [X] **Step 3: Run the test harness**
 
 ```
 bash tests/guard3-test.sh
@@ -165,7 +165,7 @@ Expected:
 Results: 2 passed, 0 failed
 ```
 
-- [ ] **Step 4: Commit**
+- [X] **Step 4: Commit**
 
 ```bash
 git add -f .claude/hooks/pre-tool-use.sh tests/guard3-test.sh
@@ -180,7 +180,7 @@ git commit -m "feat(guard3): skeleton, BASH_SCAN_ALLOWLIST, and test harness"
 - Modify: `.claude/hooks/pre-tool-use.sh` (add two helper functions; wire into Guard 3)
 - Modify: `tests/guard3-test.sh`
 
-- [ ] **Step 1: Add preprocessing tests**
+- [X] **Step 1: Add preprocessing tests**
 
 Append to `tests/guard3-test.sh` (before the final `echo "Results..."` line):
 
@@ -198,13 +198,13 @@ run "hash in single quotes is literal"         "grep '#pat' file.txt"      "pass
 run "backslash-hash in UNQUOTED is literal"    'grep \#pat file.txt'       "pass"
 ```
 
-- [ ] **Step 2: Run – all 7 new tests FAIL (preprocessing not wired yet)**
+- [X] **Step 2: Run – all 7 new tests FAIL (preprocessing not wired yet)**
 
 ```
 bash tests/guard3-test.sh
 ```
 
-- [ ] **Step 3: Implement `_g3_join_continuations` and unified `_g3_scan`**
+- [X] **Step 3: Implement `_g3_join_continuations` and unified `_g3_scan`**
 
 `_g3_strip_comments` and `_g3_has_unquoted_glob` share an identical state machine; they are implemented as one function. Add all helpers to `pre-tool-use.sh` immediately before the `# ── Guard 3` comment (the `_g3_extract_command` function added in Task 1 lives here too).
 
@@ -303,7 +303,7 @@ _g3_scan() {
 }
 ```
 
-- [ ] **Step 4: Wire length guard + preprocessing into Guard 3**
+- [X] **Step 4: Wire length guard + preprocessing into Guard 3**
 
 Replace the `# ── Preprocessing and pattern checks...` placeholder comment (and the `unset _G3_CMD` line) with:
 
@@ -341,7 +341,7 @@ Replace the `# ── Preprocessing and pattern checks...` placeholder comment (
 fi
 ```
 
-- [ ] **Step 5: Run tests – preprocessing tests still fail (no patterns yet), no regressions**
+- [X] **Step 5: Run tests – preprocessing tests still fail (no patterns yet), no regressions**
 
 ```
 bash tests/guard3-test.sh
@@ -349,7 +349,7 @@ bash tests/guard3-test.sh
 
 All prior tests still pass; 7 new tests fail as expected (no pattern checks in place).
 
-- [ ] **Step 6: Commit**
+- [X] **Step 6: Commit**
 
 ```bash
 git add -f .claude/hooks/pre-tool-use.sh tests/guard3-test.sh
@@ -363,7 +363,7 @@ git commit -m "feat(guard3): preprocessing helpers (4a line-join, 4b comment-str
 **Files:**
 - Modify: `.claude/hooks/pre-tool-use.sh`
 
-- [ ] **Step 1: Add shared regex constants**
+- [X] **Step 1: Add shared regex constants**
 
 `_g3_has_unquoted_glob` no longer exists as a separate function — use `_g3_scan "glob" "$input"` wherever glob detection is needed (Task 5). Add only the regex-constant variables immediately after the `_g3_scan` function in `pre-tool-use.sh`:
 
@@ -386,7 +386,7 @@ _G3_READERS='(cat|less|more|head|tail|sed|awk|grep|egrep|fgrep|mapfile|readarray
 _G3_SHELLS='(sh|bash|dash|zsh|ksh|fish)'
 ```
 
-- [ ] **Step 2: Verify syntax and that all prior tests still pass**
+- [X] **Step 2: Verify syntax and that all prior tests still pass**
 
 ```bash
 bash -n .claude/hooks/pre-tool-use.sh && echo "syntax OK"
@@ -395,7 +395,7 @@ bash tests/guard3-test.sh
 
 Expected: `syntax OK`; no new failures.
 
-- [ ] **Step 3: Commit**
+- [X] **Step 3: Commit**
 
 ```bash
 git add -f .claude/hooks/pre-tool-use.sh
@@ -412,7 +412,7 @@ git commit -m "feat(guard3): shared POSIX-ERE regex constants (no _g3_has_unquot
 
 All `_g3_pN_*` functions take the preprocessed string as `$1` and return 0 (pass) or 1 (blocked).
 
-- [ ] **Step 1: Add tests for Patterns 1–3**
+- [X] **Step 1: Add tests for Patterns 1–3**
 
 Append to `tests/guard3-test.sh` (before final `echo "Results..."`):
 
@@ -443,13 +443,13 @@ run "P3 xargs sh (shell interpreter)"         'find . | xargs sh -c cat'      "b
 run "P3 xargs echo (not a reader)"            'ls | xargs echo'               "pass"
 ```
 
-- [ ] **Step 2: Run – all 21 new tests FAIL**
+- [X] **Step 2: Run – all 21 new tests FAIL**
 
 ```
 bash tests/guard3-test.sh
 ```
 
-- [ ] **Step 3: Implement `_g3_p1_find_depth`**
+- [X] **Step 3: Implement `_g3_p1_find_depth`**
 
 Add after the `_g3_scan` function and regex constants:
 
@@ -465,7 +465,7 @@ _g3_p1_find_depth() {
 }
 ```
 
-- [ ] **Step 4: Implement `_g3_p2_find_exec`**
+- [X] **Step 4: Implement `_g3_p2_find_exec`**
 
 ```bash
 _g3_p2_find_exec() {
@@ -478,7 +478,7 @@ _g3_p2_find_exec() {
 }
 ```
 
-- [ ] **Step 5: Implement `_g3_p3_xargs`**
+- [X] **Step 5: Implement `_g3_p3_xargs`**
 
 ```bash
 _g3_p3_xargs() {
@@ -509,7 +509,7 @@ _g3_p3_xargs() {
 }
 ```
 
-- [ ] **Step 6: Wire patterns 1–3 into Guard 3 with pattern-ID tracking and debug logging**
+- [X] **Step 6: Wire patterns 1–3 into Guard 3 with pattern-ID tracking and debug logging**
 
 Replace the entire `# ── Pattern checks...` placeholder block inside Guard 3 with:
 
@@ -545,7 +545,7 @@ Replace the entire `# ── Pattern checks...` placeholder block inside Guard 3
 fi
 ```
 
-- [ ] **Step 7: Run tests**
+- [X] **Step 7: Run tests**
 
 ```
 bash tests/guard3-test.sh
@@ -553,7 +553,7 @@ bash tests/guard3-test.sh
 
 Expected: all P1/P2/P3 tests pass; earlier preprocessing tests still fail (Pattern 4 not wired yet).
 
-- [ ] **Step 8: Commit**
+- [X] **Step 8: Commit**
 
 ```bash
 git add -f .claude/hooks/pre-tool-use.sh tests/guard3-test.sh
@@ -568,7 +568,7 @@ git commit -m "feat(guard3): patterns 1-3 (find depth, find-exec, xargs)"
 - Modify: `.claude/hooks/pre-tool-use.sh`
 - Modify: `tests/guard3-test.sh`
 
-- [ ] **Step 1: Add tests for Patterns 4–7**
+- [X] **Step 1: Add tests for Patterns 4–7**
 
 Append to `tests/guard3-test.sh`:
 
@@ -607,13 +607,13 @@ run "P7 sed -n p *.md"                     'sed -n p *.md'             "block"
 run "P7 less 'file.ts' (quoted passes)"    "less 'file.ts'"            "pass"
 ```
 
-- [ ] **Step 2: Run – all new tests FAIL**
+- [X] **Step 2: Run – all new tests FAIL**
 
 ```
 bash tests/guard3-test.sh
 ```
 
-- [ ] **Step 3: Implement `_g3_p4_cat_glob`**
+- [X] **Step 3: Implement `_g3_p4_cat_glob`**
 
 Add after `_g3_p3_xargs`:
 
@@ -637,7 +637,7 @@ _g3_p4_cat_glob() {
 }
 ```
 
-- [ ] **Step 4: Implement `_g3_p5_cmdsubst`**
+- [X] **Step 4: Implement `_g3_p5_cmdsubst`**
 
 ```bash
 _g3_p5_cmdsubst() {
@@ -659,7 +659,7 @@ _g3_p5_cmdsubst() {
 }
 ```
 
-- [ ] **Step 5: Implement `_g3_p6_grep_matchall`**
+- [X] **Step 5: Implement `_g3_p6_grep_matchall`**
 
 ```bash
 _g3_p6_grep_matchall() {
@@ -714,7 +714,7 @@ _g3_grep_has_matchall_pattern() {
 }
 ```
 
-- [ ] **Step 6: Implement `_g3_p7_pager_glob`**
+- [X] **Step 6: Implement `_g3_p7_pager_glob`**
 
 ```bash
 _g3_p7_pager_glob() {
@@ -732,7 +732,7 @@ _g3_p7_pager_glob() {
 }
 ```
 
-- [ ] **Step 7: Add pattern calls to Guard 3 dispatch block**
+- [X] **Step 7: Add pattern calls to Guard 3 dispatch block**
 
 In the pattern-check section inside Guard 3, append after the `_g3_p3_xargs` call:
 
@@ -743,7 +743,7 @@ In the pattern-check section inside Guard 3, append after the `_g3_p3_xargs` cal
   _g3_p7_pager_glob    "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P7 "; }
 ```
 
-- [ ] **Step 8: Run tests**
+- [X] **Step 8: Run tests**
 
 ```
 bash tests/guard3-test.sh
@@ -751,7 +751,7 @@ bash tests/guard3-test.sh
 
 Expected: all P4–P7 tests pass. P1–P3 and sanity tests remain green.
 
-- [ ] **Step 9: Commit**
+- [X] **Step 9: Commit**
 
 ```bash
 git add -f .claude/hooks/pre-tool-use.sh tests/guard3-test.sh
@@ -766,7 +766,7 @@ git commit -m "feat(guard3): patterns 4-7 (cat+glob, cmd-subst, grep, pager+glob
 - Modify: `.claude/hooks/pre-tool-use.sh`
 - Modify: `tests/guard3-test.sh`
 
-- [ ] **Step 1: Add tests**
+- [X] **Step 1: Add tests**
 
 Append to `tests/guard3-test.sh`:
 
@@ -804,7 +804,7 @@ run "OBF \$\"cat\" prefix blocked"         '$"cat" *.ts'                       "
 run "OBF c'a't (internal quote)"           "c'a't *.ts"                        "block"
 ```
 
-- [ ] **Step 2: Add edge-case test vectors (multi-line, nested subshells, complex escapes)**
+- [X] **Step 2: Add edge-case test vectors (multi-line, nested subshells, complex escapes)**
 
 Append to `tests/guard3-test.sh` immediately after the P8–P12 / obfuscation tests:
 
@@ -861,20 +861,20 @@ run "malformed: unclosed single quote"     "cat '*.ts"                    "block
 run "malformed: unclosed double quote"     'grep -r "pat .'               "block"
 ```
 
-- [ ] **Step 3: Fix the duplicate `cat for` test (remove the first erroneous entry)**
+- [X] **Step 3: Fix the duplicate `cat for` test (remove the first erroneous entry)**
 
 The test file now has two `cat for` entries; the second (`"pass"`) is correct. Remove the first (`"block"`) from `tests/guard3-test.sh` — edit out the line:
 ```
 run "P9 cat for (for as argument)"         'cat for'                           "block"
 ```
 
-- [ ] **Step 3: Run – all new tests FAIL**
+- [X] **Step 3: Run – all new tests FAIL**
 
 ```
 bash tests/guard3-test.sh
 ```
 
-- [ ] **Step 4: Implement Patterns 8–12 and obfuscation detection**
+- [X] **Step 4: Implement Patterns 8–12 and obfuscation detection**
 
 Add after `_g3_p7_pager_glob`:
 
@@ -936,7 +936,7 @@ _g3_obfuscation() {
 }
 ```
 
-- [ ] **Step 5: Add pattern calls to the Guard 3 dispatch block**
+- [X] **Step 5: Add pattern calls to the Guard 3 dispatch block**
 
 Append after the `_g3_p7_pager_glob` call:
 
@@ -949,7 +949,7 @@ Append after the `_g3_p7_pager_glob` call:
   _g3_obfuscation        "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="OBF "; }
 ```
 
-- [ ] **Step 6: Run tests**
+- [X] **Step 6: Run tests**
 
 ```
 bash tests/guard3-test.sh
@@ -957,7 +957,7 @@ bash tests/guard3-test.sh
 
 Expected: all P8–P12 and obfuscation tests pass.
 
-- [ ] **Step 7: Commit**
+- [>] **Step 7: Commit**
 
 ```bash
 git add -f .claude/hooks/pre-tool-use.sh tests/guard3-test.sh

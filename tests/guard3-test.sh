@@ -110,6 +110,62 @@ run "P7 awk '{p}' *.ts"                    "awk '{p}' *.ts"            "block"
 run "P7 sed -n p *.md"                     'sed -n p *.md'             "block"
 run "P7 less 'file.ts' (quoted passes)"    "less 'file.ts'"            "pass"
 
+# ── Pattern 8: ls -R ──────────────────────────────────────────────────────────
+run "P8 ls -R ."                           'ls -R .'                   "block"
+run "P8 ls -laR"                           'ls -laR'                   "block"
+run "P8 ls --recursive src/"               'ls --recursive src/'       "block"
+run "P8 ls -l (no R)"                      'ls -l .'                   "pass"
+run "P8 rsync -R (not ls)"                 'rsync -R src/ dest/'       "pass"
+# ── Pattern 9: shell loop ─────────────────────────────────────────────────────
+run "P9 for f in *.ts"                     'for f in *.ts; do cat $f; done'   "block"
+run "P9 while true"                        'while true; do less $f; done'     "block"
+run "P9 until false"                       'until false; do grep -r . ; done' "block"
+run "P9 for loop non-reader body blocked"  'for f in *.ts; do wc -l $f; done' "block"
+run "P9 grep ... while_loop.ts (arg)"      'grep -r pat while_loop.ts'        "pass"
+run "P9 cat for (literal filename passes)" 'cat for'                           "pass"
+# ── Pattern 10: mapfile / readarray ───────────────────────────────────────────
+run "P10 mapfile -t arr"                   'mapfile -t arr < src/main.ts'      "block"
+run "P10 readarray lines"                  'readarray lines < *.log'           "block"
+# ── Pattern 11: eval / source / dot ──────────────────────────────────────────
+run "P11 eval cat"                         'eval "cat *.ts"'                   "block"
+run "P11 source dump.sh"                   'source dump.sh'                    "block"
+run "P11 . dump.sh (dot operator)"         '. dump.sh'                         "block"
+run "P11 ./script.sh (path, not dot op)"   './script.sh'                       "pass"
+# ── Pattern 12: alias remapping ──────────────────────────────────────────────
+run "P12 alias c=cat"                      "alias c='cat'"                     "block"
+run "P12 alias g=grep"                     "alias g='grep -r'"                 "block"
+run "P12 alias e=echo (not a reader)"      "alias e='echo'"                    "pass"
+# ── Obfuscation detection ─────────────────────────────────────────────────────
+run "OBF \$\"cat\" prefix blocked"         '$"cat" *.ts'                       "block"
+run "OBF c'a't (internal quote)"           "c'a't *.ts"                        "block"
+# ── Edge cases: multi-line scripts ────────────────────────────────────────────
+run "multi-line: cat glob on line 2"       $'echo start\ncat *.ts'        "block"
+run "multi-line: all safe"                 $'ls -l .\necho done'           "pass"
+run "multi-line: for loop on line 2"       $'echo prep\nfor f in *.ts; do echo $f; done' "block"
+run "multi-line: continuation joins cat"   $'cat \\\n*.ts'                "block"
+run "multi-line: find continuation valid"  $'find . \\\n-maxdepth 1'     "pass"
+# ── Edge cases: nested subshells and process substitution ─────────────────────
+run "nested: echo \$(cat *.ts)"            'echo $(cat *.ts)'             "block"
+run "nested: echo \$(git log)"             'echo $(git log --oneline)'    "pass"
+run "nested: sort < <(cat *.ts)"           'sort < <(cat *.ts)'           "block"
+run "nested: x=\$((1+2)) safe"             'x=$((1+2)); echo $x'          "pass"
+run "nested: wc -l \$(grep -r '.*' .)"     "wc -l \$(grep -r '.*' .)"    "block"
+# ── Edge cases: complex quote / escape combinations ───────────────────────────
+run "escape: double-backslash-star glob"   'cat \\*.ts'                   "block"
+run "escape: single-backslash-star safe"   'cat \*.ts'                    "pass"
+run "ansi-c: \$'cat' arg is fine"          "echo \$'cat'"                 "pass"
+run "single-quote: backslash then quote"   "grep 'can'\\''t' file"        "pass"
+run "nested-quote: outer-dq inner-sq"      'grep "it'\''s fine" file'     "pass"
+run "json escape: embedded quote"          'echo "hello \"world\""'       "pass"
+run "regex: grep -r specific-re"           'grep -r "fo[o]" src/'         "pass"
+run "path-looking: dot in path is allowed" 'grep -r pattern src/main.ts'  "pass"
+run "length: 8192-char command (boundary passes)" \
+  "$(printf '%0.s#' {1..8192})" "pass"
+run "length: 8193-char command (blocked)" \
+  "$(printf '%0.s#' {1..8193})" "block"
+run "malformed: unclosed single quote"     "cat '*.ts"                    "block"
+run "malformed: unclosed double quote"     'grep -r "pat .'               "block"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 (( FAIL == 0 ))
