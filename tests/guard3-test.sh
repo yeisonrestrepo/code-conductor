@@ -166,6 +166,45 @@ run "length: 8193-char command (blocked)" \
 run "malformed: unclosed single quote"     "cat '*.ts"                    "block"
 run "malformed: unclosed double quote"     'grep -r "pat .'               "block"
 
+# ── Allowlist ─────────────────────────────────────────────────────────────────
+_run_allowlisted() {
+  local label="$1" cmd="$2" entries="$3" expect="$4" rc=0
+  local json
+  json="$(_json_cmd "$cmd")"
+  local tmp
+  tmp=$(mktemp)
+  {
+    printf '#!/usr/bin/env bash\nset -euo pipefail\n'
+    printf 'BASH_SCAN_ALLOWLIST=(%s)\n' "$entries"
+    # Skip shebang + strip the hook's own BASH_SCAN_ALLOWLIST= assignment so our
+    # injected value is not overwritten.
+    tail -n +2 "$HOOK" | grep -v '^BASH_SCAN_ALLOWLIST='
+  } > "$tmp"
+  chmod +x "$tmp"
+  export CLAUDE_TOOL_NAME="Bash"; export CLAUDE_TOOL_INPUT="$json"
+  bash "$tmp" >/dev/null 2>&1 && rc=0 || rc=$?
+  unset CLAUDE_TOOL_NAME CLAUDE_TOOL_INPUT; rm -f "$tmp"
+  if { [[ "$expect" == "block" ]] && (( rc != 0 )); } \
+  || { [[ "$expect" == "pass"  ]] && (( rc == 0 )); }; then
+    echo "  PASS: $label"; PASS=$((PASS+1))
+  else
+    echo "  FAIL: $label  [expected=$expect rc=$rc]"; FAIL=$((FAIL+1))
+  fi
+}
+
+_run_allowlisted "allowlist docs/ permits glob in docs/" \
+  'cat docs/*.md' '"docs/"' "pass"
+_run_allowlisted "allowlist does NOT permit unrelated path" \
+  'cat src/*.ts' '"docs/"' "block"
+_run_allowlisted "allowlist trailing-comment bypass blocked" \
+  'cat *.ts # docs/' '"docs/"' "block"
+_run_allowlisted "allowlist path-traversal rejected" \
+  'cat docs/../../etc/*.conf' '"docs/"' "block"
+_run_allowlisted "allowlist exact match (no trailing slash)" \
+  'cat file.ts' '"file.ts"' "pass"
+_run_allowlisted "allowlist substring not matched (docs vs doc_files)" \
+  'cat doc_files/*.ts' '"docs/"' "block"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 (( FAIL == 0 ))

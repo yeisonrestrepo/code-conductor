@@ -957,7 +957,7 @@ bash tests/guard3-test.sh
 
 Expected: all P8–P12 and obfuscation tests pass.
 
-- [>] **Step 7: Commit**
+- [X] **Step 7: Commit**
 
 ```bash
 git add -f .claude/hooks/pre-tool-use.sh tests/guard3-test.sh
@@ -972,7 +972,7 @@ git commit -m "feat(guard3): patterns 8-12 and obfuscation detection"
 - Modify: `.claude/hooks/pre-tool-use.sh`
 - Modify: `tests/guard3-test.sh`
 
-- [ ] **Step 1: Add allowlist tests**
+- [X] **Step 1: Add allowlist tests**
 
 Append to `tests/guard3-test.sh`:
 
@@ -1020,13 +1020,13 @@ _run_allowlisted "allowlist substring not matched (docs vs doc_files)" \
   'cat doc_files.ts' '"docs/"' "block"
 ```
 
-- [ ] **Step 2: Run – allowlist tests FAIL (no allowlist logic yet)**
+- [X] **Step 2: Run – allowlist tests FAIL (no allowlist logic yet)**
 
 ```
 bash tests/guard3-test.sh
 ```
 
-- [ ] **Step 3: Implement `_g3_check_allowlist`**
+- [X] **Step 3: Implement `_g3_check_allowlist`**
 
 Add after `_g3_obfuscation`:
 
@@ -1060,7 +1060,7 @@ _g3_check_allowlist() {
 }
 ```
 
-- [ ] **Step 4: Replace the stub in the Guard 3 block message section**
+- [X] **Step 4: Replace the stub in the Guard 3 block message section**
 
 In the `if (( _G3_HIT )); then` block, insert the allowlist check before the `printf` lines:
 
@@ -1072,7 +1072,7 @@ In the `if (( _G3_HIT )); then` block, insert the allowlist check before the `pr
     printf '\n⛔ BASH SCAN BLOCKED\n' ...   # (existing printf lines unchanged)
 ```
 
-- [ ] **Step 5: Run tests**
+- [X] **Step 5: Run tests**
 
 ```
 bash tests/guard3-test.sh
@@ -1080,7 +1080,7 @@ bash tests/guard3-test.sh
 
 Expected: all allowlist tests pass.
 
-- [ ] **Step 6: Commit**
+- [>] **Step 6: Commit**
 
 ```bash
 git add -f .claude/hooks/pre-tool-use.sh tests/guard3-test.sh

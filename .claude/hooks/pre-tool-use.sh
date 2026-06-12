@@ -294,6 +294,36 @@ _g3_obfuscation() {
   return 0
 }
 
+# Returns 0 (allow) if the preprocessed command string is covered by BASH_SCAN_ALLOWLIST;
+# returns 1 (do not allow) otherwise. Called only when a pattern has already fired.
+_g3_check_allowlist() {
+  local s="$1"
+  (( ${#BASH_SCAN_ALLOWLIST[@]} == 0 )) && return 1
+
+  # Delimiter: space/tab/newline, ;, |, (, )  — common shell command separators.
+  # Written as a bracket class that is safe in ERE without backslash escaping issues.
+  local _bd='(^|[[:space:]|;()])'
+  local _ad='([[:space:]|;()]|$)'
+  local entry
+  for entry in "${BASH_SCAN_ALLOWLIST[@]}"; do
+    [[ -z "$entry" ]] && continue
+    if [[ "${entry: -1}" == "/" ]]; then
+      # Directory entry: suffix may contain globs (*?) but must not traverse up with ..
+      local pat="${_bd}${entry}([A-Za-z0-9_./@%*?-]*)${_ad}"
+      if [[ "$s" =~ $pat ]]; then
+        local suffix="${BASH_REMATCH[2]}"
+        [[ "$suffix" =~ (^|/)\.\.(/|$) ]] && continue
+        return 0
+      fi
+    else
+      # Exact whole-token match
+      local pat="${_bd}${entry}${_ad}"
+      [[ "$s" =~ $pat ]] && return 0
+    fi
+  done
+  return 1
+}
+
 # ── Guard 3 regex constants ────────────────────────────────────────────────────
 # All patterns below are POSIX ERE (GNU libc implementation).
 # Rules: no \b (use ([[:space:]]|^|$) word boundaries), no backreferences,
@@ -412,6 +442,8 @@ if [ "${CLAUDE_TOOL_NAME:-}" = "Bash" ]; then
   _g3_obfuscation        "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="OBF "; }
 
   if (( _G3_HIT )); then
+    # Allowlist check: if the flagged command is covered by an explicit operator entry, pass it.
+    _g3_check_allowlist "$_G3_PRE" && { unset _G3_PRE _G3_HIT _G3_IDS; exit 0; }
     # Debug logging: export GUARD3_DEBUG=1 in the terminal to diagnose false positives
     if [[ "${GUARD3_DEBUG:-0}" == "1" ]]; then
       printf '[Guard3 DEBUG] preprocessed: %s\n' "$_G3_PRE"            >&2
