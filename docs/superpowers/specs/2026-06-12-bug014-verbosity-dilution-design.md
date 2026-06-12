@@ -23,22 +23,39 @@ VERBOSITY: MIN
 Parsing rules:
 - Raw text only — no Markdown bold, no backticks, no extra punctuation around the value.
 - One or more spaces after the colon are accepted; the extraction script strips all leading spaces from the extracted value. The "exactly one space" phrasing in the canonical format above is the recommended authoring style, not a parsing requirement.
-- The pure bash extraction loop is frontmatter-safe: YAML frontmatter keys (`name:`, `type:`, `description:`, etc.) are always lowercase and never match the `VERBOSITY:*` case pattern. No `grep` call is made; all parsing is performed by the `while IFS= read -r` loop.
+- **Frontmatter block tracking**: the claim that "YAML frontmatter keys are always lowercase" is an unsafe assumption — nothing prevents a user from writing `VERBOSITY: some_value` as a YAML key inside a `---` ... `---` frontmatter block, and the `VERBOSITY:*` case pattern would match it before the body is reached. The extraction loop must explicitly track whether it is inside a frontmatter block using a `_in_fm` flag. The frontmatter block opens on the very first line of the file if and only if that line is exactly `---` (after BOM stripping); it closes on the next `---` or `...` line. All lines while `_in_fm=1` are skipped. No `grep` call is made; all parsing is performed by the `while IFS= read -r` loop. After the closing delimiter, `_in_fm` is set to 0 and body parsing proceeds normally.
 - **UTF-8 BOM handling**: Windows editors (Notepad, VS Code with certain settings) may prepend a UTF-8 Byte Order Mark (`\xEF\xBB\xBF`) to the file. If the `VERBOSITY:` line is the very first line with no frontmatter, the BOM appears before the `V` and causes the `VERBOSITY:*` case pattern to fail. The extraction loop strips the BOM from the first line read before any pattern matching.
 - **Final line without trailing newline**: `while IFS= read -r _line` exits when `read` returns non-zero — which happens both at EOF after a newline and at EOF without a newline, but only processes the line in the first case. The trailing-newline-free case leaves `_line` populated but the loop body unexecuted. Fix: use `|| [ -n "$_line" ]` as the loop condition so the final partial line is always processed.
 - **Code block false-positive prevention**: A `VERBOSITY:` line inside a Markdown code fence (` ``` `) must not be matched. The extraction loop tracks a `_in_fence` flag (toggled by lines starting with ` ``` `). Any `^VERBOSITY:` match while `_in_fence=1` is discarded. This is implemented as a bash `while IFS= read -r` loop over the file — no external awk or sed call.
 - **Fence toggle under `set -e`**: `(( expr ))` returns exit code 1 when the arithmetic result is 0. In `set -e` environments (or scripts that inherit strict error mode), toggling `_in_fence` from 1 to 0 terminates the script. The toggle expression must be guarded: `(( _in_fence = 1 - _in_fence )) || true`.
-- **Unclosed fence recovery**: If the first pass completes with `LEVEL` still empty and `_in_fence=1`, the file contains an unclosed code fence. A recovery pass re-reads the file using a simplified loop that completely omits the `` '```'* `` case arm — no `_in_fence` variable, no toggle, no fence tracking. The loop contains only the `VERBOSITY:*` arm; the first matching line is used. This eliminates the redundant fence-toggle operations that were the source of the original miss and keeps the recovery path minimally complex. The warning is throttled using a 60-minute marker file (`$HOME/.claude/logs/.verbosity-fence-warned`) so it fires at most once per hour regardless of how many prompts are submitted: `find "$HOME/.claude/logs/.verbosity-fence-warned" -mmin -60 2>/dev/null | grep -q . || { echo "..." >&2; touch "$HOME/.claude/logs/.verbosity-fence-warned" 2>/dev/null; }`. Warning goes to stderr only — not to the append-only log file. If recovery also yields no match, fall through to the next memory source.
+- **Unclosed fence recovery**: If the first pass completes with `LEVEL` still empty and `_in_fence=1`, the file contains an unclosed code fence. A recovery pass re-reads the file using a simplified loop that completely omits the `` '```'* `` case arm — no `_in_fence` variable, no toggle, no fence tracking. The loop contains only the `VERBOSITY:*` arm; the first matching line is used. This eliminates the redundant fence-toggle operations that were the source of the original miss and keeps the recovery path minimally complex. The warning is throttled using a 60-minute marker file (`$HOME/.claude/logs/.verbosity-fence-warned`). Before the `find` and `touch` calls, the log directory must be created if absent — omitting this means `find` silently returns non-zero on a missing path and `touch` fails silently without creating the marker, causing the throttle to fire on every prompt until the directory is created by the log validation block later in the pipeline:
+
+```bash
+mkdir -p "$HOME/.claude/logs" 2>/dev/null
+find "$HOME/.claude/logs/.verbosity-fence-warned" -mmin -60 2>/dev/null | grep -q . || {
+    echo "[verbosity-remind] unclosed fence in $_mem_file; using recovery pass" >&2
+    touch "$HOME/.claude/logs/.verbosity-fence-warned" 2>/dev/null
+}
+```
+
+The warning fires at most once per hour regardless of how many prompts are submitted. Warning goes to stderr only — not to the append-only log file. If recovery also yields no match, fall through to the next memory source.
 - After extraction, the value is normalized using a `case` statement before the sanity guard (see Uppercase normalization below).
 
 Extraction sequence (pure bash, bash 3.2 compatible):
 
 ```bash
-_in_fence=0; LEVEL=""; _first=1
+_in_fence=0; _in_fm=0; LEVEL=""; _first=1
 while IFS= read -r _line || [ -n "$_line" ]; do
     if [ "$_first" = "1" ]; then
         _line="${_line#$'\xef\xbb\xbf'}"   # strip UTF-8 BOM on first line
         _first=0
+        [ "$_line" = "---" ] && { _in_fm=1; continue; }
+    fi
+    if [ "$_in_fm" = "1" ]; then
+        case "$_line" in
+            ---|\.\.\.) _in_fm=0 ;;  # frontmatter closing delimiter
+        esac
+        continue  # skip all frontmatter lines including the closing delimiter
     fi
     case "$_line" in
         '```'*) (( _in_fence = 1 - _in_fence )) || true ;;
@@ -188,18 +205,37 @@ Log writes use `>>` append redirect. If the log write itself fails (disk full, p
 
 ### `$PWD` null guard
 
-At hook entry, after the CI bypass check and before any traversal:
+At hook entry, after the CI bypass check and before any traversal, both `$PWD` and `$HOME` must be validated:
 
 ```bash
 _start="${PWD:-}"
-if [ -z "$_start" ]; then
-    # $PWD is unset or empty — skip traversal entirely
-    # Fall through directly to global $HOME/.claude/memory/verbosity.md
-    _start=""
+_skip_traversal=0
+[ -z "$_start" ] && _skip_traversal=1
+
+if [ -z "${HOME:-}" ]; then
+    # $HOME is unset — no memory path, no log path can be resolved.
+    # Emit MIN immediately and exit; the hook cannot function without $HOME.
+    printf '\n[VERBOSITY:MIN] One sentence. [CHANGES] file list only. No prose.\n'
+    exit 0
 fi
 ```
 
-If `$PWD` is null or missing, both traversal stages are skipped. Stage 2 reads `"$HOME/.claude/memory/verbosity.md"` directly. The sanity guard handles any subsequent bad state. The hook always exits 0.
+**`$PWD` null behavior**: when `_skip_traversal=1`, Stage 1 and Stage 2 upward traversal loops are both skipped entirely. Stage 2 falls through directly to reading `"$HOME/.claude/memory/verbosity.md"` without entering the loop. Without this explicit flag check, an empty `_start` would cause `_dir` to be initialised to `""`, which the traversal normalises to `/`, producing an unintended traversal from the filesystem root.
+
+**`$HOME` null behavior**: `$HOME` is required by both stages (log path, global memory fallback, fence-warning marker). If it is unset or empty, the hook emits the MIN reminder immediately and exits 0 — the reminder is still delivered; only the traversal and logging are bypassed. This is a degenerate environment; the exit-status guarantee (`trap 'exit 0' EXIT ERR`) still applies.
+
+Both Stage 1 and Stage 2 traversal loop preambles must gate on `_skip_traversal`:
+
+```bash
+if [ "$_skip_traversal" = "0" ]; then
+    _dir="$_start"; _prev=""; _iters=0; _cap=40
+    while [ "$_dir" != "$_prev" ] && (( _iters < _cap )); do
+        # stage-specific test at "$_dir"
+        _prev="$_dir"; _dir="${_dir%/*}"; [ -z "$_dir" ] && _dir="/"; (( _iters++ ))
+    done
+fi
+# stage-specific fallback follows the if block
+```
 
 ### Upward traversal algorithm
 
@@ -249,7 +285,8 @@ If the file exists but fails the `-r` test, the traversal continues upward as if
 3. **Project hook fires** (only in projects with the template installed).
    - CI bypass check first.
    - `$PWD` null guard.
-   - Runs Stages 2–3 only (no hook-detection stage; it is the authority).
+   - Runs Stages 2–3 only (no hook-detection stage; it is the reminder authority).
+   - Stage 2 upward traversal walks from `$PWD` toward the root looking for `.claude/memory/verbosity.md`. If a project-local file is found, it is used exclusively — `"$HOME/.claude/memory/verbosity.md"` is not read. If no project-local file is found at any ancestor level (traversal cap or absent), Stage 2 falls through to `"$HOME/.claude/memory/verbosity.md"` as the machine-level source of truth. The project hook does **not** short-circuit to `MIN` or stop early when local config is missing; it completes the full cascade. A corrupt or empty project-local file yields empty `LEVEL`; the sanity guard sets `MIN` after normalization — this is the same behavior as for the global hook.
    - Emit one reminder line with leading newline to stdout.
 4. Claude receives exactly one injected reminder. Format is level-aware, always preceded by `\n`:
 
@@ -269,14 +306,16 @@ The project hook cannot be registered with a static relative path (`.claude/hook
 The registration command must embed a self-contained upward traversal loop that locates the project's hook script regardless of invocation CWD:
 
 ```json
-"command": "bash -c '_dir=\"${PWD:-}\"; _prev=\"\"; _iters=0; while [ \"$_dir\" != \"$_prev\" ] && [ \"$_iters\" -lt 40 ]; do _h=\"$_dir/.claude/hooks/verbosity-remind.sh\"; [ -f \"$_h\" ] && [ -r \"$_h\" ] && { bash \"$_h\"; exit $?; }; _prev=\"$_dir\"; _dir=\"${_dir%/*}\"; [ -z \"$_dir\" ] && _dir=/; _iters=$((_iters+1)); done; exit 0'"
+"command": "bash -c 'set +e; _dir=\"${PWD:-}\"; _prev=\"\"; _iters=0; while [ \"$_dir\" != \"$_prev\" ] && [ \"$_iters\" -lt 40 ]; do _h=\"$_dir/.claude/hooks/verbosity-remind.sh\"; [ -f \"$_h\" ] && [ -r \"$_h\" ] && { bash \"$_h\"; exit $?; }; _prev=\"$_dir\"; _dir=\"${_dir%/*}\"; [ -z \"$_dir\" ] && _dir=/; _iters=$((_iters+1)); done; exit 0'"
 ```
 
 This command:
-- Uses the same change-detection termination and 40-iteration cap as the standalone scripts
-- Tests both `-f` and `-r` before invoking (matching Stage 1 readability requirement)
-- Passes `$?` through so a non-zero exit from the hook script propagates correctly
-- Falls through with `exit 0` (no output) if no project hook is found — this case should not occur in a properly installed project, but is harmless
+- Begins with `set +e` to disable any `set -e` error propagation that the parent Claude Code process or shell may have exported into the subprocess environment. Without it, arithmetic expressions that evaluate to 0 (e.g., `_iters=$((_iters+1))` when `_iters` was `−1`) or any conditional test returning non-zero would terminate the subprocess before `exit 0` is reached, causing Claude Code to report a hook error and block the prompt.
+- Uses `;` as the exclusive statement separator throughout the one-liner. All sequential statements in the loop body are separated by `;` — not `&&` or `||` — so that path-advance statements (`_prev=...`, `_dir=...`, `_iters=...`) always execute on every iteration regardless of whether the hook file test matched. The `&&` operator is used only for the two-condition file test (`-f` and `-r`) and the invocation compound command, where short-circuit behavior is intentional.
+- Uses the same change-detection termination and 40-iteration cap as the standalone scripts.
+- Tests both `-f` and `-r` before invoking (matching Stage 1 readability requirement).
+- Passes `$?` through so a non-zero exit from the hook script propagates correctly.
+- Falls through with `exit 0` (no output) if no project hook is found — this case should not occur in a properly installed project, but is harmless.
 
 **JSON escaping constraints**: the command string above is the exact value that must appear inside the JSON `"command"` field. Escaping rules that apply to this string:
 
