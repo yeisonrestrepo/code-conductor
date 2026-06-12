@@ -62,6 +62,99 @@ _g3_extract_command() {
   printf '%s' "$result"
 }
 
+_g3_join_continuations() {
+  local input="$1" result="" line=""
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%$'\r'}"           # strip trailing CR (CRLF normalisation)
+    local tmp="$line" bs=0
+    while [[ "$tmp" == *\\ ]]; do tmp="${tmp%\\}"; bs=$((bs+1)); done
+    if (( bs % 2 == 1 )); then
+      result+="${line%\\} "        # odd backslashes: line continuation
+    else
+      result+="$line"$'\n'         # even backslashes: real newline
+    fi
+  done <<< "$input"
+  printf '%s' "$result"
+}
+
+_g3_scan() {
+  # Unified 5-state scanner (UNQUOTED / SINGLE_QUOTED / DOUBLE_QUOTED /
+  #   ANSI_C_QUOTED / LOCALE_QUOTED).  Two modes:
+  #   "strip" — outputs comment-stripped string to stdout; returns 0 (ok) or 2 (malformed).
+  #   "glob"  — returns 1 if an unquoted glob char found, 0 if not, 1 on malformed (fail-closed).
+  # Malformed = state != UNQUOTED at end of input (unclosed quote).
+  # SINGLE_QUOTED: \ is literal; ANY ' exits (including directly after \).
+  local mode="$1" input="$2"
+  local state="UNQUOTED" result=""
+  local i=0 len=${#input} ch="" two=""
+  while (( i < len )); do
+    ch="${input:i:1}"; two="${input:i:2}"
+    case "$state" in
+      UNQUOTED)
+        if   [[ "$two" == "\$'" ]]; then
+          [[ "$mode" == "strip" ]] && result+="$two"
+          i=$((i+2)); state="ANSI_C_QUOTED"
+        elif [[ "$two" == '$"' ]]; then
+          [[ "$mode" == "strip" ]] && result+="$two"
+          i=$((i+2)); state="LOCALE_QUOTED"
+        elif [[ "$ch" == '\' ]]; then
+          [[ "$mode" == "strip" ]] && result+="${input:i:2}"
+          i=$((i+2))
+        elif [[ "$ch" == "'" ]]; then
+          [[ "$mode" == "strip" ]] && result+="$ch"
+          i=$((i+1)); state="SINGLE_QUOTED"
+        elif [[ "$ch" == '"' ]]; then
+          [[ "$mode" == "strip" ]] && result+="$ch"
+          i=$((i+1)); state="DOUBLE_QUOTED"
+        elif [[ "$ch" == '#' ]] && [[ "$mode" == "strip" ]]; then
+          # Comment: discard to end of line (preserve \n as separator)
+          while (( i < len )) && [[ "${input:i:1}" != $'\n' ]]; do i=$((i+1)); done
+        else
+          # Regular UNQUOTED character
+          if [[ "$mode" == "glob" ]] && [[ "$ch" =~ [*?{[] ]]; then
+            return 1  # unquoted glob found
+          fi
+          [[ "$mode" == "strip" ]] && result+="$ch"
+          i=$((i+1))
+        fi ;;
+      SINGLE_QUOTED)
+        # \ is literal; any ' exits (there is no escape mechanism here)
+        [[ "$mode" == "strip" ]] && result+="$ch"
+        [[ "$ch" == "'" ]] && state="UNQUOTED"
+        i=$((i+1)) ;;
+      DOUBLE_QUOTED|LOCALE_QUOTED)
+        if [[ "$ch" == '\' ]]; then
+          [[ "$mode" == "strip" ]] && result+="${input:i:2}"
+          i=$((i+2))
+        elif [[ "$ch" == '"' ]]; then
+          [[ "$mode" == "strip" ]] && result+="$ch"
+          i=$((i+1)); state="UNQUOTED"
+        else
+          [[ "$mode" == "strip" ]] && result+="$ch"
+          i=$((i+1))
+        fi ;;
+      ANSI_C_QUOTED)
+        if [[ "$ch" == '\' ]]; then
+          [[ "$mode" == "strip" ]] && result+="${input:i:2}"
+          i=$((i+2))
+        elif [[ "$ch" == "'" ]]; then
+          [[ "$mode" == "strip" ]] && result+="$ch"
+          i=$((i+1)); state="UNQUOTED"
+        else
+          [[ "$mode" == "strip" ]] && result+="$ch"
+          i=$((i+1))
+        fi ;;
+    esac
+  done
+  # Fail-closed: unclosed quote is malformed input
+  if [[ "$state" != "UNQUOTED" ]]; then
+    [[ "$mode" == "strip" ]] && { printf '%s' "$result"; return 2; }
+    return 1   # glob mode: fail-closed on malformed input
+  fi
+  [[ "$mode" == "strip" ]] && printf '%s' "$result"
+  return 0
+}
+
 # ── Guard 3: Bash command scan ─────────────────────────────────────────────────
 # BASH_SCAN_ALLOWLIST: exact literal path tokens the guard permits.
 # Operators add entries here. Agents must NEVER modify this array.
@@ -74,9 +167,35 @@ if [ "${CLAUDE_TOOL_NAME:-}" = "Bash" ]; then
     unset _G3_CMD; exit 0
   fi
 
-  # ── Preprocessing and pattern checks added in subsequent tasks ──
-  # Placeholder: pass through until preprocessing is wired.
+  # Length guard: fail-closed on oversized input to protect the scanner from abuse
+  if (( ${#_G3_CMD} > 8192 )); then
+    printf '\n⛔ BASH SCAN BLOCKED\n' >&2
+    printf '   Command string exceeds maximum scan length (8192 chars).\n\n' >&2
+    unset _G3_CMD; exit 1
+  fi
+
+  # Step 4a: join line continuations
+  _G3_JOINED=$(_g3_join_continuations "$_G3_CMD")
   unset _G3_CMD
+
+  # Step 4b: strip comments via unified scanner (mode="strip")
+  _G3_SCAN_RC=0
+  _G3_PRE=$(_g3_scan "strip" "$_G3_JOINED") || _G3_SCAN_RC=$?
+  unset _G3_JOINED
+
+  # Fail-closed: malformed input (rc=2 means unclosed quote)
+  if (( _G3_SCAN_RC == 2 )); then
+    printf '\n⛔ BASH SCAN BLOCKED\n' >&2
+    printf '   Malformed shell syntax (unclosed quote) — blocked as a precaution.\n\n' >&2
+    unset _G3_PRE; exit 1
+  fi
+
+  # Normalise real newlines to semicolons (simplifies all pattern regexes)
+  _G3_PRE="${_G3_PRE//$'\n'/;}"
+
+  # ── Pattern checks added in subsequent tasks ──
+  # Placeholder: pass through.
+  unset _G3_PRE
 fi
 
 # ── Guard 2: Duplicate file creation ──────────────────────────────────────────
