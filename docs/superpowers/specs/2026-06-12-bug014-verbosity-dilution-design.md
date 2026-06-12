@@ -36,16 +36,29 @@ while IFS= read -r _line; do
         '```'*) (( _in_fence = 1 - _in_fence )) ;;
         VERBOSITY:*)
             (( _in_fence )) && continue
-            LEVEL="${_line#VERBOSITY:}"      # strip key prefix
-            LEVEL="${LEVEL#"${LEVEL%%[! ]*}"}"  # strip leading spaces
-            LEVEL="${LEVEL%$'\r'}"           # strip trailing CR
-            LEVEL="${LEVEL%% *}"             # strip trailing spaces
-            LEVEL="${LEVEL^^}"               # uppercase (bash 4+)
+            LEVEL="${_line#VERBOSITY:}"           # strip key prefix
+            LEVEL="${LEVEL#"${LEVEL%%[! ]*}"}"    # strip leading spaces
+            LEVEL="${LEVEL%$'\r'}"                # strip trailing CR
+            LEVEL="${LEVEL%% *}"                  # strip trailing spaces
+            LEVEL="${LEVEL^^}"                    # uppercase (bash 4+)
             break
             ;;
     esac
 done < "$_mem_file"
 ```
+
+### Path variable quoting
+
+All path variable expansions in both scripts must be double-quoted without exception, including inside `[ ]` tests, `< "$file"` redirections, and string comparisons:
+
+```bash
+[ -f "$_dir/.claude/hooks/verbosity-remind.sh" ]   # correct
+[ -f $_dir/.claude/hooks/verbosity-remind.sh ]      # FORBIDDEN
+done < "$_mem_file"                                  # correct
+[ "$_dir" != "$_prev" ]                             # correct
+```
+
+This mandate covers: `"$_dir"`, `"$_prev"`, `"$_start"`, `"$_mem_file"`, `"$_log_dir"`, and every other variable holding a filesystem path. Paths containing spaces, parentheses, or shell-special characters must work without modification.
 
 ### Hook execution model
 
@@ -53,9 +66,51 @@ Claude Code fires `UserPromptSubmit` hooks **sequentially**, not concurrently. E
 
 The global hook's deferral decision is based on filesystem state (Stage 1 traversal), not on execution order. The guarantee of exactly one injected reminder holds regardless of which hook runs first.
 
+### CI/CD bypass
+
+At hook entry — before any guard, traversal, or file read — check for the bypass flag:
+
+```bash
+[ "${CC_VERBOSITY_SKIP:-0}" = "1" ] && exit 0
+```
+
+Setting `CC_VERBOSITY_SKIP=1` in the environment causes both hooks to exit immediately with no output. This flag is intended for:
+- Automated test suite execution (`tests/guard3-test.sh` and similar)
+- CI/CD pipelines that run Claude Code non-interactively
+- Any context where the reminder output would pollute structured pipeline logs
+
+The flag is not persisted; it must be set per-invocation or exported in the CI environment. It is not read from `verbosity.md` or any config file.
+
+### Diagnostic logging
+
+Silent extraction failures (conditions beyond the expected sanity-guard fallbacks) must not be silently dropped. Loggable conditions:
+
+- File read error (e.g., `verbosity.md` is readable but throws an I/O error mid-read)
+- Traversal cap reached (40 iterations) with no file found at any level — this is unusual and worth recording
+- Bash `set -e` trap triggered unexpectedly inside the hook body
+
+Non-loggable conditions (expected defensive paths, no log entry written):
+- `LEVEL` empty after extraction → sanity guard sets MIN (normal)
+- Unrecognized level value → sanity guard sets MIN (normal)
+- `verbosity.md` absent at all levels → sanity guard sets MIN (normal)
+
+Log target: `~/.claude/logs/verbosity-hook.log`. Parent directory created with `mkdir -p` on first write. Appended — never truncated.
+
+Log line format:
+```
+YYYY-MM-DD HH:MM:SS [global|project] <one-sentence description>
+```
+
+Example:
+```
+2026-06-12 14:32:01 [global] traversal cap (40) reached; no verbosity.md found
+```
+
+Log writes use `>>` append redirect. If the log write itself fails (e.g., disk full), the failure is silently ignored — the hook always exits 0 and emits the MIN fallback reminder regardless.
+
 ### `$PWD` null guard
 
-At hook entry, before any traversal begins:
+At hook entry, after the CI bypass check and before any traversal:
 
 ```bash
 _start="${PWD:-}"
@@ -75,7 +130,7 @@ Applies to Stage 1 (hook detection, global hook only) and Stage 2 (memory file r
 ```bash
 _dir="$_start"; _prev=""; _iters=0; _cap=40
 while [ "$_dir" != "$_prev" ] && (( _iters < _cap )); do
-    # test condition at $_dir
+    # test condition at "$_dir"
     _prev="$_dir"
     _dir="${_dir%/*}"
     [ -z "$_dir" ] && _dir="/"
@@ -84,24 +139,27 @@ done
 ```
 
 Loop invariants:
-- **Termination condition**: `dir == prev` (path stopped changing). Not `dir == /`.
-- **Iteration cap**: 40 iterations maximum. Handles virtual filesystems, bind mounts, or degenerate path structures where `${dir%/*}` does not converge. If the cap is reached without finding the target, the loop exits and the stage falls through to its next fallback.
-- **No subshells inside the loop**: `${dir%/*}` is a pure parameter expansion. No `dirname`, no `$(...)`, no fork per iteration.
+- **Termination condition**: `"$_dir" == "$_prev"` (path stopped changing). Not `"$_dir" == /`.
+- **Iteration cap**: 40 iterations maximum. Handles virtual filesystems, bind mounts, or degenerate path structures where `${_dir%/*}` does not converge. If the cap is reached without finding the target, the loop exits and the stage falls through to its next fallback. A cap-reached event at Stage 2 is logged (see Diagnostic logging).
+- **No subshells inside the loop**: `${_dir%/*}` is a pure parameter expansion. No `dirname`, no `$(...)`, no fork per iteration.
 - **Git Bash drive roots** (`/c`, `/d`): `${"/c"%/*}` yields `""`, which is set to `/`. Next iteration: `"/" == "/"` → exits. No infinite loop.
+- **Permission-denied directories**: the `-f` test evaluates false when the parent directory lacks execute permission; no error is emitted to stderr. Traversal continues upward transparently. The hook never reads or lists directory contents — only tests for a specific file path — so partial permission boundaries are handled gracefully.
 
-**Symlink note**: The traversal uses `$PWD` (logical shell-assigned path). Bash resolves symlinks transparently at the `-f` test level. Do not substitute `$(pwd -P)` (physical path) — doing so breaks setups where `.claude/` is accessible exclusively via a symlink path.
+**Symlink note**: The traversal uses `"$PWD"` (logical shell-assigned path). Bash resolves symlinks transparently at the `-f` test level. Do not substitute `$(pwd -P)` (physical path) — doing so breaks setups where `.claude/` is accessible exclusively via a symlink path.
 
 ### Main path
 
 1. User submits a prompt. Claude Code fires all `UserPromptSubmit` hooks sequentially.
 2. **Global hook fires.**
-   - Entry guard: if `$PWD` is null, skip traversal; go to Stage 2 global fallback.
+   - CI bypass: if `CC_VERBOSITY_SKIP=1`, exit 0 immediately.
+   - `$PWD` null guard: if `$PWD` empty, skip traversal; go to Stage 2 global fallback.
    - Stage 1 — upward traversal (cap 40) for `.claude/hooks/verbosity-remind.sh`. If found, exit 0 with no output (defer to project hook).
    - Stage 2 — upward traversal (cap 40) for `.claude/memory/verbosity.md`. First file found wins. If cap reached or `$PWD` was null, read `~/.claude/memory/verbosity.md`.
    - Stage 3 — parse with code-fence tracking, normalize, sanity guard. If `LEVEL` not in `{MIN, INFO, VERBOSE}`, set `LEVEL=MIN`.
    - Emit one reminder line with leading newline to stdout.
 3. **Project hook fires** (only in projects with the template installed).
-   - Entry guard: same `$PWD` null check.
+   - CI bypass check first.
+   - `$PWD` null guard.
    - Runs Stages 2–3 only (no hook-detection stage; it is the authority).
    - Emit one reminder line with leading newline to stdout.
 4. Claude receives exactly one injected reminder. Format is level-aware, always preceded by `\n`:
@@ -119,10 +177,9 @@ Loop invariants:
 
 The hook fires on the `UserPromptSubmit` event regardless of prompt content. It does not inspect or read the prompt string. When the user submits an empty string or a prompt consisting exclusively of binary attachments (images, files):
 
-- The hook runs its full three-stage pipeline identically.
+- The hook runs its full pipeline (bypass check → null guard → three stages) identically.
 - It emits the verbosity reminder normally.
 - Claude receives the reminder as injected context alongside the empty/binary input.
-- Claude's response to the empty/binary input is governed by the injected verbosity level.
 
 No special handling or suppression is required for these inputs.
 
@@ -135,19 +192,39 @@ No special handling or suppression is required for these inputs.
 
 ### Error cases
 
+- **`CC_VERBOSITY_SKIP=1` set** — hook exits 0 immediately, no output.
 - **`$PWD` is null or unset** — traversal skipped; hook reads `~/.claude/memory/verbosity.md` directly. Sanity guard handles bad state. Hook exits 0.
-- **`verbosity.md` is missing at all levels** — `grep` returns empty; sanity guard sets `LEVEL=MIN`. Hook exits 0, emits `\n[VERBOSITY:MIN]` reminder. Under normal operation, `install.sh` and `install.ps1` always provision `~/.claude/memory/verbosity.md` at install time (`echo "VERBOSITY: ${VERBOSITY}" > "${GLOBAL_DIR}/memory/verbosity.md"`). The sanity guard is a corruption defense, not a substitute for installation.
-- **`verbosity.md` contains an unrecognized value** (e.g., `VERBOSITY: LOUD`) — uppercase normalization applied first; if still not in `{MIN, INFO, VERBOSE}`, sanity guard sets `MIN`. Hook exits 0.
+- **`verbosity.md` is missing at all levels** — extraction yields empty `LEVEL`; sanity guard sets `MIN`. Hook exits 0, emits `\n[VERBOSITY:MIN]`. Under normal operation, installers always provision `~/.claude/memory/verbosity.md` at install time. The sanity guard is a corruption defense.
+- **`verbosity.md` contains an unrecognized value** — uppercase normalization applied first; if still not in `{MIN, INFO, VERBOSE}`, sanity guard sets `MIN`. Hook exits 0.
 - **`verbosity.md` is empty or has no `VERBOSITY:` line** — extraction yields empty `LEVEL`; sanity guard sets `MIN`. Hook exits 0.
-- **`verbosity.md` has Windows CRLF line endings** — `\r` stripped during extraction before sanity guard runs; `VERBOSE\r` normalizes to `VERBOSE`. Hook exits 0.
-- **`VERBOSITY:` line is inside a Markdown code fence** — `_in_fence` flag causes the match to be discarded; traversal continues reading the file for a body-level match. If none found, falls back to next memory source.
-- **Traversal cap reached (40 iterations) with no file found** — loop exits; hook falls back to `~/.claude/memory/verbosity.md`. Sanity guard handles downstream state. No error is emitted to stderr.
+- **`verbosity.md` has Windows CRLF line endings** — `\r` stripped during extraction; `VERBOSE\r` normalizes to `VERBOSE`. Hook exits 0.
+- **`VERBOSITY:` line is inside a Markdown code fence** — `_in_fence` flag discards the match; traversal continues for a body-level match. If none found, falls back to next memory source.
+- **Traversal cap reached (40 iterations)** — loop exits; falls back to `~/.claude/memory/verbosity.md`. Cap-reached event logged to `~/.claude/logs/verbosity-hook.log`.
+- **Permission-denied directory in traversal path** — `-f` test returns false silently; traversal continues upward. No error emitted.
 - **Hook script missing or not executable** — Claude Code logs a hook error; session continues. `CLAUDE.md` and `skills/verbosity.md` serve as soft fallbacks.
 - **Git Bash drive-root edge case** — change-detection loop terminates correctly; no infinite loop.
 
+### Settings JSON array-append strategy
+
+Both installers currently overwrite `settings.json` wholesale using raw file download (`download` in `install.sh`, `Save-RemoteFile` in `install.ps1`). This is replaced for `settings.json` files with a targeted merge strategy that preserves any user-added hooks:
+
+**install.sh** — if `jq` is available:
+1. Read the existing target `settings.json` (or start from `{}` if absent).
+2. Extract the current `hooks.UserPromptSubmit` array (default `[]` if absent).
+3. If the verbosity hook command string is not already present in the array, append the new hook entry.
+4. Write the merged result back. If `jq` is unavailable: overwrite with the repo version and print a warning: `"⚠ jq not found — settings.json overwritten. Re-add any custom UserPromptSubmit hooks manually."`.
+
+**install.ps1** — using `ConvertFrom-Json` / `ConvertTo-Json` (always available in PS 5.1+):
+1. Read existing `settings.json` as a `PSCustomObject` (or start from `'{}'`).
+2. Ensure `hooks.UserPromptSubmit` exists as an array.
+3. If the verbosity hook command string is not already in the array, append the new entry.
+4. Serialize back with `ConvertTo-Json -Depth 10` and `Set-Content -Encoding utf8`.
+
+**Idempotency**: the check for the hook command string ensures re-running the installer does not create duplicate entries. The hook command string used as the idempotency key is the exact value that will appear in `settings.json` (e.g., `"bash ~/.claude/hooks/verbosity-remind.sh"`).
+
 ### Windows installer and execution permissions
 
-`install.ps1` copies hook scripts using `Save-RemoteFile` (raw content write via `Set-Content`). It does not call `icacls`, `chmod`, or any permission-setting utility, and none is needed. All hooks in `settings.json` are invoked via explicit `bash path/to/script.sh` — not as direct executables (`./hook.sh`). The bash interpreter is responsible for execution; Unix execute bits are not consulted on Windows Git Bash in this invocation mode. The new `verbosity-remind.sh` hooks must follow the same registration pattern:
+`install.ps1` copies hook scripts using `Save-RemoteFile` (raw content write via `Set-Content`). No `icacls`, `chmod`, or permission-setting call is needed. All hooks in `settings.json` are invoked via explicit `bash path/to/script.sh` — not as direct executables (`./hook.sh`). Unix execute bits are not consulted on Windows Git Bash in this invocation mode. The new `verbosity-remind.sh` hooks must be registered with:
 
 - Global: `"command": "bash ~/.claude/hooks/verbosity-remind.sh"`
 - Project: `"command": "bash -c 'h=\".claude/hooks/verbosity-remind.sh\"; [ -f \"$h\" ] && bash \"$h\" || exit 0'"`
@@ -159,10 +236,14 @@ No special handling or suppression is required for these inputs.
 - [ ] `global/hooks/verbosity-remind.sh` exists; emits exactly one reminder line per invocation when no project hook is found via upward traversal.
 - [ ] `project-template/.claude/hooks/verbosity-remind.sh` exists; emits exactly one reminder line per invocation.
 - [ ] When both hooks are registered, exactly one reminder appears per prompt (global defers via upward traversal).
+- [ ] `CC_VERBOSITY_SKIP=1` causes both hooks to exit 0 with no output.
+- [ ] All path variable expansions are double-quoted; hook functions correctly with a CWD path containing spaces and parentheses.
 - [ ] Upward traversal uses only pure bash `${dir%/*}` — no `dirname`, no `$(...)` subshells inside the loop.
-- [ ] Loop termination uses change-detection (`dir != prev`), not `dir != /`.
+- [ ] Loop termination uses change-detection (`"$_dir" != "$_prev"`), not `"$_dir" != /`.
 - [ ] Loop iteration cap of 40 is enforced; traversal exits gracefully when cap is reached.
-- [ ] Reminder output begins with a leading `\n` character to prevent text concatenation with terminal input.
+- [ ] Cap-reached event at Stage 2 is appended to `~/.claude/logs/verbosity-hook.log`.
+- [ ] Permission-denied directory in traversal path is handled silently (no stderr output, traversal continues).
+- [ ] Reminder output begins with a leading `\n` character.
 - [ ] Extraction strips leading spaces, trailing spaces, and `\r` using pure bash parameter expansion.
 - [ ] Extracted level is uppercased via `${LEVEL^^}` before sanity guard; `min`, `Min`, `MIN` all resolve to `MIN`.
 - [ ] Sanity guard falls back to `MIN` for any value outside `{MIN, INFO, VERBOSE}` after normalization.
@@ -170,27 +251,35 @@ No special handling or suppression is required for these inputs.
 - [ ] `$PWD` null guard skips traversal and falls back to global `~/.claude/memory/verbosity.md`.
 - [ ] Project-local `.claude/memory/verbosity.md` overrides `~/.claude/memory/verbosity.md` when found in ancestor chain.
 - [ ] Reminder text is level-aware: three distinct messages for MIN / INFO / VERBOSE.
-- [ ] `global/settings.json` registers global hook under `UserPromptSubmit` using `bash ~/.claude/hooks/verbosity-remind.sh`; existing graphify entry preserved.
-- [ ] `project-template/.claude/settings.json` registers project hook under `UserPromptSubmit` using the `bash -c '...'` guard pattern; existing `PreToolUse` and `PostCompact` entries preserved.
+- [ ] `global/settings.json` registers global hook; existing graphify entry preserved; re-run does not duplicate the entry.
+- [ ] `project-template/.claude/settings.json` registers project hook; existing `PreToolUse` and `PostCompact` entries preserved; re-run does not duplicate.
+- [ ] Installer merge strategy: if `settings.json` contains pre-existing `UserPromptSubmit` hooks from another source, they are preserved after install.
 - [ ] `skills/verbosity.md` Application section updated to describe hook-driven enforcement.
-- [ ] `install.sh` and `install.ps1` verified to copy `global/hooks/verbosity-remind.sh` to `~/.claude/hooks/`.
+- [ ] `install.sh` and `install.ps1` copy `global/hooks/verbosity-remind.sh` to `~/.claude/hooks/`.
+
+### Performance ceiling
+
+- [ ] Both hooks complete within **50ms** measured from entry to final stdout write, on a warm local filesystem (second or later invocation in the same session). Measurement includes the full pipeline: bypass check, null guard, both traversal stages, file read, normalization, and output. Excludes cold OS filesystem cache misses on the very first invocation.
+- [ ] The hook introduces zero network I/O. All reads are local filesystem only.
 
 ### Cascading verification matrix
 
-Manual or scripted test scenarios that must pass before production release. Each row defines the filesystem layout and the expected output.
+Manual or scripted test scenarios that must pass before production release.
 
-| # | `$PWD` | Global hook present | Project hook at ancestor | Project `verbosity.md` | Global `verbosity.md` | Expected emitter | Expected level |
-|---|--------|--------------------|--------------------------|-----------------------|----------------------|-----------------|----------------|
-| 1 | `/home/user` | yes | no | no | `MIN` | global | MIN |
-| 2 | `/home/user/proj` | yes | yes (at `/home/user/proj`) | no | `MIN` | project | MIN |
-| 3 | `/home/user/proj/src` | yes | yes (at `/home/user/proj`) | no | `MIN` | project (found via traversal) | MIN |
-| 4 | `/home/user/proj` | yes | yes | `INFO` (project-local) | `MIN` (global) | project | INFO |
-| 5 | `/home/user/proj` | yes | yes | `verbose` (lowercase) | `MIN` | project | VERBOSE (normalized) |
-| 6 | `/home/user/proj` | yes | no | no | absent | global | MIN (sanity guard) |
-| 7 | `/home/user/proj` | yes | no | no | `LOUD` | global | MIN (sanity guard) |
-| 8 | empty string | yes | n/a | no | `INFO` | global (traversal skipped) | INFO |
-| 9 | `/c/Users/proj` | yes | no | no | `VERBOSE` | global (Git Bash root termination) | VERBOSE |
-| 10 | `/home/user/proj` | yes | no | file has `VERBOSITY:` inside ` ``` ` fence | `MIN` | global | MIN (fence guard active) |
+| # | `$PWD` | CI bypass | Global hook | Project hook at ancestor | Project `verbosity.md` | Global `verbosity.md` | Expected emitter | Expected level |
+|---|--------|-----------|------------|--------------------------|------------------------|-----------------------|-----------------|----------------|
+| 1 | `/home/user` | 0 | yes | no | no | `MIN` | global | MIN |
+| 2 | `/home/user/proj` | 0 | yes | yes (root) | no | `MIN` | project | MIN |
+| 3 | `/home/user/proj/src` | 0 | yes | yes (root via traversal) | no | `MIN` | project | MIN |
+| 4 | `/home/user/proj` | 0 | yes | yes | `INFO` (project-local) | `MIN` | project | INFO |
+| 5 | `/home/user/proj` | 0 | yes | yes | `verbose` (lowercase) | `MIN` | project | VERBOSE |
+| 6 | `/home/user/proj` | 0 | yes | no | no | absent | global | MIN (sanity guard) |
+| 7 | `/home/user/proj` | 0 | yes | no | no | `LOUD` | global | MIN (sanity guard) |
+| 8 | empty string | 0 | yes | n/a | no | `INFO` | global (traversal skipped) | INFO |
+| 9 | `/c/Users/proj` | 0 | yes | no | no | `VERBOSE` | global (Git Bash root) | VERBOSE |
+| 10 | `/home/user/proj` | 0 | yes | no | `VERBOSITY:` in ` ``` ` fence | `MIN` | global | MIN (fence guard) |
+| 11 | `/home/user/proj` | 1 | yes | yes | `INFO` | `MIN` | neither | (no output) |
+| 12 | `/home/user with spaces/proj` | 0 | yes | no | no | `MIN` | global | MIN (quoted path) |
 
 ## Out of Scope
 
@@ -201,16 +290,18 @@ Manual or scripted test scenarios that must pass before production release. Each
 - Windows native PowerShell hook execution — hooks run under bash (Git Bash on Windows); no PowerShell port needed.
 - Suppressing hook output from `.jsonl` session transcripts — hook output is visible in history by design.
 - Symlinked `.claude/` directories (`.claude/` is itself a symlink pointing elsewhere) — only standard layout where `.claude/` is a real directory at the project root is supported.
+- Log rotation or size management for `~/.claude/logs/verbosity-hook.log` — append-only; no rotation.
 
 ## System Impact
 
 - `global/hooks/verbosity-remind.sh` — new file; must be added to `install.sh` and `install.ps1` copy lists.
-- `global/settings.json` — second entry added to existing `UserPromptSubmit` array; graphify entry preserved.
+- `global/settings.json` — verbosity hook entry added via merge strategy; graphify entry preserved.
 - `project-template/.claude/hooks/verbosity-remind.sh` — new file; copied on `--project` installs.
-- `project-template/.claude/settings.json` — new `UserPromptSubmit` entry added; `PreToolUse` and `PostCompact` entries preserved.
+- `project-template/.claude/settings.json` — verbosity hook entry added via merge strategy; `PreToolUse` and `PostCompact` entries preserved.
 - `skills/verbosity.md` — Application section updated; level definitions unchanged.
-- `install.sh` / `install.ps1` — add `global/hooks/verbosity-remind.sh` to the copy list for global hook installation; no structural change to the installer logic.
+- `install.sh` — copy list updated; `settings.json` write replaced with jq-merge function.
+- `install.ps1` — copy list updated; `settings.json` write replaced with `ConvertFrom-Json` merge block.
 
 ## Complexity Estimate
 
-S — two bash scripts (~40 lines each), two JSON edits, one skill section update, installer line addition.
+S/M — two bash scripts (~50 lines each), JSON merge logic in both installers (~20 lines each), two JSON source file edits, one skill section update. Installer merge logic elevates from S to S/M.
