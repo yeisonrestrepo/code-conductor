@@ -3285,7 +3285,7 @@ Expected: all three steps print `PASS`. Step 3 uses `env -i` to strip session-sp
 
 **No files changed in this task.**
 
-- [>] [T-009] Stage all new and modified files. The table below maps each file to its repository source path (relative to repo root) and whether `-f` is required:
+- [X] [T-009] Stage all new and modified files. The table below maps each file to its repository source path (relative to repo root) and whether `-f` is required:
 
 | File | Repo source path | `-f` needed? | Reason |
 |------|-----------------|-------------|--------|
@@ -3309,7 +3309,7 @@ git add tests/verbosity-hook-test.sh
 
 > **`.verbosity-fence-warned` and `.gitignore`:** The marker file lives at `$HOME/.claude/logs/.verbosity-fence-warned` — inside the user's home directory, entirely outside the repository working tree. Git never traverses `$HOME` when scanning for untracked files, so the marker is invisible to git regardless of `.gitignore` contents. It does **not** need to appear in the project `.gitignore`, the global `~/.gitignore_global`, or any other ignore file. No action is required here.
 
-- [ ] [T-009-A] Verify staged files are correct (8 files total: 2 hook scripts, 1 settings.json, 1 plan file, install.sh, install.ps1, skills/verbosity.md, tests/verbosity-hook-test.sh):
+- [X] [T-009-A] Verify staged files are correct (8 files total: 2 hook scripts, 1 settings.json, 1 plan file, install.sh, install.ps1, skills/verbosity.md, tests/verbosity-hook-test.sh):
 
 ```bash
 git status
@@ -3318,7 +3318,7 @@ git diff --cached --name-only
 
 Expected: the 8 files above, no unintended changes.
 
-- [ ] [T-009-B] Create feature commit:
+- [X] [T-009-B] Create feature commit:
 
 ```bash
 git commit -m "feat(BUG-014): add verbosity-remind UserPromptSubmit hooks
@@ -3329,7 +3329,7 @@ always exit 0. Global hook defers to project hook via upward traversal. Installe
 the hook registration into settings.json via jq → python3 → manual fallback."
 ```
 
-- [ ] [T-009-C] Update CHANGELOG.md — prepend a new `## [1.11.0]` entry (minor bump: hooks are a non-breaking feature addition; no existing API removed or behavior broken; previous release was 1.10.0):
+- [X] [T-009-C] Update CHANGELOG.md — prepend a new `## [1.11.0]` entry (minor bump: hooks are a non-breaking feature addition; no existing API removed or behavior broken; previous release was 1.10.0):
 
 Handle each possible initial state of `CHANGELOG.md` before inserting:
 
@@ -3411,7 +3411,7 @@ The entry content:
 - `project-template/.claude/settings.json` — `UserPromptSubmit` array added with embedded traversal command
 ```
 
-- [ ] [T-009-D] Update `VERSION` file to `1.11.0`:
+- [X] [T-009-D] Update `VERSION` file to `1.11.0`:
 
 ```bash
 # Pre-commit check: if unrelated staged changes exist, stash them first to
@@ -3437,7 +3437,7 @@ if [ "${_stashed:-0}" = "1" ]; then
 fi
 ```
 
-- [ ] [T-009-E] Update `README.md` to reflect the 1.11.0 release state. Follow these steps in order:
+- [X] [T-009-E] Update `README.md` to reflect the 1.11.0 release state. Follow these steps in order:
 
 **Step 1 — Version string / badge update:**
 
