@@ -75,13 +75,13 @@ export default defineConfig({
 **CommonJS `require()` in an ESM project**: the project sets `"type": "module"` in `package.json`, but `node -e` evaluates inline scripts in CommonJS mode by default. To make the intent explicit and guard against future Node.js behavior changes, all three inline commands below pass `--input-type=commonjs` (available since Node 12; safe with the Node >= 20 engine requirement).
 
 ```
-node --input-type=commonjs -e "const fs=require('fs'),p='.gitignore',c=fs.readFileSync(p,'utf8'),existing=c.split('\n').map(l=>l.trim()),add=['node_modules/','.vitest-cache/'].filter(e=>!existing.includes(e));if(add.length){const sep=c.endsWith('\n')?'':'\n';fs.appendFileSync(p,sep+add.join('\n')+'\n');console.log('Added: '+add.join(', '))}else{console.log('Already present - skipped')}"
+node --input-type=commonjs -e "const fs=require('fs'),p='.gitignore',c=fs.existsSync(p)?fs.readFileSync(p,'utf8'):'',existing=c.split('\n').map(l=>l.trim()),add=['node_modules/','.vitest-cache/'].filter(e=>!existing.includes(e));if(add.length){const sep=c.endsWith('\n')?'':'\n';fs.appendFileSync(p,sep+add.join('\n')+'\n');console.log('Added: '+add.join(', '))}else{console.log('Already present - skipped')}"
 ```
 
 Validate that both entries are present exactly once (no missing entries, no duplicates, no corruption from a prior partial run):
 
 ```
-node --input-type=commonjs -e "const lines=require('fs').readFileSync('.gitignore','utf8').split('\n').map(l=>l.trim()).filter(Boolean);const check=['node_modules/','.vitest-cache/'];let ok=true;check.forEach(e=>{const n=lines.filter(l=>l===e).length;if(n===0){console.error('MISSING: '+e);ok=false}else if(n>1){console.error('DUPLICATE ('+n+'x): '+e);ok=false}});if(!ok)process.exit(1);console.log('Validation passed')"
+node --input-type=commonjs -e "const fs=require('fs'),p='.gitignore';if(!fs.existsSync(p)){console.error('MISSING: .gitignore not found');process.exit(1)}const lines=fs.readFileSync(p,'utf8').split('\n').map(l=>l.trim()).filter(Boolean);const check=['node_modules/','.vitest-cache/'];let ok=true;check.forEach(e=>{const n=lines.filter(l=>l===e).length;if(n===0){console.error('MISSING: '+e);ok=false}else if(n>1){console.error('DUPLICATE ('+n+'x): '+e);ok=false}});if(!ok)process.exit(1);console.log('Validation passed')"
 ```
 
 Expected: `Validation passed` with exit code 0. A non-zero exit means the file was already corrupt before this step; inspect `.gitignore` manually before continuing.
@@ -89,7 +89,7 @@ Expected: `Validation passed` with exit code 0. A non-zero exit means the file w
 Verify both entries appear anywhere in `.gitignore` (independent of surrounding content):
 
 ```
-node --input-type=commonjs -e "const c=require('fs').readFileSync('.gitignore','utf8');['node_modules/','.vitest-cache/'].forEach(e=>{if(c.split('\n').map(l=>l.trim()).includes(e))console.log('FOUND: '+e);else{console.error('MISSING: '+e);process.exit(1)}})"
+node --input-type=commonjs -e "const fs=require('fs'),p='.gitignore';if(!fs.existsSync(p)){console.error('MISSING: .gitignore not found');process.exit(1)}const c=fs.readFileSync(p,'utf8');['node_modules/','.vitest-cache/'].forEach(e=>{if(c.split('\n').map(l=>l.trim()).includes(e))console.log('FOUND: '+e);else{console.error('MISSING: '+e);process.exit(1)}})"
 ```
 
 Expected: `FOUND: node_modules/` then `FOUND: .vitest-cache/`, exit code 0. This check passes regardless of what other entries the repository already contains.
@@ -204,6 +204,7 @@ function jsonCmd(cmd) {
 function run(cmd) {
   const result = spawnSync('bash', [HOOK], {
     stdio: 'pipe',
+    cwd: REPO_ROOT,
     env: { ...process.env, CLAUDE_TOOL_NAME: 'Bash', CLAUDE_TOOL_INPUT: jsonCmd(cmd) },
   })
   return {
@@ -216,6 +217,7 @@ function run(cmd) {
 function runRead() {
   const result = spawnSync('bash', [HOOK], {
     stdio: 'pipe',
+    cwd: REPO_ROOT,
     env: {
       ...process.env,
       CLAUDE_TOOL_NAME: 'Read',
@@ -251,6 +253,7 @@ function runAllowlisted(cmd, entries) {
     fs.writeFileSync(tmpHook, modified, 'utf8')
     const result = spawnSync('bash', [tmpHook], {
       stdio: 'pipe',
+      cwd: REPO_ROOT,
       env: { ...process.env, CLAUDE_TOOL_NAME: 'Bash', CLAUDE_TOOL_INPUT: jsonCmd(cmd) },
     })
     return result.status ?? -1
@@ -499,7 +502,7 @@ function runGlobal(home, cwd, skip = '0') {
     cwd,
     env: { ...process.env, HOME: home, CC_VERBOSITY_SKIP: skip },
   })
-  return (result.stdout ?? Buffer.alloc(0)).toString().replace(/\r\n/g, '\n')
+  return (result.stdout ?? Buffer.alloc(0)).toString().replace(/\r\n|\r/g, '\n')
 }
 
 function runProject(home, cwd, skip = '0') {
@@ -508,7 +511,7 @@ function runProject(home, cwd, skip = '0') {
     cwd,
     env: { ...process.env, HOME: home, CC_VERBOSITY_SKIP: skip },
   })
-  return (result.stdout ?? Buffer.alloc(0)).toString().replace(/\r\n/g, '\n')
+  return (result.stdout ?? Buffer.alloc(0)).toString().replace(/\r\n|\r/g, '\n')
 }
 
 describe('verbosity-remind hooks', () => {
@@ -786,7 +789,7 @@ fi
 
 Replace it with the same block followed by the pre-commit wiring (before the closing `fi`).
 
-**CRITICAL:** The `HOOK_BLOCK` heredoc closing delimiter must appear at **column 0** (no leading whitespace) in the actual `install.sh` file. The Edit tool preserves the literal indentation shown in the code block - verify with `bash -n install.sh` after the edit (exit 0 = valid; a non-zero exit or "unexpected EOF" error means the closing marker was indented).
+**CRITICAL - column-zero alignment**: The `HOOK_BLOCK` heredoc closing delimiter must be the very first character on its line in the actual `install.sh` file; column 0 means zero preceding spaces or tabs. When transplanting this block via the Edit tool or copy-paste, count from the start of the line: any indentation, including a single space, causes bash to treat the line as heredoc content rather than the terminator, producing an `unexpected EOF while looking for matching 'HOOK_BLOCK'` error from `bash -n`. Fix: delete all leading whitespace before `HOOK_BLOCK` on that one line, then re-run `bash -n install.sh` to confirm exit 0.
 
 ```bash
   if [ ! -f "$GITIGNORE" ] || ! grep -qF "$ENTRY" "$GITIGNORE"; then
@@ -804,18 +807,24 @@ Replace it with the same block followed by the pre-commit wiring (before the clo
         ok "Pre-commit test gate already present (idempotent)"
       else
         mkdir -p "$_hooks_dir"
-        [ -f "$_precommit" ] || printf '#!/bin/sh\n' > "$_precommit"
-        # Ensure existing content ends with a newline before appending.
-        # tail -c 1 | wc -l: returns 1 if last byte is LF, 0 otherwise. Both are POSIX.
-        [ -s "$_precommit" ] && [ "$(tail -c 1 "$_precommit" | wc -l)" -eq 0 ] && printf '\n' >> "$_precommit"
-        cat >> "$_precommit" <<'HOOK_BLOCK'
+        if [ -f "$_precommit" ] && [ ! -w "$_precommit" ]; then
+          warn "Pre-commit hook file is not writable ($_precommit); test gate not installed"
+        elif [ ! -w "$_hooks_dir" ]; then
+          warn "Hooks directory is not writable ($_hooks_dir); test gate not installed"
+        else
+          [ -f "$_precommit" ] || printf '#!/bin/sh\n' > "$_precommit"
+          # Ensure existing content ends with a newline before appending.
+          # tail -c 1 | wc -l: returns 1 if last byte is LF, 0 otherwise. Both are POSIX.
+          [ -s "$_precommit" ] && [ "$(tail -c 1 "$_precommit" | wc -l)" -eq 0 ] && printf '\n' >> "$_precommit"
+          cat >> "$_precommit" <<'HOOK_BLOCK'
 # code-conductor:test-gate
 command -v npm >/dev/null 2>&1 || { echo "[conductor] npm not found - skipping test gate"; exit 0; }
 cd "$(git rev-parse --show-toplevel)" && npm test
 # /code-conductor:test-gate
 HOOK_BLOCK
-        chmod +x "$_precommit"
-        ok "Pre-commit test gate appended to $_precommit"
+          chmod +x "$_precommit"
+          ok "Pre-commit test gate appended to $_precommit"
+        fi
       fi
     else
       warn "Could not resolve git hooks directory - pre-commit hook not installed"
@@ -875,7 +884,7 @@ git commit -m "feat(FEAT-024): wire pre-commit test gate in install.sh"
 
 Replace with the same block followed by pre-commit wiring (before the closing `}`).
 
-**CRITICAL:** The `'@` closing delimiter of the here-string below must appear at **column 0** (no leading whitespace) in the actual `install.ps1` file. PowerShell will throw a parse error if `'@` is indented. The guard block content uses ASCII hyphens (`-`) for word separators in warning messages; `[System.IO.File]::WriteAllText` with `UTF8Encoding($false)` writes UTF-8 without BOM. The `.Replace` call normalizes CRLF to LF so bash on Git for Windows parses the hook correctly.
+**CRITICAL - column-zero alignment**: The `'@` here-string terminator must be the very first character on its line in the actual `install.ps1` file; column 0 means zero preceding spaces or tabs. PowerShell's parser validates this at parse time before any code runs: a misaligned `'@` produces a `The string is missing the terminator` parse error that prevents the entire script from executing. When transplanting via the Edit tool, verify character position 0; any indent causes an immediate failure. The guard block uses ASCII hyphens (`-`) in warning messages; `[System.IO.File]::WriteAllText` with `UTF8Encoding($false)` writes UTF-8 without BOM; the `.Replace` call normalizes CRLF to LF so bash on Git for Windows parses the hook correctly.
 
 ```powershell
   if (-not (Test-Path $gitignore) -or -not (Select-String -Path $gitignore -Pattern ([regex]::Escape($entry)) -Quiet)) {
@@ -901,6 +910,17 @@ Replace with the same block followed by pre-commit wiring (before the closing `}
         if (-not (Test-Path $hooksDirParent)) {
           New-Item -ItemType Directory -Path $hooksDirParent -Force | Out-Null
         }
+        # Verify write access before modifying the hook file.
+        $canWrite = $true
+        if (Test-Path $precommit) {
+          try { $s = [System.IO.File]::Open($precommit, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Write); $s.Close() } catch { $canWrite = $false }
+        } elseif ($hooksDirParent -and (Test-Path $hooksDirParent)) {
+          $tmpTest = Join-Path $hooksDirParent ([System.IO.Path]::GetRandomFileName())
+          try { [System.IO.File]::WriteAllText($tmpTest, '', $enc); Remove-Item $tmpTest -Force } catch { $canWrite = $false }
+        }
+        if (-not $canWrite) {
+          Write-Warn "Cannot write to pre-commit location ($precommit); test gate not installed"
+        } else {
         # $guardBlock: single-quoted here-string; no PS variable expansion.
         # closing '@ MUST be at column 0 in the actual install.ps1 file.
         # CRLF to LF normalization ensures bash on Git for Windows parses correctly.
@@ -928,6 +948,7 @@ cd "$(git rev-parse --show-toplevel)" && npm test
           [System.IO.File]::WriteAllText($precommit, "#!/bin/sh`n" + $guardBlock, $enc)
         }
         Write-Ok "Pre-commit test gate appended to $precommit"
+        } # end $canWrite
       }
     } else {
       Write-Warn "Could not resolve git hooks directory - pre-commit hook not installed"
