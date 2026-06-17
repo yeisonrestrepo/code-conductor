@@ -70,22 +70,24 @@ export default defineConfig({
 })
 ```
 
-- [ ] [T-001-C] Ensure `.gitignore` ends with a newline before appending (prevents accidental concatenation with the last existing line):
+- [ ] [T-001-C] Add `node_modules/` and `.vitest-cache/` to `.gitignore`, ensuring a trailing newline before appending to prevent concatenation with the existing last line. Run this single Node command from repo root (Node ≥ 20 required; works on Windows, macOS, and Linux without requiring bash):
 
 ```
-node -e "const fs=require('fs'),p='.gitignore',c=fs.readFileSync(p,'utf8');if(!c.endsWith('\n'))fs.appendFileSync(p,'\n')"
+node -e "const fs=require('fs'),p='.gitignore',c=fs.readFileSync(p,'utf8'),sep=c.endsWith('\n')?'':'\n';fs.appendFileSync(p,sep+'node_modules/\n.vitest-cache/\n')"
 ```
 
-Then append the two new entries:
+Verify the last three meaningful lines of `.gitignore`:
 
 ```
+node -e "const lines=require('fs').readFileSync('.gitignore','utf8').split('\n').filter(l=>l.trim());console.log(lines.slice(-3).join('\n'))"
+```
+
+Expected output:
+```
+.claude/memory/session-snapshot.md
 node_modules/
 .vitest-cache/
 ```
-
-Or as a single command: `printf '\nnode_modules/\n.vitest-cache/\n' >> .gitignore`
-
-The file currently ends with `.claude/memory/session-snapshot.md` (no trailing newline — this step is required).
 
 - [ ] [T-001-D] Run `npm install` from repo root to generate `package-lock.json`:
 
@@ -218,8 +220,24 @@ function runRead() {
 
 function runAllowlisted(cmd, entries) {
   const lines = fs.readFileSync(HOOK, 'utf8').replace(/\r\n/g, '\n').split('\n')
-  const body = lines.slice(1).filter(l => !l.startsWith('BASH_SCAN_ALLOWLIST=')).join('\n')
-  const modified = `#!/usr/bin/env bash\nset -euo pipefail\nBASH_SCAN_ALLOWLIST=(${entries})\n${body}`
+  // Dynamically locate BASH_SCAN_ALLOWLIST block to preserve the actual script
+  // header. Handles both single-line `=()` and multi-line `=(\n...\n)` by
+  // tracking parenthesis depth rather than assuming line structure.
+  const startIdx = lines.findIndex(l => /^BASH_SCAN_ALLOWLIST\s*=/.test(l))
+  if (startIdx === -1) throw new Error('BASH_SCAN_ALLOWLIST= not found in hook')
+  let depth = 0
+  let endIdx = startIdx
+  for (let i = startIdx; i < lines.length; i++) {
+    for (const ch of lines[i]) {
+      if (ch === '(') depth++
+      else if (ch === ')') { depth--; if (depth <= 0) { endIdx = i; break } }
+    }
+    if (depth <= 0 && i >= startIdx) break
+    endIdx = i
+  }
+  const header = lines.slice(0, startIdx).join('\n')
+  const tail = lines.slice(endIdx + 1).join('\n')
+  const modified = `${header}\nBASH_SCAN_ALLOWLIST=(${entries})\n${tail}`
   const tmpDir = fs.mkdtempSync(join(os.tmpdir(), 'g3allow-'))
   const tmpHook = join(tmpDir, 'hook.sh')
   try {
@@ -748,7 +766,7 @@ git commit -m "feat(FEAT-024): add GitHub Actions CI workflow for npm test"
 - Consumes: git hooks directory via `git rev-parse --git-path hooks`
 - Produces: idempotent pre-commit hook that runs `npm test`; only wired when `--project` flag is passed
 
-- [ ] [T-006-A] Locate the insertion point — it is the gitignore block near the end of the `$INSTALL_PROJECT` section (install.sh lines 1122–1126). The target old_string is:
+- [ ] [T-006-A] Locate the insertion point — it is the `.gitignore` update block at the tail of the `if [ "$INSTALL_PROJECT" = true ]` outer block. Do **not** rely on line numbers since unrelated changes may shift them; instead use `grep -n 'Added.*to .gitignore' install.sh` at implementation time to pinpoint the exact line. The target old_string is the unique sequence:
 
 ```bash
   if [ ! -f "$GITIGNORE" ] || ! grep -qF "$ENTRY" "$GITIGNORE"; then
@@ -760,7 +778,7 @@ fi
 
 Replace it with the same block followed by the pre-commit wiring (before the closing `fi`).
 
-**CRITICAL:** The `HOOK_BLOCK` heredoc closing delimiter must appear at **column 0** (no leading whitespace) in the actual `install.sh` file. The Edit tool preserves the indentation shown in the code block below — verify with `cat -A install.sh | grep HOOK_BLOCK` that no spaces precede the closing marker after the edit.
+**CRITICAL:** The `HOOK_BLOCK` heredoc closing delimiter must appear at **column 0** (no leading whitespace) in the actual `install.sh` file. The Edit tool preserves the literal indentation shown in the code block — verify with `bash -n install.sh` after the edit (exit 0 = valid; a non-zero exit or "unexpected EOF" error means the closing marker was indented).
 
 ```bash
   if [ ! -f "$GITIGNORE" ] || ! grep -qF "$ENTRY" "$GITIGNORE"; then
@@ -869,17 +887,30 @@ Replace with the same block followed by pre-commit wiring (before the closing `}
         if (-not (Test-Path $hooksDirParent)) {
           New-Item -ItemType Directory -Path $hooksDirParent -Force | Out-Null
         }
+        # $guardBlock: single-quoted here-string — no PS variable expansion;
+        # closing '@ MUST be at column 0 in the actual install.ps1 file.
+        # CRLF → LF normalization ensures bash on Git for Windows parses correctly.
         $guardBlock = (@'
 # code-conductor:test-gate
 command -v npm >/dev/null 2>&1 || { echo "[conductor] npm not found — skipping test gate"; exit 0; }
 cd "$(git rev-parse --show-toplevel)" && npm test
 # /code-conductor:test-gate
 '@).Replace("`r`n", "`n").Replace("`r", "`n")
+        # $enc defined once; used by both the append branch and the create branch below.
         $enc = [System.Text.UTF8Encoding]::new($false)
         if (Test-Path $precommit) {
+          # Existing file: normalize its line endings, strip trailing whitespace,
+          # then append a blank separator + guard block (all LF, UTF-8 no BOM).
           $existing = [System.IO.File]::ReadAllText($precommit, $enc).Replace("`r`n", "`n").Replace("`r", "`n")
           [System.IO.File]::WriteAllText($precommit, $existing.TrimEnd() + "`n" + $guardBlock, $enc)
         } else {
+          # New file: write POSIX sh shebang + guard block.
+          # #!/bin/sh (not #!/bin/bash) is the git hook convention; the guard block
+          # uses only POSIX-compatible commands (command -v, cd, &&).
+          # $enc guarantees UTF-8 no BOM; "#!/bin/sh`n" uses LF (PS backtick-n = \n).
+          if ($hooksDirParent -and -not (Test-Path $hooksDirParent)) {
+            New-Item -ItemType Directory -Path $hooksDirParent -Force | Out-Null
+          }
           [System.IO.File]::WriteAllText($precommit, "#!/bin/sh`n" + $guardBlock, $enc)
         }
         Write-Ok "Pre-commit test gate appended to $precommit"
@@ -919,17 +950,25 @@ git commit -m "feat(FEAT-024): wire pre-commit test gate in install.ps1 (UTF-8 n
 - Consumes: existing CONTRIBUTING.md (44 lines, four sections)
 - Produces: new section documenting `--no-verify` bypass and the unconditional CI gate
 
-- [ ] [T-008-A] Add the following section to `CONTRIBUTING.md` between the "Code Style" section and the "License" section. The insertion old_string is:
+- [ ] [T-008-A] Open `CONTRIBUTING.md`. The file has four sections: Reporting Issues, Submitting a Pull Request, Code Style, License. Insert the new section between Code Style and License.
 
-```markdown
+Use the following as the **exact old_string** for the Edit tool (includes the last Code Style bullet and the full License section to guarantee a unique match):
+
+```
+- Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `chore:`.
+
 ---
 
 ## License
+
+By contributing, you agree that your contributions will be licensed under the [Apache 2.0 License](LICENSE).
 ```
 
-Replace with:
+Use the following as the **exact new_string** (new section inserted before the unchanged License section):
 
-```markdown
+```
+- Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `chore:`.
+
 ---
 
 ## Bypassing the Pre-Commit Hook
@@ -947,6 +986,8 @@ This is a permitted operator override for WIP commits, broken test environments,
 ---
 
 ## License
+
+By contributing, you agree that your contributions will be licensed under the [Apache 2.0 License](LICENSE).
 ```
 
 - [ ] [T-008-B] Run the final `npm test` to confirm all tests still pass after all changes:
@@ -1036,7 +1077,7 @@ git commit -m "chore(FEAT-024): save implementation plan and mark in-progress"
 
 2. **guard3 `runAllowlisted` hook modification**: the function reads and modifies `.claude/hooks/pre-tool-use.sh` at test time. If the hook file is not found, the test will throw `ENOENT`. Run `ls .claude/hooks/pre-tool-use.sh` before T-003 to confirm.
 
-3. **Deep path on Windows (T-14 test)**: creating 45 nested directories may hit Windows `MAX_PATH` (260 chars). If `fs.mkdirSync` fails, the test will throw. The test is included without a `skipIf` because Node.js with `recursive: true` handles long paths via UNC `\\?\` prefix when the long-path registry key is set. If path creation fails on CI, add `.skipIf(process.platform === 'win32')`.
+3. **Deep path on local Windows dev machines (T-14 test)**: creating 45 nested directories inside `os.tmpdir()` may hit the Windows `MAX_PATH` limit (260 chars) on developer machines where long-path support is disabled. This is **not a CI concern** — the workflow runs on `ubuntu-latest` where the limit does not apply. Locally, enable long paths via `reg add HKLM\SYSTEM\CurrentControlSet\Control\FileSystem /v LongPathsEnabled /t REG_DWORD /d 1` or add `.skipIf(process.platform === 'win32')` to the T-14 test.
 
 4. **install.sh heredoc in plan**: the HOOK_BLOCK heredoc closing marker must appear at column 0 in the actual file. The `Edit` tool preserves indentation — verify the resulting file with `bash -n install.sh` (T-006-C).
 
