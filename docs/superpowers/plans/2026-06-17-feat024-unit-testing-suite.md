@@ -1,0 +1,1026 @@
+# FEAT-024 Automated Unit Testing Suite — Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Add a Vitest-based test suite that ports existing bash harnesses to JS, gates commits via a pre-commit hook, and blocks PRs via GitHub Actions CI.
+
+**Architecture:** Layer 1 tests (`tests/hooks/`) spawn bash scripts via Node's `spawnSync` with isolated temp dirs and assert exit codes and stderr. Layer 2 (`tests/unit/`) holds a scaffold stub for future JS modules. Both CI and local pre-commit hooks run `npm test`.
+
+**Tech Stack:** Node.js 20, Vitest ^3.0.0, `child_process.spawnSync`, `fs.mkdtempSync`, GitHub Actions `ubuntu-latest`
+
+## Global Constraints
+
+- `package.json` at repo root: `"private": true`, `"type": "module"`, `"engines": {"node": ">=20"}`, `"scripts": {"test": "vitest run"}`, `"devDependencies": {"vitest": "^3.0.0"}` — `memfs` must NOT appear
+- `package-lock.json` must be committed and not gitignored
+- All `spawnSync` calls: `spawnSync('bash', [absPath], opts)` — never direct `.sh` invocation
+- All `spawnSync` calls: `stdio: 'pipe'`; env overrides via `{ ...process.env, KEY: val }` only — never mutate `process.env`
+- stdout/stderr: normalize `\r\n → \n` before all string assertions
+- Exit code assertions: exact integers — `expect(result.status).toBe(0)` / `.not.toBe(0)` — never truthy checks
+- Each test creates its own temp dir; `afterEach` calls `fs.rmSync(dir, { recursive: true, force: true })`
+- Pre-commit guard block idempotency: literal string match on `# code-conductor:test-gate`
+- `install.ps1` writes hook file via `[System.IO.File]::WriteAllText(path, content, [System.Text.UTF8Encoding]::new($false))` (UTF-8 without BOM)
+- Vitest 3 note: `threads: false` was removed in Vitest v2; use `pool: 'forks'` + `poolOptions.forks.singleFork: true` for sequential execution
+
+---
+
+### Task T-001: Root manifest, Vitest config, gitignore update
+
+**Files:**
+- Create: `package.json`
+- Create: `vitest.config.js`
+- Modify: `.gitignore`
+
+**Interfaces:**
+- Produces: `npm test` command that discovers `tests/**/*.test.js`
+
+- [ ] [T-001-A] Create `package.json` at repo root with this exact content:
+
+```json
+{
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0"
+  }
+}
+```
+
+- [ ] [T-001-B] Create `vitest.config.js` at repo root:
+
+```js
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        singleFork: true,
+      },
+    },
+    include: ['tests/**/*.test.js'],
+    testTimeout: 30000,
+  },
+})
+```
+
+- [ ] [T-001-C] Add two entries to `.gitignore` (append after existing content):
+
+```
+node_modules/
+.vitest-cache/
+```
+
+Run: open `.gitignore` and append the two lines above. The file currently ends with `.claude/memory/session-snapshot.md`.
+
+- [ ] [T-001-D] Run `npm install` from repo root to generate `package-lock.json`:
+
+```
+npm install
+```
+
+Expected: creates `node_modules/` and `package-lock.json`. No errors.
+
+- [ ] [T-001-E] Verify `npm test` is recognized (no test files yet, Vitest will exit 0 or warn):
+
+```
+npm test
+```
+
+Expected: Vitest runs and exits 0 (no test files found is acceptable at this stage).
+
+- [ ] [T-001-F] Commit:
+
+```
+git add package.json vitest.config.js package-lock.json .gitignore
+git commit -m "feat(FEAT-024): add package.json, vitest config, and update gitignore"
+```
+
+---
+
+### Task T-002: Layer 2 placeholder test
+
+**Files:**
+- Create: `tests/unit/placeholder.test.js`
+
+**Interfaces:**
+- Consumes: nothing
+- Produces: a passing test that scaffolds the Layer 2 directory
+
+- [ ] [T-002-A] Create `tests/unit/placeholder.test.js`:
+
+```js
+import { describe, it, expect } from 'vitest'
+
+describe('placeholder (Layer 2 — FEAT-023 stub)', () => {
+  it('passes trivially', () => {
+    expect(true).toBe(true)
+  })
+})
+```
+
+- [ ] [T-002-B] Run tests to verify the placeholder passes:
+
+```
+npm test
+```
+
+Expected output: `1 passed` (or `Tests 1 passed`). No failures.
+
+- [ ] [T-002-C] Commit:
+
+```
+git add tests/unit/placeholder.test.js
+git commit -m "feat(FEAT-024): add Layer 2 placeholder test stub"
+```
+
+---
+
+### Task T-003: Layer 1 guard3 test
+
+**Files:**
+- Create: `tests/hooks/guard3.test.js`
+
+**Interfaces:**
+- Consumes: `.claude/hooks/pre-tool-use.sh` (existing, not modified)
+- Produces: JS port of all 107 pass/block cases from `tests/guard3-test.sh`
+
+- [ ] [T-003-A] Verify the hook file exists before creating the test:
+
+```
+ls .claude/hooks/pre-tool-use.sh
+```
+
+Expected: file found.
+
+- [ ] [T-003-B] Create `tests/hooks/guard3.test.js` with this full content:
+
+```js
+import { describe, it, expect } from 'vitest'
+import { spawnSync } from 'child_process'
+import { fileURLToPath } from 'url'
+import { dirname, join } from 'path'
+import fs from 'fs'
+import os from 'os'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+const REPO_ROOT = join(__dirname, '../..')
+const HOOK = join(REPO_ROOT, '.claude/hooks/pre-tool-use.sh')
+
+function jsonCmd(cmd) {
+  const s = cmd
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\t/g, '\\t')
+    .replace(/\r/g, '\\r')
+  return `{"command":"${s}"}`
+}
+
+function run(cmd) {
+  const result = spawnSync('bash', [HOOK], {
+    stdio: 'pipe',
+    env: { ...process.env, CLAUDE_TOOL_NAME: 'Bash', CLAUDE_TOOL_INPUT: jsonCmd(cmd) },
+  })
+  return {
+    status: result.status ?? -1,
+    stdout: (result.stdout ?? Buffer.alloc(0)).toString().replace(/\r\n/g, '\n'),
+    stderr: (result.stderr ?? Buffer.alloc(0)).toString().replace(/\r\n/g, '\n'),
+  }
+}
+
+function runRead() {
+  const result = spawnSync('bash', [HOOK], {
+    stdio: 'pipe',
+    env: {
+      ...process.env,
+      CLAUDE_TOOL_NAME: 'Read',
+      CLAUDE_TOOL_INPUT: '{"file_path":"/tmp/x"}',
+    },
+  })
+  return result.status ?? -1
+}
+
+function runAllowlisted(cmd, entries) {
+  const lines = fs.readFileSync(HOOK, 'utf8').split('\n')
+  const body = lines.slice(1).filter(l => !l.startsWith('BASH_SCAN_ALLOWLIST=')).join('\n')
+  const modified = `#!/usr/bin/env bash\nset -euo pipefail\nBASH_SCAN_ALLOWLIST=(${entries})\n${body}`
+  const tmpDir = fs.mkdtempSync(join(os.tmpdir(), 'g3allow-'))
+  const tmpHook = join(tmpDir, 'hook.sh')
+  try {
+    fs.writeFileSync(tmpHook, modified, 'utf8')
+    const result = spawnSync('bash', [tmpHook], {
+      stdio: 'pipe',
+      env: { ...process.env, CLAUDE_TOOL_NAME: 'Bash', CLAUDE_TOOL_INPUT: jsonCmd(cmd) },
+    })
+    return result.status ?? -1
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  }
+}
+
+describe('guard3 — pre-tool-use.sh', () => {
+
+  describe('sanity', () => {
+    it('empty command passes', () => expect(run('').status).toBe(0))
+    it('Read tool bypasses Guard 3', () => expect(runRead()).toBe(0))
+  })
+
+  describe('preprocessing: line continuation', () => {
+    it('continuation joined: cat over two lines', () => expect(run('cat \\\n*.ts').status).not.toBe(0))
+    it('even backslashes: not joined', () => expect(run('ls\\\\\ncat *.ts').status).not.toBe(0))
+    it('CRLF continuation normalised', () => expect(run('cat \\\r\n*.ts').status).not.toBe(0))
+  })
+
+  describe('preprocessing: comment stripping', () => {
+    it('unquoted hash stripped; cat *.ts blocked', () => expect(run('cat *.ts # safe comment').status).not.toBe(0))
+    it('hash in double quotes is literal', () => expect(run('grep "#pat" file.txt').status).toBe(0))
+    it('hash in single quotes is literal', () => expect(run("grep '#pat' file.txt").status).toBe(0))
+    it('backslash-hash in UNQUOTED is literal', () => expect(run('grep \\#pat file.txt').status).toBe(0))
+  })
+
+  describe('P1: find without/wrong depth', () => {
+    it('find . (no depth)', () => expect(run('find .').status).not.toBe(0))
+    it('find -maxdepth 2', () => expect(run('find src/ -maxdepth 2').status).not.toBe(0))
+    it('find --maxdepth=5', () => expect(run('find / --maxdepth=5').status).not.toBe(0))
+    it('find -maxdepth 1 passes', () => expect(run('find . -maxdepth 1').status).toBe(0))
+    it('find --maxdepth=1 passes', () => expect(run('find . --maxdepth=1').status).toBe(0))
+    it('find -maxdepth +1 (+ stripped)', () => expect(run('find . -maxdepth +1').status).toBe(0))
+    it('find -maxdepth +2 blocked', () => expect(run('find . -maxdepth +2').status).not.toBe(0))
+    it('findall not triggered (word-boundary)', () => expect(run('findall . -maxdepth 5').status).toBe(0))
+  })
+
+  describe('P2: find -exec content dump', () => {
+    it('find -exec cat', () => expect(run('find . -exec cat {} \\;').status).not.toBe(0))
+    it('find -execdir grep', () => expect(run('find . -maxdepth 1 -execdir grep -r . {} \\;').status).not.toBe(0))
+    it('find -ok sh -c', () => expect(run("find . -ok sh -c 'cat {}' \\;").status).not.toBe(0))
+    it('find -exec echo (not a reader)', () => expect(run('find . -maxdepth 1 -exec echo {} \\;').status).toBe(0))
+  })
+
+  describe('P3: xargs + viewer', () => {
+    it('xargs cat', () => expect(run('ls | xargs cat').status).not.toBe(0))
+    it('xargs -0 less', () => expect(run('find . | xargs -0 less').status).not.toBe(0))
+    it('xargs -I {} cat {}', () => expect(run('xargs -I {} cat {}').status).not.toBe(0))
+    it('xargs -d - cat (bare - consumed)', () => expect(run('xargs -d - cat').status).not.toBe(0))
+    it('xargs -d -- cat (-- consumed)', () => expect(run('xargs -d -- cat').status).not.toBe(0))
+    it('xargs -d -x cat (-x not consumed)', () => expect(run('xargs -d -x cat').status).not.toBe(0))
+    it('xargs -i boolean (no extra token)', () => expect(run('xargs -i cat').status).not.toBe(0))
+    it('xargs sh (shell interpreter)', () => expect(run('find . | xargs sh -c cat').status).not.toBe(0))
+    it('xargs echo (not a reader)', () => expect(run('ls | xargs echo').status).toBe(0))
+  })
+
+  describe('P4: cat + glob', () => {
+    it('cat *.md', () => expect(run('cat *.md').status).not.toBe(0))
+    it('cat src/**/*.ts', () => expect(run('cat src/**/*.ts').status).not.toBe(0))
+    it('cat dir/??.sh', () => expect(run('cat dir/??.sh').status).not.toBe(0))
+    it('cat {a,b}.ts', () => expect(run('cat {a,b}.ts').status).not.toBe(0))
+    it('cat [abc].md', () => expect(run('cat [abc].md').status).not.toBe(0))
+    it("cat '*.md' (quoted passes)", () => expect(run("cat '*.md'").status).toBe(0))
+    it('cat "*.ts" (quoted passes)', () => expect(run('cat "*.ts"').status).toBe(0))
+    it('cat \\*.ts (escaped passes)', () => expect(run('cat \\*.ts').status).toBe(0))
+    it('cat \\\\*.ts (double-bs blocks)', () => expect(run('cat \\\\*.ts').status).not.toBe(0))
+    it('/bin/cat *.md (path-invoked)', () => expect(run('/bin/cat *.md').status).not.toBe(0))
+    it('concatenate *.md (word boundary)', () => expect(run('concatenate *.md').status).toBe(0))
+  })
+
+  describe('P5: cmd-subst + reading', () => {
+    it('cat $(ls)', () => expect(run('cat $(ls)').status).not.toBe(0))
+    it('cat with backtick', () => expect(run('cat `ls`').status).not.toBe(0))
+    it('cat src/$(dir)/main.ts (prefix)', () => expect(run('cat src/$(dir)/main.ts').status).not.toBe(0))
+    it('cat $(root)/pkg.json (exempt)', () => expect(run('cat "$(git rev-parse --show-toplevel)"/package.json').status).toBe(0))
+  })
+
+  describe('P6: grep match-all', () => {
+    it("grep -r '.*' .", () => expect(run("grep -r '.*' .").status).not.toBe(0))
+    it("egrep -R '' .", () => expect(run("egrep -R '' .").status).not.toBe(0))
+    it("git grep '.*'", () => expect(run("git grep '.*'").status).not.toBe(0))
+    it("git grep '' (empty)", () => expect(run("git grep ''").status).not.toBe(0))
+    it("grep -r -F '.*' (fixed-strings)", () => expect(run("grep -r -F '.*' .").status).toBe(0))
+    it("grep -r -e foo -e '.*' .", () => expect(run("grep -r -e foo -e '.*' .").status).not.toBe(0))
+    it("grep -r --regexp='.*' .", () => expect(run("grep -r --regexp='.*' .").status).not.toBe(0))
+    it('grep -r pattern src/ (targeted)', () => expect(run('grep -r pattern src/').status).toBe(0))
+  })
+
+  describe('P7: pager + glob', () => {
+    it('less *.ts', () => expect(run('less *.ts').status).not.toBe(0))
+    it('head *.log', () => expect(run('head *.log').status).not.toBe(0))
+    it("awk '{p}' *.ts", () => expect(run("awk '{p}' *.ts").status).not.toBe(0))
+    it('sed -n p *.md', () => expect(run('sed -n p *.md').status).not.toBe(0))
+    it("less 'file.ts' (quoted passes)", () => expect(run("less 'file.ts'").status).toBe(0))
+  })
+
+  describe('P8: ls -R', () => {
+    it('ls -R .', () => expect(run('ls -R .').status).not.toBe(0))
+    it('ls -laR', () => expect(run('ls -laR').status).not.toBe(0))
+    it('ls --recursive src/', () => expect(run('ls --recursive src/').status).not.toBe(0))
+    it('ls -l (no R)', () => expect(run('ls -l .').status).toBe(0))
+    it('rsync -R (not ls)', () => expect(run('rsync -R src/ dest/').status).toBe(0))
+  })
+
+  describe('P9: shell loop', () => {
+    it('for f in *.ts', () => expect(run('for f in *.ts; do cat $f; done').status).not.toBe(0))
+    it('while true', () => expect(run('while true; do less $f; done').status).not.toBe(0))
+    it('until false', () => expect(run('until false; do grep -r . ; done').status).not.toBe(0))
+    it('for loop non-reader body blocked', () => expect(run('for f in *.ts; do wc -l $f; done').status).not.toBe(0))
+    it('grep ... while_loop.ts (arg)', () => expect(run('grep -r pat while_loop.ts').status).toBe(0))
+    it('cat for (literal filename passes)', () => expect(run('cat for').status).toBe(0))
+  })
+
+  describe('P10: mapfile / readarray', () => {
+    it('mapfile -t arr', () => expect(run('mapfile -t arr < src/main.ts').status).not.toBe(0))
+    it('readarray lines', () => expect(run('readarray lines < *.log').status).not.toBe(0))
+  })
+
+  describe('P11: eval / source / dot', () => {
+    it('eval cat', () => expect(run('eval "cat *.ts"').status).not.toBe(0))
+    it('source dump.sh', () => expect(run('source dump.sh').status).not.toBe(0))
+    it('. dump.sh (dot operator)', () => expect(run('. dump.sh').status).not.toBe(0))
+    it('./script.sh (path, not dot op)', () => expect(run('./script.sh').status).toBe(0))
+  })
+
+  describe('P12: alias remapping', () => {
+    it("alias c=cat", () => expect(run("alias c='cat'").status).not.toBe(0))
+    it("alias g=grep", () => expect(run("alias g='grep -r'").status).not.toBe(0))
+    it("alias e=echo (not a reader)", () => expect(run("alias e='echo'").status).toBe(0))
+  })
+
+  describe('obfuscation detection', () => {
+    it('$"cat" prefix blocked', () => expect(run('$"cat" *.ts').status).not.toBe(0))
+    it("c'a't (internal quote)", () => expect(run("c'a't *.ts").status).not.toBe(0))
+  })
+
+  describe('multi-line scripts', () => {
+    it('cat glob on line 2', () => expect(run('echo start\ncat *.ts').status).not.toBe(0))
+    it('all safe', () => expect(run('ls -l .\necho done').status).toBe(0))
+    it('for loop on line 2', () => expect(run('echo prep\nfor f in *.ts; do echo $f; done').status).not.toBe(0))
+    it('continuation joins cat', () => expect(run('cat \\\n*.ts').status).not.toBe(0))
+    it('find continuation valid', () => expect(run('find . \\\n-maxdepth 1').status).toBe(0))
+  })
+
+  describe('nested subshells and process substitution', () => {
+    it('echo $(cat *.ts)', () => expect(run('echo $(cat *.ts)').status).not.toBe(0))
+    it('echo $(git log)', () => expect(run('echo $(git log --oneline)').status).toBe(0))
+    it('sort < <(cat *.ts)', () => expect(run('sort < <(cat *.ts)').status).not.toBe(0))
+    it('x=$((1+2)) safe', () => expect(run('x=$((1+2)); echo $x').status).toBe(0))
+    it("wc -l $(grep -r '.*' .)", () => expect(run("wc -l $(grep -r '.*' .)").status).not.toBe(0))
+  })
+
+  describe('edge cases: quote/escape combinations', () => {
+    it('double-backslash-star glob', () => expect(run('cat \\\\*.ts').status).not.toBe(0))
+    it('single-backslash-star safe', () => expect(run('cat \\*.ts').status).toBe(0))
+    it("ansi-c: $'cat' arg is fine", () => expect(run("echo $'cat'").status).toBe(0))
+    it("single-quote: backslash then quote", () => expect(run("grep 'can'\\''t' file").status).toBe(0))
+    it("nested-quote: outer-dq inner-sq", () => expect(run("grep \"it'\\''s fine\" file").status).toBe(0))
+    it('json escape: embedded quote', () => expect(run('echo "hello \\"world\\""').status).toBe(0))
+    it('regex: grep -r specific-re', () => expect(run('grep -r "fo[o]" src/').status).toBe(0))
+    it('path-looking: dot in path is allowed', () => expect(run('grep -r pattern src/main.ts').status).toBe(0))
+    it('length: 8192-char command passes', () => expect(run('#'.repeat(8192)).status).toBe(0))
+    it('length: 8193-char command blocked', () => expect(run('#'.repeat(8193)).status).not.toBe(0))
+    it('malformed: unclosed single quote', () => expect(run("cat '*.ts").status).not.toBe(0))
+    it('malformed: unclosed double quote', () => expect(run('grep -r "pat .').status).not.toBe(0))
+  })
+
+  describe('allowlist', () => {
+    it('docs/ permits glob in docs/', () => expect(runAllowlisted('cat docs/*.md', '"docs/"')).toBe(0))
+    it('does NOT permit unrelated path', () => expect(runAllowlisted('cat src/*.ts', '"docs/"')).not.toBe(0))
+    it('trailing-comment bypass blocked', () => expect(runAllowlisted('cat *.ts # docs/', '"docs/"')).not.toBe(0))
+    it('path-traversal rejected', () => expect(runAllowlisted('cat docs/../../etc/*.conf', '"docs/"')).not.toBe(0))
+    it('exact match (no trailing slash)', () => expect(runAllowlisted('cat file.ts', '"file.ts"')).toBe(0))
+    it('substring not matched (docs vs doc_files)', () => expect(runAllowlisted('cat doc_files/*.ts', '"docs/"')).not.toBe(0))
+  })
+
+})
+```
+
+- [ ] [T-003-C] Run tests to verify all guard3 cases pass:
+
+```
+npm test
+```
+
+Expected: all guard3 tests pass (plus the placeholder). No failures. If any test fails, the hook behavior diverged from the bash harness — investigate `pre-tool-use.sh` directly.
+
+- [ ] [T-003-D] Commit:
+
+```
+git add tests/hooks/guard3.test.js
+git commit -m "feat(FEAT-024): add Layer 1 guard3 test suite (port of guard3-test.sh)"
+```
+
+---
+
+### Task T-004: Layer 1 verbosity-remind test
+
+**Files:**
+- Create: `tests/hooks/verbosity-remind.test.js`
+
+**Interfaces:**
+- Consumes: `global/hooks/verbosity-remind.sh`, `project-template/.claude/hooks/verbosity-remind.sh` (both existing, not modified)
+- Produces: JS port of all hook behavior cases from `tests/verbosity-hook-test.sh`
+
+- [ ] [T-004-A] Verify both hook files exist before creating the test:
+
+```
+ls global/hooks/verbosity-remind.sh
+ls project-template/.claude/hooks/verbosity-remind.sh
+```
+
+Expected: both found.
+
+- [ ] [T-004-B] Create `tests/hooks/verbosity-remind.test.js` with this full content:
+
+```js
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { spawnSync } from 'child_process'
+import { fileURLToPath } from 'url'
+import { dirname, join } from 'path'
+import fs from 'fs'
+import os from 'os'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+const REPO_ROOT = join(__dirname, '../..')
+const GLOBAL_HOOK = join(REPO_ROOT, 'global/hooks/verbosity-remind.sh')
+const PROJECT_HOOK = join(REPO_ROOT, 'project-template/.claude/hooks/verbosity-remind.sh')
+
+let tmpDir
+
+beforeEach(() => {
+  tmpDir = fs.mkdtempSync(join(os.tmpdir(), 'vb-test-'))
+})
+
+afterEach(() => {
+  fs.rmSync(tmpDir, { recursive: true, force: true })
+})
+
+function runGlobal(home, cwd, skip = '0') {
+  const result = spawnSync('bash', [GLOBAL_HOOK], {
+    stdio: 'pipe',
+    cwd,
+    env: { ...process.env, HOME: home, CC_VERBOSITY_SKIP: skip },
+  })
+  return (result.stdout ?? Buffer.alloc(0)).toString().replace(/\r\n/g, '\n')
+}
+
+function runProject(home, cwd, skip = '0') {
+  const result = spawnSync('bash', [PROJECT_HOOK], {
+    stdio: 'pipe',
+    cwd,
+    env: { ...process.env, HOME: home, CC_VERBOSITY_SKIP: skip },
+  })
+  return (result.stdout ?? Buffer.alloc(0)).toString().replace(/\r\n/g, '\n')
+}
+
+describe('verbosity-remind hooks', () => {
+
+  it('row1: global hook emits MIN', { timeout: 5000 }, () => {
+    const home = join(tmpDir, 'h1')
+    fs.mkdirSync(join(home, '.claude/memory'), { recursive: true })
+    fs.writeFileSync(join(home, '.claude/memory/verbosity.md'), 'VERBOSITY: MIN\n')
+    expect(runGlobal(home, home)).toContain('VERBOSITY:MIN')
+  })
+
+  it('row2: global defers (no output) when project hook exists', { timeout: 5000 }, () => {
+    const home = join(tmpDir, 'h2')
+    const proj = join(home, 'proj')
+    fs.mkdirSync(join(home, '.claude/memory'), { recursive: true })
+    fs.mkdirSync(join(proj, '.claude/hooks'), { recursive: true })
+    fs.writeFileSync(join(home, '.claude/memory/verbosity.md'), 'VERBOSITY: MIN\n')
+    fs.copyFileSync(PROJECT_HOOK, join(proj, '.claude/hooks/verbosity-remind.sh'))
+    expect(runGlobal(home, proj).trim()).toBe('')
+  })
+
+  it('row3: global defers from subdir via traversal', { timeout: 5000 }, () => {
+    const home = join(tmpDir, 'h3')
+    const proj = join(home, 'proj')
+    const sub = join(proj, 'src/lib')
+    fs.mkdirSync(join(home, '.claude/memory'), { recursive: true })
+    fs.mkdirSync(join(proj, '.claude/hooks'), { recursive: true })
+    fs.mkdirSync(sub, { recursive: true })
+    fs.writeFileSync(join(home, '.claude/memory/verbosity.md'), 'VERBOSITY: MIN\n')
+    fs.copyFileSync(PROJECT_HOOK, join(proj, '.claude/hooks/verbosity-remind.sh'))
+    expect(runGlobal(home, sub).trim()).toBe('')
+  })
+
+  it('row4: project-local verbosity.md overrides global', { timeout: 5000 }, () => {
+    const home = join(tmpDir, 'h4')
+    const proj = join(home, 'proj')
+    fs.mkdirSync(join(home, '.claude/memory'), { recursive: true })
+    fs.mkdirSync(join(proj, '.claude/memory'), { recursive: true })
+    fs.writeFileSync(join(home, '.claude/memory/verbosity.md'), 'VERBOSITY: MIN\n')
+    fs.writeFileSync(join(proj, '.claude/memory/verbosity.md'), 'VERBOSITY: INFO\n')
+    expect(runProject(home, proj)).toContain('VERBOSITY:INFO')
+  })
+
+  it('row5: lowercase verbose normalized to VERBOSE', { timeout: 5000 }, () => {
+    const home = join(tmpDir, 'h5')
+    const proj = join(home, 'proj')
+    fs.mkdirSync(join(home, '.claude/memory'), { recursive: true })
+    fs.mkdirSync(join(proj, '.claude/memory'), { recursive: true })
+    fs.writeFileSync(join(home, '.claude/memory/verbosity.md'), 'VERBOSITY: MIN\n')
+    fs.writeFileSync(join(proj, '.claude/memory/verbosity.md'), 'VERBOSITY: verbose\n')
+    expect(runProject(home, proj)).toContain('VERBOSITY:VERBOSE')
+  })
+
+  it('row6: sanity guard MIN when no verbosity.md at any level', { timeout: 5000 }, () => {
+    const home = join(tmpDir, 'h6')
+    fs.mkdirSync(home, { recursive: true })
+    expect(runGlobal(home, home)).toContain('VERBOSITY:MIN')
+  })
+
+  it('row7: unrecognized level falls back to MIN', { timeout: 5000 }, () => {
+    const home = join(tmpDir, 'h7')
+    fs.mkdirSync(join(home, '.claude/memory'), { recursive: true })
+    fs.writeFileSync(join(home, '.claude/memory/verbosity.md'), 'VERBOSITY: LOUD\n')
+    expect(runGlobal(home, home)).toContain('VERBOSITY:MIN')
+  })
+
+  it('row8: HOME-level verbosity.md used when no project override', { timeout: 5000 }, () => {
+    const home = join(tmpDir, 'h8')
+    fs.mkdirSync(join(home, '.claude/memory'), { recursive: true })
+    fs.writeFileSync(join(home, '.claude/memory/verbosity.md'), 'VERBOSITY: INFO\n')
+    expect(runGlobal(home, home)).toContain('VERBOSITY:INFO')
+  })
+
+  it('row10: fenced VERBOSITY not matched; body VERBOSITY:MIN used', { timeout: 5000 }, () => {
+    const home = join(tmpDir, 'h10')
+    fs.mkdirSync(join(home, '.claude/memory'), { recursive: true })
+    fs.writeFileSync(
+      join(home, '.claude/memory/verbosity.md'),
+      'Some doc\n\n```\nVERBOSITY: VERBOSE\n```\n\nVERBOSITY: MIN\n',
+    )
+    expect(runGlobal(home, home)).toContain('VERBOSITY:MIN')
+  })
+
+  it('row11: CC_VERBOSITY_SKIP=1 produces no output', { timeout: 5000 }, () => {
+    const home = join(tmpDir, 'h11')
+    fs.mkdirSync(join(home, '.claude/memory'), { recursive: true })
+    fs.writeFileSync(join(home, '.claude/memory/verbosity.md'), 'VERBOSITY: VERBOSE\n')
+    expect(runGlobal(home, home, '1').trim()).toBe('')
+  })
+
+  it('row12: path with spaces handled correctly', { timeout: 5000 }, () => {
+    const home = join(tmpDir, 'h12 with spaces')
+    fs.mkdirSync(join(home, '.claude/memory'), { recursive: true })
+    fs.writeFileSync(join(home, '.claude/memory/verbosity.md'), 'VERBOSITY: MIN\n')
+    expect(runGlobal(home, home)).toContain('VERBOSITY:MIN')
+  })
+
+  it.skipIf(process.platform === 'win32')(
+    'row13: unreadable project hook -> global retains authority',
+    { timeout: 5000 },
+    () => {
+      const home = join(tmpDir, 'h13')
+      const proj = join(home, 'proj')
+      fs.mkdirSync(join(home, '.claude/memory'), { recursive: true })
+      fs.mkdirSync(join(proj, '.claude/hooks'), { recursive: true })
+      fs.writeFileSync(join(home, '.claude/memory/verbosity.md'), 'VERBOSITY: MIN\n')
+      const hookCopy = join(proj, '.claude/hooks/verbosity-remind.sh')
+      fs.copyFileSync(PROJECT_HOOK, hookCopy)
+      fs.chmodSync(hookCopy, 0o000)
+      try {
+        expect(runGlobal(home, proj)).toContain('VERBOSITY:MIN')
+      } finally {
+        fs.chmodSync(hookCopy, 0o644)
+      }
+    },
+  )
+
+  it('CRLF line endings normalized correctly', { timeout: 5000 }, () => {
+    const home = join(tmpDir, 'hcr')
+    fs.mkdirSync(join(home, '.claude/memory'), { recursive: true })
+    fs.writeFileSync(join(home, '.claude/memory/verbosity.md'), 'VERBOSITY: VERBOSE\r\n')
+    expect(runGlobal(home, home)).toContain('VERBOSITY:VERBOSE')
+  })
+
+  it('frontmatter VERBOSITY not matched; body VERBOSITY:INFO used', { timeout: 5000 }, () => {
+    const home = join(tmpDir, 'hfm')
+    fs.mkdirSync(join(home, '.claude/memory'), { recursive: true })
+    fs.writeFileSync(
+      join(home, '.claude/memory/verbosity.md'),
+      '---\nVERBOSITY: VERBOSE\n---\n\nVERBOSITY: INFO\n',
+    )
+    expect(runGlobal(home, home)).toContain('VERBOSITY:INFO')
+  })
+
+  it('UTF-8 BOM stripped; VERBOSITY:INFO matched on line 1', { timeout: 5000 }, () => {
+    const home = join(tmpDir, 'hbom')
+    fs.mkdirSync(join(home, '.claude/memory'), { recursive: true })
+    const bom = Buffer.from([0xef, 0xbb, 0xbf])
+    const content = Buffer.from('VERBOSITY: INFO\n')
+    fs.writeFileSync(join(home, '.claude/memory/verbosity.md'), Buffer.concat([bom, content]))
+    expect(runGlobal(home, home)).toContain('VERBOSITY:INFO')
+  })
+
+  it('inline comment (space+hash) stripped; MIN extracted', { timeout: 5000 }, () => {
+    const home = join(tmpDir, 'hic')
+    fs.mkdirSync(join(home, '.claude/memory'), { recursive: true })
+    fs.writeFileSync(join(home, '.claude/memory/verbosity.md'), 'VERBOSITY: MIN # keep it short\n')
+    expect(runGlobal(home, home)).toContain('VERBOSITY:MIN')
+  })
+
+  it('bare-hash value fails normalization; sanity guard sets MIN', { timeout: 5000 }, () => {
+    const home = join(tmpDir, 'hbh')
+    fs.mkdirSync(join(home, '.claude/memory'), { recursive: true })
+    fs.writeFileSync(join(home, '.claude/memory/verbosity.md'), 'VERBOSITY: MIN#tag\n')
+    expect(runGlobal(home, home)).toContain('VERBOSITY:MIN')
+  })
+
+  it('hook exits 0 with empty HOME', { timeout: 5000 }, () => {
+    const result = spawnSync('bash', [GLOBAL_HOOK], {
+      stdio: 'pipe',
+      env: { ...process.env, HOME: '', PWD: '', CC_VERBOSITY_SKIP: '0' },
+    })
+    expect(result.status).toBe(0)
+  })
+
+  it('T-14: traversal cap=40 blocks verbosity.md 45 levels above; HOME fallback emits MIN', { timeout: 15000 }, () => {
+    const deepBase = join(tmpDir, 'deep-path-test')
+    let deepPath = deepBase
+    for (let i = 1; i <= 45; i++) deepPath = join(deepPath, `d${i}`)
+    fs.mkdirSync(deepPath, { recursive: true })
+    fs.mkdirSync(join(deepBase, '.claude/memory'), { recursive: true })
+    fs.writeFileSync(join(deepBase, '.claude/memory/verbosity.md'), 'VERBOSITY: VERBOSE\n')
+    const deepHome = join(tmpDir, 'deep-home')
+    fs.mkdirSync(join(deepHome, '.claude/memory'), { recursive: true })
+    fs.writeFileSync(join(deepHome, '.claude/memory/verbosity.md'), 'VERBOSITY: MIN\n')
+    const out = runGlobal(deepHome, deepPath)
+    expect(out).not.toContain('VERBOSITY:VERBOSE')
+    // Either MIN from HOME fallback, or empty string (MIN default when HOME verbosity.md absent)
+    expect(out.includes('VERBOSITY:MIN') || out.trim() === '').toBe(true)
+  })
+
+})
+```
+
+- [ ] [T-004-C] Run the full test suite:
+
+```
+npm test
+```
+
+Expected: all tests pass (placeholder + guard3 + verbosity). No failures. Row 13 is automatically skipped on Windows (prints `[skipped]`).
+
+- [ ] [T-004-D] Commit:
+
+```
+git add tests/hooks/verbosity-remind.test.js
+git commit -m "feat(FEAT-024): add Layer 1 verbosity-remind test suite (port of verbosity-hook-test.sh)"
+```
+
+---
+
+### Task T-005: CI workflow
+
+**Files:**
+- Create: `.github/workflows/test.yml`
+
+**Interfaces:**
+- Consumes: `package.json` `npm test` script from T-001
+- Produces: GitHub Actions workflow that gates every push and PR to `main`
+
+- [ ] [T-005-A] Create `.github/workflows/` directory:
+
+```
+mkdir -p .github/workflows
+```
+
+- [ ] [T-005-B] Create `.github/workflows/test.yml`:
+
+```yaml
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+```
+
+- [ ] [T-005-C] Commit:
+
+```
+git add .github/workflows/test.yml
+git commit -m "feat(FEAT-024): add GitHub Actions CI workflow for npm test"
+```
+
+---
+
+### Task T-006: install.sh pre-commit hook wiring
+
+**Files:**
+- Modify: `install.sh` (lines 1122–1126, inside the `if [ "$INSTALL_PROJECT" = true ]` block)
+
+**Interfaces:**
+- Consumes: git hooks directory via `git rev-parse --git-path hooks`
+- Produces: idempotent pre-commit hook that runs `npm test`; only wired when `--project` flag is passed
+
+- [ ] [T-006-A] Locate the insertion point — it is the gitignore block near the end of the `$INSTALL_PROJECT` section. The target old_string is:
+
+```bash
+  if [ ! -f "$GITIGNORE" ] || ! grep -qF "$ENTRY" "$GITIGNORE"; then
+    echo "$ENTRY" >> "$GITIGNORE"
+    ok "Added $ENTRY to .gitignore"
+  fi
+fi
+```
+
+Replace it with the same block followed by the pre-commit wiring (before the closing `fi`):
+
+```bash
+  if [ ! -f "$GITIGNORE" ] || ! grep -qF "$ENTRY" "$GITIGNORE"; then
+    echo "$ENTRY" >> "$GITIGNORE"
+    ok "Added $ENTRY to .gitignore"
+  fi
+
+  # ── Pre-commit test gate (FEAT-024) ───────────────────────────────────────
+  if git rev-parse --git-dir >/dev/null 2>&1; then
+    _hooks_dir=$(git rev-parse --git-path hooks 2>/dev/null)
+    _precommit="${_hooks_dir}/pre-commit"
+    _sentinel="# code-conductor:test-gate"
+    if [ -n "$_hooks_dir" ]; then
+      if grep -qF "$_sentinel" "$_precommit" 2>/dev/null; then
+        ok "Pre-commit test gate already present (idempotent)"
+      else
+        mkdir -p "$_hooks_dir"
+        [ -f "$_precommit" ] || printf '#!/bin/sh\n' > "$_precommit"
+        cat >> "$_precommit" <<'HOOK_BLOCK'
+# code-conductor:test-gate
+command -v npm >/dev/null 2>&1 || { echo "[conductor] npm not found — skipping test gate"; exit 0; }
+cd "$(git rev-parse --show-toplevel)" && npm test
+# /code-conductor:test-gate
+HOOK_BLOCK
+        chmod +x "$_precommit"
+        ok "Pre-commit test gate appended to $_precommit"
+      fi
+    else
+      warn "Could not resolve git hooks directory — pre-commit hook not installed"
+    fi
+  else
+    warn "Not in a git repository — pre-commit hook not installed"
+  fi
+fi
+```
+
+- [ ] [T-006-B] Verify the edit landed correctly — grep for the sentinel in install.sh:
+
+```
+grep -n "code-conductor:test-gate" install.sh
+```
+
+Expected: two lines — opening sentinel inside the heredoc and the `grep -qF` idempotency check line.
+
+- [ ] [T-006-C] Verify install.sh still parses as valid bash:
+
+```
+bash -n install.sh
+```
+
+Expected: no output, exit 0.
+
+- [ ] [T-006-D] Commit:
+
+```
+git add install.sh
+git commit -m "feat(FEAT-024): wire pre-commit test gate in install.sh"
+```
+
+---
+
+### Task T-007: install.ps1 pre-commit hook wiring
+
+**Files:**
+- Modify: `install.ps1` (inside the `if ($Project)` block, after the gitignore update)
+
+**Interfaces:**
+- Consumes: git hooks directory via `git rev-parse --git-path hooks`
+- Produces: idempotent pre-commit hook written as UTF-8 without BOM; only wired when `-Project` switch is passed
+
+- [ ] [T-007-A] Locate the insertion point — it is after the gitignore `if` block and before the closing `}` of the `if ($Project)` block. The target old_string is:
+
+```powershell
+  if (-not (Test-Path $gitignore) -or -not (Select-String -Path $gitignore -Pattern ([regex]::Escape($entry)) -Quiet)) {
+    Add-Content -Path $gitignore -Value $entry
+    Write-Ok "Added $entry to .gitignore"
+  }
+}
+```
+
+Replace with the same block followed by pre-commit wiring (before the closing `}`):
+
+```powershell
+  if (-not (Test-Path $gitignore) -or -not (Select-String -Path $gitignore -Pattern ([regex]::Escape($entry)) -Quiet)) {
+    Add-Content -Path $gitignore -Value $entry
+    Write-Ok "Added $entry to .gitignore"
+  }
+
+  # Pre-commit test gate (FEAT-024)
+  $gitDirCheck = git rev-parse --git-dir 2>&1
+  if ($LASTEXITCODE -eq 0) {
+    $hooksDir = (git rev-parse --git-path hooks 2>&1).ToString().Trim()
+    $precommit = Join-Path $hooksDir "pre-commit"
+    $sentinel = "# code-conductor:test-gate"
+    if ($hooksDir) {
+      $hasGate = $false
+      if (Test-Path $precommit) {
+        $hasGate = (Get-Content $precommit -Raw) -match [regex]::Escape($sentinel)
+      }
+      if ($hasGate) {
+        Write-Ok "Pre-commit test gate already present (idempotent)"
+      } else {
+        $hooksDirParent = Split-Path $precommit -Parent
+        if (-not (Test-Path $hooksDirParent)) {
+          New-Item -ItemType Directory -Path $hooksDirParent -Force | Out-Null
+        }
+        $guardBlock = "# code-conductor:test-gate`ncommand -v npm >/dev/null 2>&1 || { echo `"[conductor] npm not found -- skipping test gate`"; exit 0; }`ncd `"`$(git rev-parse --show-toplevel)`" && npm test`n# /code-conductor:test-gate`n"
+        $enc = [System.Text.UTF8Encoding]::new($false)
+        if (Test-Path $precommit) {
+          $existing = [System.IO.File]::ReadAllText($precommit, $enc)
+          [System.IO.File]::WriteAllText($precommit, $existing + "`n" + $guardBlock, $enc)
+        } else {
+          [System.IO.File]::WriteAllText($precommit, "#!/bin/sh`n" + $guardBlock, $enc)
+        }
+        Write-Ok "Pre-commit test gate appended to $precommit"
+      }
+    } else {
+      Write-Warn "Could not resolve git hooks directory -- pre-commit hook not installed"
+    }
+  } else {
+    Write-Warn "Not in a git repository -- pre-commit hook not installed"
+  }
+}
+```
+
+- [ ] [T-007-B] Verify the sentinel appears in install.ps1:
+
+```
+grep -n "code-conductor:test-gate" install.ps1
+```
+
+Expected: lines containing the sentinel string.
+
+- [ ] [T-007-C] Commit:
+
+```
+git add install.ps1
+git commit -m "feat(FEAT-024): wire pre-commit test gate in install.ps1 (UTF-8 no BOM)"
+```
+
+---
+
+### Task T-008: CONTRIBUTING.md --no-verify policy
+
+**Files:**
+- Modify: `CONTRIBUTING.md`
+
+**Interfaces:**
+- Consumes: existing CONTRIBUTING.md (44 lines, four sections)
+- Produces: new section documenting `--no-verify` bypass and the unconditional CI gate
+
+- [ ] [T-008-A] Add the following section to `CONTRIBUTING.md` between the "Code Style" section and the "License" section. The insertion old_string is:
+
+```markdown
+---
+
+## License
+```
+
+Replace with:
+
+```markdown
+---
+
+## Bypassing the Pre-Commit Hook
+
+The pre-commit test gate installed by `install.sh` / `install.ps1` can be skipped with:
+
+```
+git commit --no-verify
+```
+
+This is a permitted operator override for WIP commits, broken test environments, or emergency fixes.
+
+**The GitHub Actions CI gate is unconditional.** A PR merged without a green CI run is a policy violation regardless of `--no-verify` usage. Never disable or skip the CI workflow to merge failing tests.
+
+---
+
+## License
+```
+
+- [ ] [T-008-B] Run the final `npm test` to confirm all tests still pass after all changes:
+
+```
+npm test
+```
+
+Expected: all tests green.
+
+- [ ] [T-008-C] Commit CONTRIBUTING.md:
+
+```
+git add CONTRIBUTING.md
+git commit -m "docs(FEAT-024): document --no-verify bypass policy in CONTRIBUTING.md"
+```
+
+---
+
+### Task T-009: Verify full suite and commit plan file
+
+**Files:**
+- No code changes — verification only, then plan committed
+
+- [ ] [T-009-A] Run the complete test suite one final time from a clean state:
+
+```
+npm ci && npm test
+```
+
+Expected: all tests pass. Exit 0.
+
+- [ ] [T-009-B] Confirm `package-lock.json` is tracked (not gitignored):
+
+```
+git ls-files package-lock.json
+```
+
+Expected: `package-lock.json` printed (i.e., it is tracked).
+
+- [ ] [T-009-C] Mark FEAT-024 in-progress in the backlog (surgical single-line edit, BUG-003 invariant):
+
+In `AGENT-READABLE BACKLOG.md`, find the line:
+
+```
+### [ ] `[FEAT-024]` Automated Unit Testing Suite (Self-Testing Infrastructure)
+```
+
+Change `[ ]` to `[>]`.
+
+Pre-check before edit: `grep -c "\[FEAT-024\]" "AGENT-READABLE BACKLOG.md"` must return `1`.
+
+- [ ] [T-009-D] Commit the plan file (needs `git add -f` because `docs/` is gitignored):
+
+```
+git add -f "docs/superpowers/plans/2026-06-17-feat024-unit-testing-suite.md"
+git add "AGENT-READABLE BACKLOG.md"
+git commit -m "chore(FEAT-024): save implementation plan and mark in-progress"
+```
+
+---
+
+## Test List
+
+- [x] Unit tests: `tests/unit/placeholder.test.js` — Layer 2 scaffold (T-002)
+- [x] Integration: `tests/hooks/guard3.test.js` — all 107 guard3 pass/block cases (T-003)
+- [x] Integration: `tests/hooks/verbosity-remind.test.js` — all hook behavior cases (T-004)
+- [ ] E2E: manually verify pre-commit hook fires on `git commit` after running the installer with `--project` flag (post-implementation smoke test)
+
+## Commit Order
+
+| Commit | Tasks | Message |
+|--------|-------|---------|
+| 1 | T-001 | feat(FEAT-024): add package.json, vitest config, and update gitignore |
+| 2 | T-002 | feat(FEAT-024): add Layer 2 placeholder test stub |
+| 3 | T-003 | feat(FEAT-024): add Layer 1 guard3 test suite |
+| 4 | T-004 | feat(FEAT-024): add Layer 1 verbosity-remind test suite |
+| 5 | T-005 | feat(FEAT-024): add GitHub Actions CI workflow |
+| 6 | T-006 | feat(FEAT-024): wire pre-commit test gate in install.sh |
+| 7 | T-007 | feat(FEAT-024): wire pre-commit test gate in install.ps1 |
+| 8 | T-008 | docs(FEAT-024): document --no-verify bypass policy |
+| 9 | T-009 | chore(FEAT-024): save plan and mark in-progress |
+
+## Identified Risks
+
+1. **Vitest 3 API**: `threads: false` was removed in Vitest v2. The plan uses `pool: 'forks'` + `singleFork: true` which is the correct Vitest 3 equivalent. If Vitest 3.x changes the pool API again, check [Vitest migration docs](https://vitest.dev/guide/migration.html).
+
+2. **guard3 `runAllowlisted` hook modification**: the function reads and modifies `.claude/hooks/pre-tool-use.sh` at test time. If the hook file is not found, the test will throw `ENOENT`. Run `ls .claude/hooks/pre-tool-use.sh` before T-003 to confirm.
+
+3. **Deep path on Windows (T-14 test)**: creating 45 nested directories may hit Windows `MAX_PATH` (260 chars). If `fs.mkdirSync` fails, the test will throw. The test is included without a `skipIf` because Node.js with `recursive: true` handles long paths via UNC `\\?\` prefix when the long-path registry key is set. If path creation fails on CI, add `.skipIf(process.platform === 'win32')`.
+
+4. **install.sh heredoc in plan**: the HOOK_BLOCK heredoc closing marker must appear at column 0 in the actual file. The `Edit` tool preserves indentation — verify the resulting file with `bash -n install.sh` (T-006-C).
+
+5. **`npm ci` in CI**: requires `package-lock.json` committed. Verify with `git ls-files package-lock.json` (T-009-B) before considering implementation complete.
