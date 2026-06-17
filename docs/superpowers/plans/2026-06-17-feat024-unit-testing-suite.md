@@ -1,4 +1,4 @@
-# FEAT-024 Automated Unit Testing Suite — Implementation Plan
+# FEAT-024 Automated Unit Testing Suite - Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -70,11 +70,19 @@ export default defineConfig({
 })
 ```
 
-- [ ] [T-001-C] Add `node_modules/` and `.vitest-cache/` to `.gitignore`, ensuring a trailing newline before appending to prevent concatenation with the existing last line. Run this single Node command from repo root (Node ≥ 20 required; works on Windows, macOS, and Linux without requiring bash):
+- [ ] [T-001-C] Add `node_modules/` and `.vitest-cache/` to `.gitignore`. The command below is idempotent: it reads existing entries, skips any already present, and only appends the missing ones with a trailing-newline guard. Run from repo root (Node >= 20; no bash required):
 
 ```
-node -e "const fs=require('fs'),p='.gitignore',c=fs.readFileSync(p,'utf8'),sep=c.endsWith('\n')?'':'\n';fs.appendFileSync(p,sep+'node_modules/\n.vitest-cache/\n')"
+node -e "const fs=require('fs'),p='.gitignore',c=fs.readFileSync(p,'utf8'),existing=c.split('\n').map(l=>l.trim()),add=['node_modules/','.vitest-cache/'].filter(e=>!existing.includes(e));if(add.length){const sep=c.endsWith('\n')?'':'\n';fs.appendFileSync(p,sep+add.join('\n')+'\n');console.log('Added: '+add.join(', '))}else{console.log('Already present - skipped')}"
 ```
+
+Validate that both entries are present exactly once (no missing entries, no duplicates, no corruption from a prior partial run):
+
+```
+node -e "const lines=require('fs').readFileSync('.gitignore','utf8').split('\n').map(l=>l.trim()).filter(Boolean);const check=['node_modules/','.vitest-cache/'];let ok=true;check.forEach(e=>{const n=lines.filter(l=>l===e).length;if(n===0){console.error('MISSING: '+e);ok=false}else if(n>1){console.error('DUPLICATE ('+n+'x): '+e);ok=false}});if(!ok)process.exit(1);console.log('Validation passed')"
+```
+
+Expected: `Validation passed` with exit code 0. A non-zero exit means the file was already corrupt before this step — inspect `.gitignore` manually before continuing.
 
 Verify the last three meaningful lines of `.gitignore`:
 
@@ -169,7 +177,9 @@ ls .claude/hooks/pre-tool-use.sh
 
 Expected: file found.
 
-- [ ] [T-003-B] Create `tests/hooks/guard3.test.js` with this full content:
+- [ ] [T-003-B] Create `tests/hooks/guard3.test.js` with this full content.
+
+**Line-ending normalization**: all `stdout`/`stderr` buffers and hook file content are normalized with the pattern `/\r\n|\r/g` before string assertions or line-splitting. The alternation order matters: `\r\n` is listed before `\r` so that two-character CRLF sequences are consumed atomically in a single pass; the `\r` branch then catches any surviving bare carriage returns (produced by some terminal emulators and legacy text streams) without leaving a trailing empty string after the following `\n`.
 
 ```js
 import { describe, it, expect } from 'vitest'
@@ -201,8 +211,8 @@ function run(cmd) {
   })
   return {
     status: result.status ?? -1,
-    stdout: (result.stdout ?? Buffer.alloc(0)).toString().replace(/\r\n/g, '\n'),
-    stderr: (result.stderr ?? Buffer.alloc(0)).toString().replace(/\r\n/g, '\n'),
+    stdout: (result.stdout ?? Buffer.alloc(0)).toString().replace(/\r\n|\r/g, '\n'),
+    stderr: (result.stderr ?? Buffer.alloc(0)).toString().replace(/\r\n|\r/g, '\n'),
   }
 }
 
@@ -219,7 +229,7 @@ function runRead() {
 }
 
 function runAllowlisted(cmd, entries) {
-  const lines = fs.readFileSync(HOOK, 'utf8').replace(/\r\n/g, '\n').split('\n')
+  const lines = fs.readFileSync(HOOK, 'utf8').replace(/\r\n|\r/g, '\n').split('\n')
   // Dynamically locate BASH_SCAN_ALLOWLIST block to preserve the actual script
   // header. Handles both single-line `=()` and multi-line `=(\n...\n)` by
   // tracking parenthesis depth rather than assuming line structure.
@@ -766,7 +776,7 @@ git commit -m "feat(FEAT-024): add GitHub Actions CI workflow for npm test"
 - Consumes: git hooks directory via `git rev-parse --git-path hooks`
 - Produces: idempotent pre-commit hook that runs `npm test`; only wired when `--project` flag is passed
 
-- [ ] [T-006-A] Locate the insertion point — it is the `.gitignore` update block at the tail of the `if [ "$INSTALL_PROJECT" = true ]` outer block. Do **not** rely on line numbers since unrelated changes may shift them; instead use `grep -n 'Added.*to .gitignore' install.sh` at implementation time to pinpoint the exact line. The target old_string is the unique sequence:
+- [ ] [T-006-A] Locate the insertion point - it is the `.gitignore` update block at the tail of the `if [ "$INSTALL_PROJECT" = true ]` outer block. Do **not** rely on line numbers since unrelated changes may shift them; instead use `grep -n 'Added.*to .gitignore' install.sh` at implementation time to pinpoint the exact line. The target old_string is the unique sequence:
 
 ```bash
   if [ ! -f "$GITIGNORE" ] || ! grep -qF "$ENTRY" "$GITIGNORE"; then
@@ -778,7 +788,7 @@ fi
 
 Replace it with the same block followed by the pre-commit wiring (before the closing `fi`).
 
-**CRITICAL:** The `HOOK_BLOCK` heredoc closing delimiter must appear at **column 0** (no leading whitespace) in the actual `install.sh` file. The Edit tool preserves the literal indentation shown in the code block — verify with `bash -n install.sh` after the edit (exit 0 = valid; a non-zero exit or "unexpected EOF" error means the closing marker was indented).
+**CRITICAL:** The `HOOK_BLOCK` heredoc closing delimiter must appear at **column 0** (no leading whitespace) in the actual `install.sh` file. The Edit tool preserves the literal indentation shown in the code block - verify with `bash -n install.sh` after the edit (exit 0 = valid; a non-zero exit or "unexpected EOF" error means the closing marker was indented).
 
 ```bash
   if [ ! -f "$GITIGNORE" ] || ! grep -qF "$ENTRY" "$GITIGNORE"; then
@@ -799,7 +809,7 @@ Replace it with the same block followed by the pre-commit wiring (before the clo
         [ -f "$_precommit" ] || printf '#!/bin/sh\n' > "$_precommit"
         cat >> "$_precommit" <<'HOOK_BLOCK'
 # code-conductor:test-gate
-command -v npm >/dev/null 2>&1 || { echo "[conductor] npm not found — skipping test gate"; exit 0; }
+command -v npm >/dev/null 2>&1 || { echo "[conductor] npm not found - skipping test gate"; exit 0; }
 cd "$(git rev-parse --show-toplevel)" && npm test
 # /code-conductor:test-gate
 HOOK_BLOCK
@@ -807,15 +817,17 @@ HOOK_BLOCK
         ok "Pre-commit test gate appended to $_precommit"
       fi
     else
-      warn "Could not resolve git hooks directory — pre-commit hook not installed"
+      warn "Could not resolve git hooks directory - pre-commit hook not installed"
     fi
   else
-    warn "Not in a git repository — pre-commit hook not installed"
+    warn "Not in a git repository - pre-commit hook not installed"
   fi
 fi
 ```
 
-- [ ] [T-006-B] Verify the edit landed correctly — grep for the sentinel in install.sh:
+**Empty or unexpected `$_hooks_dir` value**: `git rev-parse --git-path hooks` outputs an empty string in non-standard git configurations (bare repositories, detached worktrees where `.git` is a file pointer rather than a directory, or submodule roots). When `$_hooks_dir` is empty or whitespace-only, `[ -n "$_hooks_dir" ]` evaluates false, the `warn` branch fires, and the block exits cleanly without modifying any file. The installer continues; only the pre-commit wiring step is skipped. If this warn fires during local testing, confirm the working directory is inside a standard git repository with `git rev-parse --show-toplevel` and `git rev-parse --git-path hooks` before investigating further.
+
+- [ ] [T-006-B] Verify the edit landed correctly - grep for the sentinel in install.sh:
 
 ```
 grep -n "code-conductor:test-gate" install.sh
@@ -849,7 +861,7 @@ git commit -m "feat(FEAT-024): wire pre-commit test gate in install.sh"
 - Consumes: git hooks directory via `git rev-parse --git-path hooks`
 - Produces: idempotent pre-commit hook written as UTF-8 without BOM; only wired when `-Project` switch is passed
 
-- [ ] [T-007-A] Locate the insertion point — it is after the gitignore `if` block and before the closing `}` of the `if ($Project)` block (install.ps1 lines 464–468). The target old_string is:
+- [ ] [T-007-A] Locate the insertion point - it is after the gitignore `if` block and before the closing `}` of the `if ($Project)` block (install.ps1 lines 464-468). The target old_string is:
 
 ```powershell
   if (-not (Test-Path $gitignore) -or -not (Select-String -Path $gitignore -Pattern ([regex]::Escape($entry)) -Quiet)) {
@@ -861,7 +873,7 @@ git commit -m "feat(FEAT-024): wire pre-commit test gate in install.sh"
 
 Replace with the same block followed by pre-commit wiring (before the closing `}`).
 
-**CRITICAL:** The `'@` closing delimiter of the here-string below must appear at **column 0** (no leading whitespace) in the actual `install.ps1` file. PowerShell will throw a parse error if `'@` is indented. The guard block content uses `—` (U+2014 em dash) matching the spec; `[System.IO.File]::WriteAllText` with `UTF8Encoding($false)` writes it as UTF-8 without BOM. The `.Replace` call normalizes CRLF → LF so bash on Git for Windows parses the hook correctly.
+**CRITICAL:** The `'@` closing delimiter of the here-string below must appear at **column 0** (no leading whitespace) in the actual `install.ps1` file. PowerShell will throw a parse error if `'@` is indented. The guard block content uses ASCII hyphens (`-`) for word separators in warning messages; `[System.IO.File]::WriteAllText` with `UTF8Encoding($false)` writes UTF-8 without BOM. The `.Replace` call normalizes CRLF to LF so bash on Git for Windows parses the hook correctly.
 
 ```powershell
   if (-not (Test-Path $gitignore) -or -not (Select-String -Path $gitignore -Pattern ([regex]::Escape($entry)) -Quiet)) {
@@ -892,7 +904,7 @@ Replace with the same block followed by pre-commit wiring (before the closing `}
         # CRLF → LF normalization ensures bash on Git for Windows parses correctly.
         $guardBlock = (@'
 # code-conductor:test-gate
-command -v npm >/dev/null 2>&1 || { echo "[conductor] npm not found — skipping test gate"; exit 0; }
+command -v npm >/dev/null 2>&1 || { echo "[conductor] npm not found - skipping test gate"; exit 0; }
 cd "$(git rev-parse --show-toplevel)" && npm test
 # /code-conductor:test-gate
 '@).Replace("`r`n", "`n").Replace("`r", "`n")
@@ -979,7 +991,7 @@ The pre-commit test gate installed by `install.sh` / `install.ps1` can be skippe
 git commit --no-verify
 ```
 
-This is a permitted operator override for WIP commits, broken test environments, or emergency fixes.
+This is a permitted developer override for WIP commits, broken test environments, or emergency fixes.
 
 **The GitHub Actions CI gate is unconditional.** A PR merged without a green CI run is a policy violation regardless of `--no-verify` usage. Never disable or skip the CI workflow to merge failing tests.
 
