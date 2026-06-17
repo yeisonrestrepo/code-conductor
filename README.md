@@ -173,6 +173,14 @@ Fires before every tool call. Three guards:
 
 Fires after `/compact`. Reads `project.md`, shows the timestamp of the last `/cc-checkpoint`, and reminds you to run `/cc-checkpoint` if context from this session hasn't been saved yet. Prevents losing decisions and conventions when the context window is compressed.
 
+### verbosity-remind *(global + project)* — v1.11.0
+
+Fires on every `UserPromptSubmit`. Re-injects the active MIN/INFO/VERBOSE verbosity constraint before every Claude response, preventing level drift as the context window fills (BUG-014).
+
+The global hook defers to a project-level hook if one exists (upward traversal from `$PWD`). The active level is read from the nearest `.claude/memory/verbosity.md` ancestor file. Set `CC_VERBOSITY_SKIP=1` to disable in CI/CD environments.
+
+> **Note — `$HOME` unset environments:** When `$HOME` is unset (e.g., some CI containers, `sudo -H` shells, minimal Docker images), `verbosity-remind.sh` exits immediately with code 0 and emits no output. Claude falls back to MIN verbosity by default. Set `HOME=/root` (or the appropriate home directory) in the container environment to restore full hook behavior. The hook never raises an error when `$HOME` is absent — it degrades gracefully to ensure the user's session is never blocked.
+
 ---
 
 ## Stack Profiles
@@ -309,3 +317,12 @@ code-conductor/
 ## .gitignore Note
 
 When installed with `--project`, the installer appends `.claude/memory/personal.md` to your project's `.gitignore`. This keeps personal preferences local and out of the shared repo.
+
+---
+
+## Uninstall Notes
+
+> **`git revert` in non-repository environments (CI/CD, Docker, bare installs):**
+> Uninstall steps that use `git checkout <tag>` or `git revert <sha>` require a git working tree. In CI/CD pipelines, Docker containers, or directories that are not git repositories, these commands will fail with `fatal: not a git repository`. This is expected and non-fatal.
+>
+> **In non-repo environments:** manually delete or restore `skills/verbosity.md` and remove the `verbosity-remind` entry from `~/.claude/settings.json`. Hook removal (`rm ~/.claude/hooks/verbosity-remind.sh`) and `settings.json` cleanup work identically in all environments — no git is required.
