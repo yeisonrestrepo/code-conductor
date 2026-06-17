@@ -72,32 +72,27 @@ export default defineConfig({
 
 - [ ] [T-001-C] Add `node_modules/` and `.vitest-cache/` to `.gitignore`. The command below is idempotent: it reads existing entries, skips any already present, and only appends the missing ones with a trailing-newline guard. Run from repo root (Node >= 20; no bash required).
 
-**CommonJS `require()` in an ESM project**: `node -e` always evaluates scripts in CommonJS mode regardless of the project's `"type": "module"` field in `package.json`. That field only controls how Node resolves `.js` files loaded from disk. `require('fs')` is therefore safe in all three inline commands below; no `--input-type=commonjs` flag is needed.
+**CommonJS `require()` in an ESM project**: the project sets `"type": "module"` in `package.json`, but `node -e` evaluates inline scripts in CommonJS mode by default. To make the intent explicit and guard against future Node.js behavior changes, all three inline commands below pass `--input-type=commonjs` (available since Node 12; safe with the Node >= 20 engine requirement).
 
 ```
-node -e "const fs=require('fs'),p='.gitignore',c=fs.readFileSync(p,'utf8'),existing=c.split('\n').map(l=>l.trim()),add=['node_modules/','.vitest-cache/'].filter(e=>!existing.includes(e));if(add.length){const sep=c.endsWith('\n')?'':'\n';fs.appendFileSync(p,sep+add.join('\n')+'\n');console.log('Added: '+add.join(', '))}else{console.log('Already present - skipped')}"
+node --input-type=commonjs -e "const fs=require('fs'),p='.gitignore',c=fs.readFileSync(p,'utf8'),existing=c.split('\n').map(l=>l.trim()),add=['node_modules/','.vitest-cache/'].filter(e=>!existing.includes(e));if(add.length){const sep=c.endsWith('\n')?'':'\n';fs.appendFileSync(p,sep+add.join('\n')+'\n');console.log('Added: '+add.join(', '))}else{console.log('Already present - skipped')}"
 ```
 
 Validate that both entries are present exactly once (no missing entries, no duplicates, no corruption from a prior partial run):
 
 ```
-node -e "const lines=require('fs').readFileSync('.gitignore','utf8').split('\n').map(l=>l.trim()).filter(Boolean);const check=['node_modules/','.vitest-cache/'];let ok=true;check.forEach(e=>{const n=lines.filter(l=>l===e).length;if(n===0){console.error('MISSING: '+e);ok=false}else if(n>1){console.error('DUPLICATE ('+n+'x): '+e);ok=false}});if(!ok)process.exit(1);console.log('Validation passed')"
+node --input-type=commonjs -e "const lines=require('fs').readFileSync('.gitignore','utf8').split('\n').map(l=>l.trim()).filter(Boolean);const check=['node_modules/','.vitest-cache/'];let ok=true;check.forEach(e=>{const n=lines.filter(l=>l===e).length;if(n===0){console.error('MISSING: '+e);ok=false}else if(n>1){console.error('DUPLICATE ('+n+'x): '+e);ok=false}});if(!ok)process.exit(1);console.log('Validation passed')"
 ```
 
 Expected: `Validation passed` with exit code 0. A non-zero exit means the file was already corrupt before this step; inspect `.gitignore` manually before continuing.
 
-Verify the last three meaningful lines of `.gitignore`:
+Verify both entries appear anywhere in `.gitignore` (independent of surrounding content):
 
 ```
-node -e "const lines=require('fs').readFileSync('.gitignore','utf8').split('\n').filter(l=>l.trim());console.log(lines.slice(-3).join('\n'))"
+node --input-type=commonjs -e "const c=require('fs').readFileSync('.gitignore','utf8');['node_modules/','.vitest-cache/'].forEach(e=>{if(c.split('\n').map(l=>l.trim()).includes(e))console.log('FOUND: '+e);else{console.error('MISSING: '+e);process.exit(1)}})"
 ```
 
-Expected output:
-```
-.claude/memory/session-snapshot.md
-node_modules/
-.vitest-cache/
-```
+Expected: `FOUND: node_modules/` then `FOUND: .vitest-cache/`, exit code 0. This check passes regardless of what other entries the repository already contains.
 
 - [ ] [T-001-D] Run `npm install` from repo root to generate `package-lock.json`:
 
@@ -679,7 +674,7 @@ describe('verbosity-remind hooks', () => {
     expect(result.status).toBe(0)
   })
 
-  it('T-14: traversal cap=40 blocks verbosity.md 45 levels above; HOME fallback emits MIN', { timeout: 15000 }, () => {
+  it.skipIf(process.platform === 'win32')('T-14: traversal cap=40 blocks verbosity.md 45 levels above; HOME fallback emits MIN', { timeout: 15000 }, () => {
     const deepBase = join(tmpDir, 'deep-path-test')
     let deepPath = deepBase
     for (let i = 1; i <= 45; i++) deepPath = join(deepPath, `d${i}`)
@@ -810,8 +805,9 @@ Replace it with the same block followed by the pre-commit wiring (before the clo
       else
         mkdir -p "$_hooks_dir"
         [ -f "$_precommit" ] || printf '#!/bin/sh\n' > "$_precommit"
-        # Ensure existing content ends with a newline before appending
-        [ -s "$_precommit" ] && tail -c 1 "$_precommit" | od -An -tx1 | grep -qv '0a' && printf '\n' >> "$_precommit"
+        # Ensure existing content ends with a newline before appending.
+        # tail -c 1 | wc -l: returns 1 if last byte is LF, 0 otherwise. Both are POSIX.
+        [ -s "$_precommit" ] && [ "$(tail -c 1 "$_precommit" | wc -l)" -eq 0 ] && printf '\n' >> "$_precommit"
         cat >> "$_precommit" <<'HOOK_BLOCK'
 # code-conductor:test-gate
 command -v npm >/dev/null 2>&1 || { echo "[conductor] npm not found - skipping test gate"; exit 0; }
@@ -1095,8 +1091,8 @@ git commit -m "chore(FEAT-024): save implementation plan and mark in-progress"
 
 2. **guard3 `runAllowlisted` hook modification**: the function reads and modifies `.claude/hooks/pre-tool-use.sh` at test time. If the hook file is not found, the test will throw `ENOENT`. Run `ls .claude/hooks/pre-tool-use.sh` before T-003 to confirm.
 
-3. **Deep path on local Windows dev machines (T-14 test)**: creating 45 nested directories inside `os.tmpdir()` may hit the Windows `MAX_PATH` limit (260 chars) on developer machines where long-path support is disabled. This is **not a CI concern**; the workflow runs on `ubuntu-latest` where the limit does not apply. Locally, enable long paths via `reg add HKLM\SYSTEM\CurrentControlSet\Control\FileSystem /v LongPathsEnabled /t REG_DWORD /d 1` or add `.skipIf(process.platform === 'win32')` to the T-14 test.
+3. **Deep path on local Windows dev machines (T-14 test)**: creating 45 nested directories inside `os.tmpdir()` may hit the Windows `MAX_PATH` limit (260 chars) on developer machines where long-path support is disabled. This is **not a CI concern**; the workflow runs on `ubuntu-latest` where the limit does not apply. The T-14 test already includes `.skipIf(process.platform === 'win32')` so Windows developers see a skip rather than a failure. To run the test locally on Windows, enable long paths via `reg add HKLM\SYSTEM\CurrentControlSet\Control\FileSystem /v LongPathsEnabled /t REG_DWORD /d 1` and remove the skipIf guard.
 
-4. **install.sh heredoc in plan**: the HOOK_BLOCK heredoc closing marker must appear at column 0 in the actual file. The `Edit` tool preserves indentation — verify the resulting file with `bash -n install.sh` (T-006-C).
+4. **install.sh heredoc in plan**: the HOOK_BLOCK heredoc closing marker must appear at column 0 in the actual file. The `Edit` tool preserves indentation; verify the resulting file with `bash -n install.sh` (T-006-C).
 
 5. **`npm ci` in CI**: requires `package-lock.json` committed. Verify with `git ls-files package-lock.json` (T-009-B) before considering implementation complete.
