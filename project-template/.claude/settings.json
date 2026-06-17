@@ -20,6 +20,17 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'set +e; _dir=\"${PWD:-}\"; _prev=\"\"; _iters=0; while [ \"$_dir\" != \"$_prev\" ] && [ \"$_iters\" -lt 40 ]; do _h=\"$_dir/.claude/hooks/verbosity-remind.sh\"; [ -f \"$_h\" ] && [ -r \"$_h\" ] && { bash \"$_h\"; exit $?; }; _prev=\"$_dir\"; _dir=\"${_dir%/*}\"; [ -z \"$_dir\" ] && _dir=/; _iters=$((_iters+1)); done; exit 0'"
+          }
+        ]
+      }
     ]
   },
   "permissions": {

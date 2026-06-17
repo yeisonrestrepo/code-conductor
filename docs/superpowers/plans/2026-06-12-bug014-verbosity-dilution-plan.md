@@ -17,7 +17,7 @@
 **Files:**
 - Create: `global/hooks/verbosity-remind.sh`
 
-- [ ] [T-001] Write `global/hooks/verbosity-remind.sh` with the following exact content:
+- [X] [T-001] Write `global/hooks/verbosity-remind.sh` with the following exact content:
 
 > **Encoding:** Write as **UTF-8 without BOM**. A BOM byte sequence (`\xef\xbb\xbf`) placed before `#!/usr/bin/env bash` causes `exec format error` on Linux — the shebang is no longer on byte 0 of the file. The hook strips a BOM from `verbosity.md` during parsing; the script file itself must carry none. In editors: VS Code → "UTF-8" in the bottom bar (no "with BOM" suffix); vim `:set nobomb`.
 
@@ -390,7 +390,7 @@ case "$LEVEL" in
 esac
 ```
 
-- [ ] [T-001-A] Set executable permission and verify syntax:
+- [X] [T-001-A] Set executable permission and verify syntax:
 
 ```bash
 # chmod +x is required — Claude Code invokes the hook via the OS exec() syscall,
@@ -403,7 +403,7 @@ bash -n global/hooks/verbosity-remind.sh
 
 Expected: `chmod` exits 0 (no output); `bash -n` exits 0 with no output.
 
-- [ ] [T-001-B] File integrity validation: after writing `global/hooks/verbosity-remind.sh`, compute its SHA-256 checksum and compare against a known-good reference. This detects disk corruption, incomplete writes, or supply-chain tampering during the install process.
+- [X] [T-001-B] File integrity validation: after writing `global/hooks/verbosity-remind.sh`, compute its SHA-256 checksum and compare against a known-good reference. This detects disk corruption, incomplete writes, or supply-chain tampering during the install process.
 
 ```bash
 # Step 1: compute SHA-256 of the written file
@@ -446,7 +446,7 @@ Add an equivalent step after T-002 for the project hook. The `checksums.sha256` 
 **Files:**
 - Create: `project-template/.claude/hooks/verbosity-remind.sh`
 
-- [ ] [T-002] Write `project-template/.claude/hooks/verbosity-remind.sh` with the following exact content (identical to the global hook except: no Stage 1 block, `_SCOPE="project"`):
+- [X] [T-002] Write `project-template/.claude/hooks/verbosity-remind.sh` with the following exact content (identical to the global hook except: no Stage 1 block, `_SCOPE="project"`):
 
 > **Encoding:** Write as **UTF-8 without BOM** — same constraint as T-001. A BOM before the shebang causes `exec format error` at hook invocation time.
 
@@ -619,7 +619,7 @@ case "$LEVEL" in
 esac
 ```
 
-- [ ] [T-002-A] Set executable permission and verify syntax:
+- [X] [T-002-A] Set executable permission and verify syntax:
 
 ```bash
 # Same exec-bit requirement as T-001-A.
@@ -651,7 +651,7 @@ The command value is a JSON string executed by Claude Code via the system shell.
 
 Verification: run `sh -c '<command string>'` (with the JSON `\"` unescaped back to `"`) on a POSIX sh (dash, ash, or `sh` on macOS) and confirm it exits 0. Expected: the command exits 0 and produces no error output when no verbosity.md is found.
 
-- [ ] [T-003] Edit `project-template/.claude/settings.json`. Replace the entire file content with:
+- [X] [T-003] Edit `project-template/.claude/settings.json`. Replace the entire file content with:
 
 ```json
 {
@@ -696,7 +696,7 @@ Verification: run `sh -c '<command string>'` (with the JSON `\"` unescaped back 
 }
 ```
 
-- [ ] [T-003-A] Verify JSON is valid:
+- [X] [T-003-A] Verify JSON is valid:
 
 ```bash
 python3 -c "import json; json.load(open('project-template/.claude/settings.json')); print('valid')"
@@ -704,7 +704,7 @@ python3 -c "import json; json.load(open('project-template/.claude/settings.json'
 
 Expected: `valid`
 
-- [ ] [T-003-B] Verify PreToolUse and PostCompact entries are unchanged (grep confirms both are present):
+- [X] [T-003-B] Verify PreToolUse and PostCompact entries are unchanged (grep confirms both are present):
 
 ```bash
 grep -c "pre-tool-use.sh" project-template/.claude/settings.json
@@ -762,7 +762,7 @@ Four additions to `install.sh`:
 
 **Prerequisite:** T-001 and T-002 must be `[X]`.
 
-- [ ] [T-004-A] Add the `_merge_settings_json` function to `install.sh`. Insert it immediately after the `download()` function definition (after line 215, before the `# ── Install global files` comment). The function handles jq → python3 → manual fallback for both global and project settings.json files:
+- [X] [T-004-A] Add the `_merge_settings_json` function to `install.sh`. Insert it immediately after the `download()` function definition (after line 215, before the `# ── Install global files` comment). The function handles jq → python3 → manual fallback for both global and project settings.json files:
 
 ```bash
 # ── settings.json merge helper ────────────────────────────────────────────────
@@ -1196,7 +1196,7 @@ NJEOF
 }
 ```
 
-- [ ] [T-004-A-1] Verify the manual fallback text printed by `_merge_settings_json` produces a JSON object matching the nested schema defined in T-003. Run this one-time check after inserting the function into `install.sh`:
+- [X] [T-004-A-1] Verify the manual fallback text printed by `_merge_settings_json` produces a JSON object matching the nested schema defined in T-003. Run this one-time check after inserting the function into `install.sh`:
 
 ```bash
 # Extract the printed fragment from the function source and validate its structure
@@ -1218,7 +1218,7 @@ PYEOF
 
 Expected: `Schema OK: fallback text matches T-003 nested format`. If this fails, the `echo` line in the manual fallback block must be updated to match T-003's schema before proceeding.
 
-- [ ] [T-004-A-2] Confirm the pre-merge backup logic is present in the final `install.sh` and document the rollback procedure for operators:
+- [X] [T-004-A-2] Confirm the pre-merge backup logic is present in the final `install.sh` and document the rollback procedure for operators:
 
 ```bash
 # Verify the backup block is in the installed function
@@ -1262,7 +1262,7 @@ echo "  [verbosity-remind] LOG: Pre-install stale state audit complete"
 
 Expected: no output from `find` (all deletions are silent). The audit must complete without error before T-004-A-3.
 
-- [ ] [T-004-A-3] Pre-flight: validate that `bash` is available and its resolved path matches the path that will be embedded in the hook command. Run this check before executing any install step:
+- [X] [T-004-A-3] Pre-flight: validate that `bash` is available and its resolved path matches the path that will be embedded in the hook command. Run this check before executing any install step:
 
 ```bash
 # 1. Confirm bash is on PATH
@@ -1325,7 +1325,7 @@ fi
 
 Expected: all `PASS` lines. Any `FATAL` line must be resolved before continuing.
 
-- [ ] [T-004-A-3-B] python3 standard module availability check: even when `python3` is on PATH, minimal or stripped environments (Alpine musl, Docker distroless images, conda envs with incomplete stdlib, PyPy distributions) may be missing standard library modules used by `_merge_settings_json`. All required modules are stdlib and should be present in any CPython 3.6+ installation, but the check prevents a cryptic `ModuleNotFoundError` at merge time. Add this check immediately after T-004-A-3 (bash pre-flight):
+- [X] [T-004-A-3-B] python3 standard module availability check: even when `python3` is on PATH, minimal or stripped environments (Alpine musl, Docker distroless images, conda envs with incomplete stdlib, PyPy distributions) may be missing standard library modules used by `_merge_settings_json`. All required modules are stdlib and should be present in any CPython 3.6+ installation, but the check prevents a cryptic `ModuleNotFoundError` at merge time. Add this check immediately after T-004-A-3 (bash pre-flight):
 
   ```bash
   # python3 standard module availability check
@@ -1360,7 +1360,7 @@ Expected: all `PASS` lines. Any `FATAL` line must be resolved before continuing.
 
   **install.ps1 equivalent:** PowerShell's `ConvertFrom-Json` and `[System.IO.File]::WriteAllText` are built into the .NET runtime — no module import is required. The PS 5.1 minimum version check in T-005-F is the equivalent gate.
 
-- [ ] [T-004-A-4] Mandatory early-stage backup: before any file is written or merged, `install.sh` MUST emit a timestamped backup of every `settings.json` file that will be modified. This backup runs unconditionally, at the start of the installer's main body (before any `download` or `_merge_settings_json` call), independently of the per-merge `.pre-merge.<ts>` backup inside `_merge_settings_json`. Add the following block to `install.sh` immediately after the pre-flight checks (T-004-A-2b, T-004-A-3) and before the `# ── Install global files` comment:
+- [X] [T-004-A-4] Mandatory early-stage backup: before any file is written or merged, `install.sh` MUST emit a timestamped backup of every `settings.json` file that will be modified. This backup runs unconditionally, at the start of the installer's main body (before any `download` or `_merge_settings_json` call), independently of the per-merge `.pre-merge.<ts>` backup inside `_merge_settings_json`. Add the following block to `install.sh` immediately after the pre-flight checks (T-004-A-2b, T-004-A-3) and before the `# ── Install global files` comment:
 
 ```bash
 # ── Early-stage mandatory backup ──────────────────────────────────────────────
@@ -1385,7 +1385,7 @@ _early_backup "${HOME}/.claude/settings.json"
 
 Rollback command (human operator): `cp "$HOME/.claude/settings.json.installer-backup.<ts>" "$HOME/.claude/settings.json"`. Backup files are not auto-cleaned; remove after confirming the installation is stable. The `.installer-backup.<ts>` suffix is distinct from the per-merge `.pre-merge.<ts>` suffix so both generations of backups are independently identifiable.
 
-- [ ] [T-004-A-5] Pre-installation JSON validation: before calling `_merge_settings_json` for any target path, validate that the file is parseable JSON (if it exists and is non-empty). A corrupt or truncated `settings.json` that is not caught here will cause the jq / python3 merge paths to fail mid-execution, leaving the file in a partially written state. Add the following guard function to `install.sh` immediately after `_early_backup` calls (before the `# ── Install global files` comment):
+- [X] [T-004-A-5] Pre-installation JSON validation: before calling `_merge_settings_json` for any target path, validate that the file is parseable JSON (if it exists and is non-empty). A corrupt or truncated `settings.json` that is not caught here will cause the jq / python3 merge paths to fail mid-execution, leaving the file in a partially written state. Add the following guard function to `install.sh` immediately after `_early_backup` calls (before the `# ── Install global files` comment):
 
 ```bash
 _pre_validate_json() {
@@ -1433,7 +1433,7 @@ The `_global_json_ok` / `_proj_json_ok` flags are checked in T-004-C and T-004-D
 
 The file is left unmodified. The operator must either restore from the `.installer-backup.<ts>` file or replace the root with `{}` and re-run the installer.
 
-- [ ] [T-004-A-6] Atomic write completeness audit: confirm that every code path inside `_merge_settings_json` that writes `settings.json` uses the atomic `mktemp + mv -f` pattern, with no direct `> path` or `open(path, "w")` writes that could leave the file truncated if the process is interrupted.
+- [X] [T-004-A-6] Atomic write completeness audit: confirm that every code path inside `_merge_settings_json` that writes `settings.json` uses the atomic `mktemp + mv -f` pattern, with no direct `> path` or `open(path, "w")` writes that could leave the file truncated if the process is interrupted.
 
   **mktemp GNU vs BSD compatibility:** The `mktemp` invocation form MUST be a full-path template to guarantee identical behavior on GNU coreutils (Linux), BSD mktemp (macOS 12+), and BusyBox (Alpine). The compatibility table:
 
@@ -1505,7 +1505,7 @@ The file is left unmodified. The operator must either restore from the `.install
   ```
   Expected: `PASS` line only. Any `FAIL` means a code path was missed.
 
-- [ ] [T-004-A-7] ISO 8601 structured log format mandate: all log output emitted by `install.sh`, `install.ps1`, and both hook scripts MUST conform to the unified machine-readable format already defined in the global hook header. Verify conformance across all four scripts and add a format compliance note to the installer's `warn()` / `ok()` functions.
+- [X] [T-004-A-7] ISO 8601 structured log format mandate: all log output emitted by `install.sh`, `install.ps1`, and both hook scripts MUST conform to the unified machine-readable format already defined in the global hook header. Verify conformance across all four scripts and add a format compliance note to the installer's `warn()` / `ok()` functions.
 
   **Canonical format (already defined in global hook):**
   ```
@@ -1557,7 +1557,7 @@ The file is left unmodified. The operator must either restore from the `.install
   # Expected: no output (all lines conform)
   ```
 
-- [ ] [T-004-A-8] `.claude/` directory existence and writability pre-check: before any hook file copy or `settings.json` merge, verify that the `$HOME/.claude/` directory exists and is writable by the current user. A missing or read-only `.claude/` directory will cause every subsequent step to fail with cryptic errors. Add this check at the very start of the install body (before T-004-A-4's early backup):
+- [X] [T-004-A-8] `.claude/` directory existence and writability pre-check: before any hook file copy or `settings.json` merge, verify that the `$HOME/.claude/` directory exists and is writable by the current user. A missing or read-only `.claude/` directory will cause every subsequent step to fail with cryptic errors. Add this check at the very start of the install body (before T-004-A-4's early backup):
 
   ```bash
   _global_claude_dir="${HOME}/.claude"
@@ -1608,7 +1608,7 @@ The file is left unmodified. The operator must either restore from the `.install
   Assert-ClaudeDirectory
   ```
 
-- [ ] [T-004-A-9] `--force` / `--clean` installer flag: define a `--force` flag that resets the hook configuration by removing all existing verbosity-remind entries from `settings.json` before re-registering, and a `--clean` flag that fully removes all verbosity-remind artifacts. Add argument parsing to `install.sh` immediately after the existing flag parsing block:
+- [X] [T-004-A-9] `--force` / `--clean` installer flag: define a `--force` flag that resets the hook configuration by removing all existing verbosity-remind entries from `settings.json` before re-registering, and a `--clean` flag that fully removes all verbosity-remind artifacts. Add argument parsing to `install.sh` immediately after the existing flag parsing block:
 
   ```bash
   # ── Verbosity hook flags ──────────────────────────────────────────────────────
@@ -1684,7 +1684,7 @@ The file is left unmodified. The operator must either restore from the `.install
   powershell.exe -ExecutionPolicy Bypass -Scope Process -File .\install.ps1 -CleanVerbosity
   ```
 
-- [ ] [T-004-A-10] jq version compatibility check: add a jq version gate to the pre-flight checks in `install.sh`. The jq filters used in `_merge_settings_json` (`select(all(...))`, `select(.hooks[]?.command)`) require jq **1.6+**. jq 1.5 and earlier do not support the `?` optional operator on iterator expressions, which causes the nested-format deduplication filter to silently drop all existing entries. Add this check immediately after the `bash` version check in T-004-A-3:
+- [X] [T-004-A-10] jq version compatibility check: add a jq version gate to the pre-flight checks in `install.sh`. The jq filters used in `_merge_settings_json` (`select(all(...))`, `select(.hooks[]?.command)`) require jq **1.6+**. jq 1.5 and earlier do not support the `?` optional operator on iterator expressions, which causes the nested-format deduplication filter to silently drop all existing entries. Add this check immediately after the `bash` version check in T-004-A-3:
 
   ```bash
   # jq version check: require 1.6+ for optional operator support (?.)
@@ -1728,7 +1728,7 @@ The file is left unmodified. The operator must either restore from the `.install
   }
   ```
 
-- [ ] [T-004-B] Add the global hook copy line to `install.sh`. Insert it inside the `# ── Install global files` block, in the "Agent-managed files — always overwrite" section, immediately after the existing `download "global/hooks/graphify-ast-refresh.py" ...` line.
+- [X] [T-004-B] Add the global hook copy line to `install.sh`. Insert it inside the `# ── Install global files` block, in the "Agent-managed files — always overwrite" section, immediately after the existing `download "global/hooks/graphify-ast-refresh.py" ...` line.
 
   **Pre-check — verify the target hook directory is writable and not mounted `noexec` before the copy attempt.** Add these guards immediately before the `download` call:
 
@@ -1763,7 +1763,7 @@ download "global/hooks/verbosity-remind.sh" "${GLOBAL_DIR}/hooks/verbosity-remin
 chmod +x "${GLOBAL_DIR}/hooks/verbosity-remind.sh"
 ```
 
-- [ ] [T-004-C] Add the global `settings.json` merge call. Insert it immediately after the `ok "Verbosity set to ${VERBOSITY}"` line (after the line `echo "VERBOSITY: ${VERBOSITY}" > ...`):
+- [X] [T-004-C] Add the global `settings.json` merge call. Insert it immediately after the `ok "Verbosity set to ${VERBOSITY}"` line (after the line `echo "VERBOSITY: ${VERBOSITY}" > ...`):
 
 > **settings.json path — environment override behavior:**
 > Claude Code does not expose an environment variable to redirect `settings.json` to a custom path. The path is always:
@@ -1881,7 +1881,7 @@ case "${CC_VERBOSITY_SKIP:-0}" in
 esac
 ```
 
-- [ ] [T-004-D] Add the project hook copy and merge inside the `if [ "$INSTALL_PROJECT" = true ]` block. Insert both lines immediately after the existing `chmod +x ...` line for `pre-tool-use.sh` and `post-compact.sh`.
+- [X] [T-004-D] Add the project hook copy and merge inside the `if [ "$INSTALL_PROJECT" = true ]` block. Insert both lines immediately after the existing `chmod +x ...` line for `pre-tool-use.sh` and `post-compact.sh`.
 
   **Pre-check — verify the project hook directory is writable before the copy attempt:**
 
@@ -1902,7 +1902,7 @@ _proj_hook_embedded="bash -c 'set +e; _dir=\"\${PWD:-}\"; _prev=\"\"; _iters=0; 
 _merge_settings_json "${PROJ_DIR}/settings.json" "$_proj_hook_embedded"
 ```
 
-- [ ] [T-004-E] Verify syntax:
+- [X] [T-004-E] Verify syntax:
 
 ```bash
 bash -n install.sh
@@ -1910,7 +1910,7 @@ bash -n install.sh
 
 Expected: no output, exit 0.
 
-- [ ] [T-004-F] Verify install.sh regression — confirm that all existing install functions survive the new code insertion and that hook injection is idempotent:
+- [X] [T-004-F] Verify install.sh regression — confirm that all existing install functions survive the new code insertion and that hook injection is idempotent:
 
 ```bash
 # 1. All required functions must be declared after the edits
@@ -1932,7 +1932,7 @@ rm -f "$_tmp_cfg"
 
 Expected: `PASS` for all three assertions.
 
-- [ ] [T-004-G] Clean up orphaned or renamed verbosity hook files. If a future naming convention changes (e.g., `verbosity-hook.sh` renamed to `verbosity-remind.sh`), stale copies under the old name will silently co-exist without firing. Add this cleanup block to `install.sh` immediately before the `_merge_settings_json` calls in both the global and project install sections:
+- [X] [T-004-G] Clean up orphaned or renamed verbosity hook files. If a future naming convention changes (e.g., `verbosity-hook.sh` renamed to `verbosity-remind.sh`), stale copies under the old name will silently co-exist without firing. Add this cleanup block to `install.sh` immediately before the `_merge_settings_json` calls in both the global and project install sections:
 
 ```bash
 # Remove any verbosity hook files that no longer match the current filename.
@@ -1948,7 +1948,7 @@ done
 
 Apply the same loop for `${PROJ_DIR}/hooks/verbosity-*.sh` inside the `--project` block.
 
-- [ ] [T-004-H] Post-install verification: immediately after all install steps complete, invoke the hook in diagnostic mode to confirm it executes successfully end-to-end. Add this block at the end of the main install body (after all `_merge_settings_json` calls):
+- [X] [T-004-H] Post-install verification: immediately after all install steps complete, invoke the hook in diagnostic mode to confirm it executes successfully end-to-end. Add this block at the end of the main install body (after all `_merge_settings_json` calls):
 
 ```bash
 echo ""
@@ -1980,7 +1980,7 @@ echo "── End diagnostic ─────────────────�
 
 Expected: `PASS: exec bit set` and `PASS: hook exits 0`. The `[VERBOSITY:]` line is present only if `$HOME/.claude/memory/verbosity.md` exists; INFO on absent file is normal immediately after a fresh install.
 
-- [ ] [T-004-I] Post-install log verification: invoke the hook once and confirm it wrote a structured log entry to `$HOME/.claude/logs/verbosity-hook.log`. This verifies end-to-end that the hook is active, the log file is writable, and the `_write_log` function is reachable. Run after T-004-H:
+- [X] [T-004-I] Post-install log verification: invoke the hook once and confirm it wrote a structured log entry to `$HOME/.claude/logs/verbosity-hook.log`. This verifies end-to-end that the hook is active, the log file is writable, and the `_write_log` function is reachable. Run after T-004-H:
 
 ```bash
 _logfile="$HOME/.claude/logs/verbosity-hook.log"
@@ -2013,7 +2013,7 @@ else
 fi
 ```
 
-- [ ] [T-004-I-2] Final install.sh stderr summary for CI/CD: add a structured summary block at the very end of `install.sh`'s main body (after T-004-H, T-004-I, all merge calls, and CC_VERBOSITY_SKIP warning). This block writes a machine-readable exit summary to **stderr** so CI/CD pipelines can parse it independently of stdout install noise:
+- [X] [T-004-I-2] Final install.sh stderr summary for CI/CD: add a structured summary block at the very end of `install.sh`'s main body (after T-004-H, T-004-I, all merge calls, and CC_VERBOSITY_SKIP warning). This block writes a machine-readable exit summary to **stderr** so CI/CD pipelines can parse it independently of stdout install noise:
 
 ```bash
 # ── Final install summary (stderr, machine-readable) ──────────────────────────
@@ -2073,7 +2073,7 @@ exit "$_install_exit_code"
 **Files:**
 - Modify: `install.ps1`
 
-- [ ] [T-005-A] Add the `Merge-SettingsJson` function to `install.ps1`. Insert it immediately after the `Save-RemoteFile` function definition (after the closing `}` of that function, before the `# -- Install global files` comment):
+- [X] [T-005-A] Add the `Merge-SettingsJson` function to `install.ps1`. Insert it immediately after the `Save-RemoteFile` function definition (after the closing `}` of that function, before the `# -- Install global files` comment):
 
 ```powershell
 # -- settings.json merge helper -------------------------------------------------
@@ -2240,20 +2240,20 @@ function Merge-SettingsJson {
 }
 ```
 
-- [ ] [T-005-B] Add the global hook copy to the "Agent-managed -- always overwrite" section of `install.ps1`, immediately after the `Save-RemoteFile "global/hooks/graphify-ast-refresh.py" ...` line:
+- [X] [T-005-B] Add the global hook copy to the "Agent-managed -- always overwrite" section of `install.ps1`, immediately after the `Save-RemoteFile "global/hooks/graphify-ast-refresh.py" ...` line:
 
 ```powershell
 Save-RemoteFile "global/hooks/verbosity-remind.sh" "$GLOBAL_DIR\hooks\verbosity-remind.sh"
 ```
 
-- [ ] [T-005-C] Add the global `settings.json` merge call immediately after the `Write-Ok "Verbosity set to $Verbosity"` line:
+- [X] [T-005-C] Add the global `settings.json` merge call immediately after the `Write-Ok "Verbosity set to $Verbosity"` line:
 
 ```powershell
 $globalHookCmd = "bash $env:USERPROFILE/.claude/hooks/verbosity-remind.sh"
 Merge-SettingsJson "$GLOBAL_DIR\settings.json" $globalHookCmd
 ```
 
-- [ ] [T-005-D] Add the project hook copy and merge call inside the `if ($Project)` block, immediately after the existing `Save-RemoteFile "project-template/.claude/hooks/post-compact.sh"` line:
+- [X] [T-005-D] Add the project hook copy and merge call inside the `if ($Project)` block, immediately after the existing `Save-RemoteFile "project-template/.claude/hooks/post-compact.sh"` line:
 
 ```powershell
 Save-RemoteFile "project-template/.claude/hooks/verbosity-remind.sh" "$projDir\hooks\verbosity-remind.sh"
@@ -2271,7 +2271,7 @@ Notes:
 - The `'@` closing delimiter MUST be at column 0 (no indentation) — PowerShell parses it as a literal terminator only when it appears at the start of a line.
 - Verify the result matches T-003's JSON `command` value: `$projHookEmbedded -eq (Get-Content project-template\.claude\settings.json | ConvertFrom-Json).hooks.UserPromptSubmit[0].hooks[0].command`
 
-- [ ] [T-005-E] Verify PowerShell syntax (Windows only). On locked-down workstations the default `Restricted` ExecutionPolicy blocks all script execution, including spawning child `powershell.exe` processes. Use the `-ExecutionPolicy Bypass -Scope Process` form to limit the override to the current process only — no elevation required:
+- [X] [T-005-E] Verify PowerShell syntax (Windows only). On locked-down workstations the default `Restricted` ExecutionPolicy blocks all script execution, including spawning child `powershell.exe` processes. Use the `-ExecutionPolicy Bypass -Scope Process` form to limit the override to the current process only — no elevation required:
 
 ```powershell
 powershell.exe -ExecutionPolicy Bypass -Scope Process -NoProfile -Command {
@@ -2297,7 +2297,7 @@ Expected: `Syntax OK`. `Resolve-Path '.\install.ps1'` always converts the relati
 
 The static parser method does not execute any code in `install.ps1`; it only tokenizes and validates syntax, so even destructive commands in the file are never run during this check.
 
-- [ ] [T-005-F] Document the required invocation form for `install.ps1` on restricted Windows workstations. Add this note to the installer's header comment block (lines 1–6 of `install.ps1`), immediately after the existing usage examples:
+- [X] [T-005-F] Document the required invocation form for `install.ps1` on restricted Windows workstations. Add this note to the installer's header comment block (lines 1–6 of `install.ps1`), immediately after the existing usage examples:
 
 ```powershell
 #        powershell.exe -ExecutionPolicy Bypass -Scope Process -File .\install.ps1
@@ -2335,7 +2335,7 @@ If the version is below 5.1, the ConvertFrom-Json path will produce incomplete o
 
 The `-Scope Process` flag limits the policy relaxation to the current PowerShell session only; it does not persist to the machine or user scope and does not require elevation. The script must not call `Set-ExecutionPolicy` internally — doing so requires elevation and silently fails for non-admin users.
 
-- [ ] [T-005-G] Verify install.ps1 regression — confirm existing functions survive the new code insertion and that `Merge-SettingsJson` is idempotent:
+- [X] [T-005-G] Verify install.ps1 regression — confirm existing functions survive the new code insertion and that `Merge-SettingsJson` is idempotent:
 
 ```powershell
 # 1. All required functions must be present
@@ -2366,7 +2366,7 @@ powershell.exe -ExecutionPolicy Bypass -Scope Process -NoProfile -Command {
 
 Expected: `PASS` for all three assertions. If `install.ps1` does not support `-WhatIf`, omit the flag and ensure the script does not perform network operations when dot-sourced without arguments.
 
-- [ ] [T-005-H] Windows-only: verify that `bash` is available and correctly resolved in the system PATH before trusting that hook commands will function at runtime. The hook command registered in `settings.json` uses the form `bash <path>/verbosity-remind.sh`, so `bash` must be on PATH in the environment where Claude Code is launched:
+- [X] [T-005-H] Windows-only: verify that `bash` is available and correctly resolved in the system PATH before trusting that hook commands will function at runtime. The hook command registered in `settings.json` uses the form `bash <path>/verbosity-remind.sh`, so `bash` must be on PATH in the environment where Claude Code is launched:
 
 ```powershell
 # Step 1: Confirm bash is reachable from PowerShell
@@ -2395,7 +2395,7 @@ Expected: `PASS` on both lines. If `bash` is not found, Claude Code will silentl
 
 Note: PowerShell 5.1 does not support the `?.` null-conditional operator — the `.Source` property access above assumes `Get-Command` returned a non-null result, guarded by the `if ($bashPath)` check on the next line.
 
-- [ ] [T-005-I] Post-install hook trigger — install.ps1 equivalent of T-004-H. After all `Merge-SettingsJson` calls complete, invoke the global hook once to confirm it is correctly registered, reachable, and executable. Add this block at the end of `install.ps1`'s main body (after all `Merge-SettingsJson` calls and the project-hook section):
+- [X] [T-005-I] Post-install hook trigger — install.ps1 equivalent of T-004-H. After all `Merge-SettingsJson` calls complete, invoke the global hook once to confirm it is correctly registered, reachable, and executable. Add this block at the end of `install.ps1`'s main body (after all `Merge-SettingsJson` calls and the project-hook section):
 
 ```powershell
 # ── Post-install hook trigger ──────────────────────────────────────────────────
@@ -2439,7 +2439,7 @@ if (Test-Path $hookPath) {
 
 Expected: `PASS: post-install hook trigger succeeded (exit 0)` and `PASS: settings.json contains exactly 1 verbosity-remind entry`. Any `ERROR` or `WARNING` line requires investigation before declaring the install complete.
 
-- [ ] [T-005-J] Mandatory early-stage backup for install.ps1 — equivalent of T-004-A-4. Add this block to `install.ps1` immediately after the pre-flight checks and before the `# -- Install global files` comment:
+- [X] [T-005-J] Mandatory early-stage backup for install.ps1 — equivalent of T-004-A-4. Add this block to `install.ps1` immediately after the pre-flight checks and before the `# -- Install global files` comment:
 
 ```powershell
 # ── Early-stage mandatory backup ───────────────────────────────────────────────
@@ -2485,7 +2485,7 @@ The equivalent contract for `install.sh` (add to its header `# Exit codes:` bloc
 # and exit 0 so CI pipelines are not blocked by a missing project settings.json.
 ```
 
-- [ ] [T-005-J-2] Final install.ps1 stderr summary for CI/CD — install.ps1 equivalent of T-004-I-2. Add this block at the very end of `install.ps1`'s main body (after T-005-I and all merge calls):
+- [X] [T-005-J-2] Final install.ps1 stderr summary for CI/CD — install.ps1 equivalent of T-004-I-2. Add this block at the very end of `install.ps1`'s main body (after T-005-I and all merge calls):
 
 ```powershell
 # ── Final install summary (stderr, machine-readable) ──────────────────────────
@@ -2528,7 +2528,7 @@ exit $exitCode
 
 Update the `## Application` section to describe hook-driven enforcement. The level definitions are unchanged.
 
-- [ ] [T-006] Replace the `## Application` section of `skills/verbosity.md`:
+- [X] [T-006] Replace the `## Application` section of `skills/verbosity.md`:
 
 Old content (lines 22–24):
 ```
@@ -2551,7 +2551,7 @@ VERBOSITY_HOOK_VERSION: 1.11.0
 
 The `VERBOSITY_HOOK_VERSION:` line serves as a machine-readable migration marker. Future versions of `verbosity-remind.sh` can read this field to detect legacy configurations and perform automatic upgrades (e.g., format changes, new token syntax). The hook ignores lines it does not recognise — `VERBOSITY_HOOK_VERSION` is not a verbosity token and will not affect level detection. Future hook authors: parse this with `grep -m1 '^VERBOSITY_HOOK_VERSION:' verbosity.md | cut -d: -f2 | tr -d ' '` and compare against the minimum supported version.
 
-- [ ] [T-006-A] Verify the file looks correct:
+- [X] [T-006-A] Verify the file looks correct:
 
 ```bash
 grep -A6 "## Application" skills/verbosity.md
@@ -2559,7 +2559,7 @@ grep -A6 "## Application" skills/verbosity.md
 
 Expected: shows the new two-paragraph Application section.
 
-- [ ] [T-006-B] Verify that the `VERBOSITY_HOOK_VERSION` parser is robust against unexpected formatting or missing lines. Future hook versions that read this field must apply the following defensive parse:
+- [X] [T-006-B] Verify that the `VERBOSITY_HOOK_VERSION` parser is robust against unexpected formatting or missing lines. Future hook versions that read this field must apply the following defensive parse:
 
 ```bash
 # Robust parser for VERBOSITY_HOOK_VERSION — handles all edge cases:
@@ -2590,7 +2590,7 @@ Run this verification after T-006 to confirm the version key is present and pars
 
 This test harness covers the 14-row cascading verification matrix from the spec plus key error cases. It uses a temp directory to simulate filesystem layouts without touching `$HOME`.
 
-- [ ] [T-007] Write `tests/verbosity-hook-test.sh`:
+- [X] [T-007] Write `tests/verbosity-hook-test.sh`:
 
 ```bash
 #!/usr/bin/env bash
@@ -2872,7 +2872,7 @@ echo "  Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1
 ```
 
-- [ ] [T-007-A] Run the test harness. All tests must pass:
+- [X] [T-007-A] Run the test harness. All tests must pass:
 
 ```bash
 bash tests/verbosity-hook-test.sh
@@ -2912,7 +2912,7 @@ Expected: `Results: N passed, 0 failed`
 
 The test harness (`tests/verbosity-hook-test.sh`) must cover T-HK-01 through T-HK-14 as automated assertions. T-INS-* and T-UNI-* rows are covered by T-004-F, T-005-G, and T-007-B/T-007-C/T-007-D verification steps respectively; they are not automated in the test harness but must be checked manually before T-009.
 
-- [ ] [T-007-B] Guard against post-edit drift: verify that the manual fallback echo line in `install.sh` still emits valid JSON matching T-003's nested `{matcher, hooks:[{type,command}]}` schema (T-004-A-1 checked this at insert time; this step re-checks against the final file):
+- [X] [T-007-B] Guard against post-edit drift: verify that the manual fallback echo line in `install.sh` still emits valid JSON matching T-003's nested `{matcher, hooks:[{type,command}]}` schema (T-004-A-1 checked this at insert time; this step re-checks against the final file):
 
 ```bash
 python3 - <<'PYEOF'
@@ -2963,7 +2963,7 @@ PYEOF
 
 Expected: `Schema OK: fallback in install.sh matches T-003 nested format`. If this fails, the `echo` line in `_merge_settings_json`'s manual fallback block has drifted from T-003's schema and must be corrected before proceeding to T-008.
 
-- [ ] [T-007-C] Verify that `install.ps1`'s `Merge-SettingsJson` generates the same T-003 nested structure `{matcher, hooks:[{type,command}]}` that `install.sh` produces. Run the idempotency fixture from T-005-G and then inspect the output:
+- [X] [T-007-C] Verify that `install.ps1`'s `Merge-SettingsJson` generates the same T-003 nested structure `{matcher, hooks:[{type,command}]}` that `install.sh` produces. Run the idempotency fixture from T-005-G and then inspect the output:
 
 ```powershell
 powershell.exe -ExecutionPolicy Bypass -Scope Process -NoProfile -Command {
@@ -2987,7 +2987,7 @@ powershell.exe -ExecutionPolicy Bypass -Scope Process -NoProfile -Command {
 
 Expected: `Schema OK: install.ps1 output matches T-003 nested format`.
 
-- [ ] [T-007-D] Pre-flight writability check for Task 9 release files — verify that `VERSION` and `CHANGELOG.md` are writable (or absent, in which case they will be created) before T-009 attempts to modify them:
+- [X] [T-007-D] Pre-flight writability check for Task 9 release files — verify that `VERSION` and `CHANGELOG.md` are writable (or absent, in which case they will be created) before T-009 attempts to modify them:
 
 ```bash
 _check_writable() {
@@ -3011,7 +3011,7 @@ _check_writable CHANGELOG.md
 
 Expected: both lines print `PASS`. If either prints `FAIL`, resolve the permission issue before executing T-009-C/D.
 
-- [ ] [T-007-E] Standardized log file cleanup procedure for `~/.claude/logs/`: the hook and installer write to `$HOME/.claude/logs/verbosity-hook.log`, and state files such as `.verbosity-fence-warned` accumulate in the same directory. Document the cleanup procedure and add a maintenance helper to `install.sh` that operators can invoke manually. Add this block to `install.sh` as a callable function (not automatically invoked):
+- [X] [T-007-E] Standardized log file cleanup procedure for `~/.claude/logs/`: the hook and installer write to `$HOME/.claude/logs/verbosity-hook.log`, and state files such as `.verbosity-fence-warned` accumulate in the same directory. Document the cleanup procedure and add a maintenance helper to `install.sh` that operators can invoke manually. Add this block to `install.sh` as a callable function (not automatically invoked):
 
 ```bash
 # ── Log maintenance helper ─────────────────────────────────────────────────────
@@ -3110,7 +3110,7 @@ done
 
 **No files changed in this task.**
 
-- [ ] [T-008] Verify global hook emits the correct verbosity line with explicit assertions:
+- [X] [T-008] Verify global hook emits the correct verbosity line with explicit assertions:
 
 ```bash
 # Confirm verbosity.md contains a valid VERBOSITY: token
@@ -3149,7 +3149,7 @@ The `cat -v` in the failure branch renders any non-printable bytes as visible es
 
 At the median Claude session (60–120 prompts), the total overhead is **600–2 000 tokens** — approximately 0.3–1% of a 200k-token context. This cost is intentional and constant: context filling does not increase the per-prompt overhead; the hook always injects the same string regardless of how full the context is. Engineers running tight token budgets can set `CC_VERBOSITY_SKIP=1` in CI environments where verbosity enforcement is not needed.
 
-- [ ] [T-008-A] Verify the 50ms performance ceiling (median of 10 warm runs ≤ 50ms):
+- [X] [T-008-A] Verify the 50ms performance ceiling (median of 10 warm runs ≤ 50ms):
 
 ```bash
 # Cold discard — prime disk cache, not measured
@@ -3185,7 +3185,7 @@ printf '%s\n' "${_times[@]}" | sort -n | awk '
 
 Expected: all 10 samples print below 150 ms; median prints `PASS: median within 50ms ceiling`.
 
-- [ ] [T-008-B] Verify hook registration persists across terminal session refreshes:
+- [X] [T-008-B] Verify hook registration persists across terminal session refreshes:
 
 The hook is invoked by Claude Code on every `UserPromptSubmit` event, not by the shell. Its registration lives in `settings.json` — a static file read when Claude Code starts. "Persistence across sessions" means the entry survives in `settings.json` after the installer runs, regardless of whether the calling shell's environment is refreshed (e.g. `exec $SHELL`, `source ~/.bashrc`).
 
@@ -3228,7 +3228,7 @@ env -i HOME="$HOME" PATH="/usr/bin:/bin" bash "$HOME/.claude/hooks/verbosity-rem
 
 Expected: all three steps print `PASS`. Step 3 uses `env -i` to strip session-specific variables (PS1, TERM, COLORTERM, etc.) that might otherwise mask hook output differences between a fresh terminal and the current session.
 
-- [ ] [T-008-C] Hook self-invocation validation — confirm the hook can invoke itself from the exact same execution path that Claude Code will use (i.e., the command string registered in `settings.json`), rather than via a bare `bash <path>` shortcut. This catches path resolution issues, quoting bugs in the registered command, and execution policy problems that would not appear in a direct bash invocation.
+- [X] [T-008-C] Hook self-invocation validation — confirm the hook can invoke itself from the exact same execution path that Claude Code will use (i.e., the command string registered in `settings.json`), rather than via a bare `bash <path>` shortcut. This catches path resolution issues, quoting bugs in the registered command, and execution policy problems that would not appear in a direct bash invocation.
 
   **Step 1 — Extract the registered command string from settings.json:**
   ```bash
@@ -3285,7 +3285,7 @@ Expected: all three steps print `PASS`. Step 3 uses `env -i` to strip session-sp
 
 **No files changed in this task.**
 
-- [ ] [T-009] Stage all new and modified files. The table below maps each file to its repository source path (relative to repo root) and whether `-f` is required:
+- [>] [T-009] Stage all new and modified files. The table below maps each file to its repository source path (relative to repo root) and whether `-f` is required:
 
 | File | Repo source path | `-f` needed? | Reason |
 |------|-----------------|-------------|--------|

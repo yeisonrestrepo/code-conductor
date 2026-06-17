@@ -3,10 +3,15 @@
 #        & ([ScriptBlock]::Create((irm https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.ps1))) -Project
 #        & ([ScriptBlock]::Create((irm https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.ps1))) -NoDeps
 #        & ([ScriptBlock]::Create((irm https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.ps1))) -Verbosity INFO
+#        powershell.exe -ExecutionPolicy Bypass -File .\install.ps1
+# Restricted/AllSigned policy: powershell.exe -ExecutionPolicy Bypass -File .\install.ps1
+# Minimum: Windows PowerShell 5.1. Check: $PSVersionTable.PSVersion (Major>=5, Minor>=1)
+# Exit codes: 0=success  4=post-install verification failure (hook registered but exec failed)
 
 param(
   [switch]$Project,
   [switch]$NoDeps,
+  [switch]$CleanupLogs,
   [ValidateSet("MIN","INFO","VERBOSE")]
   [string]$Verbosity = "MIN"
 )
@@ -195,6 +200,40 @@ if (-not $NoDeps) {
   }
 }
 
+# -- Log maintenance helper (T-007-E) ------------------------------------------
+# Usage: .\install.ps1 -CleanupLogs
+function Invoke-LogCleanup {
+    $logsDir = Join-Path $env:USERPROFILE ".claude\logs"
+    $log     = Join-Path $logsDir "verbosity-hook.log"
+    Write-Host "[verbosity-remind] INFO: starting log cleanup in $logsDir"
+    # 1. Expired fence-warned markers
+    Get-ChildItem $logsDir -Filter '.verbosity-fence-warned' -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTime -lt (Get-Date).AddMinutes(-60) } |
+        ForEach-Object { Remove-Item $_.FullName -Force -ErrorAction SilentlyContinue }
+    # 2. Stale temp files from failed installs
+    Get-ChildItem (Join-Path $env:USERPROFILE ".claude") -Recurse -Depth 2 -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^settings\.json\.(tmp|installer-backup|pre-merge|clean|force)\.' -and
+                       $_.LastWriteTime -lt (Get-Date).AddMinutes(-10) } |
+        ForEach-Object { Remove-Item $_.FullName -Force -ErrorAction SilentlyContinue }
+    # 3. Log rotation (>1 MB)
+    if (Test-Path $log) {
+        $sz = (Get-Item $log).Length
+        if ($sz -gt 1MB) {
+            $ts = Get-Date -Format 'yyyyMMddHHmmss'
+            Move-Item $log ($log + ".$ts.rotated") -Force -ErrorAction SilentlyContinue
+            Write-Host "  PASS: log rotated ($sz bytes)"
+        } else { Write-Host "  INFO: log size $sz bytes — no rotation needed." }
+    }
+    # 4. Backup files older than 30 days
+    Get-ChildItem (Join-Path $env:USERPROFILE ".claude") -Recurse -Depth 2 -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match 'installer-backup\.|pre-merge\.' -and
+                       $_.LastWriteTime -lt (Get-Date).AddDays(-30) } |
+        ForEach-Object { Remove-Item $_.FullName -Force -ErrorAction SilentlyContinue }
+    Write-Host "[verbosity-remind] INFO: log cleanup complete."
+}
+
+if ($CleanupLogs) { Invoke-LogCleanup; exit 0 }
+
 # -- Download helper ------------------------------------------------------------
 function Save-RemoteFile {
   param([string]$Src, [string]$Dest, [bool]$Overwrite = $true)
@@ -215,6 +254,129 @@ function Save-RemoteFile {
   }
 }
 
+# -- settings.json merge helper -------------------------------------------------
+# Requires PS 5.1+ (ships with Windows 10). ALL writes use the .NET
+# WriteAllText API with UTF-8-no-BOM encoding — never Set-Content or Out-File,
+# which write UTF-16 LE with BOM on PS 5.1 and break Claude Code's JSON parser.
+function Merge-SettingsJson {
+    param([string]$SettingsPath, [string]$HookCmd)
+
+    # Pre-execution timestamped backup
+    if (Test-Path $SettingsPath) {
+        $bkTs = Get-Date -Format "yyyyMMddHHmmss"
+        $bkDst = $SettingsPath + ".pre-merge." + $bkTs
+        try {
+            Copy-Item $SettingsPath $bkDst -ErrorAction Stop
+            Write-Host "  [verbosity-remind] backed up -> $bkDst"
+        } catch {
+            Write-Warning "[verbosity-remind] WARN: Could not write pre-merge backup."
+        }
+    }
+
+    # Read-only guard
+    if (Test-Path $SettingsPath) {
+        $fi = Get-Item $SettingsPath
+        if ($fi.IsReadOnly) {
+            try { $fi.IsReadOnly = $false } catch {
+                Write-Error "[verbosity-remind] ERROR: $SettingsPath is read-only and cannot be cleared."
+                return
+            }
+        }
+    }
+
+    # Idempotency pre-check: skip merge if the hook command is already present
+    if (Test-Path $SettingsPath) {
+        try {
+            $check = Get-Content $SettingsPath -Raw -Encoding utf8 | ConvertFrom-Json
+            $existing_arr = @()
+            if ($check.hooks -and $check.hooks.PSObject.Properties['UserPromptSubmit']) {
+                $existing_arr = @($check.hooks.UserPromptSubmit)
+            }
+            $already = $existing_arr | Where-Object {
+                $hks = $_.hooks
+                if ($hks -is [array]) { $hks | Where-Object { $_.command -eq $HookCmd } }
+                else { $_.command -eq $HookCmd }
+            }
+            if ($already) {
+                Write-Host "  [verbosity-remind] settings.json already contains hook -- skipping (idempotent)"
+                return
+            }
+        } catch { }
+    }
+
+    # Parse existing file or start from empty object
+    $doc = $null
+    if (Test-Path $SettingsPath) {
+        try {
+            $doc = Get-Content $SettingsPath -Raw -Encoding utf8 | ConvertFrom-Json
+        } catch {
+            Write-Warning "[verbosity-remind] WARN: settings.json malformed -- backing up and starting fresh."
+            $ts = Get-Date -Format "yyyyMMddHHmmss"
+            $rnd = [System.Guid]::NewGuid().ToString('N').Substring(0, 8)
+            Copy-Item $SettingsPath ($SettingsPath + ".bak." + $ts + "." + $rnd) -ErrorAction SilentlyContinue
+        }
+    }
+    if ($null -eq $doc) { $doc = [PSCustomObject]@{} }
+
+    # Ensure hooks object exists
+    if ($null -eq $doc.hooks -or $doc.hooks -isnot [PSCustomObject]) {
+        $doc | Add-Member -Force -NotePropertyName hooks -NotePropertyValue ([PSCustomObject]@{})
+    }
+
+    # Ensure UserPromptSubmit array exists and strip any stale verbosity-remind entries
+    $arr = @()
+    if ($doc.hooks.PSObject.Properties['UserPromptSubmit'] -and
+            $doc.hooks.UserPromptSubmit -is [array]) {
+        $arr = @($doc.hooks.UserPromptSubmit | Where-Object {
+            $hks = $_.hooks
+            if ($hks -is [array]) {
+                -not ($hks | Where-Object { $_.command -like "*verbosity-remind.sh*" })
+            } else {
+                $_.command -notlike "*verbosity-remind.sh*"
+            }
+        })
+    }
+
+    # Append the new entry in nested format
+    $entry = [PSCustomObject]@{
+        matcher = ""
+        hooks   = @([PSCustomObject]@{ type = "command"; command = $HookCmd })
+    }
+    $arr += $entry
+    $doc.hooks | Add-Member -Force -NotePropertyName UserPromptSubmit -NotePropertyValue $arr
+
+    # Atomic write: temp file + rename (NTFS rename is atomic)
+    $json = $doc | ConvertTo-Json -Depth 10
+    $rnd = [System.Guid]::NewGuid().ToString('N').Substring(0, 8)
+    $tmp = $SettingsPath + ".tmp." + $rnd
+    try {
+        $enc = New-Object System.Text.UTF8Encoding($false)
+        [System.IO.File]::WriteAllText($tmp, $json, $enc)
+        Move-Item -Path $tmp -Destination $SettingsPath -Force
+        Write-Host "  [verbosity-remind] OK: settings.json updated (UTF-8 no BOM)"
+    } catch {
+        Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+        Write-Error "[verbosity-remind] ERROR: Atomic write to $SettingsPath failed: $_"
+    }
+}
+
+# ── Early-stage mandatory backup (T-005-J) ─────────────────────────────────────
+function Backup-EarlySettings {
+    param([string]$Path)
+    if (-not (Test-Path $Path)) { return }
+    $ts = Get-Date -Format 'yyyyMMddHHmmss'
+    $bak = $Path + ".installer-backup." + $ts
+    try {
+        Copy-Item -Path $Path -Destination $bak -Force
+        Write-Host "  [verbosity-remind] early backup: $Path -> $bak"
+    } catch {
+        Write-Warning "[verbosity-remind] WARN: could not write early backup of $Path."
+        Write-Warning "  Proceeding without early backup -- per-merge backup inside Merge-SettingsJson is still active."
+    }
+}
+Backup-EarlySettings "$env:USERPROFILE\.claude\settings.json"
+if ($Project) { Backup-EarlySettings ".claude\settings.json" }
+
 # -- Install global files -------------------------------------------------------
 Write-Host ""
 Write-Info "Installing global Claude files to $GLOBAL_DIR..."
@@ -229,6 +391,7 @@ Save-RemoteFile "global/CLAUDE.md"         "$GLOBAL_DIR\CLAUDE.md"         $fals
 Save-RemoteFile "global/settings.json"      "$GLOBAL_DIR\settings.json"      $false
 Save-RemoteFile "global/memory/personal.md" "$GLOBAL_DIR\memory\personal.md" $false
 Save-RemoteFile "global/hooks/graphify-ast-refresh.py" "$GLOBAL_DIR\hooks\graphify-ast-refresh.py" $false
+Save-RemoteFile "global/hooks/verbosity-remind.sh" "$GLOBAL_DIR\hooks\verbosity-remind.sh"
 
 # Agent-managed -- always overwrite
 Save-RemoteFile "global/commands/cc-checkpoint.md" "$GLOBAL_DIR\commands\cc-checkpoint.md"
@@ -248,6 +411,10 @@ foreach ($stackProfile in @("_base","_multi-stack","_template","javascript","typ
 
 "VERBOSITY: $Verbosity" | Set-Content "$GLOBAL_DIR\memory\verbosity.md" -Encoding utf8
 Write-Ok "Verbosity set to $Verbosity"
+
+# Global settings.json merge (T-005-C)
+$globalHookCmd = "bash $env:USERPROFILE/.claude/hooks/verbosity-remind.sh"
+Merge-SettingsJson "$GLOBAL_DIR\settings.json" $globalHookCmd
 
 # -- Install project template ---------------------------------------------------
 if ($Project) {
@@ -271,6 +438,15 @@ if ($Project) {
   Save-RemoteFile "project-template/.claude/hooks/pre-tool-use.sh"  "$projDir\hooks\pre-tool-use.sh"
   Save-RemoteFile "project-template/.claude/hooks/post-compact.sh"  "$projDir\hooks\post-compact.sh"
 
+  # Project verbosity hook copy + settings.json merge (T-005-D)
+  Save-RemoteFile "project-template/.claude/hooks/verbosity-remind.sh" "$projDir\hooks\verbosity-remind.sh"
+  # Single-quoted here-string: bash variables like ${PWD:-}, $_dir, $_h are NOT expanded by PS.
+  # The closing '@ MUST be at column 0.
+  $projHookEmbedded = (@'
+bash -c 'set +e; _dir="${PWD:-}"; _prev=""; _iters=0; while [ "$_dir" != "$_prev" ] && [ "$_iters" -lt 40 ]; do _h="$_dir/.claude/hooks/verbosity-remind.sh"; [ -f "$_h" ] && [ -r "$_h" ] && { bash "$_h"; exit $?; }; _prev="$_dir"; _dir="${_dir%/*}"; [ -z "$_dir" ] && _dir=/; _iters=$((_iters+1)); done; exit 0'
+'@).TrimEnd()
+  Merge-SettingsJson "$projDir\settings.json" $projHookEmbedded
+
   if ((Get-Command graphify -ErrorAction SilentlyContinue) -and (Get-Command claude -ErrorAction SilentlyContinue)) {
     Install-Dep "Graphify project graph" "graphify .; graphify hook install; claude mcp add graphify 'python -m graphify.serve graphify-out/graph.json'"
   }
@@ -289,6 +465,52 @@ if ($Project) {
     Add-Content -Path $gitignore -Value $entry
     Write-Ok "Added $entry to .gitignore"
   }
+}
+
+# ── Post-install hook trigger (T-005-I) ────────────────────────────────────────
+$hookPath = Join-Path $GLOBAL_DIR "hooks\verbosity-remind.sh"
+if (-not (Test-Path $hookPath)) {
+    Write-Warning "[verbosity-remind] ERROR: hook not found at $hookPath after install. Re-run installer."
+} else {
+    $bashExe = (Get-Command bash -ErrorAction SilentlyContinue).Source
+    if (-not $bashExe) {
+        Write-Warning "[verbosity-remind] ERROR: bash not found on PATH. Install Git for Windows and add bash to PATH."
+    } else {
+        $result = & $bashExe $hookPath 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "PASS: post-install hook trigger succeeded (exit 0)"
+        } else {
+            Write-Warning "[verbosity-remind] ERROR exec: hook exited $LASTEXITCODE"
+        }
+        $settingsPath = "$env:USERPROFILE\.claude\settings.json"
+        if (Test-Path $settingsPath) {
+            try {
+                $sd = Get-Content $settingsPath -Raw -Encoding utf8 | ConvertFrom-Json
+                $vcount = 0
+                $ups = @()
+                if ($sd.hooks -and $sd.hooks.PSObject.Properties['UserPromptSubmit']) {
+                    $ups = @($sd.hooks.UserPromptSubmit)
+                }
+                foreach ($e in $ups) {
+                    $hks = $e.hooks
+                    if ($hks -is [array]) {
+                        foreach ($h in $hks) {
+                            if ($h.command -like "*verbosity-remind*") { $vcount++ }
+                        }
+                    }
+                }
+                if ($vcount -eq 1) {
+                    Write-Host "PASS: settings.json contains exactly 1 verbosity-remind entry"
+                } elseif ($vcount -gt 1) {
+                    Write-Warning "[verbosity-remind] ERROR json: $vcount duplicate entries. Re-run installer."
+                } else {
+                    Write-Warning "[verbosity-remind] ERROR json: 0 verbosity-remind entries. Re-run installer."
+                }
+            } catch {
+                Write-Warning "[verbosity-remind] WARN: Could not parse settings.json for entry count."
+            }
+        }
+    }
 }
 
 # -- Final report ---------------------------------------------------------------
@@ -323,3 +545,24 @@ if ($FailedDeps.Count -gt 0) {
 }
 
 Write-Host ""
+
+# ── Final install summary (stderr, machine-readable) (T-005-J-2) ───────────────
+# CI/CD: capture with (.\install.ps1 2>&1) | Select-String '\[verbosity-remind\] INSTALL'
+$summaryGlobal = if (Test-Path "$GLOBAL_DIR\hooks\verbosity-remind.sh") { 'OK' } else { 'FAIL(missing)' }
+$summaryProject = 'SKIP'
+if ($Project) {
+    $summaryProject = if (Test-Path "$projDir\hooks\verbosity-remind.sh") { 'OK' } else { 'FAIL(missing)' }
+}
+$settingsPath2 = "$env:USERPROFILE\.claude\settings.json"
+$summarySettings = 'UNKNOWN'
+if (Test-Path $settingsPath2) {
+    try {
+        $raw2 = Get-Content $settingsPath2 -Raw -Encoding utf8
+        $summarySettings = if ($raw2 -match 'verbosity-remind') { 'OK(text-match)' } else { 'FAIL(not-found)' }
+    } catch {
+        $summarySettings = 'FAIL(parse-error)'
+    }
+}
+$exitCode2 = if ($summaryGlobal -eq 'OK' -and $summarySettings -like 'OK*') { 0 } else { 4 }
+[Console]::Error.WriteLine("[verbosity-remind] INSTALL global=$summaryGlobal project=$summaryProject settings=$summarySettings exit=$exitCode2")
+exit $exitCode2
