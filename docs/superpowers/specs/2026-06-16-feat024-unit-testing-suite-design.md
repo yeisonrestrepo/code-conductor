@@ -34,7 +34,8 @@ Introduce a Vitest-based test suite rooted at a new `package.json` in the repo r
 - **npm not on PATH** (GUI git client): pre-commit hook detects missing `npm` and exits 0 with a warning message — commit is not blocked silently.
 - **Existing pre-commit hook**: installer appends a `# code-conductor` guard block; if the block is already present, it skips silently (idempotent).
 - **Non-git environment** (zip extract, container): installer checks `git rev-parse --git-dir` before touching hooks; no-ops gracefully.
-- **Windows host**: `afterEach` uses `fs.rmSync(tmpDir, { recursive: true, force: true })`; stdout assertions normalize `\r\n → \n` before comparison.
+- **Windows host**: `afterEach` uses `fs.rmSync(tmpDir, { recursive: true, force: true })`; stdout assertions normalize `\r\n → \n` before comparison. `spawnSync` is always called as `spawnSync('bash', [scriptPath], options)` — never `spawnSync(scriptPath, options)` — so that Git for Windows routes execution through the bash binary rather than attempting direct `.sh` execution.
+- **Windows pre-commit hook write**: `install.ps1` writes the hook file using `[System.IO.File]::WriteAllText(path, content, [System.Text.UTF8Encoding]::new($false))` (UTF-8 without BOM) to prevent Git for Windows bash from failing on a BOM prefix.
 
 ### Error cases
 
@@ -47,11 +48,12 @@ Introduce a Vitest-based test suite rooted at a new `package.json` in the repo r
 
 ## Acceptance Criteria
 
-- [ ] `package.json` exists at repo root with `"private": true`, `"type": "module"`, `"engines": { "node": ">=20" }`, and `"scripts": { "test": "vitest run" }`
+- [ ] `package.json` exists at repo root with `"private": true`, `"type": "module"`, `"engines": { "node": ">=20" }`, `"scripts": { "test": "vitest run" }`, and `"devDependencies": { "vitest": "^3.0.0" }` — `memfs` is NOT listed; it is deferred to FEAT-023
 - [ ] `package-lock.json` is tracked in git
 - [ ] `vitest.config.js` sets `threads: false`, `testMatch: ['tests/**/*.test.js']`, and a global timeout backstop
 - [ ] `tests/hooks/guard3.test.js` ports all pass/block cases from `guard3-test.sh`; uses `fileURLToPath(import.meta.url)` for script path resolution; asserts exact numeric exit codes and stderr strings
 - [ ] `tests/hooks/verbosity-remind.test.js` ports all traversal, skip-flag, HOME-boundary, and fence-warning cases from `verbosity-hook-test.sh`; uses `fs.mkdtempSync` + `fs.rmSync(..., { recursive: true, force: true })` in `afterEach`
+- [ ] All `spawnSync` calls use the form `spawnSync('bash', [scriptAbsPath], options)` — never direct `.sh` invocation
 - [ ] All `spawnSync` calls pass `{ ...process.env, HOME: tmpDir, ... }` in `env` — `process.env` is never mutated
 - [ ] All `spawnSync` calls set `stdio: 'pipe'`
 - [ ] Each test's temp dir contains a minimal mock `.claude/` tree before the spawn
@@ -60,7 +62,13 @@ Introduce a Vitest-based test suite rooted at a new `package.json` in the repo r
 - [ ] `.gitignore` blocks `node_modules/` and `.vitest-cache/`
 - [ ] `.github/workflows/test.yml` triggers on push and PR to `main`, uses `runs-on: ubuntu-latest`, `actions/setup-node@v4` with `node-version: '20'` and `cache: 'npm'`, runs `npm ci` then `npm test`
 - [ ] `install.sh` and `install.ps1` resolve the git hooks directory via `git rev-parse --git-path hooks` and verify a valid git repo before writing
-- [ ] Pre-commit hook appended safely (guard block, idempotent); existing pre-commit content is preserved
+- [ ] Pre-commit hook appended safely using the exact guard block below; idempotency check is a literal string match on the opening sentinel; existing pre-commit content is preserved:
+  ```
+  # code-conductor:test-gate
+  command -v npm >/dev/null 2>&1 || { echo "[conductor] npm not found — skipping test gate"; exit 0; }
+  cd "$(git rev-parse --show-toplevel)" && npm test
+  # /code-conductor:test-gate
+  ```
 - [ ] Pre-commit hook body: npm availability check → `cd "$(git rev-parse --show-toplevel)" && npm test`
 - [ ] `CONTRIBUTING.md` documents the `--no-verify` policy
 - [ ] `npm test` passes cleanly from repo root on a fresh `npm ci`
@@ -73,7 +81,7 @@ Introduce a Vitest-based test suite rooted at a new `package.json` in the repo r
 - Code coverage reporting (`c8`, `istanbul`) — deferred
 - Watch mode configuration (`vitest --watch`) — deferred
 - Actual JS module unit tests — those belong to FEAT-023
-- Integration with `memfs` beyond the placeholder stub — deferred to FEAT-023
+- `memfs` as a devDependency — deferred to FEAT-023; it must not appear in `package.json` until that feature introduces real JS modules that need filesystem virtualization
 - Windows-native CI runner — `ubuntu-latest` only for now
 
 ---
