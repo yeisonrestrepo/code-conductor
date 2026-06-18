@@ -225,10 +225,13 @@ function run(cmd) {
     env: { ...process.env, CLAUDE_TOOL_NAME: 'Bash', CLAUDE_TOOL_INPUT: jsonCmd(cmd) },
   })
   if (result.error) throw new Error(`bash spawn failed (${result.error.code}): ${result.error.message}`)
+  // Strip ANSI SGR escape sequences before asserting; CI terminals and some
+  // shell configs emit color codes that would break exact-string comparisons.
+  const strip = s => s.replace(/\r\n|\r/g, '\n').replace(/\x1b\[[0-9;]*m/g, '')
   return {
     status: result.status ?? -1,
-    stdout: (result.stdout ?? Buffer.alloc(0)).toString().replace(/\r\n|\r/g, '\n'),
-    stderr: (result.stderr ?? Buffer.alloc(0)).toString().replace(/\r\n|\r/g, '\n'),
+    stdout: strip((result.stdout ?? Buffer.alloc(0)).toString()),
+    stderr: strip((result.stderr ?? Buffer.alloc(0)).toString()),
   }
 }
 
@@ -512,30 +515,55 @@ Expected: both found.
 - [ ] [T-004-B] Create `tests/hooks/verbosity-remind.test.js` with this full content:
 
 ```js
-import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest'
 import { spawnSync } from 'child_process'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import fs from 'fs'
+import os from 'os'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const REPO_ROOT = join(__dirname, '../..')
 const GLOBAL_HOOK = join(REPO_ROOT, 'global/hooks/verbosity-remind.sh')
 const PROJECT_HOOK = join(REPO_ROOT, 'project-template/.claude/hooks/verbosity-remind.sh')
-const TESTS_TMP = join(REPO_ROOT, 'tests', '.tmp')
+
+// Verbosity tests use os.tmpdir() intentionally (not TESTS_TMP inside the repo).
+// The hook's upward traversal from $PWD looks for .claude/hooks/verbosity-remind.sh at
+// each ancestor directory. If cwd is inside the repo tree, traversal could reach the
+// project's own .claude/hooks/ and find a real hook, breaking test isolation.
+// os.tmpdir() is outside the repo so traversal stops before reaching any repo path.
+
+// Detect bash availability (Windows without Git for Windows in PATH).
+const BASH_AVAILABLE = (() => {
+  const r = spawnSync('bash', ['--version'], { stdio: 'pipe', timeout: 5000 })
+  if (r.error) {
+    console.warn('[verbosity] bash not found in PATH - all tests will be skipped. Ensure Git for Windows bin/ is in PATH.')
+    return false
+  }
+  return true
+})()
 
 let tmpDir
 
-beforeAll(() => { fs.mkdirSync(TESTS_TMP, { recursive: true }) })
-
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(join(TESTS_TMP, 'vb-test-'))
+  tmpDir = fs.mkdtempSync(join(os.tmpdir(), 'vb-test-'))
+})
+
+// Safety sweep: remove vb-test-* dirs leaked if afterEach was skipped by a crash.
+afterAll(() => {
+  try {
+    fs.readdirSync(os.tmpdir())
+      .filter(n => n.startsWith('vb-test-'))
+      .forEach(n => fs.rmSync(join(os.tmpdir(), n), { recursive: true, force: true }))
+  } catch { /* best-effort */ }
 })
 
 afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true })
 })
+
+const stripAnsi = s => s.replace(/\r\n|\r/g, '\n').replace(/\x1b\[[0-9;]*m/g, '')
 
 function runGlobal(home, cwd, skip = '0') {
   const result = spawnSync('bash', [GLOBAL_HOOK], {
@@ -544,7 +572,7 @@ function runGlobal(home, cwd, skip = '0') {
     timeout: 10000,
     env: { ...process.env, HOME: home, CC_VERBOSITY_SKIP: skip },
   })
-  return (result.stdout ?? Buffer.alloc(0)).toString().replace(/\r\n|\r/g, '\n')
+  return stripAnsi((result.stdout ?? Buffer.alloc(0)).toString())
 }
 
 function runProject(home, cwd, skip = '0') {
@@ -554,10 +582,10 @@ function runProject(home, cwd, skip = '0') {
     timeout: 10000,
     env: { ...process.env, HOME: home, CC_VERBOSITY_SKIP: skip },
   })
-  return (result.stdout ?? Buffer.alloc(0)).toString().replace(/\r\n|\r/g, '\n')
+  return stripAnsi((result.stdout ?? Buffer.alloc(0)).toString())
 }
 
-describe('verbosity-remind hooks', () => {
+describe.skipIf(!BASH_AVAILABLE)('verbosity-remind hooks', () => {
 
   it('row1: global hook emits MIN', { timeout: 5000 }, () => {
     const home = join(tmpDir, 'h1')
@@ -794,6 +822,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+          cache-dependency-path: 'package-lock.json'
 
       - name: Cache Vitest transform cache
         uses: actions/cache@v4
@@ -878,7 +907,9 @@ Replace it with the same block followed by the pre-commit wiring (before the clo
           cat >> "$_precommit" <<'HOOK_BLOCK'
 # code-conductor:test-gate
 command -v npm >/dev/null 2>&1 || { echo "[conductor] npm not found - skipping test gate"; exit 0; }
-cd "$(git rev-parse --show-toplevel)" && npm test
+_root=$(git rev-parse --show-toplevel)
+[ -d "$_root/node_modules" ] || { echo "[conductor] node_modules not installed - run npm ci first, skipping test gate"; exit 0; }
+cd "$_root" && npm test
 # /code-conductor:test-gate
 HOOK_BLOCK
           chmod +x "$_precommit"
@@ -989,7 +1020,9 @@ Replace with the same block followed by pre-commit wiring (before the closing `}
         $guardBlock = (@'
 # code-conductor:test-gate
 command -v npm >/dev/null 2>&1 || { echo "[conductor] npm not found - skipping test gate"; exit 0; }
-cd "$(git rev-parse --show-toplevel)" && npm test
+_root=$(git rev-parse --show-toplevel)
+[ -d "$_root/node_modules" ] || { echo "[conductor] node_modules not installed - run npm ci first, skipping test gate"; exit 0; }
+cd "$_root" && npm test
 # /code-conductor:test-gate
 '@).Replace("`r`n", "`n").Replace("`r", "`n")
         # $enc defined once; used by both the append branch and the create branch below.
@@ -1028,6 +1061,14 @@ grep -n "code-conductor:test-gate" install.ps1
 ```
 
 Expected: lines containing the sentinel string.
+
+- [ ] [T-007-B2] After running install.ps1 locally, verify the written pre-commit hook contains LF-only line endings (no CRLF):
+
+```
+node --input-type=commonjs -e "const f=require('fs').readFileSync('.git/hooks/pre-commit','utf8');if(f.includes('\r')){console.error('CRLF detected in hook file');process.exit(1)}console.log('LF only - OK')"
+```
+
+Expected: `LF only - OK` with exit 0. A `CRLF detected` failure means Git for Windows bash will fail to parse the shebang, producing `bad interpreter: No such file or directory`. Fix: re-run install.ps1 to overwrite the file; the `.Replace("`r`n", "`n").Replace("`r", "`n")` calls in the script normalize both the guard block and any pre-existing content before writing.
 
 - [ ] [T-007-C] Commit:
 
