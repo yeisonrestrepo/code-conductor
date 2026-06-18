@@ -59,6 +59,7 @@
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
+  cacheDir: '.vitest-cache',
   test: {
     pool: 'forks',
     poolOptions: {
@@ -77,13 +78,13 @@ export default defineConfig({
 **CommonJS `require()` in an ESM project**: the project sets `"type": "module"` in `package.json`, but `node -e` evaluates inline scripts in CommonJS mode by default. To make the intent explicit and guard against future Node.js behavior changes, all three inline commands below pass `--input-type=commonjs` (available since Node 12; safe with the Node >= 20 engine requirement).
 
 ```
-node --input-type=commonjs -e "const fs=require('fs'),p='.gitignore',c=fs.existsSync(p)?fs.readFileSync(p,'utf8'):'',existing=c.split('\n').map(l=>l.trim()),add=['node_modules/','.vitest-cache/'].filter(e=>!existing.includes(e));if(add.length){const sep=c.endsWith('\n')?'':'\n';fs.appendFileSync(p,sep+add.join('\n')+'\n');console.log('Added: '+add.join(', '))}else{console.log('Already present - skipped')}"
+node --input-type=commonjs -e "const fs=require('fs'),p='.gitignore',c=fs.existsSync(p)?fs.readFileSync(p,'utf8'):'',existing=c.split('\n').map(l=>l.trim()),add=['node_modules/','.vitest-cache/','tests/.tmp/'].filter(e=>!existing.includes(e));if(add.length){const sep=c.endsWith('\n')?'':'\n';fs.appendFileSync(p,sep+add.join('\n')+'\n');console.log('Added: '+add.join(', '))}else{console.log('Already present - skipped')}"
 ```
 
 Validate that both entries are present exactly once (no missing entries, no duplicates, no corruption from a prior partial run):
 
 ```
-node --input-type=commonjs -e "const fs=require('fs'),p='.gitignore';if(!fs.existsSync(p)){console.error('MISSING: .gitignore not found');process.exit(1)}const lines=fs.readFileSync(p,'utf8').split('\n').map(l=>l.trim()).filter(Boolean);const check=['node_modules/','.vitest-cache/'];let ok=true;check.forEach(e=>{const n=lines.filter(l=>l===e).length;if(n===0){console.error('MISSING: '+e);ok=false}else if(n>1){console.error('DUPLICATE ('+n+'x): '+e);ok=false}});if(!ok)process.exit(1);console.log('Validation passed')"
+node --input-type=commonjs -e "const fs=require('fs'),p='.gitignore';if(!fs.existsSync(p)){console.error('MISSING: .gitignore not found');process.exit(1)}const lines=fs.readFileSync(p,'utf8').split('\n').map(l=>l.trim()).filter(Boolean);const check=['node_modules/','.vitest-cache/','tests/.tmp/'];let ok=true;check.forEach(e=>{const n=lines.filter(l=>l===e).length;if(n===0){console.error('MISSING: '+e);ok=false}else if(n>1){console.error('DUPLICATE ('+n+'x): '+e);ok=false}});if(!ok)process.exit(1);console.log('Validation passed')"
 ```
 
 Expected: `Validation passed` with exit code 0. A non-zero exit means the file was already corrupt before this step; inspect `.gitignore` manually before continuing.
@@ -91,7 +92,7 @@ Expected: `Validation passed` with exit code 0. A non-zero exit means the file w
 Verify both entries appear anywhere in `.gitignore` (independent of surrounding content):
 
 ```
-node --input-type=commonjs -e "const fs=require('fs'),p='.gitignore';if(!fs.existsSync(p)){console.error('MISSING: .gitignore not found');process.exit(1)}const c=fs.readFileSync(p,'utf8');['node_modules/','.vitest-cache/'].forEach(e=>{if(c.split('\n').map(l=>l.trim()).includes(e))console.log('FOUND: '+e);else{console.error('MISSING: '+e);process.exit(1)}})"
+node --input-type=commonjs -e "const fs=require('fs'),p='.gitignore';if(!fs.existsSync(p)){console.error('MISSING: .gitignore not found');process.exit(1)}const c=fs.readFileSync(p,'utf8');['node_modules/','.vitest-cache/','tests/.tmp/'].forEach(e=>{if(c.split('\n').map(l=>l.trim()).includes(e))console.log('FOUND: '+e);else{console.error('MISSING: '+e);process.exit(1)}})"
 ```
 
 Expected: `FOUND: node_modules/` then `FOUND: .vitest-cache/`, exit code 0. This check passes regardless of what other entries the repository already contains.
@@ -103,6 +104,8 @@ npm install
 ```
 
 Expected: creates `node_modules/` and `package-lock.json`. No errors.
+
+**`npm install` vs `npm ci`**: use `npm install` here because no lockfile exists yet — this is the one-time step that generates it. Once `package-lock.json` is committed, all subsequent installs (local re-installs, CI, other developers) must use `npm ci`, which enforces the lockfile exactly and fails if it would need to be updated. The CI workflow (T-005-B) and any `npm run` re-installs after this step should always use `npm ci`, not `npm install`.
 
 - [ ] [T-001-E] Verify `npm test` is recognized (no test files yet, Vitest will exit 0 or warn):
 
@@ -176,37 +179,49 @@ ls .claude/hooks/pre-tool-use.sh
 
 Expected: file found.
 
+**If the file is missing**: abort T-003 entirely. Do not proceed to T-003-B. The test suite will throw `bash spawn failed (ENOENT)` at runtime if the hook path does not exist — the error message is accurate but gives no indication of which setup step was skipped. Fix: run `bash install.sh --project` (Unix) or `.\install.ps1 -Project` (Windows) from repo root to install the hook, then re-run this verification before proceeding. If the `BASH` constant at runtime evaluates to `null` (bash not in PATH), the entire guard3 describe block is skipped via `describe.skipIf(!BASH)` — see T-003-B for the bash-availability detection note.
+
 - [ ] [T-003-B] Create `tests/hooks/guard3.test.js` with this full content.
 
 **Line-ending normalization**: all `stdout`/`stderr` buffers and hook file content are normalized with the pattern `/\r\n|\r/g` before string assertions or line-splitting. The alternation order matters: `\r\n` is listed before `\r` so that two-character CRLF sequences are consumed atomically in a single pass; the `\r` branch then catches any surviving bare carriage returns (produced by some terminal emulators and legacy text streams) without leaving a trailing empty string after the following `\n`.
 
 ```js
-import { describe, it, expect, afterAll } from 'vitest'
+import { describe, it, expect, afterAll, beforeAll } from 'vitest'
 import { spawnSync } from 'child_process'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import fs from 'fs'
-import os from 'os'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const REPO_ROOT = join(__dirname, '../..')
 const HOOK = join(REPO_ROOT, '.claude/hooks/pre-tool-use.sh')
+const TESTS_TMP = join(REPO_ROOT, 'tests', '.tmp')
+
+// Detect bash availability. On Windows without Git for Windows in PATH, all tests are skipped
+// rather than failing with an undiagnosable ENOENT error. Install Git for Windows and ensure
+// its bin/ directory is in PATH if you need to run these tests on Windows.
+const BASH = (() => {
+  const r = spawnSync('bash', ['--version'], { stdio: 'pipe', timeout: 5000 })
+  if (r.error) {
+    console.warn('[guard3] bash not found in PATH - all tests will be skipped. On Windows, ensure Git for Windows bin/ is in PATH.')
+    return null
+  }
+  return 'bash'
+})()
+
+beforeAll(() => { fs.mkdirSync(TESTS_TMP, { recursive: true }) })
 
 function jsonCmd(cmd) {
-  const s = cmd
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-    .replace(/\n/g, '\\n')
-    .replace(/\t/g, '\\t')
-    .replace(/\r/g, '\\r')
-  return `{"command":"${s}"}`
+  // JSON.stringify handles all escaping (backslashes, quotes, control chars, Unicode) correctly.
+  return JSON.stringify({ command: cmd })
 }
 
 function run(cmd) {
-  const result = spawnSync('bash', [HOOK], {
+  const result = spawnSync(BASH, [HOOK], {
     stdio: 'pipe',
     cwd: REPO_ROOT,
+    timeout: 10000,
     env: { ...process.env, CLAUDE_TOOL_NAME: 'Bash', CLAUDE_TOOL_INPUT: jsonCmd(cmd) },
   })
   if (result.error) throw new Error(`bash spawn failed (${result.error.code}): ${result.error.message}`)
@@ -218,9 +233,10 @@ function run(cmd) {
 }
 
 function runRead() {
-  const result = spawnSync('bash', [HOOK], {
+  const result = spawnSync(BASH, [HOOK], {
     stdio: 'pipe',
     cwd: REPO_ROOT,
+    timeout: 10000,
     env: {
       ...process.env,
       CLAUDE_TOOL_NAME: 'Read',
@@ -240,24 +256,31 @@ function runAllowlisted(cmd, entries) {
   if (startIdx === -1) throw new Error('BASH_SCAN_ALLOWLIST= not found in hook')
   let depth = 0
   let endIdx = startIdx
-  for (let i = startIdx; i < lines.length; i++) {
-    for (const ch of lines[i]) {
+  let closeCharPos = -1
+  outer: for (let i = startIdx; i < lines.length; i++) {
+    for (let k = 0; k < lines[i].length; k++) {
+      const ch = lines[i][k]
       if (ch === '(') depth++
-      else if (ch === ')') { depth--; if (depth <= 0) { endIdx = i; break } }
+      else if (ch === ')') {
+        depth--
+        if (depth <= 0) { endIdx = i; closeCharPos = k; break outer }
+      }
     }
-    if (depth <= 0 && i >= startIdx) break
-    endIdx = i
   }
+  // Preserve any content on the closing-paren line after `)` (e.g., inline comments).
+  const closingSuffix = closeCharPos >= 0 ? lines[endIdx].slice(closeCharPos + 1) : ''
   const header = lines.slice(0, startIdx).join('\n')
-  const tail = lines.slice(endIdx + 1).join('\n')
+  const restLines = lines.slice(endIdx + 1).join('\n')
+  const tail = closingSuffix ? closingSuffix + (restLines ? '\n' + restLines : '') : restLines
   const modified = `${header}\nBASH_SCAN_ALLOWLIST=(${entries})\n${tail}`
-  const tmpDir = fs.mkdtempSync(join(os.tmpdir(), 'g3allow-'))
+  const tmpDir = fs.mkdtempSync(join(TESTS_TMP, 'g3allow-'))
   const tmpHook = join(tmpDir, 'hook.sh')
   try {
     fs.writeFileSync(tmpHook, modified, 'utf8')
-    const result = spawnSync('bash', [tmpHook], {
+    const result = spawnSync(BASH, [tmpHook], {
       stdio: 'pipe',
       cwd: REPO_ROOT,
+      timeout: 10000,
       env: { ...process.env, CLAUDE_TOOL_NAME: 'Bash', CLAUDE_TOOL_INPUT: jsonCmd(cmd) },
     })
     if (result.error) throw new Error(`bash spawn failed (${result.error.code}): ${result.error.message}`)
@@ -267,16 +290,18 @@ function runAllowlisted(cmd, entries) {
   }
 }
 
-// Safety sweep: remove any g3allow-* temp dirs leaked if a test crashed before finally
+// Safety sweep: remove any g3allow-* temp dirs leaked if a test crashed before finally.
+// Scans the repo-local tests/.tmp/ directory rather than the global OS temp dir,
+// keeping the cleanup scope narrow and avoiding broad system scans.
 afterAll(() => {
   try {
-    fs.readdirSync(os.tmpdir())
+    fs.readdirSync(TESTS_TMP)
       .filter(n => n.startsWith('g3allow-'))
-      .forEach(n => fs.rmSync(join(os.tmpdir(), n), { recursive: true, force: true }))
+      .forEach(n => fs.rmSync(join(TESTS_TMP, n), { recursive: true, force: true }))
   } catch { /* best-effort */ }
 })
 
-describe('guard3 - pre-tool-use.sh', () => {
+describe.skipIf(!BASH)('guard3 - pre-tool-use.sh', () => {
 
   describe('sanity', () => {
     it('empty command passes', () => expect(run('').status).toBe(0))
@@ -487,23 +512,25 @@ Expected: both found.
 - [ ] [T-004-B] Create `tests/hooks/verbosity-remind.test.js` with this full content:
 
 ```js
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest'
 import { spawnSync } from 'child_process'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import fs from 'fs'
-import os from 'os'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const REPO_ROOT = join(__dirname, '../..')
 const GLOBAL_HOOK = join(REPO_ROOT, 'global/hooks/verbosity-remind.sh')
 const PROJECT_HOOK = join(REPO_ROOT, 'project-template/.claude/hooks/verbosity-remind.sh')
+const TESTS_TMP = join(REPO_ROOT, 'tests', '.tmp')
 
 let tmpDir
 
+beforeAll(() => { fs.mkdirSync(TESTS_TMP, { recursive: true }) })
+
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(join(os.tmpdir(), 'vb-test-'))
+  tmpDir = fs.mkdtempSync(join(TESTS_TMP, 'vb-test-'))
 })
 
 afterEach(() => {
@@ -514,6 +541,7 @@ function runGlobal(home, cwd, skip = '0') {
   const result = spawnSync('bash', [GLOBAL_HOOK], {
     stdio: 'pipe',
     cwd,
+    timeout: 10000,
     env: { ...process.env, HOME: home, CC_VERBOSITY_SKIP: skip },
   })
   return (result.stdout ?? Buffer.alloc(0)).toString().replace(/\r\n|\r/g, '\n')
@@ -523,6 +551,7 @@ function runProject(home, cwd, skip = '0') {
   const result = spawnSync('bash', [PROJECT_HOOK], {
     stdio: 'pipe',
     cwd,
+    timeout: 10000,
     env: { ...process.env, HOME: home, CC_VERBOSITY_SKIP: skip },
   })
   return (result.stdout ?? Buffer.alloc(0)).toString().replace(/\r\n|\r/g, '\n')
@@ -686,6 +715,7 @@ describe('verbosity-remind hooks', () => {
   it('hook exits 0 with empty HOME', { timeout: 5000 }, () => {
     const result = spawnSync('bash', [GLOBAL_HOOK], {
       stdio: 'pipe',
+      timeout: 10000,
       env: { ...process.env, HOME: '', PWD: '', CC_VERBOSITY_SKIP: '0' },
     })
     expect(result.status).toBe(0)
@@ -765,6 +795,14 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      - name: Cache Vitest transform cache
+        uses: actions/cache@v4
+        with:
+          path: .vitest-cache
+          key: vitest-${{ runner.os }}-${{ hashFiles('vitest.config.js', 'package-lock.json') }}
+          restore-keys: |
+            vitest-${{ runner.os }}-
+
       - name: Install dependencies
         run: npm ci
 
@@ -808,7 +846,7 @@ fi
 
 Replace it with the same block followed by the pre-commit wiring (before the closing `fi`).
 
-**Safe append behavior**: the pre-commit wiring block never overwrites existing hook content. (1) `grep -qF "$_sentinel"` detects the gate and exits early if already present. (2) `[ -f "$_precommit" ] || printf '#!/bin/sh\n'` creates the file only if absent; existing content is left intact. (3) The `tail -c 1 | wc -l` check ensures a separating newline between existing content and the new block. (4) `cat >>` appends; `>` is never used on an existing pre-commit file.
+**Safe append behavior**: the pre-commit wiring block never overwrites existing hook content. (1) `grep -qF "$_sentinel"` detects the gate and exits early if already present. (2) `[ -f "$_precommit" ] || printf '#!/bin/sh\n'` creates the file only if absent; existing content is left intact. (3) The `tail -c 1 | wc -l` check ensures a separating newline between existing content and the new block. (4) `cat >>` appends; `>` is never used on an existing pre-commit file. (5) `chmod +x "$_precommit"` is called after every successful append — on Unix, git will not execute a hook file that lacks the executable bit, producing a silent no-op instead of running the test gate. This call is inside the `else` branch (only runs on first install, never on the idempotent-skip path) and is safe to re-run if the file already has the bit set.
 
 **CRITICAL - column-zero alignment**: The `HOOK_BLOCK` heredoc closing delimiter must be the very first character on its line in the actual `install.sh` file; column 0 means zero preceding spaces or tabs. When transplanting this block via the Edit tool or copy-paste, count from the start of the line: any indentation, including a single space, causes bash to treat the line as heredoc content rather than the terminator, producing an `unexpected EOF while looking for matching 'HOOK_BLOCK'` error from `bash -n`. Fix: delete all leading whitespace before `HOOK_BLOCK` on that one line, then re-run `bash -n install.sh` to confirm exit 0.
 
