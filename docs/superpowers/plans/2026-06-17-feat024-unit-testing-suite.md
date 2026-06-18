@@ -51,7 +51,9 @@
 }
 ```
 
-- [ ] [T-001-B] Create `vitest.config.js` at repo root:
+- [ ] [T-001-B] Create `vitest.config.js` at repo root.
+
+**ESM syntax required**: `vitest.config.js` uses `import`/`export` (ES module syntax). This is mandatory because `package.json` sets `"type": "module"`, causing Node.js to load all `.js` files as ES modules. A CommonJS-style `const { defineConfig } = require('vitest/config')` would throw `ERR_REQUIRE_ESM` when Vitest loads the config file.
 
 ```js
 import { defineConfig } from 'vitest/config'
@@ -179,7 +181,7 @@ Expected: file found.
 **Line-ending normalization**: all `stdout`/`stderr` buffers and hook file content are normalized with the pattern `/\r\n|\r/g` before string assertions or line-splitting. The alternation order matters: `\r\n` is listed before `\r` so that two-character CRLF sequences are consumed atomically in a single pass; the `\r` branch then catches any surviving bare carriage returns (produced by some terminal emulators and legacy text streams) without leaving a trailing empty string after the following `\n`.
 
 ```js
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterAll } from 'vitest'
 import { spawnSync } from 'child_process'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
@@ -207,6 +209,7 @@ function run(cmd) {
     cwd: REPO_ROOT,
     env: { ...process.env, CLAUDE_TOOL_NAME: 'Bash', CLAUDE_TOOL_INPUT: jsonCmd(cmd) },
   })
+  if (result.error) throw new Error(`bash spawn failed (${result.error.code}): ${result.error.message}`)
   return {
     status: result.status ?? -1,
     stdout: (result.stdout ?? Buffer.alloc(0)).toString().replace(/\r\n|\r/g, '\n'),
@@ -224,6 +227,7 @@ function runRead() {
       CLAUDE_TOOL_INPUT: '{"file_path":"/tmp/x"}',
     },
   })
+  if (result.error) throw new Error(`bash spawn failed (${result.error.code}): ${result.error.message}`)
   return result.status ?? -1
 }
 
@@ -256,11 +260,21 @@ function runAllowlisted(cmd, entries) {
       cwd: REPO_ROOT,
       env: { ...process.env, CLAUDE_TOOL_NAME: 'Bash', CLAUDE_TOOL_INPUT: jsonCmd(cmd) },
     })
+    if (result.error) throw new Error(`bash spawn failed (${result.error.code}): ${result.error.message}`)
     return result.status ?? -1
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   }
 }
+
+// Safety sweep: remove any g3allow-* temp dirs leaked if a test crashed before finally
+afterAll(() => {
+  try {
+    fs.readdirSync(os.tmpdir())
+      .filter(n => n.startsWith('g3allow-'))
+      .forEach(n => fs.rmSync(join(os.tmpdir(), n), { recursive: true, force: true }))
+  } catch { /* best-effort */ }
+})
 
 describe('guard3 - pre-tool-use.sh', () => {
 
@@ -758,6 +772,8 @@ jobs:
         run: npm test
 ```
 
+**Node version pin**: `node-version: '20'` installs the latest Node 20.x patch, which ships with npm 10.x and generates `package-lock.json` at `lockfileVersion: 3`. This matches the `"engines": {"node": ">=20"}` floor in `package.json`. Using `node-version: 'lts/*'` would work while Node 20 is the LTS pointer, but would silently advance to Node 22 when the pointer moves, potentially changing lockfile format without an explicit change.
+
 - [ ] [T-005-C] Commit:
 
 ```
@@ -776,6 +792,9 @@ git commit -m "feat(FEAT-024): add GitHub Actions CI workflow for npm test"
 - Consumes: git hooks directory via `git rev-parse --git-path hooks`
 - Produces: idempotent pre-commit hook that runs `npm test`; only wired when `--project` flag is passed
 - Execution context: run `install.sh` from the repository root; `git rev-parse --git-path hooks` resolves relative to the current working directory, so running from a subdirectory or outside the repo will target the wrong git directory or produce an empty path
+- Git repo validation: the block opens with `if git rev-parse --git-dir >/dev/null 2>&1`, which exits the hook-wiring path entirely if the working directory is not inside a git repository; the installer continues and logs a warning
+- Git worktrees: when `install.sh` is run from inside a linked worktree (where `.git` is a file pointer rather than a directory), `git rev-parse --git-path hooks` resolves to the main repository's shared hooks directory; this is correct behavior since git hooks are not per-worktree
+- npm test verbosity: the hook runs `npm test` without `--silent` so that test failure details are printed at the terminal during `git commit`; `--silent` would suppress all output including error messages, making diagnosis harder; configure Vitest reporter options if output reduction is needed
 
 - [ ] [T-006-A] Locate the insertion point - it is the `.gitignore` update block at the tail of the `if [ "$INSTALL_PROJECT" = true ]` outer block. Do **not** rely on line numbers since unrelated changes may shift them; instead use `grep -n 'Added.*to .gitignore' install.sh` at implementation time to pinpoint the exact line. The target old_string is the unique sequence:
 
@@ -788,6 +807,8 @@ fi
 ```
 
 Replace it with the same block followed by the pre-commit wiring (before the closing `fi`).
+
+**Safe append behavior**: the pre-commit wiring block never overwrites existing hook content. (1) `grep -qF "$_sentinel"` detects the gate and exits early if already present. (2) `[ -f "$_precommit" ] || printf '#!/bin/sh\n'` creates the file only if absent; existing content is left intact. (3) The `tail -c 1 | wc -l` check ensures a separating newline between existing content and the new block. (4) `cat >>` appends; `>` is never used on an existing pre-commit file.
 
 **CRITICAL - column-zero alignment**: The `HOOK_BLOCK` heredoc closing delimiter must be the very first character on its line in the actual `install.sh` file; column 0 means zero preceding spaces or tabs. When transplanting this block via the Edit tool or copy-paste, count from the start of the line: any indentation, including a single space, causes bash to treat the line as heredoc content rather than the terminator, producing an `unexpected EOF while looking for matching 'HOOK_BLOCK'` error from `bash -n`. Fix: delete all leading whitespace before `HOOK_BLOCK` on that one line, then re-run `bash -n install.sh` to confirm exit 0.
 
@@ -871,6 +892,9 @@ git commit -m "feat(FEAT-024): wire pre-commit test gate in install.sh"
 - Consumes: git hooks directory via `git rev-parse --git-path hooks`
 - Produces: idempotent pre-commit hook written as UTF-8 without BOM; only wired when `-Project` switch is passed
 - Execution context: run `install.ps1` from the repository root; `git rev-parse --git-path hooks` resolves relative to the current working directory, so running from a subdirectory or outside the repo will target the wrong git directory or produce an empty string
+- Git repo validation: the block opens with `git rev-parse --git-dir 2>&1` and checks `$LASTEXITCODE -eq 0`; if not inside a git repository the hook-wiring path is skipped entirely and a warning is logged
+- Git worktrees: same as install.sh; `git rev-parse --git-path hooks` from a linked worktree resolves to the main repo's shared hooks directory, which is the correct target
+- PowerShell execution policy: if `.\install.ps1` fails with "cannot be loaded because running scripts is disabled on this system", bypass for this session with `powershell -ExecutionPolicy Bypass -File .\install.ps1`, or set persistently for the current user: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`. The installer does not modify execution policy.
 
 - [ ] [T-007-A] Locate the insertion point - it is after the gitignore `if` block and before the closing `}` of the `if ($Project)` block (install.ps1 lines 464-468). The target old_string is:
 
