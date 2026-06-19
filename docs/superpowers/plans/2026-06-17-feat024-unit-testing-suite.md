@@ -35,6 +35,7 @@
 - Temp dir naming convention: guard3 allowlist dirs use prefix `cc-guard3-`; verbosity test dirs use prefix `cc-verbosity-`; the `cc-` prefix identifies these as code-conductor test artifacts for workspace auditing and avoids collisions on shared or multi-tenant systems
 - Temp dir lifecycle guarantee: `runAllowlisted` wraps its temp dir in `try/finally` so cleanup fires even when an assertion throws; `afterEach` owns per-test cleanup in verbosity; `afterAll` is the last-resort sweep for crash-leaked dirs in both suites — these three mechanisms together ensure no temp artifact survives any exit path
 - npm test stream routing: the pre-commit hook MUST run `npm test` without `--silent`; stdout and stderr stream natively to the developer's terminal so Vitest failure details are fully visible; use `vitest.config.js` reporter options to tune verbosity rather than adding `--silent` to the hook body
+- Shell wrapper version-parse fallback: `install.sh` validates `_node_major` and `_npm_major` are purely numeric via a `case` pattern (`''|*[!0-9]*)`) before any arithmetic comparison; `install.ps1` validates via `if (-not $nodeMajorRaw)` / `if ($npmMajorRaw)` before `[int]` cast; if either token is empty or non-numeric (caused by nvm/asdf/nvs wrappers injecting warnings into stdout), the script emits `warn "... engine check skipped"` and continues — it never errors or silently compares the wrong value
 
 ---
 
@@ -560,22 +561,24 @@ const BASH_AVAILABLE = (() => {
 })()
 
 let tmpDir
+const createdTmpDirs = []
 
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(join(os.tmpdir(), 'cc-verbosity-'))
-})
-
-// Safety sweep: remove cc-verbosity-* dirs leaked if afterEach was skipped by a crash.
-afterAll(() => {
-  try {
-    fs.readdirSync(os.tmpdir())
-      .filter(n => n.startsWith('cc-verbosity-'))
-      .forEach(n => fs.rmSync(join(os.tmpdir(), n), { recursive: true, force: true }))
-  } catch { /* best-effort */ }
+  createdTmpDirs.push(tmpDir)
 })
 
 afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true })
+})
+
+// Safety sweep for dirs afterEach missed (process crash before afterEach ran).
+// Uses the tracked set rather than scanning os.tmpdir() globally, consistent
+// with the narrow-scope cleanup principle applied in guard3's afterAll.
+afterAll(() => {
+  for (const d of createdTmpDirs) {
+    try { fs.rmSync(d, { recursive: true, force: true }) } catch { /* best-effort */ }
+  }
 })
 
 const stripAnsi = s => s.replace(/\r\n|\r/g, '\n').replace(/\x1b\[[0-9;]*m/g, '')
@@ -909,23 +912,40 @@ Replace it with the same block followed by the pre-commit wiring (before the clo
 
   # Node.js and npm engine constraint check (FEAT-024)
   if command -v node >/dev/null 2>&1; then
-    _node_major=$(node --eval "process.stdout.write(process.versions.node.split('.')[0])")
-    if [ "${_node_major:-0}" -lt 20 ] 2>/dev/null; then
-      warn "Node.js $(node --version) is below the >=20 engine requirement; npm test may fail"
-    else
-      ok "Node.js $(node --version) meets the >=20 engine requirement"
-      # npm 10+ ships bundled with Node 20; verify it is present and usable.
-      if command -v npm >/dev/null 2>&1; then
-        _npm_major=$(npm --version 2>/dev/null | cut -d. -f1)
-        if [ "${_npm_major:-0}" -lt 10 ] 2>/dev/null; then
-          warn "npm $(npm --version) is below >=10; run 'npm install -g npm@latest' to upgrade"
+    _node_major=$(node --eval "process.stdout.write(process.versions.node.split('.')[0])" 2>/dev/null)
+    # Validate _node_major is purely numeric before arithmetic comparison.
+    # nvm/asdf/nvs shell wrappers can inject warnings into stdout, producing
+    # a non-numeric or empty value; [ non-numeric -lt 20 ] would error or compare 0.
+    case "$_node_major" in
+      ''|*[!0-9]*)
+        warn "Could not parse Node.js major version (got: '${_node_major:-<empty>}'); a shell wrapper may have corrupted the output; engine check skipped"
+        ;;
+      *)
+        if [ "$_node_major" -lt 20 ]; then
+          warn "Node.js $(node --version) is below the >=20 engine requirement; npm test may fail"
         else
-          ok "npm $(npm --version) meets the >=10 constraint"
+          ok "Node.js $(node --version) meets the >=20 engine requirement"
+          # npm 10+ ships bundled with Node 20; verify it is present and usable.
+          if command -v npm >/dev/null 2>&1; then
+            _npm_major=$(npm --version 2>/dev/null | cut -d. -f1)
+            case "$_npm_major" in
+              ''|*[!0-9]*)
+                warn "Could not parse npm version (got: '${_npm_major:-<empty>}'); engine check skipped"
+                ;;
+              *)
+                if [ "$_npm_major" -lt 10 ]; then
+                  warn "npm $(npm --version) is below >=10; run 'npm install -g npm@latest' to upgrade"
+                else
+                  ok "npm $(npm --version) meets the >=10 constraint"
+                fi
+                ;;
+            esac
+          else
+            warn "npm not found in PATH even though Node >=20 is present; reinstall Node or add npm to PATH"
+          fi
         fi
-      else
-        warn "npm not found in PATH even though Node >=20 is present; reinstall Node or add npm to PATH"
-      fi
-    fi
+        ;;
+    esac
   else
     warn "node not found in PATH - cannot verify >=20 engine requirement; npm test will fail unless Node >=20 is installed"
   fi
@@ -1039,22 +1059,34 @@ Replace with the same block followed by pre-commit wiring (before the closing `}
   # Node.js and npm engine constraint check (FEAT-024)
   $nodeVer = node --version 2>&1
   if ($LASTEXITCODE -eq 0) {
-    $nodeMajor = [int]([regex]::Match($nodeVer, 'v(\d+)\.').Groups[1].Value)
-    if ($nodeMajor -lt 20) {
-      Write-Warn "Node.js $nodeVer is below the >=20 engine requirement; npm test may fail"
+    # Guard against shell wrapper corruption (nvm/asdf/nvs can inject output
+    # that corrupts $nodeVer); [int]'' throws — validate the regex match first.
+    $nodeMajorRaw = [regex]::Match($nodeVer, 'v(\d+)\.').Groups[1].Value
+    if (-not $nodeMajorRaw) {
+      Write-Warn "Could not parse Node.js major version from '$nodeVer'; a shell wrapper may have corrupted the output; engine check skipped"
     } else {
-      Write-Ok "Node.js $nodeVer meets the >=20 engine requirement"
-      # npm 10+ ships bundled with Node 20; verify it is present and usable.
-      $npmVer = npm --version 2>&1
-      if ($LASTEXITCODE -eq 0) {
-        $npmMajor = [int]([regex]::Match($npmVer, '^(\d+)\.').Groups[1].Value)
-        if ($npmMajor -lt 10) {
-          Write-Warn "npm $npmVer is below >=10; run 'npm install -g npm@latest' to upgrade"
-        } else {
-          Write-Ok "npm $npmVer meets the >=10 constraint"
-        }
+      $nodeMajor = [int]$nodeMajorRaw
+      if ($nodeMajor -lt 20) {
+        Write-Warn "Node.js $nodeVer is below the >=20 engine requirement; npm test may fail"
       } else {
-        Write-Warn "npm not found in PATH even though Node >=20 is present; reinstall Node or add npm to PATH"
+        Write-Ok "Node.js $nodeVer meets the >=20 engine requirement"
+        # npm 10+ ships bundled with Node 20; verify it is present and usable.
+        $npmVer = npm --version 2>&1
+        if ($LASTEXITCODE -eq 0) {
+          $npmMajorRaw = [regex]::Match($npmVer, '^(\d+)\.').Groups[1].Value
+          if ($npmMajorRaw) {
+            $npmMajor = [int]$npmMajorRaw
+            if ($npmMajor -lt 10) {
+              Write-Warn "npm $npmVer is below >=10; run 'npm install -g npm@latest' to upgrade"
+            } else {
+              Write-Ok "npm $npmVer meets the >=10 constraint"
+            }
+          } else {
+            Write-Warn "Could not parse npm version from '$npmVer'; engine check skipped"
+          }
+        } else {
+          Write-Warn "npm not found in PATH even though Node >=20 is present; reinstall Node or add npm to PATH"
+        }
       }
     }
   } else {
@@ -1079,6 +1111,10 @@ Replace with the same block followed by pre-commit wiring (before the closing `}
         if (-not (Test-Path $hooksDirParent)) {
           New-Item -ItemType Directory -Path $hooksDirParent -Force | Out-Null
         }
+        # $enc is initialized here, before the write-access probe, to prevent a
+        # use-before-init runtime error: the probe's WriteAllText call uses $enc
+        # when test-writing a temp file to the hooks-dir parent.
+        $enc = [System.Text.UTF8Encoding]::new($false)
         # Verify write access before modifying the hook file.
         $canWrite = $true
         if (Test-Path $precommit) {
@@ -1101,8 +1137,6 @@ _root=$(git rev-parse --show-toplevel)
 cd "$_root" && npm test
 # /code-conductor:test-gate
 '@).Replace("`r`n", "`n").Replace("`r", "`n")
-        # $enc defined once; used by both the append branch and the create branch below.
-        $enc = [System.Text.UTF8Encoding]::new($false)
         if (Test-Path $precommit) {
           # Existing file: normalize its line endings, strip trailing whitespace,
           # then append a blank separator + guard block (all LF, UTF-8 no BOM).
@@ -1138,7 +1172,7 @@ grep -n "code-conductor:test-gate" install.ps1
 
 Expected: lines containing the sentinel string.
 
-- [ ] [T-007-B2] After running install.ps1 locally, verify the written pre-commit hook contains LF-only line endings (no CRLF):
+- [ ] [T-007-C] After running install.ps1 locally, verify the written pre-commit hook contains LF-only line endings (no CRLF):
 
 ```
 node --input-type=commonjs -e "const f=require('fs').readFileSync('.git/hooks/pre-commit','utf8');if(f.includes('\r')){console.error('CRLF detected in hook file');process.exit(1)}console.log('LF only - OK')"
@@ -1146,7 +1180,7 @@ node --input-type=commonjs -e "const f=require('fs').readFileSync('.git/hooks/pr
 
 Expected: `LF only - OK` with exit 0. A `CRLF detected` failure means Git for Windows bash will fail to parse the shebang, producing `bad interpreter: No such file or directory`. Fix: re-run install.ps1 to overwrite the file; the `.Replace("`r`n", "`n").Replace("`r", "`n")` calls in the script normalize both the guard block and any pre-existing content before writing.
 
-- [ ] [T-007-C] Commit:
+- [ ] [T-007-D] Commit:
 
 ```
 git add install.ps1
@@ -1267,8 +1301,14 @@ Pre-check before edit: `grep -c "\[FEAT-024\]" "AGENT-READABLE BACKLOG.md"` must
 
 - [ ] [T-009-D] Commit the plan file (needs `git add -f` because `docs/` is gitignored):
 
+First confirm the actual plan filename — the date prefix reflects creation date and may differ if the file was renamed:
 ```
-git add -f "docs/superpowers/plans/2026-06-17-feat024-unit-testing-suite.md"
+ls docs/superpowers/plans/
+```
+
+Then stage by glob to avoid hardcoding the date prefix:
+```
+git add -f docs/superpowers/plans/*feat024*.md
 git add "AGENT-READABLE BACKLOG.md"
 git commit -m "chore(FEAT-024): save implementation plan and mark in-progress"
 ```
