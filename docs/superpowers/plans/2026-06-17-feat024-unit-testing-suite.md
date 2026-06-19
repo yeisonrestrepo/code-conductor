@@ -33,6 +33,8 @@
 - Coverage reporting (`c8`, `istanbul`, `@vitest/coverage-v8`) and code-quality metrics (ESLint, SonarQube) are OUT OF SCOPE for this phase; do not add `--coverage` flags, coverage thresholds, or quality gate steps to any file
 - CI workflow: `actions/setup-node@v4` with `cache: 'npm'` and `cache-dependency-path: 'package-lock.json'` caches the npm package store; `actions/cache@v4` with `path: .vitest-cache` caches Vitest's transform cache; no additional manual `node_modules/` caching is needed
 - Temp dir naming convention: guard3 allowlist dirs use prefix `cc-guard3-`; verbosity test dirs use prefix `cc-verbosity-`; the `cc-` prefix identifies these as code-conductor test artifacts for workspace auditing and avoids collisions on shared or multi-tenant systems
+- Temp dir lifecycle guarantee: `runAllowlisted` wraps its temp dir in `try/finally` so cleanup fires even when an assertion throws; `afterEach` owns per-test cleanup in verbosity; `afterAll` is the last-resort sweep for crash-leaked dirs in both suites — these three mechanisms together ensure no temp artifact survives any exit path
+- npm test stream routing: the pre-commit hook MUST run `npm test` without `--silent`; stdout and stderr stream natively to the developer's terminal so Vitest failure details are fully visible; use `vitest.config.js` reporter options to tune verbosity rather than adding `--silent` to the hook body
 
 ---
 
@@ -202,12 +204,12 @@ Expected: file found.
 import { describe, it, expect, afterAll, beforeAll } from 'vitest'
 import { spawnSync } from 'child_process'
 import { fileURLToPath } from 'url'
-import { dirname, join } from 'path'
+import { dirname, join, resolve } from 'path'
 import fs from 'fs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
-const REPO_ROOT = join(__dirname, '../..')
+const REPO_ROOT = resolve(__dirname, '../..')
 const HOOK = join(REPO_ROOT, '.claude/hooks/pre-tool-use.sh')
 const TESTS_TMP = join(REPO_ROOT, 'tests', '.tmp')
 
@@ -531,13 +533,13 @@ Expected: both found.
 import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest'
 import { spawnSync } from 'child_process'
 import { fileURLToPath } from 'url'
-import { dirname, join } from 'path'
+import { dirname, join, resolve } from 'path'
 import fs from 'fs'
 import os from 'os'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
-const REPO_ROOT = join(__dirname, '../..')
+const REPO_ROOT = resolve(__dirname, '../..')
 const GLOBAL_HOOK = join(REPO_ROOT, 'global/hooks/verbosity-remind.sh')
 const PROJECT_HOOK = join(REPO_ROOT, 'project-template/.claude/hooks/verbosity-remind.sh')
 
@@ -827,6 +829,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
@@ -852,6 +855,8 @@ jobs:
         run: npm test
 ```
 
+**Environment variables**: no additional `env:` block is required in the CI workflow. All test-specific env overrides (`CLAUDE_TOOL_NAME`, `CLAUDE_TOOL_INPUT`, `HOME`, `CC_VERBOSITY_SKIP`) are supplied programmatically via the `env` option of `spawnSync` within the test files; the runner inherits no special env vars from the workflow definition. If a future runner platform requires platform-specific mocking, add an `env:` block at the job level — none is needed for `ubuntu-latest`.
+
 **Node version pin**: `node-version: '20'` installs the latest Node 20.x patch, which ships with npm 10.x and generates `package-lock.json` at `lockfileVersion: 3`. This matches the `"engines": {"node": ">=20"}` floor in `package.json`. Using `node-version: 'lts/*'` would work while Node 20 is the LTS pointer, but would silently advance to Node 22 when the pointer moves, potentially changing lockfile format without an explicit change.
 
 - [ ] [T-005-C] Commit:
@@ -876,7 +881,8 @@ git commit -m "feat(FEAT-024): add GitHub Actions CI workflow for npm test"
 - Git worktrees: when `install.sh` is run from inside a linked worktree (where `.git` is a file pointer rather than a directory), `git rev-parse --git-path hooks` resolves to the main repository's shared hooks directory; this is correct behavior since git hooks are not per-worktree
 - npm test verbosity: the hook runs `npm test` without `--silent` so that test failure details are printed at the terminal during `git commit`; `--silent` would suppress all output including error messages, making diagnosis harder; configure Vitest reporter options if output reduction is needed
 - npm PATH validation: the appended hook's first executable line is `command -v npm >/dev/null 2>&1 || { echo "[conductor] npm not found - skipping test gate"; exit 0; }`; this is the explicit PATH check that prevents the hook from failing with a confusing `npm: not found` error on machines where npm is not in the git hook's PATH (common with GUI git clients that do not inherit the login shell's PATH)
-- Idempotency sentinel: the opening marker is `# code-conductor:test-gate`; the installer checks `grep -qF "$_sentinel" "$_precommit"` before appending; if the sentinel is found the block is skipped entirely and `ok "Pre-commit test gate already present (idempotent)"` is logged; the closing marker is `# /code-conductor:test-gate` but is not used in the idempotency check
+- Idempotency sentinel: the opening marker is `# code-conductor:test-gate`; the installer checks `grep -qF "$_sentinel" "$_precommit"` before appending; if the sentinel is found the block is skipped entirely and `ok "Pre-commit test gate already present (idempotent)"` is logged; the closing marker is `# /code-conductor:test-gate` but is not used in the idempotency check; re-running `install.sh` any number of times produces at most one copy of the gate block in the hook file
+- Custom hook preservation: if an existing pre-commit file is found (with any content other than the sentinel), the installer appends via `cat >>`; existing custom script content is never overwritten or discarded; only if no pre-commit file exists does the installer create a new file starting with `#!/bin/sh`
 
 - [ ] [T-006-A] Locate the insertion point - it is the `.gitignore` update block at the tail of the `if [ "$INSTALL_PROJECT" = true ]` outer block. Do **not** rely on line numbers since unrelated changes may shift them; instead use `grep -n 'Added.*to .gitignore' install.sh` at implementation time to pinpoint the exact line. The target old_string is the unique sequence:
 
@@ -898,6 +904,18 @@ Replace it with the same block followed by the pre-commit wiring (before the clo
   if [ ! -f "$GITIGNORE" ] || ! grep -qF "$ENTRY" "$GITIGNORE"; then
     echo "$ENTRY" >> "$GITIGNORE"
     ok "Added $ENTRY to .gitignore"
+  fi
+
+  # Node.js engine constraint check (FEAT-024)
+  if command -v node >/dev/null 2>&1; then
+    _node_major=$(node --eval "process.stdout.write(process.versions.node.split('.')[0])")
+    if [ "${_node_major:-0}" -lt 20 ] 2>/dev/null; then
+      warn "Node.js $(node --version) is below the >=20 engine requirement; npm test may fail"
+    else
+      ok "Node.js $(node --version) meets the >=20 engine requirement"
+    fi
+  else
+    warn "node not found in PATH - cannot verify >=20 engine requirement; npm test will fail unless Node >=20 is installed"
   fi
 
   # Pre-commit test gate (FEAT-024)
@@ -980,7 +998,9 @@ git commit -m "feat(FEAT-024): wire pre-commit test gate in install.sh"
 - Git worktrees: same as install.sh; `git rev-parse --git-path hooks` from a linked worktree resolves to the main repo's shared hooks directory, which is the correct target
 - PowerShell execution policy: if `.\install.ps1` fails with "cannot be loaded because running scripts is disabled on this system", bypass for this session with `powershell -ExecutionPolicy Bypass -File .\install.ps1`, or set persistently for the current user: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`. The installer does not modify execution policy.
 - npm PATH validation: same as install.sh — the guard block's first line is `command -v npm >/dev/null 2>&1 || { echo "[conductor] npm not found - skipping test gate"; exit 0; }`; this runs inside Git for Windows bash at commit time, not inside PowerShell, so PATH must contain npm as seen by the bash subprocess
-- Idempotency sentinel: same pattern as install.sh — `$hasGate = (Get-Content $precommit -Raw) -match [regex]::Escape($sentinel)` where `$sentinel = "# code-conductor:test-gate"`; the check is performed before any write; if the gate is found `Write-Ok "Pre-commit test gate already present (idempotent)"` is emitted and the block exits
+- Idempotency sentinel: same pattern as install.sh — `$hasGate = (Get-Content $precommit -Raw) -match [regex]::Escape($sentinel)` where `$sentinel = "# code-conductor:test-gate"`; the check is performed before any write; if the gate is found `Write-Ok "Pre-commit test gate already present (idempotent)"` is emitted and the block exits; re-running `install.ps1` any number of times produces at most one copy of the gate block
+- Custom hook preservation: if an existing pre-commit file is found, `$existing = [System.IO.File]::ReadAllText($precommit, $enc)` reads it with LF normalization, and the write produces `$existing.TrimEnd() + "\n" + $guardBlock`; the existing custom script content is never discarded; a new file is only created when no pre-commit file exists
+- npm test stream routing: same as install.sh — the hook runs `npm test` without `--silent`; in Git for Windows, bash inherits the terminal so Vitest output streams directly to the committing developer's console; adjust Vitest reporter config rather than silencing via the hook
 - Manual validation protocol: if PowerShell execution policy blocks `install.ps1`, or if a GUI git client bypasses hooks, developers can validate manually: (1) run `npm test` from repo root — must exit 0; (2) run `bash .git/hooks/pre-commit` from repo root after installation — must exit 0 on a clean codebase; (3) run `git commit --allow-empty -m "test"` to trigger the hook in a real commit flow; (4) on restricted PS hosts: `powershell -ExecutionPolicy Bypass -File .\install.ps1 -Project` installs the hook without changing system policy; (5) if bash is unavailable, the guard3 test suite skips via `describe.skipIf(!BASH)` — resolve by adding Git for Windows `bin/` to PATH and re-running `npm test`
 
 - [ ] [T-007-A] Locate the insertion point - it is after the gitignore `if` block and before the closing `}` of the `if ($Project)` block (install.ps1 lines 464-468). The target old_string is:
@@ -1001,6 +1021,19 @@ Replace with the same block followed by pre-commit wiring (before the closing `}
   if (-not (Test-Path $gitignore) -or -not (Select-String -Path $gitignore -Pattern ([regex]::Escape($entry)) -Quiet)) {
     Add-Content -Path $gitignore -Value $entry
     Write-Ok "Added $entry to .gitignore"
+  }
+
+  # Node.js engine constraint check (FEAT-024)
+  $nodeVer = node --version 2>&1
+  if ($LASTEXITCODE -eq 0) {
+    $nodeMajor = [int]([regex]::Match($nodeVer, 'v(\d+)\.').Groups[1].Value)
+    if ($nodeMajor -lt 20) {
+      Write-Warn "Node.js $nodeVer is below the >=20 engine requirement; npm test may fail"
+    } else {
+      Write-Ok "Node.js $nodeVer meets the >=20 engine requirement"
+    }
+  } else {
+    Write-Warn "node not found in PATH - cannot verify >=20 engine requirement; npm test will fail unless Node >=20 is installed"
   }
 
   # Pre-commit test gate (FEAT-024)
@@ -1249,3 +1282,17 @@ git commit -m "chore(FEAT-024): save implementation plan and mark in-progress"
 4. **install.sh heredoc in plan**: the HOOK_BLOCK heredoc closing marker must appear at column 0 in the actual file. The `Edit` tool preserves indentation; verify the resulting file with `bash -n install.sh` (T-006-C).
 
 5. **`npm ci` in CI**: requires `package-lock.json` committed. Verify with `git ls-files package-lock.json` (T-009-B) before considering implementation complete.
+
+---
+
+## Out of Scope
+
+The following items are explicitly deferred to future phases and MUST NOT be included in this implementation:
+
+- **Test coverage reporting**: `@vitest/coverage-v8`, `c8`, `istanbul`; coverage thresholds; `--coverage` CLI flags; or a `coverage/` output directory. Do NOT add `coverage/` to `.gitignore` in this phase — that entry belongs to the coverage phase.
+- **Coverage reporting directory exclusions**: `.nyc_output/`, `coverage/`, and per-file exclusion patterns (`/* c8 ignore */`) are a future concern; this phase's `.gitignore` additions are limited to `node_modules/`, `.vitest-cache/`, and `tests/.tmp/`.
+- **Code quality metrics**: ESLint, Prettier enforcement, Husky, lint-staged, SonarQube, Codecov, or any lint step in the CI workflow or pre-commit hook.
+- **Watch mode and UI**: `vitest --watch`, `vitest --ui`, or `@vitest/ui` package configuration.
+- **`memfs` / virtual filesystem**: deferred to FEAT-023; the `memfs` package MUST NOT appear in `package.json` or `package-lock.json` until FEAT-023 introduces real JS modules that require filesystem virtualization.
+- **Windows-native CI runner**: `windows-latest` — the workflow targets `ubuntu-latest` only for this phase.
+- **Additional test reporters**: JUnit XML, HTML, TAP, or any non-default Vitest reporter configuration.
