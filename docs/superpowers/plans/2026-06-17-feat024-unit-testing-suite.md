@@ -883,6 +883,7 @@ git commit -m "feat(FEAT-024): add GitHub Actions CI workflow for npm test"
 - npm PATH validation: the appended hook's first executable line is `command -v npm >/dev/null 2>&1 || { echo "[conductor] npm not found - skipping test gate"; exit 0; }`; this is the explicit PATH check that prevents the hook from failing with a confusing `npm: not found` error on machines where npm is not in the git hook's PATH (common with GUI git clients that do not inherit the login shell's PATH)
 - Idempotency sentinel: the opening marker is `# code-conductor:test-gate`; the installer checks `grep -qF "$_sentinel" "$_precommit"` before appending; if the sentinel is found the block is skipped entirely and `ok "Pre-commit test gate already present (idempotent)"` is logged; the closing marker is `# /code-conductor:test-gate` but is not used in the idempotency check; re-running `install.sh` any number of times produces at most one copy of the gate block in the hook file
 - Custom hook preservation: if an existing pre-commit file is found (with any content other than the sentinel), the installer appends via `cat >>`; existing custom script content is never overwritten or discarded; only if no pre-commit file exists does the installer create a new file starting with `#!/bin/sh`
+- `core.hooksPath` support: if the repository configures a custom hooks directory via `git config core.hooksPath /custom/hooks`, `git rev-parse --git-path hooks` returns that absolute path; the installer writes to it without any special handling needed; `mkdir -p "$_hooks_dir"` creates the directory if it does not yet exist, so custom paths that point to non-existent directories are handled safely; an empty or whitespace-only result from `git rev-parse --git-path hooks` (bare repos, detached HEAD without a hooks dir) is caught by `[ -n "$_hooks_dir" ]` and results in a `warn` rather than a write
 
 - [ ] [T-006-A] Locate the insertion point - it is the `.gitignore` update block at the tail of the `if [ "$INSTALL_PROJECT" = true ]` outer block. Do **not** rely on line numbers since unrelated changes may shift them; instead use `grep -n 'Added.*to .gitignore' install.sh` at implementation time to pinpoint the exact line. The target old_string is the unique sequence:
 
@@ -906,13 +907,24 @@ Replace it with the same block followed by the pre-commit wiring (before the clo
     ok "Added $ENTRY to .gitignore"
   fi
 
-  # Node.js engine constraint check (FEAT-024)
+  # Node.js and npm engine constraint check (FEAT-024)
   if command -v node >/dev/null 2>&1; then
     _node_major=$(node --eval "process.stdout.write(process.versions.node.split('.')[0])")
     if [ "${_node_major:-0}" -lt 20 ] 2>/dev/null; then
       warn "Node.js $(node --version) is below the >=20 engine requirement; npm test may fail"
     else
       ok "Node.js $(node --version) meets the >=20 engine requirement"
+      # npm 10+ ships bundled with Node 20; verify it is present and usable.
+      if command -v npm >/dev/null 2>&1; then
+        _npm_major=$(npm --version 2>/dev/null | cut -d. -f1)
+        if [ "${_npm_major:-0}" -lt 10 ] 2>/dev/null; then
+          warn "npm $(npm --version) is below >=10; run 'npm install -g npm@latest' to upgrade"
+        else
+          ok "npm $(npm --version) meets the >=10 constraint"
+        fi
+      else
+        warn "npm not found in PATH even though Node >=20 is present; reinstall Node or add npm to PATH"
+      fi
     fi
   else
     warn "node not found in PATH - cannot verify >=20 engine requirement; npm test will fail unless Node >=20 is installed"
@@ -1000,6 +1012,7 @@ git commit -m "feat(FEAT-024): wire pre-commit test gate in install.sh"
 - npm PATH validation: same as install.sh — the guard block's first line is `command -v npm >/dev/null 2>&1 || { echo "[conductor] npm not found - skipping test gate"; exit 0; }`; this runs inside Git for Windows bash at commit time, not inside PowerShell, so PATH must contain npm as seen by the bash subprocess
 - Idempotency sentinel: same pattern as install.sh — `$hasGate = (Get-Content $precommit -Raw) -match [regex]::Escape($sentinel)` where `$sentinel = "# code-conductor:test-gate"`; the check is performed before any write; if the gate is found `Write-Ok "Pre-commit test gate already present (idempotent)"` is emitted and the block exits; re-running `install.ps1` any number of times produces at most one copy of the gate block
 - Custom hook preservation: if an existing pre-commit file is found, `$existing = [System.IO.File]::ReadAllText($precommit, $enc)` reads it with LF normalization, and the write produces `$existing.TrimEnd() + "\n" + $guardBlock`; the existing custom script content is never discarded; a new file is only created when no pre-commit file exists
+- `core.hooksPath` support: `(git rev-parse --git-path hooks 2>&1).ToString().Trim()` resolves to the custom absolute path when `core.hooksPath` is set; `New-Item -ItemType Directory -Path $hooksDirParent -Force` creates the directory if absent; an empty or whitespace-only result is caught by `if ($hooksDir)` which fires `Write-Warn` rather than attempting a write
 - npm test stream routing: same as install.sh — the hook runs `npm test` without `--silent`; in Git for Windows, bash inherits the terminal so Vitest output streams directly to the committing developer's console; adjust Vitest reporter config rather than silencing via the hook
 - Manual validation protocol: if PowerShell execution policy blocks `install.ps1`, or if a GUI git client bypasses hooks, developers can validate manually: (1) run `npm test` from repo root — must exit 0; (2) run `bash .git/hooks/pre-commit` from repo root after installation — must exit 0 on a clean codebase; (3) run `git commit --allow-empty -m "test"` to trigger the hook in a real commit flow; (4) on restricted PS hosts: `powershell -ExecutionPolicy Bypass -File .\install.ps1 -Project` installs the hook without changing system policy; (5) if bash is unavailable, the guard3 test suite skips via `describe.skipIf(!BASH)` — resolve by adding Git for Windows `bin/` to PATH and re-running `npm test`
 
@@ -1023,7 +1036,7 @@ Replace with the same block followed by pre-commit wiring (before the closing `}
     Write-Ok "Added $entry to .gitignore"
   }
 
-  # Node.js engine constraint check (FEAT-024)
+  # Node.js and npm engine constraint check (FEAT-024)
   $nodeVer = node --version 2>&1
   if ($LASTEXITCODE -eq 0) {
     $nodeMajor = [int]([regex]::Match($nodeVer, 'v(\d+)\.').Groups[1].Value)
@@ -1031,6 +1044,18 @@ Replace with the same block followed by pre-commit wiring (before the closing `}
       Write-Warn "Node.js $nodeVer is below the >=20 engine requirement; npm test may fail"
     } else {
       Write-Ok "Node.js $nodeVer meets the >=20 engine requirement"
+      # npm 10+ ships bundled with Node 20; verify it is present and usable.
+      $npmVer = npm --version 2>&1
+      if ($LASTEXITCODE -eq 0) {
+        $npmMajor = [int]([regex]::Match($npmVer, '^(\d+)\.').Groups[1].Value)
+        if ($npmMajor -lt 10) {
+          Write-Warn "npm $npmVer is below >=10; run 'npm install -g npm@latest' to upgrade"
+        } else {
+          Write-Ok "npm $npmVer meets the >=10 constraint"
+        }
+      } else {
+        Write-Warn "npm not found in PATH even though Node >=20 is present; reinstall Node or add npm to PATH"
+      }
     }
   } else {
     Write-Warn "node not found in PATH - cannot verify >=20 engine requirement; npm test will fail unless Node >=20 is installed"
