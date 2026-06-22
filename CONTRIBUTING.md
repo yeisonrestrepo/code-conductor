@@ -38,6 +38,31 @@ The PR template will pre-fill when you open a pull request — please fill it in
 
 ---
 
+## Bypassing the Pre-Commit Hook
+
+The pre-commit test gate installed by `install.sh` / `install.ps1` can be skipped with:
+
+```
+git commit --no-verify
+```
+
+This is a permitted developer override for WIP commits, broken test environments, or emergency fixes.
+
+**The GitHub Actions CI gate is unconditional.** A PR merged without a green CI run is a policy violation regardless of `--no-verify` usage. Never disable or skip the CI workflow to merge failing tests.
+
+### Manual Validation Protocol
+
+Use this checklist when your environment restricts hook execution (restricted PowerShell policy, GUI git client that bypasses hooks, or bash not in PATH):
+
+1. **Run the test suite directly**: `npm test` from repo root must exit 0.
+2. **Invoke the hook manually**: `bash .git/hooks/pre-commit` from repo root after installation; must exit 0 on a clean codebase.
+3. **Trigger via an empty commit**: `git commit --allow-empty -m "hook smoke test"` — the hook fires normally.
+4. **Restricted PowerShell hosts**: `powershell -ExecutionPolicy Bypass -File .\install.ps1 -Project` installs the hook without altering system execution policy.
+5. **bash not in PATH (Windows)**: install [Git for Windows](https://gitforwindows.org/), add its `bin/` to PATH, then re-run `npm test` to confirm the guard3 suite no longer skips.
+6. **Verify LF line endings in the written hook**: `node --input-type=commonjs -e "const f=require('fs').readFileSync('.git/hooks/pre-commit','utf8');if(f.includes('\r'))throw new Error('CRLF');console.log('LF only - OK')"` — a CRLF result means Git for Windows bash will fail to parse the shebang; re-run `install.ps1` to normalize.
+
+---
+
 ## License
 
 By contributing, you agree that your contributions will be licensed under the [Apache 2.0 License](LICENSE).
