@@ -58,6 +58,15 @@ in both CLAUDE.md files to make the Glob-only constraint explicit and machine-sc
   anchored at the repo root will not contain the parent directory components. This is a
   documented constraint; no runtime mitigation is implemented (resolving `$PWD` inside the
   inline python3 script adds disproportionate complexity for a self-inflicted edge case).
+  **Documentation locations for end users:**
+  1. `README.md` — add a one-line note under the existing "Installation" or "Prerequisites"
+     section warning that the repository must not be cloned into a directory named
+     `graphify-out` or `node_modules`.
+  2. Both installers (`install.sh` / `install.ps1`) — immediately after the root-directory
+     sentinel check, emit a runtime warning if any component of the resolved `$PWD` (bash) /
+     `$PWD` (PS: `$pwd.Path`) matches `graphify-out` or `node_modules`:
+     `echo "Warning: repository is cloned inside a directory named '$component'. Guard 4 may produce false positives on absolute Read paths. See README for details." >&2`
+     This is non-fatal (no `exit 1`) — the install proceeds; the user is informed.
 - **Windows backslash:** `graphify-out\cache\file.json` — `replace('\\', '/')` normalizes
   before split; blocked.
 - **Case variants (case-insensitive FS):** `Graphify-Out/graph.json` or `NODE_MODULES/x.js`
@@ -118,8 +127,19 @@ print("BLOCK" if any(p in blocked for p in parts) else "OK")
         echo '{"decision":"block","reason":"Guard 4: direct reads of graphify-out/ and node_modules/ are forbidden. Use Glob for existence checks or the graphify skill: /graphify query \"<question>\"."}'
         exit 1
     fi
+    # Debug: set CC_GUARD4_DEBUG=1 to log fail-open events to stderr for diagnostics.
+    if [ -n "${CC_GUARD4_DEBUG:-}" ] && [ "$_g4_result" != "OK" ]; then
+        printf '[Guard 4 debug] fail-open: _g4_result="%s"\n' "$_g4_result" >&2
+    fi
 fi
 ```
+
+**Debug flag (`CC_GUARD4_DEBUG`):** Setting `CC_GUARD4_DEBUG=1` in the shell environment causes
+Guard 4 to emit a single diagnostic line to stderr whenever it fails open (i.e., `_g4_result`
+is neither `"BLOCK"` nor `"OK"` — indicating a python3 exception or empty output). The flag
+has no effect on normal `"OK"` or `"BLOCK"` paths, and is never set in CI or production
+environments. Developers use it to distinguish a genuine fail-open event from a correctly
+passing read without modifying the hook itself.
 
 **Key implementation decisions:**
 - `printf '%s'` pipes input to python3 instead of bash herestring `<<<`; single-quoted
@@ -174,8 +194,10 @@ Based on current installer structure, the expected locations are:
    to `.claude/hooks/pre-tool-use.sh` during the `-Project` setup phase — search for
    `pre-tool-use` within the block delimited by the `-Project` flag branch.
 2. Any `cp -r project-template/.claude/` bulk copy that would overwrite the hooks directory.
-Wrap each identified `cp` or equivalent with `[ ! -f ".claude/hooks/pre-tool-use.sh" ] &&`
-prefix or the same `if [ ! -f ]` block used for the download guard.
+Wrap each identified `cp` or equivalent with the same `if [ ! -f ]` block used for the
+download guard. The `cp` command itself does not require additional `try/catch` — `install.sh`
+runs with `set -euo pipefail`, so any `cp` failure propagates as a non-zero exit automatically;
+no silent failure is possible.
 
 ### Installer idempotency — `install.ps1`
 
@@ -232,14 +254,31 @@ Expected locations:
    `.claude\hooks\pre-tool-use.sh` in the `-Project` branch — search for `pre-tool-use`
    within the block delimited by the `-Project` parameter conditional.
 2. Any bulk `Copy-Item -Recurse` that covers the `.claude\hooks\` subtree.
-Wrap each with `if (-not (Test-Path ".claude\hooks\pre-tool-use.sh"))` matching the guard
-used for the download block.
+Each identified `Copy-Item` call must be wrapped with both the idempotency guard AND explicit
+error handling matching the download block pattern:
+```powershell
+if (-not (Test-Path ".claude\hooks\pre-tool-use.sh")) {
+    try {
+        Copy-Item "project-template\.claude\hooks\pre-tool-use.sh" `
+            -Destination ".claude\hooks\pre-tool-use.sh" -ErrorAction Stop
+    } catch {
+        Write-Host -ForegroundColor Red "Guard: failed to copy pre-tool-use.sh: $_"
+        exit 1
+    }
+}
+```
+`Copy-Item` in PS 5.1 does not throw on missing source by default; `-ErrorAction Stop` is
+required to convert that into a catchable terminating error. Omitting it would produce a
+silent partial install with no exit signal.
 
 **Propagation trade-off:** Once a user has a local `.claude/hooks/pre-tool-use.sh`, the
 idempotency check means upstream updates to the project-template hook file will NOT propagate
-automatically on reinstall. This is intentional (preserves local guards) but must be
-documented in `CONTRIBUTING.md` or installer output: users who want to pull a fresh upstream
-hook must manually delete the local file before re-running the installer.
+automatically on reinstall. This is intentional (preserves local guards). Document in
+`CONTRIBUTING.md` as a new subsection `### Resetting the Pre-Commit Hook to Upstream` inserted
+immediately after the existing `### Manual Validation Protocol` subsection (before the closing
+`---` separator of `## Bypassing the Pre-Commit Hook`). Content: one sentence stating the
+idempotency invariant and the reset procedure (`delete .claude/hooks/pre-tool-use.sh`, then
+re-run the installer).
 
 ### CLAUDE.md session init — both `CLAUDE.md` and `project-template/CLAUDE.md`
 
