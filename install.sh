@@ -1123,6 +1123,84 @@ if [ "$INSTALL_PROJECT" = true ]; then
     echo "$ENTRY" >> "$GITIGNORE"
     ok "Added $ENTRY to .gitignore"
   fi
+
+  # Node.js and npm engine constraint check (FEAT-024)
+  if command -v node >/dev/null 2>&1; then
+    _node_major=$(node --eval "process.stdout.write(process.versions.node.split('.')[0])" 2>/dev/null)
+    # Validate _node_major is purely numeric before arithmetic comparison.
+    # nvm/asdf/nvs shell wrappers can inject warnings into stdout, producing
+    # a non-numeric or empty value; [ non-numeric -lt 20 ] would error or compare 0.
+    case "$_node_major" in
+      ''|*[!0-9]*)
+        warn "Could not parse Node.js major version (got: '${_node_major:-<empty>}'); a shell wrapper may have corrupted the output; engine check skipped"
+        ;;
+      *)
+        if [ "$_node_major" -lt 20 ]; then
+          warn "Node.js $(node --version) is below the >=20 engine requirement; npm test may fail"
+        else
+          ok "Node.js $(node --version) meets the >=20 engine requirement"
+          # npm 10+ ships bundled with Node 20; verify it is present and usable.
+          if command -v npm >/dev/null 2>&1; then
+            _npm_major=$(npm --version 2>/dev/null | cut -d. -f1)
+            case "$_npm_major" in
+              ''|*[!0-9]*)
+                warn "Could not parse npm version (got: '${_npm_major:-<empty>}'); engine check skipped"
+                ;;
+              *)
+                if [ "$_npm_major" -lt 10 ]; then
+                  warn "npm $(npm --version) is below >=10; run 'npm install -g npm@latest' to upgrade"
+                else
+                  ok "npm $(npm --version) meets the >=10 constraint"
+                fi
+                ;;
+            esac
+          else
+            warn "npm not found in PATH even though Node >=20 is present; reinstall Node or add npm to PATH"
+          fi
+        fi
+        ;;
+    esac
+  else
+    warn "node not found in PATH - cannot verify >=20 engine requirement; npm test will fail unless Node >=20 is installed"
+  fi
+
+  # Pre-commit test gate (FEAT-024)
+  if git rev-parse --git-dir >/dev/null 2>&1; then
+    _hooks_dir=$(git rev-parse --git-path hooks 2>/dev/null)
+    _precommit="${_hooks_dir}/pre-commit"
+    _sentinel="# code-conductor:test-gate"
+    if [ -n "$_hooks_dir" ]; then
+      if grep -qF "$_sentinel" "$_precommit" 2>/dev/null; then
+        ok "Pre-commit test gate already present (idempotent)"
+      else
+        mkdir -p "$_hooks_dir"
+        if [ -f "$_precommit" ] && [ ! -w "$_precommit" ]; then
+          warn "Pre-commit hook file is not writable ($_precommit); test gate not installed"
+        elif [ ! -w "$_hooks_dir" ]; then
+          warn "Hooks directory is not writable ($_hooks_dir); test gate not installed"
+        else
+          [ -f "$_precommit" ] || printf '#!/bin/sh\n' > "$_precommit"
+          # Ensure existing content ends with a newline before appending.
+          # tail -c 1 | wc -l: returns 1 if last byte is LF, 0 otherwise. Both are POSIX.
+          [ -s "$_precommit" ] && [ "$(tail -c 1 "$_precommit" | wc -l)" -eq 0 ] && printf '\n' >> "$_precommit"
+          cat >> "$_precommit" <<'HOOK_BLOCK'
+# code-conductor:test-gate
+command -v npm >/dev/null 2>&1 || { echo "[conductor] npm not found - skipping test gate"; exit 0; }
+_root=$(git rev-parse --show-toplevel)
+[ -d "$_root/node_modules" ] || { echo "[conductor] node_modules not installed - run npm ci first, skipping test gate"; exit 0; }
+cd "$_root" && npm test
+# /code-conductor:test-gate
+HOOK_BLOCK
+          chmod +x "$_precommit"
+          ok "Pre-commit test gate appended to $_precommit"
+        fi
+      fi
+    else
+      warn "Could not resolve git hooks directory - pre-commit hook not installed"
+    fi
+  else
+    warn "Not in a git repository - pre-commit hook not installed"
+  fi
 fi
 
 # ── Post-install hook diagnostic (T-004-H) ─────────────────────────────────────
