@@ -97,8 +97,9 @@ Both files receive an identical block appended after Guard 3:
 if [ "$CLAUDE_TOOL_NAME" = "Read" ]; then
     _g4_result=$(printf '%s' "$CLAUDE_TOOL_INPUT" | python3 -c '
 import json, sys, posixpath
-d = json.load(sys.stdin)
-fp = d.get("file_path", "")
+raw = sys.stdin.buffer.read().decode("utf-8", errors="replace")
+d = json.loads(raw)
+fp = d.get("file_path", "").strip()
 fp_n = posixpath.normpath(fp.replace("\\", "/"))
 parts = [p.lower() for p in fp_n.split("/") if p and p != "."]
 blocked = {"graphify-out", "node_modules"}
@@ -114,6 +115,14 @@ fi
 **Key implementation decisions:**
 - `printf '%s'` pipes input to python3 instead of bash herestring `<<<`; single-quoted
   python block prevents bash from interpreting `$` or `\` inside the script.
+- `sys.stdin.buffer.read().decode('utf-8', errors='replace')` + `json.loads()` reads raw
+  bytes and decodes as UTF-8 with replacement; avoids `UnicodeDecodeError` when the system
+  locale is non-UTF-8 (e.g., `LANG=C`) and a file path contains non-ASCII characters.
+  `errors='replace'` preserves ASCII components (`graphify-out`) even if surroundings are
+  garbled → block decision remains correct.
+- `.strip()` on `file_path` removes leading/trailing whitespace injected by the caller;
+  prevents `" graphify-out/graph.json"` from producing ` graphify-out` as a component and
+  bypassing the block.
 - `posixpath.normpath` resolves `..` segments before component split, eliminating the
   `graphify-out/../src/main.js` false-positive (resolves to `src/main.js` → not blocked).
 - `p != "."` filter drops current-dir segments that `normpath` may leave in dot-relative paths.
@@ -130,7 +139,12 @@ mkdir -p ".claude/hooks"
 if [ ! -f ".claude/hooks/pre-tool-use.sh" ]; then
     curl -fsSL "$BASE_URL/pre-tool-use.sh" -o ".claude/hooks/pre-tool-use.sh"
 fi
+chmod +x ".claude/hooks/pre-tool-use.sh"
 ```
+
+`chmod +x` runs unconditionally — outside the download guard — so it applies both to freshly
+downloaded files and to pre-existing ones that may have lost the execute bit (e.g., via
+filesystem copy, tar extraction, or certain Git operations).
 
 Audit all subsequent installer steps for any `project-template` copy that targets
 `.claude/hooks/pre-tool-use.sh`; wrap each with the same `[ ! -f ]` guard.
@@ -138,7 +152,12 @@ Audit all subsequent installer steps for any `project-template` copy that target
 ### Installer idempotency — `install.ps1`
 
 ```powershell
-New-Item -ItemType Directory -Force ".claude\hooks" | Out-Null
+try {
+    New-Item -ItemType Directory -Force ".claude\hooks" -ErrorAction Stop | Out-Null
+} catch {
+    Write-Error "Guard: failed to create .claude\hooks directory: $_"
+    exit 1
+}
 # To reset hook to GitHub upstream: delete .claude\hooks\pre-tool-use.sh, then re-run.
 if (-not (Test-Path ".claude\hooks\pre-tool-use.sh")) {
     try {
@@ -191,7 +210,15 @@ New file following the `guard3.test.js` pattern (`spawnSync`, `BASH_AVAILABLE` s
 home directory. This ensures tests run against the project-committed hook, not a user-modified
 live copy.
 
-**Bash path resolution (Windows-safe):**
+**`BASH_AVAILABLE` definition:**
+```js
+const BASH_AVAILABLE = spawnSync('bash', ['--version'], { encoding: 'utf8' }).status === 0
+```
+Uses `bash --version` (not `which bash`) so it tests actual bash executability, not just
+presence in PATH. Returns `false` on native Windows without Git Bash; all guarded test suites
+call `describe.skipIf(!BASH_AVAILABLE)`.
+
+**Bash path resolution for fail-open test (Windows-safe):**
 ```js
 const BASH_PATH = (spawnSync('which', ['bash'], { encoding: 'utf8' }).stdout || '').trim() || '/bin/bash'
 ```
@@ -213,6 +240,8 @@ All exit-1 assertions use `JSON.parse(result.stderr.trim())` and verify
 | `Graphify-Out/graph.json` (case variant) | valid JSON | normal | `Read` | exit 1, JSON block |
 | `NODE_MODULES/pkg/index.js` (uppercase) | valid JSON | normal | `Read` | exit 1, JSON block |
 | `graphify-out/../src/main.js` (traversal escape) | valid JSON | normal | `Read` | exit 0 (resolves to `src/main.js`) |
+| `graphify-out/` (trailing slash) | valid JSON | normal | `Read` | exit 1 (`normpath` strips slash; component `graphify-out` matched) |
+| `  graphify-out/graph.json` (leading spaces) | valid JSON | normal | `Read` | exit 1 (`.strip()` removes whitespace before split) |
 | `graphify-out-backup/file.json` | valid JSON | normal | `Read` | exit 0 |
 | `src/utils/graphify-out-helper.js` | valid JSON | normal | `Read` | exit 0 |
 | `src/index.js` | valid JSON | normal | `Read` | exit 0 |
