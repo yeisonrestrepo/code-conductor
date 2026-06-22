@@ -49,7 +49,7 @@
 **Interfaces:**
 - Produces: `npm test` command that discovers `tests/**/*.test.js`
 
-- [ ] [T-001-A] Create `package.json` at repo root with this exact content:
+- [X] [T-001-A] Create `package.json` at repo root with this exact content:
 
 ```json
 {
@@ -67,7 +67,7 @@
 }
 ```
 
-- [ ] [T-001-B] Create `vitest.config.js` at repo root.
+- [X] [T-001-B] Create `vitest.config.js` at repo root.
 
 **ESM syntax required**: `vitest.config.js` uses `import`/`export` (ES module syntax). This is mandatory because `package.json` sets `"type": "module"`, causing Node.js to load all `.js` files as ES modules. A CommonJS-style `const { defineConfig } = require('vitest/config')` would throw `ERR_REQUIRE_ESM` when Vitest loads the config file.
 
@@ -89,7 +89,7 @@ export default defineConfig({
 })
 ```
 
-- [ ] [T-001-C] Add `node_modules/` and `.vitest-cache/` to `.gitignore`. The command below is idempotent: it reads existing entries, skips any already present, and only appends the missing ones with a trailing-newline guard. Run from repo root (Node >= 20; no bash required).
+- [X] [T-001-C] Add `node_modules/` and `.vitest-cache/` to `.gitignore`. The command below is idempotent: it reads existing entries, skips any already present, and only appends the missing ones with a trailing-newline guard. Run from repo root (Node >= 20; no bash required).
 
 **CommonJS `require()` in an ESM project**: the project sets `"type": "module"` in `package.json`, but `node -e` evaluates inline scripts in CommonJS mode by default. To make the intent explicit and guard against future Node.js behavior changes, all three inline commands below pass `--input-type=commonjs` (available since Node 12; safe with the Node >= 20 engine requirement).
 
@@ -113,7 +113,7 @@ node --input-type=commonjs -e "const fs=require('fs'),p='.gitignore';if(!fs.exis
 
 Expected: `FOUND: node_modules/` then `FOUND: .vitest-cache/`, exit code 0. This check passes regardless of what other entries the repository already contains.
 
-- [ ] [T-001-D] Run `npm install` from repo root to generate `package-lock.json`:
+- [X] [T-001-D] Run `npm install` from repo root to generate `package-lock.json`:
 
 ```
 npm install
@@ -123,7 +123,7 @@ Expected: creates `node_modules/` and `package-lock.json`. No errors.
 
 **`npm install` vs `npm ci`**: use `npm install` here because no lockfile exists yet — this is the one-time step that generates it. Once `package-lock.json` is committed, all subsequent installs (local re-installs, CI, other developers) must use `npm ci`, which enforces the lockfile exactly and fails if it would need to be updated. The CI workflow (T-005-B) and any `npm run` re-installs after this step should always use `npm ci`, not `npm install`.
 
-- [ ] [T-001-E] Verify `npm test` is recognized (no test files yet, Vitest will exit 0 or warn):
+- [X] [T-001-E] Verify `npm test` is recognized (no test files yet, Vitest will exit 0 or warn):
 
 ```
 npm test
@@ -131,7 +131,7 @@ npm test
 
 Expected: Vitest runs and exits 0 (no test files found is acceptable at this stage).
 
-- [ ] [T-001-F] Commit:
+- [X] [T-001-F] Commit:
 
 ```
 git add package.json vitest.config.js package-lock.json .gitignore
@@ -149,7 +149,7 @@ git commit -m "feat(FEAT-024): add package.json, vitest config, and update gitig
 - Consumes: nothing
 - Produces: a passing test that scaffolds the Layer 2 directory
 
-- [ ] [T-002-A] Create `tests/unit/placeholder.test.js`:
+- [X] [T-002-A] Create `tests/unit/placeholder.test.js`:
 
 ```js
 import { describe, it, expect } from 'vitest'
@@ -161,7 +161,7 @@ describe('placeholder (Layer 2 - FEAT-023 stub)', () => {
 })
 ```
 
-- [ ] [T-002-B] Run tests to verify the placeholder passes:
+- [X] [T-002-B] Run tests to verify the placeholder passes:
 
 ```
 npm test
@@ -169,7 +169,7 @@ npm test
 
 Expected output: `1 passed` (or `Tests 1 passed`). No failures.
 
-- [ ] [T-002-C] Commit:
+- [X] [T-002-C] Commit:
 
 ```
 git add tests/unit/placeholder.test.js
@@ -187,7 +187,7 @@ git commit -m "feat(FEAT-024): add Layer 2 placeholder test stub"
 - Consumes: `.claude/hooks/pre-tool-use.sh` (existing, not modified)
 - Produces: JS port of all 107 pass/block cases from `tests/guard3-test.sh`
 
-- [ ] [T-003-A] Verify the hook file exists before creating the test:
+- [X] [T-003-A] Verify the hook file exists before creating the test:
 
 ```
 ls .claude/hooks/pre-tool-use.sh
@@ -197,7 +197,7 @@ Expected: file found.
 
 **If the file is missing**: abort T-003 entirely. Do not proceed to T-003-B. The test suite will throw `bash spawn failed (ENOENT)` at runtime if the hook path does not exist — the error message is accurate but gives no indication of which setup step was skipped. Fix: run `bash install.sh --project` (Unix) or `.\install.ps1 -Project` (Windows) from repo root to install the hook, then re-run this verification before proceeding. If the `BASH` constant at runtime evaluates to `null` (bash not in PATH), the entire guard3 describe block is skipped via `describe.skipIf(!BASH)` — see T-003-B for the bash-availability detection note.
 
-- [ ] [T-003-B] Create `tests/hooks/guard3.test.js` with this full content.
+- [X] [T-003-B] Create `tests/hooks/guard3.test.js` with this full content.
 
 **Line-ending normalization**: all `stdout`/`stderr` buffers and hook file content are normalized with the pattern `/\r\n|\r/g` before string assertions or line-splitting. The alternation order matters: `\r\n` is listed before `\r` so that two-character CRLF sequences are consumed atomically in a single pass; the `\r` branch then catches any surviving bare carriage returns (produced by some terminal emulators and legacy text streams) without leaving a trailing empty string after the following `\n`.
 
@@ -493,7 +493,7 @@ describe.skipIf(!BASH)('guard3 - pre-tool-use.sh', () => {
 })
 ```
 
-- [ ] [T-003-C] Run tests to verify all guard3 cases pass:
+- [X] [T-003-C] Run tests to verify all guard3 cases pass:
 
 ```
 npm test
@@ -501,7 +501,7 @@ npm test
 
 Expected: all guard3 tests pass (plus the placeholder). No failures. If any test fails, the hook behavior diverged from the bash harness; investigate `pre-tool-use.sh` directly.
 
-- [ ] [T-003-D] Commit:
+- [X] [T-003-D] Commit:
 
 ```
 git add tests/hooks/guard3.test.js
@@ -519,7 +519,7 @@ git commit -m "feat(FEAT-024): add Layer 1 guard3 test suite (port of guard3-tes
 - Consumes: `global/hooks/verbosity-remind.sh`, `project-template/.claude/hooks/verbosity-remind.sh` (both existing, not modified)
 - Produces: JS port of all hook behavior cases from `tests/verbosity-hook-test.sh`
 
-- [ ] [T-004-A] Verify both hook files exist before creating the test:
+- [X] [T-004-A] Verify both hook files exist before creating the test:
 
 ```
 ls global/hooks/verbosity-remind.sh
@@ -528,7 +528,7 @@ ls project-template/.claude/hooks/verbosity-remind.sh
 
 Expected: both found.
 
-- [ ] [T-004-B] Create `tests/hooks/verbosity-remind.test.js` with this full content:
+- [X] [T-004-B] Create `tests/hooks/verbosity-remind.test.js` with this full content:
 
 ```js
 import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest'
@@ -786,7 +786,7 @@ describe.skipIf(!BASH_AVAILABLE)('verbosity-remind hooks', () => {
 })
 ```
 
-- [ ] [T-004-C] Run the full test suite:
+- [X] [T-004-C] Run the full test suite:
 
 ```
 npm test
@@ -794,7 +794,7 @@ npm test
 
 Expected: all tests pass (placeholder + guard3 + verbosity). No failures. Row 13 is automatically skipped on Windows (prints `[skipped]`).
 
-- [ ] [T-004-D] Commit:
+- [X] [T-004-D] Commit:
 
 ```
 git add tests/hooks/verbosity-remind.test.js
@@ -812,13 +812,13 @@ git commit -m "feat(FEAT-024): add Layer 1 verbosity-remind test suite (port of 
 - Consumes: `package.json` `npm test` script from T-001
 - Produces: GitHub Actions workflow that gates every push and PR to `main`
 
-- [ ] [T-005-A] Create `.github/workflows/` directory:
+- [X] [T-005-A] Create `.github/workflows/` directory:
 
 ```
 mkdir -p .github/workflows
 ```
 
-- [ ] [T-005-B] Create `.github/workflows/test.yml`:
+- [X] [T-005-B] Create `.github/workflows/test.yml`:
 
 ```yaml
 name: Test
@@ -862,7 +862,7 @@ jobs:
 
 **Node version pin**: `node-version: '20'` installs the latest Node 20.x patch, which ships with npm 10.x and generates `package-lock.json` at `lockfileVersion: 3`. This matches the `"engines": {"node": ">=20"}` floor in `package.json`. Using `node-version: 'lts/*'` would work while Node 20 is the LTS pointer, but would silently advance to Node 22 when the pointer moves, potentially changing lockfile format without an explicit change.
 
-- [ ] [T-005-C] Commit:
+- [X] [T-005-C] Commit:
 
 ```
 git add .github/workflows/test.yml
@@ -888,7 +888,7 @@ git commit -m "feat(FEAT-024): add GitHub Actions CI workflow for npm test"
 - Custom hook preservation: if an existing pre-commit file is found (with any content other than the sentinel), the installer appends via `cat >>`; existing custom script content is never overwritten or discarded; only if no pre-commit file exists does the installer create a new file starting with `#!/bin/sh`
 - `core.hooksPath` support: if the repository configures a custom hooks directory via `git config core.hooksPath /custom/hooks`, `git rev-parse --git-path hooks` returns that absolute path; the installer writes to it without any special handling needed; `mkdir -p "$_hooks_dir"` creates the directory if it does not yet exist, so custom paths that point to non-existent directories are handled safely; an empty or whitespace-only result from `git rev-parse --git-path hooks` (bare repos, detached HEAD without a hooks dir) is caught by `[ -n "$_hooks_dir" ]` and results in a `warn` rather than a write
 
-- [ ] [T-006-A] Locate the insertion point - it is the `.gitignore` update block at the tail of the `if [ "$INSTALL_PROJECT" = true ]` outer block. Do **not** rely on line numbers since unrelated changes may shift them; instead use `grep -n 'Added.*to .gitignore' install.sh` at implementation time to pinpoint the exact line. The target old_string is the unique sequence:
+- [X] [T-006-A] Locate the insertion point - it is the `.gitignore` update block at the tail of the `if [ "$INSTALL_PROJECT" = true ]` outer block. Do **not** rely on line numbers since unrelated changes may shift them; instead use `grep -n 'Added.*to .gitignore' install.sh` at implementation time to pinpoint the exact line. The target old_string is the unique sequence:
 
 ```bash
   if [ ! -f "$GITIGNORE" ] || ! grep -qF "$ENTRY" "$GITIGNORE"; then
@@ -992,7 +992,7 @@ fi
 
 **Empty or unexpected `$_hooks_dir` value**: `git rev-parse --git-path hooks` outputs an empty string in non-standard git configurations (bare repositories, detached worktrees where `.git` is a file pointer rather than a directory, or submodule roots). When `$_hooks_dir` is empty or whitespace-only, `[ -n "$_hooks_dir" ]` evaluates false, the `warn` branch fires, and the block exits cleanly without modifying any file. The installer continues; only the pre-commit wiring step is skipped. If this warn fires during local testing, confirm the working directory is inside a standard git repository with `git rev-parse --show-toplevel` and `git rev-parse --git-path hooks` before investigating further.
 
-- [ ] [T-006-B] Verify the edit landed correctly - grep for the sentinel in install.sh:
+- [X] [T-006-B] Verify the edit landed correctly - grep for the sentinel in install.sh:
 
 ```
 grep -n "code-conductor:test-gate" install.sh
@@ -1000,7 +1000,7 @@ grep -n "code-conductor:test-gate" install.sh
 
 Expected: two lines - opening sentinel inside the heredoc and the `grep -qF` idempotency check line.
 
-- [ ] [T-006-C] Verify install.sh still parses as valid bash:
+- [X] [T-006-C] Verify install.sh still parses as valid bash:
 
 ```
 bash -n install.sh
@@ -1008,7 +1008,7 @@ bash -n install.sh
 
 Expected: no output, exit 0.
 
-- [ ] [T-006-D] Commit:
+- [X] [T-006-D] Commit:
 
 ```
 git add install.sh
@@ -1036,7 +1036,7 @@ git commit -m "feat(FEAT-024): wire pre-commit test gate in install.sh"
 - npm test stream routing: same as install.sh — the hook runs `npm test` without `--silent`; in Git for Windows, bash inherits the terminal so Vitest output streams directly to the committing developer's console; adjust Vitest reporter config rather than silencing via the hook
 - Manual validation protocol: if PowerShell execution policy blocks `install.ps1`, or if a GUI git client bypasses hooks, developers can validate manually: (1) run `npm test` from repo root — must exit 0; (2) run `bash .git/hooks/pre-commit` from repo root after installation — must exit 0 on a clean codebase; (3) run `git commit --allow-empty -m "test"` to trigger the hook in a real commit flow; (4) on restricted PS hosts: `powershell -ExecutionPolicy Bypass -File .\install.ps1 -Project` installs the hook without changing system policy; (5) if bash is unavailable, the guard3 test suite skips via `describe.skipIf(!BASH)` — resolve by adding Git for Windows `bin/` to PATH and re-running `npm test`
 
-- [ ] [T-007-A] Locate the insertion point - it is after the gitignore `if` block and before the closing `}` of the `if ($Project)` block (install.ps1 lines 464-468). The target old_string is:
+- [X] [T-007-A] Locate the insertion point - it is after the gitignore `if` block and before the closing `}` of the `if ($Project)` block (install.ps1 lines 464-468). The target old_string is:
 
 ```powershell
   if (-not (Test-Path $gitignore) -or -not (Select-String -Path $gitignore -Pattern ([regex]::Escape($entry)) -Quiet)) {
@@ -1164,7 +1164,7 @@ cd "$_root" && npm test
 }
 ```
 
-- [ ] [T-007-B] Verify the sentinel appears in install.ps1:
+- [X] [T-007-B] Verify the sentinel appears in install.ps1:
 
 ```
 grep -n "code-conductor:test-gate" install.ps1
@@ -1172,7 +1172,7 @@ grep -n "code-conductor:test-gate" install.ps1
 
 Expected: lines containing the sentinel string.
 
-- [ ] [T-007-C] After running install.ps1 locally, verify the written pre-commit hook contains LF-only line endings (no CRLF):
+- [X] [T-007-C] After running install.ps1 locally, verify the written pre-commit hook contains LF-only line endings (no CRLF):
 
 ```
 node --input-type=commonjs -e "const f=require('fs').readFileSync('.git/hooks/pre-commit','utf8');if(f.includes('\r')){console.error('CRLF detected in hook file');process.exit(1)}console.log('LF only - OK')"
@@ -1180,7 +1180,7 @@ node --input-type=commonjs -e "const f=require('fs').readFileSync('.git/hooks/pr
 
 Expected: `LF only - OK` with exit 0. A `CRLF detected` failure means Git for Windows bash will fail to parse the shebang, producing `bad interpreter: No such file or directory`. Fix: re-run install.ps1 to overwrite the file; the `.Replace("`r`n", "`n").Replace("`r", "`n")` calls in the script normalize both the guard block and any pre-existing content before writing.
 
-- [ ] [T-007-D] Commit:
+- [X] [T-007-D] Commit:
 
 ```
 git add install.ps1
@@ -1198,7 +1198,7 @@ git commit -m "feat(FEAT-024): wire pre-commit test gate in install.ps1 (UTF-8 n
 - Consumes: existing CONTRIBUTING.md (44 lines, four sections)
 - Produces: new section documenting `--no-verify` bypass and the unconditional CI gate
 
-- [ ] [T-008-A] Open `CONTRIBUTING.md`. The file has four sections: Reporting Issues, Submitting a Pull Request, Code Style, License. Insert the new section between Code Style and License.
+- [X] [T-008-A] Open `CONTRIBUTING.md`. The file has four sections: Reporting Issues, Submitting a Pull Request, Code Style, License. Insert the new section between Code Style and License.
 
 Use the following as the **exact old_string** for the Edit tool (includes the last Code Style bullet and the full License section to guarantee a unique match):
 
@@ -1249,7 +1249,7 @@ Use this checklist when your environment restricts hook execution (restricted Po
 By contributing, you agree that your contributions will be licensed under the [Apache 2.0 License](LICENSE).
 ```
 
-- [ ] [T-008-B] Run the final `npm test` to confirm all tests still pass after all changes:
+- [X] [T-008-B] Run the final `npm test` to confirm all tests still pass after all changes:
 
 ```
 npm test
@@ -1257,7 +1257,7 @@ npm test
 
 Expected: all tests green.
 
-- [ ] [T-008-C] Commit CONTRIBUTING.md:
+- [X] [T-008-C] Commit CONTRIBUTING.md:
 
 ```
 git add CONTRIBUTING.md
@@ -1271,7 +1271,7 @@ git commit -m "docs(FEAT-024): document --no-verify bypass policy in CONTRIBUTIN
 **Files:**
 - No code changes; verification only, then plan committed
 
-- [ ] [T-009-A] Run the complete test suite one final time from a clean state:
+- [X] [T-009-A] Run the complete test suite one final time from a clean state:
 
 ```
 npm ci && npm test
@@ -1279,7 +1279,7 @@ npm ci && npm test
 
 Expected: all tests pass. Exit 0.
 
-- [ ] [T-009-B] Confirm `package-lock.json` is tracked (not gitignored):
+- [X] [T-009-B] Confirm `package-lock.json` is tracked (not gitignored):
 
 ```
 git ls-files package-lock.json
@@ -1287,7 +1287,7 @@ git ls-files package-lock.json
 
 Expected: `package-lock.json` printed (i.e., it is tracked).
 
-- [ ] [T-009-C] Mark FEAT-024 in-progress in the backlog (surgical single-line edit, BUG-003 invariant):
+- [X] [T-009-C] Mark FEAT-024 in-progress in the backlog (surgical single-line edit, BUG-003 invariant):
 
 In `AGENT-READABLE BACKLOG.md`, find the line:
 
@@ -1299,7 +1299,7 @@ Change `[ ]` to `[>]`.
 
 Pre-check before edit: `grep -c "\[FEAT-024\]" "AGENT-READABLE BACKLOG.md"` must return `1`.
 
-- [ ] [T-009-D] Commit the plan file (needs `git add -f` because `docs/` is gitignored):
+- [>] [T-009-D] Commit the plan file (needs `git add -f` because `docs/` is gitignored):
 
 First confirm the actual plan filename — the date prefix reflects creation date and may differ if the file was renamed:
 ```

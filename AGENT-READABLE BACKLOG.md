@@ -165,7 +165,7 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Components Affected:** Project manifest configs, build packaging pipeline, GitHub Actions workflows.
 * **Acceptance Criteria:** Enable global distribution through npm registries, managing directory setup, template unpacking, and local command registration natively via Node across Windows, macOS, and Linux.
 
-### [ ] `[FEAT-024]` Automated Unit Testing Suite (Self-Testing Infrastructure)
+### [>] `[FEAT-024]` Automated Unit Testing Suite (Self-Testing Infrastructure)
 * **Description:** Setup a unified, fast testing suite driven by Vitest to validate CLI orchestrator paths, stack discovery algorithms, and context guardrails.
 * **Impact:** Offers a bulletproof, deterministic validation tool for the agent to check its own work before closing issues, ensuring zero regressions in core performance.
 * **Components Affected:** Core test setup config, orchestrator business logic, in-memory file system simulation tests (`memfs`).
