@@ -160,3 +160,10 @@ Add Guard 3 to `.claude/hooks/pre-tool-use.sh`: a Bash-tool interceptor that pat
 
 ### Version
 1.11.0 released 2026-06-16
+
+## Spec: BUG-017 graphify-read-guard 2026-06-22
+
+Guard 4 in `pre-tool-use.sh`: blocks `Read` tool on `graphify-out/**` and `node_modules/**` via python3 component-match. Installer idempotency fix: skip hook download if file already exists. CLAUDE.md session init updated to mandate **Glob** (NEVER Read) for existence checks.
+- Scope: S — ~15 lines Guard 4 bash + installer one-liner guards + CLAUDE.md text change + ~10 Vitest tests
+- Spec: `docs/superpowers/specs/2026-06-22-bug017-graphify-read-guard-design.md`
+- vitest.config.js: `pool: 'forks'` → `pool: 'threads'` (fixes onTaskUpdate IPC timeout on Windows)
