@@ -51,6 +51,12 @@ in both CLAUDE.md files to make the Glob-only constraint explicit and machine-sc
   isolates `graphify-out`; blocked.
 - **Windows backslash:** `graphify-out\cache\file.json` — `replace('\\', '/')` normalizes
   before split; blocked.
+- **Case variants (case-insensitive FS):** `Graphify-Out/graph.json` or `NODE_MODULES/x.js`
+  — components are lowercased before comparison; blocked.
+- **Path traversal segments:** `src/../../graphify-out/file.json` — component split yields
+  `['src', '..', '..', 'graphify-out', 'file.json']`; `graphify-out` is present → blocked.
+  This is intentional: any path whose canonical resolution passes through these directories
+  is treated as forbidden.
 - **Unrelated file with similar name:** `src/utils/graphify-out-helper.js` — component is
   `graphify-out-helper.js`, not `graphify-out`; passes through.
 - **Non-Read tool with graphify-out path** (e.g., Bash): Guard 4 only fires on
@@ -60,8 +66,13 @@ in both CLAUDE.md files to make the Glob-only constraint explicit and machine-sc
 
 - **python3 absent:** `2>/dev/null` suppresses the error; `_g4_result` is empty (neither
   `"BLOCK"`); guard skips — fail-open. Hook does not crash.
-- **Malformed JSON input:** python3 raises `json.JSONDecodeError`; `2>/dev/null` suppresses;
-  same fail-open path.
+- **python3 present but throws any exception** (import error, env error, permission error,
+  `json.JSONDecodeError`, `KeyError`, `OSError`): all exceptions write to stderr which
+  `2>/dev/null` swallows regardless of error type; `_g4_result` is empty → fail-open.
+- **Malformed or unparseable JSON input** (`{invalid}`, empty string, non-JSON payload):
+  `json.load()` raises `json.JSONDecodeError`; caught by `2>/dev/null`; fail-open.
+- **Missing, null, or empty `file_path`:** `d.get('file_path', '')` returns `''`; split
+  produces `[]` after empty-component filter; `any(...)` is `False` → 'OK' → fail-open.
 - **Installer re-run with existing hook:** `[ ! -f ]` / `Test-Path` check prevents download;
   existing file untouched.
 
@@ -81,7 +92,7 @@ if [ "$CLAUDE_TOOL_NAME" = "Read" ]; then
 import json, sys
 d = json.load(sys.stdin)
 fp = d.get('file_path', '')
-parts = [p for p in fp.replace('\\\\', '/').split('/') if p]
+parts = [p.lower() for p in fp.replace('\\\\', '/').split('/') if p]
 blocked = {'graphify-out', 'node_modules'}
 print('BLOCK' if any(p in blocked for p in parts) else 'OK')
 " <<< "$CLAUDE_TOOL_INPUT" 2>/dev/null)
@@ -113,11 +124,20 @@ Audit all subsequent installer steps for any `project-template` copy that target
 New-Item -ItemType Directory -Force ".claude\hooks" | Out-Null
 # To reset hook to GitHub upstream: delete .claude\hooks\pre-tool-use.sh, then re-run.
 if (-not (Test-Path ".claude\hooks\pre-tool-use.sh")) {
-    Invoke-WebRequest -Uri "$BaseUrl/pre-tool-use.sh" -OutFile ".claude\hooks\pre-tool-use.sh"
+    Invoke-WebRequest -UseBasicParsing -Uri "$BaseUrl/pre-tool-use.sh" -OutFile ".claude\hooks\pre-tool-use.sh"
 }
 ```
 
+`-UseBasicParsing` is required for PowerShell 5.1 compatibility on systems without Internet
+Explorer COM object initialized (common on Server Core and CI images).
+
 Same audit for any subsequent project-template copy steps.
+
+**Propagation trade-off:** Once a user has a local `.claude/hooks/pre-tool-use.sh`, the
+idempotency check means upstream updates to the project-template hook file will NOT propagate
+automatically on reinstall. This is intentional (preserves local guards) but must be
+documented in `CONTRIBUTING.md` or installer output: users who want to pull a fresh upstream
+hook must manually delete the local file before re-running the installer.
 
 ### CLAUDE.md session init — both `CLAUDE.md` and `project-template/CLAUDE.md`
 
@@ -145,20 +165,38 @@ const BASH_PATH = spawnSync('which', ['bash'], { encoding: 'utf8' }).stdout.trim
 All exit-1 assertions use `JSON.parse(result.stderr.trim())` and verify
 `payload.decision === 'block'` and `payload.reason` matches `/Guard 4/`.
 
-**~10 test cases:**
+**~14 test cases:**
 
-| `file_path` input | `PATH` | `CLAUDE_TOOL_NAME` | Expected |
-|---|---|---|---|
-| `graphify-out/graph.json` | normal | `Read` | exit 1, JSON block |
-| `graphify-out/cache/ast/abc.json` | normal | `Read` | exit 1, JSON block |
-| `node_modules/vitest/dist/index.js` | normal | `Read` | exit 1, JSON block |
-| `/abs/path/graphify-out/file.json` | normal | `Read` | exit 1, JSON block |
-| `graphify-out\cache\file.json` (backslash) | normal | `Read` | exit 1, JSON block |
-| `graphify-out-backup/file.json` | normal | `Read` | exit 0 |
-| `src/utils/graphify-out-helper.js` | normal | `Read` | exit 0 |
-| `src/index.js` | normal | `Read` | exit 0 |
-| `graphify-out/graph.json` | `""` (no python3) | `Read` | exit 0 (fail-open), uses `BASH_PATH` |
-| `graphify-out/graph.json` | normal | `Bash` | exit 0 (Guard 4 skipped) |
+| `file_path` input | `CLAUDE_TOOL_INPUT` | `PATH` | `CLAUDE_TOOL_NAME` | Expected |
+|---|---|---|---|---|
+| `graphify-out/graph.json` | valid JSON | normal | `Read` | exit 1, JSON block |
+| `graphify-out/cache/ast/abc.json` | valid JSON | normal | `Read` | exit 1, JSON block |
+| `node_modules/vitest/dist/index.js` | valid JSON | normal | `Read` | exit 1, JSON block |
+| `/abs/path/graphify-out/file.json` | valid JSON | normal | `Read` | exit 1, JSON block |
+| `graphify-out\cache\file.json` (backslash) | valid JSON | normal | `Read` | exit 1, JSON block |
+| `Graphify-Out/graph.json` (case variant) | valid JSON | normal | `Read` | exit 1, JSON block |
+| `NODE_MODULES/pkg/index.js` (uppercase) | valid JSON | normal | `Read` | exit 1, JSON block |
+| `graphify-out-backup/file.json` | valid JSON | normal | `Read` | exit 0 |
+| `src/utils/graphify-out-helper.js` | valid JSON | normal | `Read` | exit 0 |
+| `src/index.js` | valid JSON | normal | `Read` | exit 0 |
+| `graphify-out/graph.json` | `{invalid json}` (malformed) | normal | `Read` | exit 0 (fail-open) |
+| `graphify-out/graph.json` | `{}` (missing file_path) | normal | `Read` | exit 0 (fail-open) |
+| `graphify-out/graph.json` | valid JSON | `""` (no python3) | `Read` | exit 0 (fail-open), uses `BASH_PATH` |
+| `graphify-out/graph.json` | valid JSON | normal | `Bash` | exit 0 (Guard 4 skipped) |
+
+**Latency note:** Guard 4 spawns a python3 subprocess for every `Read` tool call, adding
+~50-100ms python3 startup overhead per invocation. For high-frequency sequential reads (e.g.,
+agent reading 10+ files in a plan phase), this compounds to 0.5-1s of latency. This is an
+acceptable trade-off given Guard 4 only fires on `Read`, not on `Glob`/`Grep`. If latency
+becomes a problem in practice, a future optimisation can cache the blocked-path check result
+in a temp file keyed on the input hash.
+
+**Pre-commit gate behavior:** `npm test` exits 0 only when all non-skipped tests pass. The
+2 Windows-skipped verbosity tests (`BASH_AVAILABLE = false`) produce `2 skipped` in output
+but do NOT cause exit 1. If the entire test suite is absent (e.g., `node_modules/` deleted),
+`npm test` exits 1 with a "no test files found" error — commit is rejected. Verification
+step: after implementation, run `npm test` manually and confirm the summary line reads
+`X passed | 2 skipped` with no errors before committing.
 
 ---
 
@@ -166,12 +204,15 @@ All exit-1 assertions use `JSON.parse(result.stderr.trim())` and verify
 
 - [ ] `Read` on any `graphify-out/**` path → hook exits 1; `JSON.parse(stderr.trim())` succeeds; `decision === "block"`, `reason` matches `Guard 4`
 - [ ] `Read` on any `node_modules/**` path → same block behavior
+- [ ] `Read` on case variants (`Graphify-Out/`, `NODE_MODULES/`) → same block behavior (case-insensitive)
 - [ ] `Read` on `src/utils/graphify-out-helper.js` → exits 0 (no false positive)
+- [ ] Malformed JSON input (`{invalid}`) → hook exits 0 (fail-open)
+- [ ] Missing `file_path` key in input (`{}`) → hook exits 0 (fail-open)
 - [ ] python3 absent → hook exits 0 (fail-open, no crash)
 - [ ] `.claude/hooks/pre-tool-use.sh` NOT overwritten when file already exists on `install.sh` / `install.ps1 -Project` re-run
 - [ ] `project-template/.claude/hooks/pre-tool-use.sh` copy step has same idempotency guard
 - [ ] Session Init text in both `CLAUDE.md` files is word-for-word identical and contains `**Glob**`, `NEVER`, `/graphify query`
-- [ ] All ~10 `guard4.test.js` tests pass; pre-commit gate (`npm test`) stays fully green before any commit lands
+- [ ] All ~14 `guard4.test.js` tests pass; manual `npm test` run shows `X passed | 2 skipped`, exit 0, before any commit
 - [ ] `graphify-out/` confirmed present in `.gitignore` (already satisfied — no change needed)
 - [ ] `AGENT-READABLE BACKLOG.md` BUG-017 marked `[X]`
 
@@ -194,7 +235,8 @@ All exit-1 assertions use `JSON.parse(result.stderr.trim())` and verify
 - `install.ps1` — same idempotency fix
 - `CLAUDE.md` — Session Initialization section updated
 - `project-template/CLAUDE.md` — identical update
-- `tests/hooks/guard4.test.js` — new file (~60 lines)
+- `tests/hooks/guard4.test.js` — new file (~75 lines, 14 tests)
+- `CONTRIBUTING.md` — add propagation trade-off note (hook reset procedure)
 - `AGENT-READABLE BACKLOG.md` — BUG-017 `[ ]` → `[X]`
 - `VERSION` — 1.12.0 → 1.13.0
 - `CHANGELOG.md` — `[1.13.0]` entry referencing `[BUG-017]`
