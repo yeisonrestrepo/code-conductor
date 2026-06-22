@@ -222,7 +222,7 @@ function Invoke-LogCleanup {
             $ts = Get-Date -Format 'yyyyMMddHHmmss'
             Move-Item $log ($log + ".$ts.rotated") -Force -ErrorAction SilentlyContinue
             Write-Host "  PASS: log rotated ($sz bytes)"
-        } else { Write-Host "  INFO: log size $sz bytes — no rotation needed." }
+        } else { Write-Host "  INFO: log size $sz bytes -- no rotation needed." }
     }
     # 4. Backup files older than 30 days
     Get-ChildItem (Join-Path $env:USERPROFILE ".claude") -Recurse -Depth 2 -ErrorAction SilentlyContinue |
@@ -464,6 +464,112 @@ bash -c 'set +e; _dir="${PWD:-}"; _prev=""; _iters=0; while [ "$_dir" != "$_prev
   if (-not (Test-Path $gitignore) -or -not (Select-String -Path $gitignore -Pattern ([regex]::Escape($entry)) -Quiet)) {
     Add-Content -Path $gitignore -Value $entry
     Write-Ok "Added $entry to .gitignore"
+  }
+
+  # Node.js and npm engine constraint check (FEAT-024)
+  $nodeVer = node --version 2>&1
+  if ($LASTEXITCODE -eq 0) {
+    # Guard against shell wrapper corruption (nvm/asdf/nvs can inject output
+    # that corrupts $nodeVer); [int]'' throws -- validate the regex match first.
+    $nodeMajorRaw = [regex]::Match($nodeVer, 'v(\d+)\.').Groups[1].Value
+    if (-not $nodeMajorRaw) {
+      Write-Warn "Could not parse Node.js major version from '$nodeVer'; a shell wrapper may have corrupted the output; engine check skipped"
+    } else {
+      $nodeMajor = [int]$nodeMajorRaw
+      if ($nodeMajor -lt 20) {
+        Write-Warn "Node.js $nodeVer is below the >=20 engine requirement; npm test may fail"
+      } else {
+        Write-Ok "Node.js $nodeVer meets the >=20 engine requirement"
+        # npm 10+ ships bundled with Node 20; verify it is present and usable.
+        $npmVer = npm --version 2>&1
+        if ($LASTEXITCODE -eq 0) {
+          $npmMajorRaw = [regex]::Match($npmVer, '^(\d+)\.').Groups[1].Value
+          if ($npmMajorRaw) {
+            $npmMajor = [int]$npmMajorRaw
+            if ($npmMajor -lt 10) {
+              Write-Warn "npm $npmVer is below >=10; run 'npm install -g npm@latest' to upgrade"
+            } else {
+              Write-Ok "npm $npmVer meets the >=10 constraint"
+            }
+          } else {
+            Write-Warn "Could not parse npm version from '$npmVer'; engine check skipped"
+          }
+        } else {
+          Write-Warn "npm not found in PATH even though Node >=20 is present; reinstall Node or add npm to PATH"
+        }
+      }
+    }
+  } else {
+    Write-Warn "node not found in PATH - cannot verify >=20 engine requirement; npm test will fail unless Node >=20 is installed"
+  }
+
+  # Pre-commit test gate (FEAT-024)
+  $gitDirCheck = git rev-parse --git-dir 2>&1
+  if ($LASTEXITCODE -eq 0) {
+    $hooksDir = (git rev-parse --git-path hooks 2>&1).ToString().Trim()
+    $precommit = Join-Path $hooksDir "pre-commit"
+    $sentinel = "# code-conductor:test-gate"
+    if ($hooksDir) {
+      $hasGate = $false
+      if (Test-Path $precommit) {
+        $hasGate = (Get-Content $precommit -Raw) -match [regex]::Escape($sentinel)
+      }
+      if ($hasGate) {
+        Write-Ok "Pre-commit test gate already present (idempotent)"
+      } else {
+        $hooksDirParent = Split-Path $precommit -Parent
+        if (-not (Test-Path $hooksDirParent)) {
+          New-Item -ItemType Directory -Path $hooksDirParent -Force | Out-Null
+        }
+        # $enc is initialized here, before the write-access probe, to prevent a
+        # use-before-init runtime error: the probe's WriteAllText call uses $enc
+        # when test-writing a temp file to the hooks-dir parent.
+        $enc = [System.Text.UTF8Encoding]::new($false)
+        # Verify write access before modifying the hook file.
+        $canWrite = $true
+        if (Test-Path $precommit) {
+          try { $s = [System.IO.File]::Open($precommit, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Write); $s.Close() } catch { $canWrite = $false }
+        } elseif ($hooksDirParent -and (Test-Path $hooksDirParent)) {
+          $tmpTest = Join-Path $hooksDirParent ([System.IO.Path]::GetRandomFileName())
+          try { [System.IO.File]::WriteAllText($tmpTest, '', $enc); Remove-Item $tmpTest -Force } catch { $canWrite = $false }
+        }
+        if (-not $canWrite) {
+          Write-Warn "Cannot write to pre-commit location ($precommit); test gate not installed"
+        } else {
+        # $guardBlock: single-quoted here-string; no PS variable expansion.
+        # closing '@ MUST be at column 0 in the actual install.ps1 file.
+        # CRLF to LF normalization ensures bash on Git for Windows parses correctly.
+        $guardBlock = (@'
+# code-conductor:test-gate
+command -v npm >/dev/null 2>&1 || { echo "[conductor] npm not found - skipping test gate"; exit 0; }
+_root=$(git rev-parse --show-toplevel)
+[ -d "$_root/node_modules" ] || { echo "[conductor] node_modules not installed - run npm ci first, skipping test gate"; exit 0; }
+cd "$_root" && npm test
+# /code-conductor:test-gate
+'@).Replace("`r`n", "`n").Replace("`r", "`n")
+        if (Test-Path $precommit) {
+          # Existing file: normalize its line endings, strip trailing whitespace,
+          # then append a blank separator + guard block (all LF, UTF-8 no BOM).
+          $existing = [System.IO.File]::ReadAllText($precommit, $enc).Replace("`r`n", "`n").Replace("`r", "`n")
+          [System.IO.File]::WriteAllText($precommit, $existing.TrimEnd() + "`n" + $guardBlock, $enc)
+        } else {
+          # New file: write POSIX sh shebang + guard block.
+          # #!/bin/sh (not #!/bin/bash) is the git hook convention; the guard block
+          # uses only POSIX-compatible commands (command -v, cd, &&).
+          # $enc guarantees UTF-8 no BOM; "#!/bin/sh`n" uses LF (PS backtick-n = \n).
+          if ($hooksDirParent -and -not (Test-Path $hooksDirParent)) {
+            New-Item -ItemType Directory -Path $hooksDirParent -Force | Out-Null
+          }
+          [System.IO.File]::WriteAllText($precommit, "#!/bin/sh`n" + $guardBlock, $enc)
+        }
+        Write-Ok "Pre-commit test gate appended to $precommit"
+        } # end $canWrite
+      }
+    } else {
+      Write-Warn "Could not resolve git hooks directory - pre-commit hook not installed"
+    }
+  } else {
+    Write-Warn "Not in a git repository - pre-commit hook not installed"
   }
 }
 
