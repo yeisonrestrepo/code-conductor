@@ -1299,7 +1299,7 @@ Change `[ ]` to `[>]`.
 
 Pre-check before edit: `grep -c "\[FEAT-024\]" "AGENT-READABLE BACKLOG.md"` must return `1`.
 
-- [>] [T-009-D] Commit the plan file (needs `git add -f` because `docs/` is gitignored):
+- [X] [T-009-D] Commit the plan file (needs `git add -f` because `docs/` is gitignored):
 
 First confirm the actual plan filename — the date prefix reflects creation date and may differ if the file was renamed:
 ```
