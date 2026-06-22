@@ -9,3 +9,6 @@ docs/
 initial_prompt.xml
 !project-template/*
 .claude/memory/session-snapshot.md
+node_modules/
+.vitest-cache/
+tests/.tmp/
