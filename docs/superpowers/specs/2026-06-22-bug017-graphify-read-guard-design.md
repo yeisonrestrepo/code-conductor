@@ -49,6 +49,15 @@ in both CLAUDE.md files to make the Glob-only constraint explicit and machine-sc
 
 - **Absolute path:** `/home/user/project/graphify-out/graph.json` — component split still
   isolates `graphify-out`; blocked.
+- **Repo cloned into a directory named `graphify-out` or `node_modules`:** If the project
+  root is `/home/user/graphify-out/code-conductor/`, any absolute `Read` path to a source
+  file (e.g., `/home/user/graphify-out/code-conductor/src/main.js`) will contain `graphify-out`
+  as a path component and will be blocked — a false positive. **Policy:** do not clone this
+  repository into a parent directory named `graphify-out` or `node_modules`. If such a layout
+  is unavoidable, pass relative paths (not absolute) to `Read` tool calls — relative paths
+  anchored at the repo root will not contain the parent directory components. This is a
+  documented constraint; no runtime mitigation is implemented (resolving `$PWD` inside the
+  inline python3 script adds disproportionate complexity for a self-inflicted edge case).
 - **Windows backslash:** `graphify-out\cache\file.json` — `replace('\\', '/')` normalizes
   before split; blocked.
 - **Case variants (case-insensitive FS):** `Graphify-Out/graph.json` or `NODE_MODULES/x.js`
@@ -131,6 +140,18 @@ fi
 
 ### Installer idempotency — `install.sh`
 
+**Root directory guard (prepend before the hook download block):**
+
+```bash
+if [ ! -f "CLAUDE.md" ]; then
+    echo "Error: install.sh must be run from the repository root (CLAUDE.md not found)." >&2
+    exit 1
+fi
+```
+
+This prevents hook misplacement when the user runs `bash path/to/install.sh` from an arbitrary
+working directory — `.claude/hooks/pre-tool-use.sh` would be created relative to the wrong CWD.
+
 Locate the hook download step. Wrap in existence check; ensure directory creation runs first:
 
 ```bash
@@ -146,16 +167,36 @@ chmod +x ".claude/hooks/pre-tool-use.sh"
 downloaded files and to pre-existing ones that may have lost the execute bit (e.g., via
 filesystem copy, tar extraction, or certain Git operations).
 
-Audit all subsequent installer steps for any `project-template` copy that targets
-`.claude/hooks/pre-tool-use.sh`; wrap each with the same `[ ! -f ]` guard.
+**Project-template copy steps to guard (`install.sh`):** During the deferred full read of
+`install.sh`, locate every line that references `pre-tool-use.sh` outside the download block.
+Based on current installer structure, the expected locations are:
+1. The `cp` or `rsync` call that copies `project-template/.claude/hooks/pre-tool-use.sh`
+   to `.claude/hooks/pre-tool-use.sh` during the `-Project` setup phase — search for
+   `pre-tool-use` within the block delimited by the `-Project` flag branch.
+2. Any `cp -r project-template/.claude/` bulk copy that would overwrite the hooks directory.
+Wrap each identified `cp` or equivalent with `[ ! -f ".claude/hooks/pre-tool-use.sh" ] &&`
+prefix or the same `if [ ! -f ]` block used for the download guard.
 
 ### Installer idempotency — `install.ps1`
+
+**Root directory guard (prepend before the hook download block):**
+
+```powershell
+if (-not (Test-Path "CLAUDE.md")) {
+    Write-Host -ForegroundColor Red "Error: install.ps1 must be run from the repository root (CLAUDE.md not found)."
+    exit 1
+}
+```
+
+Same rationale as `install.sh`: prevents hook misplacement when the user invokes the script
+from a subdirectory. `CLAUDE.md` is the sentinel because it is committed at the repo root and
+always present in a valid code-conductor checkout.
 
 ```powershell
 try {
     New-Item -ItemType Directory -Force ".claude\hooks" -ErrorAction Stop | Out-Null
 } catch {
-    Write-Error "Guard: failed to create .claude\hooks directory: $_"
+    Write-Host -ForegroundColor Red "Guard: failed to create .claude\hooks directory: $_"
     exit 1
 }
 # To reset hook to GitHub upstream: delete .claude\hooks\pre-tool-use.sh, then re-run.
@@ -164,7 +205,7 @@ if (-not (Test-Path ".claude\hooks\pre-tool-use.sh")) {
         Invoke-WebRequest -UseBasicParsing -Uri "$BaseUrl/pre-tool-use.sh" `
             -OutFile ".claude\hooks\pre-tool-use.sh" -ErrorAction Stop
     } catch {
-        Write-Error "Guard: failed to download pre-tool-use.sh: $_"
+        Write-Host -ForegroundColor Red "Guard: failed to download pre-tool-use.sh: $_"
         exit 1
     }
 }
@@ -178,8 +219,21 @@ if (-not (Test-Path ".claude\hooks\pre-tool-use.sh")) {
 - `-ErrorAction Stop` converts `Invoke-WebRequest` network failure from a non-terminating
   error (silent in PS 5.1) to a terminating error caught by `try/catch`; ensures clear
   diagnostic output and non-zero exit on download failure.
+- `Write-Host -ForegroundColor Red` is used instead of `Write-Error` for all failure messages.
+  `Write-Error` in PS 5.1 produces a multi-line exception stack block (category, stack trace,
+  error record) that clutters the terminal and confuses users during interactive installs.
+  `Write-Host` emits a single clean line directly to the host stream; it is not subject to
+  PowerShell error formatting.
 
-Same audit for any subsequent project-template copy steps.
+**Project-template copy steps to guard (`install.ps1`):** During the deferred full read of
+`install.ps1`, locate every line referencing `pre-tool-use.sh` outside the download block.
+Expected locations:
+1. The `Copy-Item` call copying `project-template\.claude\hooks\pre-tool-use.sh` to
+   `.claude\hooks\pre-tool-use.sh` in the `-Project` branch — search for `pre-tool-use`
+   within the block delimited by the `-Project` parameter conditional.
+2. Any bulk `Copy-Item -Recurse` that covers the `.claude\hooks\` subtree.
+Wrap each with `if (-not (Test-Path ".claude\hooks\pre-tool-use.sh"))` matching the guard
+used for the download block.
 
 **Propagation trade-off:** Once a user has a local `.claude/hooks/pre-tool-use.sh`, the
 idempotency check means upstream updates to the project-template hook file will NOT propagate
@@ -228,7 +282,7 @@ environments where `which` is unavailable.
 All exit-1 assertions use `JSON.parse(result.stderr.trim())` and verify
 `payload.decision === 'block'` and `payload.reason` matches `/Guard 4/`.
 
-**~15 test cases:**
+**17 test cases:**
 
 | `file_path` input | `CLAUDE_TOOL_INPUT` | `PATH` | `CLAUDE_TOOL_NAME` | Expected |
 |---|---|---|---|---|
@@ -280,7 +334,7 @@ step: after implementation, run `npm test` manually and confirm the summary line
 - [ ] `project-template/.claude/hooks/pre-tool-use.sh` copy step has same idempotency guard
 - [ ] Session Init text in both `CLAUDE.md` files is word-for-word identical and contains `**Glob**`, `NEVER`, `/graphify query`
 - [ ] `graphify-out/../src/main.js` → exits 0 (traversal escape correctly passes; `posixpath.normpath` resolves to `src/main.js`)
-- [ ] All ~15 `guard4.test.js` tests pass; manual `npm test` run shows `X passed | 2 skipped`, exit 0, before any commit
+- [ ] All 17 `guard4.test.js` tests pass; manual `npm test` run shows `X passed | 2 skipped`, exit 0, before any commit
 - [ ] `graphify-out/` confirmed present in `.gitignore` (already satisfied — no change needed)
 - [ ] `package.json` version bumped to `1.13.0` in sync with `VERSION` file
 - [ ] `AGENT-READABLE BACKLOG.md` BUG-017 marked `[X]`
@@ -304,7 +358,7 @@ step: after implementation, run `npm test` manually and confirm the summary line
 - `install.ps1` — same idempotency fix
 - `CLAUDE.md` — Session Initialization section updated
 - `project-template/CLAUDE.md` — identical update
-- `tests/hooks/guard4.test.js` — new file (~80 lines, 15 tests)
+- `tests/hooks/guard4.test.js` — new file (~80 lines, 17 tests)
 - `CONTRIBUTING.md` — add propagation trade-off note (hook reset procedure)
 - `AGENT-READABLE BACKLOG.md` — BUG-017 `[ ]` → `[X]`
 - `VERSION` — 1.12.0 → 1.13.0
