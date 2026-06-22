@@ -53,12 +53,19 @@ in both CLAUDE.md files to make the Glob-only constraint explicit and machine-sc
   before split; blocked.
 - **Case variants (case-insensitive FS):** `Graphify-Out/graph.json` or `NODE_MODULES/x.js`
   — components are lowercased before comparison; blocked.
-- **Path traversal segments:** `src/../../graphify-out/file.json` — component split yields
-  `['src', '..', '..', 'graphify-out', 'file.json']`; `graphify-out` is present → blocked.
-  This is intentional: any path whose canonical resolution passes through these directories
-  is treated as forbidden.
+- **Traversal escape (false-positive fix):** `graphify-out/../src/main.js` — raw split would
+  yield `graphify-out` as a component and incorrectly block a safe file. `posixpath.normpath`
+  resolves this to `src/main.js` before splitting → components `['src', 'main.js']` → not
+  blocked.
+- **Traversal into blocked dir (correctly blocked):** `src/../../graphify-out/file.json` —
+  `posixpath.normpath` resolves to `../graphify-out/file.json` → components include
+  `graphify-out` → blocked.
 - **Unrelated file with similar name:** `src/utils/graphify-out-helper.js` — component is
   `graphify-out-helper.js`, not `graphify-out`; passes through.
+- **Symbolic links / directory junctions:** Guard 4 checks path components as written by the
+  caller, not the resolved symlink target. A symlink named `data` pointing to `graphify-out/`
+  would NOT be caught via `data/file.json`. This is a known limitation — symlink resolution
+  in bash adds complexity not justified by the current threat model; defer to FEAT-019.
 - **Non-Read tool with graphify-out path** (e.g., Bash): Guard 4 only fires on
   `CLAUDE_TOOL_NAME == "Read"`; other tools unaffected.
 
@@ -88,20 +95,30 @@ Both files receive an identical block appended after Guard 3:
 # Guard 4 — block Read on graphify-out/ and node_modules/ (BUG-017)
 # To reset to GitHub upstream: delete .claude/hooks/pre-tool-use.sh, then re-run installer.
 if [ "$CLAUDE_TOOL_NAME" = "Read" ]; then
-    _g4_result=$(python3 -c "
-import json, sys
+    _g4_result=$(printf '%s' "$CLAUDE_TOOL_INPUT" | python3 -c '
+import json, sys, posixpath
 d = json.load(sys.stdin)
-fp = d.get('file_path', '')
-parts = [p.lower() for p in fp.replace('\\\\', '/').split('/') if p]
-blocked = {'graphify-out', 'node_modules'}
-print('BLOCK' if any(p in blocked for p in parts) else 'OK')
-" <<< "$CLAUDE_TOOL_INPUT" 2>/dev/null)
+fp = d.get("file_path", "")
+fp_n = posixpath.normpath(fp.replace("\\", "/"))
+parts = [p.lower() for p in fp_n.split("/") if p and p != "."]
+blocked = {"graphify-out", "node_modules"}
+print("BLOCK" if any(p in blocked for p in parts) else "OK")
+' 2>/dev/null)
     if [ "$_g4_result" = "BLOCK" ]; then
         echo '{"decision":"block","reason":"Guard 4: direct reads of graphify-out/ and node_modules/ are forbidden. Use Glob for existence checks or the graphify skill: /graphify query \"<question>\"."}'
         exit 1
     fi
 fi
 ```
+
+**Key implementation decisions:**
+- `printf '%s'` pipes input to python3 instead of bash herestring `<<<`; single-quoted
+  python block prevents bash from interpreting `$` or `\` inside the script.
+- `posixpath.normpath` resolves `..` segments before component split, eliminating the
+  `graphify-out/../src/main.js` false-positive (resolves to `src/main.js` → not blocked).
+- `p != "."` filter drops current-dir segments that `normpath` may leave in dot-relative paths.
+- `2>/dev/null` catches ALL python3 failure modes: absent binary, import errors,
+  `JSONDecodeError`, `OSError`, env errors. Any exception → empty result → fail-open.
 
 ### Installer idempotency — `install.sh`
 
@@ -124,12 +141,24 @@ Audit all subsequent installer steps for any `project-template` copy that target
 New-Item -ItemType Directory -Force ".claude\hooks" | Out-Null
 # To reset hook to GitHub upstream: delete .claude\hooks\pre-tool-use.sh, then re-run.
 if (-not (Test-Path ".claude\hooks\pre-tool-use.sh")) {
-    Invoke-WebRequest -UseBasicParsing -Uri "$BaseUrl/pre-tool-use.sh" -OutFile ".claude\hooks\pre-tool-use.sh"
+    try {
+        Invoke-WebRequest -UseBasicParsing -Uri "$BaseUrl/pre-tool-use.sh" `
+            -OutFile ".claude\hooks\pre-tool-use.sh" -ErrorAction Stop
+    } catch {
+        Write-Error "Guard: failed to download pre-tool-use.sh: $_"
+        exit 1
+    }
 }
 ```
 
-`-UseBasicParsing` is required for PowerShell 5.1 compatibility on systems without Internet
-Explorer COM object initialized (common on Server Core and CI images).
+**install.ps1 conventions:**
+- All hook and template paths use backslashes consistently (`".claude\hooks\..."`) — no mixed
+  forward slashes in PowerShell path arguments.
+- `-UseBasicParsing` required for PS 5.1 on systems without Internet Explorer COM object
+  (Server Core, most CI images).
+- `-ErrorAction Stop` converts `Invoke-WebRequest` network failure from a non-terminating
+  error (silent in PS 5.1) to a terminating error caught by `try/catch`; ensures clear
+  diagnostic output and non-zero exit on download failure.
 
 Same audit for any subsequent project-template copy steps.
 
@@ -156,16 +185,23 @@ Replace the Session Initialization section with (word-for-word identical in both
 ### Tests — `tests/hooks/guard4.test.js`
 
 New file following the `guard3.test.js` pattern (`spawnSync`, `BASH_AVAILABLE` skip guard).
-Resolve bash path once at setup for the fail-open test:
 
+**Hook isolation:** Tests resolve the hook path relative to the project root
+(`new URL('../../.claude/hooks/pre-tool-use.sh', import.meta.url)`), not from the developer's
+home directory. This ensures tests run against the project-committed hook, not a user-modified
+live copy.
+
+**Bash path resolution (Windows-safe):**
 ```js
-const BASH_PATH = spawnSync('which', ['bash'], { encoding: 'utf8' }).stdout.trim() || '/bin/bash'
+const BASH_PATH = (spawnSync('which', ['bash'], { encoding: 'utf8' }).stdout || '').trim() || '/bin/bash'
 ```
+`|| ''` guard prevents `.trim()` from throwing if `stdout` is `null` on native Windows
+environments where `which` is unavailable.
 
 All exit-1 assertions use `JSON.parse(result.stderr.trim())` and verify
 `payload.decision === 'block'` and `payload.reason` matches `/Guard 4/`.
 
-**~14 test cases:**
+**~15 test cases:**
 
 | `file_path` input | `CLAUDE_TOOL_INPUT` | `PATH` | `CLAUDE_TOOL_NAME` | Expected |
 |---|---|---|---|---|
@@ -176,6 +212,7 @@ All exit-1 assertions use `JSON.parse(result.stderr.trim())` and verify
 | `graphify-out\cache\file.json` (backslash) | valid JSON | normal | `Read` | exit 1, JSON block |
 | `Graphify-Out/graph.json` (case variant) | valid JSON | normal | `Read` | exit 1, JSON block |
 | `NODE_MODULES/pkg/index.js` (uppercase) | valid JSON | normal | `Read` | exit 1, JSON block |
+| `graphify-out/../src/main.js` (traversal escape) | valid JSON | normal | `Read` | exit 0 (resolves to `src/main.js`) |
 | `graphify-out-backup/file.json` | valid JSON | normal | `Read` | exit 0 |
 | `src/utils/graphify-out-helper.js` | valid JSON | normal | `Read` | exit 0 |
 | `src/index.js` | valid JSON | normal | `Read` | exit 0 |
@@ -186,10 +223,11 @@ All exit-1 assertions use `JSON.parse(result.stderr.trim())` and verify
 
 **Latency note:** Guard 4 spawns a python3 subprocess for every `Read` tool call, adding
 ~50-100ms python3 startup overhead per invocation. For high-frequency sequential reads (e.g.,
-agent reading 10+ files in a plan phase), this compounds to 0.5-1s of latency. This is an
-acceptable trade-off given Guard 4 only fires on `Read`, not on `Glob`/`Grep`. If latency
-becomes a problem in practice, a future optimisation can cache the blocked-path check result
-in a temp file keyed on the input hash.
+agent reading 10+ files in a plan phase), this compounds to 0.5-1s of latency. This is
+acceptable given Guard 4 only fires on `Read`, not on `Glob`/`Grep`. **Caching threshold:**
+implement temp-file result caching (keyed on `file_path` hash) only if `npm test` total
+duration exceeds 120 seconds OR if manual profiling shows Guard 4 adds >500ms per agent
+session. Do not optimise speculatively.
 
 **Pre-commit gate behavior:** `npm test` exits 0 only when all non-skipped tests pass. The
 2 Windows-skipped verbosity tests (`BASH_AVAILABLE = false`) produce `2 skipped` in output
@@ -212,8 +250,10 @@ step: after implementation, run `npm test` manually and confirm the summary line
 - [ ] `.claude/hooks/pre-tool-use.sh` NOT overwritten when file already exists on `install.sh` / `install.ps1 -Project` re-run
 - [ ] `project-template/.claude/hooks/pre-tool-use.sh` copy step has same idempotency guard
 - [ ] Session Init text in both `CLAUDE.md` files is word-for-word identical and contains `**Glob**`, `NEVER`, `/graphify query`
-- [ ] All ~14 `guard4.test.js` tests pass; manual `npm test` run shows `X passed | 2 skipped`, exit 0, before any commit
+- [ ] `graphify-out/../src/main.js` → exits 0 (traversal escape correctly passes; `posixpath.normpath` resolves to `src/main.js`)
+- [ ] All ~15 `guard4.test.js` tests pass; manual `npm test` run shows `X passed | 2 skipped`, exit 0, before any commit
 - [ ] `graphify-out/` confirmed present in `.gitignore` (already satisfied — no change needed)
+- [ ] `package.json` version bumped to `1.13.0` in sync with `VERSION` file
 - [ ] `AGENT-READABLE BACKLOG.md` BUG-017 marked `[X]`
 
 ---
@@ -235,11 +275,23 @@ step: after implementation, run `npm test` manually and confirm the summary line
 - `install.ps1` — same idempotency fix
 - `CLAUDE.md` — Session Initialization section updated
 - `project-template/CLAUDE.md` — identical update
-- `tests/hooks/guard4.test.js` — new file (~75 lines, 14 tests)
+- `tests/hooks/guard4.test.js` — new file (~80 lines, 15 tests)
 - `CONTRIBUTING.md` — add propagation trade-off note (hook reset procedure)
 - `AGENT-READABLE BACKLOG.md` — BUG-017 `[ ]` → `[X]`
 - `VERSION` — 1.12.0 → 1.13.0
-- `CHANGELOG.md` — `[1.13.0]` entry referencing `[BUG-017]`
+- `package.json` — `"version"` field 1.12.0 → 1.13.0 (kept in sync with `VERSION`)
+- `CHANGELOG.md` — `[1.13.0]` entry; format follows existing template:
+  ```
+  ## [1.13.0] - 2026-06-22
+
+  ### Added
+  - `[BUG-017]` Guard 4 in `.claude/hooks/pre-tool-use.sh` ...
+  - `[BUG-017]` `tests/hooks/guard4.test.js` ...
+
+  ### Changed
+  - `[BUG-017]` `install.sh` / `install.ps1` — hook download now idempotent ...
+  - `[BUG-017]` `CLAUDE.md` / `project-template/CLAUDE.md` — Session Init ...
+  ```
 
 ### Files Requiring Full Read (deferred to /cc-plan)
 
