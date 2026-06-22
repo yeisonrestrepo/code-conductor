@@ -234,6 +234,13 @@ if (-not (Test-Path ".claude\hooks\pre-tool-use.sh")) {
 ```
 
 **install.ps1 conventions:**
+- **Path construction:** use hardcoded literal backslash strings (e.g., `".claude\hooks\pre-tool-use.sh"`)
+  rather than `Join-Path`. Rationale: `install.ps1` already uses literal strings throughout
+  for all other paths; introducing `Join-Path` only for the new Guard 4 blocks would be
+  inconsistent. `Join-Path` is more robust in theory (handles trailing-slash edge cases), but
+  in practice the paths here are static constants — no user-supplied segments — so there is no
+  real composition risk. If a future refactor standardizes the whole file to `Join-Path`, that
+  is a separate chore; do not mix styles within this change.
 - All hook and template paths use backslashes consistently (`".claude\hooks\..."`) — no mixed
   forward slashes in PowerShell path arguments.
 - `-UseBasicParsing` required for PS 5.1 on systems without Internet Explorer COM object
@@ -352,8 +359,12 @@ duration exceeds 120 seconds OR if manual profiling shows Guard 4 adds >500ms pe
 session. Do not optimise speculatively.
 
 **Pre-commit gate behavior:** `npm test` exits 0 only when all non-skipped tests pass. The
-2 Windows-skipped verbosity tests (`BASH_AVAILABLE = false`) produce `2 skipped` in output
-but do NOT cause exit 1. If the entire test suite is absent (e.g., `node_modules/` deleted),
+2 Windows-skipped tests are in `tests/hooks/verbosity-remind.test.js` (rows `row9` and `row11`
+— the two that require a live bash `chmod 000` call, guarded by `describe.skipIf(!BASH_AVAILABLE)`).
+These are NOT in `guard4.test.js`; all 17 Guard 4 test cases run unconditionally on any platform
+that has bash available (the entire `guard4.test.js` suite is skipped as a unit on Windows
+without Git Bash via its own top-level `describe.skipIf(!BASH_AVAILABLE)`, not on a per-row
+basis). The 2 skipped rows produce `2 skipped` in output If the entire test suite is absent (e.g., `node_modules/` deleted),
 `npm test` exits 1 with a "no test files found" error — commit is rejected. Verification
 step: after implementation, run `npm test` manually and confirm the summary line reads
 `X passed | 2 skipped` with no errors before committing.
@@ -369,11 +380,13 @@ step: after implementation, run `npm test` manually and confirm the summary line
 - [ ] Malformed JSON input (`{invalid}`) → hook exits 0 (fail-open)
 - [ ] Missing `file_path` key in input (`{}`) → hook exits 0 (fail-open)
 - [ ] python3 absent → hook exits 0 (fail-open, no crash)
+- [ ] Both installers emit a non-fatal stderr warning (no `exit 1`) when run from inside a directory whose path contains `graphify-out` or `node_modules` as a component
 - [ ] `.claude/hooks/pre-tool-use.sh` NOT overwritten when file already exists on `install.sh` / `install.ps1 -Project` re-run
 - [ ] `project-template/.claude/hooks/pre-tool-use.sh` copy step has same idempotency guard
 - [ ] Session Init text in both `CLAUDE.md` files is word-for-word identical and contains `**Glob**`, `NEVER`, `/graphify query`
 - [ ] `graphify-out/../src/main.js` → exits 0 (traversal escape correctly passes; `posixpath.normpath` resolves to `src/main.js`)
 - [ ] All 17 `guard4.test.js` tests pass; manual `npm test` run shows `X passed | 2 skipped`, exit 0, before any commit
+- [ ] `README.md` updated with parent-directory constraint warning under Installation/Prerequisites
 - [ ] `graphify-out/` confirmed present in `.gitignore` (already satisfied — no change needed)
 - [ ] `package.json` version bumped to `1.13.0` in sync with `VERSION` file
 - [ ] `AGENT-READABLE BACKLOG.md` BUG-017 marked `[X]`
@@ -399,6 +412,7 @@ step: after implementation, run `npm test` manually and confirm the summary line
 - `project-template/CLAUDE.md` — identical update
 - `tests/hooks/guard4.test.js` — new file (~80 lines, 17 tests)
 - `CONTRIBUTING.md` — add propagation trade-off note (hook reset procedure)
+- `README.md` — add one-line warning under Installation/Prerequisites: do not clone into a directory named `graphify-out` or `node_modules`
 - `AGENT-READABLE BACKLOG.md` — BUG-017 `[ ]` → `[X]`
 - `VERSION` — 1.12.0 → 1.13.0
 - `package.json` — `"version"` field 1.12.0 → 1.13.0 (kept in sync with `VERSION`)
