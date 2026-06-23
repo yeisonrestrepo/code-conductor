@@ -20,6 +20,25 @@ Two deliverables in one change set:
 
 2. **code-conductor plugin** — introduce a minimal Claude Code plugin (`code-conductor@code-conductor`) that owns the project's custom skills. The installers create the plugin directory structure under `~/.claude/plugins/cache/code-conductor/code-conductor/1.0.0/`, write a `plugin.json`, copy the three skill files, and inject `"code-conductor@code-conductor": true` into `~/.claude/settings.json` via the existing `_merge_settings_json` mechanism. Skills are then `Skill`-tool-invokable from any project, independent of the superpowers version.
 
+**Plugin cache directory structure (exact):**
+```
+~/.claude/plugins/cache/
+└── code-conductor/               ← author namespace
+    └── code-conductor/           ← plugin name
+        └── 1.0.0/                ← version
+            ├── .claude-plugin/
+            │   └── plugin.json
+            └── skills/
+                ├── critical-review/
+                │   └── SKILL.md
+                ├── memory-first/
+                │   └── SKILL.md
+                └── agent-delegation/
+                    └── SKILL.md
+```
+
+The Skill tool resolves a skill named `"critical-review"` by scanning all enabled plugin directories for `skills/critical-review/SKILL.md`. The `enabledPlugins` key format is `"<plugin-name>@<author>"` → `"code-conductor@code-conductor"`. Each skill subdirectory must match the skill name exactly (case-sensitive on Linux/macOS; case-insensitive on Windows NTFS but treat as case-sensitive for portability).
+
 SQLite replacement (FEAT-005, ARCH-008) is explicitly deferred to a separate spec.
 
 ## Behavior
@@ -37,9 +56,11 @@ SQLite replacement (FEAT-005, ARCH-008) is explicitly deferred to a separate spe
 - Superpowers plugin updates to a new version — code-conductor skills are unaffected (different author namespace).
 
 ### Error cases
-- `npx claude-mem uninstall` not found or exits non-zero (never installed) — wrapped in `|| true` / `-ErrorAction SilentlyContinue`; install proceeds normally.
+- `npx claude-mem uninstall` not found or exits non-zero (never installed, or Node.js absent on a fresh machine):
+  - `install.sh`: wrapped in `|| true`; shell never aborts.
+  - `install.ps1`: wrapped in `try { cmd /c "npx claude-mem uninstall --yes" } catch {}` with `$ErrorActionPreference = 'Continue'` scoped to that block — a missing `node`/`npx` raises a native command error that PS 5.1 converts to a terminating exception only when `$ErrorActionPreference = 'Stop'`; the `try/catch` absorbs it unconditionally. Do **not** use `-ErrorAction SilentlyContinue` on a native exe call — it suppresses output but does not catch a command-not-found exception in PS 5.1.
 - `~/.claude/settings.json` does not exist — the `_merge_settings_json` function already handles creation; no special case needed.
-- Code-conductor plugin directory already exists (re-run) — file writes are idempotent; overwriting is safe for plugin-managed files.
+- Code-conductor plugin directory already exists (re-run) — the installer **wipes** `~/.claude/plugins/cache/code-conductor/code-conductor/1.0.0/` before writing, using `rm -rf` (bash) / `Remove-Item -Recurse -Force` (PS). This prevents stale or renamed skill directories from lingering across installer versions. The wipe is scoped to the versioned subdirectory only; the author/plugin parent directories are left intact.
 
 ## Acceptance Criteria
 
@@ -67,6 +88,16 @@ SQLite replacement (FEAT-005, ARCH-008) is explicitly deferred to a separate spe
 - Graphify skill or graphify-out hooks
 - Publishing code-conductor to a public plugin marketplace
 - Migrating all skills to the plugin (only the three Skill-tool-invoked skills move; `verbosity.md`, `code-simplifier.md` remain as native Claude Code skills in `~/.claude/skills/`)
+
+## Version Bump Policy
+
+Yes — this change set requires a version bump. Rationale: it removes an installed dependency from the public installer (breaking change for existing installs that relied on claude-mem), introduces a new plugin artifact, and modifies the `enabledPlugins` contract in `~/.claude/settings.json`.
+
+- `VERSION`: bump from current to next **minor** (`1.13.0` → `1.14.0`) — new capability (code-conductor plugin) shipped alongside the removal.
+- `package.json`: update `"version"` field to match.
+- `CHANGELOG.md`: prepend `[1.14.0]` entry with **Removed** (claude-mem), **Added** (code-conductor plugin + skill wiring), and **Changed** (8 prose reference updates).
+
+The version bump commit is the final commit in the implementation sequence, after all file changes are verified and `npm test` exits 0.
 
 ## System Impact
 
