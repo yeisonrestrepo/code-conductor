@@ -37,7 +37,32 @@ Two deliverables in one change set:
                     └── SKILL.md
 ```
 
-The Skill tool resolves a skill named `"critical-review"` by scanning all enabled plugin directories for `skills/critical-review/SKILL.md`. The `enabledPlugins` key format is `"<plugin-name>@<author>"` → `"code-conductor@code-conductor"`. Each skill subdirectory must match the skill name exactly (case-sensitive on Linux/macOS; case-insensitive on Windows NTFS but treat as case-sensitive for portability).
+The Skill tool resolves a skill named `"critical-review"` by scanning all enabled plugin directories for `skills/critical-review/SKILL.md`. Each skill subdirectory must match the skill name exactly (case-sensitive on Linux/macOS; treat as case-sensitive for portability on Windows NTFS).
+
+**`enabledPlugins` JSON path (exact):** The key is nested one level inside `~/.claude/settings.json` under the top-level `"enabledPlugins"` object — it is not a top-level property itself:
+
+```json
+{
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true,
+    "code-simplifier@claude-plugins-official": true,
+    "claude-mem@thedotmack": false,
+    "code-conductor@code-conductor": true
+  }
+}
+```
+
+The `_merge_settings_json` function must merge into `.enabledPlugins["code-conductor@code-conductor"]`, not write a top-level key.
+
+**Source-to-target file transformation (exact):** Each flat source file in the repo is renamed to `SKILL.md` and placed inside a subdirectory named after the skill:
+
+| Repo source | Plugin target |
+|-------------|---------------|
+| `skills/critical-review.md` | `…/skills/critical-review/SKILL.md` |
+| `skills/memory-first.md` | `…/skills/memory-first/SKILL.md` |
+| `skills/agent-delegation.md` | `…/skills/agent-delegation/SKILL.md` |
+
+The flat filenames are the human-readable source of truth; the `SKILL.md` name is required by the plugin resolution contract.
 
 SQLite replacement (FEAT-005, ARCH-008) is explicitly deferred to a separate spec.
 
@@ -45,7 +70,7 @@ SQLite replacement (FEAT-005, ARCH-008) is explicitly deferred to a separate spe
 
 ### Main path
 1. Developer runs `install.sh` or `install.ps1` on a fresh machine — no claude-mem install step runs; the code-conductor plugin is created and enabled.
-2. Developer runs either installer on a machine with an existing claude-mem install — the installer runs `npx claude-mem uninstall --yes` silently before proceeding; the plugin hook is removed.
+2. Developer runs either installer on a machine with an existing claude-mem install — the installer runs the uninstall command silently before proceeding; the plugin hook and cached plugin directory are removed. The installer then removes any lingering `"claude-mem@thedotmack"` entry from `enabledPlugins` in `~/.claude/settings.json` and wipes the superpowers-cached copy of `critical-review` via a glob-delete (no version pinning required) so no duplicate skill resolution occurs.
 3. Sessions start without the `UserPromptSubmit` worker hook firing.
 4. `Skill({ skill: "critical-review" })` (and `memory-first`, `agent-delegation`) resolve from `code-conductor@code-conductor` — no superpowers version dependency.
 5. Agent lookup chain step 1 reads `.claude/memory/project.md` (behavior unchanged).
@@ -57,9 +82,10 @@ SQLite replacement (FEAT-005, ARCH-008) is explicitly deferred to a separate spe
 
 ### Error cases
 - `npx claude-mem uninstall` not found or exits non-zero (never installed, or Node.js absent on a fresh machine):
-  - `install.sh`: wrapped in `|| true`; shell never aborts.
-  - `install.ps1`: wrapped in `try { cmd /c "npx claude-mem uninstall --yes" } catch {}` with `$ErrorActionPreference = 'Continue'` scoped to that block — a missing `node`/`npx` raises a native command error that PS 5.1 converts to a terminating exception only when `$ErrorActionPreference = 'Stop'`; the `try/catch` absorbs it unconditionally. Do **not** use `-ErrorAction SilentlyContinue` on a native exe call — it suppresses output but does not catch a command-not-found exception in PS 5.1.
+  - **`install.sh` (exact form):** `npx claude-mem uninstall --yes 2>/dev/null || true` — `2>/dev/null` suppresses stderr noise; `|| true` ensures the exit code is always 0 so `set -euo pipefail` does not abort the script. Both guards are required together.
+  - **`install.ps1` (exact form):** `try { $null = cmd /c "npx claude-mem uninstall --yes 2>nul" } catch {}` — `cmd /c` delegates to the Windows command interpreter, which handles `npx` correctly with `legacy-peer-deps`. The `try/catch` absorbs any terminating exception (including command-not-found when Node.js is absent). `$null =` discards stdout. `2>nul` suppresses cmd-level stderr. Do **not** use `-ErrorAction SilentlyContinue` on native exe calls — PS 5.1 does not convert native exit codes to terminating exceptions, so `-ErrorAction` has no effect on them; command-not-found errors are thrown as terminating exceptions that only `try/catch` can absorb.
 - `~/.claude/settings.json` does not exist — the `_merge_settings_json` function already handles creation; no special case needed.
+- **Residual claude-mem artifacts:** The `npx claude-mem uninstall --yes` command is the authoritative cleanup mechanism; it removes the plugin's hook registration, the `~/.claude/plugins/cache/thedotmack/claude-mem/` directory, and any MCP worker state. The installers additionally: (a) remove the `"claude-mem@thedotmack"` key from `enabledPlugins` in `~/.claude/settings.json`; (b) glob-delete the orphaned superpowers-cached `critical-review` skill directory. No other env vars, cached metadata, or configuration blocks are known to be left behind by claude-mem and no further purge is specified.
 - Code-conductor plugin directory already exists (re-run) — the installer **wipes** `~/.claude/plugins/cache/code-conductor/code-conductor/1.0.0/` before writing, using `rm -rf` (bash) / `Remove-Item -Recurse -Force` (PS). This prevents stale or renamed skill directories from lingering across installer versions. The wipe is scoped to the versioned subdirectory only; the author/plugin parent directories are left intact.
 
 ## Acceptance Criteria
@@ -80,7 +106,9 @@ SQLite replacement (FEAT-005, ARCH-008) is explicitly deferred to a separate spe
 - [ ] `skills/critical-review/SKILL.md`, `skills/memory-first/SKILL.md`, `skills/agent-delegation/SKILL.md` are written into the plugin directory
 - [ ] `"code-conductor@code-conductor": true` is present in `~/.claude/settings.json` after install
 - [ ] `Skill({ skill: "critical-review" })` resolves without error in a new session
-- [ ] The temporary fix at `superpowers/6.0.3/skills/critical-review/SKILL.md` is removed by the installer (or noted as safe to delete manually)
+- [ ] The installer glob-deletes `~/.claude/plugins/cache/claude-plugins-official/superpowers/*/skills/critical-review/` (all superpowers versions) so no duplicate skill resolution occurs — this is automated, not manual
+- [ ] The installer removes `"claude-mem@thedotmack"` from `enabledPlugins` in `~/.claude/settings.json` (set to absent, not `false`)
+- [ ] No residual `~/.claude/plugins/cache/thedotmack/claude-mem/` directory remains after running the installer on a machine where claude-mem was previously installed — the `npx claude-mem uninstall` command is responsible; no additional manual wipe is specified
 
 ## Out of Scope
 - SQLite embedded database engine (FEAT-005, ARCH-008)
