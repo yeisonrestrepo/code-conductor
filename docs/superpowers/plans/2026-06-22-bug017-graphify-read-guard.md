@@ -50,7 +50,7 @@
 - Consumes: `BASH` availability (spawnSync bash --version), `BASH_PATH` (which bash), `HOOK` path resolved to `.claude/hooks/pre-tool-use.sh`
 - Produces: 17 test cases that will FAIL until Guard 4 is implemented
 
-- [ ] [T-001-A] Create `tests/hooks/guard4.test.js` with the complete content below:
+- [X] [T-001-A] Create `tests/hooks/guard4.test.js` with the complete content below:
 
 ```js
 import { describe, it, expect } from 'vitest'
@@ -220,7 +220,7 @@ describe.skipIf(!BASH_AVAILABLE)('Guard 4 — Read blocker for graphify-out/ and
 })
 ```
 
-- [ ] [T-001-B] Run `npm test` and confirm 17 new guard4 tests FAIL (Guard 4 not yet implemented):
+- [X] [T-001-B] Run `npm test` and confirm 17 new guard4 tests FAIL (Guard 4 not yet implemented):
 
 ```
 npm test
@@ -239,7 +239,7 @@ Expected: test run shows guard4 suite with 17 failures, overall exit 1.
 - Consumes: `CLAUDE_TOOL_NAME`, `CLAUDE_TOOL_INPUT` env vars (same as Guard 1 and Guard 3)
 - Produces: exits 1 with JSON block on stdout for blocked paths; exits 0 for allowed paths
 
-- [ ] [T-002-A] Insert Guard 4 block in `.claude/hooks/pre-tool-use.sh`. The insertion point is between the Guard 3 closing `fi` (line 465) and the Guard 2 comment header (line 467). Use Edit with:
+- [X] [T-002-A] Insert Guard 4 block in `.claude/hooks/pre-tool-use.sh`. The insertion point is between the Guard 3 closing `fi` (line 465) and the Guard 2 comment header (line 467). Use Edit with:
 
 `old_string`:
 ```
@@ -280,7 +280,7 @@ fi
 # ── Guard 2: Duplicate file creation ──────────────────────────────────────
 ```
 
-- [ ] [T-002-B] Run `npm test` and confirm 17 guard4 tests now pass, other tests unchanged:
+- [X] [T-002-B] Run `npm test` and confirm 17 guard4 tests now pass, other tests unchanged:
 
 ```
 npm test
@@ -295,11 +295,11 @@ Expected: summary shows all guard4 tests pass; total count increases by 17; `2 s
 **Files:**
 - Modify: `project-template/.claude/hooks/pre-tool-use.sh`
 
-- [ ] [T-003-A] Confirm the project-template hook has the same Guard 3 / Guard 2 boundary. Read lines 460–470 of `project-template/.claude/hooks/pre-tool-use.sh` with `limit: 15, offset: 459`.
+- [X] [T-003-A] Confirm the project-template hook has the same Guard 3 / Guard 2 boundary. Read lines 460–470 of `project-template/.claude/hooks/pre-tool-use.sh` with `limit: 15, offset: 459`.
 
-- [ ] [T-003-B] Apply the identical Guard 4 block insertion to `project-template/.claude/hooks/pre-tool-use.sh` using the same `old_string` / `new_string` from T-002-A.
+- [X] [T-003-B] Apply the identical Guard 4 block insertion to `project-template/.claude/hooks/pre-tool-use.sh` using the same `old_string` / `new_string` from T-002-A.
 
-- [ ] [T-003-C] Commit guard and tests together:
+- [X] [T-003-C] Commit guard and tests together:
 
 ```bash
 git add -f .claude/hooks/pre-tool-use.sh
@@ -322,7 +322,7 @@ The project install block starts at line 1067. Three surgical changes:
 
 **Change A — Root sentinel** (insert after `mkdir -p "${PROJ_DIR}/commands"...` line, line 1073):
 
-- [ ] [T-004-A] Insert root sentinel using Edit:
+- [X] [T-004-A] Insert root sentinel using Edit:
 
 `old_string`:
 ```
@@ -360,7 +360,7 @@ The project install block starts at line 1067. Three surgical changes:
 
 **Change B — Idempotency for pre-tool-use.sh download** (line 1083):
 
-- [ ] [T-004-B] Change the hook download call to use `false` as 3rd arg (skip if file exists). Use Edit:
+- [X] [T-004-B] Change the hook download call to use `false` as 3rd arg (skip if file exists). Use Edit:
 
 `old_string`:
 ```
@@ -381,7 +381,7 @@ The project install block starts at line 1067. Three surgical changes:
 
 Note: `chmod +x` stays outside the download guard — it applies the execute bit whether the file was just downloaded or pre-existed (the `download` function with `false` skips the download but the chmod still runs on the existing file).
 
-- [ ] [T-004-C] Commit install.sh changes:
+- [X] [T-004-C] Commit install.sh changes:
 
 ```bash
 git add install.sh
@@ -401,7 +401,7 @@ The project block starts at line 420 (`if ($Project)`). Three surgical changes m
 
 **Change A — Root sentinel + parent-dir warning** (insert after `foreach ($sub in ...) { New-Item ... }` block, before the `Save-RemoteFile "project-template/CLAUDE.md"` call):
 
-- [ ] [T-005-A] Insert root sentinel and parent-dir warning using Edit:
+- [X] [T-005-A] Insert root sentinel and parent-dir warning using Edit:
 
 `old_string`:
 ```
@@ -441,7 +441,7 @@ The project block starts at line 420 (`if ($Project)`). Three surgical changes m
 
 **Change B — Idempotency for pre-tool-use.sh download** (line 438):
 
-- [ ] [T-005-B] Change download call to pass `$false` as overwrite arg. Use Edit:
+- [X] [T-005-B] Change download call to pass `$false` as overwrite arg. Use Edit:
 
 `old_string`:
 ```
@@ -458,7 +458,7 @@ The project block starts at line 420 (`if ($Project)`). Three surgical changes m
 
 Note: `Save-RemoteFile` already has `if (-not $Overwrite -and (Test-Path $Dest)) { Write-Info "Skipped"; return }` — the `$false` arg activates that guard.
 
-- [ ] [T-005-C] Commit install.ps1 changes:
+- [X] [T-005-C] Commit install.ps1 changes:
 
 ```bash
 git add install.ps1
@@ -493,7 +493,7 @@ Replace with (word-for-word identical in both):
 - Do not accept implementation tasks without valid project memory and graph.
 ```
 
-- [ ] [T-006-A] Edit `CLAUDE.md` Session Initialization section:
+- [X] [T-006-A] Edit `CLAUDE.md` Session Initialization section:
 
 `old_string`:
 ```
@@ -513,9 +513,9 @@ Replace with (word-for-word identical in both):
 - Do not accept implementation tasks without valid project memory and graph.
 ```
 
-- [ ] [T-006-B] Apply identical edit to `project-template/CLAUDE.md` using the same `old_string` and `new_string`.
+- [X] [T-006-B] Apply identical edit to `project-template/CLAUDE.md` using the same `old_string` and `new_string`.
 
-- [ ] [T-006-C] Commit CLAUDE.md changes:
+- [X] [T-006-C] Commit CLAUDE.md changes:
 
 ```bash
 git add -f CLAUDE.md
@@ -531,7 +531,7 @@ git commit -m "fix(BUG-017): restrict Session Init to Glob-only; ban Read on gra
 - Modify: `CONTRIBUTING.md` (after `### Manual Validation Protocol`, before closing `---`)
 - Modify: `README.md` (after `### Update` section, before `---`)
 
-- [ ] [T-007-A] Add propagation note subsection to `CONTRIBUTING.md`. Insert new `### Resetting the Pre-Commit Hook to Upstream` subsection immediately after the `### Manual Validation Protocol` checklist (after item 6), before the closing `---`:
+- [X] [T-007-A] Add propagation note subsection to `CONTRIBUTING.md`. Insert new `### Resetting the Pre-Commit Hook to Upstream` subsection immediately after the `### Manual Validation Protocol` checklist (after item 6), before the closing `---`:
 
 `old_string`:
 ```
@@ -561,7 +561,7 @@ Remove-Item .claude\hooks\pre-tool-use.sh
 ---
 ```
 
-- [ ] [T-007-B] Add parent-dir warning note to `README.md`. Insert after the `### Update` section content, before the closing `---`:
+- [X] [T-007-B] Add parent-dir warning note to `README.md`. Insert after the `### Update` section content, before the closing `---`:
 
 `old_string`:
 ```
@@ -583,7 +583,7 @@ Re-run the same install command. User-configured files are never overwritten; ag
 ---
 ```
 
-- [ ] [T-007-C] Commit docs:
+- [X] [T-007-C] Commit docs:
 
 ```bash
 git add CONTRIBUTING.md README.md
@@ -600,12 +600,12 @@ git commit -m "docs(BUG-017): document hook reset procedure and parent-dir const
 - Modify: `CHANGELOG.md`
 - Modify: `AGENT-READABLE BACKLOG.md`
 
-- [ ] [T-008-A] Update `VERSION` from `1.12.0` to `1.13.0`:
+- [X] [T-008-A] Update `VERSION` from `1.12.0` to `1.13.0`:
 
 `old_string`: `1.12.0`
 `new_string`: `1.13.0`
 
-- [ ] [T-008-B] Add `"version"` field to `package.json` (field is currently absent):
+- [X] [T-008-B] Add `"version"` field to `package.json` (field is currently absent):
 
 `old_string`:
 ```
@@ -622,7 +622,7 @@ git commit -m "docs(BUG-017): document hook reset procedure and parent-dir const
   "type": "module",
 ```
 
-- [ ] [T-008-C] Prepend `[1.13.0]` entry to `CHANGELOG.md`. Insert before the existing `## [1.12.0]` block:
+- [X] [T-008-C] Prepend `[1.13.0]` entry to `CHANGELOG.md`. Insert before the existing `## [1.12.0]` block:
 
 `old_string`:
 ```
@@ -651,7 +651,7 @@ git commit -m "docs(BUG-017): document hook reset procedure and parent-dir const
 ## [1.12.0] - 2026-06-22
 ```
 
-- [ ] [T-008-D] Mark BUG-017 as complete in `AGENT-READABLE BACKLOG.md`. Use Grep first to confirm uniqueness:
+- [X] [T-008-D] Mark BUG-017 as complete in `AGENT-READABLE BACKLOG.md`. Use Grep first to confirm uniqueness:
 
 ```
 Grep pattern: \[ \] `\[BUG-017\]`
@@ -663,7 +663,7 @@ Expected count: 1. Then Edit:
 `old_string`: `### [ ] \`[BUG-017]\` Graphify Initialization Bloat (AST Graph Overload)`
 `new_string`: `### [X] \`[BUG-017]\` Graphify Initialization Bloat (AST Graph Overload)`
 
-- [ ] [T-008-E] Run `npm test` one final time to confirm all tests still pass before the release commit:
+- [X] [T-008-E] Run `npm test` one final time to confirm all tests still pass before the release commit:
 
 ```
 npm test
@@ -671,7 +671,7 @@ npm test
 
 Expected: `X passed | 2 skipped`, exit 0.
 
-- [ ] [T-008-F] Commit version bump and backlog:
+- [X] [T-008-F] Commit version bump and backlog:
 
 ```bash
 git add VERSION package.json CHANGELOG.md "AGENT-READABLE BACKLOG.md"
