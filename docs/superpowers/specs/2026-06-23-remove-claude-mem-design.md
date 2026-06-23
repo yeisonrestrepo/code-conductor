@@ -64,6 +64,45 @@ The `_merge_settings_json` function must merge into `.enabledPlugins["code-condu
 
 The flat filenames are the human-readable source of truth; the `SKILL.md` name is required by the plugin resolution contract.
 
+**Parent directory creation (mandatory before copy):** Each skill target subdirectory must be created before the copy step. The installers must run `mkdir -p` (bash) / `New-Item -ItemType Directory -Force` (PS) for every leaf directory — including `.claude-plugin/` — before writing any file. Copy failures in nested targets are prevented by ensuring all parent paths exist first:
+
+```bash
+# bash — order matters; all mkdirs before any cp
+mkdir -p "${PLUGIN_DIR}/.claude-plugin"
+mkdir -p "${PLUGIN_DIR}/skills/critical-review"
+mkdir -p "${PLUGIN_DIR}/skills/memory-first"
+mkdir -p "${PLUGIN_DIR}/skills/agent-delegation"
+```
+
+```powershell
+# PS 5.1 — New-Item -Force is safe even if dir already exists
+New-Item -ItemType Directory -Force "$pluginDir\.claude-plugin" | Out-Null
+New-Item -ItemType Directory -Force "$pluginDir\skills\critical-review" | Out-Null
+New-Item -ItemType Directory -Force "$pluginDir\skills\memory-first" | Out-Null
+New-Item -ItemType Directory -Force "$pluginDir\skills\agent-delegation" | Out-Null
+```
+
+These run **after** the wipe step and **before** any file write.
+
+**`plugin.json` required schema (exact):** Claude Code validates the following fields at plugin load time. All four fields are required; omitting any causes the plugin to be silently skipped:
+
+```json
+{
+  "name": "code-conductor",
+  "version": "1.0.0",
+  "description": "code-conductor custom skills: critical-review, memory-first, agent-delegation",
+  "author": {
+    "name": "code-conductor"
+  }
+}
+```
+
+- `name`: must match the plugin directory name (`code-conductor`) — used for the `<name>@<author>` resolution key.
+- `version`: must match the versioned subdirectory name (`1.0.0`).
+- `description`: free-text; non-empty string required.
+- `author.name`: must match the author namespace directory (`code-conductor`).
+- No other fields (`homepage`, `repository`, `license`, `keywords`) are required, though they are harmless if present.
+
 SQLite replacement (FEAT-005, ARCH-008) is explicitly deferred to a separate spec.
 
 ## Behavior
@@ -85,8 +124,18 @@ SQLite replacement (FEAT-005, ARCH-008) is explicitly deferred to a separate spe
   - **`install.sh` (exact form):** `npx claude-mem uninstall --yes 2>/dev/null || true` — `2>/dev/null` suppresses stderr noise; `|| true` ensures the exit code is always 0 so `set -euo pipefail` does not abort the script. Both guards are required together.
   - **`install.ps1` (exact form):** `try { $null = cmd /c "npx claude-mem uninstall --yes 2>nul" } catch {}` — `cmd /c` delegates to the Windows command interpreter, which handles `npx` correctly with `legacy-peer-deps`. The `try/catch` absorbs any terminating exception (including command-not-found when Node.js is absent). `$null =` discards stdout. `2>nul` suppresses cmd-level stderr. Do **not** use `-ErrorAction SilentlyContinue` on native exe calls — PS 5.1 does not convert native exit codes to terminating exceptions, so `-ErrorAction` has no effect on them; command-not-found errors are thrown as terminating exceptions that only `try/catch` can absorb.
 - `~/.claude/settings.json` does not exist — the `_merge_settings_json` function already handles creation; no special case needed.
-- **Residual claude-mem artifacts:** The `npx claude-mem uninstall --yes` command is the authoritative cleanup mechanism; it removes the plugin's hook registration, the `~/.claude/plugins/cache/thedotmack/claude-mem/` directory, and any MCP worker state. The installers additionally: (a) remove the `"claude-mem@thedotmack"` key from `enabledPlugins` in `~/.claude/settings.json`; (b) glob-delete the orphaned superpowers-cached `critical-review` skill directory. No other env vars, cached metadata, or configuration blocks are known to be left behind by claude-mem and no further purge is specified.
-- Code-conductor plugin directory already exists (re-run) — the installer **wipes** `~/.claude/plugins/cache/code-conductor/code-conductor/1.0.0/` before writing, using `rm -rf` (bash) / `Remove-Item -Recurse -Force` (PS). This prevents stale or renamed skill directories from lingering across installer versions. The wipe is scoped to the versioned subdirectory only; the author/plugin parent directories are left intact.
+- **`settings.json` key removal without `jq`:** Neither installer may assume `jq` is present. The removal of `"claude-mem@thedotmack"` from `enabledPlugins` must use the same `node -e` inline script mechanism already used by `_merge_settings_json` in the existing installers — read the file with `fs.readFileSync`, parse with `JSON.parse`, delete the key (`delete obj.enabledPlugins["claude-mem@thedotmack"]`), and write back with `JSON.stringify(obj, null, 2)`. If `node` is absent (fresh machine, `--no-deps` run), skip silently — the key is already absent on a fresh machine.
+- **Residual claude-mem artifacts:** The `npx claude-mem uninstall --yes` command is the authoritative cleanup mechanism; it removes the plugin's hook registration, the `~/.claude/plugins/cache/thedotmack/claude-mem/` directory, and any MCP worker state. The installers additionally: (a) remove the `"claude-mem@thedotmack"` key from `enabledPlugins` in `~/.claude/settings.json` via the `node -e` mechanism above; (b) glob-delete the orphaned superpowers-cached `critical-review` skill directory. No other env vars, cached metadata, or configuration blocks are known to be left behind by claude-mem and no further purge is specified.
+- **Code-conductor plugin directory wipe on re-run:** `rm -rf "${PLUGIN_DIR}" 2>/dev/null || true` (bash) / `if (Test-Path $pluginDir) { Remove-Item -Recurse -Force $pluginDir }` (PS). The explicit existence check in PS is required because `Remove-Item -Recurse -Force` on a non-existent path throws a terminating error in PS 5.1 even with `-Force`; wrapping in `if (Test-Path …)` is the idiomatic suppression. In bash, `2>/dev/null || true` is sufficient since `rm -rf` exits 0 on absent paths. The wipe is scoped to the versioned subdirectory only; parent directories are left intact.
+- **Superpowers glob-delete (PS 5.1):** PowerShell 5.1 does not expand mid-path wildcards in `Remove-Item` paths directly (e.g. `Remove-Item "…/superpowers/*/skills/critical-review" -Recurse` silently does nothing). The correct mechanism is a `Get-ChildItem` pipeline expansion:
+  ```powershell
+  Get-ChildItem "$env:USERPROFILE\.claude\plugins\cache\claude-plugins-official\superpowers" -Directory |
+    ForEach-Object {
+      $t = Join-Path $_.FullName "skills\critical-review"
+      if (Test-Path $t) { Remove-Item -Recurse -Force $t }
+    }
+  ```
+  In bash, the shell glob expands naturally: `rm -rf "${HOME}/.claude/plugins/cache/claude-plugins-official/superpowers"/*/skills/critical-review 2>/dev/null || true`.
 
 ## Acceptance Criteria
 
