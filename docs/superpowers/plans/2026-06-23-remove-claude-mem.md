@@ -148,13 +148,14 @@
   New (replacement — inside the SKIP_DEPS block):
   ```bash
     # Silent claude-mem removal — heals existing installs; no-op if never installed or Node absent
-    npx claude-mem uninstall --yes 2>/dev/null || true
+    npx --yes claude-mem uninstall 2>/dev/null || true
     # Remove claude-mem@thedotmack from enabledPlugins (no-op on fresh installs)
     command -v node >/dev/null 2>&1 && node -e "
 const f=require('os').homedir()+'/.claude/settings.json';
 if(!require('fs').existsSync(f))process.exit(0);
 const obj=JSON.parse(require('fs').readFileSync(f,'utf8'));
 if(obj.enabledPlugins){delete obj.enabledPlugins['claude-mem@thedotmack'];}
+require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true});
 require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
 " 2>/dev/null || true
     # Glob-delete orphaned superpowers-cached critical-review skill (all versions)
@@ -198,20 +199,51 @@ const f=require('os').homedir()+'/.claude/settings.json';
 const obj=require('fs').existsSync(f)?JSON.parse(require('fs').readFileSync(f,'utf8')):{};
 if(!obj.enabledPlugins)obj.enabledPlugins={};
 obj.enabledPlugins['code-conductor@code-conductor']=true;
+require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true});
 require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
 " 2>/dev/null || true
     ok "code-conductor plugin installed (critical-review, memory-first, agent-delegation)"
   fi
   ```
 
-- [ ] [T-002-C] **Run tests**
+- [ ] [T-002-C] **Verify plugin.json exists and is structurally valid**
+
+  Run immediately after the installer code is written (before the test suite):
+
+  ```bash
+  PLUGIN_DIR="${HOME}/.claude/plugins/cache/code-conductor/code-conductor/1.0.0"
+  [ -f "${PLUGIN_DIR}/.claude-plugin/plugin.json" ] \
+    || { echo "ERROR: plugin.json not created"; exit 1; }
+  node -e "
+const pj = JSON.parse(require('fs').readFileSync('${PLUGIN_DIR}/.claude-plugin/plugin.json','utf8'));
+['name','version','description','author'].forEach(k => {
+  if (!pj[k]) throw new Error('plugin.json missing field: ' + k);
+});
+console.log('plugin.json OK: ' + pj.name + ' v' + pj.version);
+"
+  ```
+
+  Expected output: `plugin.json OK: code-conductor v1.0.0`
+
+  Also verify SKILL.md files were copied:
+  ```bash
+  for skill in critical-review memory-first agent-delegation; do
+    [ -f "${PLUGIN_DIR}/skills/${skill}/SKILL.md" ] \
+      || { echo "ERROR: missing SKILL.md for ${skill}"; exit 1; }
+  done
+  echo "All SKILL.md files present"
+  ```
+
+  Expected output: `All SKILL.md files present`
+
+- [ ] [T-002-D] **Run tests**
 
   ```bash
   npm test
   ```
   Expected: all tests pass (142 passed, 3 skipped). The hook text edits from Task 1 do not affect test assertions (confirmed by grep — no tests assert on "claude-mem" text).
 
-- [ ] [T-002-D] **Commit**
+- [ ] [T-002-E] **Commit**
 
   ```bash
   git add install.sh
@@ -287,17 +319,20 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
     }
   ```
 
+  Use the Edit tool: `old_string` = the entire block shown above (lines 127–165); `new_string` = the replacement block below.
+
   New (replacement — inside the `-not $NoDeps` block, directly after `Write-Host ""`):
   ```powershell
     # Silent claude-mem removal — heals existing installs; no-op if never installed
     Write-Info "Removing claude-mem (no-op if never installed)..."
-    try { $null = cmd /c "npx claude-mem uninstall --yes 2>nul" } catch {}
+    try { $null = cmd /c "npx --yes claude-mem uninstall 2>nul" } catch {}
     # Remove claude-mem@thedotmack from enabledPlugins (no-op on fresh installs)
     $cmNodeScript = @'
 const f=require('os').homedir()+'/.claude/settings.json';
 if(!require('fs').existsSync(f))process.exit(0);
 const obj=JSON.parse(require('fs').readFileSync(f,'utf8'));
 if(obj.enabledPlugins){delete obj.enabledPlugins['claude-mem@thedotmack'];}
+require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true});
 require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
 '@
     if (Get-Command node -ErrorAction SilentlyContinue) {
@@ -356,6 +391,7 @@ const f=require('os').homedir()+'/.claude/settings.json';
 const obj=require('fs').existsSync(f)?JSON.parse(require('fs').readFileSync(f,'utf8')):{};
 if(!obj.enabledPlugins)obj.enabledPlugins={};
 obj.enabledPlugins['code-conductor@code-conductor']=true;
+require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true});
 require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
 '@
     if (Get-Command node -ErrorAction SilentlyContinue) {
@@ -365,14 +401,43 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
   }
   ```
 
-- [ ] [T-003-C] **Run tests**
+- [ ] [T-003-C] **Verify plugin.json exists and is structurally valid (PowerShell)**
+
+  Run after the installer block is written:
+
+  ```powershell
+  $pluginDir = "$env:USERPROFILE\.claude\plugins\cache\code-conductor\code-conductor\1.0.0"
+  if (-not (Test-Path "$pluginDir\.claude-plugin\plugin.json")) {
+    throw "ERROR: plugin.json not created at $pluginDir\.claude-plugin\plugin.json"
+  }
+  $pj = Get-Content "$pluginDir\.claude-plugin\plugin.json" -Raw -Encoding utf8 | ConvertFrom-Json
+  @('name','version','description','author') | ForEach-Object {
+    if (-not $pj.$_) { throw "plugin.json missing field: $_" }
+  }
+  Write-Ok "plugin.json OK: $($pj.name) v$($pj.version)"
+  ```
+
+  Expected output: `[OK] plugin.json OK: code-conductor v1.0.0`
+
+  Also verify SKILL.md files:
+  ```powershell
+  @('critical-review','memory-first','agent-delegation') | ForEach-Object {
+    $skillPath = "$pluginDir\skills\$_\SKILL.md"
+    if (-not (Test-Path $skillPath)) { throw "ERROR: missing SKILL.md for $_" }
+  }
+  Write-Ok "All SKILL.md files present"
+  ```
+
+  Expected output: `[OK] All SKILL.md files present`
+
+- [ ] [T-003-D] **Run tests**
 
   ```bash
   npm test
   ```
   Expected: 142 passed, 3 skipped.
 
-- [ ] [T-003-D] **Commit**
+- [ ] [T-003-E] **Commit**
 
   ```bash
   git add install.ps1
@@ -393,15 +458,24 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
 
 - [ ] [T-004-A] **Edit `VERSION`**
 
-  Old content: `1.13.0`
-  New content: `1.14.0`
+  Use the Edit tool:
+  - `file_path`: `VERSION`
+  - `old_string`: `1.13.0`
+  - `new_string`: `1.14.0`
 
 - [ ] [T-004-B] **Edit `package.json` version field**
 
-  Old: `"version": "1.13.0"`
-  New: `"version": "1.14.0"`
+  Use the Edit tool:
+  - `file_path`: `package.json`
+  - `old_string`: `"version": "1.13.0"`
+  - `new_string`: `"version": "1.14.0"`
 
 - [ ] [T-004-C] **Prepend `[1.14.0]` entry to `CHANGELOG.md`**
+
+  Use the Edit tool:
+  - `file_path`: `CHANGELOG.md`
+  - `old_string`: `# Changelog\n\n\n## [1.13.0]`
+  - `new_string`: the `# Changelog` header + the `[1.14.0]` block below + `## [1.13.0]`
 
   Insert the following block immediately after the `# Changelog` header line (before the existing `## [1.13.0]` entry):
 
@@ -410,7 +484,7 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
   ## [1.14.0] - 2026-06-23
 
   ### Removed
-  - `[BUG-020]` claude-mem installation steps removed from `install.sh` and `install.ps1`; silent `npx claude-mem uninstall --yes` call added to heal existing installs; `claude-mem@thedotmack` key removed from `enabledPlugins` in `~/.claude/settings.json` on install
+  - `[BUG-020]` claude-mem installation steps removed from `install.sh` and `install.ps1`; silent `npx --yes claude-mem uninstall` call added to heal existing installs; `claude-mem@thedotmack` key removed from `enabledPlugins` in `~/.claude/settings.json` on install
   - `[BUG-020]` Orphaned superpowers-cached `critical-review` skill glob-deleted on install (all superpowers versions)
 
   ### Added
@@ -440,7 +514,7 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
 
 ## Test List
 
-- [ ] `npm test` passes after each commit (T-002-C, T-003-C, T-004-D) — 142 passed, 3 skipped
+- [ ] `npm test` passes after each commit (T-002-D, T-003-D, T-004-D) — 142 passed, 3 skipped
 - [ ] No test file asserts on "claude-mem" text (pre-confirmed by grep — no updates needed)
 - [ ] Manual smoke: run `bash install.sh --no-deps` on a clean machine — no claude-mem step runs, no plugin created (NoDeps guard)
 - [ ] Manual smoke: run `bash install.sh` — `~/.claude/plugins/cache/code-conductor/code-conductor/1.0.0/.claude-plugin/plugin.json` exists with correct 4-field schema
@@ -448,8 +522,8 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
 ## Commit Order
 
 1. T-001-G — prose edits (6 files, 1 commit)
-2. T-002-D — install.sh (1 commit)
-3. T-003-D — install.ps1 (1 commit)
+2. T-002-E — install.sh (1 commit)
+3. T-003-E — install.ps1 (1 commit)
 4. T-004-E — version bump (1 commit)
 
 Total: 4 commits.
