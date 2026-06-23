@@ -12,7 +12,9 @@
 
 - JSON output: 2-space indentation + trailing newline (`JSON.stringify(obj, null, 2) + '\n'`). No minification.
 - No `jq` assumption: all `settings.json` manipulation uses `node -e` inline scripts.
-- `set -euo pipefail` compatibility: every `node -e` call prefixed with `command -v node >/dev/null 2>&1 &&`; every non-fatal command suffixed with `|| true`.
+- `set -euo pipefail` compatibility: every `node -e` call prefixed with `command -v node >/dev/null 2>&1 &&`; every non-fatal command suffixed with `|| true`; the uninstall call prefixed with `command -v npx >/dev/null 2>&1 &&`.
+- `node -e` JSON resilience: all `JSON.parse` calls wrapped in `try/catch`; malformed or empty `settings.json` falls back to `{}` without aborting.
+- Dynamic plugin version: both installers read `REMOTE_VERSION` / `$RemoteVersion` (already set by the version-fetch at the top of each installer) and use it for the plugin directory path and `plugin.json` version field. Fallback: `"1.0.0"` when the version fetch fails.
 - PS 5.1: mid-path wildcard glob-delete requires `Get-ChildItem` pipeline. No `&&`/`||` operator chains. `try/catch` for command-not-found.
 - `plugin.json` required fields: `name`, `version`, `description`, `author.name` — all four, exact values.
 - `enabledPlugins` JSON path: nested inside `{ "enabledPlugins": { ... } }`, not top-level.
@@ -147,13 +149,13 @@
 
   New (replacement — inside the SKIP_DEPS block):
   ```bash
-    # Silent claude-mem removal — heals existing installs; no-op if never installed or Node absent
-    npx --yes claude-mem uninstall 2>/dev/null || true
+    # Silent claude-mem removal — heals existing installs; no-op if npx/Node absent
+    command -v npx >/dev/null 2>&1 && npx --yes claude-mem uninstall 2>/dev/null || true
     # Remove claude-mem@thedotmack from enabledPlugins (no-op on fresh installs)
     command -v node >/dev/null 2>&1 && node -e "
 const f=require('os').homedir()+'/.claude/settings.json';
 if(!require('fs').existsSync(f))process.exit(0);
-const obj=JSON.parse(require('fs').readFileSync(f,'utf8'));
+let obj={};try{obj=JSON.parse(require('fs').readFileSync(f,'utf8'));}catch(e){}
 if(obj.enabledPlugins){delete obj.enabledPlugins['claude-mem@thedotmack'];}
 require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true});
 require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
@@ -175,16 +177,17 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
   ```bash
   # ── code-conductor plugin: wipe versioned dir and recreate ────────────────────
   if [ "$SKIP_DEPS" = false ]; then
-    PLUGIN_DIR="${HOME}/.claude/plugins/cache/code-conductor/code-conductor/1.0.0"
+    _cc_ver="${REMOTE_VERSION:-1.0.0}"
+    PLUGIN_DIR="${HOME}/.claude/plugins/cache/code-conductor/code-conductor/${_cc_ver}"
     rm -rf "${PLUGIN_DIR}" 2>/dev/null || true
     mkdir -p "${PLUGIN_DIR}/.claude-plugin"
     mkdir -p "${PLUGIN_DIR}/skills/critical-review"
     mkdir -p "${PLUGIN_DIR}/skills/memory-first"
     mkdir -p "${PLUGIN_DIR}/skills/agent-delegation"
-    cat > "${PLUGIN_DIR}/.claude-plugin/plugin.json" <<'PLUGINJSON'
+    cat > "${PLUGIN_DIR}/.claude-plugin/plugin.json" <<PLUGINJSON
 {
   "name": "code-conductor",
-  "version": "1.0.0",
+  "version": "${_cc_ver}",
   "description": "code-conductor custom skills: critical-review, memory-first, agent-delegation",
   "author": {
     "name": "code-conductor"
@@ -196,7 +199,7 @@ PLUGINJSON
     cp "${GLOBAL_DIR}/skills/agent-delegation.md"   "${PLUGIN_DIR}/skills/agent-delegation/SKILL.md"
     command -v node >/dev/null 2>&1 && node -e "
 const f=require('os').homedir()+'/.claude/settings.json';
-const obj=require('fs').existsSync(f)?JSON.parse(require('fs').readFileSync(f,'utf8')):{};
+let obj={};if(require('fs').existsSync(f)){try{obj=JSON.parse(require('fs').readFileSync(f,'utf8'));}catch(e){}}
 if(!obj.enabledPlugins)obj.enabledPlugins={};
 obj.enabledPlugins['code-conductor@code-conductor']=true;
 require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true});
@@ -211,7 +214,8 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
   Run immediately after the installer code is written (before the test suite):
 
   ```bash
-  PLUGIN_DIR="${HOME}/.claude/plugins/cache/code-conductor/code-conductor/1.0.0"
+  _cc_ver="${REMOTE_VERSION:-1.0.0}"
+  PLUGIN_DIR="${HOME}/.claude/plugins/cache/code-conductor/code-conductor/${_cc_ver}"
   [ -f "${PLUGIN_DIR}/.claude-plugin/plugin.json" ] \
     || { echo "ERROR: plugin.json not created"; exit 1; }
   node -e "
@@ -223,7 +227,7 @@ console.log('plugin.json OK: ' + pj.name + ' v' + pj.version);
 "
   ```
 
-  Expected output: `plugin.json OK: code-conductor v1.0.0`
+  Expected output: `plugin.json OK: code-conductor v<version>` (e.g. `v1.14.0` when `REMOTE_VERSION=1.14.0`)
 
   Also verify SKILL.md files were copied:
   ```bash
@@ -330,7 +334,7 @@ console.log('plugin.json OK: ' + pj.name + ' v' + pj.version);
     $cmNodeScript = @'
 const f=require('os').homedir()+'/.claude/settings.json';
 if(!require('fs').existsSync(f))process.exit(0);
-const obj=JSON.parse(require('fs').readFileSync(f,'utf8'));
+let obj={};try{obj=JSON.parse(require('fs').readFileSync(f,'utf8'));}catch(e){}
 if(obj.enabledPlugins){delete obj.enabledPlugins['claude-mem@thedotmack'];}
 require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true});
 require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
@@ -361,23 +365,27 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
   ```powershell
   # -- code-conductor plugin: wipe versioned dir and recreate --------------------
   if (-not $NoDeps) {
-    $pluginDir = "$env:USERPROFILE\.claude\plugins\cache\code-conductor\code-conductor\1.0.0"
+    $ccVersion = if ($RemoteVersion) { $RemoteVersion } else { "1.0.0" }
+    $pluginDir = "$env:USERPROFILE\.claude\plugins\cache\code-conductor\code-conductor\$ccVersion"
     if (Test-Path $pluginDir) { Remove-Item -Recurse -Force $pluginDir }
     New-Item -ItemType Directory -Force "$pluginDir\.claude-plugin" | Out-Null
+    # Create intermediate skills/ dir before leaf subdirs (required on PS 5.1)
+    New-Item -ItemType Directory -Force "$pluginDir\skills" | Out-Null
     New-Item -ItemType Directory -Force "$pluginDir\skills\critical-review" | Out-Null
     New-Item -ItemType Directory -Force "$pluginDir\skills\memory-first" | Out-Null
     New-Item -ItemType Directory -Force "$pluginDir\skills\agent-delegation" | Out-Null
     $pluginEnc = [System.Text.UTF8Encoding]::new($false)
-    $pluginJsonContent = @'
+    # Double-quoted here-string so $ccVersion expands into plugin.json content
+    $pluginJsonContent = @"
 {
   "name": "code-conductor",
-  "version": "1.0.0",
+  "version": "$ccVersion",
   "description": "code-conductor custom skills: critical-review, memory-first, agent-delegation",
   "author": {
     "name": "code-conductor"
   }
 }
-'@
+"@
     [System.IO.File]::WriteAllText(
       "$pluginDir\.claude-plugin\plugin.json",
       $pluginJsonContent + "`n",
@@ -388,7 +396,7 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
     Copy-Item "$GLOBAL_DIR\skills\agent-delegation.md"   "$pluginDir\skills\agent-delegation\SKILL.md"
     $enableScript = @'
 const f=require('os').homedir()+'/.claude/settings.json';
-const obj=require('fs').existsSync(f)?JSON.parse(require('fs').readFileSync(f,'utf8')):{};
+let obj={};if(require('fs').existsSync(f)){try{obj=JSON.parse(require('fs').readFileSync(f,'utf8'));}catch(e){}}
 if(!obj.enabledPlugins)obj.enabledPlugins={};
 obj.enabledPlugins['code-conductor@code-conductor']=true;
 require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true});
@@ -406,7 +414,8 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
   Run after the installer block is written:
 
   ```powershell
-  $pluginDir = "$env:USERPROFILE\.claude\plugins\cache\code-conductor\code-conductor\1.0.0"
+  $ccVersion = if ($RemoteVersion) { $RemoteVersion } else { "1.0.0" }
+  $pluginDir = "$env:USERPROFILE\.claude\plugins\cache\code-conductor\code-conductor\$ccVersion"
   if (-not (Test-Path "$pluginDir\.claude-plugin\plugin.json")) {
     throw "ERROR: plugin.json not created at $pluginDir\.claude-plugin\plugin.json"
   }
@@ -417,18 +426,19 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
   Write-Ok "plugin.json OK: $($pj.name) v$($pj.version)"
   ```
 
-  Expected output: `[OK] plugin.json OK: code-conductor v1.0.0`
+  Expected output: `[OK] plugin.json OK: code-conductor v<version>` (e.g. `v1.14.0` when `$RemoteVersion = "1.14.0"`)
 
-  Also verify SKILL.md files:
+  Also verify SKILL.md files are present and non-empty:
   ```powershell
   @('critical-review','memory-first','agent-delegation') | ForEach-Object {
     $skillPath = "$pluginDir\skills\$_\SKILL.md"
     if (-not (Test-Path $skillPath)) { throw "ERROR: missing SKILL.md for $_" }
+    if ((Get-Item $skillPath).Length -eq 0) { throw "ERROR: SKILL.md is empty for $_" }
   }
-  Write-Ok "All SKILL.md files present"
+  Write-Ok "All SKILL.md files present and non-empty"
   ```
 
-  Expected output: `[OK] All SKILL.md files present`
+  Expected output: `[OK] All SKILL.md files present and non-empty`
 
 - [ ] [T-003-D] **Run tests**
 
@@ -512,6 +522,80 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
 
 ---
 
+### Task 5: Automated plugin test file
+
+**Files:**
+- Create: `tests/plugin/code-conductor-plugin.test.js`
+
+**Interfaces:**
+- Consumes: `~/.claude/plugins/cache/code-conductor/code-conductor/<version>/` — present only when the installer has run (not in CI where install hasn't executed)
+- Produces: 5 test assertions that gate plugin schema and skill file integrity
+
+- [ ] [T-005-A] **Create `tests/plugin/code-conductor-plugin.test.js`**
+
+  ```js
+  const fs = require('fs');
+  const path = require('path');
+  const os = require('os');
+
+  const PLUGIN_BASE = path.join(os.homedir(), '.claude', 'plugins', 'cache', 'code-conductor', 'code-conductor');
+  const PLUGIN_INSTALLED = fs.existsSync(PLUGIN_BASE);
+
+  const describeIf = PLUGIN_INSTALLED ? describe : describe.skip;
+
+  describeIf('code-conductor plugin', () => {
+    let pluginDir;
+
+    beforeAll(() => {
+      // Resolve the single versioned subdirectory
+      const versions = fs.readdirSync(PLUGIN_BASE);
+      expect(versions).toHaveLength(1);
+      pluginDir = path.join(PLUGIN_BASE, versions[0]);
+    });
+
+    test('versioned plugin directory exists', () => {
+      expect(fs.existsSync(pluginDir)).toBe(true);
+    });
+
+    test('plugin.json has all 4 required fields', () => {
+      const jsonPath = path.join(pluginDir, '.claude-plugin', 'plugin.json');
+      expect(fs.existsSync(jsonPath)).toBe(true);
+      const pj = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+      expect(pj.name).toBe('code-conductor');
+      expect(typeof pj.version).toBe('string');
+      expect(pj.version.length).toBeGreaterThan(0);
+      expect(typeof pj.description).toBe('string');
+      expect(pj.description.length).toBeGreaterThan(0);
+      expect(pj.author && pj.author.name).toBe('code-conductor');
+    });
+
+    test.each(['critical-review', 'memory-first', 'agent-delegation'])(
+      'SKILL.md for %s exists and is non-empty',
+      (skill) => {
+        const skillPath = path.join(pluginDir, 'skills', skill, 'SKILL.md');
+        expect(fs.existsSync(skillPath)).toBe(true);
+        expect(fs.statSync(skillPath).size).toBeGreaterThan(0);
+      }
+    );
+  });
+  ```
+
+- [ ] [T-005-B] **Run tests**
+
+  ```bash
+  npm test
+  ```
+  Expected: 142+ passed (new tests skip in CI where plugin dir is absent), 3 skipped.
+
+- [ ] [T-005-C] **Commit**
+
+  ```bash
+  git add tests/plugin/code-conductor-plugin.test.js
+  git commit -m "test: add code-conductor plugin schema and skill file assertions"
+  ```
+
+---
+
 ## Test List
 
 - [ ] `npm test` passes after each commit (T-002-D, T-003-D, T-004-D) — 142 passed, 3 skipped
@@ -525,8 +609,9 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
 2. T-002-E — install.sh (1 commit)
 3. T-003-E — install.ps1 (1 commit)
 4. T-004-E — version bump (1 commit)
+5. T-005-C — plugin test file (1 commit)
 
-Total: 4 commits.
+Total: 5 commits.
 
 ## Identified Risks
 
