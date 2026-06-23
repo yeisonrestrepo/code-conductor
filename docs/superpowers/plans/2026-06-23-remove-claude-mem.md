@@ -136,11 +136,11 @@
 ### Task 2: `install.sh` - remove claude-mem block, add silent uninstall + plugin wiring
 
 **Files:**
-- Modify: `install.sh` (lines 187–199 removed; two new blocks added)
+- Modify: `install.sh` (lines 187-199 removed; two new blocks added)
 
 **Interfaces:**
-- Consumes: `${GLOBAL_DIR}/skills/critical-review.md`, `${GLOBAL_DIR}/skills/memory-first.md`, `${GLOBAL_DIR}/skills/agent-delegation.md` (written by the `download` calls at lines 965–969, which run before the new plugin block)
-- Produces: `~/.claude/plugins/cache/code-conductor/code-conductor/<REMOTE_VERSION>/` directory on the user's machine (version resolved at runtime from `${REMOTE_VERSION:-1.0.0}`); `enabledPlugins["code-conductor@code-conductor"]: true` in `~/.claude/settings.json`
+- Consumes: `${GLOBAL_DIR}/skills/critical-review.md`, `${GLOBAL_DIR}/skills/memory-first.md`, `${GLOBAL_DIR}/skills/agent-delegation.md` (written by the `download` calls at lines 965-969, which run before the new plugin block)
+- Produces: `~/.claude/plugins/cache/code-conductor/code-conductor/<version>/` directory on the user's machine (version resolved via fallback chain: REMOTE_VERSION env var -> local VERSION file -> "1.0.0" sentinel); `enabledPlugins["code-conductor@code-conductor"]: true` in `~/.claude/settings.json`
 
 - [ ] [T-002-A-0] **Locate and read the claude-mem install block in `install.sh` before editing**
 
@@ -170,7 +170,7 @@
   ```bash
   trap '[ -s "${HOME}/.claude/settings.json.bak" ] && cp "${HOME}/.claude/settings.json.bak" "${HOME}/.claude/settings.json" 2>/dev/null && warn "TRAP: settings.json auto-restored from backup after failure"' ERR
   ```
-  Clear the trap after T-002-C assertions pass (before the auto-cleanup step) to prevent the cleanup from triggering a false restore: `trap - ERR`. For PS (T-003-A-1): wrap the entire mutation sequence (T-003-A through T-003-B node calls) in a `try/finally` block where `finally` restores the backup if still present (the T-003-C auto-cleanup step deletes it on success, so `finally` only acts on failure paths): `finally { if (Test-Path $settingsBak) { Copy-Item $settingsBak $settingsPath -Force -ErrorAction SilentlyContinue; Write-Warn "FINALLY: settings.json auto-restored from backup" } }`.
+  Clear the trap after T-002-C assertions pass (before the auto-cleanup step) to prevent the cleanup from triggering a false restore: `trap - ERR`. For PS (T-003-A-1): wrap the entire mutation sequence (T-003-A through T-003-B node calls) in a `try/finally` block where `finally` restores the backup if still present (the T-003-C auto-cleanup step deletes it on success, so `finally` only acts on failure paths): `finally { if (Test-Path $settingsBak) { Copy-Item $settingsBak $settingsPath -Force -ErrorAction SilentlyContinue; Write-Warn "FINALLY: settings.json auto-restored from backup" } }`. **Sudden-termination caveat:** both the bash `ERR` trap and the PS `finally` block are bypassed by abrupt process termination (SIGKILL, `taskkill /F`, power loss). In that case the `.bak` file remains on disk. If the user restarts and finds `settings.json` corrupt or missing, they must manually run: bash: `cp ~/.claude/settings.json.bak ~/.claude/settings.json`; PS: `Copy-Item "$env:USERPROFILE\.claude\settings.json.bak" "$env:USERPROFILE\.claude\settings.json"`. No automatic post-crash recovery is specified beyond this manual step.
 
 - [ ] [T-002-A-2] **Verify claude-mem cache directory is removed after uninstall**
 
@@ -214,6 +214,8 @@
     command -v npx >/dev/null 2>&1 && CI=1 npx --yes claude-mem uninstall --yes 2>/dev/null || true
     # Pre-verify parent directory of settings.json exists before any write
     mkdir -p "${HOME}/.claude" 2>/dev/null || true
+    # Clear read-only attribute if set (prevents write failure on locked-down installs)
+    [ -f "${HOME}/.claude/settings.json" ] && chmod u+w "${HOME}/.claude/settings.json" 2>/dev/null || true
     # Remove claude-mem@thedotmack from enabledPlugins (no-op on fresh installs)
     command -v node >/dev/null 2>&1 && node -e "
 const f=require('os').homedir()+'/.claude/settings.json';
@@ -261,7 +263,8 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
     # Version fallback chain: remote fetch -> local VERSION file -> "1.0.0" sentinel
     # Resolves $(dirname "$0") to the installer script's directory for absolute path to VERSION
     _installer_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd || echo ".")"
-    _local_ver="$(cat "${_installer_dir}/VERSION" 2>/dev/null | tr -d '[:space:]')"
+    # tr -d '\r\n ' strips CR (Windows CRLF checkouts), LF, and spaces -- more targeted than [:space:]
+    _local_ver="$(cat "${_installer_dir}/VERSION" 2>/dev/null | tr -d '\r\n ')"
     # Reject non-semver content (e.g. whitespace-only, paths, multi-line blobs) to prevent path injection
     echo "${_local_ver}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+' || _local_ver=""
     _cc_ver="${REMOTE_VERSION:-${_local_ver:-1.0.0}}"
@@ -277,7 +280,11 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
     if [ ! -w "${HOME}/.claude/plugins" ] && [ ! -w "${HOME}/.claude" ] && [ ! -w "${HOME}" ]; then
       warn "No write permission on ${HOME}/.claude/plugins -- code-conductor plugin install may fail (check directory permissions or run with sudo)"
     fi
-    rm -rf "${PLUGIN_DIR}" 2>/dev/null || true
+    # Retry once after 2s to handle transient NTFS locks (same strategy as PS IOException catch)
+    if ! rm -rf "${PLUGIN_DIR}" 2>/dev/null; then
+      sleep 2
+      rm -rf "${PLUGIN_DIR}" 2>/dev/null || warn "Plugin dir could not be fully removed (locked files may remain) -- close Claude Code and re-run installer"
+    fi
     mkdir -p "${PLUGIN_DIR}/.claude-plugin"
     mkdir -p "${PLUGIN_DIR}/skills/critical-review"
     mkdir -p "${PLUGIN_DIR}/skills/memory-first"
@@ -327,17 +334,21 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
   Run immediately after the installer code is written (before the test suite):
 
   ```bash
-  _cc_ver="${REMOTE_VERSION:-1.0.0}"
+  _installer_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd || echo ".")"
+  _local_ver="$(cat "${_installer_dir}/VERSION" 2>/dev/null | tr -d '\r\n ')"
+  echo "${_local_ver}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+' || _local_ver=""
+  _cc_ver="${REMOTE_VERSION:-${_local_ver:-1.0.0}}"
   PLUGIN_DIR="${HOME}/.claude/plugins/cache/code-conductor/code-conductor/${_cc_ver}"
   [ -f "${PLUGIN_DIR}/.claude-plugin/plugin.json" ] \
     || { echo "ERROR: plugin.json not created"; exit 1; }
   node -e "
 const pj = JSON.parse(require('fs').readFileSync('${PLUGIN_DIR}/.claude-plugin/plugin.json','utf8'));
 ['name','version','description','author'].forEach(k => {
-  if (!pj[k]) throw new Error('plugin.json missing field: ' + k);
+  if (!(pj.hasOwnProperty(k))) { process.stderr.write('ERROR: plugin.json missing required field: '+k+'\n'); process.exit(1); }
 });
-console.log('plugin.json OK: ' + pj.name + ' v' + pj.version);
-"
+if (!pj.author || !pj.author.name) { process.stderr.write('ERROR: plugin.json author.name missing or empty\n'); process.exit(1); }
+console.log('[OK] plugin.json OK: ' + pj.name + ' v' + pj.version);
+" || { echo "ERROR: plugin.json validation failed -- see stderr above"; exit 1; }
   ```
 
   Expected output: `plugin.json OK: code-conductor v<version>` (e.g. `v1.14.0` when `REMOTE_VERSION=1.14.0`)
@@ -430,11 +441,11 @@ console.log('settings.json assertions passed');
 ### Task 3: `install.ps1` - remove claude-mem block, add silent uninstall + plugin wiring
 
 **Files:**
-- Modify: `install.ps1` (lines 127–165 removed; two new blocks added)
+- Modify: `install.ps1` (lines 127-165 removed; two new blocks added)
 
 **Interfaces:**
-- Consumes: `$GLOBAL_DIR\skills\critical-review.md`, `$GLOBAL_DIR\skills\memory-first.md`, `$GLOBAL_DIR\skills\agent-delegation.md` (written by `Save-RemoteFile` calls at lines 401–405, which run before the new plugin block)
-- Produces: `%USERPROFILE%\.claude\plugins\cache\code-conductor\code-conductor\<RemoteVersion>\` on Windows (version resolved at runtime from `if ($RemoteVersion) { $RemoteVersion } else { "1.0.0" }`); `enabledPlugins["code-conductor@code-conductor"]: true` in `~/.claude/settings.json`
+- Consumes: `$GLOBAL_DIR\skills\critical-review.md`, `$GLOBAL_DIR\skills\memory-first.md`, `$GLOBAL_DIR\skills\agent-delegation.md` (written by `Save-RemoteFile` calls at lines 401-405, which run before the new plugin block)
+- Produces: `%USERPROFILE%\.claude\plugins\cache\code-conductor\code-conductor\<version>\` on Windows (version resolved via fallback chain: $RemoteVersion param -> local VERSION file -> "1.0.0" sentinel); `enabledPlugins["code-conductor@code-conductor"]: true` in `~/.claude/settings.json`
 
 - [ ] [T-003-A-0] **Locate and read the claude-mem install block in `install.ps1` before editing**
 
@@ -534,7 +545,7 @@ console.log('settings.json assertions passed');
     }
   ```
 
-  Use the Edit tool: `old_string` = the entire block shown above (lines 127–165); `new_string` = the replacement block below.
+  Use the Edit tool: `old_string` = the entire block shown above (lines 127-165); `new_string` = the replacement block below.
 
   New (replacement - placed OUTSIDE the `-not $NoDeps` block, unconditionally, so broken environments are healed even when `-NoDeps` is passed):
   ```powershell
@@ -547,6 +558,9 @@ console.log('settings.json assertions passed');
     }
     # Pre-verify parent directory of settings.json exists before any write
     New-Item -ItemType Directory -Force "$env:USERPROFILE\.claude" -ErrorAction SilentlyContinue | Out-Null
+    # Clear read-only attribute if set -- prevents UnauthorizedAccessException on locked-down installs
+    $settingsPath = "$env:USERPROFILE\.claude\settings.json"
+    if (Test-Path $settingsPath) { $fi = Get-Item $settingsPath; if ($fi.IsReadOnly) { $fi.IsReadOnly = $false } }
     # Remove claude-mem@thedotmack from enabledPlugins (no-op on fresh installs)
     $cmNodeScript = @'
 const f=require('os').homedir()+'/.claude/settings.json';
@@ -649,7 +663,8 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
     }
     # Version fallback chain: remote fetch -> local VERSION file -> "1.0.0" sentinel
     $localVerPath = Join-Path $PSScriptRoot 'VERSION'
-    $localVer = if (Test-Path $localVerPath) { (Get-Content $localVerPath -Raw).Trim() } else { $null }
+    # .Trim() handles both LF and CRLF (strips \r\n and spaces); TrimEnd redundant but explicit for Windows CRLF checkouts
+    $localVer = if (Test-Path $localVerPath) { (Get-Content $localVerPath -Raw).Trim().TrimEnd("`r`n") } else { $null }
     # Reject non-semver content to prevent path injection from malformed VERSION file
     if ($localVer -and $localVer -notmatch '^\d+\.\d+\.\d+') { $localVer = $null }
     $ccVersion = if ($RemoteVersion) { $RemoteVersion } elseif ($localVer) { $localVer } else { "1.0.0" }
@@ -721,15 +736,19 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
   Run after the installer block is written:
 
   ```powershell
-  $ccVersion = if ($RemoteVersion) { $RemoteVersion } else { "1.0.0" }
+  $localVerPath = Join-Path $PSScriptRoot 'VERSION'
+  $localVer = if (Test-Path $localVerPath) { (Get-Content $localVerPath -Raw).Trim().TrimEnd("`r`n") } else { $null }
+  if ($localVer -and $localVer -notmatch '^\d+\.\d+\.\d+') { $localVer = $null }
+  $ccVersion = if ($RemoteVersion) { $RemoteVersion } elseif ($localVer) { $localVer } else { "1.0.0" }
   $pluginDir = "$env:USERPROFILE\.claude\plugins\cache\code-conductor\code-conductor\$ccVersion"
   if (-not (Test-Path "$pluginDir\.claude-plugin\plugin.json")) {
     throw "ERROR: plugin.json not created at $pluginDir\.claude-plugin\plugin.json"
   }
   $pj = Get-Content "$pluginDir\.claude-plugin\plugin.json" -Raw -Encoding utf8 | ConvertFrom-Json
   @('name','version','description','author') | ForEach-Object {
-    if (-not $pj.$_) { throw "plugin.json missing field: $_" }
+    if (-not ($pj.PSObject.Properties.Name -contains $_)) { throw "plugin.json missing required field: $_" }
   }
+  if (-not $pj.author.name) { throw "plugin.json author.name is missing or empty" }
   # Parity assertion: version field must exactly match the runtime $ccVersion
   if ($pj.version -ne $ccVersion) {
     throw "plugin.json version '$($pj.version)' does not match expected '$ccVersion'"
@@ -1003,7 +1022,10 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
 
   **Post-install plugin list query (CLI structural integrity check):** Before starting the live session, run this offline automatable verification using the same JSON engine as the installer:
   ```bash
-  _cc_ver="${REMOTE_VERSION:-1.0.0}"
+  _installer_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd || echo ".")"
+  _local_ver="$(cat "${_installer_dir}/VERSION" 2>/dev/null | tr -d '\r\n ')"
+  echo "${_local_ver}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+' || _local_ver=""
+  _cc_ver="${REMOTE_VERSION:-${_local_ver:-1.0.0}}"
   node -e "
 const base=require('os').homedir()+'/.claude/plugins/cache/code-conductor/code-conductor/${_cc_ver}';
 const pj=JSON.parse(require('fs').readFileSync(base+'/.claude-plugin/plugin.json','utf8'));
