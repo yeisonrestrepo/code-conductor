@@ -1072,6 +1072,24 @@ if [ "$INSTALL_PROJECT" = true ]; then
   PROJ_DIR=".claude"
   mkdir -p "${PROJ_DIR}/commands" "${PROJ_DIR}/hooks" "${PROJ_DIR}/memory"
 
+  if [ ! -f "CLAUDE.md" ]; then
+    echo "Error: install.sh must be run from the repository root (CLAUDE.md not found)." >&2
+    exit 1
+  fi
+
+  # Parent-directory warning: Guard 4 blocks absolute Read paths if repo is cloned inside
+  # a directory named graphify-out or node_modules. Non-fatal — install proceeds.
+  _oifs="$IFS"; IFS='/'
+  for _component in $PWD; do
+    case "$_component" in
+      graphify-out|node_modules)
+        echo "Warning: repository is cloned inside a directory named '$_component'. Guard 4 may produce false positives on absolute Read paths. See README for details." >&2
+        break
+        ;;
+    esac
+  done
+  IFS="$_oifs"; unset _component _oifs
+
   download "project-template/CLAUDE.md"                  "CLAUDE.md"                            false
   download "project-template/.claude/settings.json"      "${PROJ_DIR}/settings.json"            false
   download "project-template/.claude/memory/project.md"  "${PROJ_DIR}/memory/project.md"        false
@@ -1080,7 +1098,7 @@ if [ "$INSTALL_PROJECT" = true ]; then
     download "project-template/.claude/commands/${cmd}.md" "${PROJ_DIR}/commands/${cmd}.md"
   done
 
-  download "project-template/.claude/hooks/pre-tool-use.sh"  "${PROJ_DIR}/hooks/pre-tool-use.sh"
+  download "project-template/.claude/hooks/pre-tool-use.sh"  "${PROJ_DIR}/hooks/pre-tool-use.sh"  false
   download "project-template/.claude/hooks/post-compact.sh"  "${PROJ_DIR}/hooks/post-compact.sh"
 
   chmod +x "${PROJ_DIR}/hooks/pre-tool-use.sh" "${PROJ_DIR}/hooks/post-compact.sh"
