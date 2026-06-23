@@ -5,7 +5,7 @@ set -euo pipefail
 
 # ── Guard 1: Large-file Read without limit ─────────────────────────────────────
 if [ "${CLAUDE_TOOL_NAME:-}" = "Read" ]; then
-  READ_PATH=$(echo "${CLAUDE_TOOL_INPUT:-}" | grep -o '"file_path":"[^"]*"' | head -1 | sed 's/"file_path":"//;s/"//')
+  READ_PATH=$(echo "${CLAUDE_TOOL_INPUT:-}" | grep -o '"file_path":"[^"]*"' | head -1 | sed 's/"file_path":"//;s/"//' || true)
   if [ -n "$READ_PATH" ] && [ -f "$READ_PATH" ]; then
     LINE_COUNT=$(wc -l < "$READ_PATH" 2>/dev/null || echo "0")
     HAS_LIMIT=$(echo "${CLAUDE_TOOL_INPUT:-}" | grep -c '"limit"' || true)
@@ -24,6 +24,29 @@ if [ "${CLAUDE_TOOL_NAME:-}" = "Read" ]; then
       exit 1
     fi
   fi
+fi
+
+# ── Guard 4 — block Read on graphify-out/ and node_modules/ (BUG-017) ─────────────────────
+# To reset to GitHub upstream: delete .claude/hooks/pre-tool-use.sh, then re-run installer.
+if [ "$CLAUDE_TOOL_NAME" = "Read" ]; then
+    _g4_result=$(printf '%s' "$CLAUDE_TOOL_INPUT" | python3 -c '
+import json, sys, posixpath
+raw = sys.stdin.buffer.read().decode("utf-8", errors="replace")
+d = json.loads(raw)
+fp = d.get("file_path", "").strip()
+fp_n = posixpath.normpath(fp.replace("\\", "/"))
+parts = [p.lower() for p in fp_n.split("/") if p and p != "."]
+blocked = {"graphify-out", "node_modules"}
+print("BLOCK" if any(p in blocked for p in parts) else "OK")
+' 2>/dev/null) || true
+    if [ "$_g4_result" = "BLOCK" ]; then
+        echo '{"decision":"block","reason":"Guard 4: direct reads of graphify-out/ and node_modules/ are forbidden. Use Glob for existence checks or the graphify skill: /graphify query \"<question>\"."}'
+        exit 1
+    fi
+    # Debug: set CC_GUARD4_DEBUG=1 to log fail-open events to stderr for diagnostics.
+    if [ -n "${CC_GUARD4_DEBUG:-}" ] && [ "$_g4_result" != "OK" ]; then
+        printf '[Guard 4 debug] fail-open: _g4_result="%s"\n' "$_g4_result" >&2
+    fi
 fi
 
 # ── Guard 2: Duplicate file creation ──────────────────────────────────────────
