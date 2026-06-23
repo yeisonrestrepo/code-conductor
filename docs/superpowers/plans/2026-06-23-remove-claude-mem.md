@@ -11,6 +11,7 @@
 ## Global Constraints
 
 - JSON output: 2-space indentation + trailing newline (`JSON.stringify(obj, null, 2) + '\n'`). No minification.
+- UTF-8 without BOM: all JSON file writes must produce UTF-8 without BOM. PS 5.1 defaults to UTF-16 LE BOM — never use `Out-File`, `Set-Content`, or `Add-Content` for JSON files. For `plugin.json`, use `[System.IO.File]::WriteAllText(path, content, [System.Text.UTF8Encoding]::new($false))`. For `settings.json`, all writes go through Node.js `writeFileSync(f, ..., 'utf8')` which never emits BOM. For backup/restore operations, use `Copy-Item` (byte-for-byte copy, preserves original encoding).
 - No `jq` assumption: all `settings.json` manipulation uses `node -e` inline scripts.
 - `set -euo pipefail` compatibility: every `node -e` call prefixed with `command -v node >/dev/null 2>&1 &&`; every non-fatal command suffixed with `|| true`; the uninstall call prefixed with `command -v npx >/dev/null 2>&1 &&`. **Non-interactive mandate:** the full uninstall invocation must be `CI=1 npx --yes claude-mem uninstall --yes` — `CI=1` is a Node.js/npm environment flag that suppresses all interactive prompts from npx and npm (required for agentic/automated execution that has no TTY); the first `--yes` tells npx to auto-accept package installs without prompting; the second `--yes` is passed to `claude-mem uninstall` itself to suppress its own confirmation prompt. Omitting either flag risks the process hanging indefinitely waiting for input that will never arrive.
 - `node -e` JSON resilience: all `JSON.parse` calls wrapped in `try/catch`; malformed or empty `settings.json` falls back to `{}` without aborting.
@@ -33,7 +34,7 @@
 - Backup file cleanup policy: `settings.json.bak` is created (or overwritten) at the start of each installer run. It is auto-deleted by the T-002-C / T-003-C assertion steps immediately after all assertions pass (the backup is only needed as a recovery artifact if the installer fails before that point). Manual recovery path if auto-delete did not run: bash `[ -s "${HOME}/.claude/settings.json.bak" ] && cp "${HOME}/.claude/settings.json.bak" "${HOME}/.claude/settings.json"` / PS `Copy-Item "$env:USERPROFILE\.claude\settings.json.bak" "$env:USERPROFILE\.claude\settings.json" -Force`. Never delete the backup before T-002-C / T-003-C assertions complete; those steps delete it on success.
 - Version fallback chain (offline development ONLY): `REMOTE_VERSION → local VERSION file → "1.0.0"`. The VERSION file step is consulted ONLY when `REMOTE_VERSION` is unset or empty (remote fetch returned nothing). If the remote fetch SUCCEEDS and returns a stale published tag (e.g., `1.13.0`), the local `VERSION` file is NOT consulted - the remote result wins. This means the VERSION file fallback resolves offline machines but does NOT resolve the pre-release testing scenario where the remote returns an old published tag. For pre-release local testing the developer MUST set `REMOTE_VERSION=1.14.0` explicitly (see Local testing constraint). Bash expression (use absolute installer dir to prevent CWD-relative path ambiguity; `tr -d '\r\n '` explicitly strips CR for CRLF checkouts): `_installer_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd || echo ".")"; _local_ver="$(cat "${_installer_dir}/VERSION" 2>/dev/null | tr -d '\r\n ')"; echo "${_local_ver}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+' || _local_ver=""; _cc_ver="${REMOTE_VERSION:-${_local_ver:-1.0.0}}"`. PS expression (`.Trim().TrimEnd("\`r\`n")` explicitly strips CRLF; `$PSScriptRoot` is always absolute in PS 5.1): `$localVer = if (Test-Path (Join-Path $PSScriptRoot 'VERSION')) { (Get-Content (Join-Path $PSScriptRoot 'VERSION') -Raw).Trim().TrimEnd("\`r\`n") } else { $null }; if ($localVer -and $localVer -notmatch '^\d+\.\d+\.\d+') { $localVer = $null }; $ccVersion = if ($RemoteVersion) { $RemoteVersion } elseif ($localVer) { $localVer } else { '1.0.0' }`.
 - OS permissions error handling: if `~/.claude` exists but is not writable (owned by root on shared machines, corporate policy), all `node -e` mutations silently fail via `2>/dev/null || true` and the missing entries are caught by T-002-C / T-003-C assertions. Bash explicit check before the node call: `if [ -e "${HOME}/.claude" ] && [ ! -w "${HOME}/.claude" ]; then warn "${HOME}/.claude not writable -- settings.json mutations will fail (run: sudo chown $USER ${HOME}/.claude)"; fi`. PS equivalent: the T-003-B-0 write-permission probe (create and immediately delete a `.perm-test-*` temp file in `$pluginRoot`) is the authoritative PS detection mechanism - it catches both `[System.IO.IOException]` and `[System.UnauthorizedAccessException]` and emits `Write-Warn`. No additional PS shell-level check is needed; `Test-Path` has no parameter that tests write permissions, so the probe is the only reliable method.
-- Trailing newline verification fallback: `xxd` may be absent in minimal environments. Use the three-tool fallback chain in T-002-C: `xxd` (primary) → `od -An -tx1` (POSIX, available on Alpine/BusyBox/BSD) → `node -e ReadAllBytes` (always available since Node.js is a hard prerequisite). PS T-003-C uses `[System.IO.File]::ReadAllBytes` and does not depend on any Unix tool.
+- Trailing newline verification fallback: `xxd` may be absent in minimal environments. Use the three-tool fallback chain in T-002-C: `xxd` (primary, available on macOS/Debian/Ubuntu) → `tail -c 1 | od -An -tx1` (POSIX; BusyBox/Alpine-safe; reads only the last byte) → bare `od -An -tx1` (wider POSIX fallback) → `node -e Buffer.readAllBytes` (last resort; always available when Node.js is present). On PS (T-003-C), `[System.IO.File]::ReadAllBytes` is a .NET BCL method present in every PS 5.1 environment on Windows — it never requires `xxd` or any Unix utility and is the authoritative PS byte-level check.
 
 ---
 
@@ -246,9 +247,10 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
     fi
   else
     _node_ok=false
+    warn "Node.js not found on PATH -- plugin injection and settings.json merge skipped; install Node.js v16+ and re-run"
   fi
   ```
-  Guard all subsequent `node -e` calls in this block with `[ "$_node_ok" = true ] &&`.
+  Guard all subsequent `node -e` calls in this block with `[ "$_node_ok" = true ] &&`. Also add an npx absence warning immediately before the unconditional uninstall line: `command -v npx >/dev/null 2>&1 || warn "npx not found -- claude-mem uninstall skipped (no Node.js/npm on PATH)"` placed just before `command -v npx >/dev/null 2>&1 && CI=1 npx ...`.
 
 - [ ] [T-002-B] **Add code-conductor plugin creation block after the global settings merge**
 
@@ -566,6 +568,7 @@ console.log('settings.json assertions passed');
     # Clear read-only attribute if set -- prevents UnauthorizedAccessException on locked-down installs
     $settingsPath = "$env:USERPROFILE\.claude\settings.json"
     if (Test-Path $settingsPath) { $fi = Get-Item $settingsPath; if ($fi.IsReadOnly) { $fi.IsReadOnly = $false } }
+    # NOTE: backup + try/finally restore from T-003-A-1 must be inserted here, immediately before $cmNodeScript execution.
     # Remove claude-mem@thedotmack from enabledPlugins (no-op on fresh installs)
     $cmNodeScript = @'
 const f=require('os').homedir()+'/.claude/settings.json';
@@ -584,8 +587,14 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
       Get-ChildItem $superDir -Directory -Force -ErrorAction SilentlyContinue |
         ForEach-Object {
           $t = Join-Path $_.FullName "skills\critical-review"
-          if (Test-Path $t) { Remove-Item -Recurse -Force $t }
-        }
+          if (Test-Path $t) {
+            try { Remove-Item -Recurse -Force $t -ErrorAction Stop }
+            catch [System.IO.IOException] {
+              Start-Sleep -Seconds 2
+              try { Remove-Item -Recurse -Force $t -ErrorAction Stop }
+              catch { Write-Warn "Could not remove locked skill dir $t -- close Claude Code and re-run" }
+            }
+          }
     }
   ```
 
@@ -609,9 +618,11 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
     $nodeMajor = [int](node -e "process.stdout.write(String(process.version.split('.')[0].replace('v','')))" 2>$null)
     if ($nodeMajor -ge 16) { $nodeOk = $true }
     else { Write-Warn "Node.js v$nodeMajor detected -- v16+ required for plugin injection; skipping settings.json update" }
+  } else {
+    Write-Warn "Node.js not found on PATH -- plugin injection and settings.json merge skipped; install Node.js v16+ and re-run"
   }
   ```
-  Gate all subsequent `node -e` calls in this block with `if ($nodeOk) { ... }`.
+  Gate all subsequent `node -e` calls in this block with `if ($nodeOk) { ... }`. Also add an npx absence warning in the unconditional block (T-003-A): replace `if (Get-Command npx -ErrorAction SilentlyContinue) { ... }` with: `if (Get-Command npx -ErrorAction SilentlyContinue) { ... } else { Write-Warn "npx not found -- claude-mem uninstall skipped (no Node.js/npm on PATH)" }`.
 
   **Locked directory (active Claude Code process):** If Claude Code is running while the installer executes, the versioned plugin dir may be held open. The wipe step (`Remove-Item -Recurse -Force $pluginDir`) will throw `IOException` on locked files. Detection: catch `[System.IO.IOException]` separately from `[System.UnauthorizedAccessException]`. Mitigation: close Claude Code before running the installer, or rename the locked dir as a fallback. Add an upfront process check before the try block (PS side counterpart to the bash `pgrep` check added in T-002-B):
   ```powershell
@@ -1058,7 +1069,7 @@ console.log('Post-install check OK: '+pj.name+' v'+pj.version+', 3 skills readab
 
 - [ ] `npm test` passes after each commit (T-002-D, T-003-D, T-004-D) - 142 passed, 3 skipped
 - [ ] No test file asserts on "claude-mem" text (pre-confirmed by grep - no updates needed)
-- [ ] Manual smoke: run `bash install.sh --no-deps` on a clean machine - no claude-mem step runs, no plugin created (NoDeps guard)
+- [ ] Manual smoke: run `bash install.sh --no-deps` on a clean machine - claude-mem uninstall runs unconditionally (no-op if never installed); no plugin created (plugin creation is inside NoDeps guard)
 - [ ] Manual smoke: run `bash install.sh` - `~/.claude/plugins/cache/code-conductor/code-conductor/<REMOTE_VERSION>/.claude-plugin/plugin.json` exists with correct 4-field schema
 
 ## Commit Order
@@ -1074,7 +1085,7 @@ Total: 5 commits.
 ## Identified Risks
 
 1. **plugin.json heredoc trailing newline**: bash `cat > file <<'EOF'` appends a final newline from the heredoc - the file will end with `}\n`. This matches the spec requirement. `xxd` may be absent in minimal environments (Alpine, BusyBox, distroless containers). Use this tool fallback chain in T-002-C: (1) `xxd ... | awk 'END{print $NF}'` - primary; (2) `od -An -tx1 ... | awk 'END{print $NF}'` - POSIX fallback present on Alpine/BSDs; (3) `node -e "const b=readFileSync(...); if(b[b.length-1]!==0x0a)throw..."` - always available since Node.js is a hard prerequisite. If all three tools are absent the check is skipped; the PS T-003-C byte-level `ReadAllBytes` check is the authoritative verification in that case.
-2. **PS `node -e` here-string quoting**: The single-quoted `@'...'@` here-string in PS 5.1 does not expand `$` - JS `$` signs inside the script are safe. Verify after install that `settings.json` contains `"code-conductor@code-conductor": true` and lacks `"claude-mem@thedotmack"`.
+2. **PS `node -e` here-string quoting**: The single-quoted `@'...'@` here-string in PS 5.1 is completely literal — no character expansion occurs (`$`, backtick, `\` are all literal). The ONLY termination rule is `'@` appearing at column 0 of any line (no leading whitespace permitted). Single quotes inside the body do NOT end the string; they are safe. The current node scripts contain `require('os')`, `process.exit(0)`, etc. — these single quotes are at non-zero columns and are safe. If editing these scripts, verify no line begins with `'@` (even a trailing `'@` on an otherwise-indented line would end the string if positioned at column 0). Verify after install that `settings.json` contains `"code-conductor@code-conductor": true` and lacks `"claude-mem@thedotmack"`.
 3. **settings.json race**: both the key-removal and key-addition `node -e` calls read and write `settings.json` in sequence. On a fresh machine where `settings.json` was just created by `_merge_settings_json`, the file exists before the key-addition call. No race on single-threaded install.
-4. **SKIP_DEPS guard split**: the uninstall+cleanup is in the existing `SKIP_DEPS` block; the plugin creation is in a second `if [ "$SKIP_DEPS" = false ]` block after global file downloads. Both are skipped when `--no-deps` is passed. Verify by running `bash install.sh --no-deps` and confirming no `code-conductor` dir is created.
+4. **SKIP_DEPS guard split**: the uninstall+cleanup is OUTSIDE the `SKIP_DEPS` / `-NoDeps` guard (unconditional healing — runs even when `--no-deps` is passed); the plugin creation is INSIDE the `if [ "$SKIP_DEPS" = false ]` / `if (-not $NoDeps)` block. Verify by running `bash install.sh --no-deps` and confirming (a) the claude-mem uninstall DID run (no-op if never installed) and (b) no `code-conductor` plugin dir was created.
 5. **Global skills not yet downloaded at SKIP_DEPS time**: The `cp` calls in the plugin block (T-002-B section 2) reference `${GLOBAL_DIR}/skills/*.md`, which are written by the `download` calls above in the installer flow - the plugin block is placed AFTER those downloads, so the files exist. Confirm by checking the installer comment `# ── code-conductor plugin: wipe versioned dir and recreate` appears after `download "skills/agent-delegation.md"`.
