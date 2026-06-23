@@ -30,6 +30,9 @@
 - `settings.json` rollback procedure: if the installer fails at any point after `settings.json` has been mutated, restore from backup: bash `[ -s "${HOME}/.claude/settings.json.bak" ] && cp "${HOME}/.claude/settings.json.bak" "${HOME}/.claude/settings.json"` / PS `if ((Get-Item "$env:USERPROFILE\.claude\settings.json.bak" -EA 0).Length -gt 0) { Copy-Item "$env:USERPROFILE\.claude\settings.json.bak" "$env:USERPROFILE\.claude\settings.json" -Force }`. The backup is created in T-002-A-1 / T-003-A-1 BEFORE any mutation. Never restore without first verifying the `.bak` is non-empty (`[ -s ... ]` / `Length -gt 0`).
 - `settings.json` absent or unwritable parent: all `node -e` scripts guard with `if(!require('fs').existsSync(f))process.exit(0)` so a missing file is a no-op. `mkdirSync(dir,{recursive:true})` before `writeFileSync` creates `~/.claude/` if absent. If `~/.claude/` cannot be created (read-only `$HOME`, restricted permissions on corporate machines), `mkdirSync` throws - this is absorbed by `2>/dev/null || true` (bash) / `2>$null` (PS), and the missing entry is flagged during T-002-C / T-003-C assertion checks.
 - Backup file cleanup policy: `settings.json.bak` is created (or overwritten) at the start of each installer run and is NOT auto-deleted on success. It persists as a recovery artifact. Manual cleanup after a verified successful install: bash `rm "${HOME}/.claude/settings.json.bak"` / PS `Remove-Item "$env:USERPROFILE\.claude\settings.json.bak"`. Never delete before confirming the active `settings.json` parses correctly. Safe to remove after 30 days or after the next successful installer run.
+- Version fallback chain (offline development): both installers must resolve version via `REMOTE_VERSION → local VERSION file → "1.0.0"`. Bash: `_cc_ver="${REMOTE_VERSION:-$(cat "$(dirname "$0")/VERSION" 2>/dev/null | tr -d '[:space:]' || echo '1.0.0')}"`. PS: `$ccVersion = if ($RemoteVersion) { $RemoteVersion } elseif (Test-Path (Join-Path $PSScriptRoot 'VERSION')) { (Get-Content (Join-Path $PSScriptRoot 'VERSION') -Raw).Trim() } else { '1.0.0' }`. This ensures a developer testing locally with an unpushed tag still uses the correct workspace version rather than the `"1.0.0"` sentinel.
+- OS permissions error handling: if `~/.claude` exists but is not writable (owned by root on shared machines, corporate policy), all `node -e` mutations silently fail via `2>/dev/null || true` and the missing entries are caught by T-002-C / T-003-C assertions. Bash explicit check: `if [ -e "${HOME}/.claude" ] && [ ! -w "${HOME}/.claude" ]; then warn "${HOME}/.claude not writable - settings.json mutations will fail (run: sudo chown $USER ${HOME}/.claude)"; fi`. PS equivalent: `if ((Test-Path "$env:USERPROFILE\.claude") -and -not (Test-Path "$env:USERPROFILE\.claude" -PathType Container -IsValid)) { Write-Warn ... }` - rely on the T-003-B-0 write-permission probe (temp file test) as the primary detection; it already emits a `Write-Warn` and leaves the flow non-fatal.
+- Trailing newline verification fallback: `xxd` may be absent in minimal environments. Use the three-tool fallback chain in T-002-C: `xxd` (primary) → `od -An -tx1` (POSIX, available on Alpine/BusyBox/BSD) → `node -e ReadAllBytes` (always available since Node.js is a hard prerequisite). PS T-003-C uses `[System.IO.File]::ReadAllBytes` and does not depend on any Unix tool.
 
 ---
 
@@ -153,7 +156,7 @@
 
 - [ ] [T-002-A-1] **Backup `settings.json` before modification (bash)**
 
-  Immediately before the node key-removal call, add this shell-level backup:
+  Immediately before the FIRST node mutation (key-removal in T-002-A), add this shell-level backup. This single backup covers ALL sequential `settings.json` mutations in the same installer run: the claude-mem key-removal (T-002-A) AND the code-conductor enabledPlugins insertion (T-002-B). Do not create a second backup between these two steps - the pre-mutation snapshot is already captured here.
   ```bash
   if [ -f "${HOME}/.claude/settings.json" ]; then
     cp "${HOME}/.claude/settings.json" "${HOME}/.claude/settings.json.bak" 2>/dev/null || true
@@ -202,7 +205,9 @@
   New (replacement - placed OUTSIDE the SKIP_DEPS block, unconditionally, so broken environments are healed even when `--no-deps` is passed):
   ```bash
     # Unconditional claude-mem removal: heals existing installs regardless of --no-deps
-    command -v npx >/dev/null 2>&1 && npx --yes claude-mem uninstall 2>/dev/null || true
+    # --yes passed to claude-mem uninstall suppresses its own interactive confirmation prompt;
+    # CI=1 suppresses any remaining npm/npx interactive prompts (non-interactive terminal guard)
+    command -v npx >/dev/null 2>&1 && CI=1 npx --yes claude-mem uninstall --yes 2>/dev/null || true
     # Pre-verify parent directory of settings.json exists before any write
     mkdir -p "${HOME}/.claude" 2>/dev/null || true
     # Remove claude-mem@thedotmack from enabledPlugins (no-op on fresh installs)
@@ -249,7 +254,11 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
   ```bash
   # ── code-conductor plugin: wipe versioned dir and recreate ────────────────────
   if [ "$SKIP_DEPS" = false ]; then
-    _cc_ver="${REMOTE_VERSION:-1.0.0}"
+    # Version fallback chain: remote fetch -> local VERSION file -> "1.0.0" sentinel
+    # Resolves $(dirname "$0") to the installer script's directory for absolute path to VERSION
+    _installer_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd || echo ".")"
+    _local_ver="$(cat "${_installer_dir}/VERSION" 2>/dev/null | tr -d '[:space:]')"
+    _cc_ver="${REMOTE_VERSION:-${_local_ver:-1.0.0}}"
     PLUGIN_DIR="${HOME}/.claude/plugins/cache/code-conductor/code-conductor/${_cc_ver}"
     # Active Claude Code process check: on Linux/macOS rm succeeds on open files (files unlinked
     # but space held until process closes). On Windows/Git Bash the wipe may leave locked files
@@ -277,6 +286,17 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
   }
 }
 PLUGINJSON
+    # Absolute path resolution guard: GLOBAL_DIR must be absolute before cp operations.
+    # If the installer is invoked from a subdirectory (e.g., bash scripts/install.sh), a
+    # relative GLOBAL_DIR would cause cp to resolve relative to CWD, not $HOME.
+    case "${GLOBAL_DIR:-}" in
+      /*) ;;  # already absolute
+      *) GLOBAL_DIR="${HOME}/.claude" ;;  # fall back to computed absolute path
+    esac
+    [ -d "${GLOBAL_DIR}/skills" ] || { warn "GLOBAL_DIR/skills not found at ${GLOBAL_DIR}/skills -- cp step may fail; verify installer ran download steps first"; }
+    # Shell-level mkdir pre-verify immediately before enabledPlugins node script write
+    # (belt-and-suspenders: the node script also calls mkdirSync but shell mkdir is more visible)
+    mkdir -p "${HOME}/.claude" 2>/dev/null || true
     # Path separator note: cp uses forward slashes on bash/macOS/Linux; on Windows Git Bash
     # forward slashes are also valid. The target SKILL.md path must use forward slashes here
     # because bash cp does not interpret backslashes as separators.
@@ -502,7 +522,8 @@ console.log('settings.json assertions passed');
     Write-Info "Removing claude-mem (no-op if never installed)..."
     # Explicit npx guard: try/catch absorbs command-not-found on Node-absent machines
     if (Get-Command npx -ErrorAction SilentlyContinue) {
-      try { $null = cmd /c "npx --yes claude-mem uninstall 2>nul" } catch {}
+      # set CI=1 suppresses npx/npm interactive prompts; --yes passed to claude-mem uninstall itself
+      try { $null = cmd /c "set CI=1 && npx --yes claude-mem uninstall --yes 2>nul" } catch {}
     }
     # Pre-verify parent directory of settings.json exists before any write
     New-Item -ItemType Directory -Force "$env:USERPROFILE\.claude" -ErrorAction SilentlyContinue | Out-Null
@@ -553,7 +574,14 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
   ```
   Gate all subsequent `node -e` calls in this block with `if ($nodeOk) { ... }`.
 
-  **Locked directory (active Claude Code process):** If Claude Code is running while the installer executes, the versioned plugin dir may be held open. The wipe step (`Remove-Item -Recurse -Force $pluginDir`) will throw `IOException` on locked files. Detection: catch `[System.IO.IOException]` separately from `[System.UnauthorizedAccessException]`. Mitigation: close Claude Code before running the installer, or rename the locked dir as a fallback:
+  **Locked directory (active Claude Code process):** If Claude Code is running while the installer executes, the versioned plugin dir may be held open. The wipe step (`Remove-Item -Recurse -Force $pluginDir`) will throw `IOException` on locked files. Detection: catch `[System.IO.IOException]` separately from `[System.UnauthorizedAccessException]`. Mitigation: close Claude Code before running the installer, or rename the locked dir as a fallback. Add an upfront process check before the try block (PS side counterpart to the bash `pgrep` check added in T-002-B):
+  ```powershell
+  # Active Claude Code process check before plugin dir wipe (PS side)
+  if (Get-Process -Name "claude" -ErrorAction SilentlyContinue) {
+    Write-Warn "Claude Code process detected -- close Claude Code before running installer to prevent IOException on plugin dir wipe"
+  }
+  ```
+  Then the guarded wipe:
   ```powershell
   try {
     if (Test-Path $pluginDir) { Remove-Item -Recurse -Force $pluginDir }
@@ -590,7 +618,10 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
   ```powershell
   # -- code-conductor plugin: wipe versioned dir and recreate --------------------
   if (-not $NoDeps) {
-    $ccVersion = if ($RemoteVersion) { $RemoteVersion } else { "1.0.0" }
+    # Version fallback chain: remote fetch -> local VERSION file -> "1.0.0" sentinel
+    $localVerPath = Join-Path $PSScriptRoot 'VERSION'
+    $localVer = if (Test-Path $localVerPath) { (Get-Content $localVerPath -Raw).Trim() } else { $null }
+    $ccVersion = if ($RemoteVersion) { $RemoteVersion } elseif ($localVer) { $localVer } else { "1.0.0" }
     $pluginDir = "$env:USERPROFILE\.claude\plugins\cache\code-conductor\code-conductor\$ccVersion"
     if (Test-Path $pluginDir) { Remove-Item -Recurse -Force $pluginDir }
     New-Item -ItemType Directory -Force "$pluginDir\.claude-plugin" | Out-Null
@@ -620,6 +651,15 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
       $pluginJsonContent + "`n",
       $pluginEnc
     )
+    # Absolute path resolution guard: verify $GLOBAL_DIR is absolute before Copy-Item.
+    # If installer is invoked from a subdirectory, a relative $GLOBAL_DIR would resolve
+    # relative to CWD, not $env:USERPROFILE. [System.IO.Path]::IsPathRooted checks for this.
+    if (-not [System.IO.Path]::IsPathRooted($GLOBAL_DIR)) {
+      $GLOBAL_DIR = "$env:USERPROFILE\.claude"
+    }
+    if (-not (Test-Path "$GLOBAL_DIR\skills")) {
+      Write-Warn "GLOBAL_DIR\skills not found at $GLOBAL_DIR\skills -- Copy-Item step may fail; verify download steps ran first"
+    }
     # Path separator note: Copy-Item on PS 5.1/Windows uses backslashes here because
     # $pluginDir and $GLOBAL_DIR were set with backslash separators. Claude Code plugin
     # resolution on Windows reads SKILL.md via its own path normalization - backslash
