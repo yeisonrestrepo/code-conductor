@@ -427,6 +427,22 @@ if ($Project) {
     New-Item -ItemType Directory -Path "$projDir\$sub" -Force | Out-Null
   }
 
+  if (-not (Test-Path "CLAUDE.md")) {
+    Write-Host -ForegroundColor Red "Error: install.ps1 must be run from the repository root (CLAUDE.md not found)."
+    exit 1
+  }
+
+  # Parent-directory warning: Guard 4 blocks absolute Read paths if repo is cloned inside
+  # a directory named graphify-out or node_modules. Non-fatal -- install proceeds.
+  $pwdParts = ($pwd.Path -split '[/\\]') | Where-Object { $_ -ne '' }
+  foreach ($part in $pwdParts) {
+    if ($part -eq 'graphify-out' -or $part -eq 'node_modules') {
+      Write-Host "Warning: repository is cloned inside a directory named '$part'. Guard 4 may produce false positives on absolute Read paths. See README for details." -ForegroundColor Yellow
+      break
+    }
+  }
+  Remove-Variable -Name pwdParts, part -ErrorAction SilentlyContinue
+
   Save-RemoteFile "project-template/CLAUDE.md"                 "CLAUDE.md"                      $false
   Save-RemoteFile "project-template/.claude/settings.json"     "$projDir\settings.json"          $false
   Save-RemoteFile "project-template/.claude/memory/project.md" "$projDir\memory\project.md"      $false
@@ -435,7 +451,7 @@ if ($Project) {
     Save-RemoteFile "project-template/.claude/commands/$cmd.md" "$projDir\commands\$cmd.md"
   }
 
-  Save-RemoteFile "project-template/.claude/hooks/pre-tool-use.sh"  "$projDir\hooks\pre-tool-use.sh"
+  Save-RemoteFile "project-template/.claude/hooks/pre-tool-use.sh"  "$projDir\hooks\pre-tool-use.sh"  $false
   Save-RemoteFile "project-template/.claude/hooks/post-compact.sh"  "$projDir\hooks\post-compact.sh"
 
   # Project verbosity hook copy + settings.json merge (T-005-D)
