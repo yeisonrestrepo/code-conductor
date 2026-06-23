@@ -39,6 +39,13 @@
 **Interfaces:**
 - Produces: 6 files with "claude-mem" references replaced by `.claude/memory/project.md`
 
+**Punctuation matching rules (critical — mismatches silently fail Edit tool):**
+- The separator in T-001-A and T-001-D is U+2014 EM DASH (`—`), NOT a standard hyphen-minus (`-`) or en-dash (`–`). Copy-paste the character from this plan; do not retype it.
+- Backticks in `old_string` are U+0060 GRAVE ACCENT (`` ` ``), not U+2018/U+2019 curly quotes.
+- The slash `/` in `claude-mem` / `.claude/memory/project.md` is U+002F SOLIDUS.
+- Spaces around `—` are regular U+0020 spaces (one space each side).
+- Before running any Edit, verify the exact byte sequence with: `grep -Pn '\x{2014}' <file>` (should match line 25 in global/CLAUDE.md and line 143 in README.md).
+
 - [ ] [T-001-A] **Edit `global/CLAUDE.md` line 25**
 
   Old line:
@@ -124,7 +131,15 @@
 
 **Interfaces:**
 - Consumes: `${GLOBAL_DIR}/skills/critical-review.md`, `${GLOBAL_DIR}/skills/memory-first.md`, `${GLOBAL_DIR}/skills/agent-delegation.md` (written by the `download` calls at lines 965–969, which run before the new plugin block)
-- Produces: `~/.claude/plugins/cache/code-conductor/code-conductor/1.0.0/` directory on the user's machine; `enabledPlugins["code-conductor@code-conductor"]: true` in `~/.claude/settings.json`
+- Produces: `~/.claude/plugins/cache/code-conductor/code-conductor/<REMOTE_VERSION>/` directory on the user's machine (version resolved at runtime from `${REMOTE_VERSION:-1.0.0}`); `enabledPlugins["code-conductor@code-conductor"]: true` in `~/.claude/settings.json`
+
+- [ ] [T-002-A-0] **Read `install.sh` lines 183–205 before editing**
+
+  Before issuing any Edit call, read the exact source text:
+  ```
+  Read({ file_path: "install.sh", offset: 183, limit: 23 })
+  ```
+  Verify the output contains `install_dep "claude-mem"` and the `if [ "$HAS_NODE" = true ]` npm-install block. If the text differs from the `old_string` below (e.g. extra blank lines, different indentation), update the `old_string` in T-002-A to match before proceeding. Do not skip this step — Edit tool failures caused by truncated or mismatched blocks are the most common failure mode for this task.
 
 - [ ] [T-002-A] **Remove the claude-mem install block from the SKIP_DEPS section**
 
@@ -263,7 +278,15 @@ console.log('plugin.json OK: ' + pj.name + ' v' + pj.version);
 
 **Interfaces:**
 - Consumes: `$GLOBAL_DIR\skills\critical-review.md`, `$GLOBAL_DIR\skills\memory-first.md`, `$GLOBAL_DIR\skills\agent-delegation.md` (written by `Save-RemoteFile` calls at lines 401–405, which run before the new plugin block)
-- Produces: `%USERPROFILE%\.claude\plugins\cache\code-conductor\code-conductor\1.0.0\` on Windows; `enabledPlugins["code-conductor@code-conductor"]: true` in `~/.claude/settings.json`
+- Produces: `%USERPROFILE%\.claude\plugins\cache\code-conductor\code-conductor\<RemoteVersion>\` on Windows (version resolved at runtime from `if ($RemoteVersion) { $RemoteVersion } else { "1.0.0" }`); `enabledPlugins["code-conductor@code-conductor"]: true` in `~/.claude/settings.json`
+
+- [ ] [T-003-A-0] **Read `install.ps1` lines 123–170 before editing**
+
+  Before issuing any Edit call, read the exact source text:
+  ```
+  Read({ file_path: "install.ps1", offset: 123, limit: 48 })
+  ```
+  Verify the output contains `Write-Info "Installing claude-mem..."` and the winget fallback block. If the text differs from the `old_string` below, update the `old_string` in T-003-A to match before proceeding. Backtick continuation characters in PS (`` ` ``) must be preserved exactly — they are U+0060 GRAVE ACCENT, not U+2018/U+2019 curly quotes.
 
 - [ ] [T-003-A] **Remove the claude-mem install block from the `-NoDeps` section**
 
@@ -468,17 +491,29 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
 
 - [ ] [T-004-A] **Edit `VERSION`**
 
-  Use the Edit tool:
+  First read the file to confirm its sole content:
+  ```
+  Read({ file_path: "VERSION" })
+  ```
+  Expected content: a single line `1.13.0` (no surrounding text). Then use the Edit tool:
   - `file_path`: `VERSION`
   - `old_string`: `1.13.0`
   - `new_string`: `1.14.0`
 
+  Verify with `Read({ file_path: "VERSION" })` — must contain only `1.14.0`.
+
 - [ ] [T-004-B] **Edit `package.json` version field**
 
-  Use the Edit tool:
+  First read the relevant lines to confirm uniqueness of the match:
+  ```
+  Read({ file_path: "package.json", offset: 1, limit: 10 })
+  ```
+  Confirm the `"version"` key appears exactly once in the file (grep: `grep -c '"version"' package.json` → `1`). Then use the Edit tool:
   - `file_path`: `package.json`
   - `old_string`: `"version": "1.13.0"`
   - `new_string`: `"version": "1.14.0"`
+
+  Verify: `grep '"version"' package.json` → `"version": "1.14.0"`.
 
 - [ ] [T-004-C] **Prepend `[1.14.0]` entry to `CHANGELOG.md`**
 
