@@ -61,6 +61,26 @@ Use this checklist when your environment restricts hook execution (restricted Po
 5. **bash not in PATH (Windows)**: install [Git for Windows](https://gitforwindows.org/), add its `bin/` to PATH, then re-run `npm test` to confirm the guard3 suite no longer skips.
 6. **Verify LF line endings in the written hook**: `node --input-type=commonjs -e "const f=require('fs').readFileSync('.git/hooks/pre-commit','utf8');if(f.includes('\r'))throw new Error('CRLF');console.log('LF only - OK')"` — a CRLF result means Git for Windows bash will fail to parse the shebang; re-run `install.ps1` to normalize.
 
+### Resetting the Pre-Commit Hook to Upstream
+
+If your local `.claude/hooks/pre-tool-use.sh` has diverged (e.g., manual edits, failed
+partial upgrade), delete it and re-run the installer to pull the current version from the
+project template:
+
+**bash / macOS / Linux:**
+```bash
+rm .claude/hooks/pre-tool-use.sh
+bash install.sh -p
+```
+
+**PowerShell (Windows):**
+```powershell
+Remove-Item .claude\hooks\pre-tool-use.sh
+.\install.ps1 -Project
+```
+
+The installers are idempotent and will not overwrite other hook files or project settings.
+
 ---
 
 ## License

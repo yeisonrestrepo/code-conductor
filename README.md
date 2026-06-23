@@ -53,6 +53,8 @@ By default, the installer installs only the global core files. Use flags to exte
 
 Re-run the same install command. User-configured files are never overwritten; agent-managed files are always updated.
 
+> **Note:** Do not clone this repository into a parent directory named `graphify-out` or `node_modules`. Guard 4 checks path components and will block agent `Read` calls on source files if the repository root is nested inside such a directory. Use relative paths if this layout is unavoidable.
+
 ---
 
 ## How It Works
