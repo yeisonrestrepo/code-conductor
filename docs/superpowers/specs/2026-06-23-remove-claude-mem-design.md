@@ -102,6 +102,7 @@ These run **after** the wipe step and **before** any file write.
 - `description`: free-text; non-empty string required.
 - `author.name`: must match the author namespace directory (`code-conductor`).
 - No other fields (`homepage`, `repository`, `license`, `keywords`) are required, though they are harmless if present.
+- **JSON formatting:** Both `plugin.json` and any `settings.json` writes use **2-space indentation** with a trailing newline (`JSON.stringify(obj, null, 2) + '\n'`). Minified single-line output is prohibited — Claude Code and human reviewers both read these files directly. Existing `settings.json` content must be preserved; only the targeted keys are added or removed.
 
 SQLite replacement (FEAT-005, ARCH-008) is explicitly deferred to a separate spec.
 
@@ -124,8 +125,20 @@ SQLite replacement (FEAT-005, ARCH-008) is explicitly deferred to a separate spe
   - **`install.sh` (exact form):** `npx claude-mem uninstall --yes 2>/dev/null || true` — `2>/dev/null` suppresses stderr noise; `|| true` ensures the exit code is always 0 so `set -euo pipefail` does not abort the script. Both guards are required together.
   - **`install.ps1` (exact form):** `try { $null = cmd /c "npx claude-mem uninstall --yes 2>nul" } catch {}` — `cmd /c` delegates to the Windows command interpreter, which handles `npx` correctly with `legacy-peer-deps`. The `try/catch` absorbs any terminating exception (including command-not-found when Node.js is absent). `$null =` discards stdout. `2>nul` suppresses cmd-level stderr. Do **not** use `-ErrorAction SilentlyContinue` on native exe calls — PS 5.1 does not convert native exit codes to terminating exceptions, so `-ErrorAction` has no effect on them; command-not-found errors are thrown as terminating exceptions that only `try/catch` can absorb.
 - `~/.claude/settings.json` does not exist — the `_merge_settings_json` function already handles creation; no special case needed.
-- **`settings.json` key removal without `jq`:** Neither installer may assume `jq` is present. The removal of `"claude-mem@thedotmack"` from `enabledPlugins` must use the same `node -e` inline script mechanism already used by `_merge_settings_json` in the existing installers — read the file with `fs.readFileSync`, parse with `JSON.parse`, delete the key (`delete obj.enabledPlugins["claude-mem@thedotmack"]`), and write back with `JSON.stringify(obj, null, 2)`. If `node` is absent (fresh machine, `--no-deps` run), skip silently — the key is already absent on a fresh machine.
-- **Residual claude-mem artifacts:** The `npx claude-mem uninstall --yes` command is the authoritative cleanup mechanism; it removes the plugin's hook registration, the `~/.claude/plugins/cache/thedotmack/claude-mem/` directory, and any MCP worker state. The installers additionally: (a) remove the `"claude-mem@thedotmack"` key from `enabledPlugins` in `~/.claude/settings.json` via the `node -e` mechanism above; (b) glob-delete the orphaned superpowers-cached `critical-review` skill directory. No other env vars, cached metadata, or configuration blocks are known to be left behind by claude-mem and no further purge is specified.
+- **`settings.json` key removal without `jq`:** Neither installer may assume `jq` is present. The removal of `"claude-mem@thedotmack"` from `enabledPlugins` must use the same `node -e` inline script mechanism already used by `_merge_settings_json` in the existing installers. The inline script must guard against a missing `enabledPlugins` object to avoid a `TypeError: Cannot read properties of undefined`:
+  ```js
+  const f = require('os').homedir() + '/.claude/settings.json';
+  const obj = JSON.parse(require('fs').readFileSync(f, 'utf8'));
+  if (obj.enabledPlugins) { delete obj.enabledPlugins['claude-mem@thedotmack']; }
+  require('fs').writeFileSync(f, JSON.stringify(obj, null, 2) + '\n');
+  ```
+  The `if (obj.enabledPlugins)` guard makes the delete a no-op on fresh machines where the key was never written. Written output uses `JSON.stringify(obj, null, 2)` (2-space indentation) to match the existing `settings.json` format. A trailing newline is appended.
+- **`node` absence guard in `install.sh`:** Under `set -euo pipefail`, the `node -e` call must be prefixed with `command -v node >/dev/null 2>&1 &&` so the entire expression is skipped (exit 0) when Node.js is absent, rather than aborting the script on command-not-found:
+  ```bash
+  command -v node >/dev/null 2>&1 && node -e "..." || true
+  ```
+  The trailing `|| true` is redundant when `command -v` short-circuits, but is kept as a belt-and-suspenders guard if `node` exists but the script itself exits non-zero.
+- **Residual claude-mem artifacts:** The `npx claude-mem uninstall --yes` command is the authoritative cleanup mechanism; it removes the plugin's hook registration, the `~/.claude/plugins/cache/thedotmack/claude-mem/` directory, and any MCP worker state. The installers additionally: (a) remove the `"claude-mem@thedotmack"` key from `enabledPlugins` via the `node -e` mechanism above; (b) glob-delete the orphaned superpowers-cached `critical-review` skill directory. `memory-first` and `agent-delegation` were **never** placed in the superpowers cache (confirmed: only `critical-review` was added there as a temporary fix) — no cleanup of those names is required. No other env vars, cached metadata, or configuration blocks are known to be left behind by claude-mem and no further purge is specified.
 - **Code-conductor plugin directory wipe on re-run:** `rm -rf "${PLUGIN_DIR}" 2>/dev/null || true` (bash) / `if (Test-Path $pluginDir) { Remove-Item -Recurse -Force $pluginDir }` (PS). The explicit existence check in PS is required because `Remove-Item -Recurse -Force` on a non-existent path throws a terminating error in PS 5.1 even with `-Force`; wrapping in `if (Test-Path …)` is the idiomatic suppression. In bash, `2>/dev/null || true` is sufficient since `rm -rf` exits 0 on absent paths. The wipe is scoped to the versioned subdirectory only; parent directories are left intact.
 - **Superpowers glob-delete (PS 5.1):** PowerShell 5.1 does not expand mid-path wildcards in `Remove-Item` paths directly (e.g. `Remove-Item "…/superpowers/*/skills/critical-review" -Recurse` silently does nothing). The correct mechanism is a `Get-ChildItem` pipeline expansion:
   ```powershell
@@ -193,6 +206,8 @@ The version bump commit is the final commit in the implementation sequence, afte
 | `skills/agent-delegation.md` | Source of truth; installer also copies to plugin dir |
 | `~/.claude/plugins/cache/code-conductor/code-conductor/1.0.0/` | Created by installer (not in repo) |
 | `~/.claude/settings.json` | `enabledPlugins` entry added by installer (not in repo) |
+
+**Test regression audit:** No existing tests in `tests/` assert on the hook error message text ("Check claude-mem / project.md") or on the presence of the claude-mem plugin — confirmed by grep. The two `pre-tool-use.sh` hook message edits are safe with respect to the current test suite. No test files require updating as part of this change set.
 
 ### Files Requiring Full Read (deferred to /cc-plan)
 
