@@ -54,7 +54,7 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Components Affected:** `skills/verbosity.md`, `global/memory/`
 * **Acceptance Criteria:** Enforce verbosity levels strictly as a programmatic guardrail, matching response lengths to the exact technical detail limits requested.
 
-### [ ] `[BUG-017]` Graphify Initialization Bloat (AST Graph Overload)
+### [X] `[BUG-017]` Graphify Initialization Bloat (AST Graph Overload)
 * **Description:** The agent attempts to read full structural metadata dependency maps and large cache files straight into context during the initial session start.
 * **Impact:** Bloats the early context window with static relational maps and introduces temporary file noise.
 * **Components Affected:** Initialization hooks, workspace scanning policies.

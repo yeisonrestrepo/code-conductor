@@ -1,6 +1,17 @@
 # Changelog
 
 
+## [1.13.0] - 2026-06-22
+
+### Added
+- `[BUG-017]` Guard 4 in `.claude/hooks/pre-tool-use.sh` and `project-template/.claude/hooks/pre-tool-use.sh` — blocks `Read` tool on paths containing `graphify-out` or `node_modules` as exact path components; python3 component-match with normpath traversal fix; fail-open on python3 absence
+- `[BUG-017]` `tests/hooks/guard4.test.js` — 17 Vitest tests covering blocked paths, case variants, traversal escape, fail-open scenarios, and non-Read tool skip
+
+### Changed
+- `[BUG-017]` `install.sh` / `install.ps1` — hook download is now idempotent (skips if `.claude/hooks/pre-tool-use.sh` already exists); added repository-root sentinel guard and parent-directory warning
+- `[BUG-017]` `CLAUDE.md` / `project-template/CLAUDE.md` — Session Initialization mandates `Glob` (NEVER `Read`) for existence checks; explicit Guard 4 constraint documented
+
+
 ## [1.12.0] - 2026-06-22
 
 ### Added
