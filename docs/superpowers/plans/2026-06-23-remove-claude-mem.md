@@ -26,6 +26,10 @@
 - `memory-first` and `agent-delegation` were NEVER in the superpowers cache - no cleanup of those names.
 - BUG-003 invariant: all plan file edits are single-line surgical Edits only.
 - Version bump target: `1.13.0` → `1.14.0`.
+- Absolute path resolution: all path variables (`${HOME}`, `$env:USERPROFILE`, `${GLOBAL_DIR}`, `$GLOBAL_DIR`) must resolve to absolute paths. Never use bare relative paths (e.g., `./plugins/`) in any installer step - always prefix with `${HOME}/` (bash) or `$env:USERPROFILE\` (PS). If `$HOME` is unset on the executing shell, the installer must abort with an explicit error before any path operation.
+- `settings.json` rollback procedure: if the installer fails at any point after `settings.json` has been mutated, restore from backup: bash `[ -s "${HOME}/.claude/settings.json.bak" ] && cp "${HOME}/.claude/settings.json.bak" "${HOME}/.claude/settings.json"` / PS `if ((Get-Item "$env:USERPROFILE\.claude\settings.json.bak" -EA 0).Length -gt 0) { Copy-Item "$env:USERPROFILE\.claude\settings.json.bak" "$env:USERPROFILE\.claude\settings.json" -Force }`. The backup is created in T-002-A-1 / T-003-A-1 BEFORE any mutation. Never restore without first verifying the `.bak` is non-empty (`[ -s ... ]` / `Length -gt 0`).
+- `settings.json` absent or unwritable parent: all `node -e` scripts guard with `if(!require('fs').existsSync(f))process.exit(0)` so a missing file is a no-op. `mkdirSync(dir,{recursive:true})` before `writeFileSync` creates `~/.claude/` if absent. If `~/.claude/` cannot be created (read-only `$HOME`, restricted permissions on corporate machines), `mkdirSync` throws - this is absorbed by `2>/dev/null || true` (bash) / `2>$null` (PS), and the missing entry is flagged during T-002-C / T-003-C assertion checks.
+- Backup file cleanup policy: `settings.json.bak` is created (or overwritten) at the start of each installer run and is NOT auto-deleted on success. It persists as a recovery artifact. Manual cleanup after a verified successful install: bash `rm "${HOME}/.claude/settings.json.bak"` / PS `Remove-Item "$env:USERPROFILE\.claude\settings.json.bak"`. Never delete before confirming the active `settings.json` parses correctly. Safe to remove after 30 days or after the next successful installer run.
 
 ---
 
@@ -247,6 +251,17 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
   if [ "$SKIP_DEPS" = false ]; then
     _cc_ver="${REMOTE_VERSION:-1.0.0}"
     PLUGIN_DIR="${HOME}/.claude/plugins/cache/code-conductor/code-conductor/${_cc_ver}"
+    # Active Claude Code process check: on Linux/macOS rm succeeds on open files (files unlinked
+    # but space held until process closes). On Windows/Git Bash the wipe may leave locked files
+    # behind. Warn the user to close Claude Code before proceeding.
+    if command -v pgrep >/dev/null 2>&1 && pgrep -x "claude" >/dev/null 2>&1; then
+      warn "Claude Code process detected -- plugin dir wipe may leave locked files; close Claude Code before running installer, or restart it after install completes"
+    fi
+    # Write permission pre-check: verify ~/.claude/plugins is writable before any wipe or mkdir
+    mkdir -p "${HOME}/.claude/plugins" 2>/dev/null || true
+    if [ ! -w "${HOME}/.claude/plugins" ] && [ ! -w "${HOME}/.claude" ] && [ ! -w "${HOME}" ]; then
+      warn "No write permission on ${HOME}/.claude/plugins -- code-conductor plugin install may fail (check directory permissions or run with sudo)"
+    fi
     rm -rf "${PLUGIN_DIR}" 2>/dev/null || true
     mkdir -p "${PLUGIN_DIR}/.claude-plugin"
     mkdir -p "${PLUGIN_DIR}/skills/critical-review"
@@ -319,6 +334,28 @@ console.log('plugin.json OK: ' + pj.name + ' v' + pj.version);
   ```
 
   Expected output: `All SKILL.md files present`
+
+  **Bash trailing newline verification with xxd fallback (minimal environments):** `xxd` may be absent on Alpine, BusyBox, or distroless containers. Use this fallback chain:
+  ```bash
+  if command -v xxd >/dev/null 2>&1; then
+    _last_nibble=$(xxd "${PLUGIN_DIR}/.claude-plugin/plugin.json" | awk 'END{print $NF}')
+    [ "$_last_nibble" = "0a" ] \
+      && echo "plugin.json trailing newline: LF confirmed (xxd)" \
+      || warn "plugin.json does not end with LF (xxd: last nibble is ${_last_nibble})"
+  elif command -v od >/dev/null 2>&1; then
+    _last_byte=$(od -An -tx1 "${PLUGIN_DIR}/.claude-plugin/plugin.json" | awk 'END{print $NF}')
+    [ "$_last_byte" = "0a" ] \
+      && echo "plugin.json trailing newline: LF confirmed (od)" \
+      || warn "plugin.json does not end with LF (od: last byte is ${_last_byte})"
+  else
+    command -v node >/dev/null 2>&1 && node -e "
+const b=require('fs').readFileSync('${PLUGIN_DIR}/.claude-plugin/plugin.json');
+if(b[b.length-1]!==0x0a){process.stderr.write('WARN: plugin.json does not end with LF (node)\n');}
+else{console.log('plugin.json trailing newline: LF confirmed (node fallback)');}
+" 2>/dev/null || true
+  fi
+  ```
+  Expected: one of the three `LF confirmed` lines. If all three tools are absent, skip and rely on the T-003-C PS byte-level assertion as the authoritative check.
 
   **Bash parity: verify `enabledPlugins` key was written and `claude-mem` key is absent:**
   ```bash
@@ -496,6 +533,17 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
 
   Insert this guard at the top of the plugin creation block (inside `if (-not $NoDeps)`):
   ```powershell
+  # Pre-validate write permissions on global plugin directory before any wipe or mkdir attempt
+  $pluginRoot = "$env:USERPROFILE\.claude\plugins"
+  New-Item -ItemType Directory -Force $pluginRoot -ErrorAction SilentlyContinue | Out-Null
+  try {
+    $permTestFile = Join-Path $pluginRoot ".perm-test-$(Get-Random)"
+    [System.IO.File]::WriteAllText($permTestFile, "")
+    Remove-Item $permTestFile -Force -ErrorAction SilentlyContinue
+  } catch {
+    Write-Warn "No write permission on $pluginRoot -- plugin install may fail; run as Administrator or grant $env:USERNAME write access to $pluginRoot"
+  }
+
   $nodeOk = $false
   if (Get-Command node -ErrorAction SilentlyContinue) {
     $nodeMajor = [int](node -e "process.stdout.write(String(process.version.split('.')[0].replace('v','')))" 2>$null)
@@ -873,7 +921,24 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
   ```
   Expected: skill content loads (no `Unknown skill: critical-review` error).
 
-  **Note**: This step cannot be automated in `npm test` because it requires a live Claude Code session. Record the result manually. If `Unknown skill` is returned, check:
+  **Post-install plugin list query (CLI structural integrity check):** Before starting the live session, run this offline automatable verification using the same JSON engine as the installer:
+  ```bash
+  _cc_ver="${REMOTE_VERSION:-1.0.0}"
+  node -e "
+const base=require('os').homedir()+'/.claude/plugins/cache/code-conductor/code-conductor/${_cc_ver}';
+const pj=JSON.parse(require('fs').readFileSync(base+'/.claude-plugin/plugin.json','utf8'));
+['name','version','description','author'].forEach(k=>{if(!pj[k])throw new Error('missing field: '+k);});
+['critical-review','memory-first','agent-delegation'].forEach(s=>{
+  const p=base+'/skills/'+s+'/SKILL.md';
+  if(!require('fs').existsSync(p)||require('fs').statSync(p).size===0)throw new Error('bad SKILL.md: '+s);
+});
+console.log('Post-install check OK: '+pj.name+' v'+pj.version+', 3 skills readable');
+"
+  ```
+  Expected: `Post-install check OK: code-conductor v<version>, 3 skills readable`
+  This check does not require a live Claude Code session and confirms plugin dir + skill files are structurally valid before the first session launch. Run it immediately after `bash install.sh` completes on the local machine.
+
+  **Note**: The live session check below cannot be automated in `npm test`. Record result manually. If `Unknown skill` is returned, check:
   1. `~/.claude/settings.json` contains `"code-conductor@code-conductor": true`
   2. `~/.claude/plugins/cache/code-conductor/code-conductor/<version>/.claude-plugin/plugin.json` exists with all 4 fields
   3. Claude Code was restarted after the installer ran (plugin registry is read at session start)
@@ -899,7 +964,7 @@ Total: 5 commits.
 
 ## Identified Risks
 
-1. **plugin.json heredoc trailing newline**: bash `cat > file <<'EOF'` appends a final newline from the heredoc - the file will end with `}\n`. This matches the spec requirement. Verify with `xxd "${PLUGIN_DIR}/.claude-plugin/plugin.json" | tail -1` - last byte should be `0a`.
+1. **plugin.json heredoc trailing newline**: bash `cat > file <<'EOF'` appends a final newline from the heredoc - the file will end with `}\n`. This matches the spec requirement. `xxd` may be absent in minimal environments (Alpine, BusyBox, distroless containers). Use this tool fallback chain in T-002-C: (1) `xxd ... | awk 'END{print $NF}'` - primary; (2) `od -An -tx1 ... | awk 'END{print $NF}'` - POSIX fallback present on Alpine/BSDs; (3) `node -e "const b=readFileSync(...); if(b[b.length-1]!==0x0a)throw..."` - always available since Node.js is a hard prerequisite. If all three tools are absent the check is skipped; the PS T-003-C byte-level `ReadAllBytes` check is the authoritative verification in that case.
 2. **PS `node -e` here-string quoting**: The single-quoted `@'...'@` here-string in PS 5.1 does not expand `$` - JS `$` signs inside the script are safe. Verify after install that `settings.json` contains `"code-conductor@code-conductor": true` and lacks `"claude-mem@thedotmack"`.
 3. **settings.json race**: both the key-removal and key-addition `node -e` calls read and write `settings.json` in sequence. On a fresh machine where `settings.json` was just created by `_merge_settings_json`, the file exists before the key-addition call. No race on single-threaded install.
 4. **SKIP_DEPS guard split**: the uninstall+cleanup is in the existing `SKIP_DEPS` block; the plugin creation is in a second `if [ "$SKIP_DEPS" = false ]` block after global file downloads. Both are skipped when `--no-deps` is passed. Verify by running `bash install.sh --no-deps` and confirming no `code-conductor` dir is created.
