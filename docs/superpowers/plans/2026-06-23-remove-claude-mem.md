@@ -15,6 +15,8 @@
 - `set -euo pipefail` compatibility: every `node -e` call prefixed with `command -v node >/dev/null 2>&1 &&`; every non-fatal command suffixed with `|| true`; the uninstall call prefixed with `command -v npx >/dev/null 2>&1 &&`.
 - `node -e` JSON resilience: all `JSON.parse` calls wrapped in `try/catch`; malformed or empty `settings.json` falls back to `{}` without aborting.
 - Dynamic plugin version: both installers read `REMOTE_VERSION` / `$RemoteVersion` (already set by the version-fetch at the top of each installer) and use it for the plugin directory path and `plugin.json` version field. Fallback: `"1.0.0"` when the version fetch fails.
+- Version harmonization: `VERSION`, `package.json`, `plugin.json`, and the plugin directory path must all resolve to the same version string at runtime. After the Task 4 version bump, the installer's `REMOTE_VERSION` fetch will return `1.14.0` from the remote tag; the `VERSION` file on disk will also read `1.14.0`. On offline/fresh machines where the remote fetch fails, the fallback `"1.0.0"` is the safe sentinel — it does NOT need to match `1.14.0` because it only applies when the remote is unreachable (the `.bak` path protects against a corrupted install).
+- Remote version fetch execution sequence: (1) installer starts; (2) `REMOTE_VERSION` is set via `curl`/`Invoke-WebRequest` at the top of the script (line 87 bash / line 37 PS); (3) if the fetch times out or fails, `REMOTE_VERSION` is empty and `_cc_ver` / `$ccVersion` falls back to `"1.0.0"`; (4) plugin dir is created under `${_cc_ver}` / `$ccVersion`; (5) `plugin.json` version field is written with the same value; (6) `enabledPlugins` key is set regardless of version. Both the fallback path and the live path result in a valid plugin — they differ only in the versioned subdirectory name.
 - PS 5.1: mid-path wildcard glob-delete requires `Get-ChildItem` pipeline. No `&&`/`||` operator chains. `try/catch` for command-not-found.
 - `plugin.json` required fields: `name`, `version`, `description`, `author.name` — all four, exact values.
 - `enabledPlugins` JSON path: nested inside `{ "enabledPlugins": { ... } }`, not top-level.
@@ -145,10 +147,15 @@
 
   Immediately before the node key-removal call, add this shell-level backup:
   ```bash
-  [ -f "${HOME}/.claude/settings.json" ] && \
+  if [ -f "${HOME}/.claude/settings.json" ]; then
     cp "${HOME}/.claude/settings.json" "${HOME}/.claude/settings.json.bak" 2>/dev/null || true
+    # Backup validation: confirm .bak exists and is non-zero before proceeding
+    if [ ! -s "${HOME}/.claude/settings.json.bak" ]; then
+      warn "settings.json backup failed or produced empty file — proceeding without backup"
+    fi
+  fi
   ```
-  This creates `settings.json.bak` in the same dir. Recovery: `cp "${HOME}/.claude/settings.json.bak" "${HOME}/.claude/settings.json"`. The `.bak` file is overwritten on each install run — it holds only the most recent pre-install state.
+  Recovery: `cp "${HOME}/.claude/settings.json.bak" "${HOME}/.claude/settings.json"`. The `.bak` is overwritten on each install run. If recovery is needed: verify `settings.json.bak` is non-empty before restoring (`[ -s ... ]` check).
 
 - [ ] [T-002-A-2] **Verify claude-mem cache directory is removed after uninstall**
 
@@ -188,6 +195,8 @@
   ```bash
     # Silent claude-mem removal — heals existing installs; no-op if npx/Node absent
     command -v npx >/dev/null 2>&1 && npx --yes claude-mem uninstall 2>/dev/null || true
+    # Pre-verify parent directory of settings.json exists before any write
+    mkdir -p "${HOME}/.claude" 2>/dev/null || true
     # Remove claude-mem@thedotmack from enabledPlugins (no-op on fresh installs)
     command -v node >/dev/null 2>&1 && node -e "
 const f=require('os').homedir()+'/.claude/settings.json';
@@ -307,6 +316,20 @@ console.log('plugin.json OK: ' + pj.name + ' v' + pj.version);
 
   Expected output: `All SKILL.md files present`
 
+  **Bash parity: verify `enabledPlugins` key was written and `claude-mem` key is absent:**
+  ```bash
+  command -v node >/dev/null 2>&1 && node -e "
+const s=require('os').homedir()+'/.claude/settings.json';
+const obj=JSON.parse(require('fs').readFileSync(s,'utf8'));
+if(obj.enabledPlugins?.['code-conductor@code-conductor']!==true)
+  throw new Error('enabledPlugins code-conductor key not true');
+if('claude-mem@thedotmack' in (obj.enabledPlugins||{}))
+  process.stderr.write('WARN: claude-mem@thedotmack still present\n');
+console.log('settings.json assertions passed');
+" || echo "WARN: settings.json assertion check failed"
+  ```
+  Expected stdout: `settings.json assertions passed`
+
 - [ ] [T-002-D] **Run tests**
 
   ```bash
@@ -345,11 +368,16 @@ console.log('plugin.json OK: ' + pj.name + ' v' + pj.version);
   Immediately before the `$cmNodeScript` execution, add:
   ```powershell
   $settingsPath = "$env:USERPROFILE\.claude\settings.json"
+  $settingsBak  = "$env:USERPROFILE\.claude\settings.json.bak"
   if (Test-Path $settingsPath) {
-    Copy-Item $settingsPath "$env:USERPROFILE\.claude\settings.json.bak" -Force
+    Copy-Item $settingsPath $settingsBak -Force
+    # Backup validation: confirm .bak exists and is non-zero size before proceeding
+    if (-not (Test-Path $settingsBak) -or (Get-Item $settingsBak).Length -eq 0) {
+      Write-Warn "settings.json backup failed or produced empty file -- proceeding without backup"
+    }
   }
   ```
-  Recovery: `Copy-Item "$env:USERPROFILE\.claude\settings.json.bak" "$env:USERPROFILE\.claude\settings.json" -Force`. Overwritten on each install run.
+  Recovery: `Copy-Item $settingsBak $settingsPath -Force`. Verify `(Get-Item $settingsBak).Length -gt 0` before restoring. Overwritten on each install run.
 
 - [ ] [T-003-A-2] **Verify claude-mem cache directory removed (PowerShell)**
 
@@ -431,6 +459,8 @@ console.log('plugin.json OK: ' + pj.name + ' v' + pj.version);
     if (Get-Command npx -ErrorAction SilentlyContinue) {
       try { $null = cmd /c "npx --yes claude-mem uninstall 2>nul" } catch {}
     }
+    # Pre-verify parent directory of settings.json exists before any write
+    New-Item -ItemType Directory -Force "$env:USERPROFILE\.claude" -ErrorAction SilentlyContinue | Out-Null
     # Remove claude-mem@thedotmack from enabledPlugins (no-op on fresh installs)
     $cmNodeScript = @'
 const f=require('os').homedir()+'/.claude/settings.json';
@@ -467,7 +497,18 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
   ```
   Gate all subsequent `node -e` calls in this block with `if ($nodeOk) { ... }`.
 
-  **Windows permission error handling**: On corporate machines with restricted `%APPDATA%` or `%USERPROFILE%`, `New-Item -ItemType Directory -Force` or `Copy-Item` may throw `UnauthorizedAccessException`. Wrap the entire plugin creation block in `try { ... } catch { Write-Warn "code-conductor plugin install failed: $_"; Write-Warn "Run installer as Administrator or grant write access to $env:USERPROFILE\.claude\plugins" }`.
+  **Windows permission error handling**: On corporate machines with restricted `%APPDATA%` or `%USERPROFILE%`, `New-Item` or `Copy-Item` may throw `UnauthorizedAccessException`. Wrap the entire plugin creation block in:
+  ```powershell
+  try {
+    # ... all New-Item, Copy-Item, node -e calls ...
+  } catch [System.UnauthorizedAccessException] {
+    Write-Warn "code-conductor plugin install failed: access denied at $pluginDir"
+    Write-Warn "Fix: run installer as Administrator, or grant write access to $env:USERPROFILE\.claude\plugins"
+  } catch {
+    Write-Warn "code-conductor plugin install failed: $_"
+  }
+  ```
+  The outer `if (-not $NoDeps)` block remains; the `try/catch` is the inner wrapper. A permission failure is non-fatal — the installer continues; missing the plugin is reported via `Write-Warn`, not `throw`.
 
 - [ ] [T-003-B] **Add code-conductor plugin creation block after global settings merge**
 
@@ -545,10 +586,34 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
   @('name','version','description','author') | ForEach-Object {
     if (-not $pj.$_) { throw "plugin.json missing field: $_" }
   }
+  # Parity assertion: version field must exactly match the runtime $ccVersion
+  if ($pj.version -ne $ccVersion) {
+    throw "plugin.json version '$($pj.version)' does not match expected '$ccVersion'"
+  }
   Write-Ok "plugin.json OK: $($pj.name) v$($pj.version)"
   ```
 
   Expected output: `[OK] plugin.json OK: code-conductor v<version>` (e.g. `v1.14.0` when `$RemoteVersion = "1.14.0"`)
+
+  **PS parity: verify `enabledPlugins` key was written to `settings.json`:**
+  ```powershell
+  $settingsJson = Get-Content "$env:USERPROFILE\.claude\settings.json" -Raw -Encoding utf8 | ConvertFrom-Json
+  if ($settingsJson.enabledPlugins.'code-conductor@code-conductor' -ne $true) {
+    throw "ERROR: enabledPlugins['code-conductor@code-conductor'] not set to true in settings.json"
+  }
+  Write-Ok "settings.json enabledPlugins entry confirmed"
+  ```
+  Expected output: `[OK] settings.json enabledPlugins entry confirmed`
+
+  **PS parity: verify `claude-mem@thedotmack` key is absent (not just false):**
+  ```powershell
+  $cmKey = $settingsJson.enabledPlugins.'claude-mem@thedotmack'
+  if ($null -ne $cmKey) {
+    Write-Warn "claude-mem@thedotmack still present in enabledPlugins (value: $cmKey) -- key removal may have failed"
+  } else {
+    Write-Ok "claude-mem@thedotmack key absent from enabledPlugins"
+  }
+  ```
 
   **Version conflict check** — detect stale versioned dirs from prior installs:
   ```powershell
