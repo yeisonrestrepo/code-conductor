@@ -14,9 +14,9 @@
 - No `jq` assumption: all `settings.json` manipulation uses `node -e` inline scripts.
 - `set -euo pipefail` compatibility: every `node -e` call prefixed with `command -v node >/dev/null 2>&1 &&`; every non-fatal command suffixed with `|| true`; the uninstall call prefixed with `command -v npx >/dev/null 2>&1 &&`.
 - `node -e` JSON resilience: all `JSON.parse` calls wrapped in `try/catch`; malformed or empty `settings.json` falls back to `{}` without aborting.
-- Dynamic plugin version: both installers read `REMOTE_VERSION` / `$RemoteVersion` (already set by the version-fetch at the top of each installer) and use it for the plugin directory path and `plugin.json` version field. Fallback: `"1.0.0"` when the version fetch fails.
-- Version harmonization: `VERSION`, `package.json`, `plugin.json`, and the plugin directory path must all resolve to the same version string at runtime. After the Task 4 version bump, the installer's `REMOTE_VERSION` fetch will return `1.14.0` from the remote tag; the `VERSION` file on disk will also read `1.14.0`. On offline/fresh machines where the remote fetch fails, the fallback `"1.0.0"` is the safe sentinel - it does NOT need to match `1.14.0` because it only applies when the remote is unreachable (the `.bak` path protects against a corrupted install).
-- Remote version fetch execution sequence: (1) installer starts; (2) `REMOTE_VERSION` is set via `curl`/`Invoke-WebRequest` at the top of each installer script; (3) if the fetch times out or fails, `REMOTE_VERSION` is empty and `_cc_ver` / `$ccVersion` falls back to `"1.0.0"`; (4) plugin dir is created under `${_cc_ver}` / `$ccVersion`; (5) `plugin.json` version field is written with the same value; (6) `enabledPlugins` key is set regardless of version. Both the fallback path and the live path result in a valid plugin: they differ only in the versioned subdirectory name.
+- Dynamic plugin version: both installers read `REMOTE_VERSION` / `$RemoteVersion` (already set by the version-fetch at the top of each installer) and use it for the plugin directory path and `plugin.json` version field. Fallback when fetch fails: local `VERSION` file → sentinel `"1.0.0"` (full three-step chain in the Version fallback chain constraint below).
+- Version harmonization: `VERSION`, `package.json`, `plugin.json`, and the plugin directory path must all resolve to the same version string at runtime. After the Task 4 version bump, the installer's `REMOTE_VERSION` fetch will return `1.14.0` from the remote tag; the `VERSION` file on disk will also read `1.14.0`. On offline developer machines where the remote fetch fails, the fallback chain reads the local `VERSION` file (returns `1.14.0` on a post-bump workstation) before falling back to sentinel `"1.0.0"`. The `"1.0.0"` sentinel is only reached on a fresh CI machine with no `VERSION` file present; it does NOT need to match `1.14.0` because it only applies when both the remote fetch and the local file are unavailable.
+- Remote version fetch execution sequence: (1) installer starts; (2) `REMOTE_VERSION` is set via `curl`/`Invoke-WebRequest` at the top of each installer script; (3) if the fetch times out or fails, `REMOTE_VERSION` is empty - the version derivation then checks the local `VERSION` file; (3a) if `VERSION` is readable and non-empty, `_cc_ver` / `$ccVersion` is set to its trimmed content; (3b) if `VERSION` is absent or unreadable, `_cc_ver` / `$ccVersion` falls back to sentinel `"1.0.0"`; (4) plugin dir is created under `${_cc_ver}` / `$ccVersion`; (5) `plugin.json` version field is written with the same value; (6) `enabledPlugins` key is set regardless of version. All three outcome paths produce a valid plugin; they differ only in the versioned subdirectory name.
 - Local testing with pre-release version: when testing changes locally before the tag `v1.14.0` is pushed to the remote, the installer's fetch will return the current released version (e.g., `1.13.0`), not `1.14.0`. Override with: `REMOTE_VERSION=1.14.0 bash install.sh` (bash) or `$env:REMOTE_VERSION="1.14.0"; .\install.ps1` (PS). Never run the installer without this override during pre-release local testing, otherwise the plugin dir and `plugin.json` version will reflect the wrong version and subsequent verification steps will fail.
 - PS 5.1: mid-path wildcard glob-delete requires `Get-ChildItem` pipeline. No `&&`/`||` operator chains. `try/catch` for command-not-found.
 - `plugin.json` required fields: `name`, `version`, `description`, `author.name` - all four, exact values.
@@ -28,10 +28,10 @@
 - Version bump target: `1.13.0` → `1.14.0`.
 - Absolute path resolution: all path variables (`${HOME}`, `$env:USERPROFILE`, `${GLOBAL_DIR}`, `$GLOBAL_DIR`) must resolve to absolute paths. Never use bare relative paths (e.g., `./plugins/`) in any installer step - always prefix with `${HOME}/` (bash) or `$env:USERPROFILE\` (PS). If `$HOME` is unset on the executing shell, the installer must abort with an explicit error before any path operation.
 - `settings.json` rollback procedure: if the installer fails at any point after `settings.json` has been mutated, restore from backup: bash `[ -s "${HOME}/.claude/settings.json.bak" ] && cp "${HOME}/.claude/settings.json.bak" "${HOME}/.claude/settings.json"` / PS `if ((Get-Item "$env:USERPROFILE\.claude\settings.json.bak" -EA 0).Length -gt 0) { Copy-Item "$env:USERPROFILE\.claude\settings.json.bak" "$env:USERPROFILE\.claude\settings.json" -Force }`. The backup is created in T-002-A-1 / T-003-A-1 BEFORE any mutation. Never restore without first verifying the `.bak` is non-empty (`[ -s ... ]` / `Length -gt 0`).
-- `settings.json` absent or unwritable parent: all `node -e` scripts guard with `if(!require('fs').existsSync(f))process.exit(0)` so a missing file is a no-op. `mkdirSync(dir,{recursive:true})` before `writeFileSync` creates `~/.claude/` if absent. If `~/.claude/` cannot be created (read-only `$HOME`, restricted permissions on corporate machines), `mkdirSync` throws - this is absorbed by `2>/dev/null || true` (bash) / `2>$null` (PS), and the missing entry is flagged during T-002-C / T-003-C assertion checks.
-- Backup file cleanup policy: `settings.json.bak` is created (or overwritten) at the start of each installer run and is NOT auto-deleted on success. It persists as a recovery artifact. Manual cleanup after a verified successful install: bash `rm "${HOME}/.claude/settings.json.bak"` / PS `Remove-Item "$env:USERPROFILE\.claude\settings.json.bak"`. Never delete before confirming the active `settings.json` parses correctly. Safe to remove after 30 days or after the next successful installer run.
-- Version fallback chain (offline development): both installers must resolve version via `REMOTE_VERSION → local VERSION file → "1.0.0"`. Bash: `_cc_ver="${REMOTE_VERSION:-$(cat "$(dirname "$0")/VERSION" 2>/dev/null | tr -d '[:space:]' || echo '1.0.0')}"`. PS: `$ccVersion = if ($RemoteVersion) { $RemoteVersion } elseif (Test-Path (Join-Path $PSScriptRoot 'VERSION')) { (Get-Content (Join-Path $PSScriptRoot 'VERSION') -Raw).Trim() } else { '1.0.0' }`. This ensures a developer testing locally with an unpushed tag still uses the correct workspace version rather than the `"1.0.0"` sentinel.
-- OS permissions error handling: if `~/.claude` exists but is not writable (owned by root on shared machines, corporate policy), all `node -e` mutations silently fail via `2>/dev/null || true` and the missing entries are caught by T-002-C / T-003-C assertions. Bash explicit check: `if [ -e "${HOME}/.claude" ] && [ ! -w "${HOME}/.claude" ]; then warn "${HOME}/.claude not writable - settings.json mutations will fail (run: sudo chown $USER ${HOME}/.claude)"; fi`. PS equivalent: `if ((Test-Path "$env:USERPROFILE\.claude") -and -not (Test-Path "$env:USERPROFILE\.claude" -PathType Container -IsValid)) { Write-Warn ... }` - rely on the T-003-B-0 write-permission probe (temp file test) as the primary detection; it already emits a `Write-Warn` and leaves the flow non-fatal.
+- `settings.json` absent or unwritable parent: all `node -e` scripts guard with `if(!require('fs').existsSync(f))process.exit(0)` so a missing file is a no-op. The `mkdirSync` + `writeFileSync` pair is wrapped in a JavaScript `try/catch` to prevent unhandled process crashes on permission errors: `try{require('fs').mkdirSync(dir,{recursive:true});require('fs').writeFileSync(f,...);}catch(e){process.stderr.write('WARN: settings.json update failed: '+e.message+'\n');}`. The catch block emits a WARN to stderr; `2>/dev/null || true` (bash) / `2>$null` (PS) absorbs the exit, and the missing entry is flagged during T-002-C / T-003-C assertion checks.
+- Backup file cleanup policy: `settings.json.bak` is created (or overwritten) at the start of each installer run. It is auto-deleted by the T-002-C / T-003-C assertion steps immediately after all assertions pass (the backup is only needed as a recovery artifact if the installer fails before that point). Manual recovery path if auto-delete did not run: bash `[ -s "${HOME}/.claude/settings.json.bak" ] && cp "${HOME}/.claude/settings.json.bak" "${HOME}/.claude/settings.json"` / PS `Copy-Item "$env:USERPROFILE\.claude\settings.json.bak" "$env:USERPROFILE\.claude\settings.json" -Force`. Never delete the backup before T-002-C / T-003-C assertions complete; those steps delete it on success.
+- Version fallback chain (offline development ONLY): `REMOTE_VERSION → local VERSION file → "1.0.0"`. The VERSION file step is consulted ONLY when `REMOTE_VERSION` is unset or empty (remote fetch returned nothing). If the remote fetch SUCCEEDS and returns a stale published tag (e.g., `1.13.0`), the local `VERSION` file is NOT consulted - the remote result wins. This means the VERSION file fallback resolves offline machines but does NOT resolve the pre-release testing scenario where the remote returns an old published tag. For pre-release local testing the developer MUST set `REMOTE_VERSION=1.14.0` explicitly (see Local testing constraint). Bash expression: `_cc_ver="${REMOTE_VERSION:-$(cat "$(dirname "$0")/VERSION" 2>/dev/null | tr -d '[:space:]' || echo '1.0.0')}"`. PS expression: `$ccVersion = if ($RemoteVersion) { $RemoteVersion } elseif (Test-Path (Join-Path $PSScriptRoot 'VERSION')) { (Get-Content (Join-Path $PSScriptRoot 'VERSION') -Raw).Trim() } else { '1.0.0' }`.
+- OS permissions error handling: if `~/.claude` exists but is not writable (owned by root on shared machines, corporate policy), all `node -e` mutations silently fail via `2>/dev/null || true` and the missing entries are caught by T-002-C / T-003-C assertions. Bash explicit check before the node call: `if [ -e "${HOME}/.claude" ] && [ ! -w "${HOME}/.claude" ]; then warn "${HOME}/.claude not writable -- settings.json mutations will fail (run: sudo chown $USER ${HOME}/.claude)"; fi`. PS equivalent: the T-003-B-0 write-permission probe (create and immediately delete a `.perm-test-*` temp file in `$pluginRoot`) is the authoritative PS detection mechanism - it catches both `[System.IO.IOException]` and `[System.UnauthorizedAccessException]` and emits `Write-Warn`. No additional PS shell-level check is needed; `Test-Path` has no parameter that tests write permissions, so the probe is the only reliable method.
 - Trailing newline verification fallback: `xxd` may be absent in minimal environments. Use the three-tool fallback chain in T-002-C: `xxd` (primary) → `od -An -tx1` (POSIX, available on Alpine/BusyBox/BSD) → `node -e ReadAllBytes` (always available since Node.js is a hard prerequisite). PS T-003-C uses `[System.IO.File]::ReadAllBytes` and does not depend on any Unix tool.
 
 ---
@@ -216,8 +216,7 @@ const f=require('os').homedir()+'/.claude/settings.json';
 if(!require('fs').existsSync(f))process.exit(0);
 let obj={};try{obj=JSON.parse(require('fs').readFileSync(f,'utf8'));}catch(e){}
 if(obj.enabledPlugins){delete obj.enabledPlugins['claude-mem@thedotmack'];}
-require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true});
-require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
+try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true});require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');}catch(e){process.stderr.write('WARN: settings.json update failed: '+e.message+'\n');}
 " 2>/dev/null || true
     # Glob-delete orphaned superpowers-cached critical-review skill (all versions)
     rm -rf "${HOME}/.claude/plugins/cache/claude-plugins-official/superpowers"/*/skills/critical-review 2>/dev/null || true
@@ -310,8 +309,7 @@ const f=require('os').homedir()+'/.claude/settings.json';
 let obj={};if(require('fs').existsSync(f)){try{obj=JSON.parse(require('fs').readFileSync(f,'utf8'));}catch(e){}}
 if(!obj.enabledPlugins)obj.enabledPlugins={};
 obj.enabledPlugins['code-conductor@code-conductor']=true;
-require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true});
-require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
+try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true});require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');}catch(e){process.stderr.write('WARN: settings.json update failed: '+e.message+'\n');}
 " 2>/dev/null || true
     ok "code-conductor plugin installed (critical-review, memory-first, agent-delegation)"
   fi
@@ -390,6 +388,15 @@ console.log('settings.json assertions passed');
 " || echo "WARN: settings.json assertion check failed"
   ```
   Expected stdout: `settings.json assertions passed`
+
+  **Auto-cleanup backup after all assertions pass:**
+  ```bash
+  [ -f "${HOME}/.claude/settings.json.bak" ] \
+    && rm -f "${HOME}/.claude/settings.json.bak" 2>/dev/null \
+    && echo "settings.json.bak auto-cleaned up" \
+    || true
+  ```
+  Expected: `settings.json.bak auto-cleaned up` (or silent no-op if file was absent). This is the designated automated cleanup point; do not delete the backup before this step.
 
 - [ ] [T-002-D] **Run tests**
 
@@ -533,8 +540,7 @@ const f=require('os').homedir()+'/.claude/settings.json';
 if(!require('fs').existsSync(f))process.exit(0);
 let obj={};try{obj=JSON.parse(require('fs').readFileSync(f,'utf8'));}catch(e){}
 if(obj.enabledPlugins){delete obj.enabledPlugins['claude-mem@thedotmack'];}
-require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true});
-require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
+try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true});require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');}catch(e){process.stderr.write('WARN: settings.json update failed: '+e.message+'\n');}
 '@
     if (Get-Command node -ErrorAction SilentlyContinue) {
       node -e $cmNodeScript 2>$null
@@ -676,8 +682,7 @@ const f=require('os').homedir()+'/.claude/settings.json';
 let obj={};if(require('fs').existsSync(f)){try{obj=JSON.parse(require('fs').readFileSync(f,'utf8'));}catch(e){}}
 if(!obj.enabledPlugins)obj.enabledPlugins={};
 obj.enabledPlugins['code-conductor@code-conductor']=true;
-require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true});
-require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
+try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true});require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');}catch(e){process.stderr.write('WARN: settings.json update failed: '+e.message+'\n');}
 '@
     if (Get-Command node -ErrorAction SilentlyContinue) {
       node -e $enableScript 2>$null
@@ -765,6 +770,16 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
   ```
 
   Expected output: `[OK] All SKILL.md files present and non-empty`
+
+  **Auto-cleanup backup after all assertions pass (PS):**
+  ```powershell
+  $bakPath = "$env:USERPROFILE\.claude\settings.json.bak"
+  if (Test-Path $bakPath) {
+    Remove-Item $bakPath -Force -ErrorAction SilentlyContinue
+    Write-Ok "settings.json.bak auto-cleaned up after successful install"
+  }
+  ```
+  Expected: `[OK] settings.json.bak auto-cleaned up after successful install` (or silent no-op if absent). This is the designated automated cleanup point.
 
 - [ ] [T-003-D] **Run tests**
 
