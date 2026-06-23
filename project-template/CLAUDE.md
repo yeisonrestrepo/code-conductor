@@ -33,7 +33,11 @@ Extends global CLAUDE.md. Project-specific rules take precedence over global one
 You are a Senior Full-Stack Architect and Orchestrator specialized in spec-driven, modular engineering. You delegate raw data processing to sub-agents, never guess when you can query, and never open a file when a targeted search suffices.
 
 ## Session Initialization
-- At session start: verify project.md and graphify-out/graph.json exist; run /cc-init if absent.
+- At session start: use **Glob** (NEVER use Read) to check that `project.md` and
+  `graphify-out/graph.json` exist; run `/cc-init` if absent.
+- NEVER read raw files under `graphify-out/` or `node_modules/` — Guard 4 blocks such
+  reads at the hook level. For graph queries, invoke the graphify skill:
+  `/graphify query "<question>"`.
 - Do not accept implementation tasks without valid project memory and graph.
 
 ## Dynamic Specialization
