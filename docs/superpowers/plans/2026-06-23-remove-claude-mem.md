@@ -166,7 +166,11 @@
     fi
   fi
   ```
-  Recovery: `cp "${HOME}/.claude/settings.json.bak" "${HOME}/.claude/settings.json"`. The `.bak` is overwritten on each install run. If recovery is needed: verify `settings.json.bak` is non-empty before restoring (`[ -s ... ]` check).
+  After creating the backup, set a bash `ERR` trap to auto-restore on any subsequent command failure (replaces manual recovery):
+  ```bash
+  trap '[ -s "${HOME}/.claude/settings.json.bak" ] && cp "${HOME}/.claude/settings.json.bak" "${HOME}/.claude/settings.json" 2>/dev/null && warn "TRAP: settings.json auto-restored from backup after failure"' ERR
+  ```
+  Clear the trap after T-002-C assertions pass (before the auto-cleanup step) to prevent the cleanup from triggering a false restore: `trap - ERR`. For PS (T-003-A-1): wrap the entire mutation sequence (T-003-A through T-003-B node calls) in a `try/finally` block where `finally` restores the backup if still present (the T-003-C auto-cleanup step deletes it on success, so `finally` only acts on failure paths): `finally { if (Test-Path $settingsBak) { Copy-Item $settingsBak $settingsPath -Force -ErrorAction SilentlyContinue; Write-Warn "FINALLY: settings.json auto-restored from backup" } }`.
 
 - [ ] [T-002-A-2] **Verify claude-mem cache directory is removed after uninstall**
 
@@ -214,7 +218,8 @@
     command -v node >/dev/null 2>&1 && node -e "
 const f=require('os').homedir()+'/.claude/settings.json';
 if(!require('fs').existsSync(f))process.exit(0);
-let obj={};try{obj=JSON.parse(require('fs').readFileSync(f,'utf8'));}catch(e){}
+const _raw=require('fs').readFileSync(f,'utf8');
+let obj={};try{obj=JSON.parse(_raw);}catch(e){if(_raw.trim()){process.stderr.write('WARN: settings.json is malformed JSON and non-empty -- skipping key removal to avoid data loss\n');process.exit(0);}}
 if(obj.enabledPlugins){delete obj.enabledPlugins['claude-mem@thedotmack'];}
 try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true});require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');}catch(e){process.stderr.write('WARN: settings.json update failed: '+e.message+'\n');}
 " 2>/dev/null || true
@@ -257,6 +262,8 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
     # Resolves $(dirname "$0") to the installer script's directory for absolute path to VERSION
     _installer_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd || echo ".")"
     _local_ver="$(cat "${_installer_dir}/VERSION" 2>/dev/null | tr -d '[:space:]')"
+    # Reject non-semver content (e.g. whitespace-only, paths, multi-line blobs) to prevent path injection
+    echo "${_local_ver}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+' || _local_ver=""
     _cc_ver="${REMOTE_VERSION:-${_local_ver:-1.0.0}}"
     PLUGIN_DIR="${HOME}/.claude/plugins/cache/code-conductor/code-conductor/${_cc_ver}"
     # Active Claude Code process check: on Linux/macOS rm succeeds on open files (files unlinked
@@ -306,7 +313,7 @@ PLUGINJSON
     # false, the assignment below overwrites it with true - this is the correct healing behavior.
     command -v node >/dev/null 2>&1 && node -e "
 const f=require('os').homedir()+'/.claude/settings.json';
-let obj={};if(require('fs').existsSync(f)){try{obj=JSON.parse(require('fs').readFileSync(f,'utf8'));}catch(e){}}
+let obj={};if(require('fs').existsSync(f)){const _raw=require('fs').readFileSync(f,'utf8');try{obj=JSON.parse(_raw);}catch(e){if(_raw.trim()){process.stderr.write('WARN: settings.json is malformed JSON and non-empty -- skipping enabledPlugins merge to avoid data loss\n');process.exit(0);}}}
 if(!obj.enabledPlugins)obj.enabledPlugins={};
 obj.enabledPlugins['code-conductor@code-conductor']=true;
 try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true});require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');}catch(e){process.stderr.write('WARN: settings.json update failed: '+e.message+'\n');}
@@ -360,6 +367,12 @@ console.log('plugin.json OK: ' + pj.name + ' v' + pj.version);
     [ "$_last_nibble" = "0a" ] \
       && echo "plugin.json trailing newline: LF confirmed (xxd)" \
       || warn "plugin.json does not end with LF (xxd: last nibble is ${_last_nibble})"
+  elif command -v tail >/dev/null 2>&1 && command -v od >/dev/null 2>&1; then
+    # tail -c 1 reads only the final byte (efficient; POSIX; BusyBox-safe), od hex-encodes it
+    _last_byte=$(tail -c 1 "${PLUGIN_DIR}/.claude-plugin/plugin.json" | od -An -tx1 | tr -d ' \n')
+    [ "$_last_byte" = "0a" ] \
+      && echo "plugin.json trailing newline: LF confirmed (tail+od)" \
+      || warn "plugin.json does not end with LF (tail+od: last byte is ${_last_byte})"
   elif command -v od >/dev/null 2>&1; then
     _last_byte=$(od -An -tx1 "${PLUGIN_DIR}/.claude-plugin/plugin.json" | awk 'END{print $NF}')
     [ "$_last_byte" = "0a" ] \
@@ -538,7 +551,8 @@ console.log('settings.json assertions passed');
     $cmNodeScript = @'
 const f=require('os').homedir()+'/.claude/settings.json';
 if(!require('fs').existsSync(f))process.exit(0);
-let obj={};try{obj=JSON.parse(require('fs').readFileSync(f,'utf8'));}catch(e){}
+const _raw=require('fs').readFileSync(f,'utf8');
+let obj={};try{obj=JSON.parse(_raw);}catch(e){if(_raw.trim()){process.stderr.write('WARN: settings.json is malformed JSON and non-empty -- skipping key removal to avoid data loss\n');process.exit(0);}}
 if(obj.enabledPlugins){delete obj.enabledPlugins['claude-mem@thedotmack'];}
 try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true});require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');}catch(e){process.stderr.write('WARN: settings.json update failed: '+e.message+'\n');}
 '@
@@ -548,7 +562,7 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
     # Glob-delete orphaned superpowers-cached critical-review skill (PS 5.1 pipeline required)
     $superDir = "$env:USERPROFILE\.claude\plugins\cache\claude-plugins-official\superpowers"
     if (Test-Path $superDir) {
-      Get-ChildItem $superDir -Directory -ErrorAction SilentlyContinue |
+      Get-ChildItem $superDir -Directory -Force -ErrorAction SilentlyContinue |
         ForEach-Object {
           $t = Join-Path $_.FullName "skills\critical-review"
           if (Test-Path $t) { Remove-Item -Recurse -Force $t }
@@ -587,14 +601,18 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
     Write-Warn "Claude Code process detected -- close Claude Code before running installer to prevent IOException on plugin dir wipe"
   }
   ```
-  Then the guarded wipe:
+  Then the guarded wipe with 2-second sleep and retry before the rename fallback:
   ```powershell
   try {
     if (Test-Path $pluginDir) { Remove-Item -Recurse -Force $pluginDir }
   } catch [System.IO.IOException] {
-    $fallback = "$pluginDir.old-$(Get-Date -Format 'yyyyMMddHHmmss')"
-    Rename-Item $pluginDir $fallback -ErrorAction SilentlyContinue
-    Write-Warn "Plugin dir locked; renamed to $fallback -- delete after closing Claude Code"
+    Start-Sleep -Seconds 2
+    try { if (Test-Path $pluginDir) { Remove-Item -Recurse -Force $pluginDir -ErrorAction Stop } }
+    catch {
+      $fallback = "$pluginDir.old-$(Get-Date -Format 'yyyyMMddHHmmss')"
+      Rename-Item $pluginDir $fallback -ErrorAction SilentlyContinue
+      Write-Warn "Plugin dir locked; renamed to $fallback -- delete after closing Claude Code"
+    }
   }
   ```
   The same risk applies on bash (files held by a running process); `rm -rf` will succeed on Linux/macOS (files unlinked but space not reclaimed until process closes), but will fail on Windows NTFS with "file in use" errors.
@@ -624,9 +642,16 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
   ```powershell
   # -- code-conductor plugin: wipe versioned dir and recreate --------------------
   if (-not $NoDeps) {
+    # USERPROFILE abort guard: must be an absolute path before any plugin dir operations
+    if ([string]::IsNullOrWhiteSpace($env:USERPROFILE) -or -not [System.IO.Path]::IsPathRooted($env:USERPROFILE)) {
+      Write-Warn "USERPROFILE is empty or not an absolute path ('$env:USERPROFILE') -- aborting plugin install to prevent invalid paths"
+      return  # exits this if (-not $NoDeps) block without aborting the whole script
+    }
     # Version fallback chain: remote fetch -> local VERSION file -> "1.0.0" sentinel
     $localVerPath = Join-Path $PSScriptRoot 'VERSION'
     $localVer = if (Test-Path $localVerPath) { (Get-Content $localVerPath -Raw).Trim() } else { $null }
+    # Reject non-semver content to prevent path injection from malformed VERSION file
+    if ($localVer -and $localVer -notmatch '^\d+\.\d+\.\d+') { $localVer = $null }
     $ccVersion = if ($RemoteVersion) { $RemoteVersion } elseif ($localVer) { $localVer } else { "1.0.0" }
     $pluginDir = "$env:USERPROFILE\.claude\plugins\cache\code-conductor\code-conductor\$ccVersion"
     if (Test-Path $pluginDir) { Remove-Item -Recurse -Force $pluginDir }
@@ -679,7 +704,7 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
     # false, the assignment below overwrites it with true: correct healing behavior.
     $enableScript = @'
 const f=require('os').homedir()+'/.claude/settings.json';
-let obj={};if(require('fs').existsSync(f)){try{obj=JSON.parse(require('fs').readFileSync(f,'utf8'));}catch(e){}}
+let obj={};if(require('fs').existsSync(f)){const _raw=require('fs').readFileSync(f,'utf8');try{obj=JSON.parse(_raw);}catch(e){if(_raw.trim()){process.stderr.write('WARN: settings.json is malformed JSON and non-empty -- skipping enabledPlugins merge to avoid data loss\n');process.exit(0);}}}
 if(!obj.enabledPlugins)obj.enabledPlugins={};
 obj.enabledPlugins['code-conductor@code-conductor']=true;
 try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true});require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');}catch(e){process.stderr.write('WARN: settings.json update failed: '+e.message+'\n');}
