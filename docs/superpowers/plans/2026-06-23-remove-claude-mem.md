@@ -40,11 +40,11 @@
 - Produces: 6 files with "claude-mem" references replaced by `.claude/memory/project.md`
 
 **Punctuation matching rules (critical — mismatches silently fail Edit tool):**
-- The separator in T-001-A and T-001-D is U+2014 EM DASH (`—`), NOT a standard hyphen-minus (`-`) or en-dash (`–`). Copy-paste the character from this plan; do not retype it.
+- The `old_string` in T-001-A and T-001-D contains U+2014 EM DASH (`—`) — copy-paste from this plan; do not retype. The `new_string` replaces `—` with a colon (`:`) per formatting constraints.
 - Backticks in `old_string` are U+0060 GRAVE ACCENT (`` ` ``), not U+2018/U+2019 curly quotes.
 - The slash `/` in `claude-mem` / `.claude/memory/project.md` is U+002F SOLIDUS.
-- Spaces around `—` are regular U+0020 spaces (one space each side).
-- Before running any Edit, verify the exact byte sequence with: `grep -Pn '\x{2014}' <file>` (should match line 25 in global/CLAUDE.md and line 143 in README.md).
+- Spaces around `—` in `old_string` are regular U+0020 (one space each side); the colon in `new_string` has no trailing space before the content.
+- Before running any Edit, verify em-dash presence: `grep -Pn '\x{2014}' <file>` (should match line 25 in global/CLAUDE.md and line 143 in README.md).
 
 - [ ] [T-001-A] **Edit `global/CLAUDE.md` line 25**
 
@@ -52,12 +52,12 @@
   ```
   1. **Memory** — check `claude-mem` / `.claude/memory/project.md`. If the answer is there, stop.
   ```
-  New line:
+  New line (em-dash replaced with colon):
   ```
-  1. **Memory** — check `.claude/memory/project.md`. If the answer is there, stop.
+  1. **Memory**: check `.claude/memory/project.md`. If the answer is there, stop.
   ```
 
-  Use the Edit tool: `old_string` = `1. **Memory** — check \`claude-mem\` / \`.claude/memory/project.md\`. If the answer is there, stop.`; `new_string` = `1. **Memory** — check \`.claude/memory/project.md\`. If the answer is there, stop.`
+  Use the Edit tool: `old_string` = `1. **Memory** — check \`claude-mem\` / \`.claude/memory/project.md\`. If the answer is there, stop.`; `new_string` = `1. **Memory**: check \`.claude/memory/project.md\`. If the answer is there, stop.`
 
 - [ ] [T-001-B] **Edit `skills/memory-first.md` line 8**
 
@@ -87,9 +87,9 @@
   ```
   1. **Project memory** — `claude-mem` / `project.md`
   ```
-  New line:
+  New line (em-dash replaced with colon):
   ```
-  1. **Project memory** — `.claude/memory/project.md`
+  1. **Project memory**: `.claude/memory/project.md`
   ```
 
 - [ ] [T-001-E] **Edit `project-template/.claude/hooks/pre-tool-use.sh` line 19**
@@ -141,6 +141,28 @@
   ```
   Verify the output contains `install_dep "claude-mem"` and the `if [ "$HAS_NODE" = true ]` npm-install block. If the text differs from the `old_string` below (e.g. extra blank lines, different indentation), update the `old_string` in T-002-A to match before proceeding. Do not skip this step — Edit tool failures caused by truncated or mismatched blocks are the most common failure mode for this task.
 
+- [ ] [T-002-A-1] **Backup `settings.json` before modification (bash)**
+
+  Immediately before the node key-removal call, add this shell-level backup:
+  ```bash
+  [ -f "${HOME}/.claude/settings.json" ] && \
+    cp "${HOME}/.claude/settings.json" "${HOME}/.claude/settings.json.bak" 2>/dev/null || true
+  ```
+  This creates `settings.json.bak` in the same dir. Recovery: `cp "${HOME}/.claude/settings.json.bak" "${HOME}/.claude/settings.json"`. The `.bak` file is overwritten on each install run — it holds only the most recent pre-install state.
+
+- [ ] [T-002-A-2] **Verify claude-mem cache directory is removed after uninstall**
+
+  Add this assertion immediately after the npx uninstall call:
+  ```bash
+  _cm_cache="${HOME}/.claude/plugins/cache/thedotmack/claude-mem"
+  if [ -d "${_cm_cache}" ]; then
+    warn "claude-mem cache dir still present at ${_cm_cache} — manual cleanup may be needed"
+  else
+    ok "claude-mem cache dir removed"
+  fi
+  ```
+  This is a non-fatal warn (not `exit 1`) because `npx claude-mem uninstall` may be unavailable on fresh machines where claude-mem was never installed.
+
 - [ ] [T-002-A] **Remove the claude-mem install block from the SKIP_DEPS section**
 
   In `install.sh`, find and delete the following exact block (lines 187–199). Use the Edit tool with `old_string` set to the entire block and `new_string` set to the replacement below.
@@ -179,6 +201,24 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
     rm -rf "${HOME}/.claude/plugins/cache/claude-plugins-official/superpowers"/*/skills/critical-review 2>/dev/null || true
   ```
 
+- [ ] [T-002-B-0] **Node.js version baseline check (bash)**
+
+  Insert this guard at the top of the plugin creation block (inside `if [ "$SKIP_DEPS" = false ]`), before any `node -e` call:
+  ```bash
+  if command -v node >/dev/null 2>&1; then
+    _node_major=$(node -e "process.stdout.write(String(process.version.split('.')[0].replace('v','')))" 2>/dev/null || echo "0")
+    if [ "$_node_major" -lt 16 ] 2>/dev/null; then
+      warn "Node.js v${_node_major} detected — v16+ required for plugin injection; skipping settings.json update"
+      _node_ok=false
+    else
+      _node_ok=true
+    fi
+  else
+    _node_ok=false
+  fi
+  ```
+  Guard all subsequent `node -e` calls in this block with `[ "$_node_ok" = true ] &&`.
+
 - [ ] [T-002-B] **Add code-conductor plugin creation block after the global settings merge**
 
   In `install.sh`, find the line:
@@ -209,9 +249,14 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
   }
 }
 PLUGINJSON
+    # Path separator note: cp uses forward slashes on bash/macOS/Linux; on Windows Git Bash
+    # forward slashes are also valid. The target SKILL.md path must use forward slashes here
+    # because bash cp does not interpret backslashes as separators.
     cp "${GLOBAL_DIR}/skills/critical-review.md"   "${PLUGIN_DIR}/skills/critical-review/SKILL.md"
     cp "${GLOBAL_DIR}/skills/memory-first.md"       "${PLUGIN_DIR}/skills/memory-first/SKILL.md"
     cp "${GLOBAL_DIR}/skills/agent-delegation.md"   "${PLUGIN_DIR}/skills/agent-delegation/SKILL.md"
+    # enabledPlugins note: if 'code-conductor@code-conductor' is already present but set to
+    # false, the assignment below overwrites it with true — this is the correct healing behavior.
     command -v node >/dev/null 2>&1 && node -e "
 const f=require('os').homedir()+'/.claude/settings.json';
 let obj={};if(require('fs').existsSync(f)){try{obj=JSON.parse(require('fs').readFileSync(f,'utf8'));}catch(e){}}
@@ -243,6 +288,13 @@ console.log('plugin.json OK: ' + pj.name + ' v' + pj.version);
   ```
 
   Expected output: `plugin.json OK: code-conductor v<version>` (e.g. `v1.14.0` when `REMOTE_VERSION=1.14.0`)
+
+  **Version conflict check** — if a stale versioned dir from a previous install exists alongside the current one (e.g. `1.0.0/` coexisting with `1.14.0/`), the wipe in T-002-B removes only `${PLUGIN_DIR}` (the current version). Detect and warn about stale dirs:
+  ```bash
+  _cc_base="${HOME}/.claude/plugins/cache/code-conductor/code-conductor"
+  _stale_count=$(ls -1 "${_cc_base}" 2>/dev/null | grep -cv "^${_cc_ver}$" || echo 0)
+  [ "$_stale_count" -gt 0 ] && warn "Stale plugin version dirs found in ${_cc_base} — remove manually if needed"
+  ```
 
   Also verify SKILL.md files were copied:
   ```bash
@@ -287,6 +339,29 @@ console.log('plugin.json OK: ' + pj.name + ' v' + pj.version);
   Read({ file_path: "install.ps1", offset: 123, limit: 48 })
   ```
   Verify the output contains `Write-Info "Installing claude-mem..."` and the winget fallback block. If the text differs from the `old_string` below, update the `old_string` in T-003-A to match before proceeding. Backtick continuation characters in PS (`` ` ``) must be preserved exactly — they are U+0060 GRAVE ACCENT, not U+2018/U+2019 curly quotes.
+
+- [ ] [T-003-A-1] **Backup `settings.json` before modification (PowerShell)**
+
+  Immediately before the `$cmNodeScript` execution, add:
+  ```powershell
+  $settingsPath = "$env:USERPROFILE\.claude\settings.json"
+  if (Test-Path $settingsPath) {
+    Copy-Item $settingsPath "$env:USERPROFILE\.claude\settings.json.bak" -Force
+  }
+  ```
+  Recovery: `Copy-Item "$env:USERPROFILE\.claude\settings.json.bak" "$env:USERPROFILE\.claude\settings.json" -Force`. Overwritten on each install run.
+
+- [ ] [T-003-A-2] **Verify claude-mem cache directory removed (PowerShell)**
+
+  Add after the uninstall call:
+  ```powershell
+  $cmCache = "$env:USERPROFILE\.claude\plugins\cache\thedotmack\claude-mem"
+  if (Test-Path $cmCache) {
+    Write-Warn "claude-mem cache dir still present at $cmCache — manual cleanup may be needed"
+  } else {
+    Write-Ok "claude-mem cache dir removed"
+  }
+  ```
 
 - [ ] [T-003-A] **Remove the claude-mem install block from the `-NoDeps` section**
 
@@ -350,9 +425,12 @@ console.log('plugin.json OK: ' + pj.name + ' v' + pj.version);
 
   New (replacement — inside the `-not $NoDeps` block, directly after `Write-Host ""`):
   ```powershell
-    # Silent claude-mem removal — heals existing installs; no-op if never installed
+    # Silent claude-mem removal — heals existing installs; no-op if npx/Node absent
     Write-Info "Removing claude-mem (no-op if never installed)..."
-    try { $null = cmd /c "npx --yes claude-mem uninstall 2>nul" } catch {}
+    # Explicit npx guard: try/catch absorbs command-not-found on Node-absent machines
+    if (Get-Command npx -ErrorAction SilentlyContinue) {
+      try { $null = cmd /c "npx --yes claude-mem uninstall 2>nul" } catch {}
+    }
     # Remove claude-mem@thedotmack from enabledPlugins (no-op on fresh installs)
     $cmNodeScript = @'
 const f=require('os').homedir()+'/.claude/settings.json';
@@ -375,6 +453,21 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
         }
     }
   ```
+
+- [ ] [T-003-B-0] **Node.js version baseline check (PowerShell)**
+
+  Insert this guard at the top of the plugin creation block (inside `if (-not $NoDeps)`):
+  ```powershell
+  $nodeOk = $false
+  if (Get-Command node -ErrorAction SilentlyContinue) {
+    $nodeMajor = [int](node -e "process.stdout.write(String(process.version.split('.')[0].replace('v','')))" 2>$null)
+    if ($nodeMajor -ge 16) { $nodeOk = $true }
+    else { Write-Warn "Node.js v$nodeMajor detected -- v16+ required for plugin injection; skipping settings.json update" }
+  }
+  ```
+  Gate all subsequent `node -e` calls in this block with `if ($nodeOk) { ... }`.
+
+  **Windows permission error handling**: On corporate machines with restricted `%APPDATA%` or `%USERPROFILE%`, `New-Item -ItemType Directory -Force` or `Copy-Item` may throw `UnauthorizedAccessException`. Wrap the entire plugin creation block in `try { ... } catch { Write-Warn "code-conductor plugin install failed: $_"; Write-Warn "Run installer as Administrator or grant write access to $env:USERPROFILE\.claude\plugins" }`.
 
 - [ ] [T-003-B] **Add code-conductor plugin creation block after global settings merge**
 
@@ -414,9 +507,15 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
       $pluginJsonContent + "`n",
       $pluginEnc
     )
+    # Path separator note: Copy-Item on PS 5.1/Windows uses backslashes here because
+    # $pluginDir and $GLOBAL_DIR were set with backslash separators. Claude Code plugin
+    # resolution on Windows reads SKILL.md via its own path normalization — backslash
+    # paths in the plugin dir are correct on Windows; forward slashes also work on PS 5.1.
     Copy-Item "$GLOBAL_DIR\skills\critical-review.md"   "$pluginDir\skills\critical-review\SKILL.md"
     Copy-Item "$GLOBAL_DIR\skills\memory-first.md"       "$pluginDir\skills\memory-first\SKILL.md"
     Copy-Item "$GLOBAL_DIR\skills\agent-delegation.md"   "$pluginDir\skills\agent-delegation\SKILL.md"
+    # enabledPlugins note: if 'code-conductor@code-conductor' is already present but set to
+    # false, the assignment below overwrites it with true — correct healing behavior.
     $enableScript = @'
 const f=require('os').homedir()+'/.claude/settings.json';
 let obj={};if(require('fs').existsSync(f)){try{obj=JSON.parse(require('fs').readFileSync(f,'utf8'));}catch(e){}}
@@ -450,6 +549,16 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
   ```
 
   Expected output: `[OK] plugin.json OK: code-conductor v<version>` (e.g. `v1.14.0` when `$RemoteVersion = "1.14.0"`)
+
+  **Version conflict check** — detect stale versioned dirs from prior installs:
+  ```powershell
+  $ccBase = "$env:USERPROFILE\.claude\plugins\cache\code-conductor\code-conductor"
+  $staleDirs = Get-ChildItem $ccBase -Directory -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -ne $ccVersion }
+  if ($staleDirs) {
+    Write-Warn "Stale plugin version dirs found: $($staleDirs.Name -join ', ') -- remove manually if needed"
+  }
+  ```
 
   Also verify SKILL.md files are present and non-empty:
   ```powershell
@@ -517,14 +626,19 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
 
 - [ ] [T-004-C] **Prepend `[1.14.0]` entry to `CHANGELOG.md`**
 
-  Use the Edit tool:
+  First read the top of CHANGELOG.md to confirm the exact anchor text:
+  ```
+  Read({ file_path: "CHANGELOG.md", offset: 1, limit: 8 })
+  ```
+  The file must start with `# Changelog` followed by blank lines then `## [1.13.0]`. Use the Edit tool with **literal newlines** (not `\n` escape sequences) in `old_string`:
   - `file_path`: `CHANGELOG.md`
-  - `old_string`: `# Changelog\n\n\n## [1.13.0]`
-  - `new_string`: the `# Changelog` header + the `[1.14.0]` block below + `## [1.13.0]`
+  - `old_string`: the exact literal text of the first 4 lines (including blank lines) as returned by the Read above
+  - `new_string`: the same anchor line + the `[1.14.0]` block + the `[1.13.0]` anchor
 
-  Insert the following block immediately after the `# Changelog` header line (before the existing `## [1.13.0]` entry):
-
+  The full `new_string` content to write (use literal newlines):
   ```markdown
+  # Changelog
+
 
   ## [1.14.0] - 2026-06-23
 
@@ -533,13 +647,17 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
   - `[BUG-020]` Orphaned superpowers-cached `critical-review` skill glob-deleted on install (all superpowers versions)
 
   ### Added
-  - `[BUG-020]` code-conductor Claude Code plugin (`~/.claude/plugins/cache/code-conductor/code-conductor/1.0.0/`) — owns `critical-review`, `memory-first`, and `agent-delegation` skills; installed and enabled by both installers
+  - `[BUG-020]` code-conductor Claude Code plugin (`~/.claude/plugins/cache/code-conductor/code-conductor/<version>/`) — owns `critical-review`, `memory-first`, and `agent-delegation` skills; installed and enabled by both installers
   - `[BUG-020]` `"code-conductor@code-conductor": true` injected into `~/.claude/settings.json` `enabledPlugins` by both installers; `Skill({ skill: "critical-review" })` now resolves without superpowers dependency
 
   ### Changed
   - `[BUG-020]` 6 prose references to `claude-mem` replaced with `.claude/memory/project.md` in `global/CLAUDE.md`, `skills/memory-first.md`, `skills/agent-delegation.md`, `README.md`, `.claude/hooks/pre-tool-use.sh`, `project-template/.claude/hooks/pre-tool-use.sh`
 
+
+  ## [1.13.0]
   ```
+
+  Verify: `Read({ file_path: "CHANGELOG.md", offset: 1, limit: 20 })` — must show `[1.14.0]` before `[1.13.0]`.
 
 - [ ] [T-004-D] **Run tests**
 
@@ -629,6 +747,31 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
   git commit -m "test: add code-conductor plugin schema and skill file assertions"
   ```
 
+- [ ] [T-005-D] **Manual smoke test: Claude Code CLI plugin load**
+
+  After both installers have run (or after `bash install.sh` completes on the local machine), verify the plugin loads cleanly:
+
+  ```bash
+  # Confirm CLI is available
+  claude --version
+  ```
+  Expected: a version string (any); confirms Claude Code CLI is on PATH.
+
+  Then start a new session and run:
+  ```
+  /graphify
+  ```
+  If the skill resolves without `Unknown skill: graphify`, the plugin directory is being scanned. Then verify the code-conductor skills:
+  ```
+  /critical-review
+  ```
+  Expected: skill content loads (no `Unknown skill: critical-review` error).
+
+  **Note**: This step cannot be automated in `npm test` because it requires a live Claude Code session. Record the result manually. If `Unknown skill` is returned, check:
+  1. `~/.claude/settings.json` contains `"code-conductor@code-conductor": true`
+  2. `~/.claude/plugins/cache/code-conductor/code-conductor/<version>/.claude-plugin/plugin.json` exists with all 4 fields
+  3. Claude Code was restarted after the installer ran (plugin registry is read at session start)
+
 ---
 
 ## Test List
@@ -636,7 +779,7 @@ require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');
 - [ ] `npm test` passes after each commit (T-002-D, T-003-D, T-004-D) — 142 passed, 3 skipped
 - [ ] No test file asserts on "claude-mem" text (pre-confirmed by grep — no updates needed)
 - [ ] Manual smoke: run `bash install.sh --no-deps` on a clean machine — no claude-mem step runs, no plugin created (NoDeps guard)
-- [ ] Manual smoke: run `bash install.sh` — `~/.claude/plugins/cache/code-conductor/code-conductor/1.0.0/.claude-plugin/plugin.json` exists with correct 4-field schema
+- [ ] Manual smoke: run `bash install.sh` — `~/.claude/plugins/cache/code-conductor/code-conductor/<REMOTE_VERSION>/.claude-plugin/plugin.json` exists with correct 4-field schema
 
 ## Commit Order
 
