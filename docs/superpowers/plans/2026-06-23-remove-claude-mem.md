@@ -11,12 +11,13 @@
 ## Global Constraints
 
 - JSON output: 2-space indentation + trailing newline (`JSON.stringify(obj, null, 2) + '\n'`). No minification.
-- UTF-8 without BOM: all JSON file writes must produce UTF-8 without BOM. PS 5.1 defaults to UTF-16 LE BOM — never use `Out-File`, `Set-Content`, or `Add-Content` for JSON files. For `plugin.json`, use `[System.IO.File]::WriteAllText(path, content, [System.Text.UTF8Encoding]::new($false))`. For `settings.json`, all writes go through Node.js `writeFileSync(f, ..., 'utf8')` which never emits BOM. For backup/restore operations, use `Copy-Item` (byte-for-byte copy, preserves original encoding).
+- UTF-8 without BOM: all JSON file writes must produce UTF-8 without BOM. PS 5.1 defaults to UTF-16 LE BOM — never use `Out-File`, `Set-Content`, or `Add-Content` for JSON files. For `plugin.json`, use `[System.IO.File]::WriteAllText(path, content, [System.Text.UTF8Encoding]::new($false))` — the `$false` argument is `encoderShouldEmitUTF8Identifier`; `$false` = no BOM; `$true` would prepend 3 BOM bytes (0xEF 0xBB 0xBF) that break JSON parsers including Claude Code's own plugin loader. For `settings.json`, all writes go through Node.js `writeFileSync(f, ..., 'utf8')` which never emits BOM. For backup/restore operations, use `Copy-Item` (byte-for-byte copy, preserves original encoding).
 - No `jq` assumption: all `settings.json` manipulation uses `node -e` inline scripts.
 - `set -euo pipefail` compatibility: every `node -e` call prefixed with `command -v node >/dev/null 2>&1 &&`; every non-fatal command suffixed with `|| true`; the uninstall call prefixed with `command -v npx >/dev/null 2>&1 &&`. **Non-interactive mandate:** the full uninstall invocation must be `CI=1 npx --yes claude-mem uninstall --yes` — `CI=1` is a Node.js/npm environment flag that suppresses all interactive prompts from npx and npm (required for agentic/automated execution that has no TTY); the first `--yes` tells npx to auto-accept package installs without prompting; the second `--yes` is passed to `claude-mem uninstall` itself to suppress its own confirmation prompt. Omitting either flag risks the process hanging indefinitely waiting for input that will never arrive.
 - `node -e` JSON resilience: all `JSON.parse` calls wrapped in `try/catch`; malformed or empty `settings.json` falls back to `{}` without aborting.
 - Node.js minimum version: v16+. The plugin injection block (T-002-B/T-003-B) must gate ALL `node -e` calls behind a runtime version check using the `$_node_ok` flag (bash) or `$nodeOk` flag (PS) set in T-002-B-0/T-003-B-0. Versions below 16 lack stable `fs.mkdirSync({recursive:true})` behaviour on Windows and may have `JSON.stringify` edge-case differences. The unconditional key-removal block (T-002-A/T-003-A) uses `node -e` for simple key deletion, which works on any Node.js ≥ 10 and does NOT need the v16 gate; the gate applies only to the plugin creation path.
 - Dynamic plugin version: both installers read `REMOTE_VERSION` / `$RemoteVersion` (already set by the version-fetch at the top of each installer) and use it for the plugin directory path and `plugin.json` version field. Fallback when fetch fails: local `VERSION` file → sentinel `"1.0.0"` (full three-step chain in the Version fallback chain constraint below).
+- Version string consistency (anti-hardcode rule): `_cc_ver` (bash) and `$ccVersion` (PS) are the SOLE source for the plugin directory path, `plugin.json` version field, and any version-related assertions. Never hardcode a version literal (e.g., `"1.14.0"`) anywhere in the installer blocks — always use the runtime variable. If a hardcoded literal is spotted during implementation review, treat it as a blocking bug and replace it with the variable. The only permitted literal is the sentinel fallback `"1.0.0"` in the three-step version fallback chain itself.
 - Version harmonization: `VERSION`, `package.json`, `plugin.json`, and the plugin directory path must all resolve to the same version string at runtime. After the Task 4 version bump, the installer's `REMOTE_VERSION` fetch will return `1.14.0` from the remote tag; the `VERSION` file on disk will also read `1.14.0`. On offline developer machines where the remote fetch fails, the fallback chain reads the local `VERSION` file (returns `1.14.0` on a post-bump workstation) before falling back to sentinel `"1.0.0"`. The `"1.0.0"` sentinel is only reached on a fresh CI machine with no `VERSION` file present; it does NOT need to match `1.14.0` because it only applies when both the remote fetch and the local file are unavailable.
 - Remote version fetch execution sequence: (1) installer starts; (2) `REMOTE_VERSION` is set via `curl`/`Invoke-WebRequest` at the top of each installer script; (3) if the fetch times out or fails, `REMOTE_VERSION` is empty - the version derivation then checks the local `VERSION` file; (3a) if `VERSION` is readable and non-empty, `_cc_ver` / `$ccVersion` is set to its trimmed content; (3b) if `VERSION` is absent or unreadable, `_cc_ver` / `$ccVersion` falls back to sentinel `"1.0.0"`; (4) plugin dir is created under `${_cc_ver}` / `$ccVersion`; (5) `plugin.json` version field is written with the same value; (6) `enabledPlugins` key is set regardless of version. All three outcome paths produce a valid plugin; they differ only in the versioned subdirectory name.
 - Local testing with pre-release version: when testing changes locally before the tag `v1.14.0` is pushed to the remote, the installer's fetch will return the current released version (e.g., `1.13.0`), not `1.14.0`. Override with: `REMOTE_VERSION=1.14.0 bash install.sh` (bash) or `$env:REMOTE_VERSION="1.14.0"; .\install.ps1` (PS). Never run the installer without this override during pre-release local testing, otherwise the plugin dir and `plugin.json` version will reflect the wrong version and subsequent verification steps will fail.
@@ -361,6 +362,11 @@ PLUGINJSON
     # Path separator note: cp uses forward slashes on bash/macOS/Linux; on Windows Git Bash
     # forward slashes are also valid. The target SKILL.md path must use forward slashes here
     # because bash cp does not interpret backslashes as separators.
+    # Failure policy for cp: these calls have NO '|| true' — a cp failure (directory permission
+    # error, source file locked, or EACCES on the target) exits non-zero, which triggers the
+    # 'set -euo pipefail' ERR trap, auto-restores settings.json from .bak, and aborts the installer.
+    # This is the CORRECT behavior: a broken plugin dir must not silently proceed.
+    # Recovery: fix permissions on ${PLUGIN_DIR} parent, ensure source files are readable, re-run.
     cp "${GLOBAL_DIR}/skills/critical-review.md"   "${PLUGIN_DIR}/skills/critical-review/SKILL.md"
     cp "${GLOBAL_DIR}/skills/memory-first.md"       "${PLUGIN_DIR}/skills/memory-first/SKILL.md"
     cp "${GLOBAL_DIR}/skills/agent-delegation.md"   "${PLUGIN_DIR}/skills/agent-delegation/SKILL.md"
@@ -542,6 +548,8 @@ console.log('settings.json assertions passed');
 - [ ] [T-003-A] **Remove the claude-mem install block from the `-NoDeps` section**
 
   In `install.ps1`, find and delete the block starting with `if ($HasNode) { Write-Info "Installing claude-mem..."` (located by T-003-A-0 grep). Replace it with the uninstall + cleanup lines below. Do not use line numbers as the anchor.
+  **npx presence check (PS):** the replacement block uses `if (Get-Command npx -ErrorAction SilentlyContinue)` to verify npx before invoking it; the else branch emits `Write-Warn` and continues without halting. `Get-Command -ErrorAction SilentlyContinue` is the correct PS 5.1 idiom — `try/catch` only absorbs terminating exceptions and does NOT catch "command not found" errors for native executables.
+  **Execution ordering (PS):** the T-003-A unconditional block runs BEFORE the `if (-not $NoDeps)` guard. `Merge-SettingsJson` is inside the guard and runs later; T-003-B's enabledPlugins write follows. On fresh installs, `settings.json` does not yet exist when T-003-A runs — `$cmNodeScript`'s `if(!existsSync(f))process.exit(0)` exits silently. The global settings merge then creates `settings.json`; T-003-B adds `code-conductor@code-conductor`.
   **Node.js version requirement for this step:** any version ≥ 10. The v16 gate in T-003-B-0 does NOT apply to the unconditional key-removal block. The node script uses only `fs.existsSync`, `fs.readFileSync`, `JSON.parse`, `fs.writeFileSync`, and `JSON.stringify` — all available since Node.js v10. Do not add a v16 check to this step.
 
   Old (entire block to remove):
@@ -619,6 +627,8 @@ console.log('settings.json assertions passed');
     if (Test-Path $settingsPath) { $fi = Get-Item $settingsPath; if ($fi.IsReadOnly) { $fi.IsReadOnly = $false } }
     # NOTE: backup + try/finally restore from T-003-A-1 must be inserted here, immediately before $cmNodeScript execution.
     # Remove claude-mem@thedotmack from enabledPlugins (no-op on fresh installs)
+    # Fresh-install guard: line 1 of the script is 'if(!existsSync(f))process.exit(0)' --
+    # silently exits when settings.json does not yet exist; no file-not-found exception thrown.
     $cmNodeScript = @'
 const f=require('os').homedir()+'/.claude/settings.json';
 if(!require('fs').existsSync(f))process.exit(0);
@@ -709,7 +719,7 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
     Write-Warn "code-conductor plugin install failed: $_"
   }
   ```
-  The outer `if (-not $NoDeps)` block remains; the `try/catch` is the inner wrapper. A permission failure is non-fatal - the installer continues; missing the plugin is reported via `Write-Warn`, not `throw`.
+  The outer `if (-not $NoDeps)` block remains; the `try/catch` is the inner wrapper. A permission failure is non-fatal — the installer continues; missing the plugin is reported via `Write-Warn`, not `throw`. **Copy-Item failure policy (PS):** `[System.UnauthorizedAccessException]` on any `Copy-Item` call is caught by the outer `try/catch [System.UnauthorizedAccessException]` block and emits `Write-Warn`; the partial plugin dir is then detected by T-003-C's SKILL.md existence check (`throw "ERROR: missing SKILL.md for $_"`) which aborts the verification step. The implementer must NOT proceed to T-003-D without resolving T-003-C. Recovery: grant write access to `$pluginDir` (e.g., `icacls`) and re-run the installer.
 
 - [ ] [T-003-B] **Add code-conductor plugin creation block after global settings merge**
 
