@@ -140,7 +140,7 @@ Controls how much Claude writes per turn. The level is set at install time via `
 
 Before reading any file, Claude walks a priority lookup chain and stops at the first step that answers the question:
 
-1. **Project memory** — `claude-mem` / `project.md`
+1. **Project memory**: `.claude/memory/project.md`
 2. **Graphify graph** — structural/relational queries (`what calls X`, `what depends on Y`)
 3. **Grep / Glob** — pattern searches
 4. **Targeted read** — last resort, always with `offset` + `limit`, max 150 lines

@@ -22,7 +22,7 @@ Never write code without an approved spec. Never start implementing without an a
 
 Before reading any file or spawning any search, classify the task and walk this chain. Stop at the first step that answers the question.
 
-1. **Memory** — check `claude-mem` / `.claude/memory/project.md`. If the answer is there, stop.
+1. **Memory**: check `.claude/memory/project.md`. If the answer is there, stop.
 2. **Graph** — structural question? Run `graphify query "<question>"` if `graphify` is installed. Stop.
 3. **Grep / Glob** — pattern search? Use `Grep` or `Glob` inline. Stop.
 4. **Explore sub-agent** — need 3+ files to answer one question? Spawn an `Explore` sub-agent. It returns a ≤200-word summary. Main context receives only the summary. Stop.

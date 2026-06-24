@@ -16,7 +16,7 @@ if [ "${CLAUDE_TOOL_NAME:-}" = "Read" ]; then
       echo "   Lines: $LINE_COUNT (>150 — no limit specified)"
       echo ""
       echo "   Follow the orchestrator lookup chain:"
-      echo "   1. Check claude-mem / project.md"
+      echo "   1. Check .claude/memory/project.md"
       echo "   2. Query graphify for structural questions"
       echo "   3. Use Grep/Glob for pattern searches"
       echo "   4. Read with explicit offset + limit"

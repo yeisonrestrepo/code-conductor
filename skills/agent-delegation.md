@@ -34,5 +34,5 @@ Agent({ description: "Task B", prompt: "... Return a summary of ≤200 words." }
 
 ## When NOT to Spawn
 - Single Grep or Glob can answer the question.
-- Answer is already in `project.md` or claude-mem.
+- Answer is already in `.claude/memory/project.md`.
 - Task requires back-and-forth with the user (stay inline).

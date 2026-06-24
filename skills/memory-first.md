@@ -5,7 +5,7 @@ Follow this lookup chain in strict order before reading any file, running any se
 ## Chain
 
 ### 1. Project Memory
-Check `.claude/memory/project.md` and the `claude-mem` index.
+Check `.claude/memory/project.md`.
 
 Use the Grep tool to check project.md first:
 
