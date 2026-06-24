@@ -11,10 +11,11 @@
 ## Global Constraints
 
 - JSON output: 2-space indentation + trailing newline (`JSON.stringify(obj, null, 2) + '\n'`). No minification.
-- UTF-8 without BOM: all JSON file writes must produce UTF-8 without BOM. PS 5.1 defaults to UTF-16 LE BOM — never use `Out-File`, `Set-Content`, or `Add-Content` for JSON files. For `plugin.json`, use `[System.IO.File]::WriteAllText(path, content, [System.Text.UTF8Encoding]::new($false))` — the `$false` argument is `encoderShouldEmitUTF8Identifier`; `$false` = no BOM; `$true` would prepend 3 BOM bytes (0xEF 0xBB 0xBF) that break JSON parsers including Claude Code's own plugin loader. For `settings.json`, all writes go through Node.js `writeFileSync(f, ..., 'utf8')` which never emits BOM. For backup/restore operations, use `Copy-Item` (byte-for-byte copy, preserves original encoding).
+- UTF-8 without BOM: all JSON file writes must produce UTF-8 without BOM. PS 5.1 defaults to UTF-16 LE BOM — never use `Out-File`, `Set-Content`, or `Add-Content` for JSON files. For `plugin.json`, use `[System.IO.File]::WriteAllText(path, content, [System.Text.UTF8Encoding]::new($false))` — the `$false` argument is `encoderShouldEmitUTF8Identifier`; `$false` = no BOM; `$true` would prepend 3 BOM bytes (0xEF 0xBB 0xBF) that break JSON parsers including Claude Code's own plugin loader. The `[System.Text.UTF8Encoding]::new($false)` instance MUST be passed as the third argument — omitting it defaults to `[System.Text.Encoding]::UTF8` which on .NET Framework 4.x includes a 3-byte BOM preamble by default. For `settings.json`, all writes go through Node.js `writeFileSync(f, ..., 'utf8')` which never emits BOM. For backup/restore operations, use `Copy-Item` (byte-for-byte copy, preserves original encoding).
 - No `jq` assumption: all `settings.json` manipulation uses `node -e` inline scripts.
 - `set -euo pipefail` compatibility: every `node -e` call prefixed with `command -v node >/dev/null 2>&1 &&`; every non-fatal command suffixed with `|| true`; the uninstall call prefixed with `command -v npx >/dev/null 2>&1 &&`. **Non-interactive mandate:** the full uninstall invocation must be `CI=1 npx --yes claude-mem uninstall --yes` — `CI=1` is a Node.js/npm environment flag that suppresses all interactive prompts from npx and npm (required for agentic/automated execution that has no TTY); the first `--yes` tells npx to auto-accept package installs without prompting; the second `--yes` is passed to `claude-mem uninstall` itself to suppress its own confirmation prompt. Omitting either flag risks the process hanging indefinitely waiting for input that will never arrive.
 - `node -e` JSON resilience: all `JSON.parse` calls wrapped in `try/catch`; malformed or empty `settings.json` falls back to `{}` without aborting.
+- `node -e` fresh-install guard (MANDATORY): every key-removal node script MUST begin with `if(!require('fs').existsSync(f))process.exit(0)`. This is required because T-002-A/T-003-A runs BEFORE `_merge_settings_json` / `Merge-SettingsJson`; on a first install, `settings.json` does not yet exist. Omitting the guard causes `readFileSync` to throw `ENOENT`, crashing the script and triggering the ERR trap (bash) or `catch` block (PS).
 - Node.js minimum version: v16+. The plugin injection block (T-002-B/T-003-B) must gate ALL `node -e` calls behind a runtime version check using the `$_node_ok` flag (bash) or `$nodeOk` flag (PS) set in T-002-B-0/T-003-B-0. Versions below 16 lack stable `fs.mkdirSync({recursive:true})` behaviour on Windows and may have `JSON.stringify` edge-case differences. The unconditional key-removal block (T-002-A/T-003-A) uses `node -e` for simple key deletion, which works on any Node.js ≥ 10 and does NOT need the v16 gate; the gate applies only to the plugin creation path.
 - Dynamic plugin version: both installers read `REMOTE_VERSION` / `$RemoteVersion` (already set by the version-fetch at the top of each installer) and use it for the plugin directory path and `plugin.json` version field. Fallback when fetch fails: local `VERSION` file → sentinel `"1.0.0"` (full three-step chain in the Version fallback chain constraint below).
 - Version string consistency (anti-hardcode rule): `_cc_ver` (bash) and `$ccVersion` (PS) are the SOLE source for the plugin directory path, `plugin.json` version field, and any version-related assertions. Never hardcode a version literal (e.g., `"1.14.0"`) anywhere in the installer blocks — always use the runtime variable. If a hardcoded literal is spotted during implementation review, treat it as a blocking bug and replace it with the variable. The only permitted literal is the sentinel fallback `"1.0.0"` in the three-step version fallback chain itself.
@@ -551,6 +552,7 @@ console.log('settings.json assertions passed');
   **npx presence check (PS):** the replacement block uses `if (Get-Command npx -ErrorAction SilentlyContinue)` to verify npx before invoking it; the else branch emits `Write-Warn` and continues without halting. `Get-Command -ErrorAction SilentlyContinue` is the correct PS 5.1 idiom — `try/catch` only absorbs terminating exceptions and does NOT catch "command not found" errors for native executables.
   **Execution ordering (PS):** the T-003-A unconditional block runs BEFORE the `if (-not $NoDeps)` guard. `Merge-SettingsJson` is inside the guard and runs later; T-003-B's enabledPlugins write follows. On fresh installs, `settings.json` does not yet exist when T-003-A runs — `$cmNodeScript`'s `if(!existsSync(f))process.exit(0)` exits silently. The global settings merge then creates `settings.json`; T-003-B adds `code-conductor@code-conductor`.
   **Node.js version requirement for this step:** any version ≥ 10. The v16 gate in T-003-B-0 does NOT apply to the unconditional key-removal block. The node script uses only `fs.existsSync`, `fs.readFileSync`, `JSON.parse`, `fs.writeFileSync`, and `JSON.stringify` — all available since Node.js v10. Do not add a v16 check to this step.
+  **`$cmNodeScript` JSON resilience (three file-state cases):** (1) `settings.json` absent — `existsSync` check on line 1 calls `process.exit(0)` silently; no `readFileSync` is ever called. (2) file exists but is empty — `JSON.parse('')` throws; `_raw.trim()` is falsy; `obj` stays `{}`; key-removal is a no-op. (3) file exists, non-empty, malformed — `_raw.trim()` is truthy; emits WARN to stderr and calls `process.exit(0)` to avoid data loss. All three cases are encoded in `$cmNodeScript`; the implementer must NOT simplify the script.
 
   Old (entire block to remove):
   ```powershell
@@ -614,7 +616,9 @@ console.log('settings.json assertions passed');
     Write-Info "Removing claude-mem (no-op if never installed)..."
     # Explicit npx guard: try/catch absorbs command-not-found on Node-absent machines
     if (Get-Command npx -ErrorAction SilentlyContinue) {
-      # set CI=1 suppresses npx/npm interactive prompts; --yes passed to claude-mem uninstall itself
+      # Three-flag mandate (see Global Constraints "Non-interactive npx"):
+      # CI=1 suppresses npx/npm interactive prompts; first --yes = npx auto-accept; second --yes = claude-mem's own confirmation.
+      # cmd /c is required: PS 5.1 npx.cmd may hang without the Windows command interpreter; 2>nul suppresses cmd-level stderr.
       try { $null = cmd /c "set CI=1 && npx --yes claude-mem uninstall --yes 2>nul" } catch {}
     } else {
       Write-Warn "npx not found on PATH -- claude-mem uninstall skipped (install Node.js/npm to heal existing claude-mem installs)"
@@ -645,6 +649,8 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
     # Glob-delete orphaned superpowers-cached critical-review skill (PS 5.1 pipeline required)
     $superDir = "$env:USERPROFILE\.claude\plugins\cache\claude-plugins-official\superpowers"
     if (Test-Path $superDir) {
+      # -ErrorAction SilentlyContinue: defends against TOCTOU (dir removed between Test-Path and
+      # Get-ChildItem). Zero matching items = ForEach-Object body never executes; no error, no warn.
       Get-ChildItem $superDir -Directory -Force -ErrorAction SilentlyContinue |
         ForEach-Object {
           $t = Join-Path $_.FullName "skills\critical-review"
@@ -745,8 +751,23 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
     # Reject non-semver content to prevent path injection from malformed VERSION file
     if ($localVer -and $localVer -notmatch '^\d+\.\d+\.\d+') { $localVer = $null }
     $ccVersion = if ($RemoteVersion) { $RemoteVersion } elseif ($localVer) { $localVer } else { "1.0.0" }
+    # $ccVersion is NEVER hardcoded -- always resolved from the chain above (anti-hardcode rule).
+    # The only permitted literal is the sentinel "1.0.0" as the final fallback in the chain itself.
     $pluginDir = "$env:USERPROFILE\.claude\plugins\cache\code-conductor\code-conductor\$ccVersion"
-    if (Test-Path $pluginDir) { Remove-Item -Recurse -Force $pluginDir }
+    # Idempotent wipe with IOException retry (matches retry form in T-003-B-0 -- use this form in implementation):
+    if (Test-Path $pluginDir) {
+      try {
+        Remove-Item -Recurse -Force $pluginDir -ErrorAction Stop
+      } catch [System.IO.IOException] {
+        Start-Sleep -Seconds 2
+        try {
+          Remove-Item -Recurse -Force $pluginDir -ErrorAction Stop
+        } catch {
+          $archivePath = $pluginDir + "_old_" + [System.DateTime]::Now.ToString("yyyyMMddHHmmss")
+          Rename-Item -Path $pluginDir -NewName $archivePath -ErrorAction SilentlyContinue
+        }
+      }
+    }
     New-Item -ItemType Directory -Force "$pluginDir\.claude-plugin" | Out-Null
     # Create intermediate skills/ dir before leaf subdirs (required on PS 5.1)
     New-Item -ItemType Directory -Force "$pluginDir\skills" | Out-Null
