@@ -801,7 +801,7 @@ powershell -NonInteractive -NoProfile -Command "
 
 Expected: `PASS`
 
-- [>] **T-009-5: Commit**
+- [X] **T-009-5: Commit**
 
 ```bash
 git add install.ps1
@@ -820,7 +820,7 @@ git commit -m "feat(FEAT-007): update install.ps1 to wire context-guard hooks an
 - Consumes: `.claude/hooks/post-compact.sh` (for PostCompact reset test)
 - Produces: 19 passing test cases covering all spec rows
 
-- [ ] **T-010-1: Write the test file**
+- [X] **T-010-1: Write the test file**
 
 ```js
 import { describe, it, expect, afterEach } from 'vitest'
@@ -1059,7 +1059,7 @@ describe.skipIf(!BASH_AVAILABLE)('context-guard.sh', () => {
 })
 ```
 
-- [ ] **T-010-2: Run the tests**
+- [X] **T-010-2: Run the tests**
 
 ```bash
 npx vitest run tests/hooks/context-guard.test.js --reporter=verbose
@@ -1067,7 +1067,7 @@ npx vitest run tests/hooks/context-guard.test.js --reporter=verbose
 
 Expected: all tests in the `context-guard.sh` describe block pass (skipped on Windows is acceptable for rows 12, all Unix rows).
 
-- [ ] **T-010-3: Commit**
+- [>] **T-010-3: Commit**
 
 ```bash
 git add -f tests/hooks/context-guard.test.js
