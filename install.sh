@@ -1211,10 +1211,15 @@ if [ "$INSTALL_PROJECT" = true ]; then
     download "project-template/.claude/commands/${cmd}.md" "${PROJ_DIR}/commands/${cmd}.md"
   done
 
-  download "project-template/.claude/hooks/pre-tool-use.sh"  "${PROJ_DIR}/hooks/pre-tool-use.sh"  false
-  download "project-template/.claude/hooks/post-compact.sh"  "${PROJ_DIR}/hooks/post-compact.sh"
+  download "project-template/.claude/hooks/pre-tool-use.sh"    "${PROJ_DIR}/hooks/pre-tool-use.sh"    false
+  download "project-template/.claude/hooks/post-compact.sh"    "${PROJ_DIR}/hooks/post-compact.sh"
+  download "project-template/.claude/hooks/context-guard.sh"   "${PROJ_DIR}/hooks/context-guard.sh"
+  download "project-template/.claude/hooks/context-guard.ps1"  "${PROJ_DIR}/hooks/context-guard.ps1"
+  download "project-template/.claude/hooks/post-compact.ps1"   "${PROJ_DIR}/hooks/post-compact.ps1"
 
-  chmod +x "${PROJ_DIR}/hooks/pre-tool-use.sh" "${PROJ_DIR}/hooks/post-compact.sh"
+  chmod +x "${PROJ_DIR}/hooks/pre-tool-use.sh" \
+           "${PROJ_DIR}/hooks/post-compact.sh" \
+           "${PROJ_DIR}/hooks/context-guard.sh"
 
   # ── Project verbosity hook copy and merge (T-004-D) ────────────────────────
   if [ ! -w "${PROJ_DIR}/hooks" ] && [ ! -w "${PROJ_DIR}" ]; then
@@ -1233,6 +1238,51 @@ if [ "$INSTALL_PROJECT" = true ]; then
     done
     [ "$_proj_json_ok" = "1" ] && _merge_settings_json "${PROJ_DIR}/settings.json" "$_proj_hook_embedded" \
       || warn "[verbosity-remind] WARN: skipping project settings.json merge — pre-validation failed."
+  fi
+
+  # ── context-guard hook wiring ─────────────────────────────────────────────
+  if command -v node >/dev/null 2>&1; then
+    _cg_node_ok=true
+    _node_major=$(node -e "process.stdout.write(String(process.version.split('.')[0].replace('v','')))" 2>/dev/null || echo "0")
+    [ "$_node_major" -lt 16 ] 2>/dev/null && { warn "Node.js v${_node_major} < 16 — context-guard settings.json wiring skipped"; _cg_node_ok=false; }
+    if [ "$_cg_node_ok" = true ]; then
+      node - "${PROJ_DIR}/settings.json" 2>/dev/null << 'JSEOF'
+const fs = require('fs');
+const f  = process.argv[2];
+let obj  = {};
+if (fs.existsSync(f)) {
+  const raw = fs.readFileSync(f, 'utf8');
+  try {
+    const p = JSON.parse(raw);
+    if (p !== null && typeof p === 'object' && !Array.isArray(p)) { obj = p; }
+    else { process.stderr.write('WARN: settings.json root is not a JSON object -- treating as {}\n'); }
+  } catch(e) { if (raw.trim()) process.stderr.write('WARN: settings.json is malformed -- treating as {}\n'); }
+}
+if (!obj.hooks) obj.hooks = {};
+['UserPromptSubmit','PostCompact'].forEach(k => {
+  if (!Array.isArray(obj.hooks[k])) obj.hooks[k] = [{ hooks: [] }];
+  if (!obj.hooks[k][0]) obj.hooks[k][0] = { hooks: [] };
+  if (!Array.isArray(obj.hooks[k][0].hooks)) obj.hooks[k][0].hooks = [];
+});
+function appendIfAbsent(arr, cmd) {
+  if (!arr.some(h => h.command === cmd)) arr.push({ type: 'command', command: cmd });
+}
+const UPS_BASH = "bash -c 'set +e; _dir=\"${PWD:-}\"; _prev=\"\"; _i=0; while [ \"$_dir\" != \"$_prev\" ] && [ \"$_i\" -lt 40 ]; do _h=\"$_dir/.claude/hooks/context-guard.sh\"; [ -f \"$_h\" ] && [ -r \"$_h\" ] && { CC_PROJECT_ROOT=\"$_dir\" bash \"$_h\"; exit $?; }; _prev=\"$_dir\"; _dir=\"${_dir%/*}\"; [ -z \"$_dir\" ] && _dir=/; _i=$((_i+1)); done; exit 0'";
+const PC_PS   = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \".claude/hooks/post-compact.ps1\"";
+appendIfAbsent(obj.hooks.UserPromptSubmit[0].hooks, UPS_BASH);
+appendIfAbsent(obj.hooks.PostCompact[0].hooks, PC_PS);
+const tmp = f + '.tmp';
+fs.writeFileSync(tmp, JSON.stringify(obj, null, 2) + '\n', { encoding: 'utf8' });
+fs.renameSync(tmp, f);
+JSEOF
+      if [ $? -eq 0 ]; then
+        ok "context-guard hooks registered in ${PROJ_DIR}/settings.json"
+      else
+        warn "context-guard settings.json wiring failed — add hooks manually"
+      fi
+    fi
+  else
+    warn "node not found — context-guard settings.json wiring skipped; install Node.js v16+ and re-run"
   fi
 
   if command -v graphify &>/dev/null && command -v claude &>/dev/null; then
@@ -1254,6 +1304,20 @@ if [ "$INSTALL_PROJECT" = true ]; then
     echo "$ENTRY" >> "$GITIGNORE"
     ok "Added $ENTRY to .gitignore"
   fi
+
+  # ── .gitattributes eol rules (idempotent) ────────────────────────────────
+  _ga=".gitattributes"
+  if [ -f "$_ga" ] && [ ! -w "$_ga" ]; then
+    warn ".gitattributes is read-only — *.sh eol=lf and *.ps1 eol=crlf not added; add manually"
+  else
+    grep -qF '*.sh text eol=lf'    "$_ga" 2>/dev/null || printf '*.sh text eol=lf\n'    >> "$_ga"
+    grep -qF '*.ps1 text eol=crlf' "$_ga" 2>/dev/null || printf '*.ps1 text eol=crlf\n' >> "$_ga"
+    ok "Updated .gitattributes eol rules"
+  fi
+
+  # ── turn-count.txt gitignore entry (idempotent) ──────────────────────────
+  _tc_entry=".claude/memory/turn-count.txt"
+  grep -qF "$_tc_entry" .gitignore 2>/dev/null || { printf '%s\n' "$_tc_entry" >> .gitignore; ok "Added $_tc_entry to .gitignore"; }
 
   # Node.js and npm engine constraint check (FEAT-024)
   if command -v node >/dev/null 2>&1; then
