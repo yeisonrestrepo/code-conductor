@@ -12,3 +12,4 @@ initial_prompt.xml
 node_modules/
 .vitest-cache/
 tests/.tmp/
+.claude/memory/turn-count.txt
