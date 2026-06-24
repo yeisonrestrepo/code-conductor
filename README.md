@@ -171,9 +171,15 @@ Fires before every tool call. Three guards:
 
 **Bash scan guard (Guard 3)** — intercepts every Bash tool call and pattern-matches the command string against 12 mass content-dump patterns before execution: deep `find` without `maxdepth 1`, `find -exec` with readers/shells, `xargs` with readers, `cat`/pager/grep with unquoted globs, command substitution with readers, shell loops, `mapfile`/`readarray`, `eval`/`source`/dot operator, alias remapping to readers, and obfuscation sequences. Commands over 8192 characters and unclosed quotes are blocked fail-closed. Operators can whitelist specific directory prefixes or exact tokens via `BASH_SCAN_ALLOWLIST` in the hook file.
 
+### context-guard *(global + project)* — v1.15.0
+
+Fires on every `UserPromptSubmit`. Atomically increments a turn counter in `.claude/memory/turn-count.txt`. At 80% of the configured threshold it emits ⚠ CONTEXT WARNING; at or above the threshold it emits 🚨 CONTEXT CRITICAL. The threshold is read from `.claude/memory/context-threshold.txt` (default: 25). After `/compact`, the `post-compact` hook resets the counter to 0.
+
+Available on both Unix (`context-guard.sh`) and Windows (`context-guard.ps1`). Set `CC_GUARD_DEBUG=1` to print debug info to stderr. Set `CC_PROJECT_ROOT` to override the project root used for the memory directory.
+
 ### post-compact
 
-Fires after `/compact`. Reads `project.md`, shows the timestamp of the last `/cc-checkpoint`, and reminds you to run `/cc-checkpoint` if context from this session hasn't been saved yet. Prevents losing decisions and conventions when the context window is compressed.
+Fires after `/compact`. Resets the turn counter to 0, reads `project.md`, shows the timestamp of the last `/cc-checkpoint`, and reminds you to run `/cc-checkpoint` if context from this session hasn't been saved yet. Prevents losing decisions and conventions when the context window is compressed.
 
 ### verbosity-remind *(global + project)* — v1.11.0
 

@@ -1,6 +1,24 @@
 # Changelog
 
 
+## [1.15.0] - 2026-06-24
+
+### Added
+- `[FEAT-007]` `context-guard.sh` / `context-guard.ps1` — `UserPromptSubmit` hook that atomically increments `.claude/memory/turn-count.txt`; emits ⚠ at 80% of threshold and 🚨 at threshold; threshold read from `.claude/memory/context-threshold.txt` (default 25); counter saturates at 99999; `CC_GUARD_DEBUG=1` enables stderr diagnostics; fail-open (`set +e` / outer try-catch)
+- `[FEAT-007]` `post-compact.sh` / `post-compact.ps1` — `PostCompact` hook rewritten to atomically reset turn counter to 0 after `/compact`; prints last checkpoint timestamp from `project.md`
+- `[FEAT-007]` `project-template/.claude/memory/context-threshold.txt` — default threshold of 25 turns (BOM-free UTF-8 LF)
+- `[FEAT-007]` `tests/hooks/context-guard.test.js` — 19-case Vitest suite covering counter increment, warning/critical thresholds, saturation, PostCompact reset, corrupt/empty/BOM/CRLF/merge-conflict thresholds, `CC_GUARD_DEBUG` stderr, `warning=0` edge case, and no-`.claude/` directory scenario
+
+### Changed
+- `[FEAT-007]` `project-template/.claude/settings.json` — `UserPromptSubmit` array extended with context-guard bash upward-walk dispatcher and PowerShell hook; `PostCompact` array extended with `post-compact.ps1` entry
+- `[FEAT-007]` `.claude/settings.json` — mirrored to match project-template hook wiring
+- `[FEAT-007]` `install.sh` — downloads `context-guard.sh`, `post-compact.sh`, and `context-guard.ps1`; injects context-guard `UserPromptSubmit` commands and `post-compact.ps1` `PostCompact` command via node heredoc; appends `*.sh eol=lf` / `*.ps1 eol=crlf` to `.gitattributes`; adds `.claude/memory/turn-count.txt` to `.gitignore`
+- `[FEAT-007]` `install.ps1` — mirrors `install.sh` changes for Windows; uses `node -e $script $path` with `process.argv[1]` for settings injection; idempotent `.gitattributes` and `.gitignore` appends via `[System.IO.File]::AppendAllText`
+- `[FEAT-007]` `project-template/.gitignore` — `.claude/memory/turn-count.txt` excluded from git
+- `[FEAT-007]` `.gitignore` — `.claude/memory/turn-count.txt` excluded from git
+- `[FEAT-007]` `.gitattributes` — `*.sh text eol=lf` and `*.ps1 text eol=crlf` eol rules
+
+
 ## [1.14.0] - 2026-06-23
 
 ### Removed

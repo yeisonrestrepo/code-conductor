@@ -36,7 +36,7 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Components Affected:** File system access hooks, read tool configuration.
 * **Acceptance Criteria:** Restrict directory scans to return strictly path lists and metadata, blocking raw mass content dumps unless explicitly verified by an internal path whitelist.
 
-### [ ] `[FEAT-007]` Rolling Context Window (Context Compactor)
+### [X] `[FEAT-007]` Rolling Context Window (Context Compactor)
 * **Description:** Implement an orchestrator middleware that tracks the active message buffer size. Upon reaching a specific token threshold, it invokes a sub-process to generate a dense, consolidated snapshot (storing metadata, completed actions, and immediate pending steps), clears the active session chat history, and injects the snapshot as the new clean starting point.
 * **Impact:** Protects the absolute context limit, eliminates the "Lost in the Middle" attention degradation, and maximizes Prompt Caching savings up to 90% on intermediate turns.
 * **Components Affected:** Buffer monitoring layer, snapshot generation logic.
