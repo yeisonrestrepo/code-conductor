@@ -22,6 +22,7 @@
 - Local testing with pre-release version: when testing changes locally before the tag `v1.14.0` is pushed to the remote, the installer's fetch will return the current released version (e.g., `1.13.0`), not `1.14.0`. Override with: `REMOTE_VERSION=1.14.0 bash install.sh` (bash) or `$env:REMOTE_VERSION="1.14.0"; .\install.ps1` (PS). Never run the installer without this override during pre-release local testing, otherwise the plugin dir and `plugin.json` version will reflect the wrong version and subsequent verification steps will fail.
 - PS 5.1: mid-path wildcard glob-delete requires `Get-ChildItem` pipeline. No `&&`/`||` operator chains. `try/catch` for command-not-found.
 - `plugin.json` required fields: `name`, `version`, `description`, `author.name` - all four, exact values.
+- `plugin.json` validation failure policy: FATAL (installer exits non-zero via `exit 1` bash / `throw` PS). Unlike `settings.json` mutations (which emit WARN and continue), a malformed `plugin.json` guarantees skill resolution failure at Claude Code startup; failing fast during install is correct. The implementer must NOT proceed to the next task if T-002-C / T-003-C validation throws or exits non-zero.
 - `enabledPlugins` JSON path: nested inside `{ "enabledPlugins": { ... } }`, not top-level.
 - `node -e` null guard: `if (obj.enabledPlugins) { delete ... }` before delete; `if (!obj.enabledPlugins) obj.enabledPlugins = {}` before set.
 - Plugin dir wipe: bash uses `rm -rf "${PLUGIN_DIR}" 2>/dev/null || true`; PS uses `if (Test-Path $pluginDir) { Remove-Item -Recurse -Force $pluginDir }`.
@@ -35,6 +36,8 @@
 - Version fallback chain (offline development ONLY): `REMOTE_VERSION → local VERSION file → "1.0.0"`. The VERSION file step is consulted ONLY when `REMOTE_VERSION` is unset or empty (remote fetch returned nothing). If the remote fetch SUCCEEDS and returns a stale published tag (e.g., `1.13.0`), the local `VERSION` file is NOT consulted - the remote result wins. This means the VERSION file fallback resolves offline machines but does NOT resolve the pre-release testing scenario where the remote returns an old published tag. For pre-release local testing the developer MUST set `REMOTE_VERSION=1.14.0` explicitly (see Local testing constraint). Bash expression (use absolute installer dir to prevent CWD-relative path ambiguity; `tr -d '\r\n '` explicitly strips CR for CRLF checkouts): `_installer_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd || echo ".")"; _local_ver="$(cat "${_installer_dir}/VERSION" 2>/dev/null | tr -d '\r\n ')"; echo "${_local_ver}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+' || _local_ver=""; _cc_ver="${REMOTE_VERSION:-${_local_ver:-1.0.0}}"`. PS expression (`.Trim().TrimEnd("\`r\`n")` explicitly strips CRLF; `$PSScriptRoot` is always absolute in PS 5.1): `$localVer = if (Test-Path (Join-Path $PSScriptRoot 'VERSION')) { (Get-Content (Join-Path $PSScriptRoot 'VERSION') -Raw).Trim().TrimEnd("\`r\`n") } else { $null }; if ($localVer -and $localVer -notmatch '^\d+\.\d+\.\d+') { $localVer = $null }; $ccVersion = if ($RemoteVersion) { $RemoteVersion } elseif ($localVer) { $localVer } else { '1.0.0' }`.
 - OS permissions error handling: if `~/.claude` exists but is not writable (owned by root on shared machines, corporate policy), all `node -e` mutations silently fail via `2>/dev/null || true` and the missing entries are caught by T-002-C / T-003-C assertions. Bash explicit check before the node call: `if [ -e "${HOME}/.claude" ] && [ ! -w "${HOME}/.claude" ]; then warn "${HOME}/.claude not writable -- settings.json mutations will fail (run: sudo chown $USER ${HOME}/.claude)"; fi`. PS equivalent: the T-003-B-0 write-permission probe (create and immediately delete a `.perm-test-*` temp file in `$pluginRoot`) is the authoritative PS detection mechanism - it catches both `[System.IO.IOException]` and `[System.UnauthorizedAccessException]` and emits `Write-Warn`. No additional PS shell-level check is needed; `Test-Path` has no parameter that tests write permissions, so the probe is the only reliable method.
 - Trailing newline verification fallback: `xxd` may be absent in minimal environments. Use the three-tool fallback chain in T-002-C: `xxd` (primary, available on macOS/Debian/Ubuntu) → `tail -c 1 | od -An -tx1` (POSIX; BusyBox/Alpine-safe; reads only the last byte) → bare `od -An -tx1` (wider POSIX fallback) → `node -e Buffer.readAllBytes` (last resort; always available when Node.js is present). On PS (T-003-C), `[System.IO.File]::ReadAllBytes` is a .NET BCL method present in every PS 5.1 environment on Windows — it never requires `xxd` or any Unix utility and is the authoritative PS byte-level check.
+- Semver validation (MANDATORY): the local VERSION file content MUST be validated with `grep -qE '^[0-9]+\.[0-9]+\.[0-9]+'` (bash) / `-notmatch '^\d+\.\d+\.\d+'` (PS) BEFORE use in any path construction. Non-matching content is silently discarded (`_local_ver=""` / `$localVer = $null`). This prevents path injection and malformed directory names (e.g. `plugins/cache/code-conductor/code-conductor/<CR>1.14.0`) when the remote fetch fails and the VERSION file contains trailing whitespace, binary characters, or multi-line content.
+- Pre-flight Claude Code process check (recommended): the process check must appear at the START of each installer's plugin-wipe section — before any `Remove-Item` / `rm -rf` call — so lock warnings are issued regardless of the SKIP_DEPS / -NoDeps guard. The check inside T-002-B / T-003-B-0 satisfies this for the conditional path; on the unconditional path no plugin dir exists yet so no early check is required. Bash: `command -v pgrep >/dev/null 2>&1 && pgrep -x "claude" >/dev/null 2>&1 && warn "Claude Code is running -- close it before installer modifies plugin dirs"`. PS: `if (Get-Process -Name "claude" -ErrorAction SilentlyContinue) { Write-Warn "..." }`.
 
 ---
 
@@ -172,7 +175,7 @@
   ```bash
   trap '[ -s "${HOME}/.claude/settings.json.bak" ] && cp "${HOME}/.claude/settings.json.bak" "${HOME}/.claude/settings.json" 2>/dev/null && warn "TRAP: settings.json auto-restored from backup after failure"' ERR
   ```
-  Clear the trap after T-002-C assertions pass (before the auto-cleanup step) to prevent the cleanup from triggering a false restore: `trap - ERR`. For PS (T-003-A-1): wrap the entire mutation sequence (T-003-A through T-003-B node calls) in a `try/finally` block where `finally` restores the backup if still present (the T-003-C auto-cleanup step deletes it on success, so `finally` only acts on failure paths): `finally { if (Test-Path $settingsBak) { Copy-Item $settingsBak $settingsPath -Force -ErrorAction SilentlyContinue; Write-Warn "FINALLY: settings.json auto-restored from backup" } }`. **Sudden-termination caveat:** both the bash `ERR` trap and the PS `finally` block are bypassed by abrupt process termination (SIGKILL, `taskkill /F`, power loss). In that case the `.bak` file remains on disk. If the user restarts and finds `settings.json` corrupt or missing, they must manually run: bash: `cp ~/.claude/settings.json.bak ~/.claude/settings.json`; PS: `Copy-Item "$env:USERPROFILE\.claude\settings.json.bak" "$env:USERPROFILE\.claude\settings.json"`. No automatic post-crash recovery is specified beyond this manual step.
+  Clear the trap after T-002-C assertions pass (before the auto-cleanup step) to prevent the cleanup from triggering a false restore: `trap - ERR`. For PS (T-003-A-1): wrap the entire mutation sequence (T-003-A through T-003-B node calls) in a `try/finally` block where `finally` restores the backup if still present (the T-003-C auto-cleanup step deletes it on success, so `finally` only acts on failure paths): `finally { if (Test-Path $settingsBak) { Copy-Item $settingsBak $settingsPath -Force -ErrorAction SilentlyContinue; Write-Warn "FINALLY: settings.json auto-restored from backup" } }`. **Sudden-termination caveat:** both the bash `ERR` trap and the PS `finally` block are bypassed by abrupt process termination (SIGKILL, `taskkill /F`, power loss). In that case the `.bak` file remains on disk. If the user restarts and finds `settings.json` corrupt or missing, they must manually run: bash: `cp ~/.claude/settings.json.bak ~/.claude/settings.json`; PS: `Copy-Item "$env:USERPROFILE\.claude\settings.json.bak" "$env:USERPROFILE\.claude\settings.json"`. No automatic post-crash recovery is specified beyond this manual step. **State recovery checklist (sudden-termination or hard abort):** (1) Backup file location: bash `~/.claude/settings.json.bak` / PS `%USERPROFILE%\.claude\settings.json.bak`; (2) Verify backup is non-empty before restoring: bash `[ -s ~/.claude/settings.json.bak ] && echo "backup OK" || echo "backup missing or empty"` / PS `(Get-Item "$env:USERPROFILE\.claude\settings.json.bak" -EA 0).Length -gt 0`; (3) Restore: bash `cp ~/.claude/settings.json.bak ~/.claude/settings.json` / PS `Copy-Item "$env:USERPROFILE\.claude\settings.json.bak" "$env:USERPROFILE\.claude\settings.json" -Force`; (4) Delete backup after confirming restore succeeded: bash `rm ~/.claude/settings.json.bak` / PS `Remove-Item "$env:USERPROFILE\.claude\settings.json.bak"`; (5) Scope: the ERR trap is active from T-002-A-1 through T-002-C assertions; it is cleared with `trap - ERR` immediately before the T-002-C auto-cleanup step — recovery from `.bak` is only needed for failures BEFORE that `trap - ERR` line fires.
 
 - [ ] [T-002-A-2] **Verify claude-mem cache directory is removed after uninstall**
 
@@ -190,6 +193,7 @@
 - [ ] [T-002-A] **Remove the claude-mem install block from the SKIP_DEPS section**
 
   In `install.sh`, find and delete the block starting with `install_dep "claude-mem"` (located by T-002-A-0 grep). Use the Edit tool with `old_string` set to the entire block and `new_string` set to the replacement below. Do not use line numbers as the anchor.
+  **Node.js version requirement for this step:** any version ≥ 10. The v16 gate in T-002-B-0 does NOT apply to the unconditional key-removal block. The node script here uses only `fs.existsSync`, `fs.readFileSync`, `JSON.parse`, `fs.writeFileSync`, and `JSON.stringify` — all available since Node.js v10. Do not add a v16 check to this step; adding it would break key-removal on machines with older Node.js and undermine the unconditional cleanup guarantee.
 
   Old (to remove entirely - replace with the uninstall + cleanup lines):
   ```bash
@@ -213,7 +217,11 @@
     # Unconditional claude-mem removal: heals existing installs regardless of --no-deps
     # --yes passed to claude-mem uninstall suppresses its own interactive confirmation prompt;
     # CI=1 suppresses any remaining npm/npx interactive prompts (non-interactive terminal guard)
-    command -v npx >/dev/null 2>&1 && CI=1 npx --yes claude-mem uninstall --yes 2>/dev/null || true
+    if command -v npx >/dev/null 2>&1; then
+      CI=1 npx --yes claude-mem uninstall --yes 2>/dev/null || true
+    else
+      warn "npx not found on PATH -- claude-mem uninstall skipped (install Node.js/npm to heal existing claude-mem installs)"
+    fi
     # Pre-verify parent directory of settings.json exists before any write
     # On a completely fresh environment where ~/.claude does not yet exist, mkdir -p creates it.
     mkdir -p "${HOME}/.claude" 2>/dev/null || true
@@ -221,14 +229,16 @@
     [ -f "${HOME}/.claude/settings.json" ] && chmod u+w "${HOME}/.claude/settings.json" 2>/dev/null || true
     # NOTE: backup + ERR trap from T-002-A-1 must be inserted here, immediately before the node -e call.
     # Remove claude-mem@thedotmack from enabledPlugins (no-op on fresh installs)
-    command -v node >/dev/null 2>&1 && node -e "
+    if command -v node >/dev/null 2>&1; then node -e "
 const f=require('os').homedir()+'/.claude/settings.json';
 if(!require('fs').existsSync(f))process.exit(0);
 const _raw=require('fs').readFileSync(f,'utf8');
 let obj={};try{obj=JSON.parse(_raw);}catch(e){if(_raw.trim()){process.stderr.write('WARN: settings.json is malformed JSON and non-empty -- skipping key removal to avoid data loss\n');process.exit(0);}}
 if(obj.enabledPlugins){delete obj.enabledPlugins['claude-mem@thedotmack'];}
 try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true});require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');}catch(e){process.stderr.write('WARN: settings.json update failed: '+e.message+'\n');}
-" 2>/dev/null || true
+" 2>/dev/null || true; else
+      warn "node not found on PATH -- settings.json key-removal skipped (claude-mem@thedotmack key may remain until Node.js is installed)"
+    fi
     # Glob-delete orphaned superpowers-cached critical-review skill (all versions)
     rm -rf "${HOME}/.claude/plugins/cache/claude-plugins-official/superpowers"/*/skills/critical-review 2>/dev/null || true
   ```
@@ -250,9 +260,11 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
     warn "Node.js not found on PATH -- plugin injection and settings.json merge skipped; install Node.js v16+ and re-run"
   fi
   ```
-  Guard all subsequent `node -e` calls in this block with `[ "$_node_ok" = true ] &&`. Also add an npx absence warning immediately before the unconditional uninstall line: `command -v npx >/dev/null 2>&1 || warn "npx not found -- claude-mem uninstall skipped (no Node.js/npm on PATH)"` placed just before `command -v npx >/dev/null 2>&1 && CI=1 npx ...`.
+  Guard all subsequent `node -e` calls in this block with `[ "$_node_ok" = true ] &&`. The npx and node absence warns for the unconditional cleanup block are already present inline in the T-002-A replacement block above (if/else/fi form); no additional changes needed in T-002-B-0 for those.
 
 - [ ] [T-002-B] **Add code-conductor plugin creation block after the global settings merge**
+
+  **Atomicity note (two sequential settings.json writes):** T-002-A (key removal, unconditional) and this step (key insertion, inside SKIP_DEPS) are intentionally separate because they are under different guards. Combining them into a single `node -e` would require merging the two guards, changing semantics. A crash mid-combined-script would still leave partial state — disk writes are never atomic regardless of batching. The backup from T-002-A-1 + ERR trap already provides the rollback invariant for both sequential calls: if this step's write fails, the ERR trap restores the pre-T-002-A snapshot. Do not combine the two writes.
 
   In `install.sh`, find the line:
   ```bash
@@ -379,7 +391,9 @@ console.log('[OK] plugin.json OK: ' + pj.name + ' v' + pj.version);
 
   **Bash trailing newline verification with xxd fallback (minimal environments):** `xxd` may be absent on Alpine, BusyBox, or distroless containers. Use this fallback chain:
   ```bash
-  if command -v xxd >/dev/null 2>&1; then
+  if [ ! -r "${PLUGIN_DIR}/.claude-plugin/plugin.json" ]; then
+    warn "plugin.json exists but is not readable by current user -- trailing newline check skipped (check file permissions: ls -l ${PLUGIN_DIR}/.claude-plugin/plugin.json)"
+  elif command -v xxd >/dev/null 2>&1; then
     _last_nibble=$(xxd "${PLUGIN_DIR}/.claude-plugin/plugin.json" | awk 'END{print $NF}')
     [ "$_last_nibble" = "0a" ] \
       && echo "plugin.json trailing newline: LF confirmed (xxd)" \
@@ -496,6 +510,7 @@ console.log('settings.json assertions passed');
 - [ ] [T-003-A] **Remove the claude-mem install block from the `-NoDeps` section**
 
   In `install.ps1`, find and delete the block starting with `if ($HasNode) { Write-Info "Installing claude-mem..."` (located by T-003-A-0 grep). Replace it with the uninstall + cleanup lines below. Do not use line numbers as the anchor.
+  **Node.js version requirement for this step:** any version ≥ 10. The v16 gate in T-003-B-0 does NOT apply to the unconditional key-removal block. The node script uses only `fs.existsSync`, `fs.readFileSync`, `JSON.parse`, `fs.writeFileSync`, and `JSON.stringify` — all available since Node.js v10. Do not add a v16 check to this step.
 
   Old (entire block to remove):
   ```powershell
@@ -561,6 +576,8 @@ console.log('settings.json assertions passed');
     if (Get-Command npx -ErrorAction SilentlyContinue) {
       # set CI=1 suppresses npx/npm interactive prompts; --yes passed to claude-mem uninstall itself
       try { $null = cmd /c "set CI=1 && npx --yes claude-mem uninstall --yes 2>nul" } catch {}
+    } else {
+      Write-Warn "npx not found on PATH -- claude-mem uninstall skipped (install Node.js/npm to heal existing claude-mem installs)"
     }
     # Pre-verify parent directory of settings.json exists before any write
     # On a completely fresh environment where %USERPROFILE%\.claude does not yet exist, -Force creates it.
@@ -580,6 +597,8 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
 '@
     if (Get-Command node -ErrorAction SilentlyContinue) {
       node -e $cmNodeScript 2>$null
+    } else {
+      Write-Warn "node not found on PATH -- settings.json key-removal skipped (claude-mem@thedotmack key may remain until Node.js is installed)"
     }
     # Glob-delete orphaned superpowers-cached critical-review skill (PS 5.1 pipeline required)
     $superDir = "$env:USERPROFILE\.claude\plugins\cache\claude-plugins-official\superpowers"
@@ -622,7 +641,7 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
     Write-Warn "Node.js not found on PATH -- plugin injection and settings.json merge skipped; install Node.js v16+ and re-run"
   }
   ```
-  Gate all subsequent `node -e` calls in this block with `if ($nodeOk) { ... }`. Also add an npx absence warning in the unconditional block (T-003-A): replace `if (Get-Command npx -ErrorAction SilentlyContinue) { ... }` with: `if (Get-Command npx -ErrorAction SilentlyContinue) { ... } else { Write-Warn "npx not found -- claude-mem uninstall skipped (no Node.js/npm on PATH)" }`.
+  Gate all subsequent `node -e` calls in this block with `if ($nodeOk) { ... }`. The npx and node absence warns for the unconditional cleanup block are already present inline in the T-003-A replacement block above (if/else form); no additional changes needed in T-003-B-0 for those.
 
   **Locked directory (active Claude Code process):** If Claude Code is running while the installer executes, the versioned plugin dir may be held open. The wipe step (`Remove-Item -Recurse -Force $pluginDir`) will throw `IOException` on locked files. Detection: catch `[System.IO.IOException]` separately from `[System.UnauthorizedAccessException]`. Mitigation: close Claude Code before running the installer, or rename the locked dir as a fallback. Add an upfront process check before the try block (PS side counterpart to the bash `pgrep` check added in T-002-B):
   ```powershell
