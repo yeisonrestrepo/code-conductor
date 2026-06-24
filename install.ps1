@@ -119,61 +119,72 @@ function Install-Dep {
   }
 }
 
+# Unconditional claude-mem removal: heals existing installs regardless of -NoDeps
+Write-Info "Removing claude-mem (no-op if never installed)..."
+if (Get-Command npx -ErrorAction SilentlyContinue) {
+  # Three-flag mandate: CI=1 suppresses npm/npx prompts; first --yes = npx auto-accept; second --yes = claude-mem confirmation.
+  # cmd /c required: PS 5.1 npx.cmd may hang without the Windows command interpreter; 2>nul suppresses cmd-level stderr.
+  try { $null = cmd /c "set CI=1 && npx --yes claude-mem uninstall --yes 2>nul" } catch {}
+} else {
+  Write-Warn "npx not found on PATH -- claude-mem uninstall skipped (install Node.js/npm to heal existing claude-mem installs)"
+}
+# Pre-verify parent directory of settings.json exists before any write
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.claude" -ErrorAction SilentlyContinue | Out-Null
+# Clear read-only attribute if set -- prevents UnauthorizedAccessException on locked-down installs
+$settingsPath = "$env:USERPROFILE\.claude\settings.json"
+if (Test-Path $settingsPath) { $fi = Get-Item $settingsPath; if ($fi.IsReadOnly) { $fi.IsReadOnly = $false } }
+# Backup settings.json before any mutation (T-003-A-1); single backup covers key-removal + plugin enabledPlugins write
+$settingsBak = "$env:USERPROFILE\.claude\settings.json.bak"
+if (Test-Path $settingsPath) {
+  Copy-Item $settingsPath $settingsBak -Force
+  if (-not (Test-Path $settingsBak) -or (Get-Item $settingsBak).Length -eq 0) {
+    Write-Warn "settings.json backup failed or produced empty file -- proceeding without backup"
+  }
+}
+# Remove claude-mem@thedotmack from enabledPlugins (no-op on fresh installs)
+# Fresh-install guard: line 1 of the script is 'if(!existsSync(f))process.exit(0)' -- silently exits when settings.json absent.
+# IMPORTANT: the closing '@' that ends $cmNodeScript MUST be at column 0 (no leading spaces/tabs).
+$cmNodeScript = @'
+const f=require('os').homedir()+'/.claude/settings.json';
+if(!require('fs').existsSync(f))process.exit(0);
+const _raw=require('fs').readFileSync(f,'utf8');
+let obj={};try{obj=JSON.parse(_raw);}catch(e){if(_raw.trim()){process.stderr.write('WARN: settings.json is malformed JSON and non-empty -- skipping key removal to avoid data loss\n');process.exit(0);}}
+if(obj.enabledPlugins){delete obj.enabledPlugins['claude-mem@thedotmack'];}
+try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true});require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');}catch(e){process.stderr.write('WARN: settings.json update failed: '+e.message+'\n');}
+'@
+if (Get-Command node -ErrorAction SilentlyContinue) {
+  node -e $cmNodeScript 2>$null
+} else {
+  Write-Warn "node not found on PATH -- settings.json key-removal skipped (claude-mem@thedotmack key may remain until Node.js is installed)"
+}
+# Glob-delete orphaned superpowers-cached critical-review skill (PS 5.1 pipeline required; mid-path wildcards need Get-ChildItem)
+$superDir = "$env:USERPROFILE\.claude\plugins\cache\claude-plugins-official\superpowers"
+if (Test-Path $superDir) {
+  Get-ChildItem $superDir -Directory -Force -ErrorAction SilentlyContinue |
+    ForEach-Object {
+      $t = Join-Path $_.FullName "skills\critical-review"
+      if (Test-Path $t) {
+        try { Remove-Item -Recurse -Force $t -ErrorAction Stop }
+        catch [System.IO.IOException] {
+          Start-Sleep -Seconds 2
+          try { Remove-Item -Recurse -Force $t -ErrorAction Stop }
+          catch { Write-Warn "Could not remove locked skill dir $t -- close Claude Code and re-run" }
+        }
+      }
+    }
+}
+# Verify claude-mem cache directory removed (T-003-A-2)
+$cmCache = "$env:USERPROFILE\.claude\plugins\cache\thedotmack\claude-mem"
+if (Test-Path $cmCache) {
+  Write-Warn "claude-mem cache dir still present at $cmCache - manual cleanup may be needed"
+} else {
+  Write-Ok "claude-mem cache dir removed"
+}
+
 if (-not $NoDeps) {
   Write-Host ""
   Write-Info "Installing dependencies..."
   Write-Host ""
-
-  if ($HasNode) {
-    Write-Info "Installing claude-mem..."
-
-    # Attempt 1 -- run via cmd.exe; legacy-peer-deps resolves tree-sitter version conflict
-    npm config set legacy-peer-deps true
-    cmd /c "npx --yes claude-mem install"
-    $claudeMemResult = $LASTEXITCODE
-    npm config set legacy-peer-deps false
-    if ($claudeMemResult -eq 0) {
-      Write-Ok "claude-mem installed"
-    } else {
-      # Attempt 2 -- auto-install Visual C++ Build Tools (required by tree-sitter) then retry
-      Write-Info "claude-mem needs Visual C++ Build Tools -- installing via winget (this may take a few minutes)..."
-      if (Get-Command winget -ErrorAction SilentlyContinue) {
-        winget install Microsoft.VisualStudio.2022.BuildTools `
-          --silent --accept-source-agreements --accept-package-agreements `
-          --override "--quiet --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
-        if ($LASTEXITCODE -eq 0) {
-          Write-Info "Retrying claude-mem install..."
-          npm config set legacy-peer-deps true
-          cmd /c "npx --yes claude-mem install"
-          $claudeMemResult = $LASTEXITCODE
-          npm config set legacy-peer-deps false
-          if ($claudeMemResult -eq 0) {
-            Write-Ok "claude-mem installed"
-          } else {
-            Write-Warn "claude-mem failed after build tools install -- manual install: npx --yes claude-mem install"
-            $script:FailedDeps += "claude-mem: npx --yes claude-mem install"
-          }
-        } else {
-          Write-Warn "Visual C++ Build Tools install failed -- manual install: npx --yes claude-mem install"
-          $script:FailedDeps += "claude-mem: npx --yes claude-mem install"
-        }
-      } else {
-        Write-Warn "winget not found -- manual install: npx --yes claude-mem install"
-        $script:FailedDeps += "claude-mem: npx --yes claude-mem install"
-      }
-    }
-  }
-
-  if ($HasNode) {
-    $claudeMemPluginDir = Get-ChildItem "$env:USERPROFILE\.claude\plugins\cache\thedotmack\claude-mem" -Directory -ErrorAction SilentlyContinue |
-      Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
-    if ($claudeMemPluginDir) {
-      Write-Info "Installing claude-mem dependencies..."
-      npm install --prefix $claudeMemPluginDir --ignore-scripts --silent
-      if ($LASTEXITCODE -eq 0) { Write-Ok "claude-mem dependencies installed" }
-      else { Write-Warn "claude-mem dependencies failed -- run: npm install --prefix `"$claudeMemPluginDir`" --ignore-scripts" }
-    }
-  }
 
   if ($HasNode) { Install-Dep "uipro-cli" "npm install -g uipro-cli" }
 
@@ -415,6 +426,122 @@ Write-Ok "Verbosity set to $Verbosity"
 # Global settings.json merge (T-005-C)
 $globalHookCmd = "bash $env:USERPROFILE/.claude/hooks/verbosity-remind.sh"
 Merge-SettingsJson "$GLOBAL_DIR\settings.json" $globalHookCmd
+
+# -- code-conductor plugin: wipe versioned dir and recreate --------------------
+if (-not $NoDeps) {
+  # USERPROFILE abort guard: must be an absolute path before any plugin dir operations
+  if ([string]::IsNullOrWhiteSpace($env:USERPROFILE) -or -not [System.IO.Path]::IsPathRooted($env:USERPROFILE)) {
+    Write-Warn "USERPROFILE is empty or not an absolute path ('$env:USERPROFILE') -- aborting plugin install to prevent invalid paths"
+  } else {
+    # Version fallback chain: remote fetch -> local VERSION file -> "1.0.0" sentinel
+    $localVerPath = Join-Path $PSScriptRoot 'VERSION'
+    $localVer = if (Test-Path $localVerPath) { (Get-Content $localVerPath -Raw).Trim().TrimEnd("`r`n") } else { $null }
+    if ($localVer -and $localVer -notmatch '^\d+\.\d+\.\d+') { $localVer = $null }
+    $ccVersion = if ($RemoteVersion) { $RemoteVersion } elseif ($localVer) { $localVer } else { "1.0.0" }
+    $pluginDir = "$env:USERPROFILE\.claude\plugins\cache\code-conductor\code-conductor\$ccVersion"
+    # Pre-flight: warn if Claude Code is running (plugin dir may be locked)
+    if (Get-Process -Name "claude" -ErrorAction SilentlyContinue) {
+      Write-Warn "Claude Code process detected -- close Claude Code before running installer to prevent IOException on plugin dir wipe"
+    }
+    # Write permission probe before any wipe or mkdir
+    $pluginRoot = "$env:USERPROFILE\.claude\plugins"
+    New-Item -ItemType Directory -Force $pluginRoot -ErrorAction SilentlyContinue | Out-Null
+    try {
+      $permTestFile = Join-Path $pluginRoot ".perm-test-$(Get-Random)"
+      [System.IO.File]::WriteAllText($permTestFile, "")
+      Remove-Item $permTestFile -Force -ErrorAction SilentlyContinue
+    } catch {
+      Write-Warn "No write permission on $pluginRoot -- plugin install may fail; run as Administrator or grant $env:USERNAME write access to $pluginRoot"
+    }
+    # Node.js v16+ baseline check
+    $nodeOk = $false
+    if (Get-Command node -ErrorAction SilentlyContinue) {
+      $nodeMajor = [int](node -e "process.stdout.write(String(process.version.split('.')[0].replace('v','')))" 2>$null)
+      if ($nodeMajor -ge 16) { $nodeOk = $true }
+      else { Write-Warn "Node.js v$nodeMajor detected -- v16+ required for plugin injection; skipping settings.json update" }
+    } else {
+      Write-Warn "Node.js not found on PATH -- plugin injection and settings.json merge skipped; install Node.js v16+ and re-run"
+    }
+    try {
+      # Idempotent wipe with IOException retry
+      if (Test-Path $pluginDir) {
+        try {
+          Remove-Item -Recurse -Force $pluginDir -ErrorAction Stop
+        } catch [System.IO.IOException] {
+          Start-Sleep -Seconds 2
+          try {
+            Remove-Item -Recurse -Force $pluginDir -ErrorAction Stop
+          } catch {
+            $archivePath = $pluginDir + "_old_" + [System.DateTime]::Now.ToString("yyyyMMddHHmmss")
+            Rename-Item -Path $pluginDir -NewName $archivePath -ErrorAction SilentlyContinue
+            Write-Warn "Plugin dir locked; renamed to $archivePath -- delete after closing Claude Code"
+          }
+        }
+      }
+      New-Item -ItemType Directory -Force "$pluginDir\.claude-plugin" | Out-Null
+      New-Item -ItemType Directory -Force "$pluginDir\skills" | Out-Null
+      New-Item -ItemType Directory -Force "$pluginDir\skills\critical-review" | Out-Null
+      New-Item -ItemType Directory -Force "$pluginDir\skills\memory-first" | Out-Null
+      New-Item -ItemType Directory -Force "$pluginDir\skills\agent-delegation" | Out-Null
+      # UTF-8 without BOM: $false = encoderShouldEmitUTF8Identifier = no BOM preamble
+      $pluginEnc = [System.Text.UTF8Encoding]::new($false)
+      # Double-quoted here-string so $ccVersion expands into plugin.json content
+      $pluginJsonContent = @"
+{
+  "name": "code-conductor",
+  "version": "$ccVersion",
+  "description": "code-conductor custom skills: critical-review, memory-first, agent-delegation",
+  "author": {
+    "name": "code-conductor"
+  }
+}
+"@
+      # Trailing "`n" produces exactly one LF (0x0A) at EOF -- no CRLF conversion
+      [System.IO.File]::WriteAllText(
+        "$pluginDir\.claude-plugin\plugin.json",
+        $pluginJsonContent + "`n",
+        $pluginEnc
+      )
+      # Absolute path resolution guard: verify $GLOBAL_DIR is absolute before Copy-Item
+      if (-not [System.IO.Path]::IsPathRooted($GLOBAL_DIR)) {
+        $GLOBAL_DIR = "$env:USERPROFILE\.claude"
+      }
+      if (-not (Test-Path "$GLOBAL_DIR\skills")) {
+        Write-Warn "GLOBAL_DIR\skills not found at $GLOBAL_DIR\skills -- Copy-Item step may fail; verify download steps ran first"
+      }
+      # Pre-copy skill file validation
+      @('critical-review','memory-first','agent-delegation') | ForEach-Object {
+        $skillSrc = "$GLOBAL_DIR\skills\$_.md"
+        if (-not (Test-Path $skillSrc)) { throw "ERROR: source skill file missing: $skillSrc" }
+        if ((Get-Item $skillSrc).Length -eq 0) { throw "ERROR: source skill file is empty: $skillSrc" }
+        if (-not (Select-String -Path $skillSrc -Pattern '^#' -Quiet)) {
+          Write-Warn "skill file $_.md has no markdown heading -- skill may not load correctly in Claude Code"
+        }
+      }
+      Copy-Item "$GLOBAL_DIR\skills\critical-review.md"   "$pluginDir\skills\critical-review\SKILL.md"
+      Copy-Item "$GLOBAL_DIR\skills\memory-first.md"       "$pluginDir\skills\memory-first\SKILL.md"
+      Copy-Item "$GLOBAL_DIR\skills\agent-delegation.md"   "$pluginDir\skills\agent-delegation\SKILL.md"
+      New-Item -ItemType Directory -Force "$env:USERPROFILE\.claude" -ErrorAction SilentlyContinue | Out-Null
+      # enabledPlugins: overwrite false with true (healing behavior)
+      $enableScript = @'
+const f=require('os').homedir()+'/.claude/settings.json';
+let obj={};if(require('fs').existsSync(f)){const _raw=require('fs').readFileSync(f,'utf8');try{obj=JSON.parse(_raw);}catch(e){if(_raw.trim()){process.stderr.write('WARN: settings.json is malformed JSON and non-empty -- skipping enabledPlugins merge to avoid data loss\n');process.exit(0);}}}
+if(!obj.enabledPlugins)obj.enabledPlugins={};
+obj.enabledPlugins['code-conductor@code-conductor']=true;
+try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true});require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');}catch(e){process.stderr.write('WARN: settings.json update failed: '+e.message+'\n');}
+'@
+      if ($nodeOk) {
+        node -e $enableScript 2>$null
+      }
+      Write-Ok "code-conductor plugin installed (critical-review, memory-first, agent-delegation)"
+    } catch [System.UnauthorizedAccessException] {
+      Write-Warn "code-conductor plugin install failed: access denied at $pluginDir"
+      Write-Warn "Fix: run installer as Administrator, or grant write access to $env:USERPROFILE\.claude\plugins"
+    } catch {
+      Write-Warn "code-conductor plugin install failed: $_"
+    }
+  }
+}
 
 # -- Install project template ---------------------------------------------------
 if ($Project) {
