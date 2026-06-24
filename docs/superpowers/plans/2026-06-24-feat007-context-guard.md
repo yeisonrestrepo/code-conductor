@@ -1067,14 +1067,14 @@ npx vitest run tests/hooks/context-guard.test.js --reporter=verbose
 
 Expected: all tests in the `context-guard.sh` describe block pass (skipped on Windows is acceptable for rows 12, all Unix rows).
 
-- [>] **T-010-3: Commit**
+- [X] **T-010-3: Commit**
 
 ```bash
 git add -f tests/hooks/context-guard.test.js
 git commit -m "test(FEAT-007): add context-guard test suite (19 cases)"
 ```
 
-- [ ] **T-010-4: Run full test suite (regression check)**
+- [X] **T-010-4: Run full test suite (regression check)**
 
 **Dependencies:** requires T-001 (`context-guard.sh`) and T-003 (`post-compact.sh`) to be implemented first — `HOOK_PATH` and `PC_PATH` in the test resolve to those files at runtime.
 
