@@ -17,6 +17,9 @@ const _bashCheck = spawnSync('bash', ['--version'], { stdio: 'pipe', timeout: 50
 const BASH_AVAILABLE = !_bashCheck.error && _bashCheck.status === 0
 
 const WIN32 = process.platform === 'win32'
+// Resolve bash's absolute path so row16 can pass an empty PATH without ENOENT.
+const _whichBash = WIN32 ? null : spawnSync('which', ['bash'], { stdio: 'pipe', timeout: 5000 })
+const BASH_PATH = (_whichBash?.status === 0) ? _whichBash.stdout.toString().trim() : 'bash'
 
 function runRead(filePath, { toolName = 'Read', input = null } = {}) {
   const finalInput = input ?? JSON.stringify({ file_path: filePath })
@@ -128,7 +131,7 @@ describe.skipIf(!BASH_AVAILABLE)('Guard 4 — Read blocker for graphify-out/ and
     // Use a temp empty dir to guarantee python3 is truly absent on any OS.
     const fakeBin = mkdtempSync(join(tmpdir(), 'guard4-nopy-'))
     try {
-      const result = spawnSync('bash', [HOOK], {
+      const result = spawnSync(BASH_PATH, [HOOK], {
         stdio: 'pipe',
         cwd: REPO_ROOT,
         timeout: 15000,
