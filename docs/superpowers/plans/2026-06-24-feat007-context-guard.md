@@ -75,7 +75,7 @@ main() {
     printf '🚨 CONTEXT CRITICAL: Turn 99999/%d (counter saturated) — run /cc-compact NOW.\n' "$critical"
   elif [ "$new_count" -ge "$critical" ]; then
     printf '🚨 CONTEXT CRITICAL: Turn %d/%d — run /cc-compact NOW before context overflows.\n' "$new_count" "$critical"
-  elif [ "$new_count" -ge "$warning" ]; then
+  elif [ "$warning" -gt 0 ] && [ "$new_count" -ge "$warning" ]; then
     printf '⚠ CONTEXT WARNING: Turn %d/%d — consider running /cc-compact soon.\n' "$new_count" "$critical"
   fi
 }
@@ -176,7 +176,7 @@ try {
     "🚨 CONTEXT CRITICAL: Turn 99999/$critical (counter saturated) — run /cc-compact NOW."
   } elseif ($newCount -ge $critical) {
     "🚨 CONTEXT CRITICAL: Turn $newCount/$critical — run /cc-compact NOW before context overflows."
-  } elseif ($newCount -ge $warning) {
+  } elseif ($warning -gt 0 -and $newCount -ge $warning) {
     "⚠ CONTEXT WARNING: Turn $newCount/$critical — consider running /cc-compact soon."
   }
 } catch {
@@ -313,8 +313,8 @@ try {
   "📦 Conversation compacted. Context counter reset to 0."
   $projMd = Join-Path $root '.claude\memory\project.md'
   if (Test-Path $projMd) {
-    $last = (Select-String '## Checkpoint' $projMd | Select-Object -Last 1)?.Line
-    if ($last) { "   Last checkpoint: $last" } else { "   No checkpoints recorded yet in project.md." }
+    $lastMatch = Select-String '## Checkpoint' $projMd | Select-Object -Last 1
+    if ($lastMatch) { "   Last checkpoint: $($lastMatch.Line)" } else { "   No checkpoints recorded yet in project.md." }
   } else { "   No project.md found." }
   ""
   "   💡 If this session had important decisions, run /checkpoint before continuing."
@@ -480,7 +480,7 @@ appendIfAbsent(obj.hooks.UserPromptSubmit[0].hooks, UPS_BASH);
 appendIfAbsent(obj.hooks.UserPromptSubmit[0].hooks, UPS_PS);
 appendIfAbsent(obj.hooks.PostCompact[0].hooks,      PC_PS);
 const tmp = f + '.tmp';
-fs.writeFileSync(tmp, JSON.stringify(obj, null, 2) + '\n');
+fs.writeFileSync(tmp, JSON.stringify(obj, null, 2) + '\n', { encoding: 'utf8' });
 fs.renameSync(tmp, f);
 console.log('settings.json patched');
 "
@@ -591,7 +591,7 @@ Replace with:
            "${PROJ_DIR}/hooks/context-guard.sh"
 ```
 
-- [ ] **T-008-2: Add `node -e` settings.json patch after the project verbosity hook merge block**
+- [ ] **T-008-2: Add `node -` heredoc settings.json patch after the project verbosity hook merge block**
 
 After the `_merge_settings_json` call (around line 1235), insert:
 
@@ -602,9 +602,9 @@ After the `_merge_settings_json` call (around line 1235), insert:
     _node_major=$(node -e "process.stdout.write(String(process.version.split('.')[0].replace('v','')))" 2>/dev/null || echo "0")
     [ "$_node_major" -lt 16 ] 2>/dev/null && { warn "Node.js v${_node_major} < 16 — context-guard settings.json wiring skipped"; _cg_node_ok=false; }
     if [ "$_cg_node_ok" = true ]; then
-      node -e "
+      node - "${PROJ_DIR}/settings.json" 2>/dev/null << 'JSEOF'
 const fs = require('fs');
-const f  = '${PROJ_DIR}/settings.json';
+const f  = process.argv[2];
 let obj  = {};
 if (fs.existsSync(f)) {
   const raw = fs.readFileSync(f, 'utf8');
@@ -623,15 +623,19 @@ if (!obj.hooks) obj.hooks = {};
 function appendIfAbsent(arr, cmd) {
   if (!arr.some(h => h.command === cmd)) arr.push({ type: 'command', command: cmd });
 }
-const UPS_BASH = 'bash -c \'set +e; _dir=\"\${PWD:-}\"; _prev=\"\"; _i=0; while [ \"\$_dir\" != \"\$_prev\" ] && [ \"\$_i\" -lt 40 ]; do _h=\"\$_dir/.claude/hooks/context-guard.sh\"; [ -f \"\$_h\" ] && [ -r \"\$_h\" ] && { CC_PROJECT_ROOT=\"\$_dir\" bash \"\$_h\"; exit \$?; }; _prev=\"\$_dir\"; _dir=\"\${_dir%/*}\"; [ -z \"\$_dir\" ] && _dir=/; _i=\$((\$_i+1)); done; exit 0\'';
-const PC_PS   = 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \".claude/hooks/post-compact.ps1\"';
+const UPS_BASH = "bash -c 'set +e; _dir=\"${PWD:-}\"; _prev=\"\"; _i=0; while [ \"$_dir\" != \"$_prev\" ] && [ \"$_i\" -lt 40 ]; do _h=\"$_dir/.claude/hooks/context-guard.sh\"; [ -f \"$_h\" ] && [ -r \"$_h\" ] && { CC_PROJECT_ROOT=\"$_dir\" bash \"$_h\"; exit $?; }; _prev=\"$_dir\"; _dir=\"${_dir%/*}\"; [ -z \"$_dir\" ] && _dir=/; _i=$((_i+1)); done; exit 0'";
+const PC_PS   = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \".claude/hooks/post-compact.ps1\"";
 appendIfAbsent(obj.hooks.UserPromptSubmit[0].hooks, UPS_BASH);
 appendIfAbsent(obj.hooks.PostCompact[0].hooks, PC_PS);
 const tmp = f + '.tmp';
-fs.writeFileSync(tmp, JSON.stringify(obj, null, 2) + '\n');
+fs.writeFileSync(tmp, JSON.stringify(obj, null, 2) + '\n', { encoding: 'utf8' });
 fs.renameSync(tmp, f);
-" 2>/dev/null && ok "context-guard hooks registered in ${PROJ_DIR}/settings.json" \
-        || warn "context-guard settings.json wiring failed — add hooks manually"
+JSEOF
+      if [ $? -eq 0 ]; then
+        ok "context-guard hooks registered in ${PROJ_DIR}/settings.json"
+      else
+        warn "context-guard settings.json wiring failed — add hooks manually"
+      fi
     fi
   else
     warn "node not found — context-guard settings.json wiring skipped; install Node.js v16+ and re-run"
@@ -690,14 +694,14 @@ git commit -m "feat(FEAT-007): update install.sh to wire context-guard hooks and
 
 Search for the `post-compact.sh` download call in the `if ($Project)` block. It should look like:
 ```powershell
-Save-RemoteFile "project-template/.claude/hooks/post-compact.sh"  "$ProjDir\hooks\post-compact.sh"
+Save-RemoteFile "project-template/.claude/hooks/post-compact.sh"  "$projDir\hooks\post-compact.sh"
 ```
 
 Add after it:
 ```powershell
-    Save-RemoteFile "project-template/.claude/hooks/context-guard.sh"   "$ProjDir\hooks\context-guard.sh"
-    Save-RemoteFile "project-template/.claude/hooks/context-guard.ps1"  "$ProjDir\hooks\context-guard.ps1"
-    Save-RemoteFile "project-template/.claude/hooks/post-compact.ps1"   "$ProjDir\hooks\post-compact.ps1"
+    Save-RemoteFile "project-template/.claude/hooks/context-guard.sh"   "$projDir\hooks\context-guard.sh"
+    Save-RemoteFile "project-template/.claude/hooks/context-guard.ps1"  "$projDir\hooks\context-guard.ps1"
+    Save-RemoteFile "project-template/.claude/hooks/post-compact.ps1"   "$projDir\hooks\post-compact.ps1"
 ```
 
 - [ ] **T-009-2: Add `node -e` settings.json patch using `@'...'@` here-string**
@@ -714,7 +718,7 @@ After the project verbosity hook merge block, insert:
     if ($cgNodeOk) {
       $cgScript = @'
 const fs = require('fs');
-const f  = process.argv[2];
+const f  = process.argv[1];
 let obj  = {};
 if (fs.existsSync(f)) {
   const raw = fs.readFileSync(f, 'utf8');
@@ -740,10 +744,10 @@ appendIfAbsent(obj.hooks.UserPromptSubmit[0].hooks, UPS_BASH);
 appendIfAbsent(obj.hooks.UserPromptSubmit[0].hooks, UPS_PS);
 appendIfAbsent(obj.hooks.PostCompact[0].hooks,      PC_PS);
 const tmp = f + '.tmp';
-fs.writeFileSync(tmp, JSON.stringify(obj, null, 2) + '\n');
+fs.writeFileSync(tmp, JSON.stringify(obj, null, 2) + '\n', { encoding: 'utf8' });
 fs.renameSync(tmp, f);
 '@
-      $cgSettingsPath = "$ProjDir\settings.json"
+      $cgSettingsPath = "$projDir\settings.json"
       node -e $cgScript $cgSettingsPath 2>$null
       if ($LASTEXITCODE -eq 0) { Write-Ok "context-guard hooks registered in $cgSettingsPath" }
       else { Write-Warn "context-guard settings.json wiring failed -- add hooks manually" }
@@ -783,7 +787,20 @@ After the existing `.gitignore` append block, add:
     }
 ```
 
-- [ ] **T-009-4: Commit**
+- [ ] **T-009-4: Verify install.ps1 syntax**
+
+```bash
+powershell -NonInteractive -NoProfile -Command "
+  \$src = [System.IO.File]::ReadAllText('install.ps1', [System.Text.Encoding]::UTF8)
+  \$e   = \$null
+  \$null = [System.Management.Automation.PSParser]::Tokenize(\$src, [ref]\$e)
+  if (\$e.Count) { \$e | ForEach-Object { Write-Host \$_.Message }; exit 1 } else { Write-Host 'PASS' }
+"
+```
+
+Expected: `PASS`
+
+- [ ] **T-009-5: Commit**
 
 ```bash
 git add install.ps1
@@ -1055,6 +1072,16 @@ Expected: all tests in the `context-guard.sh` describe block pass (skipped on Wi
 git add -f tests/hooks/context-guard.test.js
 git commit -m "test(FEAT-007): add context-guard test suite (19 cases)"
 ```
+
+- [ ] **T-010-4: Run full test suite (regression check)**
+
+**Dependencies:** requires T-001 (`context-guard.sh`) and T-003 (`post-compact.sh`) to be implemented first — `HOOK_PATH` and `PC_PATH` in the test resolve to those files at runtime.
+
+```bash
+npx vitest run --reporter=verbose
+```
+
+Expected: all existing suites (guard3, guard4, plugin-integrity) pass with no regressions; `context-guard.test.js` adds 19 passing tests (18 on Windows where row 12 `skipIf(WIN32)` is skipped). Total test count increases by 18–19.
 
 ---
 
