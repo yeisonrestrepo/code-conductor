@@ -197,6 +197,8 @@
 - [ ] [T-002-A] **Remove the claude-mem install block from the SKIP_DEPS section**
 
   In `install.sh`, find and delete the block starting with `install_dep "claude-mem"` (located by T-002-A-0 grep). Use the Edit tool with `old_string` set to the entire block and `new_string` set to the replacement below. Do not use line numbers as the anchor.
+  **Execution ordering (relative to global settings merge):** the T-002-A unconditional block is placed BEFORE the `if [ "$SKIP_DEPS" = false ]` guard in `install.sh`, not inside it. The `_merge_settings_json` call is inside the guard and runs later. On a fresh installation where `settings.json` does not yet exist when T-002-A runs: the node script exits silently via `if(!require('fs').existsSync(f))process.exit(0)` — no file-not-found exception. The global settings merge subsequently creates `settings.json`; T-002-B then adds the `code-conductor@code-conductor` key. This three-step sequence is safe on both fresh and existing installs.
+  **settings.json resilience in the node script:** three file-state cases are handled: (1) file absent → `existsSync` guard → `process.exit(0)` (silent no-op); (2) file present but empty → `_raw.trim()` is falsy → `obj={}` treated as fresh state; (3) file present, non-empty, malformed JSON → `catch(e){if(_raw.trim())...}` → WARN to stderr + `process.exit(0)` without touching the file (data-loss prevention). No unhandled exception or installer abort occurs in any of these three states.
   **Node.js version requirement for this step:** any version ≥ 10. The v16 gate in T-002-B-0 does NOT apply to the unconditional key-removal block. The node script here uses only `fs.existsSync`, `fs.readFileSync`, `JSON.parse`, `fs.writeFileSync`, and `JSON.stringify` — all available since Node.js v10. Do not add a v16 check to this step; adding it would break key-removal on machines with older Node.js and undermine the unconditional cleanup guarantee.
 
   Old (to remove entirely - replace with the uninstall + cleanup lines):
@@ -225,6 +227,7 @@
       CI=1 npx --yes claude-mem uninstall --yes 2>/dev/null || true
     else
       warn "npx not found on PATH -- claude-mem uninstall skipped (install Node.js/npm to heal existing claude-mem installs)"
+      # Execution continues: this else branch emits a warn only; the script does NOT halt or exit.
     fi
     # Pre-verify parent directory of settings.json exists before any write
     # On a completely fresh environment where ~/.claude does not yet exist, mkdir -p creates it.
@@ -244,7 +247,11 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
       warn "node not found on PATH -- settings.json key-removal skipped (claude-mem@thedotmack key may remain until Node.js is installed)"
     fi
     # Glob-delete orphaned superpowers-cached critical-review skill (all versions)
+    # '|| true' absorbs any non-zero exit (permission errors, locked files on NTFS, or absent path).
     rm -rf "${HOME}/.claude/plugins/cache/claude-plugins-official/superpowers"/*/skills/critical-review 2>/dev/null || true
+    # Post-delete residual check: warn if any critical-review dirs remain (indicates a lock failure)
+    _cr_remaining=$(ls -d "${HOME}/.claude/plugins/cache/claude-plugins-official/superpowers"/*/skills/critical-review 2>/dev/null | wc -l || echo 0)
+    [ "${_cr_remaining}" -gt 0 ] 2>/dev/null && warn "Some superpowers/critical-review dirs could not be removed -- close Claude Code and re-run installer" || true
   ```
 
 - [ ] [T-002-B-0] **Node.js version baseline check (bash)**
@@ -339,6 +346,10 @@ PLUGINJSON
     # Shell-level mkdir pre-verify immediately before enabledPlugins node script write
     # (belt-and-suspenders: the node script also calls mkdirSync but shell mkdir is more visible)
     mkdir -p "${HOME}/.claude" 2>/dev/null || true
+    # Remote fetch failure fallback: if the installer's download step failed to populate
+    # GLOBAL_DIR/skills/, source files will be absent. The loop below detects this and aborts
+    # with exit 1 before any partial plugin content is written. Recovery: restore network
+    # connectivity (or manually copy skill .md files to GLOBAL_DIR/skills/) and re-run installer.
     # Pre-copy skill file validation: verify source files exist, are non-empty, and contain
     # at least one markdown heading (# ). Missing or empty skill files produce a broken plugin.
     for _skill in critical-review memory-first agent-delegation; do
@@ -732,6 +743,9 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
     New-Item -ItemType Directory -Force "$pluginDir\skills\critical-review" | Out-Null
     New-Item -ItemType Directory -Force "$pluginDir\skills\memory-first" | Out-Null
     New-Item -ItemType Directory -Force "$pluginDir\skills\agent-delegation" | Out-Null
+    # $false = encoderShouldEmitUTF8Identifier constructor arg = no BOM.
+    # [System.Text.UTF8Encoding]::new($true) would prepend 3 BOM bytes (0xEF 0xBB 0xBF),
+    # which JSON parsers (including Claude Code's) reject. Always pass $false here.
     $pluginEnc = [System.Text.UTF8Encoding]::new($false)
     # Double-quoted here-string so $ccVersion expands into plugin.json content
     $pluginJsonContent = @"
