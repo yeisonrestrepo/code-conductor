@@ -579,7 +579,10 @@ if ($Project) {
   }
 
   Save-RemoteFile "project-template/.claude/hooks/pre-tool-use.sh"  "$projDir\hooks\pre-tool-use.sh"  $false
-  Save-RemoteFile "project-template/.claude/hooks/post-compact.sh"  "$projDir\hooks\post-compact.sh"
+  Save-RemoteFile "project-template/.claude/hooks/post-compact.sh"    "$projDir\hooks\post-compact.sh"
+  Save-RemoteFile "project-template/.claude/hooks/context-guard.sh"   "$projDir\hooks\context-guard.sh"
+  Save-RemoteFile "project-template/.claude/hooks/context-guard.ps1"  "$projDir\hooks\context-guard.ps1"
+  Save-RemoteFile "project-template/.claude/hooks/post-compact.ps1"   "$projDir\hooks\post-compact.ps1"
 
   # Project verbosity hook copy + settings.json merge (T-005-D)
   Save-RemoteFile "project-template/.claude/hooks/verbosity-remind.sh" "$projDir\hooks\verbosity-remind.sh"
@@ -589,6 +592,50 @@ if ($Project) {
 bash -c 'set +e; _dir="${PWD:-}"; _prev=""; _iters=0; while [ "$_dir" != "$_prev" ] && [ "$_iters" -lt 40 ]; do _h="$_dir/.claude/hooks/verbosity-remind.sh"; [ -f "$_h" ] && [ -r "$_h" ] && { bash "$_h"; exit $?; }; _prev="$_dir"; _dir="${_dir%/*}"; [ -z "$_dir" ] && _dir=/; _iters=$((_iters+1)); done; exit 0'
 '@).TrimEnd()
   Merge-SettingsJson "$projDir\settings.json" $projHookEmbedded
+
+  # -- context-guard hook wiring -------------------------------------------
+  $cgNodeOk = $false
+  if (Get-Command node -ErrorAction SilentlyContinue) {
+    $nm = node -e "process.stdout.write(String(process.version.split('.')[0].replace('v','')))" 2>$null
+    if ([int]$nm -ge 16) { $cgNodeOk = $true } else { Write-Warn "Node.js v$nm < 16 -- context-guard wiring skipped" }
+  } else { Write-Warn "node not found -- context-guard settings.json wiring skipped" }
+  if ($cgNodeOk) {
+    $cgScript = @'
+const fs = require('fs');
+const f  = process.argv[1];
+let obj  = {};
+if (fs.existsSync(f)) {
+  const raw = fs.readFileSync(f, 'utf8');
+  try {
+    const p = JSON.parse(raw);
+    if (p !== null && typeof p === 'object' && !Array.isArray(p)) { obj = p; }
+    else { process.stderr.write('WARN: settings.json root is not a JSON object -- treating as {}\n'); }
+  } catch(e) { if (raw.trim()) process.stderr.write('WARN: settings.json is malformed -- treating as {}\n'); }
+}
+if (!obj.hooks) obj.hooks = {};
+['UserPromptSubmit','PostCompact'].forEach(k => {
+  if (!Array.isArray(obj.hooks[k])) obj.hooks[k] = [{ hooks: [] }];
+  if (!obj.hooks[k][0]) obj.hooks[k][0] = { hooks: [] };
+  if (!Array.isArray(obj.hooks[k][0].hooks)) obj.hooks[k][0].hooks = [];
+});
+function appendIfAbsent(arr, cmd) {
+  if (!arr.some(h => h.command === cmd)) arr.push({ type: 'command', command: cmd });
+}
+const UPS_BASH = "bash -c 'set +e; _dir=\"${PWD:-}\"; _prev=\"\"; _i=0; while [ \"$_dir\" != \"$_prev\" ] && [ \"$_i\" -lt 40 ]; do _h=\"$_dir/.claude/hooks/context-guard.sh\"; [ -f \"$_h\" ] && [ -r \"$_h\" ] && { CC_PROJECT_ROOT=\"$_dir\" bash \"$_h\"; exit $?; }; _prev=\"$_dir\"; _dir=\"${_dir%/*}\"; [ -z \"$_dir\" ] && _dir=/; _i=$((_i+1)); done; exit 0'";
+const UPS_PS   = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \".claude/hooks/context-guard.ps1\"";
+const PC_PS    = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \".claude/hooks/post-compact.ps1\"";
+appendIfAbsent(obj.hooks.UserPromptSubmit[0].hooks, UPS_BASH);
+appendIfAbsent(obj.hooks.UserPromptSubmit[0].hooks, UPS_PS);
+appendIfAbsent(obj.hooks.PostCompact[0].hooks,      PC_PS);
+const tmp = f + '.tmp';
+fs.writeFileSync(tmp, JSON.stringify(obj, null, 2) + '\n', { encoding: 'utf8' });
+fs.renameSync(tmp, f);
+'@
+    $cgSettingsPath = "$projDir\settings.json"
+    node -e $cgScript $cgSettingsPath 2>$null
+    if ($LASTEXITCODE -eq 0) { Write-Ok "context-guard hooks registered in $cgSettingsPath" }
+    else { Write-Warn "context-guard settings.json wiring failed -- add hooks manually" }
+  }
 
   if ((Get-Command graphify -ErrorAction SilentlyContinue) -and (Get-Command claude -ErrorAction SilentlyContinue)) {
     Install-Dep "Graphify project graph" "graphify .; graphify hook install; claude mcp add graphify 'python -m graphify.serve graphify-out/graph.json'"
@@ -607,6 +654,33 @@ bash -c 'set +e; _dir="${PWD:-}"; _prev=""; _iters=0; while [ "$_dir" != "$_prev
   if (-not (Test-Path $gitignore) -or -not (Select-String -Path $gitignore -Pattern ([regex]::Escape($entry)) -Quiet)) {
     Add-Content -Path $gitignore -Value $entry
     Write-Ok "Added $entry to .gitignore"
+  }
+
+  # -- .gitattributes eol rules (idempotent) --------------------------------
+  $ga = ".gitattributes"
+  $gaRo = (Test-Path $ga) -and (Get-Item $ga).IsReadOnly
+  if ($gaRo) {
+    Write-Warn ".gitattributes is read-only -- *.sh eol=lf and *.ps1 eol=crlf not added; add manually"
+  } else {
+    $enc8 = [System.Text.UTF8Encoding]::new($false)
+    $gaContent = if (Test-Path $ga) { [System.IO.File]::ReadAllText($ga, [System.Text.Encoding]::UTF8) } else { '' }
+    if ($gaContent -notmatch '\*\.sh text eol=lf') {
+      [System.IO.File]::AppendAllText($ga, "*.sh text eol=lf`n", $enc8)
+    }
+    if ($gaContent -notmatch '\*\.ps1 text eol=crlf') {
+      [System.IO.File]::AppendAllText($ga, "*.ps1 text eol=crlf`n", $enc8)
+    }
+    Write-Ok "Updated .gitattributes eol rules"
+  }
+
+  # -- turn-count.txt gitignore entry (idempotent) --------------------------
+  $tcEntry = ".claude/memory/turn-count.txt"
+  $gi = ".gitignore"
+  $giContent = if (Test-Path $gi) { [System.IO.File]::ReadAllText($gi, [System.Text.Encoding]::UTF8) } else { '' }
+  if ($giContent -notlike "*$tcEntry*") {
+    $enc8 = [System.Text.UTF8Encoding]::new($false)
+    [System.IO.File]::AppendAllText($gi, "$tcEntry`n", $enc8)
+    Write-Ok "Added $tcEntry to .gitignore"
   }
 
   # Node.js and npm engine constraint check (FEAT-024)

@@ -35,7 +35,7 @@
 - Produces: updated `.claude/memory/turn-count.txt` (atomic rename)
 - Produces: stderr debug line when `CC_GUARD_DEBUG=1`
 
-- [ ] **T-001-1: Write `.claude/hooks/context-guard.sh`**
+- [X] **T-001-1: Write `.claude/hooks/context-guard.sh`**
 
 ```bash
 #!/usr/bin/env bash
@@ -83,20 +83,20 @@ main() {
 main || exit 0
 ```
 
-- [ ] **T-001-2: Copy to project-template**
+- [X] **T-001-2: Copy to project-template**
 
 ```bash
 cp .claude/hooks/context-guard.sh project-template/.claude/hooks/context-guard.sh
 ```
 
-- [ ] **T-001-3: Set execute bit on both**
+- [X] **T-001-3: Set execute bit on both**
 
 ```bash
 chmod +x .claude/hooks/context-guard.sh
 chmod +x project-template/.claude/hooks/context-guard.sh
 ```
 
-- [ ] **T-001-4: Verify syntax**
+- [X] **T-001-4: Verify syntax**
 
 ```bash
 bash -n .claude/hooks/context-guard.sh && echo PASS
@@ -104,7 +104,7 @@ bash -n .claude/hooks/context-guard.sh && echo PASS
 
 Expected: `PASS`
 
-- [ ] **T-001-5: Commit**
+- [X] **T-001-5: Commit**
 
 ```bash
 git add -f .claude/hooks/context-guard.sh project-template/.claude/hooks/context-guard.sh
@@ -125,7 +125,7 @@ git commit -m "feat(FEAT-007): add context-guard.sh hook (Unix turn counter)"
 - Consumes: `.claude\memory\turn-count.txt`
 - Produces: stdout warning string, updated `turn-count.txt`
 
-- [ ] **T-002-1: Write `.claude/hooks/context-guard.ps1`**
+- [X] **T-002-1: Write `.claude/hooks/context-guard.ps1`**
 
 ```powershell
 try {
@@ -185,13 +185,13 @@ try {
 }
 ```
 
-- [ ] **T-002-2: Copy to project-template**
+- [X] **T-002-2: Copy to project-template**
 
 ```bash
 cp .claude/hooks/context-guard.ps1 project-template/.claude/hooks/context-guard.ps1
 ```
 
-- [ ] **T-002-3: Commit**
+- [X] **T-002-3: Commit**
 
 ```bash
 git add -f .claude/hooks/context-guard.ps1 project-template/.claude/hooks/context-guard.ps1
@@ -211,7 +211,7 @@ git commit -m "feat(FEAT-007): add context-guard.ps1 hook (Windows turn counter)
 - Produces: resets `.claude/memory/turn-count.txt` to `0\n` atomically
 - Produces: stdout reminder message (preserved from original)
 
-- [ ] **T-003-1: Rewrite `.claude/hooks/post-compact.sh`**
+- [X] **T-003-1: Rewrite `.claude/hooks/post-compact.sh`**
 
 ```bash
 #!/usr/bin/env bash
@@ -245,20 +245,20 @@ main() {
 main || exit 0
 ```
 
-- [ ] **T-003-2: Copy to project-template**
+- [X] **T-003-2: Copy to project-template**
 
 ```bash
 cp .claude/hooks/post-compact.sh project-template/.claude/hooks/post-compact.sh
 ```
 
-- [ ] **T-003-3: Set execute bit**
+- [X] **T-003-3: Set execute bit**
 
 ```bash
 chmod +x .claude/hooks/post-compact.sh
 chmod +x project-template/.claude/hooks/post-compact.sh
 ```
 
-- [ ] **T-003-4: Verify syntax**
+- [X] **T-003-4: Verify syntax**
 
 ```bash
 bash -n .claude/hooks/post-compact.sh && echo PASS
@@ -266,7 +266,7 @@ bash -n .claude/hooks/post-compact.sh && echo PASS
 
 Expected: `PASS`
 
-- [ ] **T-003-5: Commit**
+- [X] **T-003-5: Commit**
 
 ```bash
 git add -f .claude/hooks/post-compact.sh project-template/.claude/hooks/post-compact.sh
@@ -285,7 +285,7 @@ git commit -m "feat(FEAT-007): rewrite post-compact.sh with atomic counter reset
 - Consumes: `$env:CC_PROJECT_ROOT`
 - Produces: resets `turn-count.txt` to `0\n`; stdout reset confirmation
 
-- [ ] **T-004-1: Write `.claude/hooks/post-compact.ps1`**
+- [X] **T-004-1: Write `.claude/hooks/post-compact.ps1`**
 
 ```powershell
 try {
@@ -325,13 +325,13 @@ try {
 }
 ```
 
-- [ ] **T-004-2: Copy to project-template**
+- [X] **T-004-2: Copy to project-template**
 
 ```bash
 cp .claude/hooks/post-compact.ps1 project-template/.claude/hooks/post-compact.ps1
 ```
 
-- [ ] **T-004-3: Commit**
+- [X] **T-004-3: Commit**
 
 ```bash
 git add -f .claude/hooks/post-compact.ps1 project-template/.claude/hooks/post-compact.ps1
@@ -350,7 +350,7 @@ git commit -m "feat(FEAT-007): add post-compact.ps1 (Windows PostCompact counter
 **Interfaces:**
 - Produces: pre-committed settings.json with context-guard hook entries for downstream project installs
 
-- [ ] **T-005-1: Add context-guard entries to `project-template/.claude/settings.json`**
+- [X] **T-005-1: Add context-guard entries to `project-template/.claude/settings.json`**
 
 Add two entries to `UserPromptSubmit[0].hooks` and one to `PostCompact[0].hooks`:
 
@@ -409,7 +409,7 @@ Add two entries to `UserPromptSubmit[0].hooks` and one to `PostCompact[0].hooks`
 }
 ```
 
-- [ ] **T-005-2: Create `project-template/.claude/memory/context-threshold.txt`**
+- [X] **T-005-2: Create `project-template/.claude/memory/context-threshold.txt`**
 
 Write exactly `25\n` (UTF-8 no BOM, LF):
 
@@ -417,13 +417,13 @@ Write exactly `25\n` (UTF-8 no BOM, LF):
 printf '25\n' > project-template/.claude/memory/context-threshold.txt
 ```
 
-- [ ] **T-005-3: Create `project-template/.gitignore`**
+- [X] **T-005-3: Create `project-template/.gitignore`**
 
 ```bash
 printf '.claude/memory/turn-count.txt\n' > project-template/.gitignore
 ```
 
-- [ ] **T-005-4: Verify threshold file**
+- [X] **T-005-4: Verify threshold file**
 
 ```bash
 xxd project-template/.claude/memory/context-threshold.txt
@@ -431,7 +431,7 @@ xxd project-template/.claude/memory/context-threshold.txt
 
 Expected: `00000000: 3235 0a` (bytes: `2`, `5`, `\n`, no BOM)
 
-- [ ] **T-005-5: Commit**
+- [X] **T-005-5: Commit**
 
 ```bash
 git add -f "project-template/.claude/settings.json" \
@@ -451,7 +451,7 @@ git commit -m "feat(FEAT-007): update project-template with context-guard hook e
 - Consumes: current `.claude/settings.json` (must be parseable JSON object)
 - Produces: idempotently adds 3 new hook entries (bash UPS dispatcher, PS UPS dispatcher, PS PostCompact)
 
-- [ ] **T-006-1: Run `node` heredoc patch**
+- [X] **T-006-1: Run `node` heredoc patch**
 
 ```bash
 node - '.claude/settings.json' 2>/dev/null << 'JSEOF'
@@ -487,7 +487,7 @@ console.log('settings.json patched');
 JSEOF
 ```
 
-- [ ] **T-006-2: Verify the patch**
+- [X] **T-006-2: Verify the patch**
 
 ```bash
 node -e "
@@ -507,7 +507,7 @@ console.log('post-compact.ps1 in PC:', hasPCPS);
 
 Expected: all three booleans print `true`.
 
-- [ ] **T-006-3: Commit**
+- [X] **T-006-3: Commit**
 
 ```bash
 git add -f .claude/settings.json
@@ -522,7 +522,7 @@ git commit -m "feat(FEAT-007): wire context-guard dispatchers in live settings.j
 - Modify: `.gitignore`
 - Create: `.gitattributes`
 
-- [ ] **T-007-1: Add `turn-count.txt` to `.gitignore`**
+- [X] **T-007-1: Add `turn-count.txt` to `.gitignore`**
 
 Append idempotently — only if not already present:
 
@@ -531,7 +531,7 @@ grep -qF '.claude/memory/turn-count.txt' .gitignore \
   || printf '.claude/memory/turn-count.txt\n' >> .gitignore
 ```
 
-- [ ] **T-007-2: Create `.gitattributes` with eol rules**
+- [X] **T-007-2: Create `.gitattributes` with eol rules**
 
 ```bash
 grep -qF '*.sh text eol=lf'    .gitattributes 2>/dev/null \
@@ -540,7 +540,7 @@ grep -qF '*.ps1 text eol=crlf' .gitattributes 2>/dev/null \
   || printf '*.ps1 text eol=crlf\n' >> .gitattributes
 ```
 
-- [ ] **T-007-3: Verify**
+- [X] **T-007-3: Verify**
 
 ```bash
 grep turn-count.txt .gitignore && echo PASS
@@ -549,7 +549,7 @@ grep eol=lf .gitattributes && grep eol=crlf .gitattributes && echo PASS
 
 Expected: both print `PASS`.
 
-- [ ] **T-007-4: Commit**
+- [X] **T-007-4: Commit**
 
 ```bash
 git add .gitignore .gitattributes
@@ -569,7 +569,7 @@ git commit -m "chore(FEAT-007): gitignore turn-count.txt; add .gitattributes eol
 - Consumes: `PROJ_DIR` variable (set to `.claude` earlier in the `--project` block)
 - Produces: all hook files copied to `.claude/hooks/`; settings.json patched; `.gitattributes` updated; `.gitignore` updated
 
-- [ ] **T-008-1: Add hook downloads after the existing post-compact download line**
+- [X] **T-008-1: Add hook downloads after the existing post-compact download line**
 
 Find the block at line 1214–1217:
 ```bash
@@ -592,7 +592,7 @@ Replace with:
            "${PROJ_DIR}/hooks/context-guard.sh"
 ```
 
-- [ ] **T-008-2: Add `node -` heredoc settings.json patch after the project verbosity hook merge block**
+- [X] **T-008-2: Add `node -` heredoc settings.json patch after the project verbosity hook merge block**
 
 After the `_merge_settings_json` call (around line 1235), insert:
 
@@ -643,7 +643,7 @@ JSEOF
   fi
 ```
 
-- [ ] **T-008-3: Add `.gitattributes` eol rules and turn-count.txt gitignore entry**
+- [X] **T-008-3: Add `.gitattributes` eol rules and turn-count.txt gitignore entry**
 
 After the existing `.gitignore` block (around line 1254), add:
 
@@ -663,7 +663,7 @@ After the existing `.gitignore` block (around line 1254), add:
   grep -qF "$_tc_entry" .gitignore 2>/dev/null || { printf '%s\n' "$_tc_entry" >> .gitignore; ok "Added $_tc_entry to .gitignore"; }
 ```
 
-- [ ] **T-008-4: Verify bash syntax**
+- [X] **T-008-4: Verify bash syntax**
 
 ```bash
 bash -n install.sh && echo PASS
@@ -671,7 +671,7 @@ bash -n install.sh && echo PASS
 
 Expected: `PASS`
 
-- [ ] **T-008-5: Commit**
+- [X] **T-008-5: Commit**
 
 ```bash
 git add install.sh
@@ -691,7 +691,7 @@ git commit -m "feat(FEAT-007): update install.sh to wire context-guard hooks and
 - Consumes: `$Project` switch, `$HasNode`, `$projDir` variable (set to `.claude` in project block)
 - Produces: hook files copied; settings.json patched; `.gitattributes` and `.gitignore` updated
 
-- [ ] **T-009-1: Find the project block hook download section in `install.ps1`**
+- [X] **T-009-1: Find the project block hook download section in `install.ps1`**
 
 Search for the `post-compact.sh` download call in the `if ($Project)` block. It should look like:
 ```powershell
@@ -705,7 +705,7 @@ Add after it:
     Save-RemoteFile "project-template/.claude/hooks/post-compact.ps1"   "$projDir\hooks\post-compact.ps1"
 ```
 
-- [ ] **T-009-2: Add `node -e` settings.json patch using `@'...'@` here-string**
+- [X] **T-009-2: Add `node -e` settings.json patch using `@'...'@` here-string**
 
 After the project verbosity hook merge block, insert:
 
@@ -755,7 +755,7 @@ fs.renameSync(tmp, f);
     }
 ```
 
-- [ ] **T-009-3: Add `.gitattributes` eol rules and turn-count.txt gitignore**
+- [X] **T-009-3: Add `.gitattributes` eol rules and turn-count.txt gitignore**
 
 After the existing `.gitignore` append block, add:
 
@@ -788,7 +788,7 @@ After the existing `.gitignore` append block, add:
     }
 ```
 
-- [ ] **T-009-4: Verify install.ps1 syntax**
+- [X] **T-009-4: Verify install.ps1 syntax**
 
 ```bash
 powershell -NonInteractive -NoProfile -Command "
@@ -801,7 +801,7 @@ powershell -NonInteractive -NoProfile -Command "
 
 Expected: `PASS`
 
-- [ ] **T-009-5: Commit**
+- [>] **T-009-5: Commit**
 
 ```bash
 git add install.ps1
