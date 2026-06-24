@@ -73,7 +73,7 @@
 - The slash `/` in `claude-mem` / `.claude/memory/project.md` is U+002F SOLIDUS.
 - Before running any Edit on global/CLAUDE.md or README.md, verify em-dash presence: `grep -Pn '\x{2014}' <file>` (the grep should return a match; if it returns nothing the file has already been edited and you can skip the step).
 
-- [ ] [T-001-A] **Edit `global/CLAUDE.md` (anchor: `check \`claude-mem\` /`)**
+- [X] [T-001-A] **Edit `global/CLAUDE.md` (anchor: `check \`claude-mem\` /`)**
 
   Old line:
   ```
@@ -86,7 +86,7 @@
 
   Use the Edit tool: `old_string` = `1. **Memory** — check \`claude-mem\` / \`.claude/memory/project.md\`. If the answer is there, stop.`; `new_string` = `1. **Memory**: check \`.claude/memory/project.md\`. If the answer is there, stop.`
 
-- [ ] [T-001-B] **Edit `skills/memory-first.md` (anchor: `claude-mem\` index`)**
+- [X] [T-001-B] **Edit `skills/memory-first.md` (anchor: `claude-mem\` index`)**
 
   Old line:
   ```
@@ -97,7 +97,7 @@
   Check `.claude/memory/project.md`.
   ```
 
-- [ ] [T-001-C] **Edit `skills/agent-delegation.md` (anchor: `project.md\` or claude-mem`)**
+- [X] [T-001-C] **Edit `skills/agent-delegation.md` (anchor: `project.md\` or claude-mem`)**
 
   Old line:
   ```
@@ -108,7 +108,7 @@
   - Answer is already in `.claude/memory/project.md`.
   ```
 
-- [ ] [T-001-D] **Edit `README.md` (anchor: `claude-mem\` / \`project.md\``)**
+- [X] [T-001-D] **Edit `README.md` (anchor: `claude-mem\` / \`project.md\``)**
 
   Old line:
   ```
@@ -119,7 +119,7 @@
   1. **Project memory**: `.claude/memory/project.md`
   ```
 
-- [ ] [T-001-E] **Edit `project-template/.claude/hooks/pre-tool-use.sh` (anchor: `Check claude-mem / project.md`)**
+- [X] [T-001-E] **Edit `project-template/.claude/hooks/pre-tool-use.sh` (anchor: `Check claude-mem / project.md`)**
 
   Old line:
   ```
@@ -130,7 +130,7 @@
      echo "   1. Check .claude/memory/project.md"
   ```
 
-- [ ] [T-001-F] **Edit `.claude/hooks/pre-tool-use.sh` (anchor: `Check claude-mem / project.md`)**
+- [X] [T-001-F] **Edit `.claude/hooks/pre-tool-use.sh` (anchor: `Check claude-mem / project.md`)**
 
   Same as T-001-E. Old:
   ```
@@ -141,7 +141,7 @@
      echo "   1. Check .claude/memory/project.md"
   ```
 
-- [ ] [T-001-G] **Commit**
+- [X] [T-001-G] **Commit**
 
   ```bash
   git add global/CLAUDE.md skills/memory-first.md skills/agent-delegation.md README.md \
@@ -160,7 +160,7 @@
 - Consumes: `${GLOBAL_DIR}/skills/critical-review.md`, `${GLOBAL_DIR}/skills/memory-first.md`, `${GLOBAL_DIR}/skills/agent-delegation.md` (written by the `download` calls at lines 965-969, which run before the new plugin block)
 - Produces: `~/.claude/plugins/cache/code-conductor/code-conductor/<version>/` directory on the user's machine (version resolved via fallback chain: REMOTE_VERSION env var -> local VERSION file -> "1.0.0" sentinel); `enabledPlugins["code-conductor@code-conductor"]: true` in `~/.claude/settings.json`
 
-- [ ] [T-002-A-0] **Locate and read the claude-mem install block in `install.sh` before editing**
+- [X] [T-002-A-0] **Locate and read the claude-mem install block in `install.sh` before editing**
 
   Do not rely on line numbers (they shift with code drift). Instead, find the block by content:
   ```bash
@@ -172,7 +172,7 @@
   ```
   Verify the output contains `install_dep "claude-mem"` followed by the `if [ "$HAS_NODE" = true ]` npm-install block. If the block differs from `old_string` below (extra blank lines, indentation), update `old_string` to match before proceeding. Do not skip this step: Edit tool failures from mismatched blocks are the most common failure mode for this task.
 
-- [ ] [T-002-A-1] **Backup `settings.json` before modification (bash)**
+- [X] [T-002-A-1] **Backup `settings.json` before modification (bash)**
 
   Immediately before the FIRST node mutation (key-removal in T-002-A), add this shell-level backup. This single backup covers ALL sequential `settings.json` mutations in the same installer run: the claude-mem key-removal (T-002-A) AND the code-conductor enabledPlugins insertion (T-002-B). Do not create a second backup between these two steps - the pre-mutation snapshot is already captured here.
   ```bash
@@ -190,7 +190,7 @@
   ```
   Clear the trap after T-002-C assertions pass (before the auto-cleanup step) to prevent the cleanup from triggering a false restore: `trap - ERR`. For PS (T-003-A-1): wrap the entire mutation sequence (T-003-A through T-003-B node calls) in a `try/finally` block where `finally` restores the backup if still present (the T-003-C auto-cleanup step deletes it on success, so `finally` only acts on failure paths): `finally { if (Test-Path $settingsBak) { Copy-Item $settingsBak $settingsPath -Force -ErrorAction SilentlyContinue; Write-Warn "FINALLY: settings.json auto-restored from backup" } }`. **Sudden-termination caveat:** both the bash `ERR` trap and the PS `finally` block are bypassed by abrupt process termination (SIGKILL, `taskkill /F`, power loss). In that case the `.bak` file remains on disk. If the user restarts and finds `settings.json` corrupt or missing, they must manually run: bash: `cp ~/.claude/settings.json.bak ~/.claude/settings.json`; PS: `Copy-Item "$env:USERPROFILE\.claude\settings.json.bak" "$env:USERPROFILE\.claude\settings.json"`. No automatic post-crash recovery is specified beyond this manual step. **State recovery checklist (sudden-termination or hard abort):** (1) Backup file location: bash `~/.claude/settings.json.bak` / PS `%USERPROFILE%\.claude\settings.json.bak`; (2) Verify backup is non-empty before restoring: bash `[ -s ~/.claude/settings.json.bak ] && echo "backup OK" || echo "backup missing or empty"` / PS `(Get-Item "$env:USERPROFILE\.claude\settings.json.bak" -EA 0).Length -gt 0`; (3) Restore: bash `cp ~/.claude/settings.json.bak ~/.claude/settings.json` / PS `Copy-Item "$env:USERPROFILE\.claude\settings.json.bak" "$env:USERPROFILE\.claude\settings.json" -Force`; (4) Delete backup after confirming restore succeeded: bash `rm ~/.claude/settings.json.bak` / PS `Remove-Item "$env:USERPROFILE\.claude\settings.json.bak"`; (5) Scope: the ERR trap is active from T-002-A-1 through T-002-C assertions; it is cleared with `trap - ERR` immediately before the T-002-C auto-cleanup step — recovery from `.bak` is only needed for failures BEFORE that `trap - ERR` line fires.
 
-- [ ] [T-002-A-2] **Verify claude-mem cache directory is removed after uninstall**
+- [X] [T-002-A-2] **Verify claude-mem cache directory is removed after uninstall**
 
   Add this assertion immediately after the npx uninstall call:
   ```bash
@@ -203,7 +203,7 @@
   ```
   This is a non-fatal warn (not `exit 1`) because `npx claude-mem uninstall` may be unavailable on fresh machines where claude-mem was never installed.
 
-- [ ] [T-002-A] **Remove the claude-mem install block from the SKIP_DEPS section**
+- [X] [T-002-A] **Remove the claude-mem install block from the SKIP_DEPS section**
 
   In `install.sh`, find and delete the block starting with `install_dep "claude-mem"` (located by T-002-A-0 grep). Use the Edit tool with `old_string` set to the entire block and `new_string` set to the replacement below. Do not use line numbers as the anchor.
   **Execution ordering (relative to global settings merge):** the T-002-A unconditional block is placed BEFORE the `if [ "$SKIP_DEPS" = false ]` guard in `install.sh`, not inside it. The `_merge_settings_json` call is inside the guard and runs later. On a fresh installation where `settings.json` does not yet exist when T-002-A runs: the node script exits silently via `if(!require('fs').existsSync(f))process.exit(0)` — no file-not-found exception. The global settings merge subsequently creates `settings.json`; T-002-B then adds the `code-conductor@code-conductor` key. This three-step sequence is safe on both fresh and existing installs.
@@ -263,7 +263,7 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
     [ "${_cr_remaining}" -gt 0 ] 2>/dev/null && warn "Some superpowers/critical-review dirs could not be removed -- close Claude Code and re-run installer" || true
   ```
 
-- [ ] [T-002-B-0] **Node.js version baseline check (bash)**
+- [X] [T-002-B-0] **Node.js version baseline check (bash)**
 
   Insert this guard at the top of the plugin creation block (inside `if [ "$SKIP_DEPS" = false ]`), before any `node -e` call:
   ```bash
@@ -282,7 +282,7 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
   ```
   Guard all subsequent `node -e` calls in this block with `[ "$_node_ok" = true ] &&`. The npx and node absence warns for the unconditional cleanup block are already present inline in the T-002-A replacement block above (if/else/fi form); no additional changes needed in T-002-B-0 for those.
 
-- [ ] [T-002-B] **Add code-conductor plugin creation block after the global settings merge**
+- [X] [T-002-B] **Add code-conductor plugin creation block after the global settings merge**
 
   **Atomicity note (two sequential settings.json writes):** T-002-A (key removal, unconditional) and this step (key insertion, inside SKIP_DEPS) are intentionally separate because they are under different guards. Combining them into a single `node -e` would require merging the two guards, changing semantics. A crash mid-combined-script would still leave partial state — disk writes are never atomic regardless of batching. The backup from T-002-A-1 + ERR trap already provides the rollback invariant for both sequential calls: if this step's write fails, the ERR trap restores the pre-T-002-A snapshot. Do not combine the two writes.
   **Skill file pre-copy validation ordering:** the source file validation loop (checking existence, non-empty, markdown heading) runs AFTER the plugin dir is wiped and recreated in the current code order. If a source validation failure occurs after the wipe, an empty (but non-functional) plugin dir is left behind. This is acceptable because T-002-C immediately detects it (missing SKILL.md = FATAL). For cleaner failure mode in local developer testing, the implementer MAY restructure to run the validation loop BEFORE the wipe; however, the plan does not require this reordering — T-002-C / T-003-C provide the authoritative post-copy check.
@@ -396,7 +396,7 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
   fi
   ```
 
-- [ ] [T-002-C] **Verify plugin.json exists and is structurally valid**
+- [X] [T-002-C] **Verify plugin.json exists and is structurally valid**
 
   Run immediately after the installer code is written (before the test suite):
 
@@ -495,14 +495,14 @@ console.log('settings.json assertions passed');
   ```
   Expected: `settings.json.bak auto-cleaned up` (or silent no-op if file was absent). This is the designated automated cleanup point; do not delete the backup before this step.
 
-- [ ] [T-002-D] **Run tests**
+- [X] [T-002-D] **Run tests**
 
   ```bash
   npm test
   ```
   Expected: all tests pass (142 passed, 3 skipped). The hook text edits from Task 1 do not affect test assertions (confirmed by grep - no tests assert on "claude-mem" text).
 
-- [ ] [T-002-E] **Commit**
+- [X] [T-002-E] **Commit**
 
   ```bash
   git add install.sh
@@ -520,7 +520,7 @@ console.log('settings.json assertions passed');
 - Consumes: `$GLOBAL_DIR\skills\critical-review.md`, `$GLOBAL_DIR\skills\memory-first.md`, `$GLOBAL_DIR\skills\agent-delegation.md` (written by `Save-RemoteFile` calls at lines 401-405, which run before the new plugin block)
 - Produces: `%USERPROFILE%\.claude\plugins\cache\code-conductor\code-conductor\<version>\` on Windows (version resolved via fallback chain: $RemoteVersion param -> local VERSION file -> "1.0.0" sentinel); `enabledPlugins["code-conductor@code-conductor"]: true` in `~/.claude/settings.json`
 
-- [ ] [T-003-A-0] **Locate and read the claude-mem install block in `install.ps1` before editing**
+- [X] [T-003-A-0] **Locate and read the claude-mem install block in `install.ps1` before editing**
 
   Do not rely on line numbers. Find the block by content:
   ```powershell
@@ -532,7 +532,7 @@ console.log('settings.json assertions passed');
   ```
   Verify the output contains `Write-Info "Installing claude-mem..."` and the winget fallback block. If the block differs from `old_string` below, update `old_string` to match before proceeding. Backtick continuation characters in PS (`` ` ``) must be preserved exactly: they are U+0060 GRAVE ACCENT, not curly quotes.
 
-- [ ] [T-003-A-1] **Backup `settings.json` before modification (PowerShell)**
+- [X] [T-003-A-1] **Backup `settings.json` before modification (PowerShell)**
 
   Immediately before the `$cmNodeScript` execution, add:
   ```powershell
@@ -548,7 +548,7 @@ console.log('settings.json assertions passed');
   ```
   Recovery: `Copy-Item $settingsBak $settingsPath -Force`. Verify `(Get-Item $settingsBak).Length -gt 0` before restoring. Overwritten on each install run.
 
-- [ ] [T-003-A-2] **Verify claude-mem cache directory removed (PowerShell)**
+- [X] [T-003-A-2] **Verify claude-mem cache directory removed (PowerShell)**
 
   Add after the uninstall call:
   ```powershell
@@ -560,7 +560,7 @@ console.log('settings.json assertions passed');
   }
   ```
 
-- [ ] [T-003-A] **Remove the claude-mem install block from the `-NoDeps` section**
+- [X] [T-003-A] **Remove the claude-mem install block from the `-NoDeps` section**
 
   In `install.ps1`, find and delete the block starting with `if ($HasNode) { Write-Info "Installing claude-mem..."` (located by T-003-A-0 grep). Replace it with the uninstall + cleanup lines below. Do not use line numbers as the anchor.
   **npx presence check (PS):** the replacement block uses `if (Get-Command npx -ErrorAction SilentlyContinue)` to verify npx before invoking it; the else branch emits `Write-Warn` and continues without halting. `Get-Command -ErrorAction SilentlyContinue` is the correct PS 5.1 idiom — `try/catch` only absorbs terminating exceptions and does NOT catch "command not found" errors for native executables.
@@ -682,7 +682,7 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
     }
   ```
 
-- [ ] [T-003-B-0] **Node.js version baseline check (PowerShell)**
+- [X] [T-003-B-0] **Node.js version baseline check (PowerShell)**
 
   Insert this guard at the top of the plugin creation block (inside `if (-not $NoDeps)`):
   ```powershell
@@ -744,7 +744,7 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
   ```
   The outer `if (-not $NoDeps)` block remains; the `try/catch` is the inner wrapper. A permission failure is non-fatal — the installer continues; missing the plugin is reported via `Write-Warn`, not `throw`. **Copy-Item failure policy (PS):** `[System.UnauthorizedAccessException]` on any `Copy-Item` call is caught by the outer `try/catch [System.UnauthorizedAccessException]` block and emits `Write-Warn`; the partial plugin dir is then detected by T-003-C's SKILL.md existence check (`throw "ERROR: missing SKILL.md for $_"`) which aborts the verification step. The implementer must NOT proceed to T-003-D without resolving T-003-C. Recovery: grant write access to `$pluginDir` (e.g., `icacls`) and re-run the installer.
 
-- [ ] [T-003-B] **Add code-conductor plugin creation block after global settings merge**
+- [X] [T-003-B] **Add code-conductor plugin creation block after global settings merge**
 
   **Global plugin directory handling:** if `$env:USERPROFILE\.claude` does not exist, `New-Item -ItemType Directory -Force` (in T-003-A and inside this block) creates it automatically. If it exists but is not writable, the T-003-B-0 write-permission probe emits `Write-Warn`; subsequent `New-Item` for the plugin dir silently fails; `Copy-Item` then throws `[System.UnauthorizedAccessException]` caught by the outer `try/catch` in this block. See the OS permissions constraint for remediation (`icacls` command). The `-ErrorAction SilentlyContinue` on parent-dir `New-Item` calls is intentional: parent dir creation failure is non-fatal — the plugin-dir `New-Item` fails instead and is caught.
 
@@ -861,7 +861,7 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
   }
   ```
 
-- [ ] [T-003-C] **Verify plugin.json exists and is structurally valid (PowerShell)**
+- [X] [T-003-C] **Verify plugin.json exists and is structurally valid (PowerShell)**
 
   Run after the installer block is written:
 
@@ -967,14 +967,14 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
   ```
   Expected: `[OK] settings.json.bak auto-cleaned up after successful install` (or silent no-op if absent). This is the designated automated cleanup point.
 
-- [ ] [T-003-D] **Run tests**
+- [X] [T-003-D] **Run tests**
 
   ```bash
   npm test
   ```
   Expected: 142 passed, 3 skipped.
 
-- [ ] [T-003-E] **Commit**
+- [X] [T-003-E] **Commit**
 
   ```bash
   git add install.ps1
@@ -993,7 +993,7 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
 **Interfaces:**
 - Produces: published version `1.14.0` visible in `VERSION`, `package.json`, and `CHANGELOG.md`
 
-- [ ] [T-004-A] **Edit `VERSION`**
+- [X] [T-004-A] **Edit `VERSION`**
 
   First read the file to confirm its sole content:
   ```
@@ -1006,7 +1006,7 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
 
   Verify with `Read({ file_path: "VERSION" })` - must contain only `1.14.0`.
 
-- [ ] [T-004-B] **Edit `package.json` version field**
+- [X] [T-004-B] **Edit `package.json` version field**
 
   First read the relevant lines to confirm uniqueness of the match:
   ```
@@ -1019,7 +1019,7 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
 
   Verify: `grep '"version"' package.json` → `"version": "1.14.0"`.
 
-- [ ] [T-004-C] **Prepend `[1.14.0]` entry to `CHANGELOG.md`**
+- [X] [T-004-C] **Prepend `[1.14.0]` entry to `CHANGELOG.md`**
 
   First read the top of CHANGELOG.md to confirm the exact anchor text:
   ```
@@ -1054,14 +1054,14 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
 
   Verify: `Read({ file_path: "CHANGELOG.md", offset: 1, limit: 20 })` - must show `[1.14.0]` before `[1.13.0]`.
 
-- [ ] [T-004-D] **Run tests**
+- [X] [T-004-D] **Run tests**
 
   ```bash
   npm test
   ```
   Expected: 142 passed, 3 skipped.
 
-- [ ] [T-004-E] **Commit**
+- [X] [T-004-E] **Commit**
 
   ```bash
   git add VERSION package.json CHANGELOG.md
@@ -1079,7 +1079,7 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
 - Consumes: `~/.claude/plugins/cache/code-conductor/code-conductor/<version>/` - present only when the installer has run (not in CI where install hasn't executed)
 - Produces: 5 test assertions that gate plugin schema and skill file integrity
 
-- [ ] [T-005-A] **Create `tests/plugin/code-conductor-plugin.test.js`**
+- [X] [T-005-A] **Create `tests/plugin/code-conductor-plugin.test.js`**
 
   ```js
   const fs = require('fs');
@@ -1128,21 +1128,21 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
   });
   ```
 
-- [ ] [T-005-B] **Run tests**
+- [X] [T-005-B] **Run tests**
 
   ```bash
   npm test
   ```
   Expected: 142+ passed (new tests skip in CI where plugin dir is absent), 3 skipped.
 
-- [ ] [T-005-C] **Commit**
+- [X] [T-005-C] **Commit**
 
   ```bash
   git add tests/plugin/code-conductor-plugin.test.js
   git commit -m "test: add code-conductor plugin schema and skill file assertions"
   ```
 
-- [ ] [T-005-D] **Manual smoke test: Claude Code CLI plugin load**
+- [X] [T-005-D] **Manual smoke test: Claude Code CLI plugin load**
 
   After both installers have run (or after `bash install.sh` completes on the local machine), verify the plugin loads cleanly:
 
