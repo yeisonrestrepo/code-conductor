@@ -167,3 +167,10 @@ Guard 4 in `pre-tool-use.sh`: blocks `Read` tool on `graphify-out/**` and `node_
 - Scope: S — ~15 lines Guard 4 bash + installer one-liner guards + CLAUDE.md text change + ~10 Vitest tests
 - Spec: `docs/superpowers/specs/2026-06-22-bug017-graphify-read-guard-design.md`
 - vitest.config.js: `pool: 'forks'` → `pool: 'threads'` (fixes onTaskUpdate IPC timeout on Windows)
+
+## Spec: FEAT-007 context-guard 2026-06-24
+
+Turn-counter hook (`context-guard.sh` / `.ps1`) wired into `UserPromptSubmit` via upward-walk dispatcher (max 40 iter, fail-open). Increments `.claude/memory/turn-count.txt` atomically; emits ⚠ at 80% of threshold and 🚨 at threshold. Resets via `PostCompact` hook (`post-compact.sh` rewritten + new `post-compact.ps1`). Threshold configured in `.claude/memory/context-threshold.txt` (default 25; committed; `turn-count.txt` gitignored).
+- Key decisions: atomic rename (same-dir temp), CR/BOM strip, no jq, node -e with `@'...'@` in PS, `main() || exit 0` outer trap, `Array.isArray` guard, exact-command idempotency, no `set -e`/`set -u`
+- Spec: `docs/superpowers/specs/2026-06-24-feat007-context-guard-design.md`
+- Complexity: M
