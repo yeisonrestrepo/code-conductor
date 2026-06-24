@@ -17,6 +17,7 @@
 - PS 5.1: closing `'@` of all `@'...'@` here-strings at column 0, no leading whitespace.
 - PS 5.1: no `??` null-coalescing operator — use `if ($env:X) { $env:X } else { '.' }`.
 - Vitest: real filesystem, `mkdtempSync` per test, `CC_PROJECT_ROOT` per-spawn (not global mutation).
+- Atomic writes to `turn-count.txt` must produce LF-only line endings: `printf '%d\n'` on bash; `"$n`n"` with `[System.Text.UTF8Encoding]::new($false)` on PS. Never write bare `$n` (no newline) or CRLF — cross-platform git checkouts will corrupt the counter.
 
 ---
 
@@ -450,12 +451,12 @@ git commit -m "feat(FEAT-007): update project-template with context-guard hook e
 - Consumes: current `.claude/settings.json` (must be parseable JSON object)
 - Produces: idempotently adds 3 new hook entries (bash UPS dispatcher, PS UPS dispatcher, PS PostCompact)
 
-- [ ] **T-006-1: Run `node -e` patch**
+- [ ] **T-006-1: Run `node` heredoc patch**
 
 ```bash
-node -e "
+node - '.claude/settings.json' 2>/dev/null << 'JSEOF'
 const fs = require('fs');
-const f  = '.claude/settings.json';
+const f  = process.argv[2];
 let obj  = {};
 if (fs.existsSync(f)) {
   const raw = fs.readFileSync(f, 'utf8');
@@ -473,9 +474,9 @@ if (!obj.hooks) obj.hooks = {};
 function appendIfAbsent(arr, cmd) {
   if (!arr.some(h => h.command === cmd)) arr.push({ type: 'command', command: cmd });
 }
-const UPS_BASH = \"bash -c 'set +e; _dir=\\\"\\\${PWD:-}\\\"; _prev=\\\"\\\"; _i=0; while [ \\\"\\\$_dir\\\" != \\\"\\\$_prev\\\" ] && [ \\\"\\\$_i\\\" -lt 40 ]; do _h=\\\"\\\$_dir/.claude/hooks/context-guard.sh\\\"; [ -f \\\"\\\$_h\\\" ] && [ -r \\\"\\\$_h\\\" ] && { CC_PROJECT_ROOT=\\\"\\\$_dir\\\" bash \\\"\\\$_h\\\"; exit \\\$?; }; _prev=\\\"\\\$_dir\\\"; _dir=\\\"\\\${_dir%/*}\\\"; [ -z \\\"\\\$_dir\\\" ] && _dir=/; _i=\\\$((\\\$_i+1)); done; exit 0'\";
-const UPS_PS  = 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \".claude/hooks/context-guard.ps1\"';
-const PC_PS   = 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \".claude/hooks/post-compact.ps1\"';
+const UPS_BASH = "bash -c 'set +e; _dir=\"${PWD:-}\"; _prev=\"\"; _i=0; while [ \"$_dir\" != \"$_prev\" ] && [ \"$_i\" -lt 40 ]; do _h=\"$_dir/.claude/hooks/context-guard.sh\"; [ -f \"$_h\" ] && [ -r \"$_h\" ] && { CC_PROJECT_ROOT=\"$_dir\" bash \"$_h\"; exit $?; }; _prev=\"$_dir\"; _dir=\"${_dir%/*}\"; [ -z \"$_dir\" ] && _dir=/; _i=$((_i+1)); done; exit 0'";
+const UPS_PS  = 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ".claude/hooks/context-guard.ps1"';
+const PC_PS   = 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ".claude/hooks/post-compact.ps1"';
 appendIfAbsent(obj.hooks.UserPromptSubmit[0].hooks, UPS_BASH);
 appendIfAbsent(obj.hooks.UserPromptSubmit[0].hooks, UPS_PS);
 appendIfAbsent(obj.hooks.PostCompact[0].hooks,      PC_PS);
@@ -483,7 +484,7 @@ const tmp = f + '.tmp';
 fs.writeFileSync(tmp, JSON.stringify(obj, null, 2) + '\n', { encoding: 'utf8' });
 fs.renameSync(tmp, f);
 console.log('settings.json patched');
-"
+JSEOF
 ```
 
 - [ ] **T-006-2: Verify the patch**
@@ -687,7 +688,7 @@ git commit -m "feat(FEAT-007): update install.sh to wire context-guard hooks and
 **Changes:** In the `if ($Project)` block, add: (a) downloads for context-guard scripts and post-compact.ps1; (b) `node -e` settings.json patch (via `@'...'@` here-string); (c) `.gitattributes` eol rules; (d) turn-count.txt gitignore entry.
 
 **Interfaces:**
-- Consumes: `$Project` switch, `$HasNode`, `$PROJ_DIR` variable (set to `.claude` in project block)
+- Consumes: `$Project` switch, `$HasNode`, `$projDir` variable (set to `.claude` in project block)
 - Produces: hook files copied; settings.json patched; `.gitattributes` and `.gitignore` updated
 
 - [ ] **T-009-1: Find the project block hook download section in `install.ps1`**
@@ -1111,7 +1112,7 @@ Expected: all existing suites (guard3, guard4, plugin-integrity) pass with no re
 
 2. **PS `@'...'@` closing marker column-0 requirement (T-009):** If any editor auto-indents the `'@` line, PS 5.1 will throw a parse error at runtime. Verify by running the installer on Windows after T-009.
 
-3. **`post-compact.ps1` `Select-String` on Windows (T-004):** `?.Line` optional-member access is not available in PS 5.1 — rewrite as explicit `if ($last) { $last.Line }` if needed.
+3. **`post-compact.ps1` `Select-String` on Windows (T-004):** Resolved — T-004-1 uses `$lastMatch = Select-String '## Checkpoint' $projMd | Select-Object -Last 1` with `if ($lastMatch) { $($lastMatch.Line) }`, avoiding any optional-chaining operator. No action required.
 
 4. **`warning = 0` edge case (T-010 row 18):** When critical=1, `new_count=1 >= critical=1` → 🚨 fires via the first elif branch; the ⚠ branch is never reached. Test row 18 verifies 🚨, not ⚠.
 
