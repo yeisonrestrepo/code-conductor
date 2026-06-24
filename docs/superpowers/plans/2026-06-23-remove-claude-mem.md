@@ -356,9 +356,13 @@ PLUGINJSON
     # (belt-and-suspenders: the node script also calls mkdirSync but shell mkdir is more visible)
     mkdir -p "${HOME}/.claude" 2>/dev/null || true
     # Remote fetch failure fallback: if the installer's download step failed to populate
-    # GLOBAL_DIR/skills/, source files will be absent. The loop below detects this and aborts
-    # with exit 1 before any partial plugin content is written. Recovery: restore network
-    # connectivity (or manually copy skill .md files to GLOBAL_DIR/skills/) and re-run installer.
+    # GLOBAL_DIR/skills/, source files will be absent. NOTE: at the point validation runs, plugin.json
+    # has ALREADY been written (cat > above) and skill dirs have been mkdir'd, but no SKILL.md
+    # files have been copied yet. Validation failure fires exit 1 under set -euo pipefail; the ERR
+    # trap restores settings.json from .bak. The partial plugin dir (plugin.json present, no SKILL.md)
+    # is inert -- Claude Code ignores plugins missing SKILL.md files. Recovery: restore network
+    # connectivity (or manually copy skill .md files to GLOBAL_DIR/skills/) and re-run installer --
+    # the wipe step is idempotent and recreates the full plugin dir from scratch.
     # Pre-copy skill file validation: verify source files exist, are non-empty, and contain
     # at least one markdown heading (# ). Missing or empty skill files produce a broken plugin.
     for _skill in critical-review memory-first agent-delegation; do
@@ -559,7 +563,7 @@ console.log('settings.json assertions passed');
 
   In `install.ps1`, find and delete the block starting with `if ($HasNode) { Write-Info "Installing claude-mem..."` (located by T-003-A-0 grep). Replace it with the uninstall + cleanup lines below. Do not use line numbers as the anchor.
   **npx presence check (PS):** the replacement block uses `if (Get-Command npx -ErrorAction SilentlyContinue)` to verify npx before invoking it; the else branch emits `Write-Warn` and continues without halting. `Get-Command -ErrorAction SilentlyContinue` is the correct PS 5.1 idiom — `try/catch` only absorbs terminating exceptions and does NOT catch "command not found" errors for native executables.
-  **Execution ordering (PS):** the T-003-A unconditional block runs BEFORE the `if (-not $NoDeps)` guard. `Merge-SettingsJson` is inside the guard and runs later; T-003-B's enabledPlugins write follows. On fresh installs, `settings.json` does not yet exist when T-003-A runs — `$cmNodeScript`'s `if(!existsSync(f))process.exit(0)` exits silently. The global settings merge then creates `settings.json`; T-003-B adds `code-conductor@code-conductor`.
+  **Execution ordering (PS):** the T-003-A unconditional block runs BEFORE the `if (-not $NoDeps)` guard. `Merge-SettingsJson` is inside the guard and runs later; T-003-B's enabledPlugins write follows. On fresh installs, `settings.json` does not yet exist when T-003-A runs — `$cmNodeScript`'s `if(!existsSync(f))process.exit(0)` exits silently. The global settings merge then creates `settings.json`; T-003-B adds `code-conductor@code-conductor`. Numbered sequence: (1) PS script starts; (2) `$RemoteVersion` fetched via Invoke-WebRequest; (3) `$GLOBAL_DIR`, `$ccVersion` set via version fallback chain; (4) **T-003-A unconditional block runs** (this step — npx uninstall, node key-removal, glob-delete); (5) `if (-not $NoDeps)` block starts; (6) `Merge-SettingsJson` runs (creates `settings.json` if absent); (7) T-003-B plugin creation runs. `settings.json` does not yet exist at step (4); the `existsSync` guard on line 1 of `$cmNodeScript` handles this silently.
   **Node.js version requirement for this step:** any version ≥ 10. The v16 gate in T-003-B-0 does NOT apply to the unconditional key-removal block. The node script uses only `fs.existsSync`, `fs.readFileSync`, `JSON.parse`, `fs.writeFileSync`, and `JSON.stringify` — all available since Node.js v10. Do not add a v16 check to this step.
   **`$cmNodeScript` JSON resilience (three file-state cases):** (1) `settings.json` absent — `existsSync` check on line 1 calls `process.exit(0)` silently; no `readFileSync` is ever called. (2) file exists but is empty — `JSON.parse('')` throws; `_raw.trim()` is falsy; `obj` stays `{}`; key-removal is a no-op. (3) file exists, non-empty, malformed — `_raw.trim()` is truthy; emits WARN to stderr and calls `process.exit(0)` to avoid data loss. All three cases are encoded in `$cmNodeScript`; the implementer must NOT simplify the script.
   **Post-WARN execution state (PS):** if the `npx` WARN fires: claude-mem uninstall was skipped; the plugin hook may remain registered in Claude Code; the user must install Node.js and re-run the installer (or manually run `npx --yes claude-mem uninstall --yes`). If the `node` WARN fires: `settings.json` key-removal was skipped; `claude-mem@thedotmack` may remain in `enabledPlugins`; T-003-C's absence-check block will emit a second WARN. In both cases: execution CONTINUES with no halt, no `throw`, no exit-code change; the installer proceeds to T-003-B plugin creation.
@@ -643,6 +647,7 @@ console.log('settings.json assertions passed');
     # Remove claude-mem@thedotmack from enabledPlugins (no-op on fresh installs)
     # Fresh-install guard: line 1 of the script is 'if(!existsSync(f))process.exit(0)' --
     # silently exits when settings.json does not yet exist; no file-not-found exception thrown.
+    # IMPORTANT: the closing '@' that ends $cmNodeScript below MUST be at column 0 (no leading spaces/tabs).
     $cmNodeScript = @'
 const f=require('os').homedir()+'/.claude/settings.json';
 if(!require('fs').existsSync(f))process.exit(0);
@@ -917,6 +922,16 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
   Write-Ok "plugin.json trailing newline: LF confirmed"
   ```
   Expected output: `[OK] plugin.json trailing newline: LF confirmed`
+
+  **UTF-8 without BOM byte verification (PS):** Confirm the first 3 bytes are NOT the UTF-8 BOM signature (0xEF 0xBB 0xBF). A BOM indicates `WriteAllText` was called with the wrong encoding object (missing `$false` parameter — see Global Constraint "UTF-8 without BOM"):
+  ```powershell
+  if ($bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+    throw "ERROR: plugin.json has UTF-8 BOM preamble -- recheck WriteAllText encoder (must be [System.Text.UTF8Encoding]::new(`$false))"
+  } else {
+    Write-Ok "plugin.json UTF-8 without BOM confirmed"
+  }
+  ```
+  Expected output: `[OK] plugin.json UTF-8 without BOM confirmed`
 
   **Version conflict check** -- detect stale versioned dirs from prior installs:
   ```powershell
