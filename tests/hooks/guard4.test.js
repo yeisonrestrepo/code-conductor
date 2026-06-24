@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { spawnSync } from 'child_process'
+import { mkdtempSync, rmdirSync } from 'fs'
+import { tmpdir } from 'os'
 import { fileURLToPath } from 'url'
 import { dirname, join, resolve } from 'path'
 
@@ -121,20 +123,27 @@ describe.skipIf(!BASH_AVAILABLE)('Guard 4 — Read blocker for graphify-out/ and
     const r = runRead('', { input: '{}' })
     expect(r.status).toBe(0)
   })
-  it.skipIf(WIN32)('row16: fail-open when python3 absent (PATH restricted to /bin)', () => {
-    const result = spawnSync('bash', [HOOK], {
-      stdio: 'pipe',
-      cwd: REPO_ROOT,
-      timeout: 15000,
-      env: {
-        ...process.env,
-        PATH: '/bin',
-        CLAUDE_TOOL_NAME: 'Read',
-        CLAUDE_TOOL_INPUT: JSON.stringify({ file_path: 'graphify-out/graph.json' }),
-      },
-    })
-    if (result.error) throw new Error(`bash spawn failed: ${result.error.message}`)
-    expect(result.status ?? -1).toBe(0)
+  it.skipIf(WIN32)('row16: fail-open when python3 absent (PATH restricted to empty dir)', () => {
+    // /bin → /usr/bin on modern Linux (Ubuntu CI), so python3 would be found there.
+    // Use a temp empty dir to guarantee python3 is truly absent on any OS.
+    const fakeBin = mkdtempSync(join(tmpdir(), 'guard4-nopy-'))
+    try {
+      const result = spawnSync('bash', [HOOK], {
+        stdio: 'pipe',
+        cwd: REPO_ROOT,
+        timeout: 15000,
+        env: {
+          ...process.env,
+          PATH: fakeBin,
+          CLAUDE_TOOL_NAME: 'Read',
+          CLAUDE_TOOL_INPUT: JSON.stringify({ file_path: 'graphify-out/graph.json' }),
+        },
+      })
+      if (result.error) throw new Error(`bash spawn failed: ${result.error.message}`)
+      expect(result.status ?? -1).toBe(0)
+    } finally {
+      rmdirSync(fakeBin)
+    }
   })
   it('row17: does NOT fire Guard 4 when CLAUDE_TOOL_NAME is Bash (Guard 3 handles; exits 0)', () => {
     const r = runRead('graphify-out/graph.json', { toolName: 'Bash' })

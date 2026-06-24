@@ -1,10 +1,13 @@
 import { describe, test, expect, beforeAll } from 'vitest';
-import { existsSync, readFileSync, statSync, readdirSync } from 'fs';
-import { join } from 'path';
+import { existsSync, readFileSync, statSync } from 'fs';
+import { join, dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
 import { homedir } from 'os';
 
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const PKG_VERSION = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8')).version;
 const PLUGIN_BASE = join(homedir(), '.claude', 'plugins', 'cache', 'code-conductor', 'code-conductor');
-const PLUGIN_INSTALLED = existsSync(PLUGIN_BASE);
+const PLUGIN_INSTALLED = existsSync(join(PLUGIN_BASE, PKG_VERSION));
 
 const describeIf = PLUGIN_INSTALLED ? describe : describe.skip;
 
@@ -12,9 +15,7 @@ describeIf('code-conductor plugin', () => {
   let pluginDir;
 
   beforeAll(() => {
-    const versions = readdirSync(PLUGIN_BASE);
-    expect(versions).toHaveLength(1);
-    pluginDir = join(PLUGIN_BASE, versions[0]);
+    pluginDir = join(PLUGIN_BASE, PKG_VERSION);
   });
 
   test('versioned plugin directory exists', () => {
