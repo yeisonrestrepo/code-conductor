@@ -21,14 +21,14 @@ try {
   }
 
   ""
-  "📦 Conversation compacted. Context counter reset to 0."
+  "[PKG] Conversation compacted. Context counter reset to 0."
   $projMd = Join-Path $root '.claude\memory\project.md'
   if (Test-Path $projMd) {
     $lastMatch = Select-String '## Checkpoint' $projMd | Select-Object -Last 1
     if ($lastMatch) { "   Last checkpoint: $($lastMatch.Line)" } else { "   No checkpoints recorded yet in project.md." }
   } else { "   No project.md found." }
   ""
-  "   💡 If this session had important decisions, run /checkpoint before continuing."
+  "   [TIP] If this session had important decisions, run /checkpoint before continuing."
   ""
 } catch {
   exit 0

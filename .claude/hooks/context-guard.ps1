@@ -44,11 +44,11 @@ try {
   }
 
   if ($newCount -ge 99999) {
-    "🚨 CONTEXT CRITICAL: Turn 99999/$critical (counter saturated) — run /cc-compact NOW."
+    "[!!] CONTEXT CRITICAL: Turn 99999/$critical (counter saturated) -- run /cc-compact NOW."
   } elseif ($newCount -ge $critical) {
-    "🚨 CONTEXT CRITICAL: Turn $newCount/$critical — run /cc-compact NOW before context overflows."
+    "[!!] CONTEXT CRITICAL: Turn $newCount/$critical -- run /cc-compact NOW before context overflows."
   } elseif ($warning -gt 0 -and $newCount -ge $warning) {
-    "⚠ CONTEXT WARNING: Turn $newCount/$critical — consider running /cc-compact soon."
+    "[!] CONTEXT WARNING: Turn $newCount/$critical -- consider running /cc-compact soon."
   }
 } catch {
   exit 0
