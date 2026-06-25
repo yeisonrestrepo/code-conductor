@@ -204,3 +204,32 @@ Turn-counter hook (`context-guard.sh` / `.ps1`) wired into `UserPromptSubmit` vi
 ### Technical Debt
 - `context-guard.ps1` not covered by the test suite (bash-only); PS hook requires manual verification on Windows
 - BUG-015 implementation pending (spec approved, plan not yet written)
+
+## Checkpoint 2026-06-25 (BUG-015 plan refinement — 15+ constraint rounds)
+
+### Decisions
+- BUG-015 plan (`docs/superpowers/plans/2026-06-24-bug015-auto-claude-md.md`) expanded to 130+ Global Constraints via 15+ iterative rounds; all constraints live in the plan's Global Constraints section
+- **Fill regex final form:** `'^(\\s*-?\\s*Label:)\\s*(<[^>]*>)?\\s*(\\r?)$'` with `im` flags; group 1 preserves indentation, group 3 preserves CRLF; `$$$$` escapes `$` in replacement; label is always a hardcoded constant (no regex escaping needed)
+- **Atomic write:** `writeFileSync(tmp)` → `renameSync(tmp, mdPath)` → catch → `writeFileSync(mdPath)` fallback + `unlinkSync(tmp)`; temp = `mdPath + '.tmp.' + process.pid`
+- **process.exit(0) mandatory** at end of `main()` — pending readdir timeouts prevent event loop drain without it
+- **PS BOM bug:** `[System.Text.Encoding]::UTF8` writes BOM in .NET 4.x; must use `[System.Text.UTF8Encoding]::new($false)`
+- **PS GetTempFileName** creates empty `.tmp` base file — must delete base before appending `.mjs` extension
+- **PS CLM guard:** check `$ExecutionContext.SessionState.LanguageMode` before .NET type calls; skip auto-fill if `ConstrainedLanguage`
+- **PS `[Console]::OutputEncoding`** must be saved/restored in `try/finally` to avoid session side effects
+- **TLS 1.2** must be set via `-bor` before any `Invoke-WebRequest`
+- **Bun/Deno workspaces** out of scope for BUG-015; detected as package manager (bun.lockb) only
+- **cc-resume extended** (T-007a added): fills blank command fields via detect-stack on session resume; never overwrites already-populated fields; user must manually clear stale values to re-detect after manifest changes
+- **Detector priority order fixed:** Ionic → Capacitor → RNExpo → RNBare → Flutter → Angular → Next.js → NestJS → React → Vue → TSNode → Go → Python → Rust → Scala → SpringBoot → Quarkus → Java → .NET → iOS → Android
+- **Fatal stderr shape standardized:** `{error, code}` on all paths (main catch, unhandledRejection, uncaughtException)
+- **Process-level listeners required:** `process.on('unhandledRejection')` + `process.on('uncaughtException')` write `{}\n` to stdout + exit 0
+- `e.isDirectory()` returns false for symlinked dirs in expandGlob — symlinked workspace dirs skipped in wildcard expansion, only reachable via literal patterns through `safeAddDir`
+- All wildcard chars in negative patterns (`*`, `?`, `**`) make them no-ops — only literal-path exclusions work
+
+### Conventions
+- Round-by-round constraint review pattern: cross-reference all N items → list already-covered ones → add only genuine gaps (1-4 per round typically)
+- Plan Global Constraints format: `**bold title:** explanation in imperative form`
+
+### Technical Debt
+- `scripts/detect-stack.mjs` + `tests/scripts/detect-stack.test.js` (T-001 + T-002) exist on disk, uncommitted — awaiting git commit
+- T-003 through T-008 (install.sh, install.ps1, test harnesses, cc-init, cc-resume, metadata) all pending implementation
+- 51-test Vitest suite at 51/51 passing (last confirmed after Round 8 additions)
