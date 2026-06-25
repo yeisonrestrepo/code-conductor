@@ -174,3 +174,33 @@ Turn-counter hook (`context-guard.sh` / `.ps1`) wired into `UserPromptSubmit` vi
 - Key decisions: atomic rename (same-dir temp), CR/BOM strip, no jq, node -e with `@'...'@` in PS, `main() || exit 0` outer trap, `Array.isArray` guard, exact-command idempotency, no `set -e`/`set -u`
 - Spec: `docs/superpowers/specs/2026-06-24-feat007-context-guard-design.md`
 - Complexity: M
+
+## Checkpoint 2026-06-24 (FEAT-007 complete + BUG-015 spec)
+
+### Decisions
+- FEAT-007 fully implemented: `context-guard.sh/.ps1` (UserPromptSubmit) + `post-compact.sh/.ps1` rewrite; upward-walk bash dispatcher (40-iter cap); atomic rename pattern (`printf > .tmp && mv -f`); PS uses `[System.IO.File]::Replace` with `FileNotFoundException` fallback to `Move`
+- `project-template/.claude/settings.json` extended: UPS array gains context-guard bash + PS entries; PostCompact gains `post-compact.ps1` entry; node heredoc used to merge settings idempotently in both installers
+- PS 5.1 node invocation: `node -e $script $path` with `process.argv[1]` for path (NOT `process.argv[2]`); bash uses `node - path << 'JSEOF'` with `process.argv[2]`
+- `turn-count.txt` gitignored; `context-threshold.txt` committed with default value of 25; `.gitattributes` eol rules added (`*.sh eol=lf`, `*.ps1 eol=crlf`)
+- 19-case Vitest test suite added (`tests/hooks/context-guard.test.js`); covers all spec rows including saturation, BOM, CRLF, merge-conflict threshold, `warning=0` edge case, `CC_GUARD_DEBUG` stderr
+- Version bumped to 1.15.0; FEAT-007 marked `[X]` in backlog
+
+### Decisions (BUG-015 spec)
+- BUG-015 next item: auto-generate CLAUDE.md fields from manifest detection at install time and `/cc-init` time
+- Implementation: Option B (auto-detect + interactive fallback) via Option 2 (Node.js `scripts/detect-stack.mjs`)
+- `detect-stack.mjs` design: single `readdir` sweep in `main()`; file list passed to all detectors; detector priority order: Flutter/Melos → Angular (version-pinned) → Next.js → NestJS → React → Vue → TS/Node → Go → Python → Rust → Java → fallback
+- stdout = JSON only (`JSON.stringify(result, null, 2) + '\n'`, UTF-8 no BOM); stderr = all warnings/errors; exit 0 always; `{}` on any manifest error
+- PS 5.1 capture: `| Out-String` required to prevent `System.Object[]` fragmentation; `ConvertFrom-Json` in isolated try/catch; no secondary unescape (parsed values already runtime strings)
+- Placeholder matching: target `<command>` literal or blank after `:\s*` — CRLF-resilient, non-greedy, line-by-line; never raw key match
+- Monorepo: `pnpm-workspace.yaml` / `pkg.workspaces` / `melos.yaml` → adjust commands (e.g. `pnpm -r build`, `melos bootstrap`)
+- Angular version pin: extract major from `@angular/core` dep → append to stack string (e.g. `"Angular 20"`)
+- All string values `.trim()`-ed before JSON output
+- Spec: `docs/superpowers/specs/2026-06-24-bug015-auto-claude-md-design.md`
+
+### Conventions
+- Vitest mock pattern for fs-heavy scripts: `vi.mock('fs/promises')` in-memory; no real disk I/O in unit tests
+- `install.sh` / `install.ps1` helper pattern for per-field idempotent CLAUDE.md writes: `_fill_claude_md` (bash) / `Set-ClaudeMdFields` (PS)
+
+### Technical Debt
+- `context-guard.ps1` not covered by the test suite (bash-only); PS hook requires manual verification on Windows
+- BUG-015 implementation pending (spec approved, plan not yet written)
