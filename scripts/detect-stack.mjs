@@ -656,6 +656,18 @@ async function main() {
   process.exit(0); // Required: pending readdirSafe timeouts keep the event loop alive without this
 }
 
+process.on('unhandledRejection', err => {
+  process.stderr.write(JSON.stringify({ error: String(err), code: 'UNHANDLED_REJECTION' }) + '\n');
+  process.stdout.write('{}\n');
+  process.exit(0);
+});
+
+process.on('uncaughtException', err => {
+  process.stderr.write(JSON.stringify({ error: err.message ?? String(err), code: err.code ?? 'UNCAUGHT_EXCEPTION' }) + '\n');
+  process.stdout.write('{}\n');
+  process.exit(0);
+});
+
 // Guard: run main() only when this file is the entry point
 const __filename = fileURLToPath(import.meta.url);
 if (process.argv[1] === __filename) {
