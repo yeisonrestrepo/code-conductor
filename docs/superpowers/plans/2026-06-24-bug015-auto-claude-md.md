@@ -1507,7 +1507,7 @@ grep 'Build' "$_testdir/CLAUDE.md"
 
 Expected: `- Build: my-custom-build` unchanged.
 
-- [>] **T-003-5: Commit**
+- [X] **T-003-5: Commit**
 
 ```bash
 git add install.sh
@@ -1525,7 +1525,7 @@ git commit -m "feat(BUG-015): extend install.sh --project with _fill_claude_md +
 - Consumes: detect-stack.mjs downloaded from GitHub; stdout captured via `| Out-String`
 - Produces: CLAUDE.md with placeholder fields filled; UTF-8 no-BOM write via WriteAllText
 
-- [ ] **T-004-1: Add `Set-ClaudeMdFields` function to `install.ps1`**
+- [X] **T-004-1: Add `Set-ClaudeMdFields` function to `install.ps1`**
 
 Insert the following function immediately before the `# -- Install project template` comment (around line 546). Search anchor: `if ($Project) {`.
 
@@ -1628,7 +1628,7 @@ try { fs.renameSync(tmp, mdPath); } catch { fs.writeFileSync(mdPath, content, 'u
 }
 ```
 
-- [ ] **T-004-2: Add Node version guard + detect-stack download + `Set-ClaudeMdFields` call to the `-Project` block**
+- [X] **T-004-2: Add Node version guard + detect-stack download + `Set-ClaudeMdFields` call to the `-Project` block**
 
 Locate `Save-RemoteFile "project-template/CLAUDE.md" "CLAUDE.md" $false` (line ~573). Insert IMMEDIATELY AFTER that line:
 
@@ -1677,7 +1677,7 @@ Locate `Save-RemoteFile "project-template/CLAUDE.md" "CLAUDE.md" $false` (line ~
   }
 ```
 
-- [ ] **T-004-2a: Verify ConvertFrom-Json fallback when detect-stack emits invalid JSON**
+- [X] **T-004-2a: Verify ConvertFrom-Json fallback when detect-stack emits invalid JSON**
 
 If `node $dsTmp` exits 0 but stdout is not valid JSON (e.g. a partial write or a stderr bleed), `ConvertFrom-Json` throws. The `try { ... } catch { $null }` guard must absorb this:
 
@@ -1690,7 +1690,7 @@ if (-not $dsJson) { Write-Host "PASS: fallback to null on bad JSON" }
 
 Expected: `PASS: fallback to null on bad JSON`. The installer must then take the `else` branch and emit "No stack detected" rather than crashing. Add this as an assertion in `tests/scripts/installer-fill.test.ps1` (T-005-2 extension).
 
-- [ ] **T-004-2b: Confirm CLAUDE.md encoding after fill**
+- [X] **T-004-2b: Confirm CLAUDE.md encoding after fill**
 
 After `Set-ClaudeMdFields` completes, the node fill script writes via `fs.writeFileSync(tmp, content, 'utf8')` — this is Node's UTF-8 encoder, which produces UTF-8 **without BOM**. Verify:
 
@@ -1706,7 +1706,7 @@ if ($bytes[0] -ne 0xEF -or $bytes[1] -ne 0xBB -or $bytes[2] -ne 0xBF) {
 
 Expected: `PASS: no BOM`. The `[System.IO.File]::WriteAllText` with `[System.Text.UTF8Encoding]::new($false)` is used for JSON temp files; the CLAUDE.md itself is written by node's `writeFileSync` which produces no BOM. **Do not use `[System.Text.Encoding]::UTF8`** for either file — it writes a `EF BB BF` preamble that causes JSON.parse to fail in node.
 
-- [ ] **T-004-3: Verify PS installer fills CLAUDE.md on a test directory (manual test)**
+- [X] **T-004-3: Verify PS installer fills CLAUDE.md on a test directory (manual test)**
 
 In a PowerShell terminal:
 ```powershell
@@ -1720,7 +1720,7 @@ Select-String -Path "CLAUDE.md" -Pattern "Build:|Test:"
 
 Expected: `Build: vite build`, `Test: vitest`.
 
-- [ ] **T-004-4: Commit**
+- [>] **T-004-4: Commit**
 
 ```bash
 git add install.ps1

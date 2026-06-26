@@ -543,6 +543,52 @@ try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true})
   }
 }
 
+# -- CLAUDE.md smart fill -------------------------------------------------------
+# Set-ClaudeMdFields <MdPath> <JsonStr>
+# Replaces blank and <command> placeholder lines in CLAUDE.md.
+function Set-ClaudeMdFields {
+  param([string]$MdPath, [string]$JsonStr)
+  if ($ExecutionContext.SessionState.LanguageMode -eq 'ConstrainedLanguage') {
+    Write-Warning "detect-stack: ConstrainedLanguage mode — skipping auto-fill"
+    return
+  }
+  if (-not (Test-Path -LiteralPath $MdPath)) { return }
+  $null = Remove-Item "${MdPath}.tmp.*" -Force -ErrorAction SilentlyContinue
+  if (-not (Get-Command node -ErrorAction SilentlyContinue)) { return }
+
+  $jsonTmp = [System.IO.Path]::GetTempFileName()
+  Remove-Item -LiteralPath $jsonTmp -Force -ErrorAction SilentlyContinue
+  $jsonTmp = $jsonTmp + ".json"
+  try {
+    [System.IO.File]::WriteAllText($jsonTmp, $JsonStr, [System.Text.UTF8Encoding]::new($false))
+
+    $script = @'
+const fs = require('fs');
+const mdPath   = process.argv[1];
+const jsonPath = process.argv[2];
+let d;
+try { d = JSON.parse(fs.readFileSync(jsonPath, 'utf8')); } catch { process.exit(0); }
+const FIELDS = {name:'Name',description:'Description',stack:'Stack',build:'Build',test:'Test',lint:'Lint',format:'Format',setup:'Setup'};
+let content;
+try { content = fs.readFileSync(mdPath, 'utf8').replace(/^﻿/, ''); } catch { process.exit(0); }
+for (const [key, label] of Object.entries(FIELDS)) {
+  const val = d[key];
+  if (typeof val !== 'string' || !val.trim()) continue;
+  const clean = val.trim().replace(/\r?\n/g, ' ').replace(/\\[ntr]/g, ' ');
+  const re = new RegExp('^(\\s*-?\\s*' + label + ':)\\s*(<[^>]*>)?\\s*(\\r?)$', 'im');
+  if (!re.test(content)) continue;
+  content = content.replace(re, '$1 ' + clean.replace(/\$/g, '$$$$') + '$3');
+}
+const tmp = mdPath + '.tmp.' + process.pid;
+fs.writeFileSync(tmp, content, 'utf8');
+try { fs.renameSync(tmp, mdPath); } catch { fs.writeFileSync(mdPath, content, 'utf8'); try { fs.unlinkSync(tmp); } catch {} }
+'@
+    node -e $script $MdPath $jsonTmp 2>$null
+  } finally {
+    Remove-Item -LiteralPath $jsonTmp -Force -ErrorAction SilentlyContinue
+  }
+}
+
 # -- Install project template ---------------------------------------------------
 if ($Project) {
   Write-Host ""
@@ -571,6 +617,54 @@ if ($Project) {
   Remove-Variable -Name pwdParts, part -ErrorAction SilentlyContinue
 
   Save-RemoteFile "project-template/CLAUDE.md"                 "CLAUDE.md"                      $false
+
+  # -- detect-stack: auto-fill CLAUDE.md fields ----------------------------------
+  $_prevConsoleEnc = [Console]::OutputEncoding
+  $_prevOutEnc     = $OutputEncoding
+  try {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    $OutputEncoding = [System.Text.Encoding]::UTF8
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+
+    $dsSkip = $false
+    $nmRaw = node --version 2>$null
+    if ($nmRaw -match '^v(\d+)') { $nm = [int]$Matches[1] } else { $nm = 0 }
+    if (-not (Get-Command node -ErrorAction SilentlyContinue) -or $nm -lt 18) {
+      Write-Warn "detect-stack: Node >= 18 required -- skipping auto-fill"
+      $dsSkip = $true
+    }
+
+    if (-not $dsSkip) {
+      $_dsTmpBase = [System.IO.Path]::GetTempFileName()
+      Remove-Item -LiteralPath $_dsTmpBase -Force -ErrorAction SilentlyContinue
+      $dsTmp = $_dsTmpBase + '.mjs'
+      $dsOk  = $false
+      try {
+        Invoke-WebRequest -Uri "$BaseUrl/scripts/detect-stack.mjs" -OutFile $dsTmp -TimeoutSec 10 -ErrorAction Stop
+        if ((Get-Item -LiteralPath $dsTmp -ErrorAction SilentlyContinue).Length -gt 0) { $dsOk = $true }
+      } catch {
+        Write-Warn "detect-stack: could not download script -- skipping auto-fill"
+      }
+
+      if ($dsOk) {
+        $dsRaw = node $dsTmp "$($pwd.Path)" 2>$null | Out-String
+        $dsJson = try { $dsRaw | ConvertFrom-Json } catch { $null }
+        if ($dsJson -and ($dsRaw.Trim() -ne '{}')) {
+          Set-ClaudeMdFields "CLAUDE.md" $dsRaw.Trim()
+          Write-Ok "CLAUDE.md fields auto-filled from manifest detection"
+          $null = New-Item -ItemType Directory -Path "scripts" -Force -ErrorAction SilentlyContinue
+          Copy-Item -LiteralPath $dsTmp -Destination "scripts\detect-stack.mjs" -Force -ErrorAction SilentlyContinue
+        } else {
+          Write-Info "No stack detected -- CLAUDE.md placeholders kept for /cc-init to fill"
+        }
+      }
+      Remove-Item -LiteralPath $dsTmp -Force -ErrorAction SilentlyContinue
+    }
+  } finally {
+    [Console]::OutputEncoding = $_prevConsoleEnc
+    $OutputEncoding = $_prevOutEnc
+  }
+
   Save-RemoteFile "project-template/.claude/settings.json"     "$projDir\settings.json"          $false
   Save-RemoteFile "project-template/.claude/memory/project.md" "$projDir\memory\project.md"      $false
 
