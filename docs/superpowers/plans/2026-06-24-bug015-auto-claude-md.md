@@ -2183,7 +2183,7 @@ git add -f "AGENT-READABLE BACKLOG.md"
 git commit -m "chore(BUG-015): mark BUG-015 complete in BACKLOG"
 ```
 
-- [>] **T-008-6: Final git status — confirm no unstaged changes remain**
+- [X] **T-008-6: Final git status — confirm no unstaged changes remain**
 
 After all T-008 commits, verify the working tree is clean:
 
