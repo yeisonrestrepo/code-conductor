@@ -125,7 +125,7 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Components Affected:** `stack-profiles/` directory, `/cc-stack` implementation.
 * **Acceptance Criteria:** Parse active repository manifests (e.g., package.json, go.mod) dynamically, assembling the exact required stack ruleset directly into the local SQLite store during initialization.
 
-### [ ] `[BUG-015]` Orphan or Generic CLAUDE.md (Static CLAUDE.md Blindness)
+### [X] `[BUG-015]` Orphan or Generic CLAUDE.md (Static CLAUDE.md Blindness)
 * **Description:** The setup phase copies a static `CLAUDE.md` file populated with empty placeholders or generic configurations into the workspace root.
 * **Impact:** The agent starts work blindly, failing at guessing correct compilation or testing commands and wasting token quotas on test errors.
 * **Components Affected:** `project-template/CLAUDE.md`, `/cc-init` command logic.
