@@ -23,13 +23,14 @@ Replace the markdown snapshot with **SNAP v1**: a minified single-line JSON obje
 ### Main path
 
 1. `/cc-compact` collects session state (phase, commit, decisions, pending steps, files, constraints, spec reference).
-2. It serializes the state into a SNAP v1 JSON object and writes it as a single line to `.claude/memory/session-snapshot.json`.
+2. It serializes the state into a SNAP v1 JSON object and writes it as a single line to `.claude/memory/session-snapshot.json`. It also idempotently appends `.claude/memory/session-snapshot.json` to the project `.gitignore` if not already present (same pattern as `turn-count.txt` — no manual step required).
 3. If `.claude/memory/session-snapshot.md` exists (legacy), it is deleted as part of the write step.
 4. The user runs `/compact` to clear chat history.
 5. `/cc-implement` starts in a fresh session, finds `session-snapshot.json`, and reads it via `JSON.parse()`. The file is NOT deleted yet.
-6. `/cc-implement` calls `snap-validate.mjs` to assert structural correctness. On any violation it halts with `SNAP_INVALID` and leaves the file on disk so the payload can be inspected and corrected manually.
-7. On successful validation, `/cc-implement` deletes `session-snapshot.json` (destructive read — validation gate replaces immediacy).
-8. Implementation proceeds with decisions, constraints, and pending tasks populated from the parsed object.
+6. `/cc-implement` invokes `node scripts/snap-validate.mjs .claude/memory/session-snapshot.json` (node resolved via PATH; halts with `NODE_NOT_FOUND` if absent). On any violation the validator exits 1, `/cc-implement` halts with `SNAP_INVALID`, and the file is left on disk for manual inspection and correction.
+7. `/cc-implement` binds all context variables from the parsed object: phase → `sys.ph`, commit → `sys.c`, decisions → `mem.d`, constraints → `mem.x`, next steps → `ops.n`, files → `ops.f`, spec stem → `sys.s`.
+8. Only after all context variables are fully bound does `/cc-implement` delete `session-snapshot.json`. A crash or halt between steps 6 and 8 leaves the file intact for recovery.
+9. Implementation proceeds.
 
 ### Alternative paths
 
@@ -42,7 +43,7 @@ Replace the markdown snapshot with **SNAP v1**: a minified single-line JSON obje
 - **`JSON.parse()` fails**: halt with `SNAP_INVALID — malformed JSON`; leave file on disk; do not attempt line-by-line extraction.
 - **Required key missing**: halt with `SNAP_INVALID — missing: <key>`; list all missing keys; leave file on disk.
 - **`ph` outside enum**: halt with `SNAP_INVALID — ph must be spec|plan|impl|rev`; leave file on disk.
-- **Array exceeds cap**: writer truncates silently (oldest items dropped); reader never sees oversized arrays.
+- **Array exceeds cap**: writer drops from the **head** of the array (index 0 = oldest appended entry) so the most recently added items survive. Reader never sees oversized arrays. All four required array fields (`ops.n`, `ops.f`, `mem.d`, `mem.x`) accept `[]` — minimum cardinality is 0; an empty array passes validation.
 - **File absent (no snapshot)**: reader skips destructive-read block entirely and proceeds with no prior context (existing fallback behavior, unchanged).
 
 ## SNAP v1 Schema
@@ -79,7 +80,11 @@ Replace the markdown snapshot with **SNAP v1**: a minified single-line JSON obje
 | `mem.d` | string[] | yes | max 10 |
 | `mem.x` | string[] | yes | max 5 |
 
-**File action codes:** `C` = created, `M` = modified, `D` = deleted.
+**File action codes:** `C` = created, `M` = modified, `D` = deleted. The action code is the single character after the **last** `:` in each `ops.f` string, extracted via `lastIndexOf(':')`. Relative paths never carry a drive-letter colon, so `lastIndexOf` is unambiguous on all platforms.
+
+**sys.c non-git fallback:** When `git rev-parse --short HEAD` exits non-zero (non-git workspace, bare repo, no commits yet), the writer uses `"0000000"` as the deterministic fallback value. The validator accepts `"0000000"` as a valid `sys.c`.
+
+**String encoding:** All string values use native JSON string escaping per RFC 8259 §7 exclusively — no additional escaping layer. Backslashes in paths are encoded as `\\`. Unicode characters (e.g. `→`) are embedded as UTF-8 codepoints, not `\uXXXX` sequences, to minimize character count.
 
 **Serialized example** (436 chars; equivalent markdown ~880 chars; reduction: 51%):
 ```json
@@ -110,6 +115,8 @@ Future Pillar 3 agents add fields under existing blocks. The `v` field gates con
 
 **Version compatibility rule:** a reader encountering `v > supported_version` must halt with `SNAP_UNKNOWN_VERSION`. It must never silently consume unknown fields.
 
+**v1 → v2 forward compatibility:** A v2+ reader encountering a v1 snapshot (`v === 1`) must accept it by treating absent v2 fields (`role`, `tk`, `scope`, `gate`, `p`) as not provided — no error, no default substitution. A v1 reader encountering `v === 2` halts with `SNAP_UNKNOWN_VERSION`. Rule: readers must accept all snapshots where `v ≤ supported_version`; reject all where `v > supported_version`.
+
 ## Acceptance Criteria
 
 - [ ] `scripts/snap-validate.mjs` exists; validates required keys, `ph` enum, array caps, and `v === 1`; exits 0 on valid, 1 on invalid with a message on stderr
@@ -118,7 +125,7 @@ Future Pillar 3 agents add fields under existing blocks. The `v` field gates con
 - [ ] `tests/unit/snap-validate.test.js` added with ≥8 cases: valid v1, missing required key, ph outside enum, unknown version, array over cap, round-trip field equality, character-count assertion (SNAP v1 serialization must be ≤70% of a static frozen markdown fixture defined inline in the test — the fixture is the immutable baseline and must never be regenerated), SNAP_INVALID leaves file on disk
 - [ ] All 216+ existing Vitest tests continue to pass
 - [ ] `AGENT-READABLE BACKLOG.md` `[FEAT-010]` checkbox flipped to `[X]`
-- [ ] `VERSION` bumped to `1.17.0`, `CHANGELOG.md` entry added
+- [ ] `VERSION` bumped from `1.16.0` → `1.17.0` (sequential after BUG-015); `CHANGELOG.md` entry added
 - [ ] `README.md` comparison table updated with SNAP v1 row
 
 ## Out of Scope
@@ -132,7 +139,7 @@ Future Pillar 3 agents add fields under existing blocks. The `v` field gates con
 ## System Impact
 
 - `.claude/memory/session-snapshot.md` — deprecated; deleted on first SNAP v1 write; `/cc-implement` retains one-session fallback read
-- `.claude/memory/session-snapshot.json` — new canonical handoff file; must be added to `.gitignore`
+- `.claude/memory/session-snapshot.json` — new canonical handoff file; added to `.gitignore` automatically by `/cc-compact` on first write (idempotent append, same pattern as `turn-count.txt`)
 - `scripts/snap-validate.mjs` — new file; ≤30 lines; CommonJS-safe (`.mjs` extension, ES module import only)
 - `~/.claude/` user skill `cc-compact` — template updated to emit JSON
 - `project-template/.claude/commands/cc-implement.md` — Phase entry destructive-read block updated for `.json`
