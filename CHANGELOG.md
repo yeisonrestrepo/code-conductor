@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.16.0] — 2026-06-26
+
+### Added
+- `scripts/detect-stack.mjs`: auto-detects project stack from manifests (20+ ecosystems: JS/TS, Go, Python, Rust, Scala, Spring Boot, Quarkus, Java, .NET, iOS, Android, Flutter, React Native, Ionic, Capacitor). Emits JSON to stdout; exits 0 always.
+- `_fill_claude_md` (bash) / `Set-ClaudeMdFields` (PS): surgically fill CLAUDE.md blank/`<command>` fields from detected JSON; never overwrite user-customized values.
+- `install.sh --project` / `install.ps1 -Project`: now auto-detect stack and fill CLAUDE.md at install time; Node.js ≥ 18 validated before calling detect-stack.
+- `/cc-init` Step 2: rewired to run detect-stack and skip interactive questions for auto-detected fields.
+- `/cc-resume` Step 2: now auto-fills blank command fields via detect-stack on session resume when manifests have changed.
 
 ## [1.15.0] - 2026-06-24
 
