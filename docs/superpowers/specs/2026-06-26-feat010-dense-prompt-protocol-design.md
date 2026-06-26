@@ -26,9 +26,10 @@ Replace the markdown snapshot with **SNAP v1**: a minified single-line JSON obje
 2. It serializes the state into a SNAP v1 JSON object and writes it as a single line to `.claude/memory/session-snapshot.json`.
 3. If `.claude/memory/session-snapshot.md` exists (legacy), it is deleted as part of the write step.
 4. The user runs `/compact` to clear chat history.
-5. `/cc-implement` starts in a fresh session, finds `session-snapshot.json`, reads it via `JSON.parse()`, and deletes the file immediately (destructive read invariant).
-6. `/cc-implement` calls `snap-validate.mjs` to assert structural correctness; halts with `SNAP_INVALID` on any violation.
-7. Implementation proceeds with decisions, constraints, and pending tasks populated from the parsed object.
+5. `/cc-implement` starts in a fresh session, finds `session-snapshot.json`, and reads it via `JSON.parse()`. The file is NOT deleted yet.
+6. `/cc-implement` calls `snap-validate.mjs` to assert structural correctness. On any violation it halts with `SNAP_INVALID` and leaves the file on disk so the payload can be inspected and corrected manually.
+7. On successful validation, `/cc-implement` deletes `session-snapshot.json` (destructive read — validation gate replaces immediacy).
+8. Implementation proceeds with decisions, constraints, and pending tasks populated from the parsed object.
 
 ### Alternative paths
 
@@ -38,9 +39,9 @@ Replace the markdown snapshot with **SNAP v1**: a minified single-line JSON obje
 
 ### Error cases
 
-- **`JSON.parse()` fails**: halt with `SNAP_INVALID — malformed JSON`; do not attempt line-by-line extraction.
-- **Required key missing**: halt with `SNAP_INVALID — missing: <key>`; list all missing keys before halting.
-- **`ph` outside enum**: halt with `SNAP_INVALID — ph must be spec|plan|impl|rev`.
+- **`JSON.parse()` fails**: halt with `SNAP_INVALID — malformed JSON`; leave file on disk; do not attempt line-by-line extraction.
+- **Required key missing**: halt with `SNAP_INVALID — missing: <key>`; list all missing keys; leave file on disk.
+- **`ph` outside enum**: halt with `SNAP_INVALID — ph must be spec|plan|impl|rev`; leave file on disk.
 - **Array exceeds cap**: writer truncates silently (oldest items dropped); reader never sees oversized arrays.
 - **File absent (no snapshot)**: reader skips destructive-read block entirely and proceeds with no prior context (existing fallback behavior, unchanged).
 
@@ -114,7 +115,7 @@ Future Pillar 3 agents add fields under existing blocks. The `v` field gates con
 - [ ] `scripts/snap-validate.mjs` exists; validates required keys, `ph` enum, array caps, and `v === 1`; exits 0 on valid, 1 on invalid with a message on stderr
 - [ ] `/cc-compact` (user skill) updated to write SNAP v1 JSON to `session-snapshot.json`; deletes legacy `.md` if present
 - [ ] `/cc-implement` (project command) updated to read `session-snapshot.json` with destructive-read; falls back to `.md` if only `.md` exists
-- [ ] `tests/unit/snap-validate.test.js` added with ≥8 cases: valid v1, missing required key, ph outside enum, unknown version, array over cap, round-trip field equality, character-count assertion (≤70% of markdown equivalent)
+- [ ] `tests/unit/snap-validate.test.js` added with ≥8 cases: valid v1, missing required key, ph outside enum, unknown version, array over cap, round-trip field equality, character-count assertion (SNAP v1 serialization must be ≤70% of a static frozen markdown fixture defined inline in the test — the fixture is the immutable baseline and must never be regenerated), SNAP_INVALID leaves file on disk
 - [ ] All 216+ existing Vitest tests continue to pass
 - [ ] `AGENT-READABLE BACKLOG.md` `[FEAT-010]` checkbox flipped to `[X]`
 - [ ] `VERSION` bumped to `1.17.0`, `CHANGELOG.md` entry added
