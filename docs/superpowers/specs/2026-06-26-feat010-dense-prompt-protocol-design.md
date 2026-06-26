@@ -23,18 +23,18 @@ Replace the markdown snapshot with **SNAP v1**: a minified single-line JSON obje
 ### Main path
 
 1. `/cc-compact` collects session state (phase, commit, decisions, pending steps, files, constraints, spec reference).
-2. It serializes the state into a SNAP v1 JSON object and writes it as a single line to `.claude/memory/session-snapshot.json`. It also idempotently appends `.claude/memory/session-snapshot.json` to the project `.gitignore` if not already present (same pattern as `turn-count.txt` — no manual step required).
+2. It serializes the state into a SNAP v1 JSON object and writes it as a single line to `.claude/memory/session-snapshot.json`. It also idempotently appends `.claude/memory/session-snapshot.json` to the project `.gitignore` if not already present: before appending, it checks whether the last byte of `.gitignore` is `\n`; if not, it prepends a newline before the entry to prevent corrupting the last un-terminated line (same pattern as `turn-count.txt` — no manual step required).
 3. If `.claude/memory/session-snapshot.md` exists (legacy), it is deleted as part of the write step.
 4. The user runs `/compact` to clear chat history.
 5. `/cc-implement` starts in a fresh session, finds `session-snapshot.json`, and reads it via `JSON.parse()`. The file is NOT deleted yet.
-6. `/cc-implement` invokes `node <repo-root>/scripts/snap-validate.mjs <repo-root>/.claude/memory/session-snapshot.json` where `<repo-root>` is determined by `git rev-parse --show-toplevel` at invocation time (node resolved via PATH; halts with `NODE_NOT_FOUND` if absent). The repo-root-relative resolution ensures the command succeeds when `/cc-implement` is invoked from any nested subdirectory. On any violation the validator exits 1 with the error message written exclusively to stderr, `/cc-implement` halts with `SNAP_INVALID`, and the file is left on disk for manual inspection and correction.
+6. `/cc-implement` invokes `node "<repo-root>/scripts/snap-validate.mjs" "<repo-root>/.claude/memory/session-snapshot.json"` where `<repo-root>` is determined by `git rev-parse --show-toplevel` at invocation time and both paths are wrapped in double quotes to prevent shell parsing failures on directory names containing spaces. If `node` cannot be found or fails to launch, `/cc-implement` halts with `NODE_NOT_FOUND — node binary not found in PATH` and exits with code 2 (distinct from SNAP_INVALID exit code 1). On any validation violation the validator exits 1 with the error message written exclusively to stderr, `/cc-implement` halts with `SNAP_INVALID`, and the file is left on disk for manual inspection and correction.
 7. `/cc-implement` binds all context variables from the parsed object: phase → `sys.ph`, commit → `sys.c`, decisions → `mem.d`, constraints → `mem.x`, next steps → `ops.n`, files → `ops.f`, spec stem → `sys.s`.
 8. Only after all context variables are fully bound does `/cc-implement` delete `session-snapshot.json`. A crash or halt between steps 6 and 8 leaves the file intact for recovery.
 9. Implementation proceeds.
 
 ### Alternative paths
 
-- **Legacy `.md` snapshot present, no `.json`**: `/cc-implement` falls back to reading the `.md` file using the old markdown extraction logic (backward-compatible read path, one session only).
+- **Legacy `.md` snapshot present, no `.json`**: `/cc-implement` falls back to reading the `.md` file using the old markdown extraction logic (backward-compatible read path, one session only). This fallback is removed in v1.18.0 — the minor version immediately following FEAT-010 — making SNAP v1 JSON the exclusive handoff format.
 - **Both files present**: `.json` takes precedence; `.md` is deleted without being read.
 - **Unknown version (`v > 1`)**: reader emits `SNAP_UNKNOWN_VERSION` and halts; the agent must not attempt to parse fields it does not know.
 
@@ -43,7 +43,10 @@ Replace the markdown snapshot with **SNAP v1**: a minified single-line JSON obje
 - **`JSON.parse()` fails**: halt with `SNAP_INVALID — malformed JSON`; leave file on disk; do not attempt line-by-line extraction.
 - **Required key missing**: halt with `SNAP_INVALID — missing: <key>`; list all missing keys; leave file on disk.
 - **`ph` outside enum**: halt with `SNAP_INVALID — ph must be spec|plan|impl|rev`; leave file on disk.
-- **Array exceeds cap**: writer drops from the **head** of the array (index 0 = oldest appended entry) so the most recently added items survive. Reader never sees oversized arrays. All four required array fields (`ops.n`, `ops.f`, `mem.d`, `mem.x`) accept `[]` — minimum cardinality is 0; an empty array passes validation.
+- **Array exceeds cap**: writer drops from the **head** of the array (index 0 = oldest appended entry) so the most recently added items survive. Reader re-validates all caps on every read. All four required array fields (`ops.n`, `ops.f`, `mem.d`, `mem.x`) accept `[]` — minimum cardinality is 0; an empty array passes validation.
+- **Empty or whitespace-only array element**: `SNAP_INVALID — empty element in <key>`; leave file on disk.
+- **ops.f path segment before last `:` is empty**: `SNAP_INVALID — empty path in ops.f[<i>]`; leave file on disk. Triggered when an entry is `:C`, `:M`, or `:D` (no path prefix).
+- **Element exceeds per-element cap**: writer truncates silently; validator rejects with `SNAP_INVALID — element too long in <key>[<i>]`.
 - **File absent (no snapshot)**: reader skips destructive-read block entirely and proceeds with no prior context (existing fallback behavior, unchanged).
 
 ## SNAP v1 Schema
@@ -69,24 +72,26 @@ Replace the markdown snapshot with **SNAP v1**: a minified single-line JSON obje
 
 **Field constraints:**
 
-| Key | Type | Required | Cap |
-|-----|------|----------|-----|
-| `v` | integer | yes | — |
-| `sys.ph` | enum | yes | — |
-| `sys.c` | string | yes | 7 chars |
-| `sys.s` | string | yes | — |
-| `ops.n` | string[] | yes | max 3 |
-| `ops.f` | string[] | yes | max 20 |
-| `mem.d` | string[] | yes | max 10 |
-| `mem.x` | string[] | yes | max 5 |
+| Key | Type | Required | Array cap | Element max |
+|-----|------|----------|-----------|------------|
+| `v` | integer | yes | — | — |
+| `sys.ph` | enum | yes | — | — |
+| `sys.c` | string | yes | — | 7 chars |
+| `sys.s` | string | yes | — | 200 chars |
+| `ops.n` | string[] | yes | max 3 | 200 chars |
+| `ops.f` | string[] | yes | max 20 | 300 chars |
+| `mem.d` | string[] | yes | max 10 | 300 chars |
+| `mem.x` | string[] | yes | max 5 | 200 chars |
+
+Writer truncates elements that exceed their per-element cap to that cap length before serialization. Validator enforces element caps during read to guard against external modification. Elements that are empty or consist entirely of whitespace are rejected by the validator as `SNAP_INVALID — empty element in <key>`.
 
 **File action codes:** `C` = created, `M` = modified, `D` = deleted. The action code is the single character after the **last** `:` in each `ops.f` string, extracted via `lastIndexOf(':')`. Relative paths never carry a drive-letter colon, so `lastIndexOf` is unambiguous on all platforms. The validator must verify that this character belongs strictly to the set `{C, M, D}`; any other character is a `SNAP_INVALID` violation. All file paths in `ops.f` must have platform-specific backslashes normalized to forward slashes (`\` → `/`) by the writer before serialization to ensure cross-platform comparison consistency.
 
-**sys.c non-git fallback:** When `git rev-parse --short HEAD` exits non-zero (non-git workspace, bare repo, no commits yet), the writer uses `"0000000"` as the deterministic fallback value. The validator accepts `"0000000"` as a valid `sys.c`. When the command succeeds, the writer slices its stdout to exactly 7 characters (`output.trim().slice(0, 7)`) before storing, regardless of the local `core.abbrev` git configuration, to prevent validation failures from longer hashes.
+**sys.c non-git fallback:** When `git rev-parse --short HEAD` exits non-zero (non-git workspace, bare repo, no commits yet), the writer uses `"0000000"` as the deterministic fallback value. When the command succeeds, the writer slices its stdout to exactly 7 characters (`output.trim().slice(0, 7)`) before storing, regardless of the local `core.abbrev` git configuration. The validator enforces that `sys.c` matches `/^[0-9a-f]{7}$/` — exactly 7 lowercase hexadecimal characters; `"0000000"` satisfies this pattern and requires no special case.
 
 **sys.s no-spec fallback:** When no active specification file exists at the time `/cc-compact` runs, the writer stores `"none"` as the `sys.s` value. The validator accepts `"none"` as a valid `sys.s` string.
 
-**String encoding:** All string values use native JSON string escaping per RFC 8259 §7 exclusively — no additional escaping layer. Backslashes in paths are encoded as `\\`. Unicode characters (e.g. `→`) are embedded as UTF-8 codepoints, not `\uXXXX` sequences, to minimize character count. Literal newline characters (`U+000A`) within decisions or constraints must be escaped as `\n` by the JSON serializer; this is required by the JSON spec and guarantees the final file remains a single line (which the writer asserts after serialization).
+**String encoding:** All string values use native JSON string escaping per RFC 8259 §7 exclusively — no additional escaping layer. Backslashes in paths are encoded as `\\`. Unicode characters (e.g. `→`) are embedded as UTF-8 codepoints, not `\uXXXX` sequences, to minimize character count. Literal newline characters (`U+000A`) within decisions or constraints must be escaped as `\n` by the JSON serializer; this is required by the JSON spec and guarantees the final file remains a single line (which the writer asserts after serialization). A single trailing `\n` after the JSON line is acceptable at EOF; the validator trims before parsing via `content.trim()` so trailing newlines do not affect validation. More than one trailing newline is a writer error.
 
 **Serialized example** (436 chars; equivalent markdown ~880 chars; reduction: 51%):
 ```json
