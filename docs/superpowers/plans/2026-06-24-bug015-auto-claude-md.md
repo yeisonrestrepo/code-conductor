@@ -1720,7 +1720,7 @@ Select-String -Path "CLAUDE.md" -Pattern "Build:|Test:"
 
 Expected: `Build: vite build`, `Test: vitest`.
 
-- [>] **T-004-4: Commit**
+- [X] **T-004-4: Commit**
 
 ```bash
 git add install.ps1
@@ -1738,7 +1738,7 @@ git commit -m "feat(BUG-015): extend install.ps1 -Project with Set-ClaudeMdField
 **Interfaces:**
 - Both harnesses test the fill helper in isolation against a temporary CLAUDE.md
 
-- [ ] **T-005-1: Write `tests/scripts/installer-fill.test.sh`**
+- [X] **T-005-1: Write `tests/scripts/installer-fill.test.sh`**
 
 ```bash
 #!/usr/bin/env bash
@@ -1851,7 +1851,7 @@ echo ""; echo "Results: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1
 ```
 
-- [ ] **T-005-2: Write `tests/scripts/installer-fill.test.ps1`**
+- [X] **T-005-2: Write `tests/scripts/installer-fill.test.ps1`**
 
 ```powershell
 # tests/scripts/installer-fill.test.ps1
@@ -1952,7 +1952,7 @@ Write-Host "Results: $pass passed, $fail failed"
 if ($fail -eq 0) { exit 0 } else { exit 1 }
 ```
 
-- [ ] **T-005-3: Run bash test harness**
+- [X] **T-005-3: Run bash test harness**
 
 ```bash
 bash tests/scripts/installer-fill.test.sh
@@ -1960,7 +1960,7 @@ bash tests/scripts/installer-fill.test.sh
 
 Expected: all PASS.
 
-- [ ] **T-005-4: Run PS test harness (optional on Windows)**
+- [X] **T-005-4: Run PS test harness (optional on Windows)**
 
 ```powershell
 powershell -File tests/scripts/installer-fill.test.ps1
@@ -1968,7 +1968,7 @@ powershell -File tests/scripts/installer-fill.test.ps1
 
 Expected: all PASS.
 
-- [ ] **T-005-5: Commit**
+- [X] **T-005-5: Commit**
 
 ```bash
 git add tests/scripts/installer-fill.test.sh tests/scripts/installer-fill.test.ps1
@@ -1986,11 +1986,11 @@ git commit -m "test(BUG-015): add installer-fill test harnesses for bash and PS 
 - Consumes: `scripts/detect-stack.mjs` (installed by `_fill_claude_md` to `scripts/detect-stack.mjs`)
 - Produces: CLAUDE.md fields filled; interactive questions only for fields not auto-detected
 
-- [ ] **T-006-1: Verify current Step 2 content (lines 11–31)**
+- [X] **T-006-1: Verify current Step 2 content (lines 11–31)**
 
 Confirm the current Step 2 block reads `"## Step 2 — Collect project identity"` and the logic is asking the user manually. The replacement will add auto-detection before the manual questions.
 
-- [ ] **T-006-2: Replace Step 2 in `project-template/.claude/commands/cc-init.md`**
+- [X] **T-006-2: Replace Step 2 in `project-template/.claude/commands/cc-init.md`**
 
 Replace the entire `## Step 2` section (lines 11–31 inclusive) with:
 
@@ -2031,11 +2031,11 @@ Once any manual fields are collected, update CLAUDE.md with a single `Edit` call
 **CI mode:** If `CI=true` or stdin is not a TTY, skip all interactive questions. Leave unresolved `<command>` placeholders in place.
 ```
 
-- [ ] **T-006-3: Verify the file structure is intact after edit**
+- [X] **T-006-3: Verify the file structure is intact after edit**
 
 Read the first 80 lines and confirm Step 1, Step 2 (new), Step 3–7 are all present and correctly numbered.
 
-- [ ] **T-006-4: Commit**
+- [X] **T-006-4: Commit**
 
 ```bash
 git add -f project-template/.claude/commands/cc-init.md
@@ -2053,11 +2053,11 @@ git commit -m "feat(BUG-015): rewrite cc-init.md Step 2 with auto-detect + selec
 - Consumes: `scripts/detect-stack.mjs` (placed at project root by installer or cc-init)
 - Produces: CLAUDE.md blank command fields filled; session resume report shows updated stack
 
-- [ ] **T-007a-1: Read current cc-resume.md Step 2 and Step 10 content**
+- [X] **T-007a-1: Read current cc-resume.md Step 2 and Step 10 content**
 
 Read `project-template/.claude/commands/cc-resume.md` lines 1–60 to identify the exact location of Step 2 (where CLAUDE.md fields are read) and Step 10 (where `/cc-stack` is invoked).
 
-- [ ] **T-007a-2: Insert detect-stack sub-step after Step 2 field extraction**
+- [X] **T-007a-2: Insert detect-stack sub-step after Step 2 field extraction**
 
 After the block that extracts `Name`, `Description`, `Stack`, `Language` from CLAUDE.md (Step 2), add the following paragraph:
 
@@ -2073,11 +2073,11 @@ After the block that extracts `Name`, `Description`, `Stack`, `Language` from CL
 Re-read the updated CLAUDE.md fields after this step so the session resume report reflects the filled values.
 ```
 
-- [ ] **T-007a-3: Verify the edit did not disrupt surrounding steps**
+- [X] **T-007a-3: Verify the edit did not disrupt surrounding steps**
 
 Read lines 1–80 of the modified `cc-resume.md` and confirm Step 1, Step 2 (original + new sub-step), Steps 3–10 are all present and correctly numbered.
 
-- [ ] **T-007a-4: Commit**
+- [X] **T-007a-4: Commit**
 
 ```bash
 git add -f project-template/.claude/commands/cc-resume.md
@@ -2102,19 +2102,19 @@ git commit -m "feat(BUG-015): extend cc-resume Step 2 with detect-stack auto-fil
 - Modify: `CHANGELOG.md`
 - Modify: `README.md`
 
-- [ ] **T-008-1: Mark BUG-015 as complete in BACKLOG**
+- [X] **T-008-1: Mark BUG-015 as complete in BACKLOG**
 
 Pre-check: `grep -c 'BUG-015' "AGENT-READABLE BACKLOG.md"` must equal 1.
 
 Find the BUG-015 line and change `[ ]` to `[X]`. Use a surgical Edit — one field, one line.
 
-- [ ] **T-008-2: Bump VERSION to 1.16.0**
+- [X] **T-008-2: Bump VERSION to 1.16.0**
 
 ```bash
 echo "1.16.0" > VERSION
 ```
 
-- [ ] **T-008-2a: Verify VERSION content**
+- [X] **T-008-2a: Verify VERSION content**
 
 ```bash
 [ "$(cat VERSION)" = "1.16.0" ] && echo "PASS" || echo "FAIL: $(cat VERSION)"
@@ -2127,7 +2127,7 @@ git add VERSION
 git commit -m "chore(BUG-015): bump VERSION to 1.16.0"
 ```
 
-- [ ] **T-008-3: Prepend CHANGELOG entry**
+- [X] **T-008-3: Prepend CHANGELOG entry**
 
 Add the following at the top of CHANGELOG.md (after the `# Changelog` heading):
 
@@ -2142,7 +2142,7 @@ Add the following at the top of CHANGELOG.md (after the `# Changelog` heading):
 - `/cc-resume` Step 2: now auto-fills blank command fields via detect-stack on session resume when manifests have changed.
 ```
 
-- [ ] **T-008-3a: Verify CHANGELOG entry is first**
+- [X] **T-008-3a: Verify CHANGELOG entry is first**
 
 ```bash
 head -5 CHANGELOG.md | grep '## \[1\.16\.0\]' && echo "PASS" || echo "FAIL: entry missing or not first"
@@ -2155,7 +2155,7 @@ git add CHANGELOG.md
 git commit -m "chore(BUG-015): add CHANGELOG [1.16.0] entry"
 ```
 
-- [ ] **T-008-4: Update README to mention auto-detection**
+- [X] **T-008-4: Update README to mention auto-detection**
 
 Find the `## What it does` (or similar) section and add one bullet:
 
@@ -2163,7 +2163,7 @@ Find the `## What it does` (or similar) section and add one bullet:
 - **Stack auto-detection** — `install.sh --project` reads your `package.json`, `go.mod`, `Cargo.toml`, etc. and auto-fills CLAUDE.md Development Commands so the agent never guesses your build/test/lint commands.
 ```
 
-- [ ] **T-008-4a: Verify README update**
+- [X] **T-008-4a: Verify README update**
 
 ```bash
 grep -c 'Stack auto-detection' README.md | grep -q '^1$' && echo "PASS" || echo "FAIL"
@@ -2176,14 +2176,14 @@ git add README.md
 git commit -m "docs(BUG-015): document stack auto-detection in README"
 ```
 
-- [ ] **T-008-5: Commit BACKLOG**
+- [X] **T-008-5: Commit BACKLOG**
 
 ```bash
 git add -f "AGENT-READABLE BACKLOG.md"
 git commit -m "chore(BUG-015): mark BUG-015 complete in BACKLOG"
 ```
 
-- [ ] **T-008-6: Final git status — confirm no unstaged changes remain**
+- [>] **T-008-6: Final git status — confirm no unstaged changes remain**
 
 After all T-008 commits, verify the working tree is clean:
 
