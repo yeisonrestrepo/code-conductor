@@ -1346,7 +1346,7 @@ npm test -- --reporter=verbose tests/scripts/detect-stack.test.js
 
 Expected: all tests PASS.
 
-- [>] **T-002-4: Commit Task 1 + Task 2**
+- [X] **T-002-4: Commit Task 1 + Task 2**
 
 ```bash
 git add scripts/detect-stack.mjs tests/scripts/detect-stack.test.js
@@ -1364,7 +1364,7 @@ git commit -m "feat(BUG-015): add scripts/detect-stack.mjs with 20+ ecosystem de
 - Consumes: `node scripts/detect-stack.mjs` via temp file downloaded from GitHub
 - Produces: CLAUDE.md with placeholder fields filled from detected JSON
 
-- [ ] **T-003-1: Add `_fill_claude_md` function to `install.sh`**
+- [X] **T-003-1: Add `_fill_claude_md` function to `install.sh`**
 
 Insert the following function block immediately before the `# ── Install project template` comment (line ~1179). Search for the anchor: `# ── Install project template`.
 
@@ -1417,7 +1417,7 @@ FILL_EOF
 }
 ```
 
-- [ ] **T-003-2: Add Node.js version guard + detect-stack download + `_fill_claude_md` call to the `--project` install block**
+- [X] **T-003-2: Add Node.js version guard + detect-stack download + `_fill_claude_md` call to the `--project` install block**
 
 Locate the line `download "project-template/CLAUDE.md" "CLAUDE.md" false` (around line 1206). Insert the following block IMMEDIATELY AFTER that line (before `download "project-template/.claude/settings.json"`):
 
@@ -1466,7 +1466,7 @@ Locate the line `download "project-template/CLAUDE.md" "CLAUDE.md" false` (aroun
   fi
 ```
 
-- [ ] **T-003-3: Run install.sh --project in a test directory and verify CLAUDE.md is auto-filled**
+- [X] **T-003-3: Run install.sh --project in a test directory and verify CLAUDE.md is auto-filled**
 
 ```bash
 _testdir=$(mktemp -d)
@@ -1477,7 +1477,7 @@ grep -A5 'Development Commands' "$_testdir/CLAUDE.md"
 
 Expected: `- Build: vite build` and `- Test: vitest run` in CLAUDE.md.
 
-- [ ] **T-003-3a: Verify $ neutralization — dollar signs in package scripts survive fill intact**
+- [X] **T-003-3a: Verify $ neutralization — dollar signs in package scripts survive fill intact**
 
 ```bash
 _testdir=$(mktemp -d)
@@ -1488,7 +1488,7 @@ grep -F 'DATABASE_URL=$DATABASE_URL' "$_testdir/CLAUDE.md"
 
 Expected: the literal string `DATABASE_URL=$DATABASE_URL` appears in CLAUDE.md. If the dollar sign was shell-expanded or corrupted by JS regex back-reference substitution, this check fails.
 
-- [ ] **T-003-3b: Verify no orphaned temp files after fill**
+- [X] **T-003-3b: Verify no orphaned temp files after fill**
 
 ```bash
 find "$_testdir" -maxdepth 2 -name 'CLAUDE.md.tmp.*'
@@ -1496,7 +1496,7 @@ find "$_testdir" -maxdepth 2 -name 'CLAUDE.md.tmp.*'
 
 Expected: no output (zero files). The fill script must clean up its temp file even when `renameSync` falls back to `writeFileSync`.
 
-- [ ] **T-003-4: Verify idempotency — re-running does not overwrite custom values**
+- [X] **T-003-4: Verify idempotency — re-running does not overwrite custom values**
 
 ```bash
 # Set a custom value
@@ -1507,7 +1507,7 @@ grep 'Build' "$_testdir/CLAUDE.md"
 
 Expected: `- Build: my-custom-build` unchanged.
 
-- [ ] **T-003-5: Commit**
+- [>] **T-003-5: Commit**
 
 ```bash
 git add install.sh

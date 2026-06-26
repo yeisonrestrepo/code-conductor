@@ -1176,6 +1176,54 @@ case "${CC_VERBOSITY_SKIP:-0}" in
         ;;
 esac
 
+# ── CLAUDE.md smart fill ──────────────────────────────────────────────────────
+# _fill_claude_md <claude_md_path> <detect_json_string>
+# Replaces blank and <command> placeholder lines in CLAUDE.md using detected values.
+# Uses inline node to handle all encoding and regex concerns without sed portability issues.
+_fill_claude_md() {
+  local _md="$1" _json="$2"
+  [ -f "$_md" ] || return 0
+  rm -f "${_md}.tmp."* 2>/dev/null || true
+  command -v node >/dev/null 2>&1 || return 0
+
+  _CC_JSON="$_json" node - "$_md" 2>>"${_install_logfile:-/dev/null}" << 'FILL_EOF'
+const fs = require('fs');
+const mdPath = process.argv[2];
+let d;
+try { d = JSON.parse(process.env._CC_JSON || '{}'); } catch { process.exit(0); }
+const FIELDS = {
+  name:'Name', description:'Description', stack:'Stack',
+  build:'Build', test:'Test', lint:'Lint', format:'Format', setup:'Setup'
+};
+let content;
+try { content = fs.readFileSync(mdPath, 'utf8').replace(/^﻿/, ''); } catch { process.exit(0); }
+for (const [key, label] of Object.entries(FIELDS)) {
+  const val = d[key];
+  if (typeof val !== 'string' || !val.trim()) continue;
+  // Normalize: collapse actual newlines and literal \n/\t/\r escape sequences to spaces
+  const clean = val.trim().replace(/\r?\n/g, ' ').replace(/\\\\[ntr]/g, ' ');
+  // Match: optional leading whitespace + optional hyphen + optional whitespace + Label:,
+  // then blank or <placeholder>, then optional whitespace, then capture trailing \r (group 3).
+  // Group 1 captures everything before the value so indentation is preserved in $1.
+  // 'i' = case-insensitive label, 'm' = ^ matches each line start.
+  // NOTE: heredoc on MSYS2 halves \\ pairs, so \\\\s here → \\s in file → \s in RegExp string → \s regex.
+  const re = new RegExp('^(\\\\s*-?\\\\s*' + label + ':)\\\\s*(<[^>]*>)?\\\\s*(\\\\r?)$', 'im');
+  if (!re.test(content)) continue;
+  // Double $ signs so String.replace doesn't interpret $1/$2 in clean value
+  const safe = clean.replace(/\$/g, '$$$$');
+  // $1 = label prefix, $3 = captured \r (empty string if LF-only) — restores original line ending
+  content = content.replace(re, '$1 ' + safe + '$3');
+}
+const tmp = mdPath + '.tmp.' + process.pid;
+fs.writeFileSync(tmp, content, 'utf8');
+try { fs.renameSync(tmp, mdPath); } catch(e) {
+  // renameSync can fail cross-device; fall back to copy+delete
+  fs.writeFileSync(mdPath, content, 'utf8');
+  try { fs.unlinkSync(tmp); } catch {}
+}
+FILL_EOF
+}
+
 # ── Install project template ───────────────────────────────────────────────────
 if [ "$INSTALL_PROJECT" = true ]; then
   echo ""
@@ -1204,6 +1252,41 @@ if [ "$INSTALL_PROJECT" = true ]; then
   IFS="$_oifs"; unset _component _oifs
 
   download "project-template/CLAUDE.md"                  "CLAUDE.md"                            false
+
+  # ── detect-stack: auto-fill CLAUDE.md fields ────────────────────────────────
+  _ds_skip=false
+  _ds_major=$(node --version 2>/dev/null | sed 's/^v\([0-9]*\).*/\1/')
+  case "$_ds_major" in ''|*[!0-9]*) _ds_major=0 ;; esac
+  if ! command -v node >/dev/null 2>&1 || [ "$_ds_major" -lt 18 ] 2>/dev/null; then
+    warn "detect-stack: Node ≥ 18 required — skipping auto-fill"
+    _ds_skip=true
+  fi
+
+  if [ "$_ds_skip" = false ]; then
+    _ds_tmp=$(mktemp 2>/dev/null || echo "/tmp/detect-stack-$$.mjs")
+    _ds_ok=false
+    if curl -fsSL --max-time 10 "${BASE_URL}/scripts/detect-stack.mjs" -o "$_ds_tmp" 2>/dev/null && [ -s "$_ds_tmp" ]; then
+      _ds_ok=true
+    elif command -v wget >/dev/null 2>&1 && wget -q --timeout=10 "${BASE_URL}/scripts/detect-stack.mjs" -O "$_ds_tmp" 2>/dev/null && [ -s "$_ds_tmp" ]; then
+      _ds_ok=true
+    fi
+
+    if [ "$_ds_ok" = true ]; then
+      _ds_json=$(node "$_ds_tmp" "$(pwd)" 2>>"${_install_logfile:-/dev/null}")
+      if [ -n "$_ds_json" ] && [ "$_ds_json" != '{}' ]; then
+        _fill_claude_md "CLAUDE.md" "$_ds_json"
+        ok "CLAUDE.md fields auto-filled from manifest detection"
+      else
+        info "No stack detected -- CLAUDE.md placeholders kept for /cc-init to fill"
+      fi
+      mkdir -p "scripts"
+      cp "$_ds_tmp" "scripts/detect-stack.mjs" 2>/dev/null || true
+    else
+      warn "detect-stack: could not download script — skipping auto-fill"
+    fi
+    rm -f "$_ds_tmp" 2>/dev/null || true
+  fi
+
   download "project-template/.claude/settings.json"      "${PROJ_DIR}/settings.json"            false
   download "project-template/.claude/memory/project.md"  "${PROJ_DIR}/memory/project.md"        false
 
