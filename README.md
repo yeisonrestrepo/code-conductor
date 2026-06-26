@@ -14,6 +14,7 @@ AI coding assistants are only as good as the structure you put around them. With
 | Full files read on every turn | grep/find before read — targeted tool calls only |
 | Conventions reset every session | Stack profile + memory loaded at session start |
 | Frontend code with no UX consideration | UI/UX skill activated automatically for frontend stacks |
+| Manual CLAUDE.md with `<command>` placeholders | **Stack auto-detection** — `install.sh --project` reads your `package.json`, `go.mod`, `Cargo.toml`, etc. and auto-fills CLAUDE.md Development Commands so the agent never guesses your build/test/lint commands |
 
 ---
 
