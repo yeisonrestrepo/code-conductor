@@ -233,3 +233,31 @@ Turn-counter hook (`context-guard.sh` / `.ps1`) wired into `UserPromptSubmit` vi
 - `scripts/detect-stack.mjs` + `tests/scripts/detect-stack.test.js` (T-001 + T-002) exist on disk, uncommitted — awaiting git commit
 - T-003 through T-008 (install.sh, install.ps1, test harnesses, cc-init, cc-resume, metadata) all pending implementation
 - 51-test Vitest suite at 51/51 passing (last confirmed after Round 8 additions)
+
+## Checkpoint 2026-06-26 (BUG-015 complete — v1.16.0)
+
+### Decisions
+- `_fill_helper.cjs` chosen as standalone CommonJS test helper (not extracting `_fill_claude_md` from install.sh) — heredoc + eval backslash-halving layers in MSYS2 made the extracted function unreliable; standalone node script avoids all bash string-processing layers
+- `_fill_helper.ps1` wrapper calls `_fill_helper.cjs` via temp JSON file — PS 5.1 strips double-quotes from native exe arguments, so JSON string cannot be passed directly as argv; `[System.IO.File]::WriteAllText` + file path workaround is authoritative for PS
+- `_fill_helper.cjs` argv[2] dual-mode: if value starts with `{` → parse as JSON string; otherwise → read as file path (enables both bash and PS callers without code duplication)
+- PS test harness uses local `Set-ClaudeMdFields` wrapper (calls `_fill_helper.ps1`) rather than extracting the function from install.ps1 — install.ps1's function contains a here-string with embedded JS that defeats both regex and `Invoke-Expression` extraction
+
+### Conventions
+- `tests/scripts/` hosts both `.sh` and `.ps1` test harnesses for installer functions; helper scripts (`_fill_helper.cjs`, `_fill_helper.ps1`) prefixed with `_` to distinguish from test runners
+- Bash test harness uses `grep -qF -- "$_pattern"` (double-dash separator) to prevent patterns starting with `-` being parsed as grep flags
+
+### Technical Debt
+- PS test harness tests `_fill_helper.cjs` (via wrapper) not `Set-ClaudeMdFields` directly — PS-specific fill divergence (e.g. CLM guard, TLS setup) is not covered by automated tests
+- `\t`, `\n`, `\r` sequences in fill values (e.g. Windows path `C:\to\setup`) are replaced with spaces by the `/\\[ntr]/g` regex in both `_fill_helper.cjs` and install.sh/ps1 — this is intentional (escape-sequence cleanup) but will mangle Windows paths containing `\t`, `\n`, `\r` components
+
+### Version
+1.16.0 released 2026-06-26 — BUG-015 complete
+
+## Spec: FEAT-010 dense-prompt-protocol 2026-06-26
+
+SNAP v1 — minified single-line JSON handoff replacing `session-snapshot.md`; ≥30% character reduction (measured: 51%); forward-compatible via `v` integer gate.
+- Three blocks: `sys` (`ph`, `c`, `s`), `ops` (`n[]`, `f[]`), `mem` (`d[]`, `x[]`); strict allow-lists; all extra keys rejected
+- Validator `scripts/snap-validate.mjs` ≤30 lines, ES module, explicit UTF-8, stderr-only output with `SNAP_ERROR:` prefix, exits 0/1 only
+- `/cc-compact` writes JSON + idempotent `.gitignore` append; `/cc-implement` validates-then-deletes (step 8); `.md` fallback one session only (removed v1.18.0)
+- Spec: `docs/superpowers/specs/2026-06-26-feat010-dense-prompt-protocol-design.md`
+- Complexity: M; target version: 1.17.0
