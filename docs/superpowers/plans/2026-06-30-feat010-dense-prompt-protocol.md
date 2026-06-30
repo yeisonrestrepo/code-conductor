@@ -77,21 +77,24 @@ Expected: `30`. If it differs because the file was retyped instead of copied ver
 
 - [ ] **Step 3: Smoke-test manually**
 
+Use `tests/.tmp/` (the project's existing repo-relative scratch directory, already in `.gitignore`, already used the same way by `tests/hooks/guard3.test.js`) instead of the OS global temp directory: it's a stable relative path that behaves identically on every platform, unlike `/tmp/`, which does not exist on native Windows.
+
 ```bash
-trap 'rm -f /tmp/snap-ok.json' EXIT
-echo -n '{"v":1,"sys":{"ph":"impl","c":"abc1234","s":"x"},"ops":{"n":[],"f":[]},"mem":{"d":[],"x":[]}}' > /tmp/snap-ok.json
-node scripts/snap-validate.mjs /tmp/snap-ok.json; echo "exit=$?"
-node scripts/snap-validate.mjs /tmp/does-not-exist.json; echo "exit=$?"
+mkdir -p tests/.tmp
+trap 'rm -f tests/.tmp/snap-ok.json' EXIT
+echo -n '{"v":1,"sys":{"ph":"impl","c":"abc1234","s":"x"},"ops":{"n":[],"f":[]},"mem":{"d":[],"x":[]}}' > tests/.tmp/snap-ok.json
+node scripts/snap-validate.mjs tests/.tmp/snap-ok.json; echo "exit=$?"
+node scripts/snap-validate.mjs tests/.tmp/does-not-exist.json; echo "exit=$?"
 ```
-The `trap ... EXIT` guarantees `/tmp/snap-ok.json` is removed when this shell exits, regardless of which command above fails or what its exit code is (no reliance on reaching an unconditional `rm` line at the end).
+The `trap ... EXIT` guarantees `tests/.tmp/snap-ok.json` is removed when this shell exits, regardless of which command above fails or what its exit code is (no reliance on reaching an unconditional `rm` line at the end).
 Expected: first invocation prints nothing, `exit=0`; second prints `SNAP_ERROR: file not found` to stderr, `exit=1`.
 
 - [ ] **Step 4: Re-run the smoke battery against the type-mutation cases**
 
 ```bash
-trap 'rm -f /tmp/snap-bad.json' EXIT
-echo -n '{"v":1,"sys":{"ph":"impl","c":"abc1234","s":"x"},"ops":{"n":"not-an-array","f":[]},"mem":{"d":[],"x":[]}}' > /tmp/snap-bad.json
-node scripts/snap-validate.mjs /tmp/snap-bad.json; echo "exit=$?"
+trap 'rm -f tests/.tmp/snap-bad.json' EXIT
+echo -n '{"v":1,"sys":{"ph":"impl","c":"abc1234","s":"x"},"ops":{"n":"not-an-array","f":[]},"mem":{"d":[],"x":[]}}' > tests/.tmp/snap-bad.json
+node scripts/snap-validate.mjs tests/.tmp/snap-bad.json; echo "exit=$?"
 ```
 Expected: `SNAP_ERROR: ops.n must be an array` on stderr, `exit=1` (not an uncaught `TypeError` crash). The `trap` again guarantees cleanup even though this command is expected to exit 1.
 
