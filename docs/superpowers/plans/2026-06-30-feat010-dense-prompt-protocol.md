@@ -71,7 +71,7 @@ No shebang, no `chmod +x`: invocation is always explicit `node scripts/snap-vali
 
 Run (cross-platform, no shell-specific flags, same Node already required by the project):
 ```bash
-node -e "const s=require('fs').readFileSync('scripts/snap-validate.mjs','utf8').split('\n');console.log(s.filter(l=>l.trim()!==''&&!l.trim().startsWith('//')).length)"
+node -e "const s=require('fs').readFileSync('scripts/snap-validate.mjs','utf8').split(/\r?\n/);console.log(s.filter(l=>l.trim()!==''&&!l.trim().startsWith('//')).length)"
 ```
 Expected: `30`. If it differs because the file was retyped instead of copied verbatim, diff against this plan's code block before changing any logic.
 
@@ -313,8 +313,13 @@ describe('snap-validate.mjs', () => {
     expect(r.stderr).not.toBe('')
   })
 
+  it('contains no console.* invocations (stdout must stay empty on every path, not just the tested ones)', () => {
+    const src = readFileSync(VALIDATOR, 'utf8')
+    expect(src).not.toMatch(/console\./)
+  })
+
   it('scripts/snap-validate.mjs stays within the 30-line hard cap', () => {
-    const src = readFileSync(VALIDATOR, 'utf8').split('\n')
+    const src = readFileSync(VALIDATOR, 'utf8').split(/\r?\n/)
     const counted = src.filter(l => l.trim() !== '' && !l.trim().startsWith('//'))
     expect(counted.length).toBeLessThanOrEqual(30)
   })
@@ -352,18 +357,18 @@ describe('snap-validate.mjs', () => {
 })
 ```
 
-This covers 33 cases (≥16 required): 22 single `it()` cases, the 3-case parent-block `it.each`, the 4-case type-mutation `it.each` (non-array ops.n/ops.f/mem.d/mem.x), and the 4-case array-cap `it.each`, including the 30-line guard and the character-count assertion using the spec's own frozen canonical example (line 119 of the design doc) as the SNAP fixture, paired with the markdown shape `/cc-compact` historically produced for the same logical payload.
+This covers 34 cases (≥16 required): 23 single `it()` cases (including the new zero-`console.*` static check), the 3-case parent-block `it.each`, the 4-case type-mutation `it.each` (non-array ops.n/ops.f/mem.d/mem.x), and the 4-case array-cap `it.each`, including the 30-line guard and the character-count assertion using the spec's own frozen canonical example (line 119 of the design doc) as the SNAP fixture, paired with the markdown shape `/cc-compact` historically produced for the same logical payload.
 
 - [ ] **Step 2: Run the new suite and confirm all cases pass**
 
 Run: `npx vitest run tests/unit/snap-validate.test.js`
-Expected: all tests pass (33/33). If the character-count assertion fails, recheck the markdown fixture against the exact format `/cc-compact` (T-003) emits: this is the same logical payload, not necessarily the exact format if T-003 wording diverges from the historical fixture.
+Expected: all tests pass (34/34). If the character-count assertion fails, recheck the markdown fixture against the exact format `/cc-compact` (T-003) emits: this is the same logical payload, not necessarily the exact format if T-003 wording diverges from the historical fixture.
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add tests/unit/snap-validate.test.js
-git commit -m "test(FEAT-010): add snap-validate.mjs test suite (33 cases)"
+git commit -m "test(FEAT-010): add snap-validate.mjs test suite (34 cases)"
 ```
 
 ---
@@ -632,7 +637,7 @@ Insert before the line `## [1.16.0] — 2026-06-26`:
 
 ### Added
 - `[FEAT-010]` `scripts/snap-validate.mjs`: ≤30-line dependency-free Node.js ≥18 validator for SNAP v1, the minified single-line JSON handoff format; exits 0/1 only, all errors prefixed `SNAP_ERROR:` on stderr
-- `[FEAT-010]` `tests/unit/snap-validate.test.js`: 33-case Vitest suite covering schema violations, array-type mutations, array/element caps, line-count enforcement, and the >=15% character-reduction assertion against the legacy markdown format
+- `[FEAT-010]` `tests/unit/snap-validate.test.js`: 34-case Vitest suite covering schema violations, array-type mutations, array/element caps, line-count enforcement, a zero-console.* static check, and the >=15% character-reduction assertion against the legacy markdown format
 
 ### Changed
 - `[FEAT-010]` `/cc-compact` (global command): now writes `.claude/memory/session-snapshot.json` (SNAP v1) instead of `session-snapshot.md`; idempotently gitignores the new file; deletes legacy `.md` on write
@@ -685,8 +690,8 @@ git commit -m "docs(FEAT-010): append spec summary to project.md"
 
 ## Test List
 
-- [ ] `tests/unit/snap-validate.test.js`: 33 cases (T-002), validator unit/integration coverage
-- [ ] Full Vitest regression: `npx vitest run`, all 216 pre-existing + 33 new cases pass (T-006)
+- [ ] `tests/unit/snap-validate.test.js`: 34 cases (T-002), validator unit/integration coverage
+- [ ] Full Vitest regression: `npx vitest run`, all 216 pre-existing + 34 new cases pass (T-006)
 - [ ] Manual smoke test of `scripts/snap-validate.mjs` against a hand-written valid/invalid fixture (T-001 Step 3)
 - [ ] Manual diff confirming `.claude/commands/cc-implement.md` and `project-template/.claude/commands/cc-implement.md` stay byte-identical (T-005 Step 2)
 
