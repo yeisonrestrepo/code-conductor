@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace markdown `session-snapshot.md` with SNAP v1 — a minified single-line JSON handoff format — backed by a standalone validator, achieving ≥15% character reduction with 100% parse reliability (corrected 2026-06-30 from an unverified ≥30% target — see spec commit `3a4be07`).
+**Goal:** Replace markdown `session-snapshot.md` with SNAP v1 (a minified single-line JSON handoff format) backed by a standalone validator, achieving ≥15% character reduction with 100% parse reliability (corrected 2026-06-30 from an unverified ≥30% target; see spec commit `3a4be07`).
 
 **Architecture:** `scripts/snap-validate.mjs` (≤30 lines, dependency-free) enforces the SNAP v1 schema. `/cc-compact` (global user command, source-tracked at `global/commands/cc-compact.md`) writes the JSON envelope. `/cc-implement` (project command, mirrored at `.claude/commands/cc-implement.md` and `project-template/.claude/commands/cc-implement.md`) reads it via destructive-read, falling back to the legacy `.md` for one session.
 
@@ -12,23 +12,23 @@
 
 - `scripts/snap-validate.mjs` ≤ 30 non-blank, non-`//`-comment-only lines (hard design constraint, test-enforced)
 - Validator exits only 0 (valid) or 1 (schema violation); never writes to stdout under any condition
-- Every validator stderr line is prefixed `SNAP_ERROR: <message>` — single uniform prefix, no `SNAP_INVALID —` tier (resolved 2026-06-30, see spec commit `3925c35`)
-- `/cc-implement` orchestrator-level halts (`REPO_ROOT_FAILED`, `NODE_NOT_FOUND`, `SNAP_UNKNOWN_VERSION`, `SNAP_INVALID`) use plain unformatted text — these are not validator stderr lines
+- Every validator stderr line is prefixed `SNAP_ERROR: <message>`: single uniform prefix, no second `SNAP_INVALID` prefix tier (resolved 2026-06-30, see spec commit `3925c35`)
+- `/cc-implement` orchestrator-level halts (`REPO_ROOT_FAILED`, `NODE_NOT_FOUND`, `SNAP_UNKNOWN_VERSION`, `SNAP_INVALID`) use plain unformatted text: these are not validator stderr lines
 - No alphabetical JSON key sorting in the writer
-- `.claude/` and `docs/` are gitignored project-wide except `!project-template/*` — committing files under either path requires `git add -f`
+- `.claude/` and `docs/` are gitignored project-wide except `!project-template/*`: committing files under either path requires `git add -f` (paths outside both, like `global/`, do not)
 - BUG-003 invariant: plan/tracking file edits are surgical single-line `Edit` calls only, never bulk rewrites
-- VERSION/package.json/CHANGELOG.md/README.md bumps are sequenced as the final tasks (T-009–T-012), after all code and tests pass — per spec's explicit "Plan task ordering" mandate
-- `package.json` `"engines".node` is currently `>=20`; spec requires Node ≥ 18 — do not lower or touch `engines` (out of scope, pre-existing repo-wide floor)
+- VERSION/package.json/CHANGELOG.md/README.md bumps are sequenced as the final tasks (T-009 through T-012), after all code and tests pass, per spec's explicit "Plan task ordering" mandate
+- `package.json` `"engines".node` is currently `>=20`; spec requires Node ≥ 18; do not lower or touch `engines` (out of scope, pre-existing repo-wide floor)
 
 ---
 
-### Task T-001: Validator script — `scripts/snap-validate.mjs`
+### Task T-001: Validator script (`scripts/snap-validate.mjs`)
 
 **Files:**
 - Create: `scripts/snap-validate.mjs`
 
 **Interfaces:**
-- Produces: a CLI script invoked as `node scripts/snap-validate.mjs <path>`. No exports (not imported by tests — tests spawn it as a subprocess). Exit 0 on valid SNAP v1 JSON; exit 1 with `SNAP_ERROR: <message>` on stderr for any violation.
+- Produces: a CLI script invoked as `node scripts/snap-validate.mjs <path>`. No exports (not imported by tests: tests spawn it as a subprocess). Exit 0 on valid SNAP v1 JSON; exit 1 with `SNAP_ERROR: <message>` on stderr for any violation.
 
 - [ ] **Step 1: Write the validator**
 
@@ -53,7 +53,7 @@ if (typeof snap.v !== 'number' || !Number.isInteger(snap.v) || snap.v < 1) err('
 if (!['spec', 'plan', 'impl', 'rev'].includes(snap.sys.ph)) err('ph must be spec|plan|impl|rev');
 const caps = { 'ops.n': [3, 200], 'ops.f': [20, 300], 'mem.d': [10, 300], 'mem.x': [5, 200] };
 for (const [key, [cap, elemCap]] of Object.entries(caps)) {
-  const [blk, sub] = key.split('.'); const arr = snap[blk][sub]; if (arr.length > cap) err(`${key} exceeds cap`);
+  const [blk, sub] = key.split('.'); const arr = snap[blk][sub]; if (!Array.isArray(arr)) err(`${key} must be an array`); if (arr.length > cap) err(`${key} exceeds cap`);
   arr.forEach((el, i) => { if (typeof el !== 'string' || el.trim() === '') err(`empty element in ${key}[${i}]`); if (JSON.stringify(el).slice(1, -1).length > elemCap) err(`element too long in ${key}[${i}]`); });
 }
 snap.ops.f.forEach((el, i) => {
@@ -65,11 +65,14 @@ if (!/^[0-9a-f]{7}$/.test(snap.sys.c)) err('invalid sys.c format'); if (!/^[a-zA
 process.exit(0);
 ```
 
-No shebang, no `chmod +x` — invocation is always explicit `node scripts/snap-validate.mjs <path>`. This exact text was written to a scratch file and verified during plan authoring: `grep -cve '^\s*$' -e '^\s*//'` reports exactly **30**, `node -c` confirms valid syntax, and a 17-case manual battery (valid payload, empty/malformed/array-root, missing block, bad ph case, v=2, lowercase action code, backslash path, bad sys.c/sys.s, array-cap overflow, empty element, extra key, float v, no-arg, nonexistent file) all produced the exact stderr strings and exit codes specified below — copy it verbatim rather than re-deriving it, since further "simplification" risks exceeding the line cap again (an earlier, more readable draft of the same logic ran to 50 lines).
+No shebang, no `chmod +x`: invocation is always explicit `node scripts/snap-validate.mjs <path>`. This exact text (including the `Array.isArray()` guard on each of the four array fields, which prevents a non-array `ops.n`/`ops.f`/`mem.d`/`mem.x` value from reaching `.length`/`.forEach` and crashing with an uncaught native error) was written to a scratch file and verified during plan authoring: `node -c` confirmed valid syntax, a cross-platform line count (Step 2) reported exactly **30**, and a fixture battery covering valid payload, empty/malformed/array-root, missing block, bad ph case, v=2, lowercase action code, backslash path, bad sys.c/sys.s, array-cap overflow, empty element, extra key, float v, no-arg, nonexistent file, and non-array `ops.n` (string/number/object/null) all produced the exact stderr strings and exit codes specified below. Copy it verbatim rather than re-deriving it: further "simplification" risks exceeding the line cap again (an earlier, more readable draft of the same logic ran to 50 lines).
 
 - [ ] **Step 2: Count non-blank, non-comment lines and confirm ≤30**
 
-Run: `grep -cve '^\s*$' -e '^\s*//' scripts/snap-validate.mjs`
+Run (cross-platform, no shell-specific flags, same Node already required by the project):
+```bash
+node -e "const s=require('fs').readFileSync('scripts/snap-validate.mjs','utf8').split('\n');console.log(s.filter(l=>l.trim()!==''&&!l.trim().startsWith('//')).length)"
+```
 Expected: `30`. If it differs because the file was retyped instead of copied verbatim, diff against this plan's code block before changing any logic.
 
 - [ ] **Step 3: Smoke-test manually**
@@ -82,7 +85,16 @@ rm /tmp/snap-ok.json
 ```
 Expected: first invocation prints nothing, `exit=0`; second prints `SNAP_ERROR: file not found` to stderr, `exit=1`.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Re-run the smoke battery against the type-mutation cases**
+
+```bash
+echo -n '{"v":1,"sys":{"ph":"impl","c":"abc1234","s":"x"},"ops":{"n":"not-an-array","f":[]},"mem":{"d":[],"x":[]}}' > /tmp/snap-bad.json
+node scripts/snap-validate.mjs /tmp/snap-bad.json; echo "exit=$?"
+rm /tmp/snap-bad.json
+```
+Expected: `SNAP_ERROR: ops.n must be an array` on stderr, `exit=1` (not an uncaught `TypeError` crash).
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git add scripts/snap-validate.mjs
@@ -91,7 +103,7 @@ git commit -m "feat(FEAT-010): add scripts/snap-validate.mjs SNAP v1 validator"
 
 ---
 
-### Task T-002: Validator test suite — `tests/unit/snap-validate.test.js`
+### Task T-002: Validator test suite (`tests/unit/snap-validate.test.js`)
 
 **Files:**
 - Create: `tests/unit/snap-validate.test.js`
@@ -189,6 +201,18 @@ describe('snap-validate.mjs', () => {
     const r = run(fixture(j(payload)))
     expect(r.status).toBe(1)
     expect(r.stderr).toBe('SNAP_ERROR: SNAP_UNKNOWN_VERSION\n')
+  })
+
+  it.each([
+    ['ops.n', 'n', 'ops', 'a string'],
+    ['ops.f', 'f', 'ops', 42],
+    ['mem.d', 'd', 'mem', {}],
+    ['mem.x', 'x', 'mem', null],
+  ])('rejects %s when it is not an array (%s)', (key, sub, blk, badValue) => {
+    const payload = { ...VALID, [blk]: { ...VALID[blk], [sub]: badValue } }
+    const r = run(fixture(j(payload)))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe(`SNAP_ERROR: ${key} must be an array\n`)
   })
 
   it.each([
@@ -328,18 +352,18 @@ describe('snap-validate.mjs', () => {
 })
 ```
 
-This covers 24 cases (≥16 required), including the 4-array-cap `it.each`, the 30-line guard, and the character-count assertion using the spec's own frozen canonical example (line 119 of the design doc) as the SNAP fixture, paired with the markdown shape `/cc-compact` historically produced for the same logical payload.
+This covers 33 cases (≥16 required): 22 single `it()` cases, the 3-case parent-block `it.each`, the 4-case type-mutation `it.each` (non-array ops.n/ops.f/mem.d/mem.x), and the 4-case array-cap `it.each`, including the 30-line guard and the character-count assertion using the spec's own frozen canonical example (line 119 of the design doc) as the SNAP fixture, paired with the markdown shape `/cc-compact` historically produced for the same logical payload.
 
 - [ ] **Step 2: Run the new suite and confirm all cases pass**
 
 Run: `npx vitest run tests/unit/snap-validate.test.js`
-Expected: all tests pass (24/24). If the character-count assertion fails, recheck the markdown fixture against the exact format `/cc-compact` (T-003) emits — this is the same logical payload, not yet that exact format if T-003 wording diverges from the historical fixture.
+Expected: all tests pass (33/33). If the character-count assertion fails, recheck the markdown fixture against the exact format `/cc-compact` (T-003) emits: this is the same logical payload, not necessarily the exact format if T-003 wording diverges from the historical fixture.
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add tests/unit/snap-validate.test.js
-git commit -m "test(FEAT-010): add snap-validate.mjs test suite (24 cases)"
+git commit -m "test(FEAT-010): add snap-validate.mjs test suite (33 cases)"
 ```
 
 ---
@@ -348,7 +372,7 @@ git commit -m "test(FEAT-010): add snap-validate.mjs test suite (24 cases)"
 
 **Files:**
 - Modify: `global/commands/cc-compact.md` (repo-tracked source, full rewrite)
-- Modify: `/Users/yeison/.claude/commands/cc-compact.md` (live installed copy — outside the repo; mirror identically so the command behaves correctly in this session without a reinstall)
+- Modify: `$HOME/.claude/commands/cc-compact.md` (live installed copy, the same path `install.sh` writes to: outside the repo, resolve `$HOME` / `~` for whichever machine is running this plan rather than a literal path; mirror identically so the command behaves correctly in this session without a reinstall)
 
 **Interfaces:**
 - Produces: `.claude/memory/session-snapshot.json`, a single-line file matching the schema validated by T-001's `scripts/snap-validate.mjs`. Read by T-004/T-005 (`/cc-implement`).
@@ -365,7 +389,7 @@ Run `git rev-parse --short HEAD` to get the current commit SHA. Lowercase the tr
 Determine `sys.s`: take the active specification file path from this phase's context, split on `/` and `\`, keep the last segment, strip a trailing `.md` extension, truncate to 200 characters. If no active spec file exists, use `"none"`.
 
 Collect from the current conversation context:
-- **Phase** (`sys.ph`): `spec` | `plan` | `impl` | `rev` — the phase that just completed
+- **Phase** (`sys.ph`): `spec` | `plan` | `impl` | `rev`, the phase that just completed
 - **Decisions** (`mem.d`): finalized decisions this phase, max 10 elements, each ≤300 chars (JSON-serialized length)
 - **Pending** (`ops.n`): next immediate step(s), max 3 elements, each ≤200 chars
 - **Files Touched** (`ops.f`): each entry `<relpath>:C|M|D` (uppercase only); replace any backslash in the path with `/`; if the path contains a literal `:`, percent-encode it as `%3A` before appending the suffix; max 20 elements, each ≤300 chars
@@ -379,7 +403,7 @@ Write the single JSON line, followed by exactly one trailing newline, to `.claud
 
 If `.claude/memory/session-snapshot.md` exists, delete it as part of this write.
 
-Idempotently append `.claude/memory/session-snapshot.json` to the project's `.gitignore`: read the file; if any line, after stripping leading/trailing whitespace, exactly equals `.claude/memory/session-snapshot.json`, skip the append. Otherwise, check whether the last byte of `.gitignore` is a newline; if not, prepend a newline before the appended entry. If `.gitignore` cannot be read or written (permission or lock error), log a non-fatal warning to stderr and continue — do not block the snapshot write.
+Idempotently append `.claude/memory/session-snapshot.json` to the project's `.gitignore`: read the file; if any line, after stripping leading/trailing whitespace, exactly equals `.claude/memory/session-snapshot.json`, skip the append. Otherwise, check whether the last byte of `.gitignore` is a newline; if not, prepend a newline before the appended entry. If `.gitignore` cannot be read or written (permission or lock error), log a non-fatal warning to stderr and continue; do not block the snapshot write.
 
 If writing the snapshot fails (e.g., missing `.claude/memory/` directory), report the error and stop. Do NOT output the compact prompt.
 
@@ -390,16 +414,18 @@ Once the snapshot is written successfully, output exactly:
 
 - [ ] **Step 2: Apply identically to both files**
 
-Write the Step 1 content to `global/commands/cc-compact.md`, then write the exact same content to `/Users/yeison/.claude/commands/cc-compact.md`.
+Write the Step 1 content to `global/commands/cc-compact.md`, then write the exact same content to `$HOME/.claude/commands/cc-compact.md` (expand `$HOME`/`~` to the actual home directory of the machine running this step).
 
 - [ ] **Step 3: Commit the repo-tracked copy**
 
+`global/commands/cc-compact.md` is not covered by any `.gitignore` rule (`.claude/` and `docs/` are ignored; `global/` is not), so a plain `git add` is sufficient here, unlike T-004/T-008/T-012 which touch paths under `.claude/`.
+
 ```bash
-git add -f global/commands/cc-compact.md
+git add global/commands/cc-compact.md
 git commit -m "feat(FEAT-010): rewrite /cc-compact to emit SNAP v1 JSON instead of markdown"
 ```
 
-(The live copy at `~/.claude/commands/cc-compact.md` is outside the repo and is not committed — it now matches what a fresh `install.sh` would deliver.)
+(The live copy at `~/.claude/commands/cc-compact.md` is outside the repo and is not committed; it now matches what a fresh `install.sh` would deliver.)
 
 ---
 
@@ -431,19 +457,20 @@ Before doing anything else, perform this blocking check:
 
 ## Phase entry - Destructive Read Invariant
 
-1. Resolve the repository root via `git rev-parse --show-toplevel`. If `git` is not found in PATH, or the command exits non-zero, halt immediately with `REPO_ROOT_FAILED — cannot determine repository root` and exit with code 3.
+1. Resolve the repository root via `git rev-parse --show-toplevel`. If `git` is not found in PATH, or the command exits non-zero, halt immediately with `REPO_ROOT_FAILED: cannot determine repository root` and exit with code 3.
 2. If `<repo-root>/.claude/memory/session-snapshot.json` exists:
    a. Read its full contents into context (do not delete yet).
-   b. Invoke `node "<repo-root>/scripts/snap-validate.mjs" "<repo-root>/.claude/memory/session-snapshot.json"`. If `node` cannot be found or fails to launch, halt with `NODE_NOT_FOUND — node binary not found in PATH` and exit with code 2.
-   c. If the validator exits 1, halt with `SNAP_INVALID` and leave the file on disk for manual inspection; do not proceed.
-   d. If the validator exits 0, bind context variables: phase ← `sys.ph`, commit ← `sys.c`, decisions ← `mem.d`, constraints ← `mem.x`, next steps ← `ops.n`, files ← `ops.f`, spec stem ← `sys.s`. If `sys.s` is `"none"`, treat spec reference as absent.
-   e. If `sys.v` (the `v` field) is greater than `1`, halt with `SNAP_UNKNOWN_VERSION` instead of completing step d — do not attempt to parse v2+ fields.
-   f. Only after all context variables are bound: delete `session-snapshot.json`. If deletion fails (permission or lock error), log a non-fatal warning to stderr and continue — context is already bound.
+   b. If `<repo-root>/.claude/memory/session-snapshot.md` also exists, delete it now without reading it: `.json` takes precedence over `.md` whenever both are present.
+   c. Invoke `node "<repo-root>/scripts/snap-validate.mjs" "<repo-root>/.claude/memory/session-snapshot.json"`, capturing both its exit code and its stderr text.
+   d. If `node` cannot be found or fails to launch, halt with `NODE_NOT_FOUND: node binary not found in PATH` and exit with code 2.
+   e. If the validator exits 1: if its stderr is exactly `SNAP_ERROR: SNAP_UNKNOWN_VERSION` (with trailing newline), halt with `SNAP_UNKNOWN_VERSION` (the payload is structurally fine but declares a schema version this reader does not know); for any other stderr content, halt with `SNAP_INVALID`. Either way, leave the file on disk for manual inspection and do not proceed.
+   f. If the validator exits 0: bind context variables: phase from `sys.ph`, commit from `sys.c`, decisions from `mem.d`, constraints from `mem.x`, next steps from `ops.n`, files from `ops.f`, spec stem from `sys.s`. If `sys.s` is `"none"`, treat spec reference as absent. (Exit 0 already guarantees `v === 1`, since the validator itself rejects any other value before returning success: no separate version check is needed here.)
+   g. Only after all context variables are bound: delete `session-snapshot.json`. If deletion fails (permission or lock error), log a non-fatal warning to stderr and continue: context is already bound.
 3. Else if `<repo-root>/.claude/memory/session-snapshot.md` exists (legacy fallback, one session only):
-   a. Emit to stderr: `[WARN] session-snapshot.md detected — SNAP v1 JSON not found; falling back to legacy format. Update /cc-compact to write SNAP v1 JSON.`
+   a. Emit to stderr: `[WARN] session-snapshot.md detected: SNAP v1 JSON not found; falling back to legacy format. Update /cc-compact to write SNAP v1 JSON.`
    b. Read its full contents into context using the existing markdown extraction logic.
    c. Once all context variables are bound, delete `session-snapshot.md`. If deletion fails, log a non-fatal warning and continue.
-4. Else: no snapshot context available — proceed directly (read-if-present fallback, existing behavior unchanged).
+4. Else: no snapshot context available; proceed directly (read-if-present fallback, existing behavior unchanged).
 
 ---
 ```
@@ -468,7 +495,7 @@ git commit -m "feat(FEAT-010): /cc-implement reads SNAP v1 JSON with one-session
 - Modify: `project-template/.claude/commands/cc-implement.md` (currently byte-identical to the pre-T-004 `.claude/commands/cc-implement.md`)
 
 **Interfaces:**
-- None beyond T-004 — this is the distributable template consumed by `install.sh --project` for other repositories.
+- None beyond T-004: this is the distributable template consumed by `install.sh --project` for other repositories.
 
 - [ ] **Step 1: Apply the identical replacement from T-004 Step 1**
 
@@ -499,23 +526,23 @@ Expected: all 216 pre-existing tests plus the 24 new `snap-validate.test.js` cas
 
 - [ ] **Step 2: If any pre-existing test fails, stop and report**
 
-Do not proceed to T-007 until the full suite is green — this task has no commit step; it's a gate.
+Do not proceed to T-007 until the full suite is green; this task has no commit step, it's a gate.
 
 ---
 
-### Task T-007: README.md comparison table — SNAP v1 row
+### Task T-007: README.md comparison table (SNAP v1 row)
 
 **Files:**
 - Modify: `README.md:11-17` (the "Without code-conductor / With code-conductor" table)
 
-**Interfaces:** none — documentation only.
+**Interfaces:** none; documentation only.
 
 - [ ] **Step 1: Add the row**
 
 Add as a new row after line 17 (`| Manual CLAUDE.md with...`):
 
 ```markdown
-| Verbose markdown handoffs eat context | **SNAP v1** — minified single-line JSON handoff format, schema-validated by `scripts/snap-validate.mjs`, ≥15% smaller than the markdown snapshot it replaces |
+| Verbose markdown handoffs eat context | **SNAP v1**: minified single-line JSON handoff format, schema-validated by `scripts/snap-validate.mjs`, ≥15% smaller than the markdown snapshot it replaces |
 ```
 
 - [ ] **Step 2: Commit**
@@ -537,7 +564,7 @@ git commit -m "docs(FEAT-010): add SNAP v1 row to README comparison table"
 - [ ] **Step 1: Pre-check uniqueness**
 
 Run: `grep -c '\[FEAT-010\]' "AGENT-READABLE BACKLOG.md"`
-Expected: `1` (BUG-003 invariant — confirm singular match before editing).
+Expected: `1` (BUG-003 invariant: confirm singular match before editing).
 
 - [ ] **Step 2: Surgical single-line edit**
 
@@ -576,7 +603,7 @@ git commit -m "chore: bump VERSION to 1.17.0"
 - Modify: `package.json:3`
 
 **Interfaces:**
-- Consumes: must match `VERSION` from T-009 (`1.17.0`) — kept synchronized per project convention.
+- Consumes: must match `VERSION` from T-009 (`1.17.0`), kept synchronized per project convention.
 
 - [ ] **Step 1: Surgical single-line edit**
 
@@ -601,15 +628,15 @@ git commit -m "chore: bump package.json version to 1.17.0"
 Insert before the line `## [1.16.0] — 2026-06-26`:
 
 ```markdown
-## [1.17.0] — 2026-06-30
+## [1.17.0] - 2026-06-30
 
 ### Added
-- `[FEAT-010]` `scripts/snap-validate.mjs` — ≤30-line dependency-free Node.js ≥18 validator for SNAP v1, the minified single-line JSON handoff format; exits 0/1 only, all errors prefixed `SNAP_ERROR:` on stderr
-- `[FEAT-010]` `tests/unit/snap-validate.test.js` — 24-case Vitest suite covering schema violations, array/element caps, line-count enforcement, and the ≥15% character-reduction assertion against the legacy markdown format
+- `[FEAT-010]` `scripts/snap-validate.mjs`: ≤30-line dependency-free Node.js ≥18 validator for SNAP v1, the minified single-line JSON handoff format; exits 0/1 only, all errors prefixed `SNAP_ERROR:` on stderr
+- `[FEAT-010]` `tests/unit/snap-validate.test.js`: 33-case Vitest suite covering schema violations, array-type mutations, array/element caps, line-count enforcement, and the >=15% character-reduction assertion against the legacy markdown format
 
 ### Changed
-- `[FEAT-010]` `/cc-compact` (global command) — now writes `.claude/memory/session-snapshot.json` (SNAP v1) instead of `session-snapshot.md`; idempotently gitignores the new file; deletes legacy `.md` on write
-- `[FEAT-010]` `/cc-implement` (project command, both `.claude/commands/` and `project-template/.claude/commands/`) — Phase entry now validates and reads SNAP v1 JSON via the destructive-read pattern, with a one-session `.md` fallback for backward compatibility
+- `[FEAT-010]` `/cc-compact` (global command): now writes `.claude/memory/session-snapshot.json` (SNAP v1) instead of `session-snapshot.md`; idempotently gitignores the new file; deletes legacy `.md` on write
+- `[FEAT-010]` `/cc-implement` (project command, both `.claude/commands/` and `project-template/.claude/commands/`): Phase entry now validates and reads SNAP v1 JSON via the destructive-read pattern, with a one-session `.md` fallback for backward compatibility
 
 ```
 
@@ -637,7 +664,7 @@ Append at the end of the file:
 
 ## Spec: FEAT-010 Dense Prompt Protocol Standard 2026-06-30
 
-Replace `session-snapshot.md` with SNAP v1: minified single-line JSON envelope (`v`, `sys{ph,c,s}`, `ops{n,f}`, `mem{d,x}`), validated by `scripts/snap-validate.mjs` (≤30 lines, exits 0/1, all stderr lines prefixed `SNAP_ERROR:` — single-tier prefix, no `SNAP_INVALID —` variant).
+Replace `session-snapshot.md` with SNAP v1: minified single-line JSON envelope (`v`, `sys{ph,c,s}`, `ops{n,f}`, `mem{d,x}`), validated by `scripts/snap-validate.mjs` (≤30 lines, exits 0/1, all stderr lines prefixed `SNAP_ERROR:`, single-tier prefix, no second `SNAP_INVALID` variant).
 - `/cc-compact` writes JSON; `/cc-implement` reads + deletes (destructive-read), one-session `.md` fallback removed in v1.18.0
 - 4096-char max file size; array caps `ops.n≤3 ops.f≤20 mem.d≤10 mem.x≤5`; per-element caps 200-300 chars
 - v2+ schema (`role`, `tk`, `scope`, `gate`, `p`) reserved for FEAT-011/012, not implemented here
@@ -647,8 +674,10 @@ Replace `session-snapshot.md` with SNAP v1: minified single-line JSON envelope (
 
 - [ ] **Step 2: Commit**
 
+`.claude/memory/project.md` falls under the blanket `.claude/` gitignore rule (not covered by the `!project-template/*` exception), so this requires `-f` like T-004, unlike T-003's `global/commands/cc-compact.md`, which does not.
+
 ```bash
-git add .claude/memory/project.md
+git add -f .claude/memory/project.md
 git commit -m "docs(FEAT-010): append spec summary to project.md"
 ```
 
@@ -656,8 +685,8 @@ git commit -m "docs(FEAT-010): append spec summary to project.md"
 
 ## Test List
 
-- [ ] `tests/unit/snap-validate.test.js` — 24 cases (T-002), validator unit/integration coverage
-- [ ] Full Vitest regression: `npx vitest run` — all 216 pre-existing + 24 new cases pass (T-006)
+- [ ] `tests/unit/snap-validate.test.js`: 33 cases (T-002), validator unit/integration coverage
+- [ ] Full Vitest regression: `npx vitest run`, all 216 pre-existing + 33 new cases pass (T-006)
 - [ ] Manual smoke test of `scripts/snap-validate.mjs` against a hand-written valid/invalid fixture (T-001 Step 3)
 - [ ] Manual diff confirming `.claude/commands/cc-implement.md` and `project-template/.claude/commands/cc-implement.md` stay byte-identical (T-005 Step 2)
 
@@ -668,7 +697,7 @@ T-001 → T-002 → T-003 → T-004 → T-005 → T-006 (gate, no commit) → T-
 ## Identified Risks
 
 - **30-line validator cap is tight.** The Step 1 draft in T-001 is dense by necessity; any future addition to the schema (a new key, a new cap) risks pushing past 30 lines. T-002's line-count test catches this immediately as a failing test, not a silent regression.
-- **Character-count fixture drift.** T-002's ≤85% assertion hardcodes the spec's canonical example (spec line 119) as both the SNAP and markdown fixture. If T-003's actual `/cc-compact` markdown-era format ever differed from this fixture's shape, the test would still pass (it's a frozen fixture, not a live `/cc-compact` invocation) — this is by design per the spec ("fixture is immutable") but means the test does not catch future drift in `/cc-compact`'s real output shape.
-- **SNAP v1's actual reduction (18.6% measured) is modest, not dramatic.** The schema's per-element overhead (JSON quote/comma punctuation) is comparable to markdown's per-line overhead (dash/newline), so adding more decisions/files doesn't meaningfully improve the ratio — it stays in the 78-81% range regardless of payload size (verified at tiny/typical/max-cap sizes during plan authoring). If a larger reduction is wanted later, it requires schema rework (flatter delimited encoding instead of JSON), which is explicitly out of scope for this plan.
-- **Live `~/.claude/commands/cc-compact.md` is outside git.** T-003 Step 2 updates it directly so this session's own `/cc-compact` runs use the new format immediately, but it is not part of any commit — a fresh `install.sh` run elsewhere would pull from `global/commands/cc-compact.md` (which T-003 Step 3 does commit), so the two stay in sync only if T-003 is executed as written.
-- **`.gitignore` runtime append (inside `/cc-compact`'s own logic) is unverified by this plan.** It is correct per spec but only exercised the first time someone actually runs the new `/cc-compact` against a real `.gitignore` — no automated test covers it, consistent with the spec's Out of Scope (no test infra changes mandated for command-body prose, only for `scripts/snap-validate.mjs`).
+- **Character-count fixture drift.** T-002's ≤85% assertion hardcodes the spec's canonical example (spec line 119) as both the SNAP and markdown fixture. If T-003's actual `/cc-compact` markdown-era format ever differed from this fixture's shape, the test would still pass (it's a frozen fixture, not a live `/cc-compact` invocation); this is by design per the spec ("fixture is immutable") but means the test does not catch future drift in `/cc-compact`'s real output shape.
+- **SNAP v1's actual reduction (18.6% measured) is modest, not dramatic.** The schema's per-element overhead (JSON quote/comma punctuation) is comparable to markdown's per-line overhead (dash/newline), so adding more decisions/files doesn't meaningfully improve the ratio: it stays in the 78-81% range regardless of payload size (verified at tiny/typical/max-cap sizes during plan authoring). If a larger reduction is wanted later, it requires schema rework (flatter delimited encoding instead of JSON), which is explicitly out of scope for this plan.
+- **Live `~/.claude/commands/cc-compact.md` is outside git.** T-003 Step 2 updates it directly so this session's own `/cc-compact` runs use the new format immediately, but it is not part of any commit; a fresh `install.sh` run elsewhere would pull from `global/commands/cc-compact.md` (which T-003 Step 3 does commit), so the two stay in sync only if T-003 is executed as written.
+- **`.gitignore` runtime append (inside `/cc-compact`'s own logic) is unverified by this plan.** It is correct per spec but only exercised the first time someone actually runs the new `/cc-compact` against a real `.gitignore`; no automated test covers it, consistent with the spec's Out of Scope (no test infra changes mandated for command-body prose, only for `scripts/snap-validate.mjs`).
