@@ -12,6 +12,7 @@ BRANCH="main"
 BASE_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
 GLOBAL_DIR="${HOME}/.claude"
 INSTALL_PROJECT=false
+PROJ_DIR=".claude"
 SKIP_DEPS=false
 FAILED_DEPS=()
 VERBOSITY="MIN"
@@ -1230,7 +1231,6 @@ if [ "$INSTALL_PROJECT" = true ]; then
   info "Installing project template into current directory..."
   echo ""
 
-  PROJ_DIR=".claude"
   mkdir -p "${PROJ_DIR}/commands" "${PROJ_DIR}/hooks" "${PROJ_DIR}/memory"
 
   if [ ! -f "CLAUDE.md" ]; then
@@ -1264,6 +1264,10 @@ if [ "$INSTALL_PROJECT" = true ]; then
 
   if [ "$_ds_skip" = false ]; then
     _ds_tmp=$(mktemp 2>/dev/null || echo "/tmp/detect-stack-$$.mjs")
+    case "$_ds_tmp" in
+      *.mjs) ;;
+      *) mv "$_ds_tmp" "${_ds_tmp}.mjs" 2>/dev/null && _ds_tmp="${_ds_tmp}.mjs" ;;
+    esac
     _ds_ok=false
     if curl -fsSL --max-time 10 "${BASE_URL}/scripts/detect-stack.mjs" -o "$_ds_tmp" 2>/dev/null && [ -s "$_ds_tmp" ]; then
       _ds_ok=true
