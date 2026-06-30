@@ -184,8 +184,14 @@ describe('snap-validate.mjs', () => {
     expect(r.stderr).toBe('SNAP_ERROR: malformed JSON\n')
   })
 
-  it('rejects non-object root (array)', () => {
-    const r = run(fixture('[1,2,3]'))
+  it.each([
+    ['array', '[1,2,3]'],
+    ['string', '"just a string"'],
+    ['number', '42'],
+    ['boolean', 'true'],
+    ['null', 'null'],
+  ])('rejects non-object root (%s)', (label, raw) => {
+    const r = run(fixture(raw))
     expect(r.status).toBe(1)
     expect(r.stderr).toBe('SNAP_ERROR: root must be a plain object\n')
   })
@@ -267,6 +273,13 @@ describe('snap-validate.mjs', () => {
     expect(r.stderr).toBe('SNAP_ERROR: empty element in mem.d[0]\n')
   })
 
+  it('rejects a null array element (caught by the same not-a-string check as empty strings)', () => {
+    const payload = { ...VALID, mem: { ...VALID.mem, d: [null] } }
+    const r = run(fixture(j(payload)))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: empty element in mem.d[0]\n')
+  })
+
   it('rejects extra top-level key', () => {
     const payload = { ...VALID, extra: true }
     const r = run(fixture(j(payload)))
@@ -286,6 +299,27 @@ describe('snap-validate.mjs', () => {
     const r = run(fixture(j(payload)))
     expect(r.status).toBe(1)
     expect(r.stderr).toBe('SNAP_ERROR: v must be a positive integer\n')
+  })
+
+  it('rejects v of 0', () => {
+    const payload = { ...VALID, v: 0 }
+    const r = run(fixture(j(payload)))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: v must be a positive integer\n')
+  })
+
+  it('rejects negative v', () => {
+    const payload = { ...VALID, v: -1 }
+    const r = run(fixture(j(payload)))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: v must be a positive integer\n')
+  })
+
+  it('rejects v at Number.MAX_SAFE_INTEGER as an unknown future version, not a crash', () => {
+    const payload = { ...VALID, v: Number.MAX_SAFE_INTEGER }
+    const r = run(fixture(j(payload)))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: SNAP_UNKNOWN_VERSION\n')
   })
 
   it('rejects non-hex sys.c', () => {
@@ -366,18 +400,18 @@ describe('snap-validate.mjs', () => {
 })
 ```
 
-This covers 35 cases (≥16 required): 24 single `it()` cases (including the EISDIR/directory-path case and the zero-`console.*` static check), the 3-case parent-block `it.each`, the 4-case type-mutation `it.each` (non-array ops.n/ops.f/mem.d/mem.x), and the 4-case array-cap `it.each`, including the 30-line guard and the character-count assertion using the spec's own frozen canonical example (line 119 of the design doc) as the SNAP fixture, paired with the markdown shape `/cc-compact` historically produced for the same logical payload.
+This covers 43 cases (≥16 required): 27 single `it()` cases (including the EISDIR/directory-path case, the null-array-element case, the v boundary cases (0, negative, `Number.MAX_SAFE_INTEGER`), and the zero-`console.*` static check), the 5-case primitive-root `it.each` (array/string/number/boolean/null), the 3-case parent-block `it.each`, the 4-case type-mutation `it.each` (non-array ops.n/ops.f/mem.d/mem.x), and the 4-case array-cap `it.each`, including the 30-line guard and the character-count assertion using the spec's own frozen canonical example (line 119 of the design doc) as the SNAP fixture, paired with the markdown shape `/cc-compact` historically produced for the same logical payload.
 
 - [ ] **Step 2: Run the new suite and confirm all cases pass**
 
 Run: `npx vitest run tests/unit/snap-validate.test.js`
-Expected: all tests pass (35/35). If the character-count assertion fails, recheck the markdown fixture against the exact format `/cc-compact` (T-003) emits: this is the same logical payload, not necessarily the exact format if T-003 wording diverges from the historical fixture.
+Expected: all tests pass (43/43). If the character-count assertion fails, recheck the markdown fixture against the exact format `/cc-compact` (T-003) emits: this is the same logical payload, not necessarily the exact format if T-003 wording diverges from the historical fixture.
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add tests/unit/snap-validate.test.js
-git commit -m "test(FEAT-010): add snap-validate.mjs test suite (35 cases)"
+git commit -m "test(FEAT-010): add snap-validate.mjs test suite (43 cases)"
 ```
 
 ---
@@ -537,7 +571,7 @@ git commit -m "feat(FEAT-010): mirror SNAP v1 /cc-implement update to project-te
 - [ ] **Step 1: Run the complete Vitest suite**
 
 Run: `npx vitest run`
-Expected: all 216 pre-existing tests plus the 35 new `snap-validate.test.js` cases pass (251 total), zero failures.
+Expected: all 216 pre-existing tests plus the 43 new `snap-validate.test.js` cases pass (259 total), zero failures.
 
 - [ ] **Step 2: If any pre-existing test fails, stop and report**
 
@@ -629,7 +663,9 @@ Use `Edit` with `old_string`: `  "version": "1.16.0",` and `new_string`: `  "ver
 
 Run: `npm install --package-lock-only`
 
-This regenerates the lockfile's root-package `version` field to match the new `package.json` value without touching `node_modules` or any dependency resolution. Verified empirically while writing this plan: `package-lock.json` does change after a version-only `package.json` bump (the root entries gain/update a `"version": "1.17.0"` field); without this step, `npm ci` in strict CI environments could fail on a lockfile-sync mismatch.
+This regenerates the lockfile's root-package `version` field to match the new `package.json` value without touching `node_modules` or any dependency resolution. Verified empirically while writing this plan (npm 11.x, lockfileVersion 3, the format already in this repo's committed lockfile): `package-lock.json` does change after a version-only `package.json` bump (the root entries gain/update a `"version": "1.17.0"` field); without this step, `npm ci` in strict CI environments could fail on a lockfile-sync mismatch.
+
+No specific npm version is mandated here, since pinning one in a markdown plan can't be enforced; instead, verify the *output* is scoped correctly: run `git diff package-lock.json` and confirm only `"version": "1.17.0"` lines changed (the root entries under `""` and at the top of the file). If the diff also touches unrelated dependency entries (different `resolved` URLs, `integrity` hashes, or added/removed transitive packages), that signals the local npm version produced a different dependency resolution than the one that generated the currently-committed lockfile; stop and re-run with a closer npm version rather than committing an unrelated dependency-tree change alongside a version bump.
 
 - [ ] **Step 3: Commit both files together**
 
@@ -654,7 +690,7 @@ Insert before the line `## [1.16.0] — 2026-06-26`:
 
 ### Added
 - `[FEAT-010]` `scripts/snap-validate.mjs`: ≤30-line dependency-free Node.js ≥18 validator for SNAP v1, the minified single-line JSON handoff format; exits 0/1 only, all errors prefixed `SNAP_ERROR:` on stderr
-- `[FEAT-010]` `tests/unit/snap-validate.test.js`: 35-case Vitest suite covering schema violations, array-type mutations, array/element caps, directory-as-path (EISDIR), line-count enforcement, a zero-console.* static check, and the >=15% character-reduction assertion against the legacy markdown format
+- `[FEAT-010]` `tests/unit/snap-validate.test.js`: 43-case Vitest suite covering schema violations, primitive/array-type mutations, version boundary values, array/element caps, directory-as-path (EISDIR), line-count enforcement, a zero-console.* static check, and the >=15% character-reduction assertion against the legacy markdown format
 
 ### Changed
 - `[FEAT-010]` `/cc-compact` (global command): now writes `.claude/memory/session-snapshot.json` (SNAP v1) instead of `session-snapshot.md`; idempotently gitignores the new file; deletes legacy `.md` on write
@@ -707,8 +743,8 @@ git commit -m "docs(FEAT-010): append spec summary to project.md"
 
 ## Test List
 
-- [ ] `tests/unit/snap-validate.test.js`: 35 cases (T-002), validator unit/integration coverage
-- [ ] Full Vitest regression: `npx vitest run`, all 216 pre-existing + 35 new cases pass (T-006)
+- [ ] `tests/unit/snap-validate.test.js`: 43 cases (T-002), validator unit/integration coverage
+- [ ] Full Vitest regression: `npx vitest run`, all 216 pre-existing + 43 new cases pass (T-006)
 - [ ] Manual smoke test of `scripts/snap-validate.mjs` against a hand-written valid/invalid fixture (T-001 Step 3)
 - [ ] Manual diff confirming `.claude/commands/cc-implement.md` and `project-template/.claude/commands/cc-implement.md` stay byte-identical (T-005 Step 2)
 
