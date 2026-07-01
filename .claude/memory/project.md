@@ -261,3 +261,12 @@ SNAP v1 — minified single-line JSON handoff replacing `session-snapshot.md`; �
 - `/cc-compact` writes JSON + idempotent `.gitignore` append; `/cc-implement` validates-then-deletes (step 8); `.md` fallback one session only (removed v1.18.0)
 - Spec: `docs/superpowers/specs/2026-06-26-feat010-dense-prompt-protocol-design.md`
 - Complexity: M; target version: 1.17.0
+
+## Spec: FEAT-010 Dense Prompt Protocol Standard 2026-06-30
+
+Replace `session-snapshot.md` with SNAP v1: minified single-line JSON envelope (`v`, `sys{ph,c,s}`, `ops{n,f}`, `mem{d,x}`), validated by `scripts/snap-validate.mjs` (≤30 lines, exits 0/1, all stderr lines prefixed `SNAP_ERROR:`, single-tier prefix, no second `SNAP_INVALID` variant).
+- `/cc-compact` writes JSON; `/cc-implement` reads + deletes (destructive-read), one-session `.md` fallback removed in v1.18.0
+- 4096-char max file size; array caps `ops.n≤3 ops.f≤20 mem.d≤10 mem.x≤5`; per-element caps 200-300 chars
+- v2+ schema (`role`, `tk`, `scope`, `gate`, `p`) reserved for FEAT-011/012, not implemented here
+- Spec: `docs/superpowers/specs/2026-06-26-feat010-dense-prompt-protocol-design.md`
+- Complexity: M
