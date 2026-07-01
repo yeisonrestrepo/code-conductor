@@ -15,6 +15,7 @@ AI coding assistants are only as good as the structure you put around them. With
 | Conventions reset every session | Stack profile + memory loaded at session start |
 | Frontend code with no UX consideration | UI/UX skill activated automatically for frontend stacks |
 | Manual CLAUDE.md with `<command>` placeholders | **Stack auto-detection** — `install.sh --project` reads your `package.json`, `go.mod`, `Cargo.toml`, etc. and auto-fills CLAUDE.md Development Commands so the agent never guesses your build/test/lint commands |
+| Verbose markdown handoffs eat context | **SNAP v1**: minified single-line JSON handoff format, schema-validated by `scripts/snap-validate.mjs`, ≥15% smaller than the markdown snapshot it replaces |
 
 ---
 
