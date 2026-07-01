@@ -30,7 +30,7 @@
 **Interfaces:**
 - Produces: a CLI script invoked as `node scripts/snap-validate.mjs <path>`. No exports (not imported by tests: tests spawn it as a subprocess). Exit 0 on valid SNAP v1 JSON; exit 1 with `SNAP_ERROR: <message>` on stderr for any violation.
 
-- [ ] **Step 1: Write the validator**
+- [X] **Step 1: Write the validator**
 
 ```js
 import { readFileSync } from 'node:fs';
@@ -67,7 +67,7 @@ process.exit(0);
 
 No shebang, no `chmod +x`: invocation is always explicit `node scripts/snap-validate.mjs <path>`. This exact text (including the `Array.isArray()` guard on each of the four array fields, which prevents a non-array `ops.n`/`ops.f`/`mem.d`/`mem.x` value from reaching `.length`/`.forEach` and crashing with an uncaught native error) was written to a scratch file and verified during plan authoring: `node -c` confirmed valid syntax, a cross-platform line count (Step 2) reported exactly **30**, and a fixture battery covering valid payload, empty/malformed/array-root, missing block, bad ph case, v=2, lowercase action code, backslash path, bad sys.c/sys.s, array-cap overflow, empty element, extra key, float v, no-arg, nonexistent file, and non-array `ops.n` (string/number/object/null) all produced the exact stderr strings and exit codes specified below. Copy it verbatim rather than re-deriving it: further "simplification" risks exceeding the line cap again (an earlier, more readable draft of the same logic ran to 50 lines).
 
-- [ ] **Step 2: Count non-blank, non-comment lines and confirm ≤30**
+- [X] **Step 2: Count non-blank, non-comment lines and confirm ≤30**
 
 Run (cross-platform, no shell-specific flags, same Node already required by the project):
 ```bash
@@ -75,7 +75,7 @@ node -e "const s=require('fs').readFileSync('scripts/snap-validate.mjs','utf8').
 ```
 Expected: `30`. If it differs because the file was retyped instead of copied verbatim, diff against this plan's code block before changing any logic.
 
-- [ ] **Step 3: Smoke-test manually**
+- [X] **Step 3: Smoke-test manually**
 
 Use `tests/.tmp/` (the project's existing repo-relative scratch directory, already in `.gitignore`, already used the same way by `tests/hooks/guard3.test.js`) instead of the OS global temp directory: it's a stable relative path that behaves identically on every platform, unlike `/tmp/`, which does not exist on native Windows.
 
@@ -89,7 +89,7 @@ node scripts/snap-validate.mjs tests/.tmp/does-not-exist.json; echo "exit=$?"
 The `trap ... EXIT` guarantees `tests/.tmp/snap-ok.json` is removed when this shell exits, regardless of which command above fails or what its exit code is (no reliance on reaching an unconditional `rm` line at the end).
 Expected: first invocation prints nothing, `exit=0`; second prints `SNAP_ERROR: file not found` to stderr, `exit=1`.
 
-- [ ] **Step 4: Re-run the smoke battery against the type-mutation cases**
+- [X] **Step 4: Re-run the smoke battery against the type-mutation cases**
 
 ```bash
 trap 'rm -f tests/.tmp/snap-bad.json' EXIT
@@ -98,7 +98,7 @@ node scripts/snap-validate.mjs tests/.tmp/snap-bad.json; echo "exit=$?"
 ```
 Expected: `SNAP_ERROR: ops.n must be an array` on stderr, `exit=1` (not an uncaught `TypeError` crash). The `trap` again guarantees cleanup even though this command is expected to exit 1.
 
-- [ ] **Step 5: Commit**
+- [X] **Step 5: Commit**
 
 ```bash
 git add scripts/snap-validate.mjs
@@ -115,7 +115,7 @@ git commit -m "feat(FEAT-010): add scripts/snap-validate.mjs SNAP v1 validator"
 **Interfaces:**
 - Consumes: `scripts/snap-validate.mjs` (T-001) as a subprocess via `spawnSync('node', [VALIDATOR_PATH, fixturePath])`, mirroring the `spawnSync` pattern already used in `tests/hooks/context-guard.test.js`.
 
-- [ ] **Step 1: Write the test file**
+- [X] **Step 1: Write the test file**
 
 ```js
 import { describe, it, expect, afterEach } from 'vitest'
@@ -405,12 +405,12 @@ describe('snap-validate.mjs', () => {
 
 This covers 43 cases (≥16 required): 27 single `it()` cases (including the EISDIR/directory-path case, the null-array-element case, the v boundary cases (0, negative, `Number.MAX_SAFE_INTEGER`), and the zero-`console.*` static check), the 5-case primitive-root `it.each` (array/string/number/boolean/null), the 3-case parent-block `it.each`, the 4-case type-mutation `it.each` (non-array ops.n/ops.f/mem.d/mem.x), and the 4-case array-cap `it.each`, including the 30-line guard and the character-count assertion using the spec's own frozen canonical example (line 119 of the design doc) as the SNAP fixture, paired with the markdown shape `/cc-compact` historically produced for the same logical payload.
 
-- [ ] **Step 2: Run the new suite and confirm all cases pass**
+- [X] **Step 2: Run the new suite and confirm all cases pass**
 
 Run: `npx vitest run tests/unit/snap-validate.test.js`
 Expected: all tests pass (43/43). If the character-count assertion fails, recheck the markdown fixture against the exact format `/cc-compact` (T-003) emits: this is the same logical payload, not necessarily the exact format if T-003 wording diverges from the historical fixture.
 
-- [ ] **Step 3: Commit**
+- [X] **Step 3: Commit**
 
 ```bash
 git add tests/unit/snap-validate.test.js
@@ -428,7 +428,7 @@ git commit -m "test(FEAT-010): add snap-validate.mjs test suite (43 cases)"
 **Interfaces:**
 - Produces: `.claude/memory/session-snapshot.json`, a single-line file matching the schema validated by T-001's `scripts/snap-validate.mjs`. Read by T-004/T-005 (`/cc-implement`).
 
-- [ ] **Step 1: Write the new command body**
+- [X] **Step 1: Write the new command body**
 
 ```markdown
 ---
@@ -463,11 +463,11 @@ Once the snapshot is written successfully, output exactly:
 > Snapshot written. Run `/compact` now to clear history.
 ```
 
-- [ ] **Step 2: Apply identically to both files**
+- [X] **Step 2: Apply identically to both files**
 
 Resolve the actual home directory first, since file-write tools require a literal absolute path and cannot expand `$HOME`/`~` themselves: run `echo $HOME` (Unix/macOS) or `echo $env:USERPROFILE` (Windows PowerShell) via the shell, or equivalently `node -e "console.log(require('os').homedir())"` (cross-platform, no shell-specific syntax). Use that resolved path to construct `<home>/.claude/commands/cc-compact.md`. Write the Step 1 content to `global/commands/cc-compact.md`, then write the exact same content to the resolved live-copy path.
 
-- [ ] **Step 3: Commit the repo-tracked copy**
+- [X] **Step 3: Commit the repo-tracked copy**
 
 `global/commands/cc-compact.md` is not covered by any `.gitignore` rule (`.claude/` and `docs/` are ignored; `global/` is not), so a plain `git add` is sufficient here, unlike T-004/T-008/T-012 which touch paths under `.claude/`.
 
@@ -488,7 +488,7 @@ git commit -m "feat(FEAT-010): rewrite /cc-compact to emit SNAP v1 JSON instead 
 **Interfaces:**
 - Consumes: `.claude/memory/session-snapshot.json` written by T-003, validated by `scripts/snap-validate.mjs` (T-001).
 
-- [ ] **Step 1: Replace the two Phase entry sections**
+- [X] **Step 1: Replace the two Phase entry sections**
 
 Replace the existing `## Phase entry - Handoff enforcement` and `## Phase entry - Destructive Read Invariant` sections (everything from `## Phase entry - Handoff enforcement` through the line `If the file cannot be deleted after reading, report the error and halt.` followed by `---`) with:
 
@@ -526,13 +526,13 @@ Before doing anything else, perform this blocking check:
 ---
 ```
 
-- [ ] **Step 2: Verify the rest of the file is untouched**
+- [X] **Step 2: Verify the rest of the file is untouched**
 
 Run two checks:
 1. `grep -c "Surgical Plan State Ritual" .claude/commands/cc-implement.md`: expect exactly `1` (not zero, not duplicated).
 2. `wc -l .claude/commands/cc-implement.md`: expect exactly `144` (the file was 138 lines before this edit; the replacement block is 31 lines versus the 25 lines it replaces, a net +6, giving 138 + 6 = 144). If the count differs, the edit touched more or less than the intended Phase entry span; diff against this plan's Step 1 block before proceeding, do not guess at which extra lines changed.
 
-- [ ] **Step 3: Commit**
+- [X] **Step 3: Commit**
 
 ```bash
 git add -f .claude/commands/cc-implement.md
@@ -549,16 +549,16 @@ git commit -m "feat(FEAT-010): /cc-implement reads SNAP v1 JSON with one-session
 **Interfaces:**
 - None beyond T-004: this is the distributable template consumed by `install.sh --project` for other repositories.
 
-- [ ] **Step 1: Apply the identical replacement from T-004 Step 1**
+- [X] **Step 1: Apply the identical replacement from T-004 Step 1**
 
 Replace the same two Phase entry sections with the identical block used in T-004.
 
-- [ ] **Step 2: Diff against the live copy to confirm exact parity**
+- [X] **Step 2: Diff against the live copy to confirm exact parity**
 
 Run: `diff .claude/commands/cc-implement.md project-template/.claude/commands/cc-implement.md`
 Expected: no output (files identical).
 
-- [ ] **Step 3: Commit**
+- [X] **Step 3: Commit**
 
 ```bash
 git add project-template/.claude/commands/cc-implement.md
@@ -571,12 +571,12 @@ git commit -m "feat(FEAT-010): mirror SNAP v1 /cc-implement update to project-te
 
 **Files:** none (verification only)
 
-- [ ] **Step 1: Run the complete Vitest suite**
+- [X] **Step 1: Run the complete Vitest suite**
 
 Run: `npx vitest run`
 Expected: all 216 pre-existing tests plus the 43 new `snap-validate.test.js` cases pass (259 total), zero failures.
 
-- [ ] **Step 2: If any pre-existing test fails, stop and report**
+- [X] **Step 2: If any pre-existing test fails, stop and report**
 
 Do not proceed to T-007 until the full suite is green; this task has no commit step, it's a gate.
 
@@ -589,7 +589,7 @@ Do not proceed to T-007 until the full suite is green; this task has no commit s
 
 **Interfaces:** none; documentation only.
 
-- [ ] **Step 1: Add the row**
+- [X] **Step 1: Add the row**
 
 Add as a new row after line 17 (`| Manual CLAUDE.md with...`):
 
@@ -597,7 +597,7 @@ Add as a new row after line 17 (`| Manual CLAUDE.md with...`):
 | Verbose markdown handoffs eat context | **SNAP v1**: minified single-line JSON handoff format, schema-validated by `scripts/snap-validate.mjs`, ≥15% smaller than the markdown snapshot it replaces |
 ```
 
-- [ ] **Step 2: Commit**
+- [X] **Step 2: Commit**
 
 ```bash
 git add README.md
@@ -613,16 +613,16 @@ git commit -m "docs(FEAT-010): add SNAP v1 row to README comparison table"
 
 **Interfaces:** none.
 
-- [ ] **Step 1: Pre-check uniqueness**
+- [X] **Step 1: Pre-check uniqueness**
 
 Run: `grep -c '\[FEAT-010\]' "AGENT-READABLE BACKLOG.md"`
 Expected: `1` (BUG-003 invariant: confirm singular match before editing).
 
-- [ ] **Step 2: Surgical single-line edit**
+- [X] **Step 2: Surgical single-line edit**
 
 Use `Edit` with `old_string`: `### [ ] \`[FEAT-010]\` Dense Prompt Protocol Standard` and `new_string`: `### [X] \`[FEAT-010]\` Dense Prompt Protocol Standard`.
 
-- [ ] **Step 3: Commit**
+- [X] **Step 3: Commit**
 
 ```bash
 git add "AGENT-READABLE BACKLOG.md"
@@ -636,11 +636,11 @@ git commit -m "chore(FEAT-010): mark Dense Prompt Protocol Standard complete"
 **Files:**
 - Modify: `VERSION`
 
-- [ ] **Step 1: Write the new version**
+- [X] **Step 1: Write the new version**
 
 Replace file contents with exactly: `1.17.0`
 
-- [ ] **Step 2: Commit**
+- [X] **Step 2: Commit**
 
 ```bash
 git add VERSION
@@ -658,11 +658,11 @@ git commit -m "chore: bump VERSION to 1.17.0"
 **Interfaces:**
 - Consumes: must match `VERSION` from T-009 (`1.17.0`), kept synchronized per project convention.
 
-- [ ] **Step 1: Surgical single-line edit**
+- [X] **Step 1: Surgical single-line edit**
 
 Use `Edit` with `old_string`: `  "version": "1.16.0",` and `new_string`: `  "version": "1.17.0",`.
 
-- [ ] **Step 2: Sync `package-lock.json`**
+- [X] **Step 2: Sync `package-lock.json`**
 
 Run: `npm install --package-lock-only`
 
@@ -670,7 +670,7 @@ This regenerates the lockfile's root-package `version` field to match the new `p
 
 No specific npm version is mandated here, since pinning one in a markdown plan can't be enforced; instead, verify the *output* is scoped correctly: run `git diff package-lock.json` and confirm only `"version": "1.17.0"` lines changed (the root entries under `""` and at the top of the file). If the diff also touches unrelated dependency entries (different `resolved` URLs, `integrity` hashes, or added/removed transitive packages), that signals the local npm version produced a different dependency resolution than the one that generated the currently-committed lockfile; stop and re-run with a closer npm version rather than committing an unrelated dependency-tree change alongside a version bump.
 
-- [ ] **Step 3: Commit both files together**
+- [X] **Step 3: Commit both files together**
 
 ```bash
 git add package.json package-lock.json
@@ -684,7 +684,7 @@ git commit -m "chore: bump package.json version to 1.17.0"
 **Files:**
 - Modify: `CHANGELOG.md` (insert new top section before the existing `## [1.16.0]` entry)
 
-- [ ] **Step 1: Insert the new entry**
+- [X] **Step 1: Insert the new entry**
 
 Insert before the line `## [1.16.0] — 2026-06-26`:
 
@@ -701,7 +701,7 @@ Insert before the line `## [1.16.0] — 2026-06-26`:
 
 ```
 
-- [ ] **Step 2: Commit**
+- [X] **Step 2: Commit**
 
 ```bash
 git add CHANGELOG.md
@@ -717,7 +717,7 @@ git commit -m "docs: add CHANGELOG entry for v1.17.0 (FEAT-010)"
 
 **Interfaces:** none.
 
-- [ ] **Step 1: Append the spec summary**
+- [X] **Step 1: Append the spec summary**
 
 Append at the end of the file:
 
@@ -733,7 +733,7 @@ Replace `session-snapshot.md` with SNAP v1: minified single-line JSON envelope (
 - Complexity: M
 ```
 
-- [ ] **Step 2: Commit**
+- [X] **Step 2: Commit**
 
 `.claude/memory/project.md` falls under the blanket `.claude/` gitignore rule (not covered by the `!project-template/*` exception), so this requires `-f` like T-004, unlike T-003's `global/commands/cc-compact.md`, which does not.
 
@@ -746,10 +746,10 @@ git commit -m "docs(FEAT-010): append spec summary to project.md"
 
 ## Test List
 
-- [ ] `tests/unit/snap-validate.test.js`: 43 cases (T-002), validator unit/integration coverage
-- [ ] Full Vitest regression: `npx vitest run`, all 216 pre-existing + 43 new cases pass (T-006)
-- [ ] Manual smoke test of `scripts/snap-validate.mjs` against a hand-written valid/invalid fixture (T-001 Step 3)
-- [ ] Manual diff confirming `.claude/commands/cc-implement.md` and `project-template/.claude/commands/cc-implement.md` stay byte-identical (T-005 Step 2)
+- [X] `tests/unit/snap-validate.test.js`: 43 cases (T-002), validator unit/integration coverage
+- [X] Full Vitest regression: `npx vitest run`, all 216 pre-existing + 43 new cases pass (T-006)
+- [X] Manual smoke test of `scripts/snap-validate.mjs` against a hand-written valid/invalid fixture (T-001 Step 3)
+- [X] Manual diff confirming `.claude/commands/cc-implement.md` and `project-template/.claude/commands/cc-implement.md` stay byte-identical (T-005 Step 2)
 
 ## Commit Order
 

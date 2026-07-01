@@ -19,6 +19,16 @@ Read `CLAUDE.md`. Extract:
 
 Use `—` for any missing fields.
 
+**Auto-fill blank command fields (BUG-015):** After reading the identity fields, check if any of `Build`, `Test`, `Lint`, `Format`, `Setup` in CLAUDE.md are still `<command>` (any case) or blank after the colon. If at least one is blank AND `scripts/detect-stack.mjs` exists at `$PWD`:
+
+1. Run `node scripts/detect-stack.mjs "$PWD"` and capture the JSON output.
+2. For each blank/placeholder command field, if the JSON contains a matching key (`build`, `test`, `lint`, `format`, `setup`), replace the placeholder with the detected value using a single `Edit` call.
+3. Never overwrite a field that already contains a non-placeholder value.
+4. If all five fields are already populated, or if `scripts/detect-stack.mjs` does not exist, skip this step silently.
+5. If the JSON is `{}` or node exits non-zero, skip silently.
+
+Re-read the updated CLAUDE.md fields after this step so the session resume report reflects the filled values.
+
 ## Step 3 — Read project memory
 
 Read `.claude/memory/project.md`.
