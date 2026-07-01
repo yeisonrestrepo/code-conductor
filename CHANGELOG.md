@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.17.0] - 2026-06-30
+
+### Added
+- `[FEAT-010]` `scripts/snap-validate.mjs`: ≤30-line dependency-free Node.js ≥18 validator for SNAP v1, the minified single-line JSON handoff format; exits 0/1 only, all errors prefixed `SNAP_ERROR:` on stderr
+- `[FEAT-010]` `tests/unit/snap-validate.test.js`: 43-case Vitest suite covering schema violations, primitive/array-type mutations, version boundary values, array/element caps, directory-as-path (EISDIR), line-count enforcement, a zero-console.* static check, and the >=15% character-reduction assertion against the legacy markdown format
+
+### Changed
+- `[FEAT-010]` `/cc-compact` (global command): now writes `.claude/memory/session-snapshot.json` (SNAP v1) instead of `session-snapshot.md`; idempotently gitignores the new file; deletes legacy `.md` on write
+- `[FEAT-010]` `/cc-implement` (project command, both `.claude/commands/` and `project-template/.claude/commands/`): Phase entry now validates and reads SNAP v1 JSON via the destructive-read pattern, with a one-session `.md` fallback for backward compatibility
+
 ## [1.16.0] — 2026-06-26
 
 ### Added
