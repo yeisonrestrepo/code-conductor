@@ -13,18 +13,24 @@ Before doing anything else, perform this blocking check:
 
    Do not start any implementation tasks. Enter standby. Wait for the user to confirm `/compact` has been run before continuing.
 
-3. If turn count ≤ 5 AND `.claude/memory/session-snapshot.md` exists, proceed to the Destructive Read Invariant below.
-4. If turn count ≤ 5 AND `.claude/memory/session-snapshot.md` is absent, skip the Destructive Read Invariant and proceed directly - no snapshot context available (read-if-present fallback).
+3. If turn count ≤ 5, proceed to the Destructive Read Invariant below.
 
 ## Phase entry - Destructive Read Invariant
 
-Applies only when snapshot exists (step 3 above).
-
-1. Read `.claude/memory/session-snapshot.md` into context.
-2. Delete the file immediately.
-3. Use the snapshot contents as the starting context for this phase.
-
-If the file cannot be deleted after reading, report the error and halt.
+1. Resolve the repository root via `git rev-parse --show-toplevel`. If `git` is not found in PATH, or the command exits non-zero, halt immediately with `REPO_ROOT_FAILED: cannot determine repository root` and exit with code 3.
+2. If `<repo-root>/.claude/memory/session-snapshot.json` exists:
+   a. Attempt to read its full contents into context (do not delete yet). If this read fails for any reason other than the file not existing (permission denied, I/O error, or other filesystem-level corruption; the existence check above already ruled out "missing"), halt immediately with `SNAP_READ_FAILED: <brief reason, e.g. permission denied>` and leave the file on disk for manual inspection. Do not proceed to invoke the validator on a file the orchestrator itself could not read.
+   b. If `<repo-root>/.claude/memory/session-snapshot.md` also exists, delete it now without reading it: `.json` takes precedence over `.md` whenever both are present.
+   c. Invoke `node "<repo-root>/scripts/snap-validate.mjs" "<repo-root>/.claude/memory/session-snapshot.json"`, capturing both its exit code and its stderr text.
+   d. If `node` cannot be found or fails to launch, halt with `NODE_NOT_FOUND: node binary not found in PATH` and exit with code 2.
+   e. If the validator exits 1: if its stderr is exactly `SNAP_ERROR: SNAP_UNKNOWN_VERSION` (with trailing newline), halt with `SNAP_UNKNOWN_VERSION` (the payload is structurally fine but declares a schema version this reader does not know); for any other stderr content, halt with `SNAP_INVALID`. Either way, leave the file on disk for manual inspection and do not proceed.
+   f. If the validator exits 0: bind context variables: phase from `sys.ph`, commit from `sys.c`, decisions from `mem.d`, constraints from `mem.x`, next steps from `ops.n`, files from `ops.f`, spec stem from `sys.s`. If `sys.s` is `"none"`, treat spec reference as absent. (Exit 0 already guarantees `v === 1`, since the validator itself rejects any other value before returning success: no separate version check is needed here.)
+   g. Only after all context variables are bound: delete `session-snapshot.json`. If deletion fails (permission or lock error), log a non-fatal warning to stderr and continue: context is already bound.
+3. Else if `<repo-root>/.claude/memory/session-snapshot.md` exists (legacy fallback, one session only):
+   a. Emit to stderr: `[WARN] session-snapshot.md detected: SNAP v1 JSON not found; falling back to legacy format. Update /cc-compact to write SNAP v1 JSON.`
+   b. Read its full contents into context using the existing markdown extraction logic.
+   c. Once all context variables are bound, delete `session-snapshot.md`. If deletion fails, log a non-fatal warning and continue.
+4. Else: no snapshot context available; proceed directly (read-if-present fallback, existing behavior unchanged).
 
 ---
 
