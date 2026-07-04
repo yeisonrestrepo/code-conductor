@@ -270,3 +270,14 @@ Replace `session-snapshot.md` with SNAP v1: minified single-line JSON envelope (
 - v2+ schema (`role`, `tk`, `scope`, `gate`, `p`) reserved for FEAT-011/012, not implemented here
 - Spec: `docs/superpowers/specs/2026-06-26-feat010-dense-prompt-protocol-design.md`
 - Complexity: M
+
+## Spec: FEAT-013 Dynamic Stack Discovery 2026-07-04
+
+Retire static `stack-profiles/` (18 files); rewire `/cc-stack` to invoke existing `detect-stack.mjs` and write detected stack + commands + an agent-generated ruleset into the project `CLAUDE.md` (not project.md — CLAUDE.md is the only file CC loads at runtime, per BUG-020). Detector-only: no static rulesets shipped; ruleset synthesized on the fly per detected stack.
+- SQLite sink (FEAT-005 AC) deferred → CLAUDE.md is persistence sink until FEAT-005 lands; no rework expected
+- Reuses BUG-015 CLAUDE.md fill machinery; surgical section/field edits only (BUG-003 invariant)
+- Removes profile downloads from install.sh/install.ps1; removes Stack Profiles section + File Structure block from README
+- Release closeout (final, gated behind green suite): VERSION + package.json → 1.18.0, README revision, CHANGELOG [1.18.0] entry tagged [FEAT-013]
+- Reconcile /cc-stack write path with /cc-init + /cc-resume (both already fill CLAUDE.md via detect-stack) in /cc-plan
+- Spec: `docs/superpowers/specs/2026-07-04-feat013-dynamic-stack-discovery-design.md`
+- Complexity: S–M; target version 1.18.0
