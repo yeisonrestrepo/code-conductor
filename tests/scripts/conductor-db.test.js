@@ -358,3 +358,32 @@ describe.skipIf(!HAS_SQLITE)('conductor-db corrupt-db recovery', () => {
     }
   });
 });
+
+describe.skipIf(!HAS_SQLITE)('conductor-db non-regular file at db path', () => {
+  const conductorDir = () => join(repo, '.conductor');
+  const dbPath = () => join(conductorDir(), 'cache.db');
+
+  it('renames a directory-at-path aside (never rm -r) and creates a fresh db', async () => {
+    mkdirSync(dbPath(), { recursive: true });                  // cache.db is a DIRECTORY
+    writeFileSync(join(dbPath(), 'keep.txt'), 'sentinel');     // proves no rm -r
+    const r = runDb(['record', 'plan.md', 'T-001', 'X'], { cwd: repo });
+    expect(r.status).toBe(0);
+
+    const moved = readdirSync(conductorDir()).filter((f) => f.startsWith('cache.db.corrupt.'));
+    expect(moved).toHaveLength(1);
+    expect(existsSync(join(conductorDir(), moved[0], 'keep.txt'))).toBe(true);   // contents survived the move
+    const rows = await readRows(dbPath());                      // cache.db is now a real db
+    expect(rows).toHaveLength(1);
+  });
+
+  it('moves a .conductor squatting FILE aside and creates the directory', async () => {
+    writeFileSync(conductorDir(), 'i am a file, not a directory');   // .conductor is a regular file
+    const r = runDb(['record', 'plan.md', 'T-001', 'X'], { cwd: repo });
+    expect(r.status).toBe(0);
+    // The squatting file was renamed aside (never deleted); .conductor is now a dir.
+    const moved = readdirSync(repo).filter((f) => f.startsWith('.conductor.corrupt.'));
+    expect(moved).toHaveLength(1);
+    const rows = await readRows(dbPath());                            // fresh db created inside the new dir
+    expect(rows).toHaveLength(1);
+  });
+});

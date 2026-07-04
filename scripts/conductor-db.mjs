@@ -167,6 +167,14 @@ function isCorruptionError(e) {
 }
 
 function openReady(DatabaseSync, dbPath) {
+  // A directory or other non-regular file squatting the db path: move it aside
+  // (its contents travel with the rename) — never recursively delete it.
+  try {
+    if (!statSync(dbPath).isFile()) {
+      if (!backupAside(dbPath)) return null;
+    }
+  } catch { /* ENOENT: nothing there yet — normal first run */ }
+
   let db;
   try {
     db = openConn(DatabaseSync, dbPath);
