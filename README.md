@@ -67,7 +67,7 @@ code-conductor operates at three layers:
 
 **Project template** (`.claude/`) — lives in your repo and is shared with your team via git. Adds project-specific slash commands, hooks that guard file writes, and a shared memory file for decisions, conventions, and technical debt.
 
-**Dynamic profiles + skills** — loaded at session start by `/cc-stack` based on your detected framework. Each profile defines naming conventions, project structure, standard tooling, idiomatic patterns, and anti-patterns for your specific stack. Skills extend the agent's behavior for cross-cutting concerns like code simplicity and UI/UX.
+**Dynamic stack discovery + skills** — `/cc-stack` runs the bundled `detect-stack.mjs` scanner and writes your detected build/test/lint/format commands plus a concise, generated ruleset straight into your project `CLAUDE.md`. Skills extend the agent's behavior for cross-cutting concerns like code simplicity and UI/UX.
 
 ---
 
@@ -80,7 +80,7 @@ All commands are tagged `(Conductor)` in the Claude Code command palette so they
 | Command | Description |
 |---------|-------------|
 | `/cc-checkpoint` | Read the current session, extract decisions, conventions, and debt, then write them to `project.md` and `personal.md` with a timestamp. Run before `/compact`, after completing a feature, and after key architectural decisions. |
-| `/cc-stack` | Scan manifest files to detect your framework, confirm before loading the matching profile, and cache the result in `project.md` to avoid re-detection next session. |
+| `/cc-stack` | Run the dynamic detector to identify your framework and write the detected commands and a generated ruleset into your project `CLAUDE.md`. |
 | `/cc-lang [code]` | Switch response language for this session. Code identifiers, filenames, and commit messages remain English regardless. |
 
 ### Project (requires `--project` install)
@@ -117,7 +117,7 @@ Applied to every piece of code written or reviewed in every session. Enforces:
 
 ### ui-ux-pro-max — frontend projects
 
-Activated automatically when `/cc-stack` loads a frontend stack profile (React, Angular, Next.js, and similar). Installed from [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) — the installer downloads it directly from GitHub. Enforces visual hierarchy, spacing grids, semantic color tokens, component states, WCAG AA accessibility, and framework-specific UI conventions.
+Activated automatically when `/cc-stack` detects a frontend stack (React, Angular, Next.js, and similar). Installed from [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) — the installer downloads it directly from GitHub. Enforces visual hierarchy, spacing grids, semantic color tokens, component states, WCAG AA accessibility, and framework-specific UI conventions.
 
 ### critical-review — always active during implementation
 
@@ -193,31 +193,6 @@ The global hook defers to a project-level hook if one exists (upward traversal f
 
 ---
 
-## Stack Profiles
-
-Running `/cc-stack` detects your framework from manifest files and loads the matching profile. Each profile defines naming conventions, standard project structure, tooling, idiomatic patterns with examples, and anti-patterns — so the agent never applies Python conventions to a TypeScript file.
-
-| Profile | Detected by |
-|---------|-------------|
-| `javascript` | `package.json` (no TypeScript) |
-| `typescript` | `tsconfig.json` |
-| `python` | `requirements.txt`, `pyproject.toml` |
-| `java` | `pom.xml`, `build.gradle` |
-| `go` | `go.mod` |
-| `rust` | `Cargo.toml` |
-| `react` | `package.json` with `react` dependency but no `next` |
-| `angular` | `angular.json` |
-| `nextjs` | `next.config.js` / `next.config.ts` |
-| `nestjs` | `package.json` → `@nestjs/core` |
-| `django` | `manage.py` + `django` in deps |
-| `flask` | `flask` in deps |
-| `flutter` (single package) | `pubspec.yaml` |
-| `flutter` (Melos monorepo) | `pubspec.yaml` + `melos.yaml` |
-| `react-native` (Bare) | `package.json` with `react-native` (no `expo`) |
-| `react-native` (Expo Managed) | `package.json` with `react-native` + `expo` |
-
----
-
 ## Memory Architecture
 
 ```
@@ -237,7 +212,7 @@ project-root/
 
 `/cc-checkpoint` writes to both. Run it before `/compact`, after completing a feature, and after any key architectural decision.
 
-`/cc-stack` reads `project.md` to skip re-detection on subsequent sessions.
+`/cc-stack` records the detected stack in your project `CLAUDE.md` (the `- Stack:` line and the `## Active Stack Profiles` block); on later sessions it asks whether anything changed before re-detecting.
 
 ---
 
@@ -297,22 +272,6 @@ code-conductor/
 │       │   └── post-compact.sh   Checkpoint reminder after `/compact`
 │       └── memory/
 │           └── project.md        Shared team memory (in git)
-├── stack-profiles/
-│   ├── _base.md
-│   ├── _multi-stack.md
-│   ├── _template.md
-│   ├── javascript.md
-│   ├── typescript.md
-│   ├── python.md
-│   ├── java.md
-│   ├── go.md
-│   ├── rust.md
-│   ├── react.md
-│   ├── angular.md
-│   ├── nextjs.md
-│   ├── nestjs.md
-│   ├── django.md
-│   └── flask.md
 └── skills/
     ├── code-simplifier.md        Always active — complexity and simplicity rules
     ├── critical-review.md        Always active — 4-phase adversarial review protocol
