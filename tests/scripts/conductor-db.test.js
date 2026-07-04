@@ -292,3 +292,22 @@ describe.skipIf(!HAS_SQLITE)('conductor-db root resolution fallbacks', () => {
     }
   });
 });
+
+describe.skipIf(!HAS_SQLITE)('conductor-db node:sqlite unavailable', () => {
+  const BLOCK = fileURLToPath(new URL('./fixtures/block-sqlite.mjs', import.meta.url));
+
+  it('exits 0 with exactly one CONDUCTOR_DB stderr line, nothing on stdout, no db', () => {
+    const r = spawnSync(process.execPath,
+      [...FLAG, '--import', BLOCK, SCRIPT, 'record', 'plan.md', 'T-001', 'X'],
+      { cwd: repo, encoding: 'utf8' });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toBe('');
+    expect(r.stderr.trim().split('\n')).toHaveLength(1);
+    expect(r.stderr).toContain('CONDUCTOR_DB:');
+    expect(r.stderr.toLowerCase()).toContain('node:sqlite');
+    // The intentional degradation message — distinguishes the handled branch from
+    // the generic `main().catch` "unexpected:" fallthrough (which also mentions node:sqlite).
+    expect(r.stderr).toContain('skipping cache write');
+    expect(existsSync(join(repo, '.conductor', 'cache.db'))).toBe(false);
+  });
+});

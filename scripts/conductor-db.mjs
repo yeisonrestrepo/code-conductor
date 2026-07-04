@@ -125,7 +125,13 @@ function upsert(db, planFile, taskId, state) {
 }
 
 async function withDb(root, fn) {
-  const { DatabaseSync } = await import('node:sqlite');
+  let DatabaseSync;
+  try {
+    ({ DatabaseSync } = await import('node:sqlite'));
+  } catch {
+    warn('node:sqlite unavailable, skipping cache write');
+    return;
+  }
   const dir = join(root, '.conductor');
   const dbPath = join(dir, 'cache.db');
   mkdirSync(dir, { recursive: true });
