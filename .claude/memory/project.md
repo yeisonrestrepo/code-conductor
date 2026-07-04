@@ -281,3 +281,27 @@ Retire static `stack-profiles/` (18 files); rewire `/cc-stack` to invoke existin
 - Reconcile /cc-stack write path with /cc-init + /cc-resume (both already fill CLAUDE.md via detect-stack) in /cc-plan
 - Spec: `docs/superpowers/specs/2026-07-04-feat013-dynamic-stack-discovery-design.md`
 - Complexity: S–M; target version 1.18.0
+- STATUS: shipped v1.18.0 (commit bec0990); backlog checkbox still `[ ]` — mark `[X]`
+
+## Spec: FEAT-005 SQLite Task-State Engine 2026-07-04
+
+New `scripts/conductor-db.mjs` (zero-dep ES module) wrapping built-in `node:sqlite` to own `.conductor/cache.db`; makes the `cc-implement` Step 6 hook (currently a no-op) live. TIGHT scope: engine + single `task_state` table only; sessions/raw_history/snapshots + git-hash time-travel + metadata caching deferred to ARCH-008. claude-mem already purged in BUG-020 (nothing to remove).
+- Schema v1: `task_state(plan_file, task_id, state CHECK IN (' ','>','X','!'), updated_at) WITHOUT ROWID`, PK `(plan_file, task_id)`, upsert; WAL mode; `user_version=1`; setup atomic via `BEGIN IMMEDIATE…COMMIT` (WAL set before txn)
+- `plan_file` normalized to repo-relative POSIX key (dedup across CWDs); args capped 512 chars (reject not truncate); empty/whitespace rejected; `updated_at`=runtime `toISOString()` (ms), not mtime
+- node:sqlite needs Node ≥22.5 → hook probes `node --version`, passes `--experimental-sqlite` only when ≥22.5; engines.node STAYS `>=20` (no bump), cache runtime-gated + self-disables below 22.5 (graceful degradation resolves the conflict)
+- Root resolution: git rev-parse → bounded `.git` walk (40-cap, stops at fs root) → script-dir fallback; `path.resolve`+`path.join` normalized
+- All failures non-fatal, exit 0, single `CONDUCTOR_DB:`-prefixed stderr line: absent node:sqlite, SQLITE_BUSY, corrupt db (rename aside colon-free `<ts>` + numeric collision suffix → unlink → give up), rename-fail ladder, non-regular-file at path (rename aside, never rm -r), `user_version>1` forward-compat no-write, CLI misuse; `db.close()` in finally
+- `init` + `record` silent on success (no stdout); `.conductor/` via `mkdirSync recursive`; `.gitignore` add `.conductor/`
+- Wiring: `cc-implement.md` Step 6 rewrite in BOTH mirrors (`.claude/commands/` + `project-template/.claude/commands/`, line 118-120); Vitest suite child-process (`spawnSync`) so `npm test` stays flag-free; temp dbs in os.tmpdir with `crypto.randomUUID()`, afterEach unlinks db+`-wal`+`-shm`; skips if runner Node lacks node:sqlite
+- Release closeout (gated, last): assert VERSION+package.json=1.18.0, bump both → 1.19.0, CHANGELOG [1.19.0] tagged [FEAT-005], date via `date +%F`
+- Spec: `docs/superpowers/specs/2026-07-04-feat005-sqlite-task-state-engine-design.md`
+- Complexity: M; target version 1.19.0
+
+## Plan: FEAT-005 SQLite Task-State Engine 2026-07-04
+
+APPROVED. 11 tasks (T-001..T-011), one commit each, strict TDD red→green; every post-T-001 commit leaves the suite green so the pre-commit gate passes without `--no-verify`.
+- T-001 skeleton (record happy path, schema v1, upsert, `.gitignore`); T-002 arg validation; T-003 CLI discipline; T-004 plan_file dedup pin; T-005 root-resolution fallbacks; T-006 absent-node:sqlite (via `--import` loader fixture); T-007 corrupt-db recovery + rename/unlink ladder + sidecar clear; T-008 non-regular-file-at-path + `.conductor`-as-file; T-009 user_version>1 forward-compat + table-exists self-heal; T-010 wire Step 6 both mirrors; T-011 release closeout 1.19.0 + backlog checkboxes.
+- Single-file engine `scripts/conductor-db.mjs`; all connections via `openConn` (busy_timeout=2000); WAL best-effort (non-WAL FS ok); atomic `BEGIN IMMEDIATE` setup (user_version transactional — empirically confirmed); every close guarded+single (openReady closes before rethrow/return-null); `PRAGMA wal_checkpoint(TRUNCATE)` before close.
+- Hook: no-flag-first→flag probe dispatch (unrecognized `--experimental-sqlite` contained in throwaway probe), `--no-warnings`, all 3 args double-quoted; `npm test` stays flag-free (spawnSync child adds flags).
+- All failures exit 0, one `CONDUCTOR_DB:` stderr line; stdout always empty; ENOSPC/EDQUOT/EROFS covered by withDb catch + top-level main catch.
+- Plan: `docs/superpowers/plans/2026-07-04-feat005-sqlite-task-state-engine.md`
