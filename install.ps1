@@ -393,7 +393,7 @@ Write-Host ""
 Write-Info "Installing global Claude files to $GLOBAL_DIR..."
 Write-Host ""
 
-foreach ($sub in "commands", "hooks", "memory", "skills", "stack-profiles") {
+foreach ($sub in "commands", "hooks", "memory", "skills") {
   New-Item -ItemType Directory -Path "$GLOBAL_DIR\$sub" -Force | Out-Null
 }
 
@@ -414,11 +414,6 @@ Save-RemoteFile "skills/critical-review.md"    "$GLOBAL_DIR\skills\critical-revi
 Save-RemoteFile "skills/verbosity.md"          "$GLOBAL_DIR\skills\verbosity.md"
 Save-RemoteFile "skills/memory-first.md"       "$GLOBAL_DIR\skills\memory-first.md"
 Save-RemoteFile "skills/agent-delegation.md"   "$GLOBAL_DIR\skills\agent-delegation.md"
-
-
-foreach ($stackProfile in @("_base","_multi-stack","_template","javascript","typescript","python","java","go","rust","react","angular","nextjs","nestjs","django","flask")) {
-  Save-RemoteFile "stack-profiles/$stackProfile.md" "$GLOBAL_DIR\stack-profiles\$stackProfile.md"
-}
 
 "VERBOSITY: $Verbosity" | Set-Content "$GLOBAL_DIR\memory\verbosity.md" -Encoding utf8
 Write-Ok "Verbosity set to $Verbosity"
