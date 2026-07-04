@@ -18,6 +18,17 @@ import { join, resolve, relative, sep } from 'node:path';
 const PREFIX = 'CONDUCTOR_DB:';
 const warn = (m) => process.stderr.write(`${PREFIX} ${m}\n`);
 
+const VALID_STATES = new Set([' ', '>', 'X', '!']);
+const MAX_KEY_LEN = 512;
+const USAGE = "usage: conductor-db.mjs record <plan_file> <task_id> <state> | init";
+
+function validateKey(name, value) {
+  const v = String(value ?? '').trim();       // 1. trim FIRST (whitespace never counts)
+  if (!v) { warn(`${name} is empty; ${USAGE}`); return null; }        // 2. empty-check on trimmed
+  if (v.length > MAX_KEY_LEN) { warn(`${name} exceeds ${MAX_KEY_LEN} chars; rejected`); return null; }  // 3. length-check on trimmed
+  return v;
+}
+
 function resolveRoot() {
   const out = execFileSync('git', ['rev-parse', '--show-toplevel'], {
     encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
@@ -115,8 +126,13 @@ async function withDb(root, fn) {
 async function cmdRecord(args) {
   const [rawPlan, rawTask, rawState] = args;
   const root = resolveRoot();
-  const planFile = normalizePlanFile(rawPlan, root);
-  await withDb(root, (db) => upsert(db, planFile, rawTask, rawState));
+  const planFile = validateKey('plan_file', normalizePlanFile(String(rawPlan ?? ''), root));
+  if (planFile === null) return;
+  const taskId = validateKey('task_id', rawTask);
+  if (taskId === null) return;
+  const state = String(rawState ?? '');
+  if (!VALID_STATES.has(state)) { warn(`invalid state ${JSON.stringify(state)}; must be one of ' ' '>' 'X' '!'`); return; }
+  await withDb(root, (db) => upsert(db, planFile, taskId, state));
 }
 
 async function cmdInit() {

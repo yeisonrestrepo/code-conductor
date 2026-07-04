@@ -97,3 +97,53 @@ describe.skipIf(!HAS_SQLITE)('conductor-db record (happy path)', () => {
     expect(rows[0].task_id).toBe("T-001'; DROP TABLE task_state;--");   // stored literally, not executed
   });
 });
+
+describe.skipIf(!HAS_SQLITE)('conductor-db record (input validation)', () => {
+  const dbPath = () => join(repo, '.conductor', 'cache.db');
+
+  it('rejects a state outside the enum: exit 0, warns, writes nothing', async () => {
+    const r = runDb(['record', 'plan.md', 'T-001', 'Z'], { cwd: repo });
+    expect(r.status).toBe(0);
+    expect(r.stderr).toContain('CONDUCTOR_DB:');
+    expect(r.stderr.toLowerCase()).toContain('state');
+    expect(existsSync(dbPath()) ? await readRows(dbPath()) : []).toHaveLength(0);
+  });
+
+  it('rejects a multi-character state before the SQL CHECK (exact Set membership)', async () => {
+    const r = runDb(['record', 'plan.md', 'T-001', 'XX'], { cwd: repo });
+    expect(r.status).toBe(0);
+    expect(r.stderr).toContain('CONDUCTOR_DB:');
+    expect(r.stderr.toLowerCase()).toContain('state');
+    expect(existsSync(dbPath()) ? await readRows(dbPath()) : []).toHaveLength(0);
+  });
+
+  it('rejects empty / whitespace-only task_id', async () => {
+    const r = runDb(['record', 'plan.md', '   ', 'X'], { cwd: repo });
+    expect(r.status).toBe(0);
+    expect(r.stderr).toContain('CONDUCTOR_DB:');
+    expect(existsSync(dbPath()) ? await readRows(dbPath()) : []).toHaveLength(0);
+  });
+
+  it('rejects a plan_file longer than 512 chars (not truncated)', async () => {
+    const huge = 'a'.repeat(600);
+    const r = runDb(['record', huge, 'T-001', 'X'], { cwd: repo });
+    expect(r.status).toBe(0);
+    expect(r.stderr).toContain('CONDUCTOR_DB:');
+    expect(existsSync(dbPath()) ? await readRows(dbPath()) : []).toHaveLength(0);
+  });
+
+  it('trims a valid task_id before storing', async () => {
+    runDb(['record', 'plan.md', '  T-007  ', 'X'], { cwd: repo });
+    const rows = await readRows(dbPath());
+    expect(rows[0].task_id).toBe('T-007');
+  });
+
+  it('applies the 512 cap AFTER trimming (surrounding whitespace does not count)', async () => {
+    const padded = '  ' + 'T'.repeat(512) + '  ';   // 516 raw chars, 512 after trim
+    const r = runDb(['record', 'plan.md', padded, 'X'], { cwd: repo });
+    expect(r.status).toBe(0);
+    const rows = await readRows(dbPath());
+    expect(rows).toHaveLength(1);
+    expect(rows[0].task_id.length).toBe(512);        // trimmed to exactly the cap, accepted
+  });
+});
