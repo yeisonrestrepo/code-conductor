@@ -1,3 +1,9 @@
+---
+name: agent-delegation
+description: "Rules for when and how to spawn sub-agents: Explore for 3+ file reads, parallel agents for independent tasks, summaries only — raw output never enters main context"
+type: skill
+---
+
 # Agent Delegation
 
 Keep the main context clean. Raw file contents, grep output, and intermediate data never enter the main context. Sub-agents process data and return summaries only.

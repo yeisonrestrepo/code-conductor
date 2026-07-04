@@ -1,45 +1,37 @@
-import { describe, test, expect, beforeAll } from 'vitest';
+import { describe, test, expect } from 'vitest';
 import { existsSync, readFileSync, statSync } from 'fs';
-import { join, dirname, resolve } from 'path';
-import { fileURLToPath } from 'url';
+import { join } from 'path';
 import { homedir } from 'os';
 
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const PKG_VERSION = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8')).version;
-const PLUGIN_BASE = join(homedir(), '.claude', 'plugins', 'cache', 'code-conductor', 'code-conductor');
-const PLUGIN_INSTALLED = existsSync(join(PLUGIN_BASE, PKG_VERSION));
+const SKILLS_DIR = join(homedir(), '.claude', 'skills');
+const SKILLS = ['critical-review', 'memory-first', 'agent-delegation'];
+const SKILLS_INSTALLED = SKILLS.every((s) => existsSync(join(SKILLS_DIR, s, 'SKILL.md')));
 
-const describeIf = PLUGIN_INSTALLED ? describe : describe.skip;
+const describeIf = SKILLS_INSTALLED ? describe : describe.skip;
 
-describeIf('code-conductor plugin', () => {
-  let pluginDir;
-
-  beforeAll(() => {
-    pluginDir = join(PLUGIN_BASE, PKG_VERSION);
+describeIf('code-conductor personal skills', () => {
+  test.each(SKILLS)('SKILL.md for %s exists and is non-empty', (skill) => {
+    const skillPath = join(SKILLS_DIR, skill, 'SKILL.md');
+    expect(existsSync(skillPath)).toBe(true);
+    expect(statSync(skillPath).size).toBeGreaterThan(0);
   });
 
-  test('versioned plugin directory exists', () => {
-    expect(existsSync(pluginDir)).toBe(true);
+  test.each(SKILLS)('SKILL.md for %s has name and description frontmatter', (skill) => {
+    const content = readFileSync(join(SKILLS_DIR, skill, 'SKILL.md'), 'utf8');
+    expect(content.startsWith('---')).toBe(true);
+    expect(content).toMatch(new RegExp(`^name: ${skill}$`, 'm'));
+    expect(content).toMatch(/^description: .+$/m);
   });
 
-  test('plugin.json has all 4 required fields', () => {
-    const jsonPath = join(pluginDir, '.claude-plugin', 'plugin.json');
-    expect(existsSync(jsonPath)).toBe(true);
-    const pj = JSON.parse(readFileSync(jsonPath, 'utf8'));
-    expect(pj.name).toBe('code-conductor');
-    expect(typeof pj.version).toBe('string');
-    expect(pj.version.length).toBeGreaterThan(0);
-    expect(typeof pj.description).toBe('string');
-    expect(pj.description.length).toBeGreaterThan(0);
-    expect(pj.author && pj.author.name).toBe('code-conductor');
+  test('old plugin cache dir is cleaned up', () => {
+    const oldCache = join(homedir(), '.claude', 'plugins', 'cache', 'code-conductor');
+    expect(existsSync(oldCache)).toBe(false);
   });
 
-  test.each(['critical-review', 'memory-first', 'agent-delegation'])(
-    'SKILL.md for %s exists and is non-empty',
-    (skill) => {
-      const skillPath = join(pluginDir, 'skills', skill, 'SKILL.md');
-      expect(existsSync(skillPath)).toBe(true);
-      expect(statSync(skillPath).size).toBeGreaterThan(0);
-    }
-  );
+  test('dead enabledPlugins key is removed from settings.json', () => {
+    const settingsPath = join(homedir(), '.claude', 'settings.json');
+    if (!existsSync(settingsPath)) return;
+    const settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
+    expect(settings.enabledPlugins?.['code-conductor@code-conductor']).toBeUndefined();
+  });
 });

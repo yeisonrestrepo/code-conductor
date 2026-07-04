@@ -1,3 +1,9 @@
+---
+name: memory-first
+description: "Lookup chain enforced before any file read or search: project memory, code graph, grep/glob, Explore sub-agent, targeted read — stop at the first step that answers"
+type: skill
+---
+
 # Memory-First Protocol
 
 Follow this lookup chain in strict order before reading any file, running any search, or spawning any tool. Stop at the first step that answers the question.

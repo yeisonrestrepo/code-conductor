@@ -427,81 +427,17 @@ Write-Ok "Verbosity set to $Verbosity"
 $globalHookCmd = "bash $env:USERPROFILE/.claude/hooks/verbosity-remind.sh"
 Merge-SettingsJson "$GLOBAL_DIR\settings.json" $globalHookCmd
 
-# -- code-conductor plugin: wipe versioned dir and recreate --------------------
+# -- code-conductor skills: install as personal skills (~/.claude/skills/<name>/SKILL.md)
+# Claude Code auto-loads directory-format personal skills. The previous approach --
+# writing to ~/.claude/plugins/cache/ and setting enabledPlugins -- never worked:
+# plugins are loaded from installed_plugins.json, which the installer cannot safely
+# write, so Claude Code ignored (and orphan-swept) the hand-crafted cache dir.
 if (-not $NoDeps) {
-  # USERPROFILE abort guard: must be an absolute path before any plugin dir operations
+  # USERPROFILE abort guard: must be an absolute path before any skill dir operations
   if ([string]::IsNullOrWhiteSpace($env:USERPROFILE) -or -not [System.IO.Path]::IsPathRooted($env:USERPROFILE)) {
-    Write-Warn "USERPROFILE is empty or not an absolute path ('$env:USERPROFILE') -- aborting plugin install to prevent invalid paths"
+    Write-Warn "USERPROFILE is empty or not an absolute path ('$env:USERPROFILE') -- aborting skills install to prevent invalid paths"
   } else {
-    # Version fallback chain: remote fetch -> local VERSION file -> "1.0.0" sentinel
-    $localVerPath = Join-Path $PSScriptRoot 'VERSION'
-    $localVer = if (Test-Path $localVerPath) { (Get-Content $localVerPath -Raw).Trim().TrimEnd("`r`n") } else { $null }
-    if ($localVer -and $localVer -notmatch '^\d+\.\d+\.\d+') { $localVer = $null }
-    $ccVersion = if ($RemoteVersion) { $RemoteVersion } elseif ($localVer) { $localVer } else { "1.0.0" }
-    $pluginDir = "$env:USERPROFILE\.claude\plugins\cache\code-conductor\code-conductor\$ccVersion"
-    # Pre-flight: warn if Claude Code is running (plugin dir may be locked)
-    if (Get-Process -Name "claude" -ErrorAction SilentlyContinue) {
-      Write-Warn "Claude Code process detected -- close Claude Code before running installer to prevent IOException on plugin dir wipe"
-    }
-    # Write permission probe before any wipe or mkdir
-    $pluginRoot = "$env:USERPROFILE\.claude\plugins"
-    New-Item -ItemType Directory -Force $pluginRoot -ErrorAction SilentlyContinue | Out-Null
     try {
-      $permTestFile = Join-Path $pluginRoot ".perm-test-$(Get-Random)"
-      [System.IO.File]::WriteAllText($permTestFile, "")
-      Remove-Item $permTestFile -Force -ErrorAction SilentlyContinue
-    } catch {
-      Write-Warn "No write permission on $pluginRoot -- plugin install may fail; run as Administrator or grant $env:USERNAME write access to $pluginRoot"
-    }
-    # Node.js v16+ baseline check
-    $nodeOk = $false
-    if (Get-Command node -ErrorAction SilentlyContinue) {
-      $nodeMajor = [int](node -e "process.stdout.write(String(process.version.split('.')[0].replace('v','')))" 2>$null)
-      if ($nodeMajor -ge 16) { $nodeOk = $true }
-      else { Write-Warn "Node.js v$nodeMajor detected -- v16+ required for plugin injection; skipping settings.json update" }
-    } else {
-      Write-Warn "Node.js not found on PATH -- plugin injection and settings.json merge skipped; install Node.js v16+ and re-run"
-    }
-    try {
-      # Idempotent wipe with IOException retry
-      if (Test-Path $pluginDir) {
-        try {
-          Remove-Item -Recurse -Force $pluginDir -ErrorAction Stop
-        } catch [System.IO.IOException] {
-          Start-Sleep -Seconds 2
-          try {
-            Remove-Item -Recurse -Force $pluginDir -ErrorAction Stop
-          } catch {
-            $archivePath = $pluginDir + "_old_" + [System.DateTime]::Now.ToString("yyyyMMddHHmmss")
-            Rename-Item -Path $pluginDir -NewName $archivePath -ErrorAction SilentlyContinue
-            Write-Warn "Plugin dir locked; renamed to $archivePath -- delete after closing Claude Code"
-          }
-        }
-      }
-      New-Item -ItemType Directory -Force "$pluginDir\.claude-plugin" | Out-Null
-      New-Item -ItemType Directory -Force "$pluginDir\skills" | Out-Null
-      New-Item -ItemType Directory -Force "$pluginDir\skills\critical-review" | Out-Null
-      New-Item -ItemType Directory -Force "$pluginDir\skills\memory-first" | Out-Null
-      New-Item -ItemType Directory -Force "$pluginDir\skills\agent-delegation" | Out-Null
-      # UTF-8 without BOM: $false = encoderShouldEmitUTF8Identifier = no BOM preamble
-      $pluginEnc = [System.Text.UTF8Encoding]::new($false)
-      # Double-quoted here-string so $ccVersion expands into plugin.json content
-      $pluginJsonContent = @"
-{
-  "name": "code-conductor",
-  "version": "$ccVersion",
-  "description": "code-conductor custom skills: critical-review, memory-first, agent-delegation",
-  "author": {
-    "name": "code-conductor"
-  }
-}
-"@
-      # Trailing "`n" produces exactly one LF (0x0A) at EOF -- no CRLF conversion
-      [System.IO.File]::WriteAllText(
-        "$pluginDir\.claude-plugin\plugin.json",
-        $pluginJsonContent + "`n",
-        $pluginEnc
-      )
       # Absolute path resolution guard: verify $GLOBAL_DIR is absolute before Copy-Item
       if (-not [System.IO.Path]::IsPathRooted($GLOBAL_DIR)) {
         $GLOBAL_DIR = "$env:USERPROFILE\.claude"
@@ -509,7 +445,6 @@ if (-not $NoDeps) {
       if (-not (Test-Path "$GLOBAL_DIR\skills")) {
         Write-Warn "GLOBAL_DIR\skills not found at $GLOBAL_DIR\skills -- Copy-Item step may fail; verify download steps ran first"
       }
-      # Pre-copy skill file validation
       @('critical-review','memory-first','agent-delegation') | ForEach-Object {
         $skillSrc = "$GLOBAL_DIR\skills\$_.md"
         if (-not (Test-Path $skillSrc)) { throw "ERROR: source skill file missing: $skillSrc" }
@@ -517,28 +452,31 @@ if (-not $NoDeps) {
         if (-not (Select-String -Path $skillSrc -Pattern '^#' -Quiet)) {
           Write-Warn "skill file $_.md has no markdown heading -- skill may not load correctly in Claude Code"
         }
+        New-Item -ItemType Directory -Force "$GLOBAL_DIR\skills\$_" | Out-Null
+        Copy-Item $skillSrc "$GLOBAL_DIR\skills\$_\SKILL.md"
       }
-      Copy-Item "$GLOBAL_DIR\skills\critical-review.md"   "$pluginDir\skills\critical-review\SKILL.md"
-      Copy-Item "$GLOBAL_DIR\skills\memory-first.md"       "$pluginDir\skills\memory-first\SKILL.md"
-      Copy-Item "$GLOBAL_DIR\skills\agent-delegation.md"   "$pluginDir\skills\agent-delegation\SKILL.md"
-      New-Item -ItemType Directory -Force "$env:USERPROFILE\.claude" -ErrorAction SilentlyContinue | Out-Null
-      # enabledPlugins: overwrite false with true (healing behavior)
-      $enableScript = @'
+      # Heal artifacts of the old broken plugin install: orphaned cache dir + dead enabledPlugins key
+      $oldPluginCache = "$env:USERPROFILE\.claude\plugins\cache\code-conductor"
+      if (Test-Path $oldPluginCache) {
+        Remove-Item -Recurse -Force $oldPluginCache -ErrorAction SilentlyContinue
+      }
+      if (Get-Command node -ErrorAction SilentlyContinue) {
+        $cleanupScript = @'
 const f=require('os').homedir()+'/.claude/settings.json';
-let obj={};if(require('fs').existsSync(f)){const _raw=require('fs').readFileSync(f,'utf8');try{obj=JSON.parse(_raw);}catch(e){if(_raw.trim()){process.stderr.write('WARN: settings.json is malformed JSON and non-empty -- skipping enabledPlugins merge to avoid data loss\n');process.exit(0);}}}
-if(!obj.enabledPlugins)obj.enabledPlugins={};
-obj.enabledPlugins['code-conductor@code-conductor']=true;
-try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true});require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');}catch(e){process.stderr.write('WARN: settings.json update failed: '+e.message+'\n');}
+if(!require('fs').existsSync(f))process.exit(0);
+const _raw=require('fs').readFileSync(f,'utf8');
+let obj={};try{obj=JSON.parse(_raw);}catch(e){process.exit(0);}
+if(obj.enabledPlugins){delete obj.enabledPlugins['code-conductor@code-conductor'];}
+try{require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');}catch(e){process.stderr.write('WARN: settings.json update failed: '+e.message+'\n');}
 '@
-      if ($nodeOk) {
-        node -e $enableScript 2>$null
+        node -e $cleanupScript 2>$null
       }
-      Write-Ok "code-conductor plugin installed (critical-review, memory-first, agent-delegation)"
+      Write-Ok "code-conductor skills installed as personal skills (critical-review, memory-first, agent-delegation)"
     } catch [System.UnauthorizedAccessException] {
-      Write-Warn "code-conductor plugin install failed: access denied at $pluginDir"
-      Write-Warn "Fix: run installer as Administrator, or grant write access to $env:USERPROFILE\.claude\plugins"
+      Write-Warn "code-conductor skills install failed: access denied at $GLOBAL_DIR\skills"
+      Write-Warn "Fix: run installer as Administrator, or grant write access to $GLOBAL_DIR\skills"
     } catch {
-      Write-Warn "code-conductor plugin install failed: $_"
+      Write-Warn "code-conductor skills install failed: $_"
     }
   }
 }

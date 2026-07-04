@@ -1091,91 +1091,40 @@ done
 # restores the pre-run backup, and aborts the installer before unrelated steps run.
 trap - ERR
 
-# ── code-conductor plugin: wipe versioned dir and recreate ────────────────────
+# ── code-conductor skills: install as personal skills (~/.claude/skills/<name>/SKILL.md)
+# Claude Code auto-loads directory-format personal skills. The previous approach —
+# writing to ~/.claude/plugins/cache/ and setting enabledPlugins — never worked:
+# plugins are loaded from installed_plugins.json, which the installer cannot safely
+# write, so Claude Code ignored (and orphan-swept) the hand-crafted cache dir.
 if [ "$SKIP_DEPS" = false ]; then
-  # Version fallback chain: remote fetch -> local VERSION file -> "1.0.0" sentinel
-  # Resolves $(dirname "$0") to the installer script's directory for absolute path to VERSION
-  _installer_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd || echo ".")"
-  # tr -d '\r\n ' strips CR (Windows CRLF checkouts), LF, and spaces
-  _local_ver="$(cat "${_installer_dir}/VERSION" 2>/dev/null | tr -d '\r\n ')"
-  # Reject non-semver content to prevent path injection
-  echo "${_local_ver}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+' || _local_ver=""
-  _cc_ver="${REMOTE_VERSION:-${_local_ver:-1.0.0}}"
-  PLUGIN_DIR="${HOME}/.claude/plugins/cache/code-conductor/code-conductor/${_cc_ver}"
-  # Pre-flight: warn if Claude Code is running (plugin dir may be locked on Windows)
-  if command -v pgrep >/dev/null 2>&1 && pgrep -x "claude" >/dev/null 2>&1; then
-    warn "Claude Code is currently running -- close it before running the installer to prevent plugin dir lock conflicts. Re-run the installer after closing Claude Code."
-  fi
-  # Write permission pre-check
-  mkdir -p "${HOME}/.claude/plugins" 2>/dev/null || true
-  if [ ! -w "${HOME}/.claude/plugins" ] && [ ! -w "${HOME}/.claude" ] && [ ! -w "${HOME}" ]; then
-    warn "No write permission on ${HOME}/.claude/plugins -- code-conductor plugin install may fail (check directory permissions or run with sudo)"
-  fi
-  # Node.js v16+ baseline check (required for fs.mkdirSync recursive on Windows)
-  if command -v node >/dev/null 2>&1; then
-    _node_major=$(node -e "process.stdout.write(String(process.version.split('.')[0].replace('v','')))" 2>/dev/null || echo "0")
-    if [ "$_node_major" -lt 16 ] 2>/dev/null; then
-      warn "Node.js v${_node_major} detected - v16+ required for plugin injection; skipping settings.json update"
-      _node_ok=false
-    else
-      _node_ok=true
-    fi
-  else
-    _node_ok=false
-    warn "Node.js not found on PATH -- plugin injection and settings.json merge skipped; install Node.js v16+ and re-run"
-  fi
-  # Retry once after 2s to handle transient NTFS locks
-  if ! rm -rf "${PLUGIN_DIR}" 2>/dev/null; then
-    sleep 2
-    rm -rf "${PLUGIN_DIR}" 2>/dev/null || warn "Plugin dir could not be fully removed (locked files may remain) -- close Claude Code and re-run installer"
-  fi
-  # Retry once after 2s to handle transient locks (e.g. Claude Code running
-  # concurrently against this same plugin cache dir) -- same pattern as the
-  # rm -rf retry above. Still FATAL under set -euo pipefail if the retry fails.
-  _retry_once() { "$@" || { sleep 2; "$@"; }; }
-  _retry_once mkdir -p "${PLUGIN_DIR}/.claude-plugin"
-  _retry_once mkdir -p "${PLUGIN_DIR}/skills/critical-review"
-  _retry_once mkdir -p "${PLUGIN_DIR}/skills/memory-first"
-  _retry_once mkdir -p "${PLUGIN_DIR}/skills/agent-delegation"
-  # plugin.json written before skill validation loop (partial plugin is inert without SKILL.md)
-  cat > "${PLUGIN_DIR}/.claude-plugin/plugin.json" <<PLUGINJSON
-{
-  "name": "code-conductor",
-  "version": "${_cc_ver}",
-  "description": "code-conductor custom skills: critical-review, memory-first, agent-delegation",
-  "author": {
-    "name": "code-conductor"
-  }
-}
-PLUGINJSON
   # Absolute path resolution guard: GLOBAL_DIR must be absolute before cp operations
   case "${GLOBAL_DIR:-}" in
     /*) ;;
     *) GLOBAL_DIR="${HOME}/.claude" ;;
   esac
   [ -d "${GLOBAL_DIR}/skills" ] || { warn "GLOBAL_DIR/skills not found at ${GLOBAL_DIR}/skills -- cp step may fail; verify installer ran download steps first"; }
-  mkdir -p "${HOME}/.claude" 2>/dev/null || true
-  # Pre-copy skill file validation: verify source files exist, are non-empty, and have a heading
+  # Retry once after 2s to handle transient locks (e.g. Claude Code running concurrently).
+  # Still FATAL under set -euo pipefail if the retry fails.
+  _retry_once() { "$@" || { sleep 2; "$@"; }; }
   for _skill in critical-review memory-first agent-delegation; do
     _skill_src="${GLOBAL_DIR}/skills/${_skill}.md"
     [ -f "${_skill_src}" ] || { echo "ERROR: source skill file missing: ${_skill_src}"; exit 1; }
     [ -s "${_skill_src}" ] || { echo "ERROR: source skill file is empty: ${_skill_src}"; exit 1; }
     grep -q '^#' "${_skill_src}" || warn "skill file ${_skill}.md has no markdown heading -- skill may not load correctly in Claude Code"
+    _retry_once mkdir -p "${GLOBAL_DIR}/skills/${_skill}"
+    _retry_once cp "${_skill_src}" "${GLOBAL_DIR}/skills/${_skill}/SKILL.md"
   done
-  # cp calls have NO '|| true' -- failures are FATAL under set -euo pipefail;
-  # retried once after 2s for the same transient-lock reason as the mkdirs above.
-  _retry_once cp "${GLOBAL_DIR}/skills/critical-review.md"   "${PLUGIN_DIR}/skills/critical-review/SKILL.md"
-  _retry_once cp "${GLOBAL_DIR}/skills/memory-first.md"       "${PLUGIN_DIR}/skills/memory-first/SKILL.md"
-  _retry_once cp "${GLOBAL_DIR}/skills/agent-delegation.md"   "${PLUGIN_DIR}/skills/agent-delegation/SKILL.md"
-  # enabledPlugins: if key already exists set to false, this overwrites to true (healing behavior)
-  [ "$_node_ok" = true ] && node -e "
+  # Heal artifacts of the old broken plugin install: orphaned cache dir + dead enabledPlugins key
+  rm -rf "${HOME}/.claude/plugins/cache/code-conductor" 2>/dev/null || true
+  if command -v node >/dev/null 2>&1; then node -e "
 const f=require('os').homedir()+'/.claude/settings.json';
-let obj={};if(require('fs').existsSync(f)){const _raw=require('fs').readFileSync(f,'utf8');try{obj=JSON.parse(_raw);}catch(e){if(_raw.trim()){process.stderr.write('WARN: settings.json is malformed JSON and non-empty -- skipping enabledPlugins merge to avoid data loss\n');process.exit(0);}}}
-if(!obj.enabledPlugins)obj.enabledPlugins={};
-obj.enabledPlugins['code-conductor@code-conductor']=true;
-try{require('fs').mkdirSync(require('os').homedir()+'/.claude',{recursive:true});require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');}catch(e){process.stderr.write('WARN: settings.json update failed: '+e.message+'\n');}
-" 2>/dev/null || true
-  ok "code-conductor plugin installed (critical-review, memory-first, agent-delegation)"
+if(!require('fs').existsSync(f))process.exit(0);
+const _raw=require('fs').readFileSync(f,'utf8');
+let obj={};try{obj=JSON.parse(_raw);}catch(e){process.exit(0);}
+if(obj.enabledPlugins){delete obj.enabledPlugins['code-conductor@code-conductor'];}
+try{require('fs').writeFileSync(f,JSON.stringify(obj,null,2)+'\n');}catch(e){process.stderr.write('WARN: settings.json update failed: '+e.message+'\n');}
+" 2>/dev/null || true; fi
+  ok "code-conductor skills installed as personal skills (critical-review, memory-first, agent-delegation)"
 fi
 
 # CC_VERBOSITY_SKIP conflict check
