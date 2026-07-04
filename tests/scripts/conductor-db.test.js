@@ -311,3 +311,50 @@ describe.skipIf(!HAS_SQLITE)('conductor-db node:sqlite unavailable', () => {
     expect(existsSync(join(repo, '.conductor', 'cache.db'))).toBe(false);
   });
 });
+
+import { writeFileSync, readdirSync, readFileSync } from 'node:fs';
+
+describe.skipIf(!HAS_SQLITE)('conductor-db corrupt-db recovery', () => {
+  const conductorDir = () => join(repo, '.conductor');
+  const dbPath = () => join(conductorDir(), 'cache.db');
+
+  it('backs up a corrupt db aside (colon-free name), clears stale sidecars, recreates it', async () => {
+    mkdirSync(conductorDir(), { recursive: true });
+    writeFileSync(dbPath(), 'this is not a sqlite database');   // garbage main file
+    writeFileSync(`${dbPath()}-wal`, 'stale wal');              // orphaned sidecars whose
+    writeFileSync(`${dbPath()}-shm`, 'stale shm');              // headers would panic a fresh open
+    const r = runDb(['record', 'plan.md', 'T-001', 'X'], { cwd: repo });
+    expect(r.status).toBe(0);
+
+    const backups = readdirSync(conductorDir()).filter((f) => f.startsWith('cache.db.corrupt.'));
+    expect(backups).toHaveLength(1);
+    expect(backups[0]).not.toContain(':');          // Windows-safe
+    // The stale sidecars were cleared. (The fresh db may create its own `-wal`/
+    // `-shm`; assert only that no sidecar still carries the OLD 'stale' bytes,
+    // which avoids coupling to the script's own WAL lifecycle across platforms.)
+    for (const suffix of ['-wal', '-shm']) {
+      const p = `${dbPath()}${suffix}`;
+      if (existsSync(p)) expect(readFileSync(p, 'utf8')).not.toContain('stale');
+    }
+    const rows = await readRows(dbPath());           // fresh db opened cleanly, write succeeded
+    expect(rows).toHaveLength(1);
+    expect(rows[0].state).toBe('X');
+  });
+
+  it('degrades to exit 0 without throwing when the db dir is read-only', () => {
+    // Force every recovery hop (rename/unlink/create) to fail; the script must
+    // still exit 0 and never throw. (Skipped where chmod is a no-op, e.g. Windows.)
+    mkdirSync(conductorDir(), { recursive: true });
+    writeFileSync(dbPath(), 'not a database');
+    let readonly = false;
+    try { execFileSync('chmod', ['555', conductorDir()]); readonly = true; } catch { /* skip */ }
+    if (!readonly) return;
+    try {
+      const r = runDb(['record', 'plan.md', 'T-001', 'X'], { cwd: repo });
+      expect(r.status).toBe(0);
+      expect(r.stderr).toContain('CONDUCTOR_DB:');
+    } finally {
+      execFileSync('chmod', ['755', conductorDir()]);   // let afterEach clean up
+    }
+  });
+});

@@ -12,7 +12,7 @@
 // The plan markdown remains the authoritative task-state record.
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, existsSync } from 'node:fs';
+import { mkdirSync, existsSync, renameSync, unlinkSync, statSync } from 'node:fs';
 import { dirname, join, resolve, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -110,11 +110,79 @@ function openConn(DatabaseSync, dbPath) {
   return db;
 }
 
+const compactStamp = () => new Date().toISOString().replace(/[-:.]/g, '');
+
+// Best-effort removal of the WAL/SHM sidecars that belong to a db file we are
+// replacing. A stale `-wal`/`-shm` whose header no longer matches the fresh db
+// can panic the next connection open, so they must go with the main file.
+function clearSidecars(dbPath) {
+  for (const suffix of ['-wal', '-shm']) {
+    // The common case is that the sidecar does not exist -> unlinkSync throws
+    // ENOENT; that is expected and swallowed. Any other error (EACCES, locked
+    // file) is likewise non-fatal here. The empty catch suppresses ALL of them.
+    try { unlinkSync(`${dbPath}${suffix}`); } catch { /* ENOENT (absent) or locked: best-effort, ignore */ }
+  }
+}
+
+// Move a corrupt/non-regular file aside; never recursively delete. Returns true
+// if the path was cleared (renamed or removed) so a fresh db can be created.
+function backupAside(path) {
+  const base = `${path}.corrupt.${compactStamp()}`;
+  let target = base;
+  for (let i = 1; i <= 100 && existsSync(target); i++) target = `${base}.${i}`;
+
+  const cleared = (() => {
+    // Preferred: rename aside — atomic and content-preserving for files AND dirs.
+    try { renameSync(path, target); return true; }
+    catch { /* rename failed (locked / cross-device / perms): type-aware fallback */ }
+
+    // Rename failed. The unlink fallback is valid ONLY for a regular file:
+    //  - unlinkSync on a directory throws EISDIR (POSIX) / EPERM (Windows);
+    //  - rmdirSync only removes an *empty* dir (ours may hold files) and a
+    //    recursive delete is explicitly forbidden.
+    // So: regular file -> unlinkSync; directory -> give up (warn, no write),
+    // never unlink/rmdir/rm -r it. This is why we branch on statSync here rather
+    // than blindly calling unlinkSync.
+    let isDir = false;
+    try { isDir = statSync(path).isDirectory(); }
+    catch { return true; }   // path vanished between attempts: treat as cleared
+    if (isDir) {
+      warn(`cannot move aside directory at ${path} (rename failed); skipping cache write`);
+      return false;
+    }
+    try { unlinkSync(path); return true; }
+    catch { warn(`cannot move aside file at ${path}; skipping cache write`); return false; }
+  })();
+
+  // Only after the main file is cleared: drop its now-orphaned sidecars so the
+  // fresh db opens against a clean slate (no mismatched journal headers).
+  if (cleared) clearSidecars(path);
+  return cleared;
+}
+
+function isCorruptionError(e) {
+  const s = `${(e && e.code) || ''} ${(e && e.message) || ''}`.toLowerCase();
+  return s.includes('not a database') || s.includes('malformed') ||
+         s.includes('file is encrypted') || s.includes('notadb');
+}
+
 function openReady(DatabaseSync, dbPath) {
-  const db = openConn(DatabaseSync, dbPath);
-  const ver = db.prepare('PRAGMA user_version').get().user_version;
-  if (ver === 0 || !tableExists(db)) applySchema(db);
-  return db;
+  let db;
+  try {
+    db = openConn(DatabaseSync, dbPath);
+    const ver = db.prepare('PRAGMA user_version').get().user_version;   // first I/O
+    if (ver === 0 || !tableExists(db)) applySchema(db);
+    return db;
+  } catch (e) {
+    // Close the (possibly half-usable) handle BEFORE any rethrow or return so
+    // no path — corruption OR an unexpected non-corruption error — leaks it.
+    try { if (db) db.close(); } catch { /* ignore */ }
+    if (!isCorruptionError(e)) throw e;
+    if (!backupAside(dbPath)) return null;
+    db = openConn(DatabaseSync, dbPath);   // retry once on a fresh file
+    applySchema(db);
+    return db;
+  }
 }
 
 function upsert(db, planFile, taskId, state) {
@@ -134,13 +202,34 @@ async function withDb(root, fn) {
   }
   const dir = join(root, '.conductor');
   const dbPath = join(dir, 'cache.db');
-  mkdirSync(dir, { recursive: true });
+  // If `.conductor` already exists but as a regular FILE (not a directory),
+  // mkdirSync would throw EEXIST/ENOTDIR. Move the squatting file aside with the
+  // same non-destructive rename used for a bad db, then create the directory.
+  try {
+    if (!statSync(dir).isDirectory()) { if (!backupAside(dir)) return; }
+  } catch { /* ENOENT: nothing at the path yet — mkdir will create it */ }
+  try {
+    mkdirSync(dir, { recursive: true });
+  } catch (e) {
+    warn(`cannot create ${dir}: ${(e && e.code) || (e && e.message)}, skipping cache write`);
+    return;
+  }
   let db = null;
   try {
     db = openReady(DatabaseSync, dbPath);
+    if (!db) return;             // skipped (unrecoverable or newer schema — Task 9)
     fn(db);
+  } catch (e) {
+    warn(`${(e && e.code) || 'error'} writing ${dbPath}: ${e && e.message}, skipping cache write`);
   } finally {
-    if (db) { try { db.close(); } catch { /* ignore */ } }
+    if (db) {
+      // Force a full WAL flush + truncate before closing so the -wal/-shm
+      // sidecars are collapsed into the main db on every filesystem (some
+      // network/oddball FS skip the implicit close-time checkpoint). Best-effort:
+      // a checkpoint failure must never mask the operation's own outcome.
+      try { db.exec('PRAGMA wal_checkpoint(TRUNCATE);'); } catch { /* best-effort flush */ }
+      try { db.close(); } catch { /* ignore */ }
+    }
   }
 }
 
