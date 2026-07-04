@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.19.0] - 2026-07-04
+
+### Added
+- `[FEAT-005]` `scripts/conductor-db.mjs`: zero-dependency ES-module CLI wrapping Node's built-in `node:sqlite` (`DatabaseSync`); owns `.conductor/cache.db` with `record <plan_file> <task_id> <state>` and idempotent `init` subcommands. Schema v1 `task_state(plan_file, task_id, state CHECK IN (' ','>','X','!'), updated_at) WITHOUT ROWID`, PK `(plan_file, task_id)`, WAL journaling, `user_version=1` set atomically via `BEGIN IMMEDIATE`. Repo-relative POSIX `plan_file` key (dedup across CWDs), 512-char arg cap, ms ISO-8601 `updated_at`. All failures non-fatal (single `CONDUCTOR_DB:` stderr line, exit 0): absent `node:sqlite`, corrupt/non-regular file (renamed aside, never `rm -r`), `SQLITE_BUSY`, `user_version > 1` forward-compat, CLI misuse.
+- `[FEAT-005]` `tests/scripts/conductor-db.test.js`: Vitest child-process (`spawnSync`) suite covering schema/`user_version`, upsert, timestamp shape, state-enum/empty/over-length rejection, CLI discipline, `plan_file` dedup, git/`.git`-walk/script-dir root resolution, absent-`node:sqlite` degradation (via `--import` loader fixture), corrupt-db recovery, non-regular-file handling, and forward-compat no-write. Temp dbs under `os.tmpdir()` with `crypto.randomUUID()` names; `-wal`/`-shm` sidecars cleaned up; skips when the runner lacks `node:sqlite`.
+
+### Changed
+- `[FEAT-005]` `/cc-implement` Step 6 hook (both `.claude/commands/` and `project-template/.claude/commands/` mirrors): rewired from a `.conductor/cache.db`-existence no-op to a `node --version >= 22.5.0`-gated `conductor-db.mjs record` invocation; the cache self-disables below 22.5, so `engines.node` stays `>=20`.
+- `[FEAT-005]` `.gitignore`: ignores `.conductor/` (local cache, never committed).
+
 ## [1.18.0] - 2026-07-04
 
 ### Removed

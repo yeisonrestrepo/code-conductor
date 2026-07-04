@@ -76,7 +76,7 @@ This document is the single source of truth for the evolutionary engineering of 
 
 ## PILLAR 2: LOCAL PERSISTENCE AND STATE ENGINE
 
-### [ ] `[FEAT-005]` Local Persistence Layer (SQLite Context Engine)
+### [X] `[FEAT-005]` Local Persistence Layer (SQLite Context Engine)
 * **Description:** Establish an embedded local database file (`.conductor/cache.db`) to serve as the persistent "bird's-eye view" of the target workspace, caching file structures, interface hashes, method signatures, and task tracking records. This core engine implementation initiates the deprecation phase for the legacy `claude-mem` system.
 * **Impact:** Eliminates the need to inject the full repository file map into the LLM prompt, reducing planning input tokens by 60% to 80%, and prepares the codebase to cut ties with external memory utilities.
 * **Components Affected:** Core framework storage layer, repository indexing scripts, installer configuration templates, project dependency manifests.
@@ -119,7 +119,7 @@ This document is the single source of truth for the evolutionary engineering of 
 
 ## PILLAR 4: DYNAMIC INITIALIZATION AND ONBOARDING
 
-### [ ] `[FEAT-013]` Dynamic Stack Discovery (Just-In-Time Profiles)
+### [X] `[FEAT-013]` Dynamic Stack Discovery (Just-In-Time Profiles)
 * **Description:** Drop the rigid structure of static configuration profiles for technical stacks and deploy an automated, on-the-fly repository manifest scanner.
 * **Impact:** Removes the maintenance burden of individual stack files and prevents loading unneeded framework rules into the context of multi-stack or mixed projects.
 * **Components Affected:** `stack-profiles/` directory, `/cc-stack` implementation.
