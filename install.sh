@@ -999,11 +999,6 @@ download "skills/verbosity.md"          "${GLOBAL_DIR}/skills/verbosity.md"
 download "skills/memory-first.md"       "${GLOBAL_DIR}/skills/memory-first.md"
 download "skills/agent-delegation.md"   "${GLOBAL_DIR}/skills/agent-delegation.md"
 
-
-for profile in _base _multi-stack _template javascript typescript python java go rust react angular nextjs nestjs django flask; do
-  download "stack-profiles/${profile}.md" "${GLOBAL_DIR}/stack-profiles/${profile}.md"
-done
-
 echo "VERBOSITY: ${VERBOSITY}" > "${GLOBAL_DIR}/memory/verbosity.md"
 ok "Verbosity set to ${VERBOSITY}"
 
