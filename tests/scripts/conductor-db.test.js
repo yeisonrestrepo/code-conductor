@@ -257,3 +257,38 @@ describe.skipIf(!HAS_SQLITE)('conductor-db plan_file normalization', () => {
     expect(rows[0].plan_file.startsWith('../')).toBe(true);
   });
 });
+
+import { cpSync } from 'node:fs';
+
+const NO_GIT_ENV = { ...process.env, PATH: '' };
+
+describe.skipIf(!HAS_SQLITE)('conductor-db root resolution fallbacks', () => {
+  it('Fallback A: finds repo root via .git walk when git is unavailable', async () => {
+    // repo already has a real .git (from beforeEach git init). Disable git and
+    // run from a deep subdir; the walk must climb to `repo`.
+    const nested = join(repo, 'x', 'y');
+    mkdirSync(nested, { recursive: true });
+    const r = runDb(['record', 'plan.md', 'T-001', 'X'], { cwd: nested, env: NO_GIT_ENV });
+    expect(r.status).toBe(0);
+    expect(existsSync(join(repo, '.conductor', 'cache.db'))).toBe(true);
+  });
+
+  it('Fallback B: script-dir parent is root when git fails and no .git exists', async () => {
+    // Copy the script into an isolated tree with NO .git anywhere, so both git
+    // and the .git-walk fail and only the script-dir fallback remains.
+    const tree = mkdtempSync(join(tmpdir(), `cc-db-nogit-${randomUUID()}-`));
+    try {
+      const scriptsDir = join(tree, 'scripts');
+      mkdirSync(scriptsDir, { recursive: true });
+      cpSync(SCRIPT, join(scriptsDir, 'conductor-db.mjs'));
+      const r = spawnSync(process.execPath,
+        [...FLAG, join(scriptsDir, 'conductor-db.mjs'), 'record', 'plan.md', 'T-001', 'X'],
+        { cwd: scriptsDir, encoding: 'utf8', env: NO_GIT_ENV });
+      expect(r.status).toBe(0);
+      // <root> = scripts/.. = tree ; db lands at tree/.conductor/cache.db
+      expect(existsSync(join(tree, '.conductor', 'cache.db'))).toBe(true);
+    } finally {
+      rmSync(tree, { recursive: true, force: true });
+    }
+  });
+});

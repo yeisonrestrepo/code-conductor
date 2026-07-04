@@ -12,14 +12,16 @@
 // The plan markdown remains the authoritative task-state record.
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
-import { join, resolve, relative, sep } from 'node:path';
+import { mkdirSync, existsSync } from 'node:fs';
+import { dirname, join, resolve, relative, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const PREFIX = 'CONDUCTOR_DB:';
 const warn = (m) => process.stderr.write(`${PREFIX} ${m}\n`);
 
 const VALID_STATES = new Set([' ', '>', 'X', '!']);
 const MAX_KEY_LEN = 512;
+const WALK_CAP = 40;
 const USAGE = "usage: conductor-db.mjs record <plan_file> <task_id> <state> | init";
 
 function validateKey(name, value) {
@@ -30,10 +32,23 @@ function validateKey(name, value) {
 }
 
 function resolveRoot() {
-  const out = execFileSync('git', ['rev-parse', '--show-toplevel'], {
-    encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
-  }).trim();
-  return resolve(out);
+  // 1. Primary: git.
+  try {
+    const out = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    if (out) return resolve(out);
+  } catch { /* fall through */ }
+  // 2. Fallback A: bounded walk up from cwd looking for a .git entry.
+  let dir = resolve(process.cwd());
+  for (let i = 0; i < WALK_CAP; i++) {
+    if (existsSync(join(dir, '.git'))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) break;   // filesystem root
+    dir = parent;
+  }
+  // 3. Fallback B: this script lives at <root>/scripts/conductor-db.mjs.
+  return resolve(dirname(fileURLToPath(import.meta.url)), '..');
 }
 
 function normalizePlanFile(planFile, root) {
