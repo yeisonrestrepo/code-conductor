@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.18.0] - 2026-07-04
+
+### Removed
+- `stack-profiles/` static profile directory (17 files) [FEAT-013]
+- Stack-profile downloads from `install.sh` and `install.ps1` [FEAT-013]
+
+### Changed
+- `/cc-stack` now runs `detect-stack.mjs` and writes detected commands plus a generated ruleset into the project `CLAUDE.md` instead of loading a static profile [FEAT-013]
+- `README.md` replaces the Stack Profiles documentation with dynamic-detection wording [FEAT-013]
+
 ## [1.17.0] - 2026-06-30
 
 ### Added
