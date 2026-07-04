@@ -14,3 +14,4 @@ node_modules/
 tests/.tmp/
 .claude/memory/turn-count.txt
 .claude/memory/session-snapshot.json
+.conductor/
