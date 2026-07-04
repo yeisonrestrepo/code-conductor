@@ -1085,6 +1085,12 @@ done
 [ "$_global_json_ok" = "1" ] && _merge_settings_json "${GLOBAL_DIR}/settings.json" "$_global_hook_cmd" \
     || warn "[verbosity-remind] WARN: skipping global settings.json merge — pre-validation failed."
 
+# Clear the settings.json ERR trap (set near line 201) now that all settings.json
+# mutations are done. Left active, it fires on ANY later failure in this script
+# (e.g. the plugin-install block below), misreports it as a settings.json failure,
+# restores the pre-run backup, and aborts the installer before unrelated steps run.
+trap - ERR
+
 # ── code-conductor plugin: wipe versioned dir and recreate ────────────────────
 if [ "$SKIP_DEPS" = false ]; then
   # Version fallback chain: remote fetch -> local VERSION file -> "1.0.0" sentinel
@@ -1123,11 +1129,14 @@ if [ "$SKIP_DEPS" = false ]; then
     sleep 2
     rm -rf "${PLUGIN_DIR}" 2>/dev/null || warn "Plugin dir could not be fully removed (locked files may remain) -- close Claude Code and re-run installer"
   fi
-  # mkdir -p calls have NO '|| true' -- failures are FATAL under set -euo pipefail
-  mkdir -p "${PLUGIN_DIR}/.claude-plugin"
-  mkdir -p "${PLUGIN_DIR}/skills/critical-review"
-  mkdir -p "${PLUGIN_DIR}/skills/memory-first"
-  mkdir -p "${PLUGIN_DIR}/skills/agent-delegation"
+  # Retry once after 2s to handle transient locks (e.g. Claude Code running
+  # concurrently against this same plugin cache dir) -- same pattern as the
+  # rm -rf retry above. Still FATAL under set -euo pipefail if the retry fails.
+  _retry_once() { "$@" || { sleep 2; "$@"; }; }
+  _retry_once mkdir -p "${PLUGIN_DIR}/.claude-plugin"
+  _retry_once mkdir -p "${PLUGIN_DIR}/skills/critical-review"
+  _retry_once mkdir -p "${PLUGIN_DIR}/skills/memory-first"
+  _retry_once mkdir -p "${PLUGIN_DIR}/skills/agent-delegation"
   # plugin.json written before skill validation loop (partial plugin is inert without SKILL.md)
   cat > "${PLUGIN_DIR}/.claude-plugin/plugin.json" <<PLUGINJSON
 {
@@ -1153,10 +1162,11 @@ PLUGINJSON
     [ -s "${_skill_src}" ] || { echo "ERROR: source skill file is empty: ${_skill_src}"; exit 1; }
     grep -q '^#' "${_skill_src}" || warn "skill file ${_skill}.md has no markdown heading -- skill may not load correctly in Claude Code"
   done
-  # cp calls have NO '|| true' -- cp failure triggers ERR trap and aborts installer
-  cp "${GLOBAL_DIR}/skills/critical-review.md"   "${PLUGIN_DIR}/skills/critical-review/SKILL.md"
-  cp "${GLOBAL_DIR}/skills/memory-first.md"       "${PLUGIN_DIR}/skills/memory-first/SKILL.md"
-  cp "${GLOBAL_DIR}/skills/agent-delegation.md"   "${PLUGIN_DIR}/skills/agent-delegation/SKILL.md"
+  # cp calls have NO '|| true' -- failures are FATAL under set -euo pipefail;
+  # retried once after 2s for the same transient-lock reason as the mkdirs above.
+  _retry_once cp "${GLOBAL_DIR}/skills/critical-review.md"   "${PLUGIN_DIR}/skills/critical-review/SKILL.md"
+  _retry_once cp "${GLOBAL_DIR}/skills/memory-first.md"       "${PLUGIN_DIR}/skills/memory-first/SKILL.md"
+  _retry_once cp "${GLOBAL_DIR}/skills/agent-delegation.md"   "${PLUGIN_DIR}/skills/agent-delegation/SKILL.md"
   # enabledPlugins: if key already exists set to false, this overwrites to true (healing behavior)
   [ "$_node_ok" = true ] && node -e "
 const f=require('os').homedir()+'/.claude/settings.json';
