@@ -31,6 +31,81 @@ deliberately tight — only the engine and the `task_state` table ship here; the
 `sessions`/`raw_history`/`snapshots` schema, git-hash time-travel, and metadata
 caching are deferred to ARCH-008.
 
+## Schema and CLI Contract
+
+### DDL (schema v1)
+
+Exact, deterministic DDL — all columns `TEXT` affinity, composite primary key,
+`WITHOUT ROWID` (the PK is a natural composite key, so the rowid is dead weight):
+
+```sql
+PRAGMA journal_mode = WAL;
+PRAGMA user_version = 1;
+CREATE TABLE IF NOT EXISTS task_state (
+  plan_file  TEXT NOT NULL,
+  task_id    TEXT NOT NULL,
+  state      TEXT NOT NULL CHECK (state IN (' ', '>', 'X', '!')),
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (plan_file, task_id)
+) WITHOUT ROWID;
+```
+
+Upsert statement:
+
+```sql
+INSERT INTO task_state (plan_file, task_id, state, updated_at)
+VALUES (?, ?, ?, ?)
+ON CONFLICT (plan_file, task_id)
+DO UPDATE SET state = excluded.state, updated_at = excluded.updated_at;
+```
+
+### `<state>` validation
+
+The allowed set is the four checkbox states: `' '` (pending), `'>'`
+(in-progress), `'X'` (complete), `'!'` (failed). Validation is enforced twice —
+in the CLI (before binding) and by the SQL `CHECK` constraint. Any other value is
+rejected with a `CONDUCTOR_DB:` warning and exit 0; nothing is written. This
+prevents arbitrary/corrupt state strings from ever reaching the table.
+
+### Repository-root resolution
+
+1. Primary: `git rev-parse --show-toplevel`.
+2. Fallback A: walk up from `process.cwd()` looking for a `.git` entry; stop when
+   `path.dirname(dir) === dir` (filesystem root) or after a hard cap of 40
+   iterations (matching the project's existing traversal-cap convention). This
+   bounds the walk and cannot loop.
+3. Fallback B (deterministic): `path.resolve(dirname(fileURLToPath(import.meta.url)), '..')`
+   — the script lives at `<root>/scripts/conductor-db.mjs`, so its parent's parent
+   is the root by construction.
+
+The resolved root is normalized with `path.resolve`, and the db path is built
+with `path.join(root, '.conductor', 'cache.db')` so separators are OS-correct
+(git returns forward slashes even on Windows; `path.resolve` normalizes them).
+
+### Corrupt-backup naming and collisions
+
+`<ts>` is a filesystem-safe, colon-free compact UTC stamp derived from
+`new Date().toISOString().replace(/[-:.]/g, '')` → e.g. `20260704T141211123Z`
+(no `:` or `.`, safe on Windows/NTFS). If `cache.db.corrupt.<ts>` already exists
+(rapid back-to-back failures within the same millisecond), append an incrementing
+numeric suffix `.1`, `.2`, … up to 100 attempts; if all are taken, warn and
+proceed to recreate without preserving the older backup.
+
+### CLI parsing and output discipline
+
+- `argv[2]` is the subcommand: `record` or `init`. Parsing is strictly
+  positional — there is no flag library. Any unknown subcommand, unexpected/extra
+  positional argument, or stray flag yields a single `CONDUCTOR_DB:` usage warning
+  on stderr and exit 0 (never a crash, never a non-zero exit).
+- `record` requires exactly three positional args (`plan_file`, `task_id`,
+  `state`); fewer or more → usage warning, exit 0.
+- Both `record` and `init` are **completely silent on success**: no stdout, no
+  diagnostic text, exit 0. `init` only creates/verifies the db and schema. Only
+  the degraded/error paths ever emit (to stderr, `CONDUCTOR_DB:`-prefixed).
+- The `DatabaseSync` connection is always closed with `db.close()` in a `finally`
+  block before exit — this checkpoints and releases the WAL so no `-wal`/`-shm`
+  residue or lock lingers.
+
 ## Behavior
 
 ### Main path
@@ -81,11 +156,17 @@ contract:
 - **Locked database** (`SQLITE_BUSY`): WAL mode makes this rare; if it still
   occurs, warn and exit 0.
 - **Corrupt database:** on a malformed-image open error, rename the file aside to
-  `cache.db.corrupt.<ts>` and recreate a fresh schema (mirrors the installer's
+  `cache.db.corrupt.<ts>` (colon-free `<ts>`, numeric suffix on collision — see
+  Corrupt-backup naming) and recreate a fresh schema (mirrors the installer's
   `_backup_if_malformed` pattern), then retry the write once; if it still fails,
   warn and exit 0.
 - **Denied directory/file write** (permission): warn naming the path and exit 0.
+- **Invalid `<state>` / CLI misuse:** reject with a `CONDUCTOR_DB:` usage warning
+  and exit 0; write nothing (see Schema and CLI Contract).
 - **Missing/short args:** warn with usage and exit 0 (never crash the hook).
+
+In all paths `db.close()` runs in a `finally` block before exit so the WAL is
+checkpointed and no lock or `-wal`/`-shm` residue lingers.
 
 ## Acceptance Criteria
 
@@ -102,8 +183,15 @@ contract:
       the CWD).
 - [ ] When `node:sqlite` is unavailable the script exits 0 and emits exactly one
       `CONDUCTOR_DB:`-prefixed stderr line; nothing on stdout.
-- [ ] A corrupt `cache.db` is backed up aside and recreated; the write then
-      succeeds.
+- [ ] A corrupt `cache.db` is backed up aside (colon-free `<ts>` name, numeric
+      suffix on collision) and recreated; the write then succeeds.
+- [ ] `state` outside `{' ', '>', 'X', '!'}` is rejected (CLI + SQL `CHECK`),
+      exits 0 with a `CONDUCTOR_DB:` warning, and writes nothing.
+- [ ] Unknown subcommand / extra args / stray flags produce a single
+      `CONDUCTOR_DB:` usage warning and exit 0; `init` and `record` are silent on
+      success (no stdout); `db.close()` runs in a `finally` before exit.
+- [ ] The resolved root is `path.resolve`-normalized and the db path built with
+      `path.join`, verified on both POSIX and Windows separator forms.
 - [ ] `cc-implement.md` Step 6 (both `.claude/commands/` and
       `project-template/.claude/commands/` mirrors) invokes the recorder behind a
       `node --version >= 22.5.0` pre-flight gate and passes `--experimental-sqlite`
@@ -112,9 +200,12 @@ contract:
 - [ ] `package.json` `engines.node` is `>=22.5`; framework still runs on Node 20
       with the cache silently disabled (graceful degradation).
 - [ ] A Vitest suite covers schema/`user_version` creation, upsert-replaces-state,
-      timestamp shape, absent-`node:sqlite` degradation, and corrupt-db recovery,
-      using unique random temp-db filenames (`crypto.randomUUID()`) for parallel
-      isolation; it skips cleanly when the runner's Node lacks `node:sqlite`.
+      timestamp shape, `state`-enum rejection, CLI misuse, absent-`node:sqlite`
+      degradation, and corrupt-db recovery. Temp dbs live under `os.tmpdir()` with
+      unique `crypto.randomUUID()` filenames for parallel isolation; an
+      `afterEach`/`finally` unlinks each db **and its `-wal`/`-shm` sidecars** so no
+      dangling files pollute the workspace. It skips cleanly when the runner's Node
+      lacks `node:sqlite`.
 - [ ] Full Vitest suite green; VERSION + package.json bumped to 1.19.0; CHANGELOG
       `[1.19.0]` entry tagged `[FEAT-005]` with a dynamically resolved date.
 
