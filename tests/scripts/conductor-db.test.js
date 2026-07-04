@@ -220,3 +220,40 @@ describe.skipIf(!HAS_SQLITE)('conductor-db CLI discipline', () => {
     expect(existsSync(dbPath())).toBe(false);
   });
 });
+
+import { mkdirSync, realpathSync } from 'node:fs';
+
+describe.skipIf(!HAS_SQLITE)('conductor-db plan_file normalization', () => {
+  const dbPath = () => join(repo, '.conductor', 'cache.db');
+
+  it('same plan from two different CWDs yields exactly one row', async () => {
+    const nested = join(repo, 'a', 'b', 'c');
+    mkdirSync(nested, { recursive: true });
+    // Canonicalize the root: on macOS os.tmpdir() is the /var symlink while git's
+    // toplevel (and the child's process.cwd()) are the physical /private/var path.
+    // An absolute plan arg in symlink form would not be realpath'd by path.resolve,
+    // producing a cross-namespace key that never dedups. The real hook passes
+    // repo-relative paths (always physical via cwd), so this only affects the test.
+    const plan = join(realpathSync(repo), 'docs', 'plan.md');
+
+    // Absolute path from repo root, then the same plan referenced from a deep CWD.
+    runDb(['record', plan, 'T-001', '>'], { cwd: repo });
+    runDb(['record', '../../../docs/plan.md', 'T-001', 'X'], { cwd: nested });
+
+    const rows = await readRows(dbPath());
+    expect(rows).toHaveLength(1);
+    expect(rows[0].plan_file).toBe('docs/plan.md');   // repo-relative POSIX
+    expect(rows[0].state).toBe('X');
+  });
+
+  it('a plan resolving outside the root is stored verbatim (../ key), not rejected', async () => {
+    // Reference a file one level above the repo root: normalization yields a
+    // leading `../`. Per the outside-root constraint this is accepted and stored,
+    // subject only to the empty/512-char caps.
+    const r = runDb(['record', '../outside-plan.md', 'T-001', 'X'], { cwd: repo });
+    expect(r.status).toBe(0);
+    const rows = await readRows(dbPath());
+    expect(rows).toHaveLength(1);
+    expect(rows[0].plan_file.startsWith('../')).toBe(true);
+  });
+});
