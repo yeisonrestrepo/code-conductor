@@ -147,3 +147,76 @@ describe.skipIf(!HAS_SQLITE)('conductor-db record (input validation)', () => {
     expect(rows[0].task_id.length).toBe(512);        // trimmed to exactly the cap, accepted
   });
 });
+
+describe.skipIf(!HAS_SQLITE)('conductor-db CLI discipline', () => {
+  const dbPath = () => join(repo, '.conductor', 'cache.db');
+
+  it('unknown subcommand: exit 0, one exact usage line, no db', async () => {
+    const r = runDb(['frobnicate'], { cwd: repo });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toBe('');
+    // Exactly one line, exact text (the token is JSON.stringify'd so it is quoted).
+    expect(r.stderr).toBe(
+      'CONDUCTOR_DB: unknown subcommand "frobnicate"; ' +
+      'usage: conductor-db.mjs record <plan_file> <task_id> <state> | init\n'
+    );
+    expect(existsSync(dbPath())).toBe(false);
+  });
+
+  it('no subcommand at all: exit 0, usage line naming the empty subcommand', async () => {
+    const r = runDb([], { cwd: repo });
+    expect(r.status).toBe(0);
+    // sub is undefined -> `sub ?? ''` -> JSON.stringify('') -> the empty quoted token.
+    expect(r.stderr).toBe(
+      'CONDUCTOR_DB: unknown subcommand ""; ' +
+      'usage: conductor-db.mjs record <plan_file> <task_id> <state> | init\n'
+    );
+  });
+
+  it('subcommand matching is case-sensitive: RECORD is unknown, not dispatched', async () => {
+    const r = runDb(['RECORD', 'plan.md', 'T-001', 'X'], { cwd: repo });
+    expect(r.status).toBe(0);
+    expect(r.stderr).toBe(
+      'CONDUCTOR_DB: unknown subcommand "RECORD"; ' +
+      'usage: conductor-db.mjs record <plan_file> <task_id> <state> | init\n'
+    );
+    expect(existsSync(dbPath())).toBe(false);   // never reached record's body
+  });
+
+  it('record with too few args: exit 0, usage warning, writes nothing', async () => {
+    const r = runDb(['record', 'plan.md'], { cwd: repo });
+    expect(r.status).toBe(0);
+    expect(r.stderr).toContain('CONDUCTOR_DB:');
+    expect(existsSync(dbPath()) ? await readRows(dbPath()) : []).toHaveLength(0);
+  });
+
+  it('record with too many args: exit 0, exact usage line, no db created', async () => {
+    const r = runDb(['record', 'plan.md', 'T-001', 'X', 'extra'], { cwd: repo });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toBe('');
+    // Strict `!== 3` reject, symmetric with init's `!== 0`; runs before any db work.
+    expect(r.stderr).toBe(
+      'CONDUCTOR_DB: usage: conductor-db.mjs record <plan_file> <task_id> <state> | init\n'
+    );
+    expect(existsSync(dbPath())).toBe(false);
+  });
+
+  it('init is silent on success and creates the db', async () => {
+    const r = runDb(['init'], { cwd: repo });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toBe('');
+    expect(r.stderr).toBe('');
+    expect(existsSync(dbPath())).toBe(true);
+  });
+
+  it('init with any trailing arg: exit 0, exact usage line, no db created', async () => {
+    const r = runDb(['init', 'oops'], { cwd: repo });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toBe('');
+    expect(r.stderr).toBe(
+      'CONDUCTOR_DB: usage: conductor-db.mjs record <plan_file> <task_id> <state> | init\n'
+    );
+    // The arg-count guard runs BEFORE resolveRoot/withDb, so nothing is created.
+    expect(existsSync(dbPath())).toBe(false);
+  });
+});

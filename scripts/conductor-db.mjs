@@ -124,6 +124,7 @@ async function withDb(root, fn) {
 }
 
 async function cmdRecord(args) {
+  if (args.length !== 3) { warn(USAGE); return; }
   const [rawPlan, rawTask, rawState] = args;
   const root = resolveRoot();
   const planFile = validateKey('plan_file', normalizePlanFile(String(rawPlan ?? ''), root));
@@ -135,7 +136,8 @@ async function cmdRecord(args) {
   await withDb(root, (db) => upsert(db, planFile, taskId, state));
 }
 
-async function cmdInit() {
+async function cmdInit(args) {
+  if (args.length !== 0) { warn(USAGE); return; }
   const root = resolveRoot();
   await withDb(root, () => { /* create/verify only */ });
 }
@@ -144,6 +146,7 @@ async function main() {
   const [sub, ...rest] = process.argv.slice(2);
   if (sub === 'record') return cmdRecord(rest);
   if (sub === 'init') return cmdInit(rest);
+  warn(`unknown subcommand ${JSON.stringify(sub ?? '')}; ${USAGE}`);
 }
 
 main().then(() => process.exit(0)).catch((e) => {
