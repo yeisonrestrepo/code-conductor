@@ -39,7 +39,9 @@ Exact, deterministic DDL — all columns `TEXT` affinity, composite primary key,
 `WITHOUT ROWID` (the PK is a natural composite key, so the rowid is dead weight):
 
 ```sql
-PRAGMA journal_mode = WAL;
+PRAGMA journal_mode = WAL;   -- runs OUTSIDE any transaction (WAL switch cannot
+                             -- be set mid-transaction)
+BEGIN IMMEDIATE;
 PRAGMA user_version = 1;
 CREATE TABLE IF NOT EXISTS task_state (
   plan_file  TEXT NOT NULL,
@@ -48,7 +50,25 @@ CREATE TABLE IF NOT EXISTS task_state (
   updated_at TEXT NOT NULL,
   PRIMARY KEY (plan_file, task_id)
 ) WITHOUT ROWID;
+COMMIT;
 ```
+
+First-time setup is atomic: `journal_mode = WAL` is set first (it is a no-op
+inside a transaction), then `user_version` and the `CREATE TABLE` run inside a
+single `BEGIN IMMEDIATE … COMMIT` so a crash mid-setup leaves either no db or a
+fully-formed one — never a half-initialized schema. On any error the transaction
+rolls back.
+
+### Schema-version gating (forward compatibility)
+
+On open, read `PRAGMA user_version`:
+- `0` (fresh/legacy) → apply the v1 setup transaction above.
+- `1` → proceed normally.
+- `> 1` (a newer conductor-db, e.g. post-ARCH-008, wrote this db) → do **not**
+  downgrade, migrate, or write. Emit
+  `CONDUCTOR_DB: db schema vN newer than supported v1, skipping cache write` and
+  exit 0. This mirrors FEAT-010's `SNAP_UNKNOWN_VERSION` forward-compat stance:
+  an older reader never corrupts a newer store.
 
 Upsert statement:
 
@@ -71,6 +91,21 @@ prevents arbitrary/corrupt state strings from ever reaching the table.
 (mirroring the BUG-015 `!val.trim()` guard). An empty string, whitespace-only
 value, or missing positional is treated as invalid input: `CONDUCTOR_DB:` usage
 warning, exit 0, no write — identical to the missing-arg path.
+
+**`plan_file` key normalization.** `plan_file` is normalized to a
+repository-root-relative POSIX path **before** it is used as part of the key:
+`path.relative(root, path.resolve(process.cwd(), plan_file))` with `\\` → `/`.
+This guarantees the same plan yields one stable key regardless of the caller's
+subdirectory, preventing duplicate rows when the CLI runs from different deep
+paths. If the resolved path escapes the root (leading `..`), the normalized
+relative form is stored as-is (rare; non-fatal).
+
+**Length caps (hygiene, not overflow).** `node:sqlite` binds TEXT safely with no
+C-string/buffer-overflow exposure, but to bound row size and reject accidental or
+abusive giant inputs, `plan_file` and `task_id` are each capped at 512 characters
+(post-normalization). Over-cap input is **rejected** (not silently truncated —
+truncation would corrupt the key) with a `CONDUCTOR_DB:` warning and exit 0.
+`state` is already a single enum character.
 
 ### Timestamp source
 
@@ -152,7 +187,9 @@ proceed to recreate without preserving the older backup.
 ### Alternative paths
 
 - **Deep subdirectory:** commands run from any nested path still resolve the same
-  root-level `.conductor/cache.db` via `git rev-parse --show-toplevel`.
+  root-level `.conductor/cache.db` via `git rev-parse --show-toplevel`, and
+  `plan_file` is normalized to a repo-relative POSIX key, so the same task never
+  produces duplicate rows across different CWDs.
 - **Repeated writes to the same task:** the upsert replaces the prior row for that
   `(plan_file, task_id)`, so the table always holds the latest state per task.
   Millisecond `updated_at` precision guarantees correct ordering of rapid
@@ -182,6 +219,13 @@ contract:
   created; if the unlink also fails, emit a `CONDUCTOR_DB:` warning and exit 0
   without writing (fully degraded — the plan file remains authoritative).
 - **Denied directory/file write** (permission): warn naming the path and exit 0.
+- **db path is a directory (or other non-regular file):** detect via `statSync`
+  before opening; if the path is not a regular file, rename it aside using the
+  same corrupt-backup naming (a directory move is non-destructive — its contents
+  travel with it) and create a fresh db. If the rename fails, warn and exit 0.
+  Never recursively delete a directory found at that path.
+- **db schema newer than v1** (`user_version > 1`): warn and exit 0 without
+  writing (see Schema-version gating).
 - **Invalid `<state>` / CLI misuse:** reject with a `CONDUCTOR_DB:` usage warning
   and exit 0; write nothing (see Schema and CLI Contract).
 - **Missing/short args:** warn with usage and exit 0 (never crash the hook).
@@ -220,6 +264,17 @@ checkpointed and no lock or `-wal`/`-shm` residue lingers.
 - [ ] If the corrupt-db rename fails, the script falls back to `unlinkSync`, then
       to a warn-and-exit-0 no-write; it never throws or exits non-zero.
 - [ ] `updated_at` reflects runtime write time, not the plan file's mtime.
+- [ ] `plan_file` is normalized to a repo-relative POSIX key; recording the same
+      task from two different deep CWDs yields exactly one row (no duplicate).
+- [ ] `plan_file`/`task_id` over 512 chars are rejected (not truncated) with a
+      `CONDUCTOR_DB:` warning and exit 0.
+- [ ] First-time schema setup is atomic: `user_version` + `CREATE TABLE` run in a
+      single `BEGIN IMMEDIATE … COMMIT` (WAL set before it); an interrupted setup
+      leaves no half-formed schema.
+- [ ] An existing db with `user_version > 1` triggers a `CONDUCTOR_DB:` newer-schema
+      warning and exit 0 with no write (forward-compat, no downgrade).
+- [ ] A non-regular file (e.g. a directory) at the db path is renamed aside
+      (never recursively deleted); a fresh db is created.
 - [ ] `cc-implement.md` Step 6 (both `.claude/commands/` and
       `project-template/.claude/commands/` mirrors) invokes the recorder behind a
       `node --version >= 22.5.0` pre-flight gate and passes `--experimental-sqlite`
@@ -232,10 +287,19 @@ checkpointed and no lock or `-wal`/`-shm` residue lingers.
       note, and self-disables below 22.5. This resolves the conflict: no `engines`
       bump means no npm warning/block on Node 20, while the cache still activates
       only where `node:sqlite` exists.
+- [ ] The `npm test` script stays flag-free (no `--experimental-sqlite`, no
+      `NODE_OPTIONS`). Tests invoke `conductor-db.mjs` as a **child process**
+      (`spawnSync`), exactly like the hook — the child adds the version-gated flag
+      itself on Node 22.5–22.x — so the Vitest runner's own Node needs no flag and
+      the suite runs on Node <23 unchanged. On Node <22.5 the child degrades and
+      the degradation assertions cover it.
 - [ ] A Vitest suite covers schema/`user_version` creation, upsert-replaces-state,
-      timestamp shape, `state`-enum rejection, empty-arg rejection, CLI misuse,
-      absent-`node:sqlite` degradation, corrupt-db recovery, and the rename-fail
-      fallback. Root resolution is validated with **nested temporary directories**:
+      timestamp shape, `state`-enum rejection, empty-arg rejection, over-length
+      rejection, `plan_file` normalization (no dup rows), atomic setup,
+      `user_version > 1` forward-compat, non-regular-file-at-path handling, CLI
+      misuse, absent-`node:sqlite` degradation, corrupt-db recovery, and the
+      rename-fail fallback. Root resolution is validated with **nested temporary
+      directories**:
       a real `git init` temp repo exercises the primary path, and a git-less nested
       temp tree (git call forced to fail — no heavyweight mock-git binary needed)
       exercises the `.git`-walk and script-dir fallbacks. Temp dbs live under
