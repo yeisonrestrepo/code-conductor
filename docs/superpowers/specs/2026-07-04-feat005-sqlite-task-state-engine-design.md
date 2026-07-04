@@ -59,13 +59,31 @@ ON CONFLICT (plan_file, task_id)
 DO UPDATE SET state = excluded.state, updated_at = excluded.updated_at;
 ```
 
-### `<state>` validation
+### Argument and `<state>` validation
 
-The allowed set is the four checkbox states: `' '` (pending), `'>'`
+The allowed `state` set is the four checkbox states: `' '` (pending), `'>'`
 (in-progress), `'X'` (complete), `'!'` (failed). Validation is enforced twice —
 in the CLI (before binding) and by the SQL `CHECK` constraint. Any other value is
 rejected with a `CONDUCTOR_DB:` warning and exit 0; nothing is written. This
 prevents arbitrary/corrupt state strings from ever reaching the table.
+
+`plan_file` and `task_id` are required and must be non-empty after `String(arg).trim()`
+(mirroring the BUG-015 `!val.trim()` guard). An empty string, whitespace-only
+value, or missing positional is treated as invalid input: `CONDUCTOR_DB:` usage
+warning, exit 0, no write — identical to the missing-arg path.
+
+### Timestamp source
+
+`updated_at` is strictly the script's **runtime wall-clock at write time**
+(`new Date().toISOString()`), recording when the state transition occurred — the
+agent's action. It is deliberately **not** the plan file's filesystem mtime, which
+is noisy (unrelated edits bump it) and unreliable across systems/clocks.
+
+### Directory creation
+
+The `.conductor/` directory is created with `mkdirSync(dir, { recursive: true })`
+— recursive so missing parents and pre-existing directories are both handled
+without error (idempotent), safe under unexpected environment states.
 
 ### Repository-root resolution
 
@@ -159,7 +177,10 @@ contract:
   `cache.db.corrupt.<ts>` (colon-free `<ts>`, numeric suffix on collision — see
   Corrupt-backup naming) and recreate a fresh schema (mirrors the installer's
   `_backup_if_malformed` pattern), then retry the write once; if it still fails,
-  warn and exit 0.
+  warn and exit 0. **If the rename itself fails** (strict permissions or a held
+  lock), fall back to `unlinkSync` of the corrupt file so a fresh db can be
+  created; if the unlink also fails, emit a `CONDUCTOR_DB:` warning and exit 0
+  without writing (fully degraded — the plan file remains authoritative).
 - **Denied directory/file write** (permission): warn naming the path and exit 0.
 - **Invalid `<state>` / CLI misuse:** reject with a `CONDUCTOR_DB:` usage warning
   and exit 0; write nothing (see Schema and CLI Contract).
@@ -192,20 +213,36 @@ checkpointed and no lock or `-wal`/`-shm` residue lingers.
       success (no stdout); `db.close()` runs in a `finally` before exit.
 - [ ] The resolved root is `path.resolve`-normalized and the db path built with
       `path.join`, verified on both POSIX and Windows separator forms.
+- [ ] Empty or whitespace-only `plan_file` or `task_id` is rejected (post-`trim`)
+      with a `CONDUCTOR_DB:` warning and exit 0; nothing is written.
+- [ ] `.conductor/` is created via `mkdirSync(..., { recursive: true })`;
+      re-running against an existing directory is a no-op (no error).
+- [ ] If the corrupt-db rename fails, the script falls back to `unlinkSync`, then
+      to a warn-and-exit-0 no-write; it never throws or exits non-zero.
+- [ ] `updated_at` reflects runtime write time, not the plan file's mtime.
 - [ ] `cc-implement.md` Step 6 (both `.claude/commands/` and
       `project-template/.claude/commands/` mirrors) invokes the recorder behind a
       `node --version >= 22.5.0` pre-flight gate and passes `--experimental-sqlite`
       only when the gate passes.
 - [ ] `.gitignore` ignores `.conductor/` (local cache never committed).
-- [ ] `package.json` `engines.node` is `>=22.5`; framework still runs on Node 20
-      with the cache silently disabled (graceful degradation).
+- [ ] `package.json` `engines.node` stays `>=20` (the framework's true floor —
+      everything but the optional cache runs on 20). The cache's Node `>=22.5`
+      requirement is enforced at runtime (hook version gate + the script's dynamic
+      `import`), documented in a `conductor-db.mjs` header comment and README/CLAUDE
+      note, and self-disables below 22.5. This resolves the conflict: no `engines`
+      bump means no npm warning/block on Node 20, while the cache still activates
+      only where `node:sqlite` exists.
 - [ ] A Vitest suite covers schema/`user_version` creation, upsert-replaces-state,
-      timestamp shape, `state`-enum rejection, CLI misuse, absent-`node:sqlite`
-      degradation, and corrupt-db recovery. Temp dbs live under `os.tmpdir()` with
-      unique `crypto.randomUUID()` filenames for parallel isolation; an
-      `afterEach`/`finally` unlinks each db **and its `-wal`/`-shm` sidecars** so no
-      dangling files pollute the workspace. It skips cleanly when the runner's Node
-      lacks `node:sqlite`.
+      timestamp shape, `state`-enum rejection, empty-arg rejection, CLI misuse,
+      absent-`node:sqlite` degradation, corrupt-db recovery, and the rename-fail
+      fallback. Root resolution is validated with **nested temporary directories**:
+      a real `git init` temp repo exercises the primary path, and a git-less nested
+      temp tree (git call forced to fail — no heavyweight mock-git binary needed)
+      exercises the `.git`-walk and script-dir fallbacks. Temp dbs live under
+      `os.tmpdir()` with unique `crypto.randomUUID()` filenames for parallel
+      isolation; an `afterEach`/`finally` unlinks each db **and its `-wal`/`-shm`
+      sidecars** so no dangling files pollute the workspace. It skips cleanly when
+      the runner's Node lacks `node:sqlite`.
 - [ ] Full Vitest suite green; VERSION + package.json bumped to 1.19.0; CHANGELOG
       `[1.19.0]` entry tagged `[FEAT-005]` with a dynamically resolved date.
 
@@ -230,7 +267,8 @@ checkpointed and no lock or `-wal`/`-shm` residue lingers.
   body rewritten from the file-existence no-op to the version-gated recorder
   invocation (surgical, mirrored edit in both).
 - **`.gitignore`** — add `.conductor/` (idempotent append).
-- **`package.json:5-7`** — `engines.node` `>=20` → `>=22.5`.
+- **`package.json`** — `engines.node` stays `>=20` (no bump; cache requirement is
+  runtime-gated and documented). Only the `version` field changes at release.
 - **`tests/scripts/conductor-db.test.js`** — new Vitest suite.
 - **`VERSION`, `CHANGELOG.md`** — release closeout to 1.19.0 (gated behind green
   suite, last).
