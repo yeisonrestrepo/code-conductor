@@ -82,7 +82,7 @@
 
 An implementer executing tasks out of order must not "helpfully" pre-add these to Task 1 — doing so turns the later tasks' Step 2 (verify-it-fails) green and breaks the TDD contract.
 
-- [ ] **[T-001] Step 1: Add `.conductor/` to `.gitignore`**
+- [X] **[T-001] Step 1: Add `.conductor/` to `.gitignore`**
 
 Append one line so dev-time db writes are never committed. `.gitignore` currently ends at `.claude/memory/session-snapshot.json` (line 16). Add:
 
@@ -90,7 +90,7 @@ Append one line so dev-time db writes are never committed. `.gitignore` currentl
 .conductor/
 ```
 
-- [ ] **[T-001] Step 2: Write the failing test (happy path + upsert)**
+- [X] **[T-001] Step 2: Write the failing test (happy path + upsert)**
 
 Create `tests/scripts/conductor-db.test.js`:
 
@@ -196,12 +196,12 @@ describe.skipIf(!HAS_SQLITE)('conductor-db record (happy path)', () => {
 });
 ```
 
-- [ ] **[T-001] Step 3: Run the test, verify it fails**
+- [X] **[T-001] Step 3: Run the test, verify it fails**
 
 Run: `npm test -- tests/scripts/conductor-db.test.js`
 Expected: FAIL — the script file does not exist yet (child exits non-zero / `Cannot find module`).
 
-- [ ] **[T-001] Step 4: Write the minimal implementation**
+- [X] **[T-001] Step 4: Write the minimal implementation**
 
 Create `scripts/conductor-db.mjs`:
 
@@ -344,12 +344,12 @@ main().then(() => process.exit(0)).catch((e) => {
 });
 ```
 
-- [ ] **[T-001] Step 5: Run the test, verify it passes**
+- [X] **[T-001] Step 5: Run the test, verify it passes**
 
 Run: `npm test -- tests/scripts/conductor-db.test.js`
 Expected: PASS (4 tests in the happy-path block; the suite skips entirely if `HAS_SQLITE` is false).
 
-- [ ] **[T-001] Step 6: Commit**
+- [X] **[T-001] Step 6: Commit**
 
 ```bash
 git add scripts/conductor-db.mjs tests/scripts/conductor-db.test.js .gitignore
@@ -370,7 +370,7 @@ Note: the full `npm test` suite has no red tests here (this is the first green f
 - Consumes: `cmdRecord`, `normalizePlanFile`, `warn` from Task 1.
 - Produces: `validateKey(name, value) -> string | null`; `VALID_STATES` set; `MAX_KEY_LEN = 512`; `USAGE` string. `cmdRecord` now rejects bad input before any db work.
 
-- [ ] **[T-002] Step 1: Write the failing tests**
+- [X] **[T-002] Step 1: Write the failing tests**
 
 Append to `tests/scripts/conductor-db.test.js`:
 
@@ -426,12 +426,12 @@ describe.skipIf(!HAS_SQLITE)('conductor-db record (input validation)', () => {
 });
 ```
 
-- [ ] **[T-002] Step 2: Run the tests, verify they fail**
+- [X] **[T-002] Step 2: Run the tests, verify they fail**
 
 Run: `npm test -- tests/scripts/conductor-db.test.js -t "input validation"`
 Expected: FAIL — Task 1 has no CLI validation; the enum case surfaces a raw SQL `CHECK` error (wrong message / possibly a created db), the whitespace case stores `'   '`, over-length stores 600 chars, and the trim case stores `'  T-007  '`.
 
-- [ ] **[T-002] Step 3: Write the implementation**
+- [X] **[T-002] Step 3: Write the implementation**
 
 In `scripts/conductor-db.mjs`, add constants below `warn`:
 
@@ -471,12 +471,12 @@ async function cmdRecord(args) {
 
 Never write `String(rawPlan)` / `String(rawTask)` / `String(rawState)` without the `?? ''`. A grep for `String(raw` in the finished script must show `?? ''` on every hit.
 
-- [ ] **[T-002] Step 4: Run the tests, verify they pass**
+- [X] **[T-002] Step 4: Run the tests, verify they pass**
 
 Run: `npm test -- tests/scripts/conductor-db.test.js -t "input validation"`
 Expected: PASS (4 tests).
 
-- [ ] **[T-002] Step 5: Commit**
+- [X] **[T-002] Step 5: Commit**
 
 ```bash
 git add scripts/conductor-db.mjs tests/scripts/conductor-db.test.js
@@ -495,7 +495,7 @@ git commit -m "feat(FEAT-005): validate state enum, empty args, 512-char cap"
 - Consumes: `cmdRecord`, `cmdInit`, `warn`, `USAGE`, `withDb` from Tasks 1–2.
 - Produces: `main` rejects unknown subcommands; `cmdRecord` enforces exactly 3 args; `cmdInit` enforces 0 args and stays silent on success.
 
-- [ ] **[T-003] Step 1: Write the failing tests**
+- [X] **[T-003] Step 1: Write the failing tests**
 
 Append to `tests/scripts/conductor-db.test.js`:
 
@@ -574,12 +574,12 @@ describe.skipIf(!HAS_SQLITE)('conductor-db CLI discipline', () => {
 });
 ```
 
-- [ ] **[T-003] Step 2: Run the tests, verify they fail**
+- [X] **[T-003] Step 2: Run the tests, verify they fail**
 
 Run: `npm test -- tests/scripts/conductor-db.test.js -t "CLI discipline"`
 Expected: FAIL — Task 1's `main`/`cmdRecord`/`cmdInit` do not warn on unknown subcommand, do not count args, and `record plan.md` throws inside `resolveRoot`/normalize before any guard.
 
-- [ ] **[T-003] Step 3: Write the implementation**
+- [X] **[T-003] Step 3: Write the implementation**
 
 In `scripts/conductor-db.mjs`, add an arg-count guard at the top of `cmdRecord` (first line inside the function):
 
@@ -626,12 +626,12 @@ CONDUCTOR_DB: unknown subcommand "<token>"; usage: conductor-db.mjs record <plan
 
 `<token>` is `JSON.stringify(sub ?? '')`, so it is always double-quoted (an absent subcommand renders as `""`). No database is opened or created on this path — `resolveRoot`/`withDb` are never reached. This is the same exit-0, one-`CONDUCTOR_DB:`-line discipline every other degraded path follows.
 
-- [ ] **[T-003] Step 4: Run the tests, verify they pass**
+- [X] **[T-003] Step 4: Run the tests, verify they pass**
 
 Run: `npm test -- tests/scripts/conductor-db.test.js -t "CLI discipline"`
 Expected: PASS (5 tests).
 
-- [ ] **[T-003] Step 5: Commit**
+- [X] **[T-003] Step 5: Commit**
 
 ```bash
 git add scripts/conductor-db.mjs tests/scripts/conductor-db.test.js
@@ -648,7 +648,7 @@ git commit -m "feat(FEAT-005): CLI discipline — unknown subcommand, arg count,
 **Interfaces:**
 - Consumes: `normalizePlanFile` (already introduced in Task 1 and used by `cmdRecord`). This task adds the dedup **proof** test. `normalizePlanFile` already produces a repo-relative POSIX key, so this test locks in the behavior against regression.
 
-- [ ] **[T-004] Step 1: Write the failing test**
+- [X] **[T-004] Step 1: Write the failing test**
 
 Append to `tests/scripts/conductor-db.test.js`:
 
@@ -686,14 +686,14 @@ describe.skipIf(!HAS_SQLITE)('conductor-db plan_file normalization', () => {
 });
 ```
 
-- [ ] **[T-004] Step 2: Run the test, verify it passes (guard against silent regression)**
+- [X] **[T-004] Step 2: Run the test, verify it passes (guard against silent regression)**
 
 Run: `npm test -- tests/scripts/conductor-db.test.js -t "normalization"`
 Expected: PASS — `normalizePlanFile` (Task 1) already normalizes to a repo-relative POSIX key, so both invocations collapse to `docs/plan.md`. If this test *fails*, `normalizePlanFile` was broken by an earlier edit; fix it before continuing.
 
 (This task has no red→green code delta: normalization is intrinsic to the key. The test exists because the dedup property is an explicit acceptance criterion and must be pinned.)
 
-- [ ] **[T-004] Step 3: Commit**
+- [X] **[T-004] Step 3: Commit**
 
 ```bash
 git add tests/scripts/conductor-db.test.js
@@ -712,7 +712,7 @@ git commit -m "test(FEAT-005): pin plan_file repo-relative dedup across CWDs"
 - Consumes: `resolveRoot` from Task 1 (git-only).
 - Produces: `resolveRoot()` gains Fallback A (bounded `.git` walk, `WALK_CAP = 40`) and Fallback B (script-dir `../`). `existsSync`, `dirname`, `fileURLToPath` imported.
 
-- [ ] **[T-005] Step 1: Write the failing tests**
+- [X] **[T-005] Step 1: Write the failing tests**
 
 Append to `tests/scripts/conductor-db.test.js`. These force `git` to fail by launching the child with an empty `PATH` (node itself is spawned by absolute `process.execPath`, so it still runs; the script's `execFileSync('git', …)` gets ENOENT and falls through):
 
@@ -753,12 +753,12 @@ describe.skipIf(!HAS_SQLITE)('conductor-db root resolution fallbacks', () => {
 });
 ```
 
-- [ ] **[T-005] Step 2: Run the tests, verify they fail**
+- [X] **[T-005] Step 2: Run the tests, verify they fail**
 
 Run: `npm test -- tests/scripts/conductor-db.test.js -t "root resolution"`
 Expected: FAIL — Task 1's `resolveRoot` calls `execFileSync('git', …)`; with `PATH=''` that throws ENOENT and is **unhandled**, so the child hits `main().catch` (exit 0) but writes no db — the `existsSync` assertions fail.
 
-- [ ] **[T-005] Step 3: Write the implementation**
+- [X] **[T-005] Step 3: Write the implementation**
 
 In `scripts/conductor-db.mjs`, extend the imports:
 
@@ -798,12 +798,12 @@ function resolveRoot() {
 }
 ```
 
-- [ ] **[T-005] Step 4: Run the tests, verify they pass**
+- [X] **[T-005] Step 4: Run the tests, verify they pass**
 
 Run: `npm test -- tests/scripts/conductor-db.test.js -t "root resolution"`
 Expected: PASS (2 tests). Re-run the full file to confirm no regression: `npm test -- tests/scripts/conductor-db.test.js`.
 
-- [ ] **[T-005] Step 5: Commit**
+- [X] **[T-005] Step 5: Commit**
 
 ```bash
 git add scripts/conductor-db.mjs tests/scripts/conductor-db.test.js
@@ -823,7 +823,7 @@ git commit -m "feat(FEAT-005): root resolution fallbacks — .git walk + script-
 - Consumes: `withDb` from Task 1.
 - Produces: `withDb` wraps `import('node:sqlite')` in try/catch and warns `node:sqlite unavailable, skipping cache write` on failure. Test fixture forces that failure on a sqlite-capable Node.
 
-- [ ] **[T-006] Step 1: Create the loader fixture**
+- [X] **[T-006] Step 1: Create the loader fixture**
 
 Create `tests/scripts/fixtures/block-sqlite.mjs` — a module-customization loader that makes `import('node:sqlite')` reject, so the absent-sqlite branch is reachable on Node 26:
 
@@ -847,7 +847,7 @@ export async function resolve(specifier, context, next) {
 }
 ```
 
-- [ ] **[T-006] Step 2: Write the failing test**
+- [X] **[T-006] Step 2: Write the failing test**
 
 Append to `tests/scripts/conductor-db.test.js`:
 
@@ -869,12 +869,12 @@ describe.skipIf(!HAS_SQLITE)('conductor-db node:sqlite unavailable', () => {
 });
 ```
 
-- [ ] **[T-006] Step 3: Run the test, verify it fails**
+- [X] **[T-006] Step 3: Run the test, verify it fails**
 
 Run: `npm test -- tests/scripts/conductor-db.test.js -t "node:sqlite unavailable"`
 Expected: FAIL — Task 1's `withDb` calls `await import('node:sqlite')` with no try/catch; with the blocker registered it rejects, bubbles to `main().catch`, which prints `unexpected: …` (wrong message, wrong shape).
 
-- [ ] **[T-006] Step 4: Write the implementation**
+- [X] **[T-006] Step 4: Write the implementation**
 
 In `scripts/conductor-db.mjs`, replace the first two lines of `withDb` (the import) so the failure is caught:
 
@@ -900,12 +900,12 @@ async function withDb(root, fn) {
 }
 ```
 
-- [ ] **[T-006] Step 5: Run the test, verify it passes**
+- [X] **[T-006] Step 5: Run the test, verify it passes**
 
 Run: `npm test -- tests/scripts/conductor-db.test.js -t "node:sqlite unavailable"`
 Expected: PASS (1 test).
 
-- [ ] **[T-006] Step 6: Commit**
+- [X] **[T-006] Step 6: Commit**
 
 ```bash
 git add scripts/conductor-db.mjs tests/scripts/fixtures/block-sqlite.mjs tests/scripts/fixtures/block-sqlite-hooks.mjs tests/scripts/conductor-db.test.js
@@ -924,7 +924,7 @@ git commit -m "feat(FEAT-005): graceful degradation when node:sqlite is unavaila
 - Consumes: `openReady`, `applySchema`, `withDb`, `warn` from earlier tasks.
 - Produces: `compactStamp()`, `backupAside(path) -> boolean`, `isCorruptionError(e) -> boolean`; `openReady` now moves a corrupt db aside and recreates; `withDb` catches residual write failures (`SQLITE_BUSY`, permission) → warn + exit 0.
 
-- [ ] **[T-007] Step 1: Write the failing tests**
+- [X] **[T-007] Step 1: Write the failing tests**
 
 Append to `tests/scripts/conductor-db.test.js`:
 
@@ -977,12 +977,12 @@ describe.skipIf(!HAS_SQLITE)('conductor-db corrupt-db recovery', () => {
 });
 ```
 
-- [ ] **[T-007] Step 2: Run the tests, verify they fail**
+- [X] **[T-007] Step 2: Run the tests, verify they fail**
 
 Run: `npm test -- tests/scripts/conductor-db.test.js -t "corrupt-db recovery"`
 Expected: FAIL — Task 1's `openReady` runs `PRAGMA user_version` on the garbage file, which throws `SQLITE_NOTADB`; unhandled, the child exits 0 (via `main().catch`) but leaves the corrupt file in place and writes no row, so no backup exists and `readRows` finds an unreadable db.
 
-- [ ] **[T-007] Step 3: Write the implementation**
+- [X] **[T-007] Step 3: Write the implementation**
 
 In `scripts/conductor-db.mjs`, add `renameSync, unlinkSync, statSync` to the fs import and add these helpers above `openReady`:
 
@@ -1118,12 +1118,12 @@ async function withDb(root, fn) {
 
 **`finally` must guard `db.close()` — the handle may never have been created.** In `withDb`, `db` is initialized to `null` and only assigned from `openReady()`'s return value. If the `DatabaseSync` constructor throws (locked file, ENOENT race, unopenable path), `openReady` either returns `null` (recovery gave up) or throws — in both cases the assignment `db = openReady(...)` leaves `db` as `null`, never a half-built handle. The `finally` therefore **must** gate on `if (db)` before calling `db.close()`; calling `.close()` on `null`/`undefined` would raise a `TypeError` that masks the original failure. The same `if (db)` guard applies to `openReady`'s internal cleanup (`try { if (db) db.close(); } catch {}` on the corruption branch, where `db` is `undefined` if the first constructor threw). Never write an unguarded `db.close()` anywhere in this script; every close site is `if (db) { try { db.close(); } catch { /* ignore */ } }` or equivalent. A `grep -n "\.close()" scripts/conductor-db.mjs` must show every hit fronted by an `if (db)`/`if (...db)` guard or inside its own try/catch.
 
-- [ ] **[T-007] Step 4: Run the tests, verify they pass**
+- [X] **[T-007] Step 4: Run the tests, verify they pass**
 
 Run: `npm test -- tests/scripts/conductor-db.test.js -t "corrupt-db recovery"`
 Expected: PASS (2 tests; the read-only case self-skips where `chmod` is a no-op). Re-run the full file to confirm no regression.
 
-- [ ] **[T-007] Step 5: Commit**
+- [X] **[T-007] Step 5: Commit**
 
 ```bash
 git add scripts/conductor-db.mjs tests/scripts/conductor-db.test.js
@@ -1142,7 +1142,7 @@ git commit -m "feat(FEAT-005): corrupt-db recovery + rename/unlink degradation l
 - Consumes: `backupAside`, `openReady`, `statSync` from earlier tasks.
 - Produces: a pre-open `statSync` guard in `openReady` that renames a directory (or other non-regular file) aside before opening — never `rm -r`.
 
-- [ ] **[T-008] Step 1: Write the failing test**
+- [X] **[T-008] Step 1: Write the failing test**
 
 Append to `tests/scripts/conductor-db.test.js`:
 
@@ -1177,12 +1177,12 @@ describe.skipIf(!HAS_SQLITE)('conductor-db non-regular file at db path', () => {
 });
 ```
 
-- [ ] **[T-008] Step 2: Run the test, verify it fails**
+- [X] **[T-008] Step 2: Run the test, verify it fails**
 
 Run: `npm test -- tests/scripts/conductor-db.test.js -t "non-regular file"`
 Expected: FAIL — Task 7's `openReady` calls `new DatabaseSync(<dir>)`; opening a directory as a db throws an error that is not a corruption error, so it re-throws → caught by `withDb` as a generic write error → no backup, no fresh db.
 
-- [ ] **[T-008] Step 3: Write the implementation**
+- [X] **[T-008] Step 3: Write the implementation**
 
 `statSync` is already imported (added in T-007 for `backupAside`); confirm the fs import reads `import { mkdirSync, existsSync, renameSync, unlinkSync, statSync } from 'node:fs';` and do not duplicate it.
 
@@ -1217,12 +1217,12 @@ function openReady(DatabaseSync, dbPath) {
 }
 ```
 
-- [ ] **[T-008] Step 4: Run the test, verify it passes**
+- [X] **[T-008] Step 4: Run the test, verify it passes**
 
 Run: `npm test -- tests/scripts/conductor-db.test.js -t "non-regular file"`
 Expected: PASS (1 test).
 
-- [ ] **[T-008] Step 5: Commit**
+- [X] **[T-008] Step 5: Commit**
 
 ```bash
 git add scripts/conductor-db.mjs tests/scripts/conductor-db.test.js
@@ -1241,7 +1241,7 @@ git commit -m "feat(FEAT-005): move a non-regular file at db path aside, never r
 - Consumes: `openReady`, `warn` from earlier tasks.
 - Produces: `openReady` returns `null` (no write) when the existing db's `user_version > 1`, emitting the newer-schema warning.
 
-- [ ] **[T-009] Step 1: Write the failing test**
+- [X] **[T-009] Step 1: Write the failing test**
 
 Append to `tests/scripts/conductor-db.test.js`:
 
@@ -1295,12 +1295,12 @@ describe.skipIf(!HAS_SQLITE)('conductor-db schema self-heal', () => {
 });
 ```
 
-- [ ] **[T-009] Step 2: Run the test, verify it fails**
+- [X] **[T-009] Step 2: Run the test, verify it fails**
 
 Run: `npm test -- tests/scripts/conductor-db.test.js -t "forward compatibility"`
 Expected: FAIL — Task 8's `openReady` only special-cases `ver === 0`; for `ver === 2` it skips schema but returns the open db, so `upsert` runs against a table that does not exist and throws (caught as a generic write error with the wrong message), and the newer-schema warning is absent.
 
-- [ ] **[T-009] Step 3: Write the implementation**
+- [X] **[T-009] Step 3: Write the implementation**
 
 In `scripts/conductor-db.mjs`, update the version branch inside `openReady` (the `try` block) to gate on `> 1`:
 
@@ -1319,13 +1319,13 @@ In `scripts/conductor-db.mjs`, update the version branch inside `openReady` (the
   } catch (e) {
 ```
 
-- [ ] **[T-009] Step 4: Run the test, verify it passes**
+- [X] **[T-009] Step 4: Run the test, verify it passes**
 
 Run: `npm test -- tests/scripts/conductor-db.test.js -t "forward compatibility"`
 Expected: PASS (1 test). Then run the entire suite to confirm the engine is fully green: `npm test`.
 Expected: all suites PASS.
 
-- [ ] **[T-009] Step 5: Commit**
+- [X] **[T-009] Step 5: Commit**
 
 ```bash
 git add scripts/conductor-db.mjs tests/scripts/conductor-db.test.js
@@ -1346,7 +1346,7 @@ git commit -m "feat(FEAT-005): forward-compat — never downgrade or write a new
 
 **Do not use line numbers.** These command files are edited every cycle, so any hardcoded line range drifts. Locate the region by its heading text (`### Step 6: Hook`) and match the exact paragraph below as the `Edit` `old_string`. Because that paragraph string is unique within the file, the `Edit` tool anchors correctly regardless of where the section currently sits.
 
-- [ ] **[T-010] Step 1: Replace the Step 6 body in the live command**
+- [X] **[T-010] Step 1: Replace the Step 6 body in the live command**
 
 First locate the region without assuming a position:
 
@@ -1384,21 +1384,21 @@ Runs after both success (`[X]`) and failure (`[!]`) paths. Record the task's fin
    The recorder self-initializes `.conductor/cache.db`, upserts the row, and exits 0 on every path. If the launch fails for any reason (permission error, unexpected abort), it is non-fatal: log a warning and continue. The plan file is the authoritative state record.
 ```
 
-- [ ] **[T-010] Step 2: Verify the live edit landed (anchor-based, no line numbers)**
+- [X] **[T-010] Step 2: Verify the live edit landed (anchor-based, no line numbers)**
 
 Run: `awk '/^### Step 6: Hook$/{f=1} f{print} /^### Repeat from Step 1\.$/{exit}' .claude/commands/cc-implement.md`
 Expected: prints the new numbered hook body, starting at `### Step 6: Hook` and ending at `### Repeat from Step 1.`; the `conductor-db.mjs record` invocation and the `>= 22.5.0` gate are present.
 
-- [ ] **[T-010] Step 3: Apply the identical replacement to the template mirror**
+- [X] **[T-010] Step 3: Apply the identical replacement to the template mirror**
 
 Repeat the exact same `Edit` on `project-template/.claude/commands/cc-implement.md` — locate the `### Step 6: Hook` region by heading anchor (same original paragraph, same replacement). Do not rely on a line number.
 
-- [ ] **[T-010] Step 4: Confirm both mirrors match (anchor-based)**
+- [X] **[T-010] Step 4: Confirm both mirrors match (anchor-based)**
 
 Run: `diff <(awk '/^### Step 6: Hook$/{f=1} f{print} /^### Repeat from Step 1\.$/{exit}' .claude/commands/cc-implement.md) <(awk '/^### Step 6: Hook$/{f=1} f{print} /^### Repeat from Step 1\.$/{exit}' project-template/.claude/commands/cc-implement.md)`
 Expected: no output (the two Step 6 regions are identical).
 
-- [ ] **[T-010] Step 5: Commit**
+- [X] **[T-010] Step 5: Commit**
 
 ```bash
 git add -f .claude/commands/cc-implement.md project-template/.claude/commands/cc-implement.md
@@ -1420,14 +1420,14 @@ git commit -m "feat(FEAT-005): wire cc-implement Step 6 hook to conductor-db rec
 **Interfaces:**
 - Consumes: a fully green `npm test` from Tasks 1–10.
 
-- [ ] **[T-011] Step 1: Gate — run the full suite and assert current version**
+- [X] **[T-011] Step 1: Gate — run the full suite and assert current version**
 
 Run: `npm test`
 Expected: all suites PASS.
 Run: `cat VERSION && node -p "require('./package.json').version"`
 Expected: both print `1.18.0`. If either differs, stop and reconcile before bumping.
 
-- [ ] **[T-011] Step 2: Bump `VERSION`**
+- [X] **[T-011] Step 2: Bump `VERSION`**
 
 Replace the single line `1.18.0` with:
 
@@ -1435,7 +1435,7 @@ Replace the single line `1.18.0` with:
 1.19.0
 ```
 
-- [ ] **[T-011] Step 3: Bump `package.json` version**
+- [X] **[T-011] Step 3: Bump `package.json` version**
 
 `Edit` line 3 of `package.json`:
 
@@ -1445,7 +1445,7 @@ Replace the single line `1.18.0` with:
 
 Leave `"engines": { "node": ">=20" }` unchanged (Global Constraint: no engines bump).
 
-- [ ] **[T-011] Step 4: Add the CHANGELOG entry**
+- [X] **[T-011] Step 4: Add the CHANGELOG entry**
 
 Resolve the date: `date +%F` (e.g. `2026-07-04`). Insert a new top entry directly under the `# Changelog` heading, above `## [1.18.0]`:
 
@@ -1461,7 +1461,7 @@ Resolve the date: `date +%F` (e.g. `2026-07-04`). Insert a new top entry directl
 - `[FEAT-005]` `.gitignore`: ignores `.conductor/` (local cache, never committed).
 ```
 
-- [ ] **[T-011] Step 5: Check the backlog checkboxes**
+- [X] **[T-011] Step 5: Check the backlog checkboxes**
 
 Per the BUG-003 invariant, edit **one checkbox at a time**. First confirm each pattern is unique:
 
@@ -1469,7 +1469,7 @@ Run: `grep -nc "FEAT-005" "AGENT-READABLE BACKLOG.md" && grep -nc "FEAT-013" "AG
 
 Then surgically flip the `[FEAT-005]` task checkbox to `[X]` (single-line `Edit`), and separately flip the `[FEAT-013]` checkbox to `[X]` (it shipped in 1.18.0 but was never marked). If either grep shows a count other than the expected single task line, stop and resolve manually before editing.
 
-- [ ] **[T-011] Step 6: Final full-suite run and commit**
+- [X] **[T-011] Step 6: Final full-suite run and commit**
 
 Run: `npm test`
 Expected: all suites PASS (release must ship green).

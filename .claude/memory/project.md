@@ -305,3 +305,21 @@ APPROVED. 11 tasks (T-001..T-011), one commit each, strict TDD red→green; ever
 - Hook: no-flag-first→flag probe dispatch (unrecognized `--experimental-sqlite` contained in throwaway probe), `--no-warnings`, all 3 args double-quoted; `npm test` stays flag-free (spawnSync child adds flags).
 - All failures exit 0, one `CONDUCTOR_DB:` stderr line; stdout always empty; ENOSPC/EDQUOT/EROFS covered by withDb catch + top-level main catch.
 - Plan: `docs/superpowers/plans/2026-07-04-feat005-sqlite-task-state-engine.md`
+
+## Checkpoint 2026-07-04 18:08 (FEAT-005 complete — v1.19.0)
+
+### Decisions
+- FEAT-005 shipped v1.19.0 (release commit ef93f4d): 11 tasks T-001..T-011, one commit each, strict TDD; every commit passed the pre-commit gate without `--no-verify`; final suite 302/302 green
+- Engine `scripts/conductor-db.mjs` final shape as designed: single-file, all opens via `openConn` (busy_timeout=2000), atomic `BEGIN IMMEDIATE` schema, WAL best-effort, `wal_checkpoint(TRUNCATE)` before every guarded single close, forward-compat `user_version>1` no-write, corrupt/non-regular recovery renames aside (never `rm -r`)
+- Step 6 hook wired in both mirrors (`.claude/commands/` + `project-template/`): version-gated (`node >= 22.5.0`), no-flag-first→flag probe dispatch, all 3 args double-quoted; `engines.node` stays `>=20` (cache self-disables below 22.5)
+- `[FEAT-013]` backlog checkbox (shipped 1.18.0 but never marked) flipped `[X]` alongside `[FEAT-005]` in T-011
+
+### Conventions
+- writing-plans hybrid format: `- [ ] **[T-NNN] Step K: …**` repeats one task ID across its TDD step checkboxes; cc-implement 5-step ritual applied per step-line (uniqueness check per step, not per task ID)
+- Node's `os.tmpdir()` returns the `/var` symlink on macOS while git toplevel + `process.cwd()` return physical `/private/var`; tests feeding an ABSOLUTE path into a git-rooted repo must `realpathSync(repo)` first or the repo-relative key never dedups (test-only; the real hook passes relative paths via physical cwd)
+- TDD red-step guard: assert on a message string UNIQUE to the implemented branch (e.g. `skipping cache write`), never a loose substring the generic `main().catch` fallthrough also emits — otherwise the red step is falsely green and the test proves nothing
+
+### Technical Debt
+- Step 6 hook is executed prose (agent-interpreted), not a shell script — no automated test covers the markdown; correctness depends on the ritual reader honoring the probe order (verified only by mirror `diff`)
+- `backupAside` numeric collision suffix caps at 100 backups per timestamp; beyond that it falls to the unlink/give-up ladder (non-fatal, but a pathological corrupt-loop could exhaust it)
+- ARCH-008 deferred: sessions / raw_history / snapshots tables + git-hash time-travel + metadata caching are out of FEAT-005 scope (engine + single `task_state` table only)

@@ -92,7 +92,7 @@ All commands are tagged `(Conductor)` in the Claude Code command palette so they
 | `/cc-spec [name]` | Search the codebase first, ask only for missing context, generate a full feature spec, and wait for your approval before any plan is made. |
 | `/cc-plan` | Require an approved spec, map the codebase, and generate an ordered implementation plan with exact file paths, a test list, a commit order, and identified risks. Every generated task line carries a unique `[T-NNN]` ID (min 3 digits, unlimited suffix depth) using plain ASCII checkboxes — enforced at generation time. |
 | `/cc-compact` | Phase-boundary command. Serializes the current phase's essential state (decisions, pending steps, files touched, constraints) into a ≤300-token snapshot at `.claude/memory/session-snapshot.md`, then prompts you to run `/compact` to clear conversation history. Run at the end of every phase to prevent context overflow. |
-| `/cc-implement` | Execute implementation tasks from an approved plan using a surgical 5-step ritual: Grep-locate pending tasks → single-line Read verify → pre-flip `[ ]` to `[>]` → execute → post-flip to `[X]` or `[!]`. Never reads or rewrites the full plan file. Includes dependency evaluation, drift detection, and a hook point for future SQLite state recording. |
+| `/cc-implement` | Execute implementation tasks from an approved plan using a surgical 5-step ritual: Grep-locate pending tasks → single-line Read verify → pre-flip `[ ]` to `[>]` → execute → post-flip to `[X]` or `[!]`. Never reads or rewrites the full plan file. Includes dependency evaluation, drift detection, and a Step 6 hook that records each task's final state to a local SQLite cache (see below). |
 | `/cc-review [file\|dir]` | Review code in three layers - Critical / Important / Suggestion - then deliver a verdict and offer to auto-fix. |
 | `/cc-debug [problem]` | Generate hypotheses ordered by probability, confirm before investigating, use Playwright MCP for visual bugs, and report the root cause with a targeted fix. |
 | `/cc-refactor [file\|module]` | Diagnose complexity, plan ordered changes, apply one step at a time, and verify tests pass after each step. |
@@ -190,6 +190,19 @@ Fires on every `UserPromptSubmit`. Re-injects the active MIN/INFO/VERBOSE verbos
 The global hook defers to a project-level hook if one exists (upward traversal from `$PWD`). The active level is read from the nearest `.claude/memory/verbosity.md` ancestor file. Set `CC_VERBOSITY_SKIP=1` to disable in CI/CD environments.
 
 > **Note — `$HOME` unset environments:** When `$HOME` is unset (e.g., some CI containers, `sudo -H` shells, minimal Docker images), `verbosity-remind.sh` exits immediately with code 0 and emits no output. Claude falls back to MIN verbosity by default. Set `HOME=/root` (or the appropriate home directory) in the container environment to restore full hook behavior. The hook never raises an error when `$HOME` is absent — it degrades gracefully to ensure the user's session is never blocked.
+
+---
+
+## Local State Cache — v1.19.0
+
+`/cc-implement`'s Step 6 hook records each task's final state to a local SQLite cache at `.conductor/cache.db`, written by the bundled `scripts/conductor-db.mjs` engine — a zero-dependency ES module wrapping Node's built-in `node:sqlite`.
+
+- **Schema (v1):** a single `task_state(plan_file, task_id, state, updated_at)` table, keyed by `(plan_file, task_id)`; `plan_file` is normalized to a repo-relative POSIX path so the same plan de-duplicates across working directories. Upserts on every write.
+- **Runtime-gated:** `node:sqlite` needs Node `>= 22.5`, so the hook probes the Node version and self-disables below it. `engines.node` stays `>=20`; the cache is an optimization, never a requirement.
+- **Non-authoritative + fail-safe:** the plan markdown remains the source of truth for task state. Every failure path — absent `node:sqlite`, a corrupt or non-regular file at the db path, `SQLITE_BUSY`, a newer (`user_version > 1`) schema, CLI misuse — degrades to a single `CONDUCTOR_DB:` stderr line and exit 0. A corrupt db is renamed aside (never `rm -r`) and recreated.
+- **Gitignored:** `.conductor/` is local-only and never committed.
+
+> Session-level history (sessions, raw history, snapshots, git-hash time-travel) is out of scope for this release and deferred to a future engine (ARCH-008). v1.19.0 ships the task-state table only.
 
 ---
 

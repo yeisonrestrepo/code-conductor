@@ -87,6 +87,7 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Impact:** Enables instant agent session resumption with clean context bounds, adds support for agent "time-travel" rollbacks, and eliminates the `claude-mem` footprint entirely from the setup overhead.
 * **Components Affected:** Cache database schema, state serialization engines, core installation scripts (`install.sh`, `install.ps1`), dependency manifest files.
 * **Acceptance Criteria:** Successfully reload full agent awareness across branch switches or project rollbacks by matching database state records to the current Git commit identifier. Completely purge all `claude-mem` binary references, installation steps, and environment dependencies from every setup script and project manifest.
+* **Note (from FEAT-005, v1.19.0):** Consider mirroring `/cc-checkpoint` output into the relational store here. Today checkpoints write prose (decisions, conventions, debt) to `project.md`, while the FEAT-005 `task_state` table stores only per-task checkbox state — there is no column for checkpoint content, and the cache is an explicitly non-authoritative, fail-open mirror. A `sessions`/`snapshots` table under this milestone would give checkpoints a queryable, git-hash-indexed home without overloading `task_state`. Keep the plan markdown + `project.md` authoritative; the DB copy would be an optimization only.
 
 ---
 
