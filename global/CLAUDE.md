@@ -57,7 +57,7 @@ The code-simplifier skill is always active. Apply its rules to every change:
 
 ## Stack Detection
 
-Auto-run `/cc-stack` at the start of every session. Confirm before loading any stack profile. If the stack is already in project.md memory, load from there and ask if anything changed.
+Auto-run `/cc-stack` at the start of every session. It runs the dynamic detector and records the stack in the project `CLAUDE.md`. If a stack is already recorded, it asks whether anything changed before re-detecting.
 
 ## Memory
 
@@ -90,4 +90,4 @@ Always tag responses:
 
 ## Loaded Profiles
 
-Stack profiles are loaded dynamically by `/cc-stack`. They define conventions for your specific language and framework. Never apply one language's conventions to another.
+`/cc-stack` detects your stack dynamically and writes the detected commands and a generated ruleset into the project `CLAUDE.md`. Never apply one language's conventions to another.
