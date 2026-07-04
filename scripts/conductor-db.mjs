@@ -179,6 +179,11 @@ function openReady(DatabaseSync, dbPath) {
   try {
     db = openConn(DatabaseSync, dbPath);
     const ver = db.prepare('PRAGMA user_version').get().user_version;   // first I/O
+    if (ver > 1) {
+      warn(`db schema v${ver} newer than supported v1, skipping cache write`);
+      db.close();
+      return null;
+    }
     if (ver === 0 || !tableExists(db)) applySchema(db);
     return db;
   } catch (e) {

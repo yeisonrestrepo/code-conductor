@@ -387,3 +387,51 @@ describe.skipIf(!HAS_SQLITE)('conductor-db non-regular file at db path', () => {
     expect(rows).toHaveLength(1);
   });
 });
+
+describe.skipIf(!HAS_SQLITE)('conductor-db forward compatibility', () => {
+  const dbPath = () => join(repo, '.conductor', 'cache.db');
+
+  it('does not write or downgrade a db whose user_version is newer than v1', async () => {
+    // Simulate a post-ARCH-008 db: valid sqlite file, user_version = 2, no task_state table.
+    const { DatabaseSync } = await import('node:sqlite');
+    mkdirSync(join(repo, '.conductor'), { recursive: true });
+    const seed = new DatabaseSync(dbPath());
+    seed.exec('PRAGMA user_version = 2;');
+    seed.close();
+
+    const r = runDb(['record', 'plan.md', 'T-001', 'X'], { cwd: repo });
+    expect(r.status).toBe(0);
+    expect(r.stderr).toContain('CONDUCTOR_DB:');
+    expect(r.stderr.toLowerCase()).toContain('newer');
+
+    const check = new DatabaseSync(dbPath());
+    try {
+      expect(check.prepare('PRAGMA user_version').get().user_version).toBe(2);   // not downgraded
+      const t = check.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='task_state'").get();
+      expect(t).toBeUndefined();                                                 // no table created, no write
+    } finally { check.close(); }
+  });
+});
+
+// Pinned regression: the table-existence self-heal (added in T-001's openReady
+// via `|| !tableExists(db)`) must survive later edits. Passes from T-001 onward.
+describe.skipIf(!HAS_SQLITE)('conductor-db schema self-heal', () => {
+  const dbPath = () => join(repo, '.conductor', 'cache.db');
+
+  it('self-heals an interrupted state: user_version=1 but task_state table missing', async () => {
+    // Simulate a crash between the version bump and CREATE (or a later DROP):
+    // the header claims v1 yet the table is absent. openReady must detect this
+    // via tableExists (independent of user_version) and re-apply the schema.
+    const { DatabaseSync } = await import('node:sqlite');
+    mkdirSync(join(repo, '.conductor'), { recursive: true });
+    const seed = new DatabaseSync(dbPath());
+    seed.exec('PRAGMA user_version = 1;');   // header says v1, but no table created
+    seed.close();
+
+    const r = runDb(['record', 'plan.md', 'T-001', 'X'], { cwd: repo });
+    expect(r.status).toBe(0);
+    const rows = await readRows(dbPath());   // table recreated, write landed — no "no such table" crash
+    expect(rows).toHaveLength(1);
+    expect(rows[0].state).toBe('X');
+  });
+});
