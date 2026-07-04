@@ -117,7 +117,22 @@ On `[!]`: proceed to Step 6 to record the failure state, then halt with a failur
 
 ### Step 6: Hook
 
-Runs after both success (`[X]`) and failure (`[!]`) paths. If `.conductor/cache.db` exists, attempt to record task ID + final state + timestamp. If the write fails for any reason, log a non-fatal warning and continue. The plan file is the authoritative state record.
+Runs after both success (`[X]`) and failure (`[!]`) paths. Record the task's final state to the local cache, best-effort:
+
+1. Probe `node --version`. If it is missing or below `22.5.0`, skip the cache write (the `node:sqlite` engine needs `>= 22.5`); the plan file remains authoritative.
+2. Decide how to launch so that an unrecognized flag can never fatally abort Node at startup. Probe with throwaway children, in order:
+   a. **No flag first:** run `node --no-warnings -e "require('node:sqlite')"`. Exit 0 means `node:sqlite` is stable on this Node — launch the recorder **without** `--experimental-sqlite`.
+   b. **Flag second:** else run `node --experimental-sqlite --no-warnings -e "require('node:sqlite')"`. Exit 0 means the flag is needed and recognized — launch the recorder **with** `--experimental-sqlite --no-warnings`.
+   c. **Neither:** else skip the cache write. Both a too-old Node and a future Node that removed/renamed the flag land here.
+
+   Each probe is a disposable child; a non-zero exit — including a fatal `bad option: --experimental-sqlite` from a Node that does not recognize the flag — is caught and simply advances to the next branch. The fatal startup error is therefore always contained inside a probe whose failure is expected; it never propagates and never aborts the hook.
+3. Launch the chosen form, from the repo root, with the active plan file path, the task ID, and the just-written state character (`X` or `!`):
+
+   `node <chosen-flags> scripts/conductor-db.mjs record "<plan_file>" "<task_id>" "<state>"`
+
+   All three arguments **must** be wrapped in double quotes exactly as shown. A repository path can contain spaces (e.g. `/Users/me/My Projects/repo/docs/plan.md`); unquoted, the shell word-splits it into several argv entries and the recorder sees `!== 3` positionals, silently rejecting a legitimate write. `--no-warnings` (in both probe and launch) suppresses Node's `ExperimentalWarning: SQLite is an experimental feature` line so it never pollutes hook stderr; it does not affect the recorder's own `CONDUCTOR_DB:` diagnostics (those are direct `process.stderr` writes, not process warnings).
+
+   The recorder self-initializes `.conductor/cache.db`, upserts the row, and exits 0 on every path. If the launch fails for any reason (permission error, unexpected abort), it is non-fatal: log a warning and continue. The plan file is the authoritative state record.
 
 After the hook: if the task state is `[!]`, halt with the failure report from Step 5.
 
