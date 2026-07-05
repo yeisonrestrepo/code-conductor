@@ -41,7 +41,7 @@
 **Interfaces:**
 - Produces: `SCHEMA_VERSION = 2` constant; `applySchema(db)` now creates `task_state`, `sessions`, `snapshots`, `raw_history` + indexes `idx_snapshots_hash`, `idx_raw_history_session`, sets `user_version = 2`, all in one `BEGIN IMMEDIATE`. `openReady` bails when `ver > SCHEMA_VERSION`, migrates when `ver < SCHEMA_VERSION || !tableExists(db)`.
 
-- [ ] **[T-001] Step 1: Retarget the two version-coupled FEAT-005 tests (they will fail under v2 until steps below land)**
+- [X] **[T-001] Step 1: Retarget the two version-coupled FEAT-005 tests (they will fail under v2 until steps below land)**
 
 In `tests/scripts/conductor-db.test.js`, line 86, change:
 ```js
@@ -89,7 +89,7 @@ so re-declaring the seeded `task_state` is a no-op — SQLite never raises "tabl
 exists". No seed is modified beyond the two version-number changes in Step 1; every mock db
 is created in its own `mkdtemp` repo, so no seed can collide with another test's schema.
 
-- [ ] **[T-001] Step 2: Add the migration describe block (failing tests first)**
+- [X] **[T-001] Step 2: Add the migration describe block (failing tests first)**
 
 Append to `tests/scripts/conductor-db.test.js`:
 ```js
@@ -154,12 +154,12 @@ describe.skipIf(!HAS_SQLITE)('conductor-db v2 migration', () => {
 });
 ```
 
-- [ ] **[T-001] Step 3: Run the new + retargeted tests to confirm they fail**
+- [X] **[T-001] Step 3: Run the new + retargeted tests to confirm they fail**
 
 Run: `npx vitest run tests/scripts/conductor-db.test.js -t "migration"`
 Expected: FAIL (tables/indexes absent, `user_version` still 1).
 
-- [ ] **[T-001] Step 4: Add constants**
+- [X] **[T-001] Step 4: Add constants**
 
 In `scripts/conductor-db.mjs`, after line 23 (`const MAX_KEY_LEN = 512;`) add:
 ```js
@@ -174,7 +174,7 @@ const U_GET_SNAPSHOT = 'usage: conductor-db.mjs get-snapshot <git_commit_hash>';
 const U_HISTORY = 'usage: conductor-db.mjs history <session_id> <kind>';
 ```
 
-- [ ] **[T-001] Step 5: Extend `applySchema` (reuse task_state literal in place; bump version to 2)**
+- [X] **[T-001] Step 5: Extend `applySchema` (reuse task_state literal in place; bump version to 2)**
 
 Replace the body of `applySchema` (lines 71–85, the `BEGIN IMMEDIATE` block) so the `task_state` CREATE string literal is **kept in place** and the three new tables + two indexes are appended, and `user_version` is set to `SCHEMA_VERSION`:
 ```js
@@ -215,7 +215,7 @@ Replace the body of `applySchema` (lines 71–85, the `BEGIN IMMEDIATE` block) s
 ```
 (The `PRAGMA journal_mode = WAL` line and comment above it, lines 65–70, stay unchanged.)
 
-- [ ] **[T-001] Step 6: Retarget the `openReady` version guard**
+- [X] **[T-001] Step 6: Retarget the `openReady` version guard**
 
 In `scripts/conductor-db.mjs`, replace lines 182–187:
 ```js
@@ -228,12 +228,12 @@ In `scripts/conductor-db.mjs`, replace lines 182–187:
 ```
 (`ver < SCHEMA_VERSION` covers `ver === 0` and any pre-v2 db; `tableExists` still guards the interrupted-init self-heal.)
 
-- [ ] **[T-001] Step 7: Run the migration + retargeted + full FEAT-005 suite**
+- [X] **[T-001] Step 7: Run the migration + retargeted + full FEAT-005 suite**
 
 Run: `npx vitest run tests/scripts/conductor-db.test.js`
 Expected: PASS (migration block green; self-heal, forward-compat, and `user_version=2` assertions green; all pre-existing record/init/CLI tests still green).
 
-- [ ] **[T-001] Step 8: Commit**
+- [X] **[T-001] Step 8: Commit**
 
 ```bash
 git add scripts/conductor-db.mjs tests/scripts/conductor-db.test.js
@@ -265,7 +265,7 @@ rule. The length check runs on the trimmed value, so a control-char key is lengt
 by its raw character count. No control-character-specific rejection is added. Step 1's tests
 pin both halves of this (whitespace-only rejected; control-char key accepted + round-trips).
 
-- [ ] **[T-002] Step 1: Write the failing sessions tests**
+- [X] **[T-002] Step 1: Write the failing sessions tests**
 
 Append to `tests/scripts/conductor-db.test.js`:
 ```js
@@ -332,12 +332,12 @@ describe.skipIf(!HAS_SQLITE)('conductor-db session / get-session', () => {
 });
 ```
 
-- [ ] **[T-002] Step 2: Run to verify failure**
+- [X] **[T-002] Step 2: Run to verify failure**
 
 Run: `npx vitest run tests/scripts/conductor-db.test.js -t "session / get-session"`
 Expected: FAIL (`unknown subcommand "session"`).
 
-- [ ] **[T-002] Step 3: Add the `usage` param to `validateKey`**
+- [X] **[T-002] Step 3: Add the `usage` param to `validateKey`**
 
 In `scripts/conductor-db.mjs`, change lines 27–29:
 ```js
@@ -347,7 +347,7 @@ function validateKey(name, value, usage = USAGE) {
 ```
 (Default `usage = USAGE` keeps `record`/`init` behaviour byte-identical.)
 
-- [ ] **[T-002] Step 4: Add `validateOptional` (after `validateKey`, before `resolveRoot`)**
+- [X] **[T-002] Step 4: Add `validateOptional` (after `validateKey`, before `resolveRoot`)**
 
 ```js
 // Optional metadata: empty allowed, NOT trimmed, capped at MAX_KEY_LEN. Returns
@@ -360,7 +360,7 @@ function validateOptional(name, value) {
 }
 ```
 
-- [ ] **[T-002] Step 5: Change `withDb` to return the callback's value**
+- [X] **[T-002] Step 5: Change `withDb` to return the callback's value**
 
 In `scripts/conductor-db.mjs` line 234, change:
 ```js
@@ -372,7 +372,7 @@ to:
 ```
 The `finally` block (checkpoint + close) still runs after the return; the `catch` path still falls through to `return undefined`, so degradation yields `undefined` (→ zero-byte stdout for queries). Write callbacks return `undefined` and are unaffected.
 
-- [ ] **[T-002] Step 6: Add `upsertSession` (after `upsert`)**
+- [X] **[T-002] Step 6: Add `upsertSession` (after `upsert`)**
 
 ```js
 function upsertSession(db, sessionId, phase, spec, gitHash) {
@@ -388,7 +388,7 @@ function upsertSession(db, sessionId, phase, spec, gitHash) {
 ```
 (`started_at` is absent from the `DO UPDATE SET` list, so it is preserved across upserts.)
 
-- [ ] **[T-002] Step 7: Add `cmdSession` and `cmdGetSession` (after `cmdInit`)**
+- [X] **[T-002] Step 7: Add `cmdSession` and `cmdGetSession` (after `cmdInit`)**
 
 ```js
 async function cmdSession(args) {
@@ -426,7 +426,7 @@ async function cmdGetSession(args) {
 }
 ```
 
-- [ ] **[T-002] Step 8: Wire dispatch**
+- [X] **[T-002] Step 8: Wire dispatch**
 
 In `main` (lines 270–272), add after the `init` line:
 ```js
@@ -434,12 +434,12 @@ In `main` (lines 270–272), add after the `init` line:
   if (sub === 'get-session') return cmdGetSession(rest);
 ```
 
-- [ ] **[T-002] Step 9: Run the sessions block + full suite**
+- [X] **[T-002] Step 9: Run the sessions block + full suite**
 
 Run: `npx vitest run tests/scripts/conductor-db.test.js`
 Expected: PASS (sessions block green; FEAT-005 tests unaffected — `record`/`init` usage strings unchanged).
 
-- [ ] **[T-002] Step 10: Commit**
+- [X] **[T-002] Step 10: Commit**
 
 ```bash
 git add scripts/conductor-db.mjs tests/scripts/conductor-db.test.js
@@ -460,7 +460,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 - Consumes: `MAX_SNAP_BYTES`, `STDIN_CHUNK`, `U_SNAPSHOT`, `U_GET_SNAPSHOT`.
 - Produces: `readStdinCapped(max) → { buf: Buffer|null, overCap: boolean }` (aborts once total > max; peak memory ~cap); `cmdSnapshot(args)` (1 arg + stdin blob, append-only insert); `cmdGetSnapshot(args)` (1 arg, prints newest `snap_json` byte-for-byte + one `\n`).
 
-- [ ] **[T-003] Step 1: Teach the `runDb` helper to forward stdin `input`**
+- [X] **[T-003] Step 1: Teach the `runDb` helper to forward stdin `input`**
 
 The existing helper (lines 23–28) ignores `input`. Change it so stdin payloads reach the child:
 ```js
@@ -474,7 +474,7 @@ function runDb(args, { cwd, env, input } = {}) {
 ```
 (`input: undefined` is the spawnSync default, so record/init callers that omit it are unaffected — passing `undefined` closes the child's stdin at EOF, exactly as before.)
 
-- [ ] **[T-003] Step 2: Write the failing snapshots tests**
+- [X] **[T-003] Step 2: Write the failing snapshots tests**
 
 Append to `tests/scripts/conductor-db.test.js`:
 ```js
@@ -552,12 +552,12 @@ Add the `MAX_SNAP` constant near the top of the test file (after line 17):
 const MAX_SNAP = 10 * 1024 * 1024;
 ```
 
-- [ ] **[T-003] Step 3: Run to verify failure**
+- [X] **[T-003] Step 3: Run to verify failure**
 
 Run: `npx vitest run tests/scripts/conductor-db.test.js -t "snapshot / get-snapshot"`
 Expected: FAIL (`unknown subcommand "snapshot"`).
 
-- [ ] **[T-003] Step 4: Add `readSync` to the fs import**
+- [X] **[T-003] Step 4: Add `readSync` to the fs import**
 
 In `scripts/conductor-db.mjs` line 15, change:
 ```js
@@ -568,7 +568,7 @@ to:
 import { mkdirSync, existsSync, renameSync, unlinkSync, statSync, readSync } from 'node:fs';
 ```
 
-- [ ] **[T-003] Step 5: Add `readStdinCapped` (after `openConn`, before `compactStamp`)**
+- [X] **[T-003] Step 5: Add `readStdinCapped` (after `openConn`, before `compactStamp`)**
 
 ```js
 // Bounded, memory-safe stdin reader. Loops readSync(0,...) into a fixed reusable
@@ -596,7 +596,7 @@ function readStdinCapped(max) {
 }
 ```
 
-- [ ] **[T-003] Step 6: Add `cmdSnapshot` and `cmdGetSnapshot` (after `cmdGetSession`)**
+- [X] **[T-003] Step 6: Add `cmdSnapshot` and `cmdGetSnapshot` (after `cmdGetSession`)**
 
 ```js
 async function cmdSnapshot(args) {
@@ -644,7 +644,7 @@ independent; the delimiter is equivalently expressible as `Buffer.from('\n')` �
 `0x0A` — and the plan uses the string form for readability with the same guarantee. No
 `setEncoding`/locale conversion is applied to stdout.
 
-- [ ] **[T-003] Step 7: Wire dispatch**
+- [X] **[T-003] Step 7: Wire dispatch**
 
 In `main`, add after the `get-session` line:
 ```js
@@ -652,12 +652,12 @@ In `main`, add after the `get-session` line:
   if (sub === 'get-snapshot') return cmdGetSnapshot(rest);
 ```
 
-- [ ] **[T-003] Step 8: Run the snapshots block + full suite**
+- [X] **[T-003] Step 8: Run the snapshots block + full suite**
 
 Run: `npx vitest run tests/scripts/conductor-db.test.js`
 Expected: PASS.
 
-- [ ] **[T-003] Step 9: Commit**
+- [X] **[T-003] Step 9: Commit**
 
 ```bash
 git add scripts/conductor-db.mjs tests/scripts/conductor-db.test.js
@@ -689,7 +689,7 @@ reflects true insertion order, with no tie-break ambiguity that a same-`created_
 would introduce. The `snapshots` table shares this guarantee (`get-snapshot` uses
 `ORDER BY id DESC`). Step 1's test asserts two same-run inserts read back in insertion order.
 
-- [ ] **[T-004] Step 1: Write the failing history tests**
+- [X] **[T-004] Step 1: Write the failing history tests**
 
 Append to `tests/scripts/conductor-db.test.js`:
 ```js
@@ -738,12 +738,12 @@ describe.skipIf(!HAS_SQLITE)('conductor-db history', () => {
 });
 ```
 
-- [ ] **[T-004] Step 2: Run to verify failure**
+- [X] **[T-004] Step 2: Run to verify failure**
 
 Run: `npx vitest run tests/scripts/conductor-db.test.js -t "history"`
 Expected: FAIL (`unknown subcommand "history"`).
 
-- [ ] **[T-004] Step 3: Add `cmdHistory` (after `cmdGetSnapshot`)**
+- [X] **[T-004] Step 3: Add `cmdHistory` (after `cmdGetSnapshot`)**
 
 ```js
 async function cmdHistory(args) {
@@ -769,19 +769,19 @@ async function cmdHistory(args) {
 }
 ```
 
-- [ ] **[T-004] Step 4: Wire dispatch**
+- [X] **[T-004] Step 4: Wire dispatch**
 
 In `main`, add after the `get-snapshot` line:
 ```js
   if (sub === 'history') return cmdHistory(rest);
 ```
 
-- [ ] **[T-004] Step 5: Run the history block + full suite**
+- [X] **[T-004] Step 5: Run the history block + full suite**
 
 Run: `npx vitest run tests/scripts/conductor-db.test.js`
 Expected: PASS.
 
-- [ ] **[T-004] Step 6: Commit**
+- [X] **[T-004] Step 6: Commit**
 
 ```bash
 git add scripts/conductor-db.mjs tests/scripts/conductor-db.test.js
@@ -801,7 +801,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 - Consumes: `BLOCK` fixture pattern (`fixtures/block-sqlite.mjs`, lines 296–313), `readRows`, temp-repo harness.
 - Produces: no engine change — these tests pin the fail-open query contract and the no-real-cache invariant.
 
-- [ ] **[T-005] Step 1: Write the degradation + guard tests**
+- [X] **[T-005] Step 1: Write the degradation + guard tests**
 
 Append to `tests/scripts/conductor-db.test.js`:
 ```js
@@ -837,7 +837,7 @@ describe.skipIf(!HAS_SQLITE)('conductor-db query degradation + isolation', () =>
 });
 ```
 
-- [ ] **[T-005] Step 1b: Add the migration-failure recovery test (open-probe corruption → v2 rebuild)**
+- [X] **[T-005] Step 1b: Add the migration-failure recovery test (open-probe corruption → v2 rebuild)**
 
 This is the spec-mandated "migration-failure recovery" case and it also documents the
 **file-descriptor discipline** the reviewer asked about. The corruption is seeded with
@@ -873,17 +873,17 @@ directory and is not blocked by the closed writer.) Append to the same describe 
 ```
 (`writeFileSync`, `mkdirSync`, `readdirSync` are already imported by the suite — lines 224, 315.)
 
-- [ ] **[T-005] Step 2: Run the degradation block + full suite**
+- [X] **[T-005] Step 2: Run the degradation block + full suite**
 
 Run: `npx vitest run tests/scripts/conductor-db.test.js`
 Expected: PASS (all describe blocks green).
 
-- [ ] **[T-005] Step 3: Run the whole repo test-gate**
+- [X] **[T-005] Step 3: Run the whole repo test-gate**
 
 Run: `npm test`
 Expected: PASS — total test count increased from 302 (new cases added), zero regressions.
 
-- [ ] **[T-005] Step 4: Commit**
+- [X] **[T-005] Step 4: Commit**
 
 ```bash
 git add tests/scripts/conductor-db.test.js
@@ -902,15 +902,15 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 **Interfaces:** none (release bookkeeping).
 
-- [ ] **[T-006] Step 1: Bump `VERSION`**
+- [X] **[T-006] Step 1: Bump `VERSION`**
 
 Replace the single line `1.19.0` with `1.20.0`.
 
-- [ ] **[T-006] Step 2: Bump `package.json` version**
+- [X] **[T-006] Step 2: Bump `package.json` version**
 
 Line 3: `"version": "1.19.0",` → `"version": "1.20.0",`.
 
-- [ ] **[T-006] Step 2b: Sync the two root-version references in `package-lock.json`**
+- [X] **[T-006] Step 2b: Sync the two root-version references in `package-lock.json`**
 
 `package-lock.json` embeds the project's own version twice — at the top level (line 3) and
 in the root `packages[""]` entry (line 8). Both are currently **stale at `1.17.0`** (they
@@ -924,7 +924,7 @@ grep -n '"version": "1.20.0"' package-lock.json   # expect exactly lines 3 and 8
 grep -c '"version": "1.17.0"' package-lock.json    # expect 0
 ```
 
-- [ ] **[T-006] Step 3: Prepend the CHANGELOG entry**
+- [X] **[T-006] Step 3: Prepend the CHANGELOG entry**
 
 Insert directly under the `# Changelog` header (before `## [1.19.0]`):
 ```markdown
@@ -938,23 +938,23 @@ Insert directly under the `# Changelog` header (before `## [1.19.0]`):
 - `[ARCH-008-S1]` `scripts/conductor-db.mjs`: `withDb` now returns its callback's value (query support); `validateKey` gains an optional per-subcommand `usage` argument; `SCHEMA_VERSION` bumped to 2. `record`/`init` behaviour and stderr strings unchanged.
 ```
 
-- [ ] **[T-006] Step 4: Surgically flip the backlog sub-item**
+- [X] **[T-006] Step 4: Surgically flip the backlog sub-item**
 
 In `AGENT-READABLE BACKLOG.md`, change the single line `### [ ] [ARCH-008-S1]` to `### [X] [ARCH-008-S1]` (one-line edit; leave the umbrella `[ARCH-008]` and sibling sub-items untouched — BUG-003 invariant).
 
-- [ ] **[T-006] Step 5: Append the ship line to project memory**
+- [X] **[T-006] Step 5: Append the ship line to project memory**
 
 Append one dated line under the existing `## Spec: ARCH-008-S1` section in `.claude/memory/project.md`:
 ```markdown
 - Shipped 2026-07-04 as v1.20.0 (schema engine only; ARCH-008-A/B still open).
 ```
 
-- [ ] **[T-006] Step 6: Final full test-gate**
+- [X] **[T-006] Step 6: Final full test-gate**
 
 Run: `npm test`
 Expected: PASS.
 
-- [ ] **[T-006] Step 7: Commit**
+- [X] **[T-006] Step 7: Commit**
 
 ```bash
 git add VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md"
