@@ -340,3 +340,22 @@ Wire `/cc-compact` + `/cc-checkpoint` to persist a `sessions` upsert + one `snap
 - **Fail-open discipline:** authoritative-write failure halts (no tail); DB tail synchronous, stderr→`.conductor/last-write.log` (never UI), `mkdir .conductor` before redirect; ~5s timeout via spawnSync native (tests) / shell `timeout` only if binary present (else internal `busy_timeout=2000`); partial tail failure (session ok/snapshot fail) accepted; bare `node` (probe only for the two conductor-db calls).
 - **Hooks:** `post-compact.sh`/`.ps1` clear `.conductor/session-id` + sweep `session-id.*.tmp` (space-safe quoted, error-isolated); only rotates degraded fallback id — env-var path unaffected. Stale `v===1` reader comment → `v∈{1,2}`.
 - Scope: `global/commands/` only (not project-template). Complexity L. Spec: `docs/superpowers/specs/2026-07-04-arch008-a-checkpoint-compact-write-wiring-design.md`.
+
+## Checkpoint 2026-07-05 (ARCH-008-A complete — v1.21.0)
+
+### Decisions
+- ARCH-008-A shipped v1.21.0 (release commit 65e0ec6, plan-state 6f35e33): 8 tasks T-001..T-008, one commit each, strict TDD; final suite 351/351 green. Umbrella `[ARCH-008]` still open pending ARCH-008-B (resume-read wiring).
+- `snap-build.mjs` must emit via an **async `process.stdout.write(s, () => process.exit(0))` drain callback**, NOT `process.stdout.write(...)` then immediate `process.exit(0)` (the plan's form) — the latter truncates the 10 MiB v2 blob past ~64 KiB on a pipe. `writeFileSync(1, …)` is also wrong: it throws EAGAIN on a non-blocking stdout pipe for large payloads.
+- SNAP v2 shipped as designed: version-aware top-key allow-list (`v2` adds `pr`), `pr` optional string, `v>2 → SNAP_UNKNOWN_VERSION`, `sys.c` broadened to `/^[0-9a-f]{7,40}$/`; 4096-char file cap unchanged (v2's 10 MiB is DB-only).
+- Full-40 `git rev-parse HEAD` (not `--short`) is the single value for `sys.c` + both DB keys; `0000000` sentinel on non-git/zero-commit/timeout.
+
+### Conventions
+- Child-process test suites that capture a payload larger than 1 MiB on stdout **must set `spawnSync(..., { maxBuffer })` above the payload cap** — the 1 MiB default overflows to ENOBUFS → SIGTERM → `status: null`, which masquerades as a script failure.
+- SNAP validator line-count cap test tracks the real file size (was 30, now 32 after the v2 edits); update the assertion when the validator legitimately grows rather than forcing the code smaller.
+
+### Technical Debt
+- Two FEAT-010 validator tests (`v>1` rejection, 30-line cap) were contract-obsoleted by the approved v2 change and rewritten to `v>2` / 32-line — the plan's "43 existing tests stay green" assumption did not hold; the rewrite is contract-correct, not a regression.
+- `/cc-compact` + `/cc-checkpoint` DB tails and the Windows `.ps1` post-compact mirrors are agent-interpreted prose / inspection-only (no `powershell` on the macOS host); correctness rests on the script-level suites + mirror `diff`, not an automated end-to-end of the command prose.
+
+### Version
+1.21.0 released 2026-07-05 — ARCH-008-A complete
