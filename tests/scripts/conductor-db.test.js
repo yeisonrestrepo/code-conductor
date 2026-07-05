@@ -495,3 +495,65 @@ describe.skipIf(!HAS_SQLITE)('conductor-db v2 migration', () => {
     } finally { check.close(); }
   });
 });
+
+describe.skipIf(!HAS_SQLITE)('conductor-db session / get-session', () => {
+  it('creates a session and reads it back as fixed-key single-line JSON', async () => {
+    runDb(['session', 's1', 'impl', 'my-spec', '0000000'], { cwd: repo });
+    const r = runDb(['get-session', 's1'], { cwd: repo });
+    expect(r.status).toBe(0);
+    const obj = JSON.parse(r.stdout);
+    expect(Object.keys(obj)).toEqual(['session_id', 'started_at', 'updated_at', 'phase', 'spec', 'git_commit_hash']);
+    expect(obj).toMatchObject({ session_id: 's1', phase: 'impl', spec: 'my-spec', git_commit_hash: '0000000' });
+    expect(r.stdout.endsWith('\n')).toBe(true);
+    expect(r.stdout.trim().split('\n')).toHaveLength(1);
+  });
+
+  it('upsert preserves started_at and updates the mutable columns', async () => {
+    runDb(['session', 's2', 'spec', 'a', '0000000'], { cwd: repo });
+    const first = JSON.parse(runDb(['get-session', 's2'], { cwd: repo }).stdout);
+    await new Promise((res) => setTimeout(res, 5));
+    runDb(['session', 's2', 'impl', 'b', 'abc123'], { cwd: repo });
+    const second = JSON.parse(runDb(['get-session', 's2'], { cwd: repo }).stdout);
+    expect(second.started_at).toBe(first.started_at);          // creation time preserved
+    expect(second.updated_at >= first.updated_at).toBe(true);   // refreshed
+    expect(second).toMatchObject({ phase: 'impl', spec: 'b', git_commit_hash: 'abc123' });
+  });
+
+  it('empty optional fields serialize as "" never null; CR stays single-line', async () => {
+    runDb(['session', 's3', '', 'has\rcr', '0000000'], { cwd: repo });
+    const r = runDb(['get-session', 's3'], { cwd: repo });
+    expect(r.stdout.trim().split('\n')).toHaveLength(1);        // \r escaped, one line
+    const obj = JSON.parse(r.stdout);
+    expect(obj.phase).toBe('');
+    expect(obj.spec).toBe('has\rcr');
+  });
+
+  it('get-session miss writes zero bytes, exit 0', () => {
+    const r = runDb(['get-session', 'nope'], { cwd: repo });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+
+  it('rejects whitespace-only session_id as empty', () => {
+    const r = runDb(['session', '   ', 'p', 's', '0000000'], { cwd: repo });
+    expect(r.status).toBe(0);
+    expect(r.stderr).toContain('session_id is empty');
+    expect(r.stdout).toBe('');
+  });
+
+  it('accepts a non-whitespace control-char session_id as an opaque key (not rejected by trim)', () => {
+    const key = '\x01\x02ctrl';                    // C0 controls: trim leaves them intact
+    const w = runDb(['session', key, 'p', 's', '0000000'], { cwd: repo });
+    expect(w.status).toBe(0);
+    expect(w.stderr).toBe('');                          // accepted, no rejection line
+    const r = runDb(['get-session', key], { cwd: repo });
+    expect(JSON.parse(r.stdout).session_id).toBe(key);  // stored + read back verbatim
+  });
+
+  it('rejects wrong arg count (too few AND over-supply) with the usage line', () => {
+    const few = runDb(['session', 's1', 'impl'], { cwd: repo });
+    expect(few.stderr).toBe(`CONDUCTOR_DB: ${'usage: conductor-db.mjs session <session_id> <phase> <spec> <git_commit_hash>'}\n`);
+    const many = runDb(['get-session', 's1', 'extra'], { cwd: repo });
+    expect(many.stderr).toBe(`CONDUCTOR_DB: ${'usage: conductor-db.mjs get-session <session_id>'}\n`);
+  });
+});

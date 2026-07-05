@@ -33,10 +33,19 @@ const U_SNAPSHOT = 'usage: conductor-db.mjs snapshot <git_commit_hash>';
 const U_GET_SNAPSHOT = 'usage: conductor-db.mjs get-snapshot <git_commit_hash>';
 const U_HISTORY = 'usage: conductor-db.mjs history <session_id> <kind>';
 
-function validateKey(name, value) {
+function validateKey(name, value, usage = USAGE) {
   const v = String(value ?? '').trim();       // 1. trim FIRST (whitespace never counts)
-  if (!v) { warn(`${name} is empty; ${USAGE}`); return null; }        // 2. empty-check on trimmed
+  if (!v) { warn(`${name} is empty; ${usage}`); return null; }        // 2. empty-check on trimmed
   if (v.length > MAX_KEY_LEN) { warn(`${name} exceeds ${MAX_KEY_LEN} chars; rejected`); return null; }  // 3. length-check on trimmed
+  return v;
+}
+
+// Optional metadata: empty allowed, NOT trimmed, capped at MAX_KEY_LEN. Returns
+// the raw string (possibly '') on success, or null ONLY when over the cap. Callers
+// must test `=== null` — '' is a valid accepted value, not a rejection.
+function validateOptional(name, value) {
+  const v = String(value ?? '');
+  if (v.length > MAX_KEY_LEN) { warn(`${name} exceeds ${MAX_KEY_LEN} chars; rejected`); return null; }
   return v;
 }
 
@@ -233,6 +242,17 @@ function upsert(db, planFile, taskId, state) {
   ).run(planFile, taskId, state, new Date().toISOString());
 }
 
+function upsertSession(db, sessionId, phase, spec, gitHash) {
+  const now = new Date().toISOString();
+  db.prepare(
+    'INSERT INTO sessions (session_id, started_at, updated_at, phase, spec, git_commit_hash) ' +
+    'VALUES ($session_id, $started_at, $updated_at, $phase, $spec, $git_commit_hash) ' +
+    'ON CONFLICT(session_id) DO UPDATE SET ' +
+    'updated_at = excluded.updated_at, phase = excluded.phase, ' +
+    'spec = excluded.spec, git_commit_hash = excluded.git_commit_hash'
+  ).run({ $session_id: sessionId, $started_at: now, $updated_at: now, $phase: phase, $spec: spec, $git_commit_hash: gitHash });
+}
+
 async function withDb(root, fn) {
   let DatabaseSync;
   try {
@@ -259,7 +279,7 @@ async function withDb(root, fn) {
   try {
     db = openReady(DatabaseSync, dbPath);
     if (!db) return;             // skipped (unrecoverable or newer schema — Task 9)
-    fn(db);
+    return fn(db);
   } catch (e) {
     warn(`${(e && e.code) || 'error'} writing ${dbPath}: ${e && e.message}, skipping cache write`);
   } finally {
@@ -293,10 +313,46 @@ async function cmdInit(args) {
   await withDb(root, () => { /* create/verify only */ });
 }
 
+async function cmdSession(args) {
+  if (args.length !== 4) { warn(U_SESSION); return; }
+  const [rawId, rawPhase, rawSpec, rawHash] = args;
+  const sessionId = validateKey('session_id', rawId, U_SESSION);
+  if (sessionId === null) return;
+  const phase = validateOptional('phase', rawPhase);
+  if (phase === null) return;
+  const spec = validateOptional('spec', rawSpec);
+  if (spec === null) return;
+  const gitHash = validateKey('git_commit_hash', rawHash, U_SESSION);
+  if (gitHash === null) return;
+  const root = resolveRoot();
+  await withDb(root, (db) => upsertSession(db, sessionId, phase, spec, gitHash));
+}
+
+async function cmdGetSession(args) {
+  if (args.length !== 1) { warn(U_GET_SESSION); return; }
+  const sessionId = validateKey('session_id', args[0], U_GET_SESSION);
+  if (sessionId === null) return;
+  const root = resolveRoot();
+  const row = await withDb(root, (db) =>
+    db.prepare(
+      'SELECT session_id, started_at, updated_at, phase, spec, git_commit_hash FROM sessions WHERE session_id = $id'
+    ).get({ $id: sessionId })
+  );
+  if (row) {
+    const out = {
+      session_id: row.session_id, started_at: row.started_at, updated_at: row.updated_at,
+      phase: row.phase, spec: row.spec, git_commit_hash: row.git_commit_hash,
+    };
+    process.stdout.write(JSON.stringify(out) + '\n');
+  }
+}
+
 async function main() {
   const [sub, ...rest] = process.argv.slice(2);
   if (sub === 'record') return cmdRecord(rest);
   if (sub === 'init') return cmdInit(rest);
+  if (sub === 'session') return cmdSession(rest);
+  if (sub === 'get-session') return cmdGetSession(rest);
   warn(`unknown subcommand ${JSON.stringify(sub ?? '')}; ${USAGE}`);
 }
 
