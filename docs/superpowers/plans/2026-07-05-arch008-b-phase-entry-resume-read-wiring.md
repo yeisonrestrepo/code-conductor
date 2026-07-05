@@ -733,21 +733,21 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 - Consumes: all prior tasks complete and green.
 - Produces: version 1.22.0 across the manifests, a `[1.22.0]` CHANGELOG entry tagged `[ARCH-008-B]`, and both `[ARCH-008-B]` and the umbrella `[ARCH-008]` checkboxes flipped to `[X]` (all three sub-specs now shipped). Surgical single-line edits per BUG-003 - never a bulk rewrite.
 
-- [ ] [T-006] **Ship v1.22.0 and close the ARCH-008 umbrella**
+- [X] [T-006] **Ship v1.22.0 and close the ARCH-008 umbrella**
 
-- [ ] [T-006-A] **Step 1: Bump `VERSION`**
+- [X] [T-006-A] **Step 1: Bump `VERSION`**
 
 Replace the sole line `1.21.0` with `1.22.0`.
 
-- [ ] [T-006-B] **Step 2: Bump `package.json`**
+- [X] [T-006-B] **Step 2: Bump `package.json`**
 
 At line 3, change `"version": "1.21.0",` → `"version": "1.22.0",`.
 
-- [ ] [T-006-C] **Step 3: Bump `package-lock.json`**
+- [X] [T-006-C] **Step 3: Bump `package-lock.json`**
 
 Change both `"version": "1.21.0",` occurrences (lines 3 and 8 - the root and the root-package node) to `"version": "1.22.0",`. Leave all dependency versions untouched.
 
-- [ ] [T-006-D] **Step 4: Prepend the CHANGELOG entry**
+- [X] [T-006-D] **Step 4: Prepend the CHANGELOG entry**
 
 Insert immediately before line 3 (`## [1.21.0] - 2026-07-04`):
 
@@ -763,15 +763,15 @@ Insert immediately before line 3 (`## [1.21.0] - 2026-07-04`):
 
 ```
 
-- [ ] [T-006-E] **Step 5: Flip the `[ARCH-008-B]` checkbox (surgical)**
+- [X] [T-006-E] **Step 5: Flip the `[ARCH-008-B]` checkbox (surgical)**
 
 At `AGENT-READABLE BACKLOG.md:105`, change `### [ ] \`[ARCH-008-B]\`` → `### [X] \`[ARCH-008-B]\`` (single-line edit).
 
-- [ ] [T-006-F] **Step 6: Flip the umbrella `[ARCH-008]` checkbox (surgical)**
+- [X] [T-006-F] **Step 6: Flip the umbrella `[ARCH-008]` checkbox (surgical)**
 
 At `AGENT-READABLE BACKLOG.md:85`, change `### [ ] \`[ARCH-008]\`` → `### [X] \`[ARCH-008]\`` (single-line edit; all three sub-specs are now `[X]`).
 
-- [ ] [T-006-G] **Step 7: Verify versions and flips**
+- [X] [T-006-G] **Step 7: Verify versions and flips**
 
 Run:
 ```bash
@@ -780,7 +780,7 @@ npm test
 ```
 Expected: `1.22.0` in VERSION and package.json; both backlog lines show `[X]`; the CHANGELOG entry present; the full suite green.
 
-- [ ] [T-006-H] **Step 8: Commit**
+- [X] [T-006-H] **Step 8: Commit**
 
 ```bash
 git add VERSION package.json package-lock.json CHANGELOG.md
