@@ -73,10 +73,14 @@ invocation cwd is. Steps:
 2. Else read `<repo-root>/.conductor/session-id`; if present and non-empty → print it, exit.
 3. Else generate `crypto.randomUUID()` and persist it **atomically (Q7)**: write to a
    same-dir temp file `.conductor/session-id.<pid>.tmp`, then `renameSync` it onto
-   `.conductor/session-id` (atomic on POSIX and Windows; create `.conductor/` first — it is
-   already gitignored). **Concurrency guard:** if the final path already exists at rename time
-   (a racing invocation won), re-read it and adopt the existing id — **first-writer-wins**, so
-   rapid concurrent runs never corrupt the file or diverge onto different ids.
+   `.conductor/session-id` (create `.conductor/` first — it is already gitignored).
+   **Concurrency guard:** the `renameSync` is wrapped in `try/catch`. On **any** rename error —
+   `EEXIST` (POSIX concurrent winner) or Windows-specific **`EPERM`/`EACCES`** (the target briefly
+   locked by another process — antivirus or a concurrent reader — common under multi-process
+   execution) **(Q5)** — the script **re-reads** `.conductor/session-id`; if it is now present and
+   non-empty, it adopts that id (**first-writer-wins**); otherwise it falls back to the in-memory
+   UUID. It **never rethrows** the rename error, so rapid concurrent runs never corrupt the file,
+   diverge onto different ids, or crash on a Windows lock.
 4. Any I/O error is non-fatal: a value is always printed (fall back to a fresh in-memory
    UUID if the cache cannot be read or written).
 
@@ -103,11 +107,14 @@ the canonical single-line SNAP JSON, exit 0 on success):
   stringifies only the candidate `pr` (added to the once-computed skeleton byte cost), not the
   whole object repeatedly. On the (monotonic-length-function-impossible) event of
   non-convergence within the cap, `snap-build` falls back to a **conservative byte-budget slice**:
-  `keepChars = Math.floor((MAX_SNAP_BYTES − skeletonBytes − 2) / 6)` then `pr.slice(0, keepChars)`
-  (surrogate back-off). The **multiplier 6 (Q3)** is the worst-case UTF-8+JSON bytes per UTF-16
-  unit — a control char escapes to `\uXXXX` (6 bytes), the maximum single-unit stringify
-  expansion; the `−2` reserves the enclosing quotes. This guarantees an under-cap valid blob in a
-  single operation. CPU is bounded with no timeout needed.
+  `keepChars = Math.max(0, Math.floor((MAX_SNAP_BYTES − skeletonBytes − 2) / 6))` then
+  `pr.slice(0, keepChars)` (surrogate back-off). The **multiplier 6 (Q3)** is the worst-case
+  UTF-8+JSON bytes per UTF-16 unit — a control char escapes to `\uXXXX` (6 bytes), the maximum
+  single-unit stringify expansion; the `−2` reserves the enclosing quotes. The **`Math.max(0, …)`
+  clamp (Q-neg) is mandatory**: a negative `keepChars` passed to `slice(0, negative)` would, by
+  JS semantics, index **from the end** of `pr` (returning a near-whole or empty tail) rather than
+  truncating — silently defeating the cap. Clamping to 0 guarantees a genuine prefix. This yields
+  an under-cap valid blob in a single operation; CPU is bounded with no timeout needed.
 - **Empty/zero-byte stdin (Q6):** `snap-build` reads a JSON **object** on stdin; a zero-byte or
   empty stream makes `JSON.parse` throw → treated as **malformed input → non-zero exit, no
   stdout** (the caller skips the DB write, fail-open). *(This is `snap-build`'s field-object
@@ -128,8 +135,9 @@ the canonical single-line SNAP JSON, exit 0 on success):
   exceeds its cap (4096 in v1, 10 MiB in v2), `snap-build` writes a stderr diagnostic, **exits
   non-zero, and emits nothing** — an unrecoverable input the caller skips (fail-open).
 
-**`/cc-compact`** (edited): unchanged authoritative behavior first — derive `sys.c`
-(`git rev-parse --short HEAD`, `/^[0-9a-f]{7}$/`, `"0000000"` fallback), gather `ph/s/n/f/d/x`
+**`/cc-compact`** (edited): unchanged authoritative behavior first — derive `sys.c` (full-40
+`git rev-parse HEAD`, lowercased, `/^[0-9a-f]{7,40}$/`, `"0000000"` fallback — see Hash
+strategy), gather `ph/s/n/f/d/x`
 from context, pipe them (no `pr`) to `snap-build.mjs` → v1 line, write it to
 `.claude/memory/session-snapshot.json`, delete any legacy `.md`, idempotently gitignore the
 `.json`. **If that file write fails, stop — do not run the DB tail and do not print the
@@ -141,7 +149,7 @@ tail's outcome.
 
 **`/cc-checkpoint`** (edited): unchanged authoritative behavior first — append the timestamped
 `## Checkpoint` section to `project.md` (and `personal.md`). Then the **fail-open DB tail**
-(synchronous): derive `sys.c` (same short-hash rule), resolve the id, and build a **v2** blob by
+(synchronous): derive `sys.c` (same full-40 Hash-strategy rule), resolve the id, and build a **v2** blob by
 piping to `snap-build.mjs` with the following field derivation:
 - **`pr` — prose capture (Q3):** the `pr` value is the **verbatim `## Checkpoint …` section body
   the command just composed and appended to `project.md`** — the same in-context string, captured
@@ -164,7 +172,10 @@ piping to `snap-build.mjs` with the following field derivation:
 - **`d` / `x` — structured projection (Q4):** best-effort parse of the just-written section.
   Headings are matched by regex `/^#{2,4}[ \t]+(.+?)[ \t]*$/` and classified case-insensitively:
   a heading whose text contains `decision` or `convention` opens a `d` block; one containing
-  `debt`, `workaround`, or `limitation` opens an `x` block. Within a block, bullet lines matching
+  `debt`, `workaround`, or `limitation` opens an `x` block. **Precedence (Q2):** the `d`
+  (decision/convention) set is tested **first** and wins — a heading matching *both* keyword sets
+  (e.g. "Decisions and Technical Debt") opens exactly one block, a `d` block; each heading opens at
+  most one block. Within a block, bullet lines matching
   `/^[ \t]*[-*][ \t]+(\S.*?)[ \t]*$/` contribute their trimmed capture; non-bullet lines are
   ignored. This tolerates minor markdown variation (`-`/`*` bullets, extra whitespace, heading
   level 2–4). **Parent heading (Q1):** the `## Checkpoint …` heading matches the heading regex but
@@ -201,7 +212,7 @@ are passed as **double-quoted shell variable expansions** (`"$id"`, `"$ph"`, `"$
 inside double quotes the shell performs no word-splitting, globbing, or re-parsing of the value's
 characters, so an embedded quote or space is inert. Every scalar source is additionally
 constrained to a quote-free character set — `s` matches `[a-zA-Z0-9._-]`, `ph` is an enum, `c` is
-`[0-9a-f]{7}`/`0000000`, and `id` is a UUID — so a double quote cannot occur in practice; the
+`[0-9a-f]{7,40}`/`0000000`, and `id` is a UUID — so a double quote cannot occur in practice; the
 double-quoted-expansion pattern is defense-in-depth.
 
 **Node-flag probe scope (Q14):** the probe is **unchanged** and is applied **only** to the two
@@ -233,9 +244,21 @@ added to the command prose.
   `conductor-db`-guarded). Making the cap version-conditional would add coupling to guard a case
   the data flow never produces; the cap stays a flat 4096 for every file. (A future feature that
   needs v2 *files* > 4096 is a separate follow-up.)
-- Every v1 rule is untouched: sub-block key allow-lists, `sys.ph ∈ {spec,plan,impl,rev}`,
-  array caps, `ops.f` action-code check, and the `sys.c` `/^[0-9a-f]{7}$/` test — under which
-  `"0000000"` is valid for **both** schemas.
+- Every v1 rule is untouched **except the `sys.c` regex**, which is broadened from
+  `/^[0-9a-f]{7}$/` to **`/^[0-9a-f]{7,40}$/` (Q7)** — see "Hash strategy" below. This is
+  backward-compatible: legacy 7-char blobs and the `"0000000"` sentinel still pass, under **both**
+  schemas. All other v1 rules (sub-block key allow-lists, `sys.ph ∈ {spec,plan,impl,rev}`, array
+  caps, `ops.f` action-code check) are byte-identical.
+
+**Hash strategy (Q7) — full 40-char, not `--short`:** `git rev-parse --short HEAD` **auto-scales**
+its abbreviation length in large repos (git widens it to stay unambiguous), and that length is
+**not stable across repo growth** — the same commit could abbreviate to 7 chars at write time and
+8+ later, breaking ARCH-008-B's key match. Both commands therefore derive the **full 40-char hash
+via `git rev-parse HEAD`** (fixed-length, unambiguous, stable), lowercased and validated against
+`/^[0-9a-f]{7,40}$/`; a non-zero exit, timeout, or format mismatch falls back to the `"0000000"`
+sentinel (7 zeros, still valid under the broadened regex). This supersedes the earlier
+"short 7-hex" default. `sys.c`, the `sessions.git_commit_hash`, and the `snapshots.git_commit_hash`
+key are all this same 40-char value, so A writes and B reads an identical, growth-stable key.
 
 ### Alternative paths
 
@@ -265,11 +288,10 @@ added to the command prose.
 - **DB / pipeline failure inside `/cc-checkpoint` or `/cc-compact`:** the tail is fail-open —
   the `project.md` update (checkpoint) or the `session-snapshot.json` write + compact prompt
   (compact) proceed uninterrupted and are never reverted.
-- **Corrupt / locked / hung git (Q11):** the short-hash derivation runs
-  `git rev-parse --short HEAD` with a **bounded timeout**; a non-zero exit, a timeout/hang, or
-  output not matching `/^[0-9a-f]{7}$/` (after lowercase → slice-7 → pad) all fall back to
-  `"0000000"`. The commands never block on a stuck git process, and the `"0000000"` sentinel is a
-  valid `sys.c` under both schemas.
+- **Corrupt / locked / hung git (Q11):** the hash derivation runs `git rev-parse HEAD` with a
+  **bounded timeout**; a non-zero exit, a timeout/hang, or output not matching `/^[0-9a-f]{7,40}$/`
+  (after lowercasing) all fall back to `"0000000"`. The commands never block on a stuck git
+  process, and the `"0000000"` sentinel is a valid `sys.c` under both schemas.
 - **`post-compact` cache clear (Q7):** `.sh` uses `rm -f`; `.ps1` uses
   `Remove-Item -Force -ErrorAction SilentlyContinue` with the `Join-Path` result passed as a
   **literal double-quoted string** (space-safe repo paths). It deletes **only**
@@ -283,12 +305,30 @@ added to the command prose.
   no-env-var path, where it intentionally **rotates the fallback UUID at the compact boundary**
   to bound stale-id leakage (Q1/Q8 session-id). It is a leakage-bounding measure, not a
   deliberate session reset.
-- **Session-id fragmentation (Q8, accepted residual):** if `$CLAUDE_CODE_SESSION_ID` is absent
-  **and** `.conductor/session-id` cannot be written across repeated invocations, each run emits a
-  fresh in-memory UUID, producing multiple `sessions`/`snapshots` rows for one logical session.
-  This compound edge cannot occur under real Claude Code (the env var is always set); when it
-  does it is non-fatal and does **not** affect ARCH-008-B resume, which keys on `git_commit_hash`,
-  not `session_id`. No extra mechanism is added (YAGNI).
+- **Session-id fragmentation (Q8/Q4-disconnect, accepted residual):** if `$CLAUDE_CODE_SESSION_ID`
+  is absent **and** `.conductor/session-id` cannot be written across repeated invocations, each run
+  emits a fresh **unpersisted in-memory UUID**. By construction an unpersisted id **inherently
+  cannot bind sequential invocations** — each command becomes its own `sessions`/`snapshots`
+  row (documented, not a defect). This compound edge cannot occur under real Claude Code (the env
+  var is always set); when it does it is non-fatal and does **not** affect ARCH-008-B resume,
+  which keys on `git_commit_hash`, not `session_id`. No extra mechanism is added (YAGNI).
+- **Partial DB-tail failure (Q6):** the tail runs `session` (upsert) **then** `snapshot`
+  (insert) as two independent, non-transactional, fail-open processes. If `session` succeeds but
+  `snapshot` fails (or vice-versa), the partial result is **accepted and non-fatal**: ARCH-008-B
+  tolerates a `sessions` miss and a `snapshots` miss **independently** (a snapshot miss degrades
+  to fresh-start, the designed miss behavior). No rollback or compensation is attempted — each
+  call is already exit-0 fail-open, and no cross-process transaction spans the two.
+- **Authoritative-write failure halts the tail (Q3-halt):** if the primary write fails —
+  `session-snapshot.json` for `/cc-compact`, or the `project.md` append for `/cc-checkpoint` —
+  the command **reports the error and stops; the (synchronous) DB tail does not run** and, for
+  compact, the compact prompt is not printed. The tail only ever executes **after** the
+  authoritative record is safely persisted, so the DB never holds a snapshot for a checkpoint/
+  compaction that did not actually land on disk.
+- **Shell `timeout` availability (Q8-timeout):** the command wraps a DB-tail call with shell
+  `timeout` **only when the binary exists** (`command -v timeout` / `command -v gtimeout`
+  succeeds); otherwise it runs the call **unwrapped**, bounded by `conductor-db`'s internal 2 s
+  `busy_timeout`. The wrapper is never invoked blindly, so a host without GNU `timeout` (e.g.
+  stock macOS) never fails with command-not-found.
 
 ## Acceptance Criteria
 
@@ -307,9 +347,13 @@ added to the command prose.
 - [ ] `snap-build` exits non-zero with no stdout on malformed input; the caller skips the DB
       write.
 - [ ] `scripts/snap-validate.mjs` accepts `v ∈ {1, 2}`, rejects `v > 2` with
-      `SNAP_UNKNOWN_VERSION`, treats `pr` as optional (string-typed, no separate cap), keeps
-      every v1 rule byte-identical, and validates `"0000000"` `sys.c` under both schemas. All
-      43 existing validator tests stay green.
+      `SNAP_UNKNOWN_VERSION`, treats `pr` as optional (string-typed, no separate cap), broadens
+      `sys.c` to `/^[0-9a-f]{7,40}$/`, and keeps every other v1 rule byte-identical. All 43
+      existing validator tests stay green (7-char and `"0000000"` still pass); new tests cover
+      8–40-char `sys.c` and `v:2`+`pr`.
+- [ ] Both commands derive the hash via full-40 `git rev-parse HEAD` (not `--short`),
+      validate `/^[0-9a-f]{7,40}$/`, and fall back to `"0000000"`; the same value is used for
+      `sys.c`, the `sessions` hash, and the `snapshots` key (growth-stable A/B match).
 - [ ] `/cc-compact` writes the v1 handoff file first (authoritative; failure suppresses the DB
       tail and the compact prompt), then best-effort synchronously upserts one `sessions` row
       and inserts one `snapshots` row keyed by the short git hash; the compact prompt prints
@@ -350,7 +394,8 @@ added to the command prose.
 
 - **New:** `scripts/session-id.mjs`, `scripts/snap-build.mjs`, and their Vitest suites under
   `tests/scripts/`.
-- **Modified:** `scripts/snap-validate.mjs` (v2 + optional `pr`), `global/commands/cc-compact.md`,
+- **Modified:** `scripts/snap-validate.mjs` (v2 + optional `pr` + `sys.c` → `/^[0-9a-f]{7,40}$/`),
+  `global/commands/cc-compact.md`,
   `global/commands/cc-checkpoint.md`, `.claude/hooks/post-compact.sh`,
   `.claude/hooks/post-compact.ps1` (+ their `project-template/.claude/hooks/` mirrors), one
   stale comment in `.claude/commands/cc-implement.md` and its `project-template` mirror
