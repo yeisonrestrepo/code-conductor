@@ -668,9 +668,9 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 - Consumes: the `.conductor/resume-validate.<pid>.tmp.json` temp naming from Task 3.
 - Produces: each hook removes any leaked validation temp at the compaction boundary (the belt-and-suspenders reclaim for the no-signal-listener design). One added line beside the existing `session-id.*.tmp` sweep; no test (hooks are exercised only by the compact lifecycle) - verified by inspection.
 
-- [ ] [T-005] **Add the validation-temp sweep to all four hooks**
+- [X] [T-005] **Add the validation-temp sweep to all four hooks**
 
-- [ ] [T-005-A] **Step 1: Extend `.claude/hooks/post-compact.sh`**
+- [X] [T-005-A] **Step 1: Extend `.claude/hooks/post-compact.sh`**
 
 After line 31 (`rm -f "${_cond}"/session-id.*.tmp 2>/dev/null`), add:
 
@@ -678,11 +678,11 @@ After line 31 (`rm -f "${_cond}"/session-id.*.tmp 2>/dev/null`), add:
   rm -f "${_cond}"/resume-validate.*.tmp.json 2>/dev/null
 ```
 
-- [ ] [T-005-B] **Step 2: Extend `project-template/.claude/hooks/post-compact.sh`**
+- [X] [T-005-B] **Step 2: Extend `project-template/.claude/hooks/post-compact.sh`**
 
 Apply the identical one-line addition to the template mirror (same anchor).
 
-- [ ] [T-005-C] **Step 3: Extend `.claude/hooks/post-compact.ps1`**
+- [X] [T-005-C] **Step 3: Extend `.claude/hooks/post-compact.ps1`**
 
 After line 35 (`Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $cond 'session-id.*.tmp')`), add:
 
@@ -690,11 +690,11 @@ After line 35 (`Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $con
   Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $cond 'resume-validate.*.tmp.json')
 ```
 
-- [ ] [T-005-D] **Step 4: Extend `project-template/.claude/hooks/post-compact.ps1`**
+- [X] [T-005-D] **Step 4: Extend `project-template/.claude/hooks/post-compact.ps1`**
 
 Apply the identical one-line addition to the template mirror (same anchor).
 
-- [ ] [T-005-E] **Step 5: Restore executable bits on the shell hooks**
+- [X] [T-005-E] **Step 5: Restore executable bits on the shell hooks**
 
 Editing the `.sh` hooks in place preserves their mode, but assert the executable bit explicitly so a fresh checkout, or a filesystem that dropped it, still runs them on Unix-like systems (a no-op on native Windows):
 
@@ -702,7 +702,7 @@ Editing the `.sh` hooks in place preserves their mode, but assert the executable
 chmod +x .claude/hooks/post-compact.sh project-template/.claude/hooks/post-compact.sh
 ```
 
-- [ ] [T-005-F] **Step 6: Verify all four hooks sweep the temp**
+- [X] [T-005-F] **Step 6: Verify all four hooks sweep the temp**
 
 Run:
 ```bash
@@ -710,7 +710,7 @@ grep -rln "resume-validate.\*.tmp.json" .claude/hooks project-template/.claude/h
 ```
 Expected: all four hook files listed.
 
-- [ ] [T-005-G] **Step 7: Commit**
+- [X] [T-005-G] **Step 7: Commit**
 
 ```bash
 git add -f .claude/hooks/post-compact.sh .claude/hooks/post-compact.ps1
