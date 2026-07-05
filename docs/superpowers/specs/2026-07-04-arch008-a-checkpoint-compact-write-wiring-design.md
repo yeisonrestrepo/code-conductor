@@ -108,9 +108,12 @@ the canonical single-line SNAP JSON, exit 0 on success):
   (`MAX_SNAP_BYTES = 10485760`): truncate the **raw `pr` string value before serialization**
   via **index-based `pr.slice(0, n)`** (no `Array.from`, no spread — avoids call-stack and
   10 MiB code-point-array reallocation), using a **binary search on `n`** against
-  `Buffer.byteLength(JSON.stringify(obj), 'utf8')`, backing off one UTF-16 unit if the cut
-  lands on a lone high surrogate. Re-serializing after each raw-value cut guarantees the
-  emitted JSON is always structurally valid and correctly accounts for stringify escaping.
+  `Buffer.byteLength(JSON.stringify(obj), 'utf8')`. **Surrogate-boundary guard (Q3-surr):** after
+  the final `n` is chosen — for **both** the binary-search result and the fallback slice — if the
+  last retained UTF-16 unit (`pr.charCodeAt(n−1)`) is a high surrogate (0xD800–0xDBFF), `n` is
+  decremented by one so no half of a surrogate pair is ever retained at the truncation boundary.
+  Re-serializing after each raw-value cut guarantees the emitted JSON is always structurally valid
+  and correctly accounts for stringify escaping.
 - **Bounded binary search (Q2 search):** the search is inherently `O(log₂(pr.length))` ≈ 24
   probes for a 10 MiB input, but is **hard-capped at 64 iterations** as a defensive stop.
   **Skeleton accounting (Q5):** `skeletonBytes` is computed once as
@@ -186,9 +189,14 @@ piping to `snap-build.mjs` with the following field derivation:
   unavailable, the 2 s `busy_timeout` still bounds real contention).
 - **`d` / `x` — structured projection (Q4):** best-effort parse of the just-written section.
   Headings are matched by regex `/^#{2,4}[ \t]+(.+?)[ \t]*$/` and classified case-insensitively:
-  the captured heading text is first **normalized (Q3-emphasis)** — surrounding/inline markdown
-  emphasis (`*`, `_`, `` ` ``) stripped and trimmed — so `### **Technical Debt**` and `### _Decisions_`
-  classify identically to their plain forms; then, case-insensitively, a heading whose normalized
+  the captured heading text is first **normalized (Q3-emphasis, Q5-ws)** — **all** `*`, `_`, and
+  `` ` `` characters removed (not just surrounding pairs, so `** Decisions **` and `Dec*is*ions`
+  both normalize cleanly), then leading/trailing whitespace `.trim()`-ed and lowercased — so
+  `### **Technical Debt**` and `### _Decisions_` classify identically to their plain forms.
+  Internal whitespace is intentionally **not** collapsed: the classification keywords are single
+  contiguous words (`decision`/`convention`/`debt`/`workaround`/`limitation`) matched as
+  substrings, so inter-word spacing never affects a match. Then, case-insensitively, a heading
+  whose normalized
   text contains `decision` or `convention` opens a `d` block, and one containing `debt`,
   `workaround`, or `limitation` opens an `x` block. (Emphasis-stripping is applied to the heading
   **classification** only; bullet content is captured verbatim.) **Precedence (Q2):** the `d`
@@ -219,7 +227,11 @@ surfaces nothing to the user while leaving a debug trail. **Explicitly (Q6-mute)
 **fully suppressed from the terminal** — every DB-tail call redirects both streams to the log
 (`> .conductor/last-write.log 2>&1`), and the command reports nothing from the tail's output (only
 its exit is observed). It is **not** sent to `/dev/null`: the diagnostic is preserved in the log,
-merely never printed to the user.
+merely never printed to the user. **Directory precondition (Q1):** before **any** redirected
+call, the tail ensures `.conductor/` exists (`mkdir -p .conductor` / PS
+`New-Item -ItemType Directory -Force`, best-effort) so the `> .conductor/last-write.log`
+redirection can never fail with a missing-path error; if that mkdir itself fails, the tail is
+skipped (fail-open) rather than emitting a fatal redirect error.
 
 **`last-write.log` concurrency (Q8):** the log is a **best-effort diagnostic**, not a
 correctness artifact. It is written in **overwrite mode (`>`, not append)** and is **not
@@ -314,17 +326,32 @@ key are all this same 40-char value, so A writes and B reads an identical, growt
 - **DB / pipeline failure inside `/cc-checkpoint` or `/cc-compact`:** the tail is fail-open —
   the `project.md` update (checkpoint) or the `session-snapshot.json` write + compact prompt
   (compact) proceed uninterrupted and are never reverted.
-- **Corrupt / locked / hung git (Q11):** the hash derivation runs `git rev-parse HEAD` with a
-  **bounded timeout**; a non-zero exit, a timeout/hang, or output not matching `/^[0-9a-f]{7,40}$/`
-  (after lowercasing) all fall back to `"0000000"`. The commands never block on a stuck git
-  process, and the `"0000000"` sentinel is a valid `sys.c` under both schemas.
+- **Corrupt / locked / hung / absent git (Q11, Q2-git):** the hash derivation runs
+  `git rev-parse HEAD` with a **bounded timeout**; a non-zero exit, a timeout/hang, **a
+  command-not-found (git binary absent from PATH), a permission/exec restriction (EACCES)**, or
+  output not matching `/^[0-9a-f]{7,40}$/` (after lowercasing) **all** fall back to `"0000000"`.
+  The commands never block on a stuck git nor hard-fail on a git-less or restricted host; the
+  `"0000000"` sentinel is a valid `sys.c` under both schemas.
+- **Aborted / reset stdin pipe during a large payload (Q4-pipe):** the payload is delivered as a
+  single buffered stdin write (spawnSync/shell pipe writes the whole buffer, then closes stdin),
+  and `conductor-db` reads to EOF via `readStdinCapped` **before** its single `INSERT`. So an abort
+  manifests as either (a) the child is killed before the `INSERT` → nothing is committed (no
+  partial row), or (b) a stdin read error → `withDb` catch → one log line, exit 0, no write, or
+  (c) a truncation ending on an invalid UTF-8 boundary → `TextDecoder{fatal}` rejects it, no write.
+  A truncated-but-valid-UTF-8 blob is not reachable via buffered delivery; even if one were stored
+  (snapshot is opaque by S1 design), ARCH-008-B's defensive `JSON.parse` treats it as a miss
+  (fresh-start). Fail-open throughout — no crash, no corrupt committed row.
 - **`post-compact` cache clear (Q7/Q4-sweep):** `.sh` uses `rm -f`; `.ps1` uses
   `Remove-Item -Force -ErrorAction SilentlyContinue` with the `Join-Path` results passed as
   **literal double-quoted strings** (space-safe repo paths). It deletes **only**
   `.conductor/session-id` **and** any orphaned `.conductor/session-id.*.tmp` (wildcard sweep) —
   never `.conductor/` itself or any other file, even if the directory would be left empty (it
   normally holds `cache.db`). Each stays inside its hook's existing exit-0 guard, so a delete
-  failure never crashes the hook.
+  failure never crashes the hook. **Sweep error isolation (Q6-sweep):** a locked or
+  permission-denied temp is fully isolated — `.ps1` via `-ErrorAction SilentlyContinue`, `.sh` via
+  `rm -f … 2>/dev/null` plus the existing `main || exit 0` guard — so an un-unlinkable file under
+  active process contention is simply left in place (swept on a later run) and never aborts the
+  hook or surfaces an error.
 - **Deletion does NOT force a new session in the primary path (Q6):** `/compact` clears history
   but stays the **same Claude Code invocation** with the same `$CLAUDE_CODE_SESSION_ID`, so the
   next command re-resolves the **identical** id and upserts the **same** `sessions` row — the
