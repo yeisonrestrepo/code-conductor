@@ -29,6 +29,7 @@ main() {
   _cond="${CC_PROJECT_ROOT:-.}/.conductor"
   rm -f "${_cond}/session-id" 2>/dev/null
   rm -f "${_cond}"/session-id.*.tmp 2>/dev/null
+  rm -f "${_cond}"/resume-validate.*.tmp.json 2>/dev/null
 
   echo ""
 }

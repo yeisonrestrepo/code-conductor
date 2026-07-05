@@ -33,6 +33,7 @@ try {
   $cond = Join-Path $root '.conductor'
   Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $cond 'session-id')
   Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $cond 'session-id.*.tmp')
+  Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $cond 'resume-validate.*.tmp.json')
 
   ""
 } catch {
