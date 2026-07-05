@@ -606,33 +606,33 @@ Branch on `resume_rc` - **only `0` and `4` are meaningful; every other code proc
 ---
 ````
 
-- [ ] [T-004] **Rewire all six command mirrors**
+- [X] [T-004] **Rewire all six command mirrors**
 
-- [ ] [T-004-A] **Step 1: Replace the phase-entry block in `.claude/commands/cc-spec.md`**
+- [X] [T-004-A] **Step 1: Replace the phase-entry block in `.claude/commands/cc-spec.md`**
 
 Read lines 1-14, then replace the block spanning `## Phase entry - Destructive Read Invariant` through its closing `---` (currently lines 5-14, ending at the `---` on line 14) with the canonical Resume Read block above (preserve the YAML frontmatter on lines 1-3 and the blank line 4). Use `git add -f` at commit (`.claude/` is gitignored).
 
-- [ ] [T-004-B] **Step 2: Replace the phase-entry block in `project-template/.claude/commands/cc-spec.md`**
+- [X] [T-004-B] **Step 2: Replace the phase-entry block in `project-template/.claude/commands/cc-spec.md`**
 
 Apply the identical replacement to the template mirror (same source shape as T-004-A).
 
-- [ ] [T-004-C] **Step 3: Replace the phase-entry block in `.claude/commands/cc-plan.md`**
+- [X] [T-004-C] **Step 3: Replace the phase-entry block in `.claude/commands/cc-plan.md`**
 
 Replace the two sections `## Phase entry - Handoff enforcement` and `## Phase entry - Destructive Read Invariant` (lines 5 through the `---` closing the Destructive Read Invariant section) with the single canonical Resume Read block. The turn-count handoff-enforcement gate is removed - `resume-read.mjs` no longer depends on turn count.
 
-- [ ] [T-004-D] **Step 4: Replace the phase-entry block in `project-template/.claude/commands/cc-plan.md`**
+- [X] [T-004-D] **Step 4: Replace the phase-entry block in `project-template/.claude/commands/cc-plan.md`**
 
 Apply the identical replacement to the template mirror.
 
-- [ ] [T-004-E] **Step 5: Replace the phase-entry block in `.claude/commands/cc-implement.md`**
+- [X] [T-004-E] **Step 5: Replace the phase-entry block in `.claude/commands/cc-implement.md`**
 
 Replace both the `## Phase entry - Handoff enforcement` gate and the full JSON `## Phase entry - Destructive Read Invariant` procedure (steps 1-4, the `snap-validate` invocation, the legacy `.md` fallback) with the single canonical Resume Read block. The exit-4 halt contract this block specifies is the same `SNAP_INVALID` gate `cc-implement` used before - now sourced from `resume-read`'s exit code.
 
-- [ ] [T-004-F] **Step 6: Replace the phase-entry block in `project-template/.claude/commands/cc-implement.md`**
+- [X] [T-004-F] **Step 6: Replace the phase-entry block in `project-template/.claude/commands/cc-implement.md`**
 
 Apply the identical replacement to the template mirror.
 
-- [ ] [T-004-G] **Step 7: Verify no legacy `.md` handoff reference and no orphaned turn-count gate remains**
+- [X] [T-004-G] **Step 7: Verify no legacy `.md` handoff reference and no orphaned turn-count gate remains**
 
 Run:
 ```bash
@@ -641,12 +641,12 @@ grep -rln "resume-read.mjs" .claude/commands project-template/.claude/commands
 ```
 Expected: the first grep returns **nothing** (all legacy read blocks removed); the second lists all six rewired command files.
 
-- [ ] [T-004-H] **Step 8: Run the full suite (regression guard)**
+- [X] [T-004-H] **Step 8: Run the full suite (regression guard)**
 
 Run: `npm test`
 Expected: PASS - 351 baseline + Task 1/2/3 additions; command-file edits touch no test.
 
-- [ ] [T-004-I] **Step 9: Commit**
+- [X] [T-004-I] **Step 9: Commit**
 
 ```bash
 git add -f .claude/commands/cc-spec.md .claude/commands/cc-plan.md .claude/commands/cc-implement.md
