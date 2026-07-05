@@ -2,29 +2,40 @@
 description: "(Conductor) Map implementation steps from an approved spec"
 ---
 
-## Phase entry - Handoff enforcement
+## Phase entry - Resume Read
 
-Before doing anything else, perform this blocking check:
+Before doing anything else, restore any stored context for the current commit by running `scripts/resume-read.mjs`. It resolves the current git hash, prefers a valid DB snapshot (`conductor-db get-snapshot`), falls back to the `.claude/memory/session-snapshot.json` handoff file, and prints a `RESUME_HIT` block on a hit / nothing on a miss. Capture its stdout **and** its exit code with the canonical per-platform form (each first probes for `node` and treats its absence as a clean miss, never an error):
 
-1. Count the number of turns in the current conversation history.
-2. If turn count exceeds 5, halt immediately and output:
+- **Unix / Git Bash:**
+  ```sh
+  if command -v node >/dev/null 2>&1; then
+    resume_out="$(node scripts/resume-read.mjs 2>>.conductor/last-write.log)"; resume_rc=$?
+  else resume_rc=3; resume_out=""; fi
+  ```
+- **PowerShell:**
+  ```powershell
+  if (Get-Command node -ErrorAction SilentlyContinue) {
+    $__eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    if (Test-Path variable:PSNativeCommandUseErrorActionPreference) {
+      $__nap = $PSNativeCommandUseErrorActionPreference; $PSNativeCommandUseErrorActionPreference = $false
+    }
+    try {
+      $resume_out = node scripts/resume-read.mjs 2>> .conductor/last-write.log; $resume_rc = $LASTEXITCODE
+    } catch { $resume_rc = 3; $resume_out = "" }
+    finally {
+      $ErrorActionPreference = $__eap
+      if (Test-Path variable:__nap) { $PSNativeCommandUseErrorActionPreference = $__nap }
+    }
+  } else { $resume_rc = 3; $resume_out = "" }
+  ```
 
-   > "Phase boundary detected. Please execute /compact to clear history before proceeding."
+Branch on `resume_rc` - **only `0` and `4` are meaningful; every other code proceeds fresh:**
 
-   Do not start any plan tasks. Enter standby. Wait for the user to confirm `/compact` has been run before continuing.
+- **`0`** → parse the captured block and adopt it as this phase's starting context, then echo one banner to the user: `> Resumed from stored snapshot @ <commit> (phase: <phase>)`, appending ` (checkpoint prose available)` when the block reports `prose: available`. Parsing (the command owns normalization): split on `\n`; strip a trailing `\r` from every line; drop leading/trailing wholly-blank lines; require `lines[0].trim() === 'RESUME_HIT'` (anything else = miss); `key: value` lines split on the first `': '` (both sides trimmed); the `pending:` block is every subsequent `^\s*-\s+` line up to the first blank line or EOF, each item trimmed. Unknown keys are ignored. In PowerShell, `node …` binds `string[]` for multi-line output - normalize with `$lines = @($resume_out)`; a `$null`/empty capture with `resume_rc = 3` is a miss.
+- **`4`** → **operational halt.** Do not run this phase's normal work. Emit exactly: `SNAP_INVALID: corrupt handoff at .claude/memory/session-snapshot.json - inspect or remove it, then re-run.` and enter standby awaiting user action. The corrupt file is left on disk (the script did not delete it).
+- **`3` or any other code** → **proceed fresh** (clean miss, bypass, degrade, absent `node`, or any unexpected runtime code). Ignore the capture.
 
-3. If turn count ≤ 5 AND `.claude/memory/session-snapshot.md` exists, proceed to the Destructive Read Invariant below.
-4. If turn count ≤ 5 AND `.claude/memory/session-snapshot.md` is absent, skip the Destructive Read Invariant and proceed directly - no snapshot context available (read-if-present fallback).
-
-## Phase entry - Destructive Read Invariant
-
-Applies only when snapshot exists (step 3 above).
-
-1. Read `.claude/memory/session-snapshot.md` into context.
-2. Delete the file immediately.
-3. Use the snapshot contents as the starting context for this phase.
-
-If the file cannot be deleted after reading, report the error and halt.
+`resume-read.mjs` writes its own trace lines to `.conductor/last-write.log` via `appendFileSync`; the `2>>` redirect above only sinks the incidental exit-4 halt reason away from the UI - it is not the trace channel.
 
 ---
 

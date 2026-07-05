@@ -2,35 +2,40 @@
 description: "(Conductor) Execute implementation tasks from an approved plan"
 ---
 
-## Phase entry - Handoff enforcement
+## Phase entry - Resume Read
 
-Before doing anything else, perform this blocking check:
+Before doing anything else, restore any stored context for the current commit by running `scripts/resume-read.mjs`. It resolves the current git hash, prefers a valid DB snapshot (`conductor-db get-snapshot`), falls back to the `.claude/memory/session-snapshot.json` handoff file, and prints a `RESUME_HIT` block on a hit / nothing on a miss. Capture its stdout **and** its exit code with the canonical per-platform form (each first probes for `node` and treats its absence as a clean miss, never an error):
 
-1. Count the number of turns in the current conversation history.
-2. If turn count exceeds 5, halt immediately and output:
+- **Unix / Git Bash:**
+  ```sh
+  if command -v node >/dev/null 2>&1; then
+    resume_out="$(node scripts/resume-read.mjs 2>>.conductor/last-write.log)"; resume_rc=$?
+  else resume_rc=3; resume_out=""; fi
+  ```
+- **PowerShell:**
+  ```powershell
+  if (Get-Command node -ErrorAction SilentlyContinue) {
+    $__eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    if (Test-Path variable:PSNativeCommandUseErrorActionPreference) {
+      $__nap = $PSNativeCommandUseErrorActionPreference; $PSNativeCommandUseErrorActionPreference = $false
+    }
+    try {
+      $resume_out = node scripts/resume-read.mjs 2>> .conductor/last-write.log; $resume_rc = $LASTEXITCODE
+    } catch { $resume_rc = 3; $resume_out = "" }
+    finally {
+      $ErrorActionPreference = $__eap
+      if (Test-Path variable:__nap) { $PSNativeCommandUseErrorActionPreference = $__nap }
+    }
+  } else { $resume_rc = 3; $resume_out = "" }
+  ```
 
-   > "Phase boundary detected. Please execute /compact to clear history before proceeding."
+Branch on `resume_rc` - **only `0` and `4` are meaningful; every other code proceeds fresh:**
 
-   Do not start any implementation tasks. Enter standby. Wait for the user to confirm `/compact` has been run before continuing.
+- **`0`** → parse the captured block and adopt it as this phase's starting context, then echo one banner to the user: `> Resumed from stored snapshot @ <commit> (phase: <phase>)`, appending ` (checkpoint prose available)` when the block reports `prose: available`. Parsing (the command owns normalization): split on `\n`; strip a trailing `\r` from every line; drop leading/trailing wholly-blank lines; require `lines[0].trim() === 'RESUME_HIT'` (anything else = miss); `key: value` lines split on the first `': '` (both sides trimmed); the `pending:` block is every subsequent `^\s*-\s+` line up to the first blank line or EOF, each item trimmed. Unknown keys are ignored. In PowerShell, `node …` binds `string[]` for multi-line output - normalize with `$lines = @($resume_out)`; a `$null`/empty capture with `resume_rc = 3` is a miss.
+- **`4`** → **operational halt.** Do not run this phase's normal work. Emit exactly: `SNAP_INVALID: corrupt handoff at .claude/memory/session-snapshot.json - inspect or remove it, then re-run.` and enter standby awaiting user action. The corrupt file is left on disk (the script did not delete it).
+- **`3` or any other code** → **proceed fresh** (clean miss, bypass, degrade, absent `node`, or any unexpected runtime code). Ignore the capture.
 
-3. If turn count ≤ 5, proceed to the Destructive Read Invariant below.
-
-## Phase entry - Destructive Read Invariant
-
-1. Resolve the repository root via `git rev-parse --show-toplevel`. If `git` is not found in PATH, or the command exits non-zero, halt immediately with `REPO_ROOT_FAILED: cannot determine repository root` and exit with code 3.
-2. If `<repo-root>/.claude/memory/session-snapshot.json` exists:
-   a. Attempt to read its full contents into context (do not delete yet). If this read fails for any reason other than the file not existing (permission denied, I/O error, or other filesystem-level corruption; the existence check above already ruled out "missing"), halt immediately with `SNAP_READ_FAILED: <brief reason, e.g. permission denied>` and leave the file on disk for manual inspection. Do not proceed to invoke the validator on a file the orchestrator itself could not read.
-   b. If `<repo-root>/.claude/memory/session-snapshot.md` also exists, delete it now without reading it: `.json` takes precedence over `.md` whenever both are present.
-   c. Invoke `node "<repo-root>/scripts/snap-validate.mjs" "<repo-root>/.claude/memory/session-snapshot.json"`, capturing both its exit code and its stderr text.
-   d. If `node` cannot be found or fails to launch, halt with `NODE_NOT_FOUND: node binary not found in PATH` and exit with code 2.
-   e. If the validator exits 1: if its stderr is exactly `SNAP_ERROR: SNAP_UNKNOWN_VERSION` (with trailing newline), halt with `SNAP_UNKNOWN_VERSION` (the payload is structurally fine but declares a schema version this reader does not know); for any other stderr content, halt with `SNAP_INVALID`. Either way, leave the file on disk for manual inspection and do not proceed.
-   f. If the validator exits 0: bind context variables: phase from `sys.ph`, commit from `sys.c`, decisions from `mem.d`, constraints from `mem.x`, next steps from `ops.n`, files from `ops.f`, spec stem from `sys.s`. If `sys.s` is `"none"`, treat spec reference as absent. (Exit 0 guarantees `v ∈ {1,2}`; the reader binds only sys/ops/mem fields and ignores any optional top-level pr, so no separate version check is needed here.)
-   g. Only after all context variables are bound: delete `session-snapshot.json`. If deletion fails (permission or lock error), log a non-fatal warning to stderr and continue: context is already bound.
-3. Else if `<repo-root>/.claude/memory/session-snapshot.md` exists (legacy fallback, one session only):
-   a. Emit to stderr: `[WARN] session-snapshot.md detected: SNAP v1 JSON not found; falling back to legacy format. Update /cc-compact to write SNAP v1 JSON.`
-   b. Read its full contents into context using the existing markdown extraction logic.
-   c. Once all context variables are bound, delete `session-snapshot.md`. If deletion fails, log a non-fatal warning and continue.
-4. Else: no snapshot context available; proceed directly (read-if-present fallback, existing behavior unchanged).
+`resume-read.mjs` writes its own trace lines to `.conductor/last-write.log` via `appendFileSync`; the `2>>` redirect above only sinks the incidental exit-4 halt reason away from the UI - it is not the trace channel.
 
 ---
 
