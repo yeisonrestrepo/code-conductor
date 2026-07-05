@@ -60,7 +60,12 @@ newest (`ORDER BY id DESC`); `pr` with embedded quotes/newlines/emoji → raw-va
 
 ### Main path
 
-**`scripts/session-id.mjs`** (zero-dep, any Node ≥ 14; prints one line, exit 0):
+**`scripts/session-id.mjs`** (zero-dep, any Node ≥ 14; prints one line, exit 0). **Root
+resolution (Q2):** identical to `conductor-db.mjs` — `git rev-parse --show-toplevel`, else a
+bounded `.git` upward walk from cwd (40-iteration cap, stops at fs root), else the script's own
+`../` (it lives in `scripts/`, so `dirname(fileURLToPath(import.meta.url))/..`). The cache path
+is always `<root>/.conductor/session-id`, so it is canonical regardless of how deeply nested the
+invocation cwd is. Steps:
 1. Read `$CLAUDE_CODE_SESSION_ID`; trim. If non-empty → print it and exit. *(Primary path is
    cacheless: the env var is unique per session and identical across every invocation, so
    consecutive commands in one session bind to the same `sessions` row and cross-session
@@ -97,9 +102,16 @@ the canonical single-line SNAP JSON, exit 0 on success):
   a 10 MiB input, but is **hard-capped at 64 iterations** as a defensive stop. Each probe
   stringifies only the candidate `pr` (added to the once-computed skeleton byte cost), not the
   whole object repeatedly. On the (monotonic-length-function-impossible) event of
-  non-convergence within the cap, `snap-build` falls back to a **conservative byte-budget slice**
-  (`pr` cut to a length guaranteed under `MAX_SNAP_BYTES − skeletonBytes`) and emits a valid
-  under-cap blob. CPU is bounded with no timeout needed.
+  non-convergence within the cap, `snap-build` falls back to a **conservative byte-budget slice**:
+  `keepChars = Math.floor((MAX_SNAP_BYTES − skeletonBytes − 2) / 6)` then `pr.slice(0, keepChars)`
+  (surrogate back-off). The **multiplier 6 (Q3)** is the worst-case UTF-8+JSON bytes per UTF-16
+  unit — a control char escapes to `\uXXXX` (6 bytes), the maximum single-unit stringify
+  expansion; the `−2` reserves the enclosing quotes. This guarantees an under-cap valid blob in a
+  single operation. CPU is bounded with no timeout needed.
+- **Empty/zero-byte stdin (Q6):** `snap-build` reads a JSON **object** on stdin; a zero-byte or
+  empty stream makes `JSON.parse` throw → treated as **malformed input → non-zero exit, no
+  stdout** (the caller skips the DB write, fail-open). *(This is `snap-build`'s field-object
+  input, distinct from `conductor-db snapshot`'s separate "content is empty" stdin check.)*
 - **Flat→nested mapping (Q1 map):** the stdin object is flat; `snap-build` builds the nested SNAP
   object as `sys = {ph, c, s}`, `ops = {n, f}`, `mem = {d, x}`, with top-level `v` and optional
   `pr`. It reads **only** these whitelisted keys — **any extraneous stdin key is ignored and
@@ -142,17 +154,27 @@ piping to `snap-build.mjs` with the following field derivation:
   row, its phase is empty, the DB is unavailable, **or the call times out under disk contention**,
   default to `"impl"` (the phase during which checkpoints are routinely taken; a valid enum
   member). The timeout ensures a contended DB never blocks the checkpoint. *(All DB-tail process
-  calls — `get-session`, `session`, `snapshot` — carry the same outer timeout; a timeout is a
-  best-effort miss, never a block.)*
+  calls — `get-session`, `session`, `snapshot` — carry the same bound; a timeout is a best-effort
+  miss, never a block.)* **Timeout mechanism (Q7):** the realistic block source (a DB write lock)
+  is already capped at 2 s by `conductor-db`'s internal `PRAGMA busy_timeout = 2000`; the outer
+  ~5 s bound is defense-in-depth, enforced via **`spawnSync`'s native `timeout: 5000`** in the
+  Vitest harness (SIGTERM on expiry → `status===null`/`signal` set → treated as best-effort
+  failure) and via shell `timeout` in the command prose (best-effort — where `timeout` is
+  unavailable, the 2 s `busy_timeout` still bounds real contention).
 - **`d` / `x` — structured projection (Q4):** best-effort parse of the just-written section.
   Headings are matched by regex `/^#{2,4}[ \t]+(.+?)[ \t]*$/` and classified case-insensitively:
   a heading whose text contains `decision` or `convention` opens a `d` block; one containing
   `debt`, `workaround`, or `limitation` opens an `x` block. Within a block, bullet lines matching
   `/^[ \t]*[-*][ \t]+(\S.*?)[ \t]*$/` contribute their trimmed capture; non-bullet lines are
   ignored. This tolerates minor markdown variation (`-`/`*` bullets, extra whitespace, heading
-  level 2–4). `snap-build` then dedups/caps (`d≤10×300`, `x≤5×200`). If the block is not cleanly
-  structured, `d`/`x` may be empty arrays (valid) — the full verbatim block always lives in `pr`,
-  the audit source of truth.
+  level 2–4). **Parent heading (Q1):** the `## Checkpoint …` heading matches the heading regex but
+  its text contains none of the keywords, so it opens **no** block and **closes** any open one —
+  bullets before the first `### Decisions`/`### Technical Debt` subheading are never captured (no
+  false positives). **Multi-line bullets (Q4):** extraction is **line-based** — only the marker
+  line's text enters `d`/`x`; wrapped continuation lines (indented, no marker) are ignored. The
+  complete multi-line text always survives verbatim in `pr`. `snap-build` then dedups/caps
+  (`d≤10×300`, `x≤5×200`). If the block is not cleanly structured, `d`/`x` may be empty arrays
+  (valid) — the full verbatim block always lives in `pr`, the audit source of truth.
 - **Defaults:** `n=[]`, `f=[]` (no compaction next-steps/files at checkpoint time), `s=`the active
   spec stem or `"none"`.
 
@@ -186,6 +208,12 @@ double-quoted-expansion pattern is defense-in-depth.
 `conductor-db` calls (which import `node:sqlite`). `session-id.mjs` and `snap-build.mjs` import
 nothing from `node:sqlite`, so they are invoked as plain `node scripts/<name>.mjs` — no flags, no
 probe, any Node ≥ 14. No conditional-logic change to the probe is required.
+
+**Node invocation (Q5):** the command prose uses **bare `node`** (relying on PATH), matching the
+existing `cc-implement` Step 6 hook and the probe itself — Claude Code is a Node process, so
+`node` is on PATH; if it were absent, the whole tail simply degrades fail-open. The Vitest
+harness spawns children via `process.execPath` (hermetic), but no absolute-path resolution is
+added to the command prose.
 
 **`scripts/snap-validate.mjs`** (edited, backward-compatible):
 - Accept `v ∈ {1, 2}`; `v > 2` → `SNAP_UNKNOWN_VERSION` (unchanged single-tier error prefix).
