@@ -89,6 +89,21 @@ the canonical single-line SNAP JSON, exit 0 on success):
   `Buffer.byteLength(JSON.stringify(obj), 'utf8')`, backing off one UTF-16 unit if the cut
   lands on a lone high surrogate. Re-serializing after each raw-value cut guarantees the
   emitted JSON is always structurally valid and correctly accounts for stringify escaping.
+- **Flat→nested mapping (Q1):** the stdin object is flat; `snap-build` builds the nested SNAP
+  object as `sys = {ph, c, s}`, `ops = {n, f}`, `mem = {d, x}`, with top-level `v` and optional
+  `pr`. It reads **only** these whitelisted keys — **any extraneous stdin key is ignored and
+  never copied to the output** (Q10), so the emitted blob always conforms to the schema and
+  cannot leak an unexpected key that would fail `snap-validate`.
+- **Version/`pr` invariant (Q9):** `snap-build` emits `v:2` **iff** a non-empty `pr` is
+  supplied, and `v:1` otherwise — so `v` and `pr`-presence are equivalent, and there is never a
+  snap-build-produced `v:2` blob lacking `pr`. `v` is the **sole** structural differentiator;
+  downstream code needs no separate "is this really v2?" probe. (The validator still
+  independently *accepts* a hand-written `v:2`-without-`pr` blob, per the strictly-optional rule.)
+- **Non-`pr` fail-safe (Q5):** the truncation loop only ever shrinks `pr`. Before it runs,
+  `snap-build` measures the serialized size of the `pr`-less skeleton (arrays already normalized
+  and capped, so the skeleton is ~10 KB max); in the pathological event the skeleton alone
+  exceeds its cap (4096 in v1, 10 MiB in v2), `snap-build` writes a stderr diagnostic, **exits
+  non-zero, and emits nothing** — an unrecoverable input the caller skips (fail-open).
 
 **`/cc-compact`** (edited): unchanged authoritative behavior first — derive `sys.c`
 (`git rev-parse --short HEAD`, `/^[0-9a-f]{7}$/`, `"0000000"` fallback), gather `ph/s/n/f/d/x`
@@ -103,21 +118,50 @@ tail's outcome.
 
 **`/cc-checkpoint`** (edited): unchanged authoritative behavior first — append the timestamped
 `## Checkpoint` section to `project.md` (and `personal.md`). Then the **fail-open DB tail**
-(synchronous): derive `sys.c` (same short-hash rule), resolve the id, build a **v2** blob by
-piping to `snap-build.mjs` with `pr` = the checkpoint prose block just written to `project.md`
-and compaction-only fields defaulted (`n=[]`, `f=[]`, `ph`=current/last phase or `"impl"`,
-`s`=`"none"` when no active spec, `d`/`x` mapped from the checkpoint's decisions/constraints
-where available). Run `conductor-db.mjs session ...` + `conductor-db.mjs snapshot "<c>"` (v2
-blob on stdin). Report the checkpoint as usual regardless of the tail's outcome.
+(synchronous): derive `sys.c` (same short-hash rule), resolve the id, and build a **v2** blob by
+piping to `snap-build.mjs` with the following field derivation:
+- **`pr` — prose capture (Q3):** the `pr` value is the **verbatim `## Checkpoint …` section body
+  the command just composed and appended to `project.md`** — the same in-context string, captured
+  before the DB tail runs (not read from CLI args; there are none). This guarantees `project.md`
+  and the DB snapshot's `pr` are byte-identical. `pr` is therefore always non-empty for a real
+  checkpoint, so the blob is always v2.
+- **`ph` — phase without ambient state (Q2):** run `conductor-db get-session "<id>"` and reuse
+  the returned row's `phase` if non-empty (carry-forward — the state lives in the DB row, not the
+  process); if there is no prior row or its phase is empty (or the DB is unavailable), default to
+  `"impl"` (the phase during which checkpoints are routinely taken; a valid enum member).
+- **`d` / `x` — structured projection (Q4):** best-effort, `d` = the bullet lines under the
+  section's *Decisions* (and *Conventions*) headings; `x` = the bullet lines under *Technical
+  Debt* / *Workarounds*. `snap-build` caps them (`d≤10×300`, `x≤5×200`). If the block is not
+  cleanly structured, `d`/`x` may be empty arrays (valid) — the full verbatim block always lives
+  in `pr`, which is the audit source of truth.
+- **Defaults:** `n=[]`, `f=[]` (no compaction next-steps/files at checkpoint time), `s=`the active
+  spec stem or `"none"`.
+
+Run `conductor-db.mjs session ...` + `conductor-db.mjs snapshot "<c>"` (v2 blob on stdin). Report
+the checkpoint as usual regardless of the tail's outcome.
+
+**DB-tail output isolation (Q6, both commands):** the synchronous tail redirects the child
+`session-id.mjs` / `snap-build.mjs` / `conductor-db.mjs` stdout **and** stderr to
+`.conductor/last-write.log` (best-effort, overwritten each run, gitignored under `.conductor/`).
+The lone `CONDUCTOR_DB:` degradation line therefore never reaches the Claude Code UI; the tail
+surfaces nothing to the user while leaving a debug trail.
+
+**Node-flag probe scope (Q14):** the probe is **unchanged** and is applied **only** to the two
+`conductor-db` calls (which import `node:sqlite`). `session-id.mjs` and `snap-build.mjs` import
+nothing from `node:sqlite`, so they are invoked as plain `node scripts/<name>.mjs` — no flags, no
+probe, any Node ≥ 14. No conditional-logic change to the probe is required.
 
 **`scripts/snap-validate.mjs`** (edited, backward-compatible):
 - Accept `v ∈ {1, 2}`; `v > 2` → `SNAP_UNKNOWN_VERSION` (unchanged single-tier error prefix).
 - Top-level allowed keys are **version-aware**: v1 → `{v, sys, ops, mem}` (unchanged — still
   rejects `pr`); v2 → additionally allows `pr`.
 - `pr` is **strictly optional**: a v2 blob without `pr` is valid. When present, `pr` must be a
-  string; **no dedicated length cap** — it is bounded transitively by the existing 4096-char
-  overall file cap (large prose never reaches the file validator; it lives only in the DB
-  under `conductor-db`'s 10 MiB cap).
+  string; **no dedicated length cap (Q12)** — it is bounded transitively by the existing
+  4096-char overall file cap, which `snap-validate` enforces on `raw.length` **before** parsing,
+  so an oversized `pr` never even reaches the type check. A separate absolute `pr` cap would be
+  dead code: large prose never reaches this file validator (it lives only in the DB), and
+  oversized/corrupt DB payloads are guarded at write time by `conductor-db`'s 10 MiB cap and are
+  read by ARCH-008-B via direct parsing, never fed to this file validator.
 - Every v1 rule is untouched: sub-block key allow-lists, `sys.ph ∈ {spec,plan,impl,rev}`,
   array caps, `ops.f` action-code check, and the `sys.c` `/^[0-9a-f]{7}$/` test — under which
   `"0000000"` is valid for **both** schemas.
@@ -130,8 +174,13 @@ blob on stdin). Report the checkpoint as usual regardless of the tail's outcome.
 - **Empty prose at checkpoint:** `snap-build` emits v1 (not v2); still a valid snapshot row.
 - **Non-git workspace / no commits:** `sys.c` and the snapshot/session hash key both use
   `"0000000"`; the row is stored under that sentinel.
-- **Repeated compaction/checkpoint on one commit:** each writes its own append-only
-  `snapshots` row; `get-snapshot` (ARCH-008-B) returns the newest via `ORDER BY id DESC`.
+- **Repeated / concurrent compaction/checkpoint on one commit (Q13):** the `snapshots` insert
+  is **append-only** — every write gets a fresh auto-incrementing `id` primary key and **never
+  overwrites** a prior row, even for the identical commit hash; concurrent writers serialize on
+  `conductor-db`'s `BEGIN IMMEDIATE` + `busy_timeout=2000`, each obtaining a distinct `id`.
+  `get-snapshot` (ARCH-008-B) returns the newest via `ORDER BY id DESC`. The `sessions` write, by
+  contrast, is an **upsert** keyed by `session_id` (preserving `started_at`), so re-running within
+  one session updates the same row rather than adding one.
 
 ### Error cases
 
@@ -145,10 +194,23 @@ blob on stdin). Report the checkpoint as usual regardless of the tail's outcome.
 - **DB / pipeline failure inside `/cc-checkpoint` or `/cc-compact`:** the tail is fail-open —
   the `project.md` update (checkpoint) or the `session-snapshot.json` write + compact prompt
   (compact) proceed uninterrupted and are never reverted.
-- **`post-compact` cache clear:** `.sh` uses `rm -f`; `.ps1` uses
+- **Corrupt / locked / hung git (Q11):** the short-hash derivation runs
+  `git rev-parse --short HEAD` with a **bounded timeout**; a non-zero exit, a timeout/hang, or
+  output not matching `/^[0-9a-f]{7}$/` (after lowercase → slice-7 → pad) all fall back to
+  `"0000000"`. The commands never block on a stuck git process, and the `"0000000"` sentinel is a
+  valid `sys.c` under both schemas.
+- **`post-compact` cache clear (Q7):** `.sh` uses `rm -f`; `.ps1` uses
   `Remove-Item -Force -ErrorAction SilentlyContinue` with the `Join-Path` result passed as a
-  **literal double-quoted string** (space-safe repo paths). Each stays inside its hook's
+  **literal double-quoted string** (space-safe repo paths). It deletes **only**
+  `.conductor/session-id` and never removes `.conductor/` itself or any other file, even if the
+  directory would be left empty (it normally holds `cache.db`). Each stays inside its hook's
   existing exit-0 guard, so a delete failure never crashes the hook.
+- **Session-id fragmentation (Q8, accepted residual):** if `$CLAUDE_CODE_SESSION_ID` is absent
+  **and** `.conductor/session-id` cannot be written across repeated invocations, each run emits a
+  fresh in-memory UUID, producing multiple `sessions`/`snapshots` rows for one logical session.
+  This compound edge cannot occur under real Claude Code (the env var is always set); when it
+  does it is non-fatal and does **not** affect ARCH-008-B resume, which keys on `git_commit_hash`,
+  not `session_id`. No extra mechanism is added (YAGNI).
 
 ## Acceptance Criteria
 
@@ -177,8 +239,21 @@ blob on stdin). Report the checkpoint as usual regardless of the tail's outcome.
 - [ ] `/cc-checkpoint` updates `project.md` first (authoritative), then best-effort
       synchronously writes one `sessions` upsert + one v2 `snapshots` row (prose in `pr`); DB
       failure never blocks or reverts the `project.md` update.
+- [ ] `snap-build` maps flat input to `sys/ops/mem` sub-blocks and **strips** any extraneous
+      stdin key from the output; a `v:2` blob is emitted iff a non-empty `pr` is supplied (`v` is
+      the sole differentiator); a `pr`-less skeleton exceeding its cap exits non-zero with no
+      stdout.
+- [ ] `/cc-checkpoint` sets `pr` to the verbatim appended `## Checkpoint` block, derives `ph` by
+      `get-session` carry-forward (else `"impl"`), and projects `d`/`x` from the section bullets.
+- [ ] Each `snapshots` write is append-only with a fresh auto-incrementing `id` (never
+      overwrites, even on an identical commit hash); the `sessions` write upserts by `session_id`.
+- [ ] The DB tail redirects all child stdout+stderr to `.conductor/last-write.log`; no
+      `CONDUCTOR_DB:` line reaches the UI. The short-hash derivation falls back to `"0000000"` on
+      git non-zero exit, timeout, or format mismatch.
 - [ ] Every `conductor-db` argument is double-quoted; the `post-compact.ps1` cache-clear path
-      is double-quoted and uses `Remove-Item -Force -ErrorAction SilentlyContinue`.
+      is double-quoted, uses `Remove-Item -Force -ErrorAction SilentlyContinue`, and removes only
+      `.conductor/session-id` (never the directory). `session-id.mjs`/`snap-build.mjs` run
+      flag-free (no probe).
 - [ ] All new scripts have Vitest child-process (`spawnSync`) coverage; the repo-wide
       `npm test` gate is green.
 
