@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.22.0] - 2026-07-05
+
+### Added
+- `[ARCH-008-B]` Phase-entry resume-read wiring: `scripts/resume-read.mjs` restores agent context across branch switches and rollbacks by reading the DB snapshot for the current git commit (DB wins), falling back to the `.claude/memory/session-snapshot.json` handoff. The `cc-spec`/`cc-plan`/`cc-implement` phase-entry blocks (both mirrors) now call it; a hit prints a `RESUME_HIT` block, a miss proceeds fresh, a corrupt handoff halts (exit 4). Completes the `[ARCH-008]` milestone (S1 schema → A writers → B readers).
+
+### Changed
+- `scripts/snap-validate.mjs`: `sys.c` length ceiling widened `{7,40}`→`{7,64}` to accept SHA-256 (64-char) commit hashes.
+- `post-compact` hooks (both mirrors): also sweep leaked `.conductor/resume-validate.*.tmp.json` validation temps.
+
 ## [1.21.0] - 2026-07-04
 
 ### Added

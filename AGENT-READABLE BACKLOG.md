@@ -82,7 +82,7 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Components Affected:** Core framework storage layer, repository indexing scripts, installer configuration templates, project dependency manifests.
 * **Acceptance Criteria:** Maintain an independent local SQLite instance capable of handling schema updates, fast metadata lookups, and task state tracking without querying the LLM context. Verify that dependency files and installers are mapped out to drop the legacy memory tool.
 
-### [ ] `[ARCH-008]` Relational Persistence for Agent Memory
+### [X] `[ARCH-008]` Relational Persistence for Agent Memory
 * **Description:** Detail and implement the local SQLite schema across three distinct git-linked operational tables: `sessions` (global tracking), `raw_history` (raw developer execution logs kept out of the active prompt, reserved for local RAG/audits), and `snapshots` (compacted state timelines indexed directly by `git_commit_hash`). This milestone marks the final, absolute removal of `claude-mem`.
 * **Impact:** Enables instant agent session resumption with clean context bounds, adds support for agent "time-travel" rollbacks, and eliminates the `claude-mem` footprint entirely from the setup overhead.
 * **Components Affected:** Cache database schema, state serialization engines, core installation scripts (`install.sh`, `install.ps1`), dependency manifest files.
@@ -102,7 +102,7 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Components Affected:** `cc-checkpoint` command, `cc-compact` command, both `.claude/` and `project-template/.claude/` mirrors.
 * **Acceptance Criteria:** Each checkpoint/compact writes exactly one `snapshots` row indexed by the current git hash and upserts its `sessions` row; write failures remain non-fatal (fail-open). Depends on `[ARCH-008-S1]`.
 
-### [ ] `[ARCH-008-B]` Phase-Entry Resume Read Wiring
+### [X] `[ARCH-008-B]` Phase-Entry Resume Read Wiring
 * **Description:** On phase entry (`cc-spec` / `cc-plan` / `cc-implement`), read `get-snapshot <current-git-hash>` to restore agent awareness across branch switches and rollbacks; a miss degrades cleanly to today's fresh-start behavior.
 * **Impact:** Delivers ARCH-008's headline acceptance behavior — reload full awareness by matching DB state to the current Git commit identifier.
 * **Components Affected:** `cc-spec` / `cc-plan` / `cc-implement` phase-entry logic, both command mirrors.
