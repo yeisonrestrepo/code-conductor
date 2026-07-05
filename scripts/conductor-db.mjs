@@ -12,7 +12,7 @@
 // The plan markdown remains the authoritative task-state record.
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, existsSync, renameSync, unlinkSync, statSync } from 'node:fs';
+import { mkdirSync, existsSync, renameSync, unlinkSync, statSync, readSync } from 'node:fs';
 import { dirname, join, resolve, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -145,6 +145,30 @@ function openConn(DatabaseSync, dbPath) {
   try { db.exec('PRAGMA busy_timeout = 2000;'); }
   catch { warn('busy_timeout pragma failed, continuing without it'); }
   return db;
+}
+
+// Bounded, memory-safe stdin reader. Loops readSync(0,...) into a fixed reusable
+// chunk buffer and stops the instant the running total EXCEEDS `max` (returning an
+// over-cap signal without draining a hostile stream), so peak memory is ~max+chunk.
+// Never calls process.exit; a read error propagates to the caller's try/catch.
+function readStdinCapped(max) {
+  const chunk = Buffer.allocUnsafe(STDIN_CHUNK);
+  const parts = [];
+  let total = 0;
+  for (;;) {
+    let n;
+    try { n = readSync(0, chunk, 0, STDIN_CHUNK, null); }
+    catch (e) {
+      if (e && e.code === 'EAGAIN') continue;   // non-blocking stdin not ready: retry
+      if (e && e.code === 'EOF') break;          // some platforms signal EOF as throw
+      throw e;
+    }
+    if (n === 0) break;                          // clean EOF
+    total += n;
+    if (total > max) return { buf: null, overCap: true };
+    parts.push(Buffer.from(chunk.subarray(0, n)));
+  }
+  return { buf: Buffer.concat(parts), overCap: false };
 }
 
 const compactStamp = () => new Date().toISOString().replace(/[-:.]/g, '');
@@ -347,16 +371,54 @@ async function cmdGetSession(args) {
   }
 }
 
+async function cmdSnapshot(args) {
+  if (args.length !== 1) { warn(U_SNAPSHOT); return; }
+  const gitHash = validateKey('git_commit_hash', args[0], U_SNAPSHOT);
+  if (gitHash === null) return;
+  if (process.stdin.isTTY) { warn(`snap_json is empty; ${U_SNAPSHOT}`); return; }  // no-hang guard
+  let buf, overCap;
+  try { ({ buf, overCap } = readStdinCapped(MAX_SNAP_BYTES)); }
+  catch (e) { warn(`error reading stdin: ${(e && e.code) || (e && e.message)}, skipping cache write`); return; }
+  if (overCap) { warn(`snap_json exceeds ${MAX_SNAP_BYTES} bytes (10 MiB); rejected`); return; }
+  if (buf.length === 0) { warn(`snap_json is empty; ${U_SNAPSHOT}`); return; }
+  let snapJson;
+  try { snapJson = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+  catch { warn('snap_json is not valid UTF-8; rejected'); return; }
+  const root = resolveRoot();
+  await withDb(root, (db) => {
+    db.prepare('INSERT INTO snapshots (git_commit_hash, created_at, snap_json) VALUES ($h, $c, $j)')
+      .run({ $h: gitHash, $c: new Date().toISOString(), $j: snapJson });
+  });
+}
+
+async function cmdGetSnapshot(args) {
+  if (args.length !== 1) { warn(U_GET_SNAPSHOT); return; }
+  const gitHash = validateKey('git_commit_hash', args[0], U_GET_SNAPSHOT);
+  if (gitHash === null) return;
+  const root = resolveRoot();
+  const row = await withDb(root, (db) =>
+    db.prepare('SELECT snap_json FROM snapshots WHERE git_commit_hash = $h ORDER BY id DESC LIMIT 1').get({ $h: gitHash })
+  );
+  if (row) { process.stdout.write(row.snap_json); process.stdout.write('\n'); }
+}
+
 async function main() {
   const [sub, ...rest] = process.argv.slice(2);
   if (sub === 'record') return cmdRecord(rest);
   if (sub === 'init') return cmdInit(rest);
   if (sub === 'session') return cmdSession(rest);
   if (sub === 'get-session') return cmdGetSession(rest);
+  if (sub === 'snapshot') return cmdSnapshot(rest);
+  if (sub === 'get-snapshot') return cmdGetSnapshot(rest);
   warn(`unknown subcommand ${JSON.stringify(sub ?? '')}; ${USAGE}`);
 }
 
-main().then(() => process.exit(0)).catch((e) => {
+// Set exitCode rather than calling process.exit(0): a large query payload
+// (> the ~64 KiB pipe buffer) is written asynchronously, and a synchronous
+// process.exit would truncate the unflushed tail. The db is already closed in
+// withDb's finally and no timers/handles linger, so the event loop drains
+// stdout and exits 0 on its own.
+main().then(() => { process.exitCode = 0; }).catch((e) => {
   warn(`unexpected: ${e && e.message}`);
-  process.exit(0);
+  process.exitCode = 0;
 });

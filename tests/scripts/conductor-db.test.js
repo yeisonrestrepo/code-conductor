@@ -20,12 +20,15 @@ const FLAG = NEEDS_FLAG ? ['--experimental-sqlite', '--no-warnings'] : [];
 let HAS_SQLITE = false;
 try { execFileSync(process.execPath, [...FLAG, '-e', "require('node:sqlite')"], { stdio: 'ignore' }); HAS_SQLITE = true; } catch { /* skip below */ }
 
-function runDb(args, { cwd, env } = {}) {
+function runDb(args, { cwd, env, input } = {}) {
   return spawnSync(process.execPath, [...FLAG, SCRIPT, ...args], {
     cwd, encoding: 'utf8',
     env: env ?? process.env,
+    input,
   });
 }
+
+const MAX_SNAP = 10 * 1024 * 1024;
 
 // Reads rows back using an out-of-band DatabaseSync in the runner itself.
 async function readRows(dbPath) {
@@ -555,5 +558,73 @@ describe.skipIf(!HAS_SQLITE)('conductor-db session / get-session', () => {
     expect(few.stderr).toBe(`CONDUCTOR_DB: ${'usage: conductor-db.mjs session <session_id> <phase> <spec> <git_commit_hash>'}\n`);
     const many = runDb(['get-session', 's1', 'extra'], { cwd: repo });
     expect(many.stderr).toBe(`CONDUCTOR_DB: ${'usage: conductor-db.mjs get-session <session_id>'}\n`);
+  });
+});
+
+describe.skipIf(!HAS_SQLITE)('conductor-db snapshot / get-snapshot', () => {
+  it('stores a snapshot from stdin and returns it byte-for-byte (+ one \\n)', () => {
+    const payload = '{"v":1,"note":"hello"}';
+    const w = runDb(['snapshot', 'deadbee'], { cwd: repo, input: payload });
+    expect(w.status).toBe(0);
+    expect(w.stdout).toBe('');
+    const r = runDb(['get-snapshot', 'deadbee'], { cwd: repo });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toBe(payload + '\n');
+  });
+
+  it('get-snapshot returns the NEWEST blob for a hash (ORDER BY id DESC)', () => {
+    runDb(['snapshot', 'h1'], { cwd: repo, input: 'first' });
+    runDb(['snapshot', 'h1'], { cwd: repo, input: 'second' });
+    const r = runDb(['get-snapshot', 'h1'], { cwd: repo });
+    expect(r.stdout).toBe('second\n');
+  });
+
+  it('round-trips a >128 KiB payload (proves no ARG_MAX ceiling — payload via stdin)', () => {
+    const big = 'x'.repeat(200 * 1024);
+    runDb(['snapshot', 'bigh'], { cwd: repo, input: big });
+    const r = runDb(['get-snapshot', 'bigh'], { cwd: repo });
+    expect(r.stdout).toBe(big + '\n');
+  });
+
+  it('rejects a payload over 10 MiB without writing (message cites the limit)', () => {
+    const over = Buffer.alloc(MAX_SNAP + 1, 0x61);   // 10 MiB + 1 byte of 'a'
+    const w = runDb(['snapshot', 'toobig'], { cwd: repo, input: over });
+    expect(w.status).toBe(0);
+    expect(w.stderr).toContain('snap_json exceeds 10485760 bytes (10 MiB); rejected');
+    expect(runDb(['get-snapshot', 'toobig'], { cwd: repo }).stdout).toBe('');   // nothing stored
+  });
+
+  it('rejects an empty stdin stream as an argument violation', () => {
+    const w = runDb(['snapshot', 'emptyh'], { cwd: repo, input: '' });
+    expect(w.status).toBe(0);
+    expect(w.stderr).toContain('snap_json is empty');
+    expect(runDb(['get-snapshot', 'emptyh'], { cwd: repo }).stdout).toBe('');
+  });
+
+  it('rejects malformed UTF-8 (fatal decoder), never storing U+FFFD', () => {
+    const bad = Buffer.from([0xff, 0xfe, 0x00, 0x80]);   // invalid UTF-8
+    const w = runDb(['snapshot', 'badutf'], { cwd: repo, input: bad });
+    expect(w.status).toBe(0);
+    expect(w.stderr).toContain('snap_json is not valid UTF-8; rejected');
+    expect(runDb(['get-snapshot', 'badutf'], { cwd: repo }).stdout).toBe('');
+  });
+
+  it('does not hang when stdin is closed with no data (spawnSync timeout guard)', () => {
+    const w = spawnSync(process.execPath, [...FLAG, SCRIPT, 'snapshot', 'nohang'],
+      { cwd: repo, encoding: 'utf8', timeout: 5000 });   // no `input` -> stdin closed at EOF
+    expect(w.signal).toBe(null);          // not killed by timeout
+    expect(w.status).toBe(0);
+    expect(w.stderr).toContain('snap_json is empty');
+  });
+
+  it('rejects arg over-supply and whitespace-only hash', () => {
+    expect(runDb(['snapshot', 'h', 'extra'], { cwd: repo, input: 'x' }).stderr)
+      .toBe('CONDUCTOR_DB: usage: conductor-db.mjs snapshot <git_commit_hash>\n');
+    expect(runDb(['snapshot', '   '], { cwd: repo, input: 'x' }).stderr)
+      .toContain('git_commit_hash is empty');
+  });
+
+  it('get-snapshot miss writes zero bytes', () => {
+    expect(runDb(['get-snapshot', 'absent'], { cwd: repo }).stdout).toBe('');
   });
 });
