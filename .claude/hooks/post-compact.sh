@@ -25,6 +25,11 @@ main() {
   echo ""
   echo "   💡 If this session had important decisions or conventions,"
   echo "      run /checkpoint before continuing."
+
+  _cond="${CC_PROJECT_ROOT:-.}/.conductor"
+  rm -f "${_cond}/session-id" 2>/dev/null
+  rm -f "${_cond}"/session-id.*.tmp 2>/dev/null
+
   echo ""
 }
 main || exit 0

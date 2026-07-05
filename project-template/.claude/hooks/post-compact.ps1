@@ -29,6 +29,11 @@ try {
   } else { "   No project.md found." }
   ""
   "   [TIP] If this session had important decisions, run /checkpoint before continuing."
+
+  $cond = Join-Path $root '.conductor'
+  Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $cond 'session-id')
+  Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $cond 'session-id.*.tmp')
+
   ""
 } catch {
   exit 0
