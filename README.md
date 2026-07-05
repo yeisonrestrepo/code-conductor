@@ -91,8 +91,10 @@ All commands are tagged `(Conductor)` in the Claude Code command palette so they
 | `/cc-init` | Initialize or re-sync the project environment: detect stack, checkpoint memory, refresh the project graph, and verify hook integrity. Run at the start of every session. |
 | `/cc-spec [name]` | Search the codebase first, ask only for missing context, generate a full feature spec, and wait for your approval before any plan is made. |
 | `/cc-plan` | Require an approved spec, map the codebase, and generate an ordered implementation plan with exact file paths, a test list, a commit order, and identified risks. Every generated task line carries a unique `[T-NNN]` ID (min 3 digits, unlimited suffix depth) using plain ASCII checkboxes — enforced at generation time. |
-| `/cc-compact` | Phase-boundary command. Serializes the current phase's essential state (decisions, pending steps, files touched, constraints) into a ≤300-token snapshot at `.claude/memory/session-snapshot.md`, then prompts you to run `/compact` to clear conversation history. Run at the end of every phase to prevent context overflow. |
+| `/cc-compact` | Phase-boundary command. Serializes the current phase's essential state (decisions, pending steps, files touched, constraints) into a single-line SNAP JSON snapshot at `.claude/memory/session-snapshot.json` — and, when Node `>= 22.5` is available, a git-hash-keyed row in the local `.conductor/cache.db` — then prompts you to run `/compact` to clear conversation history. Run at the end of every phase to prevent context overflow. |
 | `/cc-implement` | Execute implementation tasks from an approved plan using a surgical 5-step ritual: Grep-locate pending tasks → single-line Read verify → pre-flip `[ ]` to `[>]` → execute → post-flip to `[X]` or `[!]`. Never reads or rewrites the full plan file. Includes dependency evaluation, drift detection, and a Step 6 hook that records each task's final state to a local SQLite cache (see below). |
+
+Each of `/cc-spec`, `/cc-plan`, and `/cc-implement` opens its phase with a **resume read** (`scripts/resume-read.mjs`): it restores any context stored for the current git commit, so work survives branch switches and rollbacks (see [Local State Cache & Session Persistence](#local-state-cache--session-persistence--v1220)).
 | `/cc-review [file\|dir]` | Review code in three layers - Critical / Important / Suggestion - then deliver a verdict and offer to auto-fix. |
 | `/cc-debug [problem]` | Generate hypotheses ordered by probability, confirm before investigating, use Playwright MCP for visual bugs, and report the root cause with a targeted fix. |
 | `/cc-refactor [file\|module]` | Diagnose complexity, plan ordered changes, apply one step at a time, and verify tests pass after each step. |
@@ -193,16 +195,18 @@ The global hook defers to a project-level hook if one exists (upward traversal f
 
 ---
 
-## Local State Cache — v1.19.0
+## Local State Cache & Session Persistence — v1.22.0
 
 `/cc-implement`'s Step 6 hook records each task's final state to a local SQLite cache at `.conductor/cache.db`, written by the bundled `scripts/conductor-db.mjs` engine — a zero-dependency ES module wrapping Node's built-in `node:sqlite`.
 
-- **Schema (v1):** a single `task_state(plan_file, task_id, state, updated_at)` table, keyed by `(plan_file, task_id)`; `plan_file` is normalized to a repo-relative POSIX path so the same plan de-duplicates across working directories. Upserts on every write.
-- **Runtime-gated:** `node:sqlite` needs Node `>= 22.5`, so the hook probes the Node version and self-disables below it. `engines.node` stays `>=20`; the cache is an optimization, never a requirement.
-- **Non-authoritative + fail-safe:** the plan markdown remains the source of truth for task state. Every failure path — absent `node:sqlite`, a corrupt or non-regular file at the db path, `SQLITE_BUSY`, a newer (`user_version > 1`) schema, CLI misuse — degrades to a single `CONDUCTOR_DB:` stderr line and exit 0. A corrupt db is renamed aside (never `rm -r`) and recreated.
+- **Schema (v2, ARCH-008):** `task_state(plan_file, task_id, state, updated_at)` keyed by `(plan_file, task_id)` — `plan_file` normalized to a repo-relative POSIX path so the same plan de-duplicates across working directories — plus `sessions`, `snapshots` (one verbatim SNAP blob per git commit, newest wins), and `raw_history`. Upserts on every write.
+- **Runtime-gated:** `node:sqlite` needs Node `>= 22.5`, so every caller probes the Node version and self-disables below it. `engines.node` stays `>=20`; the cache is an optimization, never a requirement.
+- **Non-authoritative + fail-safe:** the plan markdown and the `.claude/memory/session-snapshot.json` handoff remain the sources of truth. Every failure path — absent `node:sqlite`, a corrupt or non-regular file at the db path, `SQLITE_BUSY`, a newer schema, CLI misuse — degrades to a single `CONDUCTOR_DB:` stderr line and exit 0. A corrupt db is renamed aside (never `rm -r`) and recreated.
 - **Gitignored:** `.conductor/` is local-only and never committed.
 
-> Session-level history (sessions, raw history, snapshots, git-hash time-travel) is out of scope for this release and deferred to a future engine (ARCH-008). v1.19.0 ships the task-state table only.
+### Phase-entry resume — v1.22.0
+
+`/cc-spec`, `/cc-plan`, and `/cc-implement` open each phase by running `scripts/resume-read.mjs`, which resolves the current git commit hash and restores any context stored for it — surviving branch switches and rollbacks. A valid DB snapshot for the commit wins; otherwise it falls back to the `.claude/memory/session-snapshot.json` handoff written by `/cc-compact`. A hit prints a `RESUME_HIT` block the command adopts as its starting context; a clean miss proceeds fresh; a readable-but-corrupt handoff halts the phase (exit `4`) with a `SNAP_INVALID` notice so you can inspect it. This completes the **ARCH-008** milestone: relational schema (v1.20.0) → checkpoint/compact writers (v1.21.0) → phase-entry readers (v1.22.0).
 
 ---
 
@@ -282,9 +286,17 @@ code-conductor/
 │       │   └── cc-docs.md        /cc-docs
 │       ├── hooks/
 │       │   ├── pre-tool-use.sh   Large-file read guard + duplicate file guard + bash scan guard
-│       │   └── post-compact.sh   Checkpoint reminder after `/compact`
+│       │   ├── context-guard.sh  Turn-counter warning (.sh + .ps1)
+│       │   └── post-compact.sh   Checkpoint reminder + cache sweep after `/compact` (.sh + .ps1)
 │       └── memory/
 │           └── project.md        Shared team memory (in git)
+├── scripts/
+│   ├── conductor-db.mjs          Zero-dep node:sqlite engine (.conductor/cache.db)
+│   ├── resume-read.mjs           Phase-entry resume reader (DB snapshot → handoff fallback)
+│   ├── snap-build.mjs            SNAP v1/v2 handoff serializer
+│   ├── snap-validate.mjs         SNAP schema validator
+│   ├── session-id.mjs            Stable session-id resolver
+│   └── detect-stack.mjs          Stack auto-detection scanner
 └── skills/
     ├── code-simplifier.md        Always active — complexity and simplicity rules
     ├── critical-review.md        Always active — 4-phase adversarial review protocol
