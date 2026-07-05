@@ -21,7 +21,7 @@ Add one zero-dependency script, `scripts/resume-read.mjs`, that resolves the cur
 
 Phase entry (`cc-spec` / `cc-plan` / `cc-implement`) runs `node scripts/resume-read.mjs` from the repo root, which performs:
 
-1. **Resolve hash** — `git rev-parse HEAD` via Node's `execFileSync('git', ['rev-parse','HEAD'], { encoding:'utf8', timeout: 2000, stdio: ['ignore','pipe','ignore'] })`, trimmed and lowercased, matched against `/^[0-9a-f]{7,40}$/`; on non-zero exit, git-absent (`ENOENT`), zero-commit, timeout, or format mismatch, use the `"0000000"` sentinel. The 2000 ms timeout is a **Node-level child timeout**, not the GNU `timeout` binary — it is portable to native Windows PowerShell and Git Bash alike, so `resume-read.mjs` never depends on GNU coreutils. git's stderr is routed to `stdio[2] = 'ignore'` so no git diagnostic (`fatal: not a git repository`, `fatal: ambiguous argument 'HEAD'`) ever reaches the terminal.
+1. **Resolve hash** — `git rev-parse HEAD` via Node's `execFileSync('git', ['rev-parse','HEAD'], { encoding:'utf8', timeout: 2000, stdio: ['ignore','pipe','ignore'] })`, wrapped in `try/catch`. `execFileSync` **throws** on git-absent (`ENOENT`), non-zero exit (non-repo / zero-commit → `fatal:`), and the 2000 ms timeout (`ETIMEDOUT`, `SIGTERM`) — every one of these is caught by the same `catch`, which falls back to the `"0000000"` sentinel. A successful result is trimmed, lowercased, and matched against `/^[0-9a-f]{7,40}$/`; a format mismatch also yields the sentinel. The 2000 ms timeout is a **Node-level child timeout**, not the GNU `timeout` binary — portable to native Windows PowerShell and Git Bash alike, so `resume-read.mjs` never depends on GNU coreutils. git's stderr is routed to `stdio[2] = 'ignore'` so no git diagnostic (`fatal: not a git repository`, `fatal: ambiguous argument 'HEAD'`) ever reaches the terminal, and any that `execFileSync` surfaces in the thrown error is discarded inside the catch.
 2. **Sentinel bypass** — if the resolved hash is the `"0000000"` sentinel, **skip the DB query entirely** and go straight to the handoff-file branch (step 3, miss path). A sentinel is a shared key across every non-git / zero-commit context, so a `get-snapshot "0000000"` would collide with unrelated sessions' sentinel-keyed rows; the session-local handoff file is the only safe source there. Trace: `resume: sentinel-bypass`.
 3. **Query the DB (non-destructive)** — otherwise run `conductor-db.mjs get-snapshot <hash>` under the Node-flag probe (no-flag-first → `--experimental-sqlite --no-warnings` → skip). It prints one blob line on a hit and zero bytes on a miss or on any degradation (Node < 22.5, `node:sqlite` absent, corrupt DB). `get-snapshot` returns the **newest** row for the hash (`ORDER BY id DESC LIMIT 1`) — a mid-work `/cc-checkpoint` (v2) written after a `/cc-compact` (v1) at the same commit therefore resumes the checkpoint blob; this is intentional and consistent with "DB wins."
 4. **Bind by precedence:**
@@ -34,7 +34,7 @@ Phase entry (`cc-spec` / `cc-plan` / `cc-implement`) runs `node scripts/resume-r
    - **No usable context** → exit 3 (clean miss), **zero bytes on stdout** (not even a trailing newline); the command proceeds fresh. Trace: `resume: miss`.
 5. **Legacy `.md` sweep** — if a legacy `.claude/memory/session-snapshot.md` is found at any point, delete it unread (best-effort, silent); it is never bound. This completes the v1.18.0 deprecation. Trace: `resume: legacy-md-swept`.
 6. **Surface (on any hit)** — stdout carries a stable machine-readable block (see *Stdout contract* below) that the command adopts as its starting context; the command then echoes one human banner to the UI, e.g. `> Resumed from stored snapshot @ <hash> (phase: plan)`, adding `(checkpoint prose available)` when the block reports `prose: available`.
-7. **Trace** — every evaluation and deletion step appends one diagnostic line to `.conductor/last-write.log` (vocabulary: `resume: db-hit`, `resume: db-invalid degrade`, `resume: file-bind+unlink`, `resume: file-invalid halt`, `resume: file-stale-hash degrade`, `resume: sentinel-bypass`, `resume: legacy-md-swept`, `resume: miss`); never printed to the UI.
+7. **Trace** — every evaluation and deletion step is written **directly by the script** via synchronous `appendFileSync('.conductor/last-write.log', line, { flag: 'a' })` (after a best-effort `mkdirSync('.conductor', { recursive: true })`), never via stderr. Traces do **not** ride the shell's `2>>` redirect: the script owns its log destination unconditionally, so a command that forgets the redirect still logs, and there is no double-write or destination conflict. The synchronous append with the `'a'` flag maps to a single `O_APPEND` write per line, which the OS serializes — so two concurrent phase entries never interleave or truncate each other's trace. Every append is wrapped in `try/catch` (best-effort; a locked/inaccessible log never aborts phase entry). Vocabulary: `resume: db-hit`, `resume: db-invalid degrade`, `resume: file-bind+unlink`, `resume: file-invalid halt`, `resume: file-stale-hash degrade`, `resume: sentinel-bypass`, `resume: legacy-md-swept`, `resume: miss`. stderr is reserved exclusively for the exit-4 halt reason; stdout is reserved exclusively for the `RESUME_HIT` block.
 
 ### Stdout contract
 
@@ -55,14 +55,33 @@ pending:
 
 `pending:` is always emitted; with no pending steps it is followed by zero `- ` lines. On a **miss** (exit 3) and only then, stdout is empty (zero bytes). On a **halt** (exit 4), stdout is empty and the reason is on stderr / in the trace log.
 
+The `prose:` value is derived from exactly one JSON key — the **top-level `pr`** field of the SNAP v2 schema: `prose: available` iff `typeof snap.pr === 'string' && snap.pr.length > 0`, else `prose: none` (all v1 blobs, which have no `pr`, report `none`). `version:` is `snap.v`; `phase:` is `snap.sys.ph`; `spec:` is `snap.sys.s`; `commit:` is the resolved hash; `pending:` items are `snap.ops.n`.
+
+### Paths and validation mechanism
+
+- **Handoff file** — a single module constant `HANDOFF = join(root, '.claude/memory/session-snapshot.json')` is the *only* spelling of the path, reused verbatim in every operational branch (existence check, capture-read, validation, unlink, hash-stale re-delete). **Legacy** `LEGACY_MD = join(root, '.claude/memory/session-snapshot.md')` is used only by the sweep. `root` is resolved with the same git-toplevel → bounded `.git` walk → script-parent fallback as `session-id.mjs`.
+- **Validation reuses `snap-validate.mjs` unchanged** — which validates a **file path only** (it `readFileSync`s `argv[2]`; it has no stdin or in-memory-string surface). So:
+  - The **handoff file** is validated at its own `HANDOFF` path (it already exists on disk). Capture-before-delete still holds: its bytes are read into memory for *binding* first; validation reads the same path; the unlink happens only after both.
+  - The **DB blob** (an in-memory string with no path) is written to a temp file `join(root, '.conductor', 'resume-validate.<pid>.tmp.json')`, validated by spawning `snap-validate.mjs` against that temp, then the temp is unlinked (best-effort, silent). No validation logic is duplicated or rewritten.
+
 ### Shell capture syntax (command files)
 
-The six command files are agent-interpreted prose, not literal scripts, but they specify one canonical capture form per platform so the phase command reliably reads the block and the exit code:
+The six command files are agent-interpreted prose, not literal scripts, but they specify one canonical capture form per platform so the phase command reliably reads the block and the exit code. **Each form first probes for `node` and treats its absence as a clean miss** — never an error — because on native PowerShell an unresolved `node` raises a terminating `CommandNotFoundException` that would abort the whole phase-entry block:
 
-- **Unix / Git Bash:** `resume_out="$(node scripts/resume-read.mjs 2>>.conductor/last-write.log)"; resume_rc=$?`
-- **PowerShell:** `$resume_out = node scripts/resume-read.mjs 2>> .conductor/last-write.log; $resume_rc = $LASTEXITCODE`
+- **Unix / Git Bash:**
+  ```sh
+  if command -v node >/dev/null 2>&1; then
+    resume_out="$(node scripts/resume-read.mjs 2>>.conductor/last-write.log)"; resume_rc=$?
+  else resume_rc=3; resume_out=""; fi
+  ```
+- **PowerShell:**
+  ```powershell
+  if (Get-Command node -ErrorAction SilentlyContinue) {
+    $resume_out = node scripts/resume-read.mjs 2>> .conductor/last-write.log; $resume_rc = $LASTEXITCODE
+  } else { $resume_rc = 3; $resume_out = "" }
+  ```
 
-The command then branches on `resume_rc`: `0` → parse the `RESUME_HIT` block and adopt it (+ echo the banner); `3` → proceed fresh (empty capture); `4` → halt for manual inspection (corrupt handoff).
+The command then branches on `resume_rc`: `0` → parse the `RESUME_HIT` block and adopt it (+ echo the banner); `3` → proceed fresh (empty capture — covers both a true miss and an absent `node`); `4` → halt for manual inspection (corrupt handoff). The `2>>` redirect only sinks any incidental stderr (the exit-4 halt reason) away from the UI; it is **not** the trace channel — the script writes traces itself via `appendFileSync` (see step 7), so the two never conflict.
 
 ### Alternative paths
 
@@ -97,8 +116,14 @@ The command then branches on `resume_rc`: `0` → parse the `RESUME_HIT` block a
 - [ ] The DB `get-snapshot` read is non-destructive (repeatable across successive branch switches).
 - [ ] Both the DB blob and the handoff file are validated through `snap-validate.mjs`; no schema logic is duplicated in `resume-read.mjs`.
 - [ ] `cc-spec`, `cc-plan`, and `cc-implement` phase-entry blocks (all six mirror files) call `resume-read.mjs` with the canonical per-platform capture syntax and adopt its output; the legacy `.md` handoff path is removed from all three.
+- [ ] Traces are written by the script via synchronous `appendFileSync(..., { flag: 'a' })` directly to `.conductor/last-write.log`, never through the shell `2>>` redirect; the log append is best-effort and never aborts phase entry.
+- [ ] The DB blob is validated by writing it to a `.conductor/resume-validate.<pid>.tmp.json` temp and spawning the unmodified `snap-validate.mjs`; the handoff file is validated at its own path; the temp is unlinked best-effort. `snap-validate.mjs` is not modified.
+- [ ] `node` absence is probed by each command (`command -v node` / `Get-Command node`) and treated as a clean miss (`resume_rc=3`), never a terminating error — verified for the PowerShell mirror by inspection.
+- [ ] `prose: available|none` is derived solely from the top-level `pr` key (`available` iff a non-empty string), and `version:` from `snap.v`.
+- [ ] The handoff path is a single `HANDOFF` constant reused across the existence-check, capture-read, validation, unlink, and hash-stale branches; no path string is duplicated inline.
+- [ ] The git resolution `try/catch` demonstrably catches `ENOENT` (git absent), non-zero exit, and `ETIMEDOUT`/`SIGTERM` (timeout), each falling back to `"0000000"`.
 - [ ] A branch-switch test proves context stored at commit A is restored at A and absent at B (no cross-branch contamination).
-- [ ] All existing suites stay green; new `tests/scripts/resume-read.test.js` covers hit/miss/invalid/hash-stale/unlink-failure/sentinel-bypass/branch-switch.
+- [ ] All existing suites stay green; new `tests/scripts/resume-read.test.js` covers hit/miss/invalid/hash-stale/unlink-failure/sentinel-bypass/node-absent/branch-switch.
 
 ## Out of Scope
 
