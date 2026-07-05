@@ -324,8 +324,13 @@ describe('snap-validate.mjs', () => {
     expect(run(fixture(j({ ...VALID, sys: { ...VALID.sys, c: 'abc1234' } }))).status).toBe(0)
   })
 
-  it('rejects a 41-char sys.c hash', () => {
-    const bad = { ...VALID, sys: { ...VALID.sys, c: 'a'.repeat(41) } }
+  it('accepts a 64-char sys.c hash (SHA-256 object id)', () => {
+    const long = { ...VALID, sys: { ...VALID.sys, c: 'a'.repeat(64) } }
+    expect(run(fixture(j(long))).status).toBe(0)
+  })
+
+  it('rejects a 65-char sys.c hash', () => {
+    const bad = { ...VALID, sys: { ...VALID.sys, c: 'a'.repeat(65) } }
     const r = run(fixture(j(bad)))
     expect(r.status).toBe(1)
     expect(r.stderr).toBe('SNAP_ERROR: invalid sys.c format\n')

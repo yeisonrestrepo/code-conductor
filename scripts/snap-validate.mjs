@@ -28,5 +28,5 @@ snap.ops.f.forEach((el, i) => {
   const idx = el.lastIndexOf(':'); if (idx <= 0) err(`empty path in ops.f[${i}]`);
   if (!['C', 'M', 'D'].includes(el.slice(idx + 1))) err(`invalid action code in ops.f[${i}]`);
 });
-if (!/^[0-9a-f]{7,40}$/.test(snap.sys.c)) err('invalid sys.c format'); if (!/^[a-zA-Z0-9._-]+$/.test(snap.sys.s)) err('invalid chars in sys.s');
+if (!/^[0-9a-f]{7,64}$/.test(snap.sys.c)) err('invalid sys.c format'); if (!/^[a-zA-Z0-9._-]+$/.test(snap.sys.s)) err('invalid chars in sys.s');
 process.exit(0);
