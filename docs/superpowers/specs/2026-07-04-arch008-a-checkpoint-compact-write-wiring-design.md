@@ -47,8 +47,12 @@ hash; `/cc-compact` writes the v1 handoff file, then persists the matching v1 bl
 - Malformed stdin into `snap-build` → non-zero exit, no output, DB write skipped, command
   continues.
 - Over-cap prose (v2 blob > 10 MiB) → `pr` truncated predictably before the DB write.
-- Repo path contains spaces → all three `conductor-db` args and the PowerShell cache-clear
-  path are double-quoted.
+- Repo path contains spaces → all `conductor-db` argv and the PowerShell cache-clear path are
+  double-quoted.
+- **ARG_MAX safety (Q2):** the ≤10 MiB SNAP blob is **exclusively piped via stdin** to
+  `conductor-db snapshot`, whose only argv is the small hash scalar; likewise `session`/
+  `get-session` carry only short scalars (id/ph/s/c). No large payload ever appears in argv, so
+  the OS `ARG_MAX` / `MAX_ARG_STRLEN` per-argument ceiling can never be breached.
 
 **Boundary conditions:** non-git workspace / no commits → `sys.c` and the hash key both use
 `"0000000"` (valid under both schemas); empty prose → v1 (not v2); concurrent
@@ -80,7 +84,12 @@ invocation cwd is. Steps:
    execution) **(Q5)** — the script **re-reads** `.conductor/session-id`; if it is now present and
    non-empty, it adopts that id (**first-writer-wins**); otherwise it falls back to the in-memory
    UUID. It **never rethrows** the rename error, so rapid concurrent runs never corrupt the file,
-   diverge onto different ids, or crash on a Windows lock.
+   diverge onto different ids, or crash on a Windows lock. **Temp-file lifecycle (Q4):** on the
+   happy path the temp is consumed by the rename; on any failure path the script best-effort
+   `unlinkSync`s its own `session-id.<pid>.tmp` so it does not leak. As a backstop against temps
+   orphaned by an abrupt process kill (between write and rename), the `post-compact` hook also
+   sweeps `.conductor/session-id.*.tmp` (below), bounding any accumulation to one pre-compact
+   window.
 4. Any I/O error is non-fatal: a value is always printed (fall back to a fresh in-memory
    UUID if the cache cannot be read or written).
 
@@ -102,10 +111,16 @@ the canonical single-line SNAP JSON, exit 0 on success):
   `Buffer.byteLength(JSON.stringify(obj), 'utf8')`, backing off one UTF-16 unit if the cut
   lands on a lone high surrogate. Re-serializing after each raw-value cut guarantees the
   emitted JSON is always structurally valid and correctly accounts for stringify escaping.
-- **Bounded binary search (Q2):** the search is inherently `O(log₂(pr.length))` ≈ 24 probes for
-  a 10 MiB input, but is **hard-capped at 64 iterations** as a defensive stop. Each probe
-  stringifies only the candidate `pr` (added to the once-computed skeleton byte cost), not the
-  whole object repeatedly. On the (monotonic-length-function-impossible) event of
+- **Bounded binary search (Q2 search):** the search is inherently `O(log₂(pr.length))` ≈ 24
+  probes for a 10 MiB input, but is **hard-capped at 64 iterations** as a defensive stop.
+  **Skeleton accounting (Q5):** `skeletonBytes` is computed once as
+  `Buffer.byteLength(JSON.stringify({ ...fields, pr: '' }), 'utf8')` — this **already includes the
+  full `,"pr":""` structural prefix** (the key, colon, and the two empty-value quote bytes). Each
+  probe's total is then `skeletonBytes + Buffer.byteLength(JSON.stringify(prCandidate), 'utf8') − 2`,
+  where the `− 2` removes the empty-string quotes already counted in the skeleton so the value's
+  interior bytes are added exactly once. The `"pr":` key prefix is thus accounted for precisely,
+  with no double-count, while re-stringifying only the candidate value (not the whole object) each
+  probe. On the (monotonic-length-function-impossible) event of
   non-convergence within the cap, `snap-build` falls back to a **conservative byte-budget slice**:
   `keepChars = Math.max(0, Math.floor((MAX_SNAP_BYTES − skeletonBytes − 2) / 6))` then
   `pr.slice(0, keepChars)` (surrogate back-off). The **multiplier 6 (Q3)** is the worst-case
@@ -171,8 +186,12 @@ piping to `snap-build.mjs` with the following field derivation:
   unavailable, the 2 s `busy_timeout` still bounds real contention).
 - **`d` / `x` — structured projection (Q4):** best-effort parse of the just-written section.
   Headings are matched by regex `/^#{2,4}[ \t]+(.+?)[ \t]*$/` and classified case-insensitively:
-  a heading whose text contains `decision` or `convention` opens a `d` block; one containing
-  `debt`, `workaround`, or `limitation` opens an `x` block. **Precedence (Q2):** the `d`
+  the captured heading text is first **normalized (Q3-emphasis)** — surrounding/inline markdown
+  emphasis (`*`, `_`, `` ` ``) stripped and trimmed — so `### **Technical Debt**` and `### _Decisions_`
+  classify identically to their plain forms; then, case-insensitively, a heading whose normalized
+  text contains `decision` or `convention` opens a `d` block, and one containing `debt`,
+  `workaround`, or `limitation` opens an `x` block. (Emphasis-stripping is applied to the heading
+  **classification** only; bullet content is captured verbatim.) **Precedence (Q2):** the `d`
   (decision/convention) set is tested **first** and wins — a heading matching *both* keyword sets
   (e.g. "Decisions and Technical Debt") opens exactly one block, a `d` block; each heading opens at
   most one block. Within a block, bullet lines matching
@@ -196,7 +215,11 @@ the checkpoint as usual regardless of the tail's outcome.
 `session-id.mjs` / `snap-build.mjs` / `conductor-db.mjs` stdout **and** stderr to
 `.conductor/last-write.log` (best-effort, overwritten each run, gitignored under `.conductor/`).
 The lone `CONDUCTOR_DB:` degradation line therefore never reaches the Claude Code UI; the tail
-surfaces nothing to the user while leaving a debug trail.
+surfaces nothing to the user while leaving a debug trail. **Explicitly (Q6-mute):** child stderr is
+**fully suppressed from the terminal** — every DB-tail call redirects both streams to the log
+(`> .conductor/last-write.log 2>&1`), and the command reports nothing from the tail's output (only
+its exit is observed). It is **not** sent to `/dev/null`: the diagnostic is preserved in the log,
+merely never printed to the user.
 
 **`last-write.log` concurrency (Q8):** the log is a **best-effort diagnostic**, not a
 correctness artifact. It is written in **overwrite mode (`>`, not append)** and is **not
@@ -256,7 +279,10 @@ its abbreviation length in large repos (git widens it to stay unambiguous), and 
 8+ later, breaking ARCH-008-B's key match. Both commands therefore derive the **full 40-char hash
 via `git rev-parse HEAD`** (fixed-length, unambiguous, stable), lowercased and validated against
 `/^[0-9a-f]{7,40}$/`; a non-zero exit, timeout, or format mismatch falls back to the `"0000000"`
-sentinel (7 zeros, still valid under the broadened regex). This supersedes the earlier
+sentinel (7 zeros, still valid under the broadened regex). **Zero-commit repos (Q1):** in a
+freshly-initialized repo with no commits, `git rev-parse HEAD` exits non-zero (`fatal: … unknown
+revision 'HEAD'`); this error is caught like any other and yields the `"0000000"` sentinel — the
+commands never fail on a first-run/empty repo. This supersedes the earlier
 "short 7-hex" default. `sys.c`, the `sessions.git_commit_hash`, and the `snapshots.git_commit_hash`
 key are all this same 40-char value, so A writes and B reads an identical, growth-stable key.
 
@@ -292,12 +318,13 @@ key are all this same 40-char value, so A writes and B reads an identical, growt
   **bounded timeout**; a non-zero exit, a timeout/hang, or output not matching `/^[0-9a-f]{7,40}$/`
   (after lowercasing) all fall back to `"0000000"`. The commands never block on a stuck git
   process, and the `"0000000"` sentinel is a valid `sys.c` under both schemas.
-- **`post-compact` cache clear (Q7):** `.sh` uses `rm -f`; `.ps1` uses
-  `Remove-Item -Force -ErrorAction SilentlyContinue` with the `Join-Path` result passed as a
-  **literal double-quoted string** (space-safe repo paths). It deletes **only**
-  `.conductor/session-id` and never removes `.conductor/` itself or any other file, even if the
-  directory would be left empty (it normally holds `cache.db`). Each stays inside its hook's
-  existing exit-0 guard, so a delete failure never crashes the hook.
+- **`post-compact` cache clear (Q7/Q4-sweep):** `.sh` uses `rm -f`; `.ps1` uses
+  `Remove-Item -Force -ErrorAction SilentlyContinue` with the `Join-Path` results passed as
+  **literal double-quoted strings** (space-safe repo paths). It deletes **only**
+  `.conductor/session-id` **and** any orphaned `.conductor/session-id.*.tmp` (wildcard sweep) —
+  never `.conductor/` itself or any other file, even if the directory would be left empty (it
+  normally holds `cache.db`). Each stays inside its hook's existing exit-0 guard, so a delete
+  failure never crashes the hook.
 - **Deletion does NOT force a new session in the primary path (Q6):** `/compact` clears history
   but stays the **same Claude Code invocation** with the same `$CLAUDE_CODE_SESSION_ID`, so the
   next command re-resolves the **identical** id and upserts the **same** `sessions` row — the
