@@ -96,7 +96,7 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Components Affected:** `scripts/conductor-db.mjs`, `tests/scripts/conductor-db.test.js`.
 * **Acceptance Criteria:** Migration is idempotent and preserves `task_state`; `sessions` upsert preserves original `started_at`; `get-snapshot` uses `ORDER BY id DESC LIMIT 1`; `snap_json` capped at 10 MiB; indexes on `snapshots(git_commit_hash)` and `raw_history(session_id)`; no foreign keys; all write paths stay fail-open (exit 0). Spec: `docs/superpowers/specs/2026-07-04-arch008-relational-persistence-schema-design.md`.
 
-### [ ] `[ARCH-008-A]` Checkpoint/Compact Write Wiring
+### [X] `[ARCH-008-A]` Checkpoint/Compact Write Wiring
 * **Description:** Wire `/cc-checkpoint` and `/cc-compact` to resolve the current git commit hash and persist `sessions` + `snapshots` (the SNAP v1 blob) into the cache via the `[ARCH-008-S1]` subcommands.
 * **Impact:** Gives checkpoints and compaction a queryable, commit-indexed relational home; `project.md` + plan markdown remain authoritative.
 * **Components Affected:** `cc-checkpoint` command, `cc-compact` command, both `.claude/` and `project-template/.claude/` mirrors.

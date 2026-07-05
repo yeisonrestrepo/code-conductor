@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.21.0] - 2026-07-04
+
+### Added
+- `[ARCH-008-A]` `scripts/session-id.mjs`: zero-dep session-id resolver — emits `$CLAUDE_CODE_SESSION_ID` verbatim when set (cacheless), else a `looksValid`-gated `.conductor/session-id` cache read, else a fresh `crypto.randomUUID()` persisted via atomic temp+rename. First-writer-wins on `EEXIST`/`EPERM`/`EACCES`; unwritable shared dir falls back to an in-memory UUID; runs flag-free on any Node ≥ 14.
+- `[ARCH-008-A]` `scripts/snap-build.mjs`: canonical SNAP serializer reading a flat `{ph,c,s,n,f,d,x,pr?}` JSON object on stdin. Emits **v1** (`{v:1,sys,ops,mem}`, 4096-char head-drop trim) when `pr` is absent/empty, **v2** (`+pr`, 10 MiB byte cap) otherwise; strips extraneous keys, normalizes arrays (filter/dedup/per-element cap/head-drop), and truncates an over-cap `pr` with a surrogate-safe bounded binary search.
+- `[ARCH-008-A]` `tests/scripts/session-id.test.js`, `tests/scripts/snap-build.test.js`: hermetic child-process suites (env-verbatim / generate+persist / cache-reuse; v1/v2 selection, key-stripping, 10 MiB truncation, surrogate-safety, malformed/empty/missing-scalar rejection, round-trip validation against `snap-validate`).
+
+### Changed
+- `[ARCH-008-A]` `scripts/snap-validate.mjs`: accepts SNAP **v2** — optional top-level `pr` (string; version-aware allow-list still rejects `pr` on v1), `v ∈ {1,2}` (`v>2` → `SNAP_UNKNOWN_VERSION`), and a broadened `sys.c` hash regex `/^[0-9a-f]{7,40}$/` (backward-compatible; `0000000` sentinel valid). The 4096-char file cap is unchanged.
+- `[ARCH-008-A]` `/cc-compact` + `/cc-checkpoint`: after the authoritative write, run a synchronous fail-open DB tail persisting one `sessions` upsert + one git-hash-keyed `snapshots` row via the S1 subcommands (session id + snap-build blob on stdin, argv double-quoted, append-mode log, Node-flag probe). Hash source is the full-40 `git rev-parse HEAD` (not `--short`). `/cc-checkpoint` captures the verbatim `## Checkpoint` block as v2 `pr`.
+- `[ARCH-008-A]` `post-compact.sh`/`.ps1` (live + template): clear `.conductor/session-id` and sweep `session-id.*.tmp` on compaction. `cc-implement.md` reader comment corrected for SNAP v2 (`v ∈ {1,2}`).
+
 ## [1.20.0] - 2026-07-04
 
 ### Added
