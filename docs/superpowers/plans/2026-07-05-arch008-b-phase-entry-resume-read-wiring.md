@@ -104,9 +104,9 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 - Consumes: `scripts/snap-validate.mjs` (via `process.execPath`, exit-code verdict) from Task 1.
 - Produces: an executable that resolves the git hash, sweeps a legacy `.md`, and binds the handoff file. `queryDb(hash)` is a stub returning `null` here (Task 3 fills it). Exit contract: `0` hit (stdout `RESUME_HIT` block), `3` miss (zero bytes), `4` halt (readable + non-empty + invalid handoff). Exit-code mapping is exhaustive: `0` = a valid DB or handoff hit; `3` = a clean miss, covering no handoff, an unreadable handoff (EACCES/EIO), an empty or whitespace-only handoff (checked before validation and best-effort deleted), a hash-stale handoff, a sentinel or non-full-hash DB bypass, a DB degrade, and any uncaught startup error; `4` = a handoff that is readable and non-empty but structurally invalid (malformed JSON, or a schema/version failure). Only `4` halts; `3` and every other code proceed fresh. Prints via a drain-callback so stdout is never truncated. Task 3 replaces the `queryDb` stub in place; Task 4 consumes the exit codes and stdout block from the command mirrors.
 
-- [ ] [T-002] **Build the resume-read core and its file-branch test suite**
+- [X] [T-002] **Build the resume-read core and its file-branch test suite**
 
-- [ ] [T-002-A] **Step 1: Write the failing test suite**
+- [X] [T-002-A] **Step 1: Write the failing test suite**
 
 Create `tests/scripts/resume-read.test.js`:
 
@@ -235,12 +235,12 @@ describe('resume-read.mjs core (file branch)', () => {
 });
 ```
 
-- [ ] [T-002-B] **Step 2: Run the suite to verify it fails**
+- [X] [T-002-B] **Step 2: Run the suite to verify it fails**
 
 Run: `npx vitest run tests/scripts/resume-read.test.js`
 Expected: FAIL - every test errors because `scripts/resume-read.mjs` does not exist yet (`Cannot find module`).
 
-- [ ] [T-002-C] **Step 3: Write the resume-read core**
+- [X] [T-002-C] **Step 3: Write the resume-read core**
 
 Create `scripts/resume-read.mjs` (the `queryDb` stub is replaced in Task 3):
 
@@ -367,12 +367,12 @@ if (res.out) { process.stdout.write(res.out, () => process.exit(res.code)); }
 else { process.exit(res.code); }
 ```
 
-- [ ] [T-002-D] **Step 4: Run the suite to verify green**
+- [X] [T-002-D] **Step 4: Run the suite to verify green**
 
 Run: `npx vitest run tests/scripts/resume-read.test.js`
 Expected: PASS - all core file-branch cases green (miss, bind+unlink, v2 prose, invalid halt, empty degrade, hash-stale, legacy sweep, trace line, Node-14 syntax).
 
-- [ ] [T-002-E] **Step 5: Commit**
+- [X] [T-002-E] **Step 5: Commit**
 
 ```bash
 git add scripts/resume-read.mjs tests/scripts/resume-read.test.js
