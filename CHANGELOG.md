@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.20.0] - 2026-07-04
+
+### Added
+- `[ARCH-008-S1]` `scripts/conductor-db.mjs`: additive `user_version` 1→2 migration creating `sessions(session_id PK WITHOUT ROWID, started_at, updated_at, phase, spec, git_commit_hash)`, `snapshots(id INTEGER PK, git_commit_hash, created_at, snap_json)` + `idx_snapshots_hash`, and `raw_history(id INTEGER PK, session_id, created_at, kind, content)` + `idx_raw_history_session`, alongside the untouched `task_state`. Five fail-open subcommands: `session` (ON CONFLICT DO UPDATE upsert, preserves `started_at`), `get-session` (fixed-key single-line JSON), `snapshot` / `history` (payload from stdin via bounded `readStdinCapped`, 10 MiB / 1 MiB caps, strict UTF-8), `get-snapshot` (newest blob `ORDER BY id DESC LIMIT 1`, byte-for-byte). Query commands emit one line on hit, zero bytes on miss/degradation; writes stay empty-stdout/exit-0. No FKs, no pruning, no env override. Named `$name` binding for new statements.
+- `[ARCH-008-S1]` `tests/scripts/conductor-db.test.js`: migration (v1→v2 in place, DROP-free, index accounting), each subcommand, query round-trip, >128 KiB stdin round-trip (no ARG_MAX ceiling), 10 MiB/1 MiB over-cap rejection, malformed-UTF-8 rejection, empty-stdin/TTY no-hang, fixed key order, CR/whitespace, degraded-query zero-byte output, and isolation guard.
+
+### Changed
+- `[ARCH-008-S1]` `scripts/conductor-db.mjs`: `withDb` now returns its callback's value (query support); `validateKey` gains an optional per-subcommand `usage` argument; `SCHEMA_VERSION` bumped to 2. `record`/`init` behaviour and stderr strings unchanged.
+
 ## [1.19.0] - 2026-07-04
 
 ### Added
