@@ -78,12 +78,12 @@ describe.skipIf(!HAS_SQLITE)('conductor-db record (happy path)', () => {
     expect(row.updated_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
   });
 
-  it('WAL journal_mode and user_version=1 are set', async () => {
+  it('WAL journal_mode and user_version=2 are set', async () => {
     runDb(['record', 'plan.md', 'T-001', 'X'], { cwd: repo });
     const { DatabaseSync } = await import('node:sqlite');
     const db = new DatabaseSync(dbPath());
     try {
-      expect(db.prepare('PRAGMA user_version').get().user_version).toBe(1);
+      expect(db.prepare('PRAGMA user_version').get().user_version).toBe(2);
       expect(String(db.prepare('PRAGMA journal_mode').get().journal_mode).toLowerCase()).toBe('wal');
     } finally { db.close(); }
   });
@@ -391,12 +391,12 @@ describe.skipIf(!HAS_SQLITE)('conductor-db non-regular file at db path', () => {
 describe.skipIf(!HAS_SQLITE)('conductor-db forward compatibility', () => {
   const dbPath = () => join(repo, '.conductor', 'cache.db');
 
-  it('does not write or downgrade a db whose user_version is newer than v1', async () => {
-    // Simulate a post-ARCH-008 db: valid sqlite file, user_version = 2, no task_state table.
+  it('does not write or downgrade a db whose user_version is newer than the supported schema', async () => {
+    // Simulate a FUTURE schema: valid sqlite file, user_version = 3, no task_state table.
     const { DatabaseSync } = await import('node:sqlite');
     mkdirSync(join(repo, '.conductor'), { recursive: true });
     const seed = new DatabaseSync(dbPath());
-    seed.exec('PRAGMA user_version = 2;');
+    seed.exec('PRAGMA user_version = 3;');
     seed.close();
 
     const r = runDb(['record', 'plan.md', 'T-001', 'X'], { cwd: repo });
@@ -406,7 +406,7 @@ describe.skipIf(!HAS_SQLITE)('conductor-db forward compatibility', () => {
 
     const check = new DatabaseSync(dbPath());
     try {
-      expect(check.prepare('PRAGMA user_version').get().user_version).toBe(2);   // not downgraded
+      expect(check.prepare('PRAGMA user_version').get().user_version).toBe(3);   // not downgraded
       const t = check.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='task_state'").get();
       expect(t).toBeUndefined();                                                 // no table created, no write
     } finally { check.close(); }
@@ -433,5 +433,65 @@ describe.skipIf(!HAS_SQLITE)('conductor-db schema self-heal', () => {
     const rows = await readRows(dbPath());   // table recreated, write landed — no "no such table" crash
     expect(rows).toHaveLength(1);
     expect(rows[0].state).toBe('X');
+  });
+});
+
+describe.skipIf(!HAS_SQLITE)('conductor-db v2 migration', () => {
+  const dbPath = () => join(repo, '.conductor', 'cache.db');
+  async function tables(p) {
+    const { DatabaseSync } = await import('node:sqlite');
+    const db = new DatabaseSync(p);
+    try {
+      return db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map((r) => r.name);
+    } finally { db.close(); }
+  }
+
+  it('init creates all four tables, two indexes, and user_version=2', async () => {
+    runDb(['init'], { cwd: repo });
+    const { DatabaseSync } = await import('node:sqlite');
+    const db = new DatabaseSync(dbPath());
+    try {
+      expect(db.prepare('PRAGMA user_version').get().user_version).toBe(2);
+      const t = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map((r) => r.name);
+      expect(t).toEqual(expect.arrayContaining(['raw_history', 'sessions', 'snapshots', 'task_state']));
+      const idx = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%' ORDER BY name").all().map((r) => r.name);
+      expect(idx).toEqual(['idx_raw_history_session', 'idx_snapshots_hash']);
+    } finally { db.close(); }
+  });
+
+  it('migrates a pre-existing v1 db in place, preserving task_state rows', async () => {
+    const { DatabaseSync } = await import('node:sqlite');
+    mkdirSync(join(repo, '.conductor'), { recursive: true });
+    const seed = new DatabaseSync(dbPath());
+    seed.exec('PRAGMA user_version = 1;');
+    seed.exec("CREATE TABLE task_state (plan_file TEXT NOT NULL, task_id TEXT NOT NULL, state TEXT NOT NULL CHECK (state IN (' ','>','X','!')), updated_at TEXT NOT NULL, PRIMARY KEY (plan_file, task_id)) WITHOUT ROWID;");
+    seed.prepare('INSERT INTO task_state VALUES (?,?,?,?)').run('legacy.md', 'T-000', 'X', '2026-01-01T00:00:00.000Z');
+    seed.close();
+
+    const r = runDb(['init'], { cwd: repo });
+    expect(r.status).toBe(0);
+    const check = new DatabaseSync(dbPath());
+    try {
+      expect(check.prepare('PRAGMA user_version').get().user_version).toBe(2);
+      const row = check.prepare("SELECT state FROM task_state WHERE plan_file='legacy.md' AND task_id='T-000'").get();
+      expect(row.state).toBe('X');                                  // pre-existing row survived
+      expect(check.prepare("SELECT count(*) c FROM sqlite_master WHERE type='table' AND name='sessions'").get().c).toBe(1);
+    } finally { check.close(); }
+  });
+
+  it('DROP-free: a pre-existing third-party index on task_state survives the migration', async () => {
+    const { DatabaseSync } = await import('node:sqlite');
+    mkdirSync(join(repo, '.conductor'), { recursive: true });
+    const seed = new DatabaseSync(dbPath());
+    seed.exec('PRAGMA user_version = 1;');
+    seed.exec("CREATE TABLE task_state (plan_file TEXT NOT NULL, task_id TEXT NOT NULL, state TEXT NOT NULL CHECK (state IN (' ','>','X','!')), updated_at TEXT NOT NULL, PRIMARY KEY (plan_file, task_id)) WITHOUT ROWID;");
+    seed.exec('CREATE INDEX idx_thirdparty ON task_state (updated_at);');
+    seed.close();
+
+    runDb(['init'], { cwd: repo });
+    const check = new DatabaseSync(dbPath());
+    try {
+      expect(check.prepare("SELECT count(*) c FROM sqlite_master WHERE type='index' AND name='idx_thirdparty'").get().c).toBe(1);
+    } finally { check.close(); }
   });
 });

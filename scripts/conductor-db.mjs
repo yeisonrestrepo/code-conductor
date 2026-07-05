@@ -23,6 +23,15 @@ const VALID_STATES = new Set([' ', '>', 'X', '!']);
 const MAX_KEY_LEN = 512;
 const WALK_CAP = 40;
 const USAGE = "usage: conductor-db.mjs record <plan_file> <task_id> <state> | init";
+const SCHEMA_VERSION = 2;
+const MAX_SNAP_BYTES = 10 * 1024 * 1024;   // 10 MiB
+const MAX_CONTENT_BYTES = 1024 * 1024;     // 1 MiB
+const STDIN_CHUNK = 65536;
+const U_SESSION = 'usage: conductor-db.mjs session <session_id> <phase> <spec> <git_commit_hash>';
+const U_GET_SESSION = 'usage: conductor-db.mjs get-session <session_id>';
+const U_SNAPSHOT = 'usage: conductor-db.mjs snapshot <git_commit_hash>';
+const U_GET_SNAPSHOT = 'usage: conductor-db.mjs get-snapshot <git_commit_hash>';
+const U_HISTORY = 'usage: conductor-db.mjs history <session_id> <kind>';
 
 function validateKey(name, value) {
   const v = String(value ?? '').trim();       // 1. trim FIRST (whitespace never counts)
@@ -70,7 +79,7 @@ function applySchema(db) {
   try { db.exec('PRAGMA journal_mode = WAL;'); } catch { /* WAL unsupported: use default journal */ }
   db.exec('BEGIN IMMEDIATE;');
   try {
-    db.exec('PRAGMA user_version = 1;');
+    db.exec(`PRAGMA user_version = ${SCHEMA_VERSION};`);
     db.exec(
       "CREATE TABLE IF NOT EXISTS task_state (" +
       "plan_file TEXT NOT NULL, task_id TEXT NOT NULL, " +
@@ -78,6 +87,25 @@ function applySchema(db) {
       "updated_at TEXT NOT NULL, " +
       "PRIMARY KEY (plan_file, task_id)) WITHOUT ROWID;"
     );
+    db.exec(
+      "CREATE TABLE IF NOT EXISTS sessions (" +
+      "session_id TEXT NOT NULL, started_at TEXT NOT NULL, updated_at TEXT NOT NULL, " +
+      "phase TEXT NOT NULL DEFAULT '', spec TEXT NOT NULL DEFAULT '', " +
+      "git_commit_hash TEXT NOT NULL DEFAULT '', " +
+      "PRIMARY KEY (session_id)) WITHOUT ROWID;"
+    );
+    db.exec(
+      "CREATE TABLE IF NOT EXISTS snapshots (" +
+      "id INTEGER PRIMARY KEY, git_commit_hash TEXT NOT NULL, " +
+      "created_at TEXT NOT NULL, snap_json TEXT NOT NULL);"
+    );
+    db.exec("CREATE INDEX IF NOT EXISTS idx_snapshots_hash ON snapshots (git_commit_hash);");
+    db.exec(
+      "CREATE TABLE IF NOT EXISTS raw_history (" +
+      "id INTEGER PRIMARY KEY, session_id TEXT NOT NULL DEFAULT '', " +
+      "created_at TEXT NOT NULL, kind TEXT NOT NULL DEFAULT '', content TEXT NOT NULL);"
+    );
+    db.exec("CREATE INDEX IF NOT EXISTS idx_raw_history_session ON raw_history (session_id);");
     db.exec('COMMIT;');
   } catch (e) {
     try { db.exec('ROLLBACK;'); } catch { /* ignore */ }
@@ -179,12 +207,12 @@ function openReady(DatabaseSync, dbPath) {
   try {
     db = openConn(DatabaseSync, dbPath);
     const ver = db.prepare('PRAGMA user_version').get().user_version;   // first I/O
-    if (ver > 1) {
-      warn(`db schema v${ver} newer than supported v1, skipping cache write`);
+    if (ver > SCHEMA_VERSION) {
+      warn(`db schema v${ver} newer than supported v${SCHEMA_VERSION}, skipping cache write`);
       db.close();
       return null;
     }
-    if (ver === 0 || !tableExists(db)) applySchema(db);
+    if (ver < SCHEMA_VERSION || !tableExists(db)) applySchema(db);
     return db;
   } catch (e) {
     // Close the (possibly half-usable) handle BEFORE any rethrow or return so
