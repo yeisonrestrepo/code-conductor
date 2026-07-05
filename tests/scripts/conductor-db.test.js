@@ -628,3 +628,47 @@ describe.skipIf(!HAS_SQLITE)('conductor-db snapshot / get-snapshot', () => {
     expect(runDb(['get-snapshot', 'absent'], { cwd: repo }).stdout).toBe('');
   });
 });
+
+describe.skipIf(!HAS_SQLITE)('conductor-db history', () => {
+  const dbPath = () => join(repo, '.conductor', 'cache.db');
+  async function historyRows(p) {
+    const { DatabaseSync } = await import('node:sqlite');
+    const db = new DatabaseSync(p);
+    try { return db.prepare('SELECT session_id, kind, content FROM raw_history ORDER BY id').all(); }
+    finally { db.close(); }
+  }
+
+  it('appends rows from stdin (no query subcommand exists — read out-of-band)', async () => {
+    runDb(['history', 's1', 'stdout'], { cwd: repo, input: 'line one' });
+    runDb(['history', 's1', 'stderr'], { cwd: repo, input: 'line two' });
+    const rows = await historyRows(dbPath());
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ session_id: 's1', kind: 'stdout', content: 'line one' });
+    expect(rows[1]).toMatchObject({ session_id: 's1', kind: 'stderr', content: 'line two' });
+  });
+
+  it('accepts an empty kind (optional) but rejects empty content', async () => {
+    runDb(['history', 's2', ''], { cwd: repo, input: 'body' });
+    const rows = await historyRows(dbPath());
+    expect(rows).toHaveLength(1);
+    expect(rows[0].kind).toBe('');
+    const w = runDb(['history', 's2', 'k'], { cwd: repo, input: '' });
+    expect(w.stderr).toContain('content is empty');
+  });
+
+  it('rejects content over 1 MiB (message cites the limit)', () => {
+    const over = Buffer.alloc(1024 * 1024 + 1, 0x62);
+    const w = runDb(['history', 's3', 'k'], { cwd: repo, input: over });
+    expect(w.status).toBe(0);
+    expect(w.stderr).toContain('content exceeds 1048576 bytes (1 MiB); rejected');
+  });
+
+  it('rejects wrong arg count and whitespace-only session_id', () => {
+    expect(runDb(['history', 's1'], { cwd: repo, input: 'x' }).stderr)
+      .toBe('CONDUCTOR_DB: usage: conductor-db.mjs history <session_id> <kind>\n');
+    expect(runDb(['history', 's1', 'k', 'extra'], { cwd: repo, input: 'x' }).stderr)
+      .toBe('CONDUCTOR_DB: usage: conductor-db.mjs history <session_id> <kind>\n');
+    expect(runDb(['history', '   ', 'k'], { cwd: repo, input: 'x' }).stderr)
+      .toContain('session_id is empty');
+  });
+});

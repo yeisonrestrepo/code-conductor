@@ -402,6 +402,28 @@ async function cmdGetSnapshot(args) {
   if (row) { process.stdout.write(row.snap_json); process.stdout.write('\n'); }
 }
 
+async function cmdHistory(args) {
+  if (args.length !== 2) { warn(U_HISTORY); return; }
+  const sessionId = validateKey('session_id', args[0], U_HISTORY);
+  if (sessionId === null) return;
+  const kind = validateOptional('kind', args[1]);
+  if (kind === null) return;
+  if (process.stdin.isTTY) { warn(`content is empty; ${U_HISTORY}`); return; }  // no-hang guard
+  let buf, overCap;
+  try { ({ buf, overCap } = readStdinCapped(MAX_CONTENT_BYTES)); }
+  catch (e) { warn(`error reading stdin: ${(e && e.code) || (e && e.message)}, skipping cache write`); return; }
+  if (overCap) { warn(`content exceeds ${MAX_CONTENT_BYTES} bytes (1 MiB); rejected`); return; }
+  if (buf.length === 0) { warn(`content is empty; ${U_HISTORY}`); return; }
+  let content;
+  try { content = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+  catch { warn('content is not valid UTF-8; rejected'); return; }
+  const root = resolveRoot();
+  await withDb(root, (db) => {
+    db.prepare('INSERT INTO raw_history (session_id, created_at, kind, content) VALUES ($s, $c, $k, $ct)')
+      .run({ $s: sessionId, $c: new Date().toISOString(), $k: kind, $ct: content });
+  });
+}
+
 async function main() {
   const [sub, ...rest] = process.argv.slice(2);
   if (sub === 'record') return cmdRecord(rest);
@@ -410,6 +432,7 @@ async function main() {
   if (sub === 'get-session') return cmdGetSession(rest);
   if (sub === 'snapshot') return cmdSnapshot(rest);
   if (sub === 'get-snapshot') return cmdGetSnapshot(rest);
+  if (sub === 'history') return cmdHistory(rest);
   warn(`unknown subcommand ${JSON.stringify(sub ?? '')}; ${USAGE}`);
 }
 
