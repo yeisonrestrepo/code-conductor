@@ -88,6 +88,25 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Components Affected:** Cache database schema, state serialization engines, core installation scripts (`install.sh`, `install.ps1`), dependency manifest files.
 * **Acceptance Criteria:** Successfully reload full agent awareness across branch switches or project rollbacks by matching database state records to the current Git commit identifier. Completely purge all `claude-mem` binary references, installation steps, and environment dependencies from every setup script and project manifest.
 * **Note (from FEAT-005, v1.19.0):** Consider mirroring `/cc-checkpoint` output into the relational store here. Today checkpoints write prose (decisions, conventions, debt) to `project.md`, while the FEAT-005 `task_state` table stores only per-task checkbox state — there is no column for checkpoint content, and the cache is an explicitly non-authoritative, fail-open mirror. A `sessions`/`snapshots` table under this milestone would give checkpoints a queryable, git-hash-indexed home without overloading `task_state`. Keep the plan markdown + `project.md` authoritative; the DB copy would be an optimization only.
+* **Decomposition (from 2026-07-04 scoping):** ARCH-008 ships as three sequential specs. `[ARCH-008-S1]` builds the relational schema engine (below), `[ARCH-008-A]` wires the writers, `[ARCH-008-B]` wires resume-reads. The umbrella `[ARCH-008]` checkbox flips only when all three are `[X]`. claude-mem purge is already satisfied by `[BUG-020]`.
+
+### [ ] `[ARCH-008-S1]` Relational Schema Engine (Foundation)
+* **Description:** Extend `scripts/conductor-db.mjs` with a `user_version` 1→2 additive migration creating `sessions`, `snapshots`, `raw_history` alongside the untouched `task_state`, plus flat subcommands `session` / `get-session` / `snapshot` / `get-snapshot` / `history`. Snapshots store one verbatim SNAP v1 JSON blob; queries print a single line on hit and an empty string on miss/degradation.
+* **Impact:** Provides the git-hash-indexed storage substrate for session tracking, raw logs, and compacted timelines without touching any consumer.
+* **Components Affected:** `scripts/conductor-db.mjs`, `tests/scripts/conductor-db.test.js`.
+* **Acceptance Criteria:** Migration is idempotent and preserves `task_state`; `sessions` upsert preserves original `started_at`; `get-snapshot` uses `ORDER BY id DESC LIMIT 1`; `snap_json` capped at 10 MiB; indexes on `snapshots(git_commit_hash)` and `raw_history(session_id)`; no foreign keys; all write paths stay fail-open (exit 0). Spec: `docs/superpowers/specs/2026-07-04-arch008-relational-persistence-schema-design.md`.
+
+### [ ] `[ARCH-008-A]` Checkpoint/Compact Write Wiring
+* **Description:** Wire `/cc-checkpoint` and `/cc-compact` to resolve the current git commit hash and persist `sessions` + `snapshots` (the SNAP v1 blob) into the cache via the `[ARCH-008-S1]` subcommands.
+* **Impact:** Gives checkpoints and compaction a queryable, commit-indexed relational home; `project.md` + plan markdown remain authoritative.
+* **Components Affected:** `cc-checkpoint` command, `cc-compact` command, both `.claude/` and `project-template/.claude/` mirrors.
+* **Acceptance Criteria:** Each checkpoint/compact writes exactly one `snapshots` row indexed by the current git hash and upserts its `sessions` row; write failures remain non-fatal (fail-open). Depends on `[ARCH-008-S1]`.
+
+### [ ] `[ARCH-008-B]` Phase-Entry Resume Read Wiring
+* **Description:** On phase entry (`cc-spec` / `cc-plan` / `cc-implement`), read `get-snapshot <current-git-hash>` to restore agent awareness across branch switches and rollbacks; a miss degrades cleanly to today's fresh-start behavior.
+* **Impact:** Delivers ARCH-008's headline acceptance behavior — reload full awareness by matching DB state to the current Git commit identifier.
+* **Components Affected:** `cc-spec` / `cc-plan` / `cc-implement` phase-entry logic, both command mirrors.
+* **Acceptance Criteria:** A branch switch or rollback to a commit with a stored snapshot restores phase context; absence of a snapshot is non-fatal and silent. Depends on `[ARCH-008-A]`. Flips the umbrella `[ARCH-008]` when complete.
 
 ---
 
