@@ -672,3 +672,57 @@ describe.skipIf(!HAS_SQLITE)('conductor-db history', () => {
       .toContain('session_id is empty');
   });
 });
+
+describe.skipIf(!HAS_SQLITE)('conductor-db query degradation + isolation', () => {
+  const BLOCK = fileURLToPath(new URL('./fixtures/block-sqlite.mjs', import.meta.url));
+
+  it('a query with node:sqlite absent writes zero bytes + one stderr line, exit 0', () => {
+    // Seed a real session first (with sqlite present), then query with sqlite blocked.
+    runDb(['session', 's1', 'p', 's', '0000000'], { cwd: repo });
+    const r = spawnSync(process.execPath, [...FLAG, '--import', BLOCK, SCRIPT, 'get-session', 's1'],
+      { cwd: repo, encoding: 'utf8' });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toBe('');                       // zero bytes, not {} or null
+    expect(r.stderr).toContain('node:sqlite unavailable, skipping cache write');
+  });
+
+  it('a payload subcommand still validates stdin before the node:sqlite import fails', () => {
+    const r = spawnSync(process.execPath, [...FLAG, '--import', BLOCK, SCRIPT, 'snapshot', 'h'],
+      { cwd: repo, encoding: 'utf8', input: '' });
+    expect(r.status).toBe(0);
+    expect(r.stderr).toContain('snap_json is empty');   // stdin validated (read precedes withDb)
+  });
+
+  it('isolation guard: subcommands honor cwd and never touch the real project cache', () => {
+    // Every runDb here targets the temp `repo`; assert the write landed there and
+    // that nothing resolved to a different root. (Real-root protection is structural:
+    // resolveRoot uses git toplevel / .git walk from cwd=repo.)
+    runDb(['session', 'guard', 'p', 's', '0000000'], { cwd: repo });
+    expect(existsSync(join(repo, '.conductor', 'cache.db'))).toBe(true);
+    const outside = join(repo, '..', '.conductor', 'cache.db');
+    expect(existsSync(outside)).toBe(false);            // parent dir untouched
+  });
+
+  it('migration-failure recovery: corrupt bytes at the db path rebuild a fresh v2 db', async () => {
+    const conductorDir = join(repo, '.conductor');
+    const dbPath = join(conductorDir, 'cache.db');
+    mkdirSync(conductorDir, { recursive: true });
+    writeFileSync(dbPath, 'notadb corrupt bytes');   // fd opened+written+CLOSED synchronously here
+
+    const r = runDb(['session', 's1', 'p', 's', '0000000'], { cwd: repo });
+    expect(r.status).toBe(0);                          // fail-open
+    expect(r.stderr).toBe('');                         // successful backupAside recovery is SILENT (zero CONDUCTOR_DB lines)
+
+    const moved = readdirSync(conductorDir).filter((f) => f.startsWith('cache.db.corrupt.'));
+    expect(moved).toHaveLength(1);                     // bad file moved aside, never rm -r'd
+
+    const { DatabaseSync } = await import('node:sqlite');
+    const check = new DatabaseSync(dbPath);            // fresh db opened cleanly
+    try {
+      expect(check.prepare('PRAGMA user_version').get().user_version).toBe(2);   // rebuilt at v2
+      const t = check.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map((x) => x.name);
+      expect(t).toEqual(expect.arrayContaining(['raw_history', 'sessions', 'snapshots', 'task_state']));
+      expect(check.prepare("SELECT session_id FROM sessions WHERE session_id='s1'").get().session_id).toBe('s1');  // write landed
+    } finally { check.close(); }
+  });
+});
