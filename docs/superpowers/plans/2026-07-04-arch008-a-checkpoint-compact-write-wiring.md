@@ -48,9 +48,9 @@
 - Produces: a validator that accepts `{v:1|2, sys, ops, mem, pr?}`; `pr` optional string; `sys.c` matches `/^[0-9a-f]{7,40}$/`; `v>2` → `SNAP_ERROR: SNAP_UNKNOWN_VERSION`.
 - Dependency: none.
 
-- [ ] **[T-001] SNAP v2 validator**
+- [X] **[T-001] SNAP v2 validator**
 
-- [ ] **[T-001-A] Step 1: Write failing tests**
+- [X] **[T-001-A] Step 1: Write failing tests**
 
 Append to `tests/unit/snap-validate.test.js` (inside the top `describe`):
 
@@ -106,12 +106,12 @@ Append to `tests/unit/snap-validate.test.js` (inside the top `describe`):
   })
 ```
 
-- [ ] **[T-001-B] Step 2: Run tests, verify they fail**
+- [X] **[T-001-B] Step 2: Run tests, verify they fail**
 
 Run: `npx vitest run tests/unit/snap-validate.test.js`
 Expected: the 8 new cases FAIL (pr rejected on v2, v:2 rejected as unknown version, 40-char hash rejected).
 
-- [ ] **[T-001-C] Step 3: Edit the validator**
+- [X] **[T-001-C] Step 3: Edit the validator**
 
 `scripts/snap-validate.mjs` line 14 — make the top-level key allow-list version-aware and validate `pr`:
 
@@ -135,12 +135,12 @@ if (!/^[0-9a-f]{7,40}$/.test(snap.sys.c)) err('invalid sys.c format'); if (!/^[a
 
 Note: the `pr` type check must run **after** the version is known (line 17 already parsed `snap.v`), so place the `snap.pr !== undefined` check where the version-aware top-key block sits (line 14 runs after `snap` is parsed and blocks validated; `snap.v` is readable there). Keep the 4096 `raw.length` cap (line 7) **unchanged** — it is a file-channel property, not version-conditional.
 
-- [ ] **[T-001-D] Step 4: Run the full validator suite**
+- [X] **[T-001-D] Step 4: Run the full validator suite**
 
 Run: `npx vitest run tests/unit/snap-validate.test.js`
 Expected: PASS — all pre-existing cases plus the 8 new cases green.
 
-- [ ] **[T-001-E] Step 5: Commit**
+- [X] **[T-001-E] Step 5: Commit**
 
 ```bash
 git add scripts/snap-validate.mjs tests/unit/snap-validate.test.js
@@ -159,9 +159,9 @@ git commit -m "feat(ARCH-008-A): extend snap-validate to SNAP v2 with optional p
 - Produces: `node scripts/session-id.mjs` prints exactly one non-empty line and exits 0 — `$CLAUDE_CODE_SESSION_ID` if set, else cached `<root>/.conductor/session-id`, else a fresh `crypto.randomUUID()` (persisted atomically).
 - Dependency: none.
 
-- [ ] **[T-002] session-id resolver**
+- [X] **[T-002] session-id resolver**
 
-- [ ] **[T-002-A] Step 1: Write failing tests**
+- [X] **[T-002-A] Step 1: Write failing tests**
 
 Create `tests/scripts/session-id.test.js`:
 
@@ -216,12 +216,12 @@ describe('session-id.mjs', () => {
 });
 ```
 
-- [ ] **[T-002-B] Step 2: Run tests, verify they fail**
+- [X] **[T-002-B] Step 2: Run tests, verify they fail**
 
 Run: `npx vitest run tests/scripts/session-id.test.js`
 Expected: FAIL — module not found (`scripts/session-id.mjs` does not exist).
 
-- [ ] **[T-002-C] Step 3: Write `scripts/session-id.mjs`**
+- [X] **[T-002-C] Step 3: Write `scripts/session-id.mjs`**
 
 ```js
 import { readFileSync, writeFileSync, renameSync, unlinkSync, mkdirSync, existsSync } from 'node:fs';
@@ -290,12 +290,12 @@ function main() {
 main();
 ```
 
-- [ ] **[T-002-D] Step 4: Run tests, verify pass**
+- [X] **[T-002-D] Step 4: Run tests, verify pass**
 
 Run: `npx vitest run tests/scripts/session-id.test.js`
 Expected: PASS — all four cases green.
 
-- [ ] **[T-002-E] Step 5: Commit**
+- [X] **[T-002-E] Step 5: Commit**
 
 ```bash
 git add scripts/session-id.mjs tests/scripts/session-id.test.js
@@ -315,9 +315,9 @@ git commit -m "feat(ARCH-008-A): add zero-dep session-id resolver with atomic ca
 - Produces: `node scripts/snap-build.mjs` reads one flat JSON object on stdin `{ph,c,s,n,f,d,x,pr?}` and prints canonical single-line SNAP JSON. v1 (`{v:1,sys,ops,mem}`) when `pr` absent/empty; v2 (`{v:2,sys,ops,mem,pr}`) otherwise. Exit non-zero with no stdout on malformed input.
 - Dependency: Task 1 (tests validate output against `snap-validate.mjs`).
 
-- [ ] **[T-003] snap-build serializer**
+- [X] **[T-003] snap-build serializer**
 
-- [ ] **[T-003-A] Step 1: Write failing tests**
+- [X] **[T-003-A] Step 1: Write failing tests**
 
 Create `tests/scripts/snap-build.test.js`:
 
@@ -427,12 +427,12 @@ describe('snap-build.mjs', () => {
 });
 ```
 
-- [ ] **[T-003-B] Step 2: Run tests, verify they fail**
+- [X] **[T-003-B] Step 2: Run tests, verify they fail**
 
 Run: `npx vitest run tests/scripts/snap-build.test.js`
 Expected: FAIL — module not found (`scripts/snap-build.mjs` does not exist).
 
-- [ ] **[T-003-C] Step 3: Write `scripts/snap-build.mjs`**
+- [X] **[T-003-C] Step 3: Write `scripts/snap-build.mjs`**
 
 ```js
 import { readFileSync } from 'node:fs';
@@ -524,12 +524,12 @@ process.stdout.write(JSON.stringify(snap) + '\n');
 process.exit(0);
 ```
 
-- [ ] **[T-003-D] Step 4: Run tests, verify pass**
+- [X] **[T-003-D] Step 4: Run tests, verify pass**
 
 Run: `npx vitest run tests/scripts/snap-build.test.js`
 Expected: PASS — all cases green, including the round-trip validation against Task 1's validator.
 
-- [ ] **[T-003-E] Step 5: Commit**
+- [X] **[T-003-E] Step 5: Commit**
 
 ```bash
 git add scripts/snap-build.mjs tests/scripts/snap-build.test.js
@@ -547,9 +547,9 @@ git commit -m "feat(ARCH-008-A): add canonical snap-build serializer (v1/v2, sur
 - Consumes: `scripts/session-id.mjs`, `scripts/snap-build.mjs` (Tasks 2–3), `conductor-db session`/`snapshot` (S1).
 - Dependency: Tasks 2, 3.
 
-- [ ] **[T-004] rewire /cc-compact**
+- [X] **[T-004] rewire /cc-compact**
 
-- [ ] **[T-004-A] Step 1: Replace the hash-derivation line**
+- [X] **[T-004-A] Step 1: Replace the hash-derivation line**
 
 Replace `global/commands/cc-compact.md` line 5 with the full-40 rule:
 
@@ -557,7 +557,7 @@ Replace `global/commands/cc-compact.md` line 5 with the full-40 rule:
 Run `git rev-parse HEAD` to get the current commit SHA (the **full 40-char** hash — NOT `--short`, whose abbreviation length auto-scales with repo size and is unstable across growth). Lowercase and trim it; if it does not match `/^[0-9a-f]{7,40}$/`, or the command exits non-zero (non-git workspace, no commits, git absent, or permission-denied), use `"0000000"`. Wrap the call with shell `timeout` only when `command -v timeout` (or `gtimeout`) succeeds; otherwise run it unwrapped. This same value is `sys.c` and the `sessions` / `snapshots` git-hash key.
 ```
 
-- [ ] **[T-004-B] Step 2: Route serialization through snap-build**
+- [X] **[T-004-B] Step 2: Route serialization through snap-build**
 
 Replace the "Serialize as a single-line JSON object …" instruction (line 18) so the command **pipes the normalized fields to `snap-build.mjs`** (no `pr`) instead of hand-serializing:
 
@@ -565,7 +565,7 @@ Replace the "Serialize as a single-line JSON object …" instruction (line 18) s
 Serialize by piping a flat JSON object `{ph, c, s, n, f, d, x}` (no `pr`) on **stdin** to `node scripts/snap-build.mjs`; its stdout is the canonical single-line **v1** SNAP JSON. `snap-build` performs all array normalization (filter/dedup/per-element cap/head-drop) and the 4096-char size trim internally — do not pre-serialize. If `snap-build` exits non-zero (malformed field object), report the error and stop; do not write the handoff file, do not run the DB tail, do not print the compact prompt.
 ```
 
-- [ ] **[T-004-C] Step 3: Append the fail-open DB tail**
+- [X] **[T-004-C] Step 3: Append the fail-open DB tail**
 
 After the "> Snapshot written…" line (end of file), append:
 
@@ -591,11 +591,11 @@ All argv scalars are double-quoted. **Every** DB-tail redirect uses **append mod
 **Cross-platform note:** the incantations above are the **Unix (bash) canonical form**; the `.md` file is an agent instruction, not a literal script — realize the same semantics on the host shell. On Windows/PowerShell: **first set `$OutputEncoding = [System.Text.UTF8Encoding]::new($false)`** (no-BOM UTF-8, so the piped snapshot string reaches Node's UTF-8 `TextDecoder` byte-clean); capture the id via `$id = node scripts/session-id.mjs`; pipe the blob with `$snap_json | node … snapshot "$c"`; append the log with `… 2>&1 | Out-File -Append -Encoding utf8 .conductor/last-write.log` (explicit UTF-8 append — never the bare `*>>`, whose default encoding is UTF-16LE on PS 5.1 and would corrupt the trace); ensure the dir with `New-Item -ItemType Directory -Force .conductor`. The stdin-only-for-payloads, double-quoted-argv, append-log, and fail-open rules are identical on both platforms.
 ```
 
-- [ ] **[T-004-D] Step 4: Self-verify the prose**
+- [X] **[T-004-D] Step 4: Self-verify the prose**
 
 Re-read the edited `global/commands/cc-compact.md` and confirm: (a) full-40 hash rule present, (b) snap-build pipe replaces hand-serialization, (c) DB tail is gated on authoritative-write success, (d) `snapshot` blob is on stdin, (e) compact prompt still prints unconditionally after the tail. (No unit test — this is agent-instruction prose; behavior is covered by the script suites.)
 
-- [ ] **[T-004-E] Step 5: Commit**
+- [X] **[T-004-E] Step 5: Commit**
 
 ```bash
 git add global/commands/cc-compact.md
@@ -613,9 +613,9 @@ git commit -m "feat(ARCH-008-A): wire /cc-compact to snap-build and the fail-ope
 - Consumes: `scripts/session-id.mjs`, `scripts/snap-build.mjs`, `conductor-db get-session`/`session`/`snapshot`.
 - Dependency: Tasks 2, 3.
 
-- [ ] **[T-005] rewire /cc-checkpoint**
+- [X] **[T-005] rewire /cc-checkpoint**
 
-- [ ] **[T-005-A] Step 1: Append the fail-open DB tail**
+- [X] **[T-005-A] Step 1: Append the fail-open DB tail**
 
 After line 25 of `global/commands/cc-checkpoint.md`, append:
 
@@ -647,11 +647,11 @@ All DB-tail redirects use **append mode (`>>`)** so concurrent runs never trunca
 Report the checkpoint as usual regardless of the tail's outcome.
 ```
 
-- [ ] **[T-005-B] Step 2: Self-verify the prose**
+- [X] **[T-005-B] Step 2: Self-verify the prose**
 
 Re-read the edited `global/commands/cc-checkpoint.md` and confirm: (a) tail gated on `project.md` success, (b) full-40 hash rule, (c) `pr` = verbatim appended block, (d) `ph` carry-forward → `impl` default, (e) `d`/`x` regex projection with decision-precedence + parent-heading exclusion, (f) `snapshot` blob on stdin, (g) checkpoint reported regardless of tail.
 
-- [ ] **[T-005-C] Step 3: Commit**
+- [X] **[T-005-C] Step 3: Commit**
 
 ```bash
 git add global/commands/cc-checkpoint.md
@@ -670,9 +670,9 @@ git commit -m "feat(ARCH-008-A): wire /cc-checkpoint to a v2 fail-open DB tail w
 - Consumes: the `.conductor/session-id` cache written by Task 2.
 - Dependency: none (independent; touches only cleanup).
 
-- [ ] **[T-006] post-compact session-id rotation**
+- [X] **[T-006] post-compact session-id rotation**
 
-- [ ] **[T-006-A] Step 1: Edit both `.sh` hooks**
+- [X] **[T-006-A] Step 1: Edit both `.sh` hooks**
 
 In `.claude/hooks/post-compact.sh` (and the identical `project-template/.claude/hooks/post-compact.sh`), inside `main()` before the final `echo ""` (still within the `main || exit 0` guard), add:
 
@@ -684,7 +684,7 @@ In `.claude/hooks/post-compact.sh` (and the identical `project-template/.claude/
 
 This rotates only the fallback cache (env-var sessions re-resolve the same id, so this is a no-op for them) and sweeps any orphaned temp; `rm -f … 2>/dev/null` plus the existing guard isolate any locked/permission-denied file.
 
-- [ ] **[T-006-B] Step 2: Edit both `.ps1` hooks**
+- [X] **[T-006-B] Step 2: Edit both `.ps1` hooks**
 
 In `.claude/hooks/post-compact.ps1` (and `project-template/.claude/hooks/post-compact.ps1`), inside the `try` block before the final `""`, add:
 
@@ -696,11 +696,11 @@ In `.claude/hooks/post-compact.ps1` (and `project-template/.claude/hooks/post-co
 
 `Join-Path` results are passed as literal (space-safe) arguments; `-Force -ErrorAction SilentlyContinue` isolates locked/absent files; the whole thing stays inside the hook's `try/catch { exit 0 }`.
 
-- [ ] **[T-006-C] Step 3: Verify the hooks still run clean**
+- [X] **[T-006-C] Step 3: Verify the hooks still run clean**
 
 Run: `bash .claude/hooks/post-compact.sh` (from repo root) and confirm exit 0 with the normal compact banner, no error on a missing `.conductor/session-id`. (PowerShell mirror is not executed on this macOS host — verified by inspection; `powershell` is absent, matching the observed post-compact log.)
 
-- [ ] **[T-006-D] Step 4: Commit**
+- [X] **[T-006-D] Step 4: Commit**
 
 ```bash
 git add .claude/hooks/post-compact.sh .claude/hooks/post-compact.ps1 project-template/.claude/hooks/post-compact.sh project-template/.claude/hooks/post-compact.ps1
@@ -716,9 +716,9 @@ git commit -m "feat(ARCH-008-A): rotate .conductor/session-id and sweep temps in
 
 **Interfaces:** none. Dependency: none.
 
-- [ ] **[T-007] stale reader-comment fix**
+- [X] **[T-007] stale reader-comment fix**
 
-- [ ] **[T-007-A] Step 1: Correct the `v === 1` comment (both mirrors)**
+- [X] **[T-007-A] Step 1: Correct the `v === 1` comment (both mirrors)**
 
 In both files, replace the parenthetical:
 
@@ -728,7 +728,7 @@ with:
 
 `(Exit 0 guarantees v ∈ {1,2}; the reader binds only sys/ops/mem fields and ignores any optional top-level pr, so no separate version check is needed here.)`
 
-- [ ] **[T-007-B] Step 2: Commit**
+- [X] **[T-007-B] Step 2: Commit**
 
 ```bash
 git add .claude/commands/cc-implement.md project-template/.claude/commands/cc-implement.md
@@ -744,28 +744,28 @@ git commit -m "docs(ARCH-008-A): correct cc-implement reader comment for SNAP v2
 
 **Interfaces:** none. Dependency: Tasks 1–7 complete and green.
 
-- [ ] **[T-008] release v1.21.0**
+- [X] **[T-008] release v1.21.0**
 
-- [ ] **[T-008-A] Step 1: Run the full test gate**
+- [X] **[T-008-A] Step 1: Run the full test gate**
 
 Run: `npm test`
 Expected: PASS — all suites green (329 baseline + the new session-id / snap-build / validator cases).
 
-- [ ] **[T-008-B] Step 2: Bump versions**
+- [X] **[T-008-B] Step 2: Bump versions**
 
 - `VERSION` → `1.21.0`
 - `package.json` line 3 `"version"` → `1.21.0`
 - `package-lock.json` — both `"version": "1.20.0"` fields (root + the self-referencing `packages.""`) → `1.21.0`
 
-- [ ] **[T-008-C] Step 3: Prepend the CHANGELOG entry**
+- [X] **[T-008-C] Step 3: Prepend the CHANGELOG entry**
 
 Prepend a `## [1.21.0] - 2026-07-04` section to `CHANGELOG.md` summarizing: new `session-id.mjs` / `snap-build.mjs`; SNAP v2 (optional `pr`, `sys.c` 7–40 hex); `/cc-compact` + `/cc-checkpoint` fail-open DB write wiring; post-compact session-id rotation.
 
-- [ ] **[T-008-D] Step 4: Flip the backlog checkbox (surgical, single line)**
+- [X] **[T-008-D] Step 4: Flip the backlog checkbox (surgical, single line)**
 
 In `AGENT-READABLE BACKLOG.md`, change the `[ARCH-008-A]` heading checkbox `[ ]` → `[X]` (single-line edit only; BUG-003 invariant).
 
-- [ ] **[T-008-E] Step 5: Commit**
+- [X] **[T-008-E] Step 5: Commit**
 
 ```bash
 git add VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md"
