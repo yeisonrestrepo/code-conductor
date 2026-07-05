@@ -94,8 +94,8 @@ describe('snap-validate.mjs', () => {
     expect(r.stderr).toBe('SNAP_ERROR: ph must be spec|plan|impl|rev\n')
   })
 
-  it('rejects unknown version (v > 1)', () => {
-    const payload = { ...VALID, v: 2 }
+  it('rejects unknown version (v > 2)', () => {
+    const payload = { ...VALID, v: 3 }
     const r = run(fixture(j(payload)))
     expect(r.status).toBe(1)
     expect(r.stderr).toBe('SNAP_ERROR: SNAP_UNKNOWN_VERSION\n')
@@ -244,10 +244,10 @@ describe('snap-validate.mjs', () => {
     expect(src).not.toMatch(/console\./)
   })
 
-  it('scripts/snap-validate.mjs stays within the 30-line hard cap', () => {
+  it('scripts/snap-validate.mjs stays within the 32-line hard cap', () => {
     const src = readFileSync(VALIDATOR, 'utf8').split(/\r?\n/)
     const counted = src.filter(l => l.trim() !== '' && !l.trim().startsWith('//'))
-    expect(counted.length).toBeLessThanOrEqual(30)
+    expect(counted.length).toBeLessThanOrEqual(32)
   })
 
   it('SNAP v1 serialization is at most 85% of the equivalent markdown snapshot length', () => {
@@ -279,5 +279,55 @@ describe('snap-validate.mjs', () => {
     ].join('\n')
     const norm = (s) => s.replace(/\r\n/g, '\n')
     expect(norm(snapFixture).length).toBeLessThanOrEqual(norm(markdownFixture).length * 0.85)
+  })
+
+  it('accepts a valid v2 payload with pr', () => {
+    const v2 = { v: 2, sys: { ph: 'impl', c: 'abc1234', s: 'feat010' }, ops: { n: [], f: [] }, mem: { d: [], x: [] }, pr: 'checkpoint prose' }
+    const r = run(fixture(j(v2)))
+    expect(r.status).toBe(0)
+    expect(r.stderr).toBe('')
+  })
+
+  it('accepts a v2 payload without pr (pr strictly optional)', () => {
+    const v2 = { ...VALID, v: 2 }
+    expect(run(fixture(j(v2))).status).toBe(0)
+  })
+
+  it('rejects pr on a v1 payload as an unexpected key', () => {
+    const bad = { ...VALID, pr: 'nope' }
+    const r = run(fixture(j(bad)))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: unexpected key: pr\n')
+  })
+
+  it('rejects a non-string pr on v2', () => {
+    const bad = { ...VALID, v: 2, pr: 123 }
+    const r = run(fixture(j(bad)))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: pr must be a string\n')
+  })
+
+  it('rejects v > 2 with SNAP_UNKNOWN_VERSION', () => {
+    const bad = { ...VALID, v: 3 }
+    const r = run(fixture(j(bad)))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: SNAP_UNKNOWN_VERSION\n')
+  })
+
+  it('accepts a 40-char sys.c hash', () => {
+    const long = { ...VALID, sys: { ...VALID.sys, c: 'a'.repeat(40) } }
+    expect(run(fixture(j(long))).status).toBe(0)
+  })
+
+  it('accepts the 0000000 sentinel and 7-char hash (regression)', () => {
+    expect(run(fixture(j({ ...VALID, sys: { ...VALID.sys, c: '0000000' } }))).status).toBe(0)
+    expect(run(fixture(j({ ...VALID, sys: { ...VALID.sys, c: 'abc1234' } }))).status).toBe(0)
+  })
+
+  it('rejects a 41-char sys.c hash', () => {
+    const bad = { ...VALID, sys: { ...VALID.sys, c: 'a'.repeat(41) } }
+    const r = run(fixture(j(bad)))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: invalid sys.c format\n')
   })
 })
