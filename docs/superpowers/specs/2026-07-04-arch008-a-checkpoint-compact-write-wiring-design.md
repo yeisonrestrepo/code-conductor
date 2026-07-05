@@ -66,8 +66,12 @@ newest (`ORDER BY id DESC`); `pr` with embedded quotes/newlines/emoji → raw-va
    consecutive commands in one session bind to the same `sessions` row and cross-session
    leakage is impossible.)*
 2. Else read `<repo-root>/.conductor/session-id`; if present and non-empty → print it, exit.
-3. Else generate `crypto.randomUUID()`, best-effort write it to `.conductor/session-id`
-   (create `.conductor/` if needed; `.conductor/` is already gitignored), print it, exit.
+3. Else generate `crypto.randomUUID()` and persist it **atomically (Q7)**: write to a
+   same-dir temp file `.conductor/session-id.<pid>.tmp`, then `renameSync` it onto
+   `.conductor/session-id` (atomic on POSIX and Windows; create `.conductor/` first — it is
+   already gitignored). **Concurrency guard:** if the final path already exists at rename time
+   (a racing invocation won), re-read it and adopt the existing id — **first-writer-wins**, so
+   rapid concurrent runs never corrupt the file or diverge onto different ids.
 4. Any I/O error is non-fatal: a value is always printed (fall back to a fresh in-memory
    UUID if the cache cannot be read or written).
 
@@ -89,7 +93,14 @@ the canonical single-line SNAP JSON, exit 0 on success):
   `Buffer.byteLength(JSON.stringify(obj), 'utf8')`, backing off one UTF-16 unit if the cut
   lands on a lone high surrogate. Re-serializing after each raw-value cut guarantees the
   emitted JSON is always structurally valid and correctly accounts for stringify escaping.
-- **Flat→nested mapping (Q1):** the stdin object is flat; `snap-build` builds the nested SNAP
+- **Bounded binary search (Q2):** the search is inherently `O(log₂(pr.length))` ≈ 24 probes for
+  a 10 MiB input, but is **hard-capped at 64 iterations** as a defensive stop. Each probe
+  stringifies only the candidate `pr` (added to the once-computed skeleton byte cost), not the
+  whole object repeatedly. On the (monotonic-length-function-impossible) event of
+  non-convergence within the cap, `snap-build` falls back to a **conservative byte-budget slice**
+  (`pr` cut to a length guaranteed under `MAX_SNAP_BYTES − skeletonBytes`) and emits a valid
+  under-cap blob. CPU is bounded with no timeout needed.
+- **Flat→nested mapping (Q1 map):** the stdin object is flat; `snap-build` builds the nested SNAP
   object as `sys = {ph, c, s}`, `ops = {n, f}`, `mem = {d, x}`, with top-level `v` and optional
   `pr`. It reads **only** these whitelisted keys — **any extraneous stdin key is ignored and
   never copied to the output** (Q10), so the emitted blob always conforms to the schema and
@@ -125,15 +136,23 @@ piping to `snap-build.mjs` with the following field derivation:
   before the DB tail runs (not read from CLI args; there are none). This guarantees `project.md`
   and the DB snapshot's `pr` are byte-identical. `pr` is therefore always non-empty for a real
   checkpoint, so the blob is always v2.
-- **`ph` — phase without ambient state (Q2):** run `conductor-db get-session "<id>"` and reuse
-  the returned row's `phase` if non-empty (carry-forward — the state lives in the DB row, not the
-  process); if there is no prior row or its phase is empty (or the DB is unavailable), default to
-  `"impl"` (the phase during which checkpoints are routinely taken; a valid enum member).
-- **`d` / `x` — structured projection (Q4):** best-effort, `d` = the bullet lines under the
-  section's *Decisions* (and *Conventions*) headings; `x` = the bullet lines under *Technical
-  Debt* / *Workarounds*. `snap-build` caps them (`d≤10×300`, `x≤5×200`). If the block is not
-  cleanly structured, `d`/`x` may be empty arrays (valid) — the full verbatim block always lives
-  in `pr`, which is the audit source of truth.
+- **`ph` — phase without ambient state (Q2 phase):** run `conductor-db get-session "<id>"`
+  **with a bounded outer execution timeout (Q5, ~5 s)** and reuse the returned row's `phase` if
+  non-empty (carry-forward — the state lives in the DB row, not the process); if there is no prior
+  row, its phase is empty, the DB is unavailable, **or the call times out under disk contention**,
+  default to `"impl"` (the phase during which checkpoints are routinely taken; a valid enum
+  member). The timeout ensures a contended DB never blocks the checkpoint. *(All DB-tail process
+  calls — `get-session`, `session`, `snapshot` — carry the same outer timeout; a timeout is a
+  best-effort miss, never a block.)*
+- **`d` / `x` — structured projection (Q4):** best-effort parse of the just-written section.
+  Headings are matched by regex `/^#{2,4}[ \t]+(.+?)[ \t]*$/` and classified case-insensitively:
+  a heading whose text contains `decision` or `convention` opens a `d` block; one containing
+  `debt`, `workaround`, or `limitation` opens an `x` block. Within a block, bullet lines matching
+  `/^[ \t]*[-*][ \t]+(\S.*?)[ \t]*$/` contribute their trimmed capture; non-bullet lines are
+  ignored. This tolerates minor markdown variation (`-`/`*` bullets, extra whitespace, heading
+  level 2–4). `snap-build` then dedups/caps (`d≤10×300`, `x≤5×200`). If the block is not cleanly
+  structured, `d`/`x` may be empty arrays (valid) — the full verbatim block always lives in `pr`,
+  the audit source of truth.
 - **Defaults:** `n=[]`, `f=[]` (no compaction next-steps/files at checkpoint time), `s=`the active
   spec stem or `"none"`.
 
@@ -145,6 +164,23 @@ the checkpoint as usual regardless of the tail's outcome.
 `.conductor/last-write.log` (best-effort, overwritten each run, gitignored under `.conductor/`).
 The lone `CONDUCTOR_DB:` degradation line therefore never reaches the Claude Code UI; the tail
 surfaces nothing to the user while leaving a debug trail.
+
+**`last-write.log` concurrency (Q8):** the log is a **best-effort diagnostic**, not a
+correctness artifact. It is written in **overwrite mode (`>`, not append)** and is **not
+lock-synchronized** — interleaving or last-writer-wins is acceptable for a debug trail, and any
+write/lock error is swallowed (non-fatal, like the rest of the tail). In the normal workflow
+`/cc-checkpoint` and `/cc-compact` run **sequentially** (checkpoint before compact), so real
+contention is rare; if strict per-run isolation is ever needed, a `.<pid>` suffix is the
+follow-up. No lock is taken and no write-lock error can surface to the user.
+
+**CLI argument quote-safety (Q3):** arbitrary content (`pr` / `snap_json`) is **never** placed in
+argv — it is piped via **stdin** (the S1 ARG_MAX + injection-safety principle). The argv scalars
+are passed as **double-quoted shell variable expansions** (`"$id"`, `"$ph"`, `"$s"`, `"$c"`);
+inside double quotes the shell performs no word-splitting, globbing, or re-parsing of the value's
+characters, so an embedded quote or space is inert. Every scalar source is additionally
+constrained to a quote-free character set — `s` matches `[a-zA-Z0-9._-]`, `ph` is an enum, `c` is
+`[0-9a-f]{7}`/`0000000`, and `id` is a UUID — so a double quote cannot occur in practice; the
+double-quoted-expansion pattern is defense-in-depth.
 
 **Node-flag probe scope (Q14):** the probe is **unchanged** and is applied **only** to the two
 `conductor-db` calls (which import `node:sqlite`). `session-id.mjs` and `snap-build.mjs` import
@@ -162,6 +198,13 @@ probe, any Node ≥ 14. No conditional-logic change to the probe is required.
   dead code: large prose never reaches this file validator (it lives only in the DB), and
   oversized/corrupt DB payloads are guarded at write time by `conductor-db`'s 10 MiB cap and are
   read by ARCH-008-B via direct parsing, never fed to this file validator.
+- **4096 cap is NOT bypassed or raised for v2 (Q1):** the cap is a property of the **file
+  handoff channel**, not of the schema version, and it is checked on `raw.length` before the
+  version is known. No false rejection of valid prose can arise, because valid v2 prose payloads
+  are **never presented to the file validator** — they travel the DB channel (10 MiB,
+  `conductor-db`-guarded). Making the cap version-conditional would add coupling to guard a case
+  the data flow never produces; the cap stays a flat 4096 for every file. (A future feature that
+  needs v2 *files* > 4096 is a separate follow-up.)
 - Every v1 rule is untouched: sub-block key allow-lists, `sys.ph ∈ {spec,plan,impl,rev}`,
   array caps, `ops.f` action-code check, and the `sys.c` `/^[0-9a-f]{7}$/` test — under which
   `"0000000"` is valid for **both** schemas.
@@ -205,6 +248,13 @@ probe, any Node ≥ 14. No conditional-logic change to the probe is required.
   `.conductor/session-id` and never removes `.conductor/` itself or any other file, even if the
   directory would be left empty (it normally holds `cache.db`). Each stays inside its hook's
   existing exit-0 guard, so a delete failure never crashes the hook.
+- **Deletion does NOT force a new session in the primary path (Q6):** `/compact` clears history
+  but stays the **same Claude Code invocation** with the same `$CLAUDE_CODE_SESSION_ID`, so the
+  next command re-resolves the **identical** id and upserts the **same** `sessions` row — the
+  cache deletion is a no-op for env-var sessions. Its **only** effect is in the degraded
+  no-env-var path, where it intentionally **rotates the fallback UUID at the compact boundary**
+  to bound stale-id leakage (Q1/Q8 session-id). It is a leakage-bounding measure, not a
+  deliberate session reset.
 - **Session-id fragmentation (Q8, accepted residual):** if `$CLAUDE_CODE_SESSION_ID` is absent
   **and** `.conductor/session-id` cannot be written across repeated invocations, each run emits a
   fresh in-memory UUID, producing multiple `sessions`/`snapshots` rows for one logical session.
