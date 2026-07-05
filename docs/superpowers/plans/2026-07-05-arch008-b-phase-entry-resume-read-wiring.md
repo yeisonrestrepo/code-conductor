@@ -393,9 +393,9 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 - Consumes: `scripts/conductor-db.mjs` `get-snapshot <hash>` (ARCH-008-S1, non-destructive `SELECT … ORDER BY id DESC LIMIT 1`) via `process.execPath` + Node-flag probe; `scripts/snap-validate.mjs` (exit-code verdict) via a `.conductor/resume-validate.<pid>.tmp.json` temp.
 - Produces: a `queryDb(hash)` that returns a validated snap object on a DB hit or `null` to fall through. On a hit `main` deletes the handoff (superseded). The DB is best-effort: any degrade (Node <22.5, `node:sqlite` absent, timeout, non-zero exit, empty output, invalid blob, sentinel/non-full hash) falls through to the file branch, never a halt. The DB-blob validation temp `.conductor/resume-validate.<pid>.tmp.json` (pid-unique via `process.pid`, so concurrent phase entries never collide) is created and removed inside a `try/finally` in `validateBlob`, so it is cleaned immediately on every normal or throwing return; the Task 5 post-compact sweep is only a belt-and-suspenders reclaim for a hard SIGKILL landing in the sub-second validation window.
 
-- [ ] [T-003] **Add the DB precedence branch and its tests**
+- [X] [T-003] **Add the DB precedence branch and its tests**
 
-- [ ] [T-003-A] **Step 1: Write the failing DB tests**
+- [X] [T-003-A] **Step 1: Write the failing DB tests**
 
 First centralize the SQLite-capability probe in a shared helper so it is defined once, not re-inlined in each suite. Create `tests/helpers/sqlite.js`:
 
@@ -480,12 +480,12 @@ describe.runIf(sqliteAvailable())('resume-read.mjs DB branch', () => {
 });
 ```
 
-- [ ] [T-003-B] **Step 2: Run the DB tests to verify they fail**
+- [X] [T-003-B] **Step 2: Run the DB tests to verify they fail**
 
 Run: `npx vitest run tests/scripts/resume-read.test.js -t "DB branch"`
 Expected: FAIL (when `node:sqlite` is available) - `queryDb` still returns `null`, so the DB-hit test gets `source: file` (or exit 3), not `source: db`; the branch-switch test's restore assertion fails. (On a Node without `node:sqlite`, the block is skipped via `describe.runIf` - that is expected, not a failure.)
 
-- [ ] [T-003-C] **Step 3: Replace the `queryDb` stub with the real DB branch**
+- [X] [T-003-C] **Step 3: Replace the `queryDb` stub with the real DB branch**
 
 In `scripts/resume-read.mjs`, replace exactly this stub line:
 
@@ -538,12 +538,12 @@ function queryDb(hash) {
 }
 ```
 
-- [ ] [T-003-D] **Step 4: Run the full resume-read suite to verify green**
+- [X] [T-003-D] **Step 4: Run the full resume-read suite to verify green**
 
 Run: `npx vitest run tests/scripts/resume-read.test.js`
 Expected: PASS - core file-branch cases still green; DB-hit binds `source: db` and deletes the handoff; branch-switch restores at A, misses at B; two successive reads both hit (non-destructive). (DB block skipped only if the runner's Node lacks `node:sqlite`.)
 
-- [ ] [T-003-E] **Step 5: Commit**
+- [X] [T-003-E] **Step 5: Commit**
 
 ```bash
 git add scripts/resume-read.mjs tests/scripts/resume-read.test.js
