@@ -21,6 +21,7 @@ function mkRepo() {
   g(['config', 'user.email', 't@t.t']);
   g(['config', 'user.name', 'T']);
   writeFileSync(join(dir, 'f'), 'x', 'utf8');
+  writeFileSync(join(dir, '.gitignore'), '.conductor/\n', 'utf8'); // mirror production: DB is never tracked
   g(['add', '.']);
   g(['commit', '-q', '-m', 'init']);
   const head = g(['rev-parse', 'HEAD']).trim();
@@ -118,5 +119,65 @@ describe('resume-read.mjs core (file branch)', () => {
     expect(src).not.toMatch(/\|\|=|&&=|\?\?=/);
     expect(src).not.toMatch(/\.at\(/);
     expect(src).not.toMatch(/structuredClone/);
+  });
+});
+
+import { sqliteAvailable, dbFlags } from '../helpers/sqlite.js';
+const DB = fileURLToPath(new URL('../../scripts/conductor-db.mjs', import.meta.url));
+// Store a snapshot blob for a hash via the real conductor-db writer, into the repo's .conductor/cache.db.
+function dbStore(dir, hash, obj) {
+  const args = dbFlags().concat([DB, 'snapshot', hash]);
+  const r = spawnSync(process.execPath, args, { cwd: dir, input: JSON.stringify(obj), encoding: 'utf8', env: process.env });
+  expect(r.status).toBe(0);
+}
+
+describe.runIf(sqliteAvailable())('resume-read.mjs DB branch', () => {
+  it('DB hit + valid blob → source: db, deletes handoff, exit 0', () => {
+    const { dir, head } = mkRepo();
+    dbStore(dir, head, snap(head, { sys: { ph: 'impl', c: head, s: 'db-spec' }, ops: { n: ['db pending'], f: [] } }));
+    writeHandoff(dir, snap(head)); // present but superseded
+    const r = run(dir);
+    expect(r.status).toBe(0);
+    const lines = r.stdout.split('\n');
+    expect(lines[0]).toBe('RESUME_HIT');
+    expect(lines).toContain('source: db');
+    expect(lines).toContain('phase: impl');
+    expect(lines).toContain('spec: db-spec');
+    expect(lines).toContain('- db pending');
+    expect(existsSync(join(dir, HANDOFF_REL))).toBe(false); // handoff deleted as superseded
+    expect(existsSync(join(dir, '.conductor', 'cache.db'))).toBe(true); // non-destructive read
+  });
+
+  it('DB miss + valid handoff → falls through to file branch (source: file)', () => {
+    const { dir, head } = mkRepo();
+    writeHandoff(dir, snap(head));
+    const r = run(dir);
+    expect(r.status).toBe(0);
+    expect(r.stdout.split('\n')).toContain('source: file');
+  });
+
+  it('branch-switch isolation: context stored at A is restored at A, absent at B', () => {
+    const { dir, head } = mkRepo(); // commit A = head
+    const g = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    dbStore(dir, head, snap(head, { sys: { ph: 'plan', c: head, s: 'branch-a' } }));
+    // switch to a NEW commit B with no stored snapshot
+    g(['checkout', '-q', '-b', 'other']);
+    writeFileSync(join(dir, 'f2'), 'y', 'utf8');
+    g(['add', '.']);
+    g(['commit', '-q', '-m', 'B']);
+    const rB = run(dir);
+    expect(rB.status).toBe(3); // miss at B - no leak from A
+    // switch back to A → restored
+    g(['checkout', '-q', '-']);
+    const rA = run(dir);
+    expect(rA.status).toBe(0);
+    expect(rA.stdout.split('\n')).toContain('spec: branch-a');
+  });
+
+  it('non-destructive: two successive reads at the same commit both hit', () => {
+    const { dir, head } = mkRepo();
+    dbStore(dir, head, snap(head, { sys: { ph: 'plan', c: head, s: 's' } }));
+    expect(run(dir).status).toBe(0);
+    expect(run(dir).status).toBe(0);
   });
 });

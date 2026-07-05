@@ -60,8 +60,45 @@ function validateFile(p) {
   return r.status === 0;
 }
 
-// DB branch - replaced in Task 3. For now every hash falls through to the file branch.
-function queryDb(hash) { return null; }
+// Probe how to launch node:sqlite. Returns [] (no flag), ['--experimental-sqlite','--no-warnings'], or null (unavailable).
+function probeSqliteFlags() {
+  const opts = { encoding: 'utf8', timeout: 2000, env: process.env };
+  if (spawnSync(process.execPath, ['--no-warnings', '-e', "require('node:sqlite')"], opts).status === 0) return [];
+  if (spawnSync(process.execPath, ['--experimental-sqlite', '--no-warnings', '-e', "require('node:sqlite')"], opts).status === 0) {
+    return ['--experimental-sqlite', '--no-warnings'];
+  }
+  return null;
+}
+
+// Validate an in-memory blob by bridging it through the path-only snap-validate via a pid-unique temp.
+function validateBlob(blob) {
+  const tmp = join(COND, 'resume-validate.' + process.pid + '.tmp.json');
+  try { mkdirSync(COND, { recursive: true }); writeFileSync(tmp, blob, 'utf8'); }
+  catch { return false; } // FS write error → blob unusable, degrade
+  try {
+    const r = spawnSync(process.execPath, [VALIDATE, tmp], { encoding: 'utf8', env: process.env });
+    return r.status === 0;
+  } finally { tryUnlink(tmp); }
+}
+
+// DB branch - returns a validated snap object on a hit, or null to fall through to the file branch.
+function queryDb(hash) {
+  if (!/^([0-9a-f]{40}|[0-9a-f]{64})$/.test(hash)) {
+    trace(hash === SENTINEL ? 'sentinel-bypass' : 'nonfull-hash-bypass');
+    return null;
+  }
+  const flags = probeSqliteFlags();
+  if (flags === null) return null; // Node <22.5 or node:sqlite absent → degrade
+  const args = flags.concat([CONDUCTOR_DB, 'get-snapshot', hash]);
+  const r = spawnSync(process.execPath, args, { encoding: 'utf8', timeout: 5000, env: process.env });
+  if (r.status !== 0 || !r.stdout) return null; // timeout/kill/non-zero/empty → miss
+  const blob = r.stdout.trim();
+  if (blob === '') return null;
+  if (!validateBlob(blob)) { trace('db-invalid degrade'); return null; }
+  const snap = parseJson(blob);
+  if (snap === undefined) { trace('db-invalid degrade'); return null; }
+  return snap;
+}
 
 function buildHit(source, snap, hash) {
   const proseAvail = typeof snap.pr === 'string' && snap.pr.length > 0;
