@@ -16,7 +16,7 @@ describe('package.json manifest', () => {
   });
   it('allowlists only shipped assets + entry', () => {
     expect(pkg.files.sort()).toEqual(
-      ['bin/', 'global/', 'lib/', 'project-template/', 'skills/'].sort()
+      ['bin/', 'global/', 'lib/', 'project-template/', 'scripts/', 'skills/'].sort()
     );
     expect(pkg.files).not.toContain('tests/');
     expect(pkg.files).not.toContain('docs/');

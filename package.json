@@ -1,6 +1,6 @@
 {
   "name": "@yeison.restrepo.r/code-conductor",
-  "version": "1.23.1",
+  "version": "1.23.2",
   "description": "A spec-first, token-efficient Claude Code configuration and installer CLI.",
   "repository": {
     "type": "git",
@@ -15,6 +15,7 @@
     "lib/",
     "global/",
     "skills/",
+    "scripts/",
     "project-template/"
   ],
   "engines": {

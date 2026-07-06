@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.23.2] - 2026-07-06
+### Fixed
+- `scripts/` (`conductor-db.mjs`, `resume-read.mjs`, `snap-build.mjs`, `snap-validate.mjs`, `session-id.mjs`) was never published to npm (`package.json` `files` omitted it) and `deployProject` had no step copying it into a scaffolded project, so every npm install was missing the scripts `/cc-checkpoint`, `/cc-compact`, and `/cc-implement` depend on. `files` now includes `scripts/`, `assertAssets` pre-flight checks for it, and `deployProject` copies it to `<cwd>/scripts` alongside `.claude/`.
+
 ## [1.23.1] - 2026-07-06
 ### Fixed
 - `deployProject` no longer nests a second `.claude/` under `<cwd>/.claude` when scaffolding with `--project`; `CLAUDE.md`/`.gitignore` now land at the project root and commands/hooks/memory/settings land directly under `.claude/`, matching `project-template`'s on-disk layout.
