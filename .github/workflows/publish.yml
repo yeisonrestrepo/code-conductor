@@ -18,6 +18,8 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
+      # OIDC trusted publishing requires npm >= 11.5.1; Node 20 bundles npm 10.x.
+      - run: npm install -g npm@latest
       - run: npm ci
       - run: npx vitest run
       - name: Verify package version matches the release tag
@@ -34,6 +36,5 @@ jobs:
           if npm view "@yeison.restrepo.r/code-conductor@$PKG_VERSION" version >/dev/null 2>&1; then
             echo "::error::@yeison.restrepo.r/code-conductor@$PKG_VERSION already exists on the registry"; exit 1
           fi
+      # Auth via OIDC trusted publishing (configured on npmjs.com) — no token needed.
       - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

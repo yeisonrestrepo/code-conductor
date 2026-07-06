@@ -21,8 +21,10 @@ describe('publish workflow', () => {
     expect(wf).toMatch(/runs-on:\s*ubuntu-latest/);
     expect(wf).toMatch(/environment:\s*npm-publish/);
   });
-  it('authenticates with the NPM_TOKEN secret via NODE_AUTH_TOKEN', () => {
-    expect(wf).toMatch(/NODE_AUTH_TOKEN:\s*\$\{\{\s*secrets\.NPM_TOKEN\s*\}\}/);
+  it('authenticates via OIDC trusted publishing, not a stored token', () => {
+    expect(wf).not.toMatch(/NODE_AUTH_TOKEN/);
+    expect(wf).not.toMatch(/secrets\.NPM_TOKEN/);
+    expect(wf).toMatch(/id-token:\s*write/);
   });
   it('guards version==tag and blocks a duplicate publish before publishing', () => {
     expect(wf).toMatch(/release\.tag_name/);
