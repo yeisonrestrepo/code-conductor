@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.23.1] - 2026-07-06
+### Fixed
+- `deployProject` no longer nests a second `.claude/` under `<cwd>/.claude` when scaffolding with `--project`; `CLAUDE.md`/`.gitignore` now land at the project root and commands/hooks/memory/settings land directly under `.claude/`, matching `project-template`'s on-disk layout.
+
 ## [1.23.0] - 2026-07-05
 ### Changed
 - Distribution moved from shell installers to the `@yeison.restrepo.r/code-conductor` npm CLI (`npx @yeison.restrepo.r/code-conductor`; the installed command is `code-conductor`). `install.sh` and `install.ps1` removed. (FEAT-023)

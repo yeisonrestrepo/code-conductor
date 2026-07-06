@@ -11,12 +11,14 @@ beforeEach(() => {
   mkdirSync(join(asset, 'global', 'hooks'), { recursive: true });
   mkdirSync(join(asset, 'global', 'memory'), { recursive: true });
   mkdirSync(join(asset, 'skills'), { recursive: true });
-  mkdirSync(join(asset, 'project-template'), { recursive: true });
+  mkdirSync(join(asset, 'project-template', '.claude', 'commands'), { recursive: true });
   writeFileSync(join(asset, 'global', 'CLAUDE.md'), 'managed-v2');
   writeFileSync(join(asset, 'global', 'hooks', 'h.sh'), '#!/bin/sh\n');
   writeFileSync(join(asset, 'global', 'memory', 'personal.md'), 'BUNDLED');
   writeFileSync(join(asset, 'skills', 's.md'), 'skill');
   writeFileSync(join(asset, 'project-template', 'CLAUDE.md'), 'proj');
+  writeFileSync(join(asset, 'project-template', '.gitignore'), 'ignore-me');
+  writeFileSync(join(asset, 'project-template', '.claude', 'commands', 'cc-spec.md'), 'spec');
 });
 afterEach(() => {
   rmSync(asset, { recursive: true, force: true });
@@ -52,9 +54,13 @@ describe('deployGlobal', () => {
 });
 
 describe('deployProject', () => {
-  it('copies the template into cwd/.claude', () => {
+  it('places .claude contents under cwd/.claude and root files at cwd', () => {
     const dir = deployProject(asset, home);
-    expect(readFileSync(join(dir, 'CLAUDE.md'), 'utf8')).toBe('proj');
+    expect(dir).toBe(join(home, '.claude'));
+    expect(existsSync(join(dir, '.claude'))).toBe(false);
+    expect(readFileSync(join(dir, 'commands', 'cc-spec.md'), 'utf8')).toBe('spec');
+    expect(readFileSync(join(home, 'CLAUDE.md'), 'utf8')).toBe('proj');
+    expect(readFileSync(join(home, '.gitignore'), 'utf8')).toBe('ignore-me');
   });
 });
 

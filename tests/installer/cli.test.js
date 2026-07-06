@@ -34,7 +34,9 @@ describe('run', () => {
   it('with --project also deploys into cwd/.claude', () => {
     const rc = run(['--project'], { HOME: home }, { cwd, log });
     expect(rc).toBe(0);
-    expect(existsSync(join(cwd, '.claude', 'CLAUDE.md'))).toBe(true);
+    expect(existsSync(join(cwd, 'CLAUDE.md'))).toBe(true);
+    expect(existsSync(join(cwd, '.claude', '.claude'))).toBe(false);
+    expect(existsSync(join(cwd, '.claude', 'commands'))).toBe(true);
   });
   it('exits 1 when the --project target exists as a non-directory file', () => {
     writeFileSync(join(cwd, '.claude'), 'i am a file');
