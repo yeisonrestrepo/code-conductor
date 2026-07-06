@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { resolveAssetRoot, resolveHome, nodeMajorAtLeast } from '../lib/installer/env.mjs';
@@ -119,6 +119,15 @@ export function run(argv, env = process.env, { cwd = process.cwd(), log } = {}) 
 }
 
 // Compare as file URLs so a Windows path (C:\...\bin\code-conductor.mjs) matches
-// import.meta.url; naive `file://` + backslash string concat never would.
-const invokedDirectly = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
-if (invokedDirectly) process.exit(run(process.argv.slice(2)));
+// import.meta.url; naive `file://` + backslash string concat never would. Node's ESM
+// loader sets import.meta.url to the module's REALPATH, so argv[1] must be realpath-
+// resolved too — otherwise a symlinked launch path (npx cache, a global prefix, or
+// macOS /tmp -> /private/var) never matches and the CLI exits 0 doing nothing.
+function invokedDirectly() {
+  const argv1 = process.argv[1];
+  if (!argv1) return false;
+  let resolved;
+  try { resolved = realpathSync(argv1); } catch { resolved = argv1; }
+  return import.meta.url === pathToFileURL(resolved).href;
+}
+if (invokedDirectly()) process.exit(run(process.argv.slice(2)));
