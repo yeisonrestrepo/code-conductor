@@ -87,7 +87,7 @@ export function run(argv, env = process.env, { cwd = process.cwd(), log } = {}) 
   // and the environment codes (EROFS/EACCES/EPERM), which are exit 1 regardless.
   let writing = false;
   try {
-    assertAssets(assetRoot, ['global', 'skills', 'project-template']); // pre-flight
+    assertAssets(assetRoot, ['global', 'skills', 'scripts', 'project-template']); // pre-flight
     writing = true;                                                    // copy phase begins
     const claudeDir = deployGlobal(assetRoot, home);
     chmodHooks(claudeDir);

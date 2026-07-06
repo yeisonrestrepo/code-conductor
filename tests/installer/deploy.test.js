@@ -12,6 +12,8 @@ beforeEach(() => {
   mkdirSync(join(asset, 'global', 'memory'), { recursive: true });
   mkdirSync(join(asset, 'skills'), { recursive: true });
   mkdirSync(join(asset, 'project-template', '.claude', 'commands'), { recursive: true });
+  mkdirSync(join(asset, 'scripts'), { recursive: true });
+  writeFileSync(join(asset, 'scripts', 'conductor-db.mjs'), 'db-engine');
   writeFileSync(join(asset, 'global', 'CLAUDE.md'), 'managed-v2');
   writeFileSync(join(asset, 'global', 'hooks', 'h.sh'), '#!/bin/sh\n');
   writeFileSync(join(asset, 'global', 'memory', 'personal.md'), 'BUNDLED');
@@ -61,6 +63,10 @@ describe('deployProject', () => {
     expect(readFileSync(join(dir, 'commands', 'cc-spec.md'), 'utf8')).toBe('spec');
     expect(readFileSync(join(home, 'CLAUDE.md'), 'utf8')).toBe('proj');
     expect(readFileSync(join(home, '.gitignore'), 'utf8')).toBe('ignore-me');
+  });
+  it('copies scripts/ to cwd/scripts as a sibling of .claude', () => {
+    deployProject(asset, home);
+    expect(readFileSync(join(home, 'scripts', 'conductor-db.mjs'), 'utf8')).toBe('db-engine');
   });
 });
 
