@@ -1,0 +1,39 @@
+name: Publish
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx vitest run
+      - name: Verify package version matches the release tag
+        run: |
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          TAG="${{ github.event.release.tag_name }}"
+          TAG="${TAG#v}"
+          if [ "$PKG_VERSION" != "$TAG" ]; then
+            echo "::error::package.json version ($PKG_VERSION) != release tag ($TAG)"; exit 1
+          fi
+      - name: Guard against re-publishing an existing version
+        run: |
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if npm view "code-conductor@$PKG_VERSION" version >/dev/null 2>&1; then
+            echo "::error::code-conductor@$PKG_VERSION already exists on the registry"; exit 1
+          fi
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
