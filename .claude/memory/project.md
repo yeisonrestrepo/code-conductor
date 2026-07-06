@@ -385,3 +385,25 @@ Replace `install.sh` (1563 lines) + `install.ps1` (918 lines) with one bundled N
 - **Resolved decisions round 3 (2026-07-05):** exit codes 0 ok / 1 pre-flight-env (home, perm, EROFS, missing assets) / 2 mid-copy partial-write; fresh-machine settings = copy bundled `global/settings.json` then idempotent merge (no synthesized default); `bin` command always `code-conductor` even under scoped-name fallback; `--verbosity` persists to `~/.claude/memory/verbosity.md` (overwrites when flag given, else MIN-if-absent) + sets install log level; malformed-backup prune = lexical sort of fixed-width UTC suffix, keep newest 5; coverage ≥90% lines on new CLI modules (not repo-global); publish trigger = `release:[published]` (supersedes `v*` tag push); `fs.cpSync {recursive,force:true,dereference:false}`.
 - **Resolved decisions round 4 (2026-07-05):** corrupt existing `verbosity.md` (no flag) → overwrite MIN + stderr warn, never abort; `package.json publishConfig.access:"public"` (for scoped fallback); publish workflow `runs-on: ubuntu-latest`; smoke/CI asserts committed `bin/code-conductor.mjs` has exec bit (git `100755`).
 - Spec doc: `docs/superpowers/specs/2026-07-05-feat-023-npm-cli-distribution-design.md`.
+
+## Checkpoint 2026-07-06 10:07 (FEAT-023 shipped + published — v1.23.0)
+
+### Decisions
+- FEAT-023 shipped v1.23.0: 10 TDD tasks (T-001..T-010), one commit each, replacing install.sh/install.ps1 with the bundled `code-conductor` npm CLI; final suite 430/430 green. Backlog `[FEAT-023]` flipped `[x]`.
+- npm rejected the unscoped name `code-conductor` (403, too similar to existing `codeconductor`) — the spec's scoped fallback was taken: package renamed `@yeison.restrepo.r/code-conductor` (npm-suggested scope from the account username). The `bin` command stays `code-conductor` (spec invariant); only the package name is scoped.
+- Provenance publish (E422) required `package.json` `repository.url` matching the OIDC repo claim; added `repository: {type:git, url:git+https://github.com/yeisonrestrepo/code-conductor.git}` + a manifest test guarding it.
+- Distribution direction settled: code-conductor is an INSTALLER CLI (runs once, copies into ~/.claude), NOT an MCP server (no runtime JSON-RPC) and NOT yet a Claude Code plugin. `claude plugin install npx …` is invalid — CC plugins install from a marketplace repo (`.claude-plugin/marketplace.json` + `plugin.json`), never npm. A genuine plugin package would be a NEW `/cc-spec` (repo has NO plugin manifest today; `tests/plugin/*` only checks installed skills).
+- Publish auth moved to npm OIDC trusted publishing (commit 49a4027): dropped `NODE_AUTH_TOKEN`/`NPM_TOKEN`, added `npm install -g npm@latest` (OIDC needs npm >=11.5.1), kept `--provenance --access public` + `id-token: write` + `npm-publish` environment. Token bootstrap only needed because trusted-publisher config requires the package to exist first.
+
+### Conventions
+- CLI is ESM `.mjs`, zero runtime deps, native `node:fs` only; `bin/code-conductor.mjs` thin (parseArgs + orchestrate + exit codes 0/1/2), logic in `lib/installer/{env,deploy,settings,config}.mjs`; tests under `tests/installer/*` are PERMANENT.
+- `NPM_TOKEN` is an ENVIRONMENT secret on the protected `npm-publish` environment (never a repo secret) — inherits the required-reviewer gate; removed entirely once OIDC lands.
+- Release requires the `v<version>` tag to point at the commit carrying that version+manifest; moving the tag does NOT retarget an existing GitHub Release (must delete+re-publish the Release).
+
+### Technical Debt
+- `git add -A` in the T-010 cutover swept the generated `coverage/` report tree into the commit; caught and fixed by `git rm -r --cached coverage` + gitignoring `coverage/` (amended into 4d987fa). `coverage/` is now in `.gitignore`.
+- Publish workflow, Windows `chmod` no-op, and PS parity remain inspection-only (no `powershell`/live-registry on the macOS host); correctness rests on the script-level vitest suites + `npm pack` smoke, not an end-to-end publish.
+- Scoped package may have published as RESTRICTED (anonymous `npm view` 404s); if public install is intended, run `npm access public @yeison.restrepo.r/code-conductor` or set visibility Public in npm settings — unverified this session.
+
+### Version
+1.23.0 published to npm as @yeison.restrepo.r/code-conductor — FEAT-023 complete.
