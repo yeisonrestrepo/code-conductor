@@ -179,7 +179,7 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Components Affected:** `.claude/skills/ui-ux-pro-max/` (Restructuring).
 * **Acceptance Criteria:** Transform the static layout CSV sheets into lightweight Markdown guidelines that are loaded directly alongside the discovered active technology stack profile.
 
-### [ ] `[FEAT-023]` Global Distribution Infrastructure via NPM CLI
+### [x] `[FEAT-023]` Global Distribution Infrastructure via NPM CLI
 * **Description:** Upgrade the current installation strategy away from loose shell scripts (`install.sh`, `install.ps1`) to a standard Node package executable.
 * **Impact:** Establishes cross-platform installation consistency, proper semantic versioning management, and streamlined updates.
 * **Components Affected:** Project manifest configs, build packaging pipeline, GitHub Actions workflows.

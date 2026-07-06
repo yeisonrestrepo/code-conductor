@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.23.0] - 2026-07-05
+### Changed
+- Distribution moved from shell installers to the `code-conductor` npm CLI (`npx code-conductor`). `install.sh` and `install.ps1` removed. (FEAT-023)
+
 ## [1.22.0] - 2026-07-05
 
 ### Added

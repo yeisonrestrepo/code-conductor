@@ -14,31 +14,23 @@ AI coding assistants are only as good as the structure you put around them. With
 | Full files read on every turn | grep/find before read — targeted tool calls only |
 | Conventions reset every session | Stack profile + memory loaded at session start |
 | Frontend code with no UX consideration | UI/UX skill activated automatically for frontend stacks |
-| Manual CLAUDE.md with `<command>` placeholders | **Stack auto-detection** — `install.sh --project` reads your `package.json`, `go.mod`, `Cargo.toml`, etc. and auto-fills CLAUDE.md Development Commands so the agent never guesses your build/test/lint commands |
+| Manual CLAUDE.md with `<command>` placeholders | **Stack auto-detection** — `code-conductor --project` reads your `package.json`, `go.mod`, `Cargo.toml`, etc. and auto-fills CLAUDE.md Development Commands so the agent never guesses your build/test/lint commands |
 | Verbose markdown handoffs eat context | **SNAP v1**: minified single-line JSON handoff format, schema-validated by `scripts/snap-validate.mjs`, ≥15% smaller than the markdown snapshot it replaces |
 
 ---
 
 ## Install
 
-**macOS / Linux:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.sh | bash
-```
-
-**Windows (PowerShell):**
-```powershell
-irm https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.ps1 | iex
+npx code-conductor            # one-shot global setup
+# or
+npm install -g code-conductor && code-conductor
 ```
 
 ### Add to a project
 
 ```bash
-# macOS / Linux
-curl -fsSL https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.sh | bash -s -- --project
-
-# Windows
-& ([ScriptBlock]::Create((irm https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/install.ps1))) -Project
+code-conductor --project      # also scaffold ./.claude in the current repo
 ```
 
 ### Flags
@@ -255,8 +247,8 @@ code-conductor/
 ├── README.md
 ├── VERSION
 ├── .gitignore
-├── install.sh                    macOS/Linux
-├── install.ps1                   Windows
+├── bin/code-conductor.mjs        npm CLI entry (npx code-conductor)
+├── lib/installer/                CLI modules (env, deploy, settings, config)
 ├── global/
 │   ├── CLAUDE.md                 Global agent behavior (all projects)
 │   ├── settings.json

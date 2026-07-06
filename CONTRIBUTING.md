@@ -40,7 +40,7 @@ The PR template will pre-fill when you open a pull request — please fill it in
 
 ## Bypassing the Pre-Commit Hook
 
-The pre-commit test gate installed by `install.sh` / `install.ps1` can be skipped with:
+The pre-commit test gate installed by `code-conductor --project` can be skipped with:
 
 ```
 git commit --no-verify
@@ -57,9 +57,9 @@ Use this checklist when your environment restricts hook execution (restricted Po
 1. **Run the test suite directly**: `npm test` from repo root must exit 0.
 2. **Invoke the hook manually**: `bash .git/hooks/pre-commit` from repo root after installation; must exit 0 on a clean codebase.
 3. **Trigger via an empty commit**: `git commit --allow-empty -m "hook smoke test"` — the hook fires normally.
-4. **Restricted PowerShell hosts**: `powershell -ExecutionPolicy Bypass -File .\install.ps1 -Project` installs the hook without altering system execution policy.
+4. **Restricted PowerShell hosts**: `code-conductor --project` installs the hook natively via Node (no shell execution policy involved).
 5. **bash not in PATH (Windows)**: install [Git for Windows](https://gitforwindows.org/), add its `bin/` to PATH, then re-run `npm test` to confirm the guard3 suite no longer skips.
-6. **Verify LF line endings in the written hook**: `node --input-type=commonjs -e "const f=require('fs').readFileSync('.git/hooks/pre-commit','utf8');if(f.includes('\r'))throw new Error('CRLF');console.log('LF only - OK')"` — a CRLF result means Git for Windows bash will fail to parse the shebang; re-run `install.ps1` to normalize.
+6. **Verify LF line endings in the written hook**: `node --input-type=commonjs -e "const f=require('fs').readFileSync('.git/hooks/pre-commit','utf8');if(f.includes('\r'))throw new Error('CRLF');console.log('LF only - OK')"` — a CRLF result means Git for Windows bash will fail to parse the shebang; re-run `code-conductor --project` to normalize.
 
 ### Resetting the Pre-Commit Hook to Upstream
 
@@ -67,19 +67,13 @@ If your local `.claude/hooks/pre-tool-use.sh` has diverged (e.g., manual edits, 
 partial upgrade), delete it and re-run the installer to pull the current version from the
 project template:
 
-**bash / macOS / Linux:**
+**macOS / Linux / Windows:**
 ```bash
-rm .claude/hooks/pre-tool-use.sh
-bash install.sh -p
+rm .claude/hooks/pre-tool-use.sh   # (PowerShell: Remove-Item .claude\hooks\pre-tool-use.sh)
+code-conductor --project
 ```
 
-**PowerShell (Windows):**
-```powershell
-Remove-Item .claude\hooks\pre-tool-use.sh
-.\install.ps1 -Project
-```
-
-The installers are idempotent and will not overwrite other hook files or project settings.
+The CLI is idempotent and will not overwrite other hook files or project settings.
 
 ---
 

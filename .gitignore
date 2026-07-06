@@ -11,6 +11,7 @@ initial_prompt.xml
 .claude/memory/session-snapshot.md
 node_modules/
 .vitest-cache/
+coverage/
 tests/.tmp/
 .claude/memory/turn-count.txt
 .claude/memory/session-snapshot.json

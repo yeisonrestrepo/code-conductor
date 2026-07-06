@@ -14,8 +14,6 @@ const read = (p) => readFileSync(resolve(root, p), 'utf8');
 // so the hyphenated check does not produce a false positive.
 const NAMED_FILES = [
   'global/commands/cc-stack.md',
-  'install.sh',
-  'install.ps1',
   'README.md',
   'global/CLAUDE.md',
 ];
