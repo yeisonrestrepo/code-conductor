@@ -1,6 +1,23 @@
 ﻿# code-conductor
 
+[![npm version](https://img.shields.io/npm/v/%40yeison.restrepo.r%2Fcode-conductor.svg)](https://www.npmjs.com/package/@yeison.restrepo.r/code-conductor)
+[![License](https://img.shields.io/github/license/yeisonrestrepo/code-conductor.svg)](LICENSE)
+[![GitHub issues](https://img.shields.io/github/issues/yeisonrestrepo/code-conductor.svg)](https://github.com/yeisonrestrepo/code-conductor/issues)
+
 A spec-first, token-efficient Claude Code configuration that turns AI-assisted coding into a disciplined, repeatable engineering workflow.
+
+---
+
+## Dependencies
+
+code-conductor assumes these are already in place — the installer does not set them up for you:
+
+| Dependency | Required for | How to get it |
+|---|---|---|
+| Node.js `>= 20` | Running the `code-conductor` CLI itself | Any current Node LTS |
+| Claude Code | The environment every command/skill/hook in this repo runs inside | — |
+| **superpowers plugin** | `/cc-spec` (`brainstorming`), `/cc-plan` (`writing-plans`), and `/cc-debug`, `/cc-refactor`, `/cc-review`, `/cc-test` (all four via `subagent-driven-development`) | Install from Claude Code's `/plugin` marketplace, then run `/reload-plugins`, **before** using these commands — without it, their `Skill(...)` calls fail |
+| ui-ux-pro-max skill | UI/UX guidance on frontend projects | No manual step — the installer downloads it from GitHub automatically when `/cc-stack` detects a frontend stack |
 
 ---
 
@@ -29,8 +46,10 @@ npm install -g @yeison.restrepo.r/code-conductor && code-conductor
 
 ### Add to a project
 
+`--project` performs the global setup **and** scaffolds the project template in one call — there is no separate step to run first:
+
 ```bash
-code-conductor --project      # also scaffold ./.claude in the current repo
+code-conductor --project      # global setup + scaffold ./.claude in the current repo
 ```
 
 ### Flags
