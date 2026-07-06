@@ -48,7 +48,9 @@ describe('packed tarball', () => {
     const home = mkdtempSync(join(tmpdir(), 'cc-smoke-h2-'));
     const cwd = mkdtempSync(join(tmpdir(), 'cc-smoke-c-'));
     execFileSync('node', [join(pkgDir, 'bin', 'code-conductor.mjs'), '--project'], { cwd, env: { ...process.env, HOME: home, USERPROFILE: home } });
-    expect(existsSync(join(cwd, '.claude', 'CLAUDE.md'))).toBe(true);
+    expect(existsSync(join(cwd, 'CLAUDE.md'))).toBe(true);
+    expect(existsSync(join(cwd, '.claude', '.claude'))).toBe(false);
+    expect(existsSync(join(cwd, '.claude', 'commands', 'cc-spec.md'))).toBe(true);
     rmSync(home, { recursive: true, force: true });
     rmSync(cwd, { recursive: true, force: true });
   });
