@@ -1,14 +1,30 @@
 {
-  "private": true,
+  "name": "code-conductor",
   "version": "1.22.0",
+  "description": "A spec-first, token-efficient Claude Code configuration and installer CLI.",
   "type": "module",
+  "bin": {
+    "code-conductor": "bin/code-conductor.mjs"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "global/",
+    "skills/",
+    "project-template/"
+  ],
   "engines": {
     "node": ">=20"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "coverage": "vitest run --coverage"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^3.0.0",
     "vitest": "^3.0.0"
   }
 }
