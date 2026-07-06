@@ -21,6 +21,9 @@ describe('package.json manifest', () => {
     expect(pkg.files).not.toContain('tests/');
     expect(pkg.files).not.toContain('docs/');
   });
+  it('declares the repository url required for provenance publishing', () => {
+    expect(pkg.repository.url).toBe('git+https://github.com/yeisonrestrepo/code-conductor.git');
+  });
   it('keeps ESM + node floor and publishes public', () => {
     expect(pkg.type).toBe('module');
     expect(pkg.engines.node).toBe('>=20');
