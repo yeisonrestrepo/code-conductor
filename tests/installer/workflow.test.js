@@ -26,6 +26,6 @@ describe('publish workflow', () => {
   });
   it('guards version==tag and blocks a duplicate publish before publishing', () => {
     expect(wf).toMatch(/release\.tag_name/);
-    expect(wf).toMatch(/npm view "code-conductor@/);
+    expect(wf).toMatch(/npm view "@yeison\.restrepo\.r\/code-conductor@/);
   });
 });

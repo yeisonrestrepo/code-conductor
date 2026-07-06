@@ -8,7 +8,7 @@ const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 
 describe('package.json manifest', () => {
   it('names the package code-conductor and is not private', () => {
-    expect(pkg.name).toBe('code-conductor');
+    expect(pkg.name).toBe('@yeison.restrepo.r/code-conductor');
     expect(pkg.private).toBeUndefined();
   });
   it('maps the bin command to the mjs entry', () => {

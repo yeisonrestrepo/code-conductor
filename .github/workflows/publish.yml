@@ -31,8 +31,8 @@ jobs:
       - name: Guard against re-publishing an existing version
         run: |
           PKG_VERSION="$(node -p "require('./package.json').version")"
-          if npm view "code-conductor@$PKG_VERSION" version >/dev/null 2>&1; then
-            echo "::error::code-conductor@$PKG_VERSION already exists on the registry"; exit 1
+          if npm view "@yeison.restrepo.r/code-conductor@$PKG_VERSION" version >/dev/null 2>&1; then
+            echo "::error::@yeison.restrepo.r/code-conductor@$PKG_VERSION already exists on the registry"; exit 1
           fi
       - run: npm publish --provenance --access public
         env:

@@ -2,7 +2,7 @@
 
 ## [1.23.0] - 2026-07-05
 ### Changed
-- Distribution moved from shell installers to the `code-conductor` npm CLI (`npx code-conductor`). `install.sh` and `install.ps1` removed. (FEAT-023)
+- Distribution moved from shell installers to the `@yeison.restrepo.r/code-conductor` npm CLI (`npx @yeison.restrepo.r/code-conductor`; the installed command is `code-conductor`). `install.sh` and `install.ps1` removed. (FEAT-023)
 
 ## [1.22.0] - 2026-07-05
 

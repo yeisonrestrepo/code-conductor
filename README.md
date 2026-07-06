@@ -22,9 +22,9 @@ AI coding assistants are only as good as the structure you put around them. With
 ## Install
 
 ```bash
-npx code-conductor            # one-shot global setup
+npx @yeison.restrepo.r/code-conductor            # one-shot global setup
 # or
-npm install -g code-conductor && code-conductor
+npm install -g @yeison.restrepo.r/code-conductor && code-conductor
 ```
 
 ### Add to a project
