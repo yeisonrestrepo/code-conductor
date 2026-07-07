@@ -190,3 +190,9 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Impact:** Offers a bulletproof, deterministic validation tool for the agent to check its own work before closing issues, ensuring zero regressions in core performance.
 * **Components Affected:** Core test setup config, orchestrator business logic, in-memory file system simulation tests (`memfs`).
 * **Acceptance Criteria:** Ensure robust test coverage across stack identification, template interpolation, and tool boundary filtering, binding test runs as a mandatory criteria before any backlog item change can be committed.
+
+### [ ] `[FEAT-026]` Guided Branch Creation and Commit Drafting for Backlog Work
+* **Description:** No part of the project automates the Git side of picking up a backlog item: branch creation and commit-message drafting are manual, guided only by the naming/format convention documented in `CONTRIBUTING.md`. Add a step (e.g. at `/cc-spec` or `/cc-plan` approval, or a new `/cc-branch` helper) that offers to create a descriptively named branch (derived from the `[FEAT-XXX]`/`[BUG-XXX]` id and title) and drafts a Conventional-Commits-style commit message from the resulting diff.
+* **Impact:** Removes manual naming/formatting friction for routine backlog work while keeping every Git write auditable and explicit.
+* **Components Affected:** `project-template/.claude/commands/cc-spec.md` / `cc-plan.md` (trigger point), possible new `cc-branch` command, both command mirrors.
+* **Acceptance Criteria:** The agent proposes a branch name and drafts a commit message automatically, but still requires explicit user confirmation before running `git checkout -b`, `git commit`, `git push`, or opening a PR — matching this project's existing Git safety protocol (never push or open PRs without confirmation).
