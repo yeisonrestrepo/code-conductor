@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { spawnSync, execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, existsSync, readFileSync, rmSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, existsSync, readFileSync, rmSync, mkdirSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -179,5 +179,34 @@ describe.runIf(sqliteAvailable())('resume-read.mjs DB branch', () => {
     dbStore(dir, head, snap(head, { sys: { ph: 'plan', c: head, s: 's' } }));
     expect(run(dir).status).toBe(0);
     expect(run(dir).status).toBe(0);
+  });
+});
+
+describe('resume-read.mjs root resolution fallbacks (no git)', () => {
+  const NO_GIT_ENV = { ...process.env, PATH: '' };
+
+  it('tier 3: script-dir parent is root at scripts/ (dev checkout)', () => {
+    const tree = mkdtempSync(join(tmpdir(), 'resume-nogit-'));
+    repos.push(tree);
+    const scriptsDir = join(tree, 'scripts');
+    mkdirSync(scriptsDir, { recursive: true });
+    cpSync(SCRIPT, join(scriptsDir, 'resume-read.mjs'));
+    const r = spawnSync(process.execPath, [join(scriptsDir, 'resume-read.mjs')],
+      { cwd: scriptsDir, encoding: 'utf8', env: NO_GIT_ENV });
+    expect(r.status).toBe(3); // total miss, but proves the trace file lands at the right root
+    expect(existsSync(join(tree, '.conductor', 'last-write.log'))).toBe(true);
+  });
+
+  it('tier 3: goes up one extra level when deployed under .claude/scripts', () => {
+    const tree = mkdtempSync(join(tmpdir(), 'resume-nogit-claude-'));
+    repos.push(tree);
+    const scriptsDir = join(tree, '.claude', 'scripts');
+    mkdirSync(scriptsDir, { recursive: true });
+    cpSync(SCRIPT, join(scriptsDir, 'resume-read.mjs'));
+    const r = spawnSync(process.execPath, [join(scriptsDir, 'resume-read.mjs')],
+      { cwd: scriptsDir, encoding: 'utf8', env: NO_GIT_ENV });
+    expect(r.status).toBe(3);
+    expect(existsSync(join(tree, '.conductor', 'last-write.log'))).toBe(true);
+    expect(existsSync(join(tree, '.claude', '.conductor'))).toBe(false);
   });
 });

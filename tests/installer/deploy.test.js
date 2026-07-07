@@ -64,9 +64,24 @@ describe('deployProject', () => {
     expect(readFileSync(join(home, 'CLAUDE.md'), 'utf8')).toBe('proj');
     expect(readFileSync(join(home, '.gitignore'), 'utf8')).toBe('ignore-me');
   });
-  it('copies scripts/ to cwd/scripts as a sibling of .claude', () => {
+  it('copies scripts/ under cwd/.claude/scripts, not the project root', () => {
     deployProject(asset, home);
-    expect(readFileSync(join(home, 'scripts', 'conductor-db.mjs'), 'utf8')).toBe('db-engine');
+    expect(readFileSync(join(home, '.claude', 'scripts', 'conductor-db.mjs'), 'utf8')).toBe('db-engine');
+    expect(existsSync(join(home, 'scripts'))).toBe(false);
+  });
+  it('sweeps a stale root-level scripts/ dir left by the 1.23.2 bug', () => {
+    mkdirSync(join(home, 'scripts'), { recursive: true });
+    writeFileSync(join(home, 'scripts', 'conductor-db.mjs'), 'stale-db-engine');
+    deployProject(asset, home);
+    expect(existsSync(join(home, 'scripts'))).toBe(false);
+    expect(readFileSync(join(home, '.claude', 'scripts', 'conductor-db.mjs'), 'utf8')).toBe('db-engine');
+  });
+  it('leaves a host-owned scripts/ dir untouched when contents differ from the bundle', () => {
+    mkdirSync(join(home, 'scripts'), { recursive: true });
+    writeFileSync(join(home, 'scripts', 'build.sh'), '#!/bin/sh\necho host-script\n');
+    deployProject(asset, home);
+    expect(readFileSync(join(home, 'scripts', 'build.sh'), 'utf8')).toBe('#!/bin/sh\necho host-script\n');
+    expect(readFileSync(join(home, '.claude', 'scripts', 'conductor-db.mjs'), 'utf8')).toBe('db-engine');
   });
 });
 

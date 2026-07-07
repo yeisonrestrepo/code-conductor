@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.23.3] - 2026-07-06
+### Fixed
+- `deployProject` deployed `scripts/` to `<cwd>/scripts` (the host project root) instead of nesting it under `.claude/`, risking a collision with a host project's own `scripts/` folder. It now copies to `<cwd>/.claude/scripts` and sweeps away a stale root-level `scripts/` dir left behind by the 1.23.2 bug (only when its contents exactly match the bundled script set — a host-owned `scripts/` is left untouched). The five commands that invoke these scripts (`cc-checkpoint`, `cc-compact`, `cc-spec`, `cc-plan`, `cc-implement`) now reference `.claude/scripts/...`, and the no-git root-resolution fallback in `conductor-db.mjs`, `resume-read.mjs`, and `session-id.mjs` now accounts for the extra `.claude/` nesting level.
+
 ## [1.23.2] - 2026-07-06
 ### Fixed
 - `scripts/` (`conductor-db.mjs`, `resume-read.mjs`, `snap-build.mjs`, `snap-validate.mjs`, `session-id.mjs`) was never published to npm (`package.json` `files` omitted it) and `deployProject` had no step copying it into a scaffolded project, so every npm install was missing the scripts `/cc-checkpoint`, `/cc-compact`, and `/cc-implement` depend on. `files` now includes `scripts/`, `assertAssets` pre-flight checks for it, and `deployProject` copies it to `<cwd>/scripts` alongside `.claude/`.

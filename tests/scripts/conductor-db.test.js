@@ -294,6 +294,27 @@ describe.skipIf(!HAS_SQLITE)('conductor-db root resolution fallbacks', () => {
       rmSync(tree, { recursive: true, force: true });
     }
   });
+
+  it('Fallback B: goes up one extra level when deployed under .claude/scripts', () => {
+    // Same as above, but scripts/ is nested one level deeper under .claude/, as
+    // a real deployProject() output would produce - the fallback must not stop
+    // at .claude/ and mistake it for the project root.
+    const tree = mkdtempSync(join(tmpdir(), `cc-db-nogit-claude-${randomUUID()}-`));
+    try {
+      const scriptsDir = join(tree, '.claude', 'scripts');
+      mkdirSync(scriptsDir, { recursive: true });
+      cpSync(SCRIPT, join(scriptsDir, 'conductor-db.mjs'));
+      const r = spawnSync(process.execPath,
+        [...FLAG, join(scriptsDir, 'conductor-db.mjs'), 'record', 'plan.md', 'T-001', 'X'],
+        { cwd: scriptsDir, encoding: 'utf8', env: NO_GIT_ENV });
+      expect(r.status).toBe(0);
+      // <root> = .claude/scripts/../.. = tree ; db lands at tree/.conductor/cache.db
+      expect(existsSync(join(tree, '.conductor', 'cache.db'))).toBe(true);
+      expect(existsSync(join(tree, '.claude', '.conductor'))).toBe(false);
+    } finally {
+      rmSync(tree, { recursive: true, force: true });
+    }
+  });
 });
 
 describe.skipIf(!HAS_SQLITE)('conductor-db node:sqlite unavailable', () => {

@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, writeFileSync, appendFileSync, unlinkSync, mkdirSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { dirname, basename, join } from 'node:path';
 
 const SENTINEL = '0000000';
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -24,7 +24,10 @@ function resolveRoot() {
     dir = parent;
   }
   rootTier = 3;
-  return join(SCRIPT_DIR, '..');
+  // this script lives at <root>/scripts/resume-read.mjs (dev checkout) or
+  // <root>/.claude/scripts/resume-read.mjs (deployed project).
+  const parent = join(SCRIPT_DIR, '..');
+  return basename(parent) === '.claude' ? join(parent, '..') : parent;
 }
 
 const root = resolveRoot();
