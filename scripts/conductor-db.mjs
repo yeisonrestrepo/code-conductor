@@ -13,7 +13,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, existsSync, renameSync, unlinkSync, statSync, readSync } from 'node:fs';
-import { dirname, join, resolve, relative, sep } from 'node:path';
+import { dirname, basename, join, resolve, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const PREFIX = 'CONDUCTOR_DB:';
@@ -65,8 +65,11 @@ function resolveRoot() {
     if (parent === dir) break;   // filesystem root
     dir = parent;
   }
-  // 3. Fallback B: this script lives at <root>/scripts/conductor-db.mjs.
-  return resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  // 3. Fallback B: this script lives at either <root>/scripts/conductor-db.mjs
+  // (dev checkout) or <root>/.claude/scripts/conductor-db.mjs (deployed project).
+  const scriptsDir = dirname(fileURLToPath(import.meta.url));
+  const parent = resolve(scriptsDir, '..');
+  return basename(parent) === '.claude' ? resolve(parent, '..') : parent;
 }
 
 function normalizePlanFile(planFile, root) {

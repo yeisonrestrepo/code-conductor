@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, renameSync, unlinkSync, mkdirSync, existsS
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { dirname, basename, join } from 'node:path';
 
 // Repo root: git toplevel, else bounded .git upward walk, else this script's parent.
 function resolveRoot() {
@@ -18,7 +18,10 @@ function resolveRoot() {
     if (parent === dir) break;
     dir = parent;
   }
-  return join(dirname(fileURLToPath(import.meta.url)), '..');
+  // this script lives at <root>/scripts/session-id.mjs (dev checkout) or
+  // <root>/.claude/scripts/session-id.mjs (deployed project).
+  const parent = join(dirname(fileURLToPath(import.meta.url)), '..');
+  return basename(parent) === '.claude' ? join(parent, '..') : parent;
 }
 
 function emit(id) { process.stdout.write(id + '\n'); }

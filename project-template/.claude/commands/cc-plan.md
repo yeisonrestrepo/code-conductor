@@ -4,12 +4,12 @@ description: "(Conductor) Map implementation steps from an approved spec"
 
 ## Phase entry - Resume Read
 
-Before doing anything else, restore any stored context for the current commit by running `scripts/resume-read.mjs`. It resolves the current git hash, prefers a valid DB snapshot (`conductor-db get-snapshot`), falls back to the `.claude/memory/session-snapshot.json` handoff file, and prints a `RESUME_HIT` block on a hit / nothing on a miss. Capture its stdout **and** its exit code with the canonical per-platform form (each first probes for `node` and treats its absence as a clean miss, never an error):
+Before doing anything else, restore any stored context for the current commit by running `.claude/scripts/resume-read.mjs`. It resolves the current git hash, prefers a valid DB snapshot (`conductor-db get-snapshot`), falls back to the `.claude/memory/session-snapshot.json` handoff file, and prints a `RESUME_HIT` block on a hit / nothing on a miss. Capture its stdout **and** its exit code with the canonical per-platform form (each first probes for `node` and treats its absence as a clean miss, never an error):
 
 - **Unix / Git Bash:**
   ```sh
   if command -v node >/dev/null 2>&1; then
-    resume_out="$(node scripts/resume-read.mjs 2>>.conductor/last-write.log)"; resume_rc=$?
+    resume_out="$(node .claude/scripts/resume-read.mjs 2>>.conductor/last-write.log)"; resume_rc=$?
   else resume_rc=3; resume_out=""; fi
   ```
 - **PowerShell:**
@@ -20,7 +20,7 @@ Before doing anything else, restore any stored context for the current commit by
       $__nap = $PSNativeCommandUseErrorActionPreference; $PSNativeCommandUseErrorActionPreference = $false
     }
     try {
-      $resume_out = node scripts/resume-read.mjs 2>> .conductor/last-write.log; $resume_rc = $LASTEXITCODE
+      $resume_out = node .claude/scripts/resume-read.mjs 2>> .conductor/last-write.log; $resume_rc = $LASTEXITCODE
     } catch { $resume_rc = 3; $resume_out = "" }
     finally {
       $ErrorActionPreference = $__eap

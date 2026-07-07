@@ -4,12 +4,12 @@ description: "(Conductor) Execute implementation tasks from an approved plan"
 
 ## Phase entry - Resume Read
 
-Before doing anything else, restore any stored context for the current commit by running `scripts/resume-read.mjs`. It resolves the current git hash, prefers a valid DB snapshot (`conductor-db get-snapshot`), falls back to the `.claude/memory/session-snapshot.json` handoff file, and prints a `RESUME_HIT` block on a hit / nothing on a miss. Capture its stdout **and** its exit code with the canonical per-platform form (each first probes for `node` and treats its absence as a clean miss, never an error):
+Before doing anything else, restore any stored context for the current commit by running `.claude/scripts/resume-read.mjs`. It resolves the current git hash, prefers a valid DB snapshot (`conductor-db get-snapshot`), falls back to the `.claude/memory/session-snapshot.json` handoff file, and prints a `RESUME_HIT` block on a hit / nothing on a miss. Capture its stdout **and** its exit code with the canonical per-platform form (each first probes for `node` and treats its absence as a clean miss, never an error):
 
 - **Unix / Git Bash:**
   ```sh
   if command -v node >/dev/null 2>&1; then
-    resume_out="$(node scripts/resume-read.mjs 2>>.conductor/last-write.log)"; resume_rc=$?
+    resume_out="$(node .claude/scripts/resume-read.mjs 2>>.conductor/last-write.log)"; resume_rc=$?
   else resume_rc=3; resume_out=""; fi
   ```
 - **PowerShell:**
@@ -20,7 +20,7 @@ Before doing anything else, restore any stored context for the current commit by
       $__nap = $PSNativeCommandUseErrorActionPreference; $PSNativeCommandUseErrorActionPreference = $false
     }
     try {
-      $resume_out = node scripts/resume-read.mjs 2>> .conductor/last-write.log; $resume_rc = $LASTEXITCODE
+      $resume_out = node .claude/scripts/resume-read.mjs 2>> .conductor/last-write.log; $resume_rc = $LASTEXITCODE
     } catch { $resume_rc = 3; $resume_out = "" }
     finally {
       $ErrorActionPreference = $__eap
@@ -133,7 +133,7 @@ Runs after both success (`[X]`) and failure (`[!]`) paths. Record the task's fin
    Each probe is a disposable child; a non-zero exit — including a fatal `bad option: --experimental-sqlite` from a Node that does not recognize the flag — is caught and simply advances to the next branch. The fatal startup error is therefore always contained inside a probe whose failure is expected; it never propagates and never aborts the hook.
 3. Launch the chosen form, from the repo root, with the active plan file path, the task ID, and the just-written state character (`X` or `!`):
 
-   `node <chosen-flags> scripts/conductor-db.mjs record "<plan_file>" "<task_id>" "<state>"`
+   `node <chosen-flags> .claude/scripts/conductor-db.mjs record "<plan_file>" "<task_id>" "<state>"`
 
    All three arguments **must** be wrapped in double quotes exactly as shown. A repository path can contain spaces (e.g. `/Users/me/My Projects/repo/docs/plan.md`); unquoted, the shell word-splits it into several argv entries and the recorder sees `!== 3` positionals, silently rejecting a legitimate write. `--no-warnings` (in both probe and launch) suppresses Node's `ExperimentalWarning: SQLite is an experimental feature` line so it never pollutes hook stderr; it does not affect the recorder's own `CONDUCTOR_DB:` diagnostics (those are direct `process.stderr` writes, not process warnings).
 
