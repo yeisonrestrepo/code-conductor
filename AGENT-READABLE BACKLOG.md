@@ -191,8 +191,16 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Components Affected:** Core test setup config, orchestrator business logic, in-memory file system simulation tests (`memfs`).
 * **Acceptance Criteria:** Ensure robust test coverage across stack identification, template interpolation, and tool boundary filtering, binding test runs as a mandatory criteria before any backlog item change can be committed.
 
+
+### [ ] `[FEAT-025]` Retention Purge for the Conductor Cache DB (`snapshots` / `raw_history`)
+* **Description:** `scripts/conductor-db.mjs` inserts new rows into `snapshots` (one per checkpoint/compact, keyed by git commit hash) and `raw_history` (one per recorded event) with no eviction path — both tables grow without bound over the life of a repo. Add a bounded retention mechanism (e.g. keep only the last N rows per `session_id`/`git_commit_hash`, or a max-age window) so `.conductor/cache.db` stays small over time.
+* **Impact:** Prevents unbounded disk growth of the local cache DB without weakening context restoration: `get-snapshot` already only ever reads the most recent row per commit hash (`ORDER BY id DESC LIMIT 1`) and `sessions` is already upserted to one row per `session_id`, so purging older `snapshots`/`raw_history` rows does not remove data any current read path depends on.
+* **Components Affected:** `scripts/conductor-db.mjs` (`applySchema`, `upsert`/insert helpers, new purge routine), both `.claude/scripts/` and `project-template/.claude/scripts/` mirrors.
+* **Acceptance Criteria:** Writes to `snapshots`/`raw_history` trigger (or a scheduled path performs) a bounded purge that keeps the most recent N rows or rows within a max-age window per key; purge failures remain non-fatal (fail-open, matching the existing `CONDUCTOR_DB:` warn-and-continue convention); `get-snapshot`/`get-session` behavior is unaffected by the purge.
+
 ### [ ] `[FEAT-026]` Guided Branch Creation and Commit Drafting for Backlog Work
 * **Description:** No part of the project automates the Git side of picking up a backlog item: branch creation and commit-message drafting are manual, guided only by the naming/format convention documented in `CONTRIBUTING.md`. Add a step (e.g. at `/cc-spec` or `/cc-plan` approval, or a new `/cc-branch` helper) that offers to create a descriptively named branch (derived from the `[FEAT-XXX]`/`[BUG-XXX]` id and title) and drafts a Conventional-Commits-style commit message from the resulting diff.
 * **Impact:** Removes manual naming/formatting friction for routine backlog work while keeping every Git write auditable and explicit.
 * **Components Affected:** `project-template/.claude/commands/cc-spec.md` / `cc-plan.md` (trigger point), possible new `cc-branch` command, both command mirrors.
 * **Acceptance Criteria:** The agent proposes a branch name and drafts a commit message automatically, but still requires explicit user confirmation before running `git checkout -b`, `git commit`, `git push`, or opening a PR — matching this project's existing Git safety protocol (never push or open PRs without confirmation).
+
