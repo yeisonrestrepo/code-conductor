@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.24.1] - 2026-09-22
+### Fixed
+- The project template's ignore rules never reached an npm install: npm strips any file literally named `.gitignore` from every published tarball, so `project-template/.gitignore` was absent from the package despite `project-template/` being listed in `files`. Only a git-clone install ever received it. The rules now ship as `project-template/gitignore` and the installer maps that source name back to `.gitignore` when it merges into the host project, so 1.24.0's `*.installer-backup.*` and `*.installer-tmp.*` patterns finally arrive. A contract test fails the build if any shipped asset dir reintroduces a filename npm strips.
+- The publish workflow could not run: it pinned Node 20 and then installed `npm@latest`, which has advanced to 12.0.2 and dropped Node 20 from its engine range, failing the job with `EBADENGINE` before `npm publish`. The install is now pinned to `npm@^11.5.1` — above OIDC trusted publishing's 11.5.1 floor and inside npm 11's `^20.17.0 || >=22.9.0` range.
+
 ## [1.24.0] - 2026-09-22
 ### Fixed
 - The installer overwrote an existing `CLAUDE.md` (both `~/.claude/CLAUDE.md` and the host project's) and `.gitignore` with the bundled template, destroying every hand-authored convention, architecture note and stack profile. Both files are now merged: conductor-owned content lives in a `<!-- cc:managed:start -->` / `<!-- cc:managed:end -->` block that is refreshed on every upgrade, everything outside it is preserved byte-for-byte, and missing template sections are appended once above the block. Each change is preceded by a `<file>.installer-backup.<UTC stamp>` copy (5 retained) and written atomically via temp+rename, through `realpath` so a symlinked file keeps its link. The first upgrade from a marker-less `CLAUDE.md` removes host sections that collide with managed headings — the backup is the recovery; see the README.
