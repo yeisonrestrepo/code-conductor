@@ -281,6 +281,7 @@ code-conductor/
 │       └── personal.md           Template (never committed)
 ├── project-template/
 │   ├── CLAUDE.md
+│   ├── gitignore                 Merged into the host project's .gitignore
 │   └── .claude/
 │       ├── settings.json         Hooks wiring (pre-tool-use, post-compact)
 │       ├── commands/
@@ -322,7 +323,19 @@ code-conductor/
 
 ## .gitignore Note
 
-When installed with `--project`, the installer appends `.claude/memory/personal.md` to your project's `.gitignore`. This keeps personal preferences local and out of the shared repo.
+When installed with `--project`, the installer appends these rules to your project's
+`.gitignore`, and only the ones you are missing — your own entries are never touched:
+
+```
+.claude/memory/turn-count.txt
+*.installer-backup.*
+*.installer-tmp.*
+```
+
+The last two keep the installer's own backups and crash-stranded temp files out of
+`git status`. The rules ship inside the package as `project-template/gitignore`
+(no leading dot) because npm strips any file literally named `.gitignore` from every
+published tarball; the installer restores the dot when it writes to your project.
 
 ---
 

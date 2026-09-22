@@ -35,6 +35,10 @@ describe('packed tarball', () => {
     expect(existsSync(join(pkgDir, 'docs'))).toBe(false);
     expect(existsSync(join(pkgDir, 'install.sh'))).toBe(false);
   });
+  it('ships the template ignore rules under the undotted name', () => {
+    expect(existsSync(join(pkgDir, 'project-template', 'gitignore'))).toBe(true);
+    expect(existsSync(join(pkgDir, 'project-template', '.gitignore'))).toBe(false);
+  });
   it('deploys the global set from the extracted package', () => {
     const home = mkdtempSync(join(tmpdir(), 'cc-smoke-h-'));
     execFileSync('node', [join(pkgDir, 'bin', 'code-conductor.mjs')], { env: { ...process.env, HOME: home, USERPROFILE: home } });
@@ -51,6 +55,10 @@ describe('packed tarball', () => {
     expect(existsSync(join(cwd, 'CLAUDE.md'))).toBe(true);
     expect(existsSync(join(cwd, '.claude', '.claude'))).toBe(false);
     expect(existsSync(join(cwd, '.claude', 'commands', 'cc-spec.md'))).toBe(true);
+    const ignore = readFileSync(join(cwd, '.gitignore'), 'utf8');
+    expect(ignore).toContain('*.installer-backup.*');
+    expect(ignore).toContain('*.installer-tmp.*');
+    expect(existsSync(join(cwd, 'gitignore'))).toBe(false);
     rmSync(home, { recursive: true, force: true });
     rmSync(cwd, { recursive: true, force: true });
   });

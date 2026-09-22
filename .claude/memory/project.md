@@ -498,3 +498,37 @@ report) — separate spec. VERSION → 1.24.0; both defects to be tracked in
 
 ### Workarounds
 - The "replaces a FILE occupying skills/<name>" test aborts the whole vitest process natively (`libc++abi` filesystem_error from `cpSync`) in the pre-implementation red state; that hard abort is the expected failure signal, not a broken test.
+
+---
+
+## Spec: BUG-029 — Ship the project template's ignore rules to npm installs [2026-09-22]
+
+**Spec file:** `docs/superpowers/specs/2026-09-22-bug029-template-gitignore-packaging-design.md` (revision 2, approved)
+
+### Problem
+npm unconditionally strips any file literally named `.gitignore` from every published tarball, so `project-template/.gitignore` has never shipped despite `project-template/` being in `package.json`'s `files`. Confirmed against the live tree: `npm pack --dry-run --json` returns 51 entries, all other `project-template/.claude/` dotfiles present, the ignore file absent. npm installs therefore leak `*.installer-backup.*` / `*.installer-tmp.*` into `git status`.
+
+### Decisions
+- Rename `project-template/.gitignore` → `project-template/gitignore` (undotted) and map source → target at deploy time; npm does not strip the undotted name.
+- `MERGED_ROOT_FILES` changes from a `Set` to a `Map` of source name → target name (`CLAUDE.md`→`CLAUDE.md`, `gitignore`→`.gitignore`). The root-file copy loop must skip on the **source** name — skipping on the target name would deploy a stray `gitignore` file into the project root.
+- `.npmignore` and a `prepack` rename hook were both rejected: each reintroduces a second source of truth for what ships.
+- The `'skipped-missing'` guard in `lib/installer/file-merge.mjs` stays, demoted from load-bearing workaround to defence in depth.
+- The merge engine (`appendMissingLinesText`) is untouched; its `have` set already makes the append idempotent across upgrades.
+
+### Decisions (Part 2 — publish pipeline, folded into this spec 2026-09-22)
+- `.github/workflows/publish.yml` fails at `npm install -g npm@latest` with `EBADENGINE`: the job pins Node 20 (20.20.2) but npm@latest is now 12.0.2, whose engine range is `^22.22.2 || ^24.15.0 || >=26.0.0`. The release carrying BUG-029 cannot be published until this is fixed, so it is in scope.
+- Fix: pin the major — `npm install -g npm@^11.5.1`. Verified on the live registry 2026-09-22: npm@11 declares `node: "^20.17.0 || >=22.9.0"`, so it installs on Node 20 and still satisfies OIDC trusted publishing's >= 11.5.1 floor.
+- The runner stays on `node-version: '20'`, matching `engines.node`'s floor and the Test workflow, so the tarball is validated on the minimum Node the package supports. Raising the runner to 22/24 and adding a Node matrix to Test are both out of scope.
+- Pinning the major removes the failure class: an unpinned `@latest` re-breaks the release job on every npm major that drops a Node line.
+
+### Conventions
+- Spec anchors record the VERSION they were verified against and instruct the implementer to re-locate by symbol, not by line number. Verified at 1.24.0: `file-merge.mjs:64`, `deploy.mjs:8`, `deploy.mjs:145-150`.
+- No shipped asset dir may contain a file npm strips. A new contract test enforces this across `global/`, `skills/`, `scripts/`, `project-template/` for `.gitignore`, `.npmrc`, `.npmignore`.
+- Packaging assertions reuse `smoke.test.js`'s single `beforeAll` pack + `tar -xzf` extract (lines 16-19) and its existing `--project` install (line 50); `npm install <tgz>` into a temp prefix is explicitly not used. `tar` is already a hard dependency of the suite — on Windows, bsdtar (`tar.exe`, Windows 10 1803+) handles `-xzf` identically.
+
+### Debt
+- README:325's `.gitignore Note` claims the installer appends `.claude/memory/personal.md`; the template has never contained that line. Corrected as part of this spec since the section is being touched anyway.
+- Projects installed from npm before this fix are not backfilled beyond what re-running the installer does.
+
+### Complexity
+S — one rename, one constant reshaped, two call sites, three test files.
