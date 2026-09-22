@@ -109,6 +109,14 @@ describe('mergeFileInto', () => {
   });
 });
 
+describe('mergeFileInto — absent template', () => {
+  it('skips without throwing when the bundled template is missing', () => {
+    const missing = join(dir, 'nope.md');
+    expect(mergeFileInto(missing, target, mergeClaudeMdText, { warn: (m) => warnings.push(m) })).toBe('skipped-missing');
+    expect(existsSync(target)).toBe(false);
+  });
+});
+
 describe('resolveRealTarget', () => {
   it('reports absent, file, directory and dangling-symlink targets', () => {
     expect(resolveRealTarget(join(dir, 'nope')).exists).toBe(false);
