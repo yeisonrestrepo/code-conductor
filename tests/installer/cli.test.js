@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, statSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, statSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -110,6 +110,31 @@ describe('run', () => {
     // the bash hook command embeds the spaced path unmodified (fs handles it natively).
     expect(s.hooks.UserPromptSubmit.some(e => e.hooks.some(h => h.command.includes('verbosity-remind.sh')))).toBe(true);
     rmSync(spaced, { recursive: true, force: true });
+  });
+  it('exits 1 and writes nothing when the global CLAUDE.md target is a directory', () => {
+    mkdirSync(join(home, '.claude', 'CLAUDE.md'), { recursive: true });
+    const rc = run([], { HOME: home }, { cwd, log });
+    expect(rc).toBe(1);
+    expect(logs.join('\n')).toMatch(/cannot merge/);
+    // the global deploy never ran: nothing else landed in ~/.claude
+    expect(existsSync(join(home, '.claude', 'settings.json'))).toBe(false);
+    expect(existsSync(join(home, '.claude', 'skills'))).toBe(false);
+  });
+  it('exits 1 when --project is passed and the project CLAUDE.md is a directory', () => {
+    mkdirSync(join(cwd, 'CLAUDE.md'), { recursive: true });
+    expect(run(['--project'], { HOME: home }, { cwd, log })).toBe(1);
+    expect(existsSync(join(home, '.claude', 'settings.json'))).toBe(false);
+  });
+  it('ignores a project CLAUDE.md directory on a global-only install', () => {
+    mkdirSync(join(cwd, 'CLAUDE.md'), { recursive: true });
+    expect(run([], { HOME: home }, { cwd, log })).toBe(0);
+  });
+  it('preserves a host CLAUDE.md through a --project install', () => {
+    writeFileSync(join(cwd, 'CLAUDE.md'), '# Acme\n\n## Deployment\n\nkubectl apply\n');
+    expect(run(['--project'], { HOME: home }, { cwd, log })).toBe(0);
+    const after = readFileSync(join(cwd, 'CLAUDE.md'), 'utf8');
+    expect(after).toContain('kubectl apply');
+    expect(after).toContain('## Agent Identity');
   });
 });
 

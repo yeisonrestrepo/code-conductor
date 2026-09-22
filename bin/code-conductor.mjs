@@ -3,7 +3,7 @@ import { readFileSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { resolveAssetRoot, resolveHome, nodeMajorAtLeast } from '../lib/installer/env.mjs';
-import { assertAssets, deployGlobal, deployProject, chmodHooks } from '../lib/installer/deploy.mjs';
+import { assertAssets, assertMergeTargets, deployGlobal, deployProject, chmodHooks } from '../lib/installer/deploy.mjs';
 import { verbosityHookCommand, mergeVerbosityHook } from '../lib/installer/settings.mjs';
 import { writeVerbosity, seedMemoryFile, writeVersionFile } from '../lib/installer/config.mjs';
 
@@ -88,6 +88,7 @@ export function run(argv, env = process.env, { cwd = process.cwd(), log } = {}) 
   let writing = false;
   try {
     assertAssets(assetRoot, ['global', 'skills', 'scripts', 'project-template']); // pre-flight
+    assertMergeTargets(home, cwd, opts.project);                                  // pre-flight
     writing = true;                                                    // copy phase begins
     const claudeDir = deployGlobal(assetRoot, home);
     chmodHooks(claudeDir);
