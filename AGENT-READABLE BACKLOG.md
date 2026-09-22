@@ -204,3 +204,15 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Components Affected:** `project-template/.claude/commands/cc-spec.md` / `cc-plan.md` (trigger point), possible new `cc-branch` command, both command mirrors.
 * **Acceptance Criteria:** The agent proposes a branch name and drafts a commit message automatically, but still requires explicit user confirmation before running `git checkout -b`, `git commit`, `git push`, or opening a PR — matching this project's existing Git safety protocol (never push or open PRs without confirmation).
 
+
+### [X] `[BUG-027]` Installer Destroys an Existing CLAUDE.md
+* **Description:** `deployProject` copied every non-`.claude` entry of `project-template/` onto the host project root with `{ force: true }`, and `deployGlobal` did the same to `~/.claude/CLAUDE.md`, replacing a hand-authored configuration with the empty-section template. `.gitignore` was clobbered by the same loop.
+* **Impact:** Every project convention, architecture note and stack profile is lost on install; installing on a second device wipes the developer's global configuration.
+* **Components Affected:** `lib/installer/deploy.mjs`, `bin/code-conductor.mjs`, `global/CLAUDE.md`, `project-template/`.
+* **Acceptance Criteria:** Conductor-owned content is delimited by `<!-- cc:managed:start -->` / `<!-- cc:managed:end -->` and refreshed wholesale on upgrade; content outside the block is preserved byte-for-byte; missing template sections are appended once above the block; every change is backed up and written atomically; a symlinked target keeps its link.
+
+### [X] `[BUG-028]` Bundled Skills Never Register
+* **Description:** `deployGlobal` copied `skills/*.md` as flat files into `~/.claude/skills/`, but Claude Code discovers personal skills only at `~/.claude/skills/<name>/SKILL.md`. Two of the five skills additionally shipped with no frontmatter.
+* **Impact:** `/cc-spec`, `/cc-plan`, `/cc-review`, `/cc-debug` and `/cc-refactor` silently skip the skill they invoke, so a fresh install runs without the adversarial-review, simplification and verbosity protocols the project advertises.
+* **Components Affected:** `lib/installer/deploy.mjs`, `skills/`, `tests/plugin/code-conductor-plugin.test.js`.
+* **Acceptance Criteria:** All five skills deploy to `~/.claude/skills/<name>/SKILL.md`, non-empty, with `name:` and `description:` frontmatter; a file blocking `skills/<name>` is removed before the copy; a stale flat `<name>.md` matching the bundled content is swept; a hermetic test proves the contract in CI.

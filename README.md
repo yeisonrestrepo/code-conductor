@@ -309,11 +309,12 @@ code-conductor/
 │   ├── session-id.mjs            Stable session-id resolver
 │   └── detect-stack.mjs          Stack auto-detection scanner
 └── skills/
-    ├── code-simplifier.md        Always active — complexity and simplicity rules
-    ├── critical-review.md        Always active — 4-phase adversarial review protocol
-    ├── verbosity.md              Always active — MIN/INFO/VERBOSE response rules
-    ├── memory-first.md           Always active — memory → graph → grep → read chain
-    └── agent-delegation.md       Always active — sub-agent spawn rules
+    ├── code-simplifier/SKILL.md   Always active — complexity and simplicity rules
+    ├── critical-review/SKILL.md   Always active — 4-phase adversarial review protocol
+    ├── verbosity/SKILL.md         Always active — MIN/INFO/VERBOSE response rules
+    ├── memory-first/SKILL.md      Always active — memory → graph → grep → read chain
+    └── agent-delegation/SKILL.md  Always active — sub-agent spawn rules
+    # Claude Code registers personal skills only at ~/.claude/skills/<name>/SKILL.md
     # ui-ux-pro-max installed from github.com/nextlevelbuilder/ui-ux-pro-max-skill
 ```
 
@@ -325,9 +326,43 @@ When installed with `--project`, the installer appends `.claude/memory/personal.
 
 ---
 
+## How the installer treats your CLAUDE.md
+
+`CLAUDE.md` and `.gitignore` are **merged**, never overwritten. Everything else the
+installer ships (`settings.json`, hooks, commands, `scripts/`) is replaced on every run.
+
+- **Managed sections** live between `<!-- cc:managed:start -->` and `<!-- cc:managed:end -->`.
+  Code Conductor owns that block and replaces its contents wholesale on every upgrade, so
+  released improvements reach existing installs. Edits inside the block are lost.
+- **Everything outside the block is yours.** Existing sections are preserved byte-for-byte;
+  sections the template has and your file lacks are appended once, immediately above the
+  managed block. Sections you wrote that the template has never heard of are never touched.
+- **Before any change, the installer copies your file to
+  `CLAUDE.md.installer-backup.<UTC timestamp>`** and keeps the five most recent.
+
+> **One-time migration on your first 1.24 install.** If your `CLAUDE.md` predates the
+> sentinel markers and already contains sections that the managed block also defines
+> (`## Agent Identity`, `## Hard Constraints`, …), **those sections are removed** and
+> replaced by the managed block, so you do not end up with two copies of each. This is the
+> only path that discards content you wrote. **Your pre-migration file is preserved in the
+> `.installer-backup.` copy beside it** — diff it after upgrading and move anything you
+> want to keep into a section outside the managed block.
+
+> **A cosmetic wart of that same migration, in `~/.claude/CLAUDE.md` only.** The managed
+> block carries the file's intro sentence ("Applies to every project on this machine…"),
+> and your pre-sentinel copy keeps its own above the block, so you will see that one
+> sentence twice after the first upgrade. Delete the copy above the block — it is outside
+> the managed region, so your deletion sticks.
+
+If the markers in your file are damaged — a `start` with no `end`, two blocks, an `end`
+before its `start` — the installer prints a warning, leaves the file completely untouched,
+and finishes the rest of the install. Fix the markers and re-run.
+
+---
+
 ## Uninstall Notes
 
 > **`git revert` in non-repository environments (CI/CD, Docker, bare installs):**
 > Uninstall steps that use `git checkout <tag>` or `git revert <sha>` require a git working tree. In CI/CD pipelines, Docker containers, or directories that are not git repositories, these commands will fail with `fatal: not a git repository`. This is expected and non-fatal.
 >
-> **In non-repo environments:** manually delete or restore `skills/verbosity.md` and remove the `verbosity-remind` entry from `~/.claude/settings.json`. Hook removal (`rm ~/.claude/hooks/verbosity-remind.sh`) and `settings.json` cleanup work identically in all environments — no git is required.
+> **In non-repo environments:** manually delete or restore `skills/verbosity/SKILL.md` and remove the `verbosity-remind` entry from `~/.claude/settings.json`. Hook removal (`rm ~/.claude/hooks/verbosity-remind.sh`) and `settings.json` cleanup work identically in all environments — no git is required.
