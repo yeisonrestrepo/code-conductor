@@ -42,7 +42,7 @@ beforeEach(() => {
   mkdirSync(join(asset, 'skills', 'critical-review'), { recursive: true });
   writeFileSync(join(asset, 'skills', 'critical-review', 'SKILL.md'), SKILL_MD);
   writeFileSync(join(asset, 'project-template', 'CLAUDE.md'), TPL_PROJECT);
-  writeFileSync(join(asset, 'project-template', '.gitignore'), TPL_GITIGNORE);
+  writeFileSync(join(asset, 'project-template', 'gitignore'), TPL_GITIGNORE);
   writeFileSync(join(asset, 'project-template', '.claude', 'commands', 'cc-spec.md'), 'spec');
 });
 afterEach(() => {
@@ -98,6 +98,11 @@ describe('deployProject', () => {
     deployProject(asset, home);
     expect(readFileSync(join(home, 'scripts', 'build.sh'), 'utf8')).toBe('#!/bin/sh\necho host-script\n');
     expect(readFileSync(join(home, '.claude', 'scripts', 'conductor-db.mjs'), 'utf8')).toBe('db-engine');
+  });
+  it('deploys the undotted template ignore file as .gitignore and leaves no stray copy', () => {
+    deployProject(asset, home);
+    expect(readFileSync(join(home, '.gitignore'), 'utf8')).toBe(TPL_GITIGNORE);
+    expect(existsSync(join(home, 'gitignore'))).toBe(false);
   });
 });
 
