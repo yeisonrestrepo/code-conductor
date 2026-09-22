@@ -1,3 +1,9 @@
+---
+name: code-simplifier
+description: "Always-active simplicity rules: no speculative abstractions, one job per function, max 30 lines, flat over nested with early returns, descriptive names, comments explain why"
+type: skill
+---
+
 # Code Simplifier
 
 **Always active.** Apply these rules to every piece of code written or reviewed.

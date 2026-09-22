@@ -1,3 +1,9 @@
+---
+name: verbosity
+description: "Response verbosity protocol: reads the level from ~/.claude/memory/verbosity.md and applies the MIN, INFO or VERBOSE output rules to every reply"
+type: skill
+---
+
 # Verbosity
 
 Read `~/.claude/memory/verbosity.md` once at the start of every session. Extract the value after `VERBOSITY:`. Default to MIN if the file is absent or the value is unrecognized.

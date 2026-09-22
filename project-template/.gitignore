@@ -1,1 +1,3 @@
 .claude/memory/turn-count.txt
+*.installer-backup.*
+*.installer-tmp.*

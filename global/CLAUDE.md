@@ -1,5 +1,6 @@
 # Global Claude Configuration
 
+<!-- cc:managed:start -->
 Applies to every project on this machine. Project CLAUDE.md adds project-specific overrides on top.
 
 ## Workflow
@@ -91,3 +92,4 @@ Always tag responses:
 ## Loaded Profiles
 
 `/cc-stack` detects your stack dynamically and writes the detected commands and a generated ruleset into the project `CLAUDE.md`. Never apply one language's conventions to another.
+<!-- cc:managed:end -->
