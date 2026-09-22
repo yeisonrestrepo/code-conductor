@@ -57,10 +57,28 @@ describe('bundled skills', () => {
   });
 });
 
-describe('project-template/.gitignore', () => {
+describe('project-template/gitignore', () => {
   it('ignores installer backups and crash-stranded temp files', () => {
-    const lines = readFileSync(join(root, 'project-template/.gitignore'), 'utf8').split('\n').map(l => l.trim());
+    const lines = readFileSync(join(root, 'project-template/gitignore'), 'utf8').split('\n').map(l => l.trim());
     expect(lines).toContain('*.installer-backup.*');
     expect(lines).toContain('*.installer-tmp.*');
+  });
+});
+
+// npm strips these names from every published tarball regardless of package.json
+// `files`, so a bundled asset carrying one silently never ships (BUG-029).
+const NPM_STRIPPED = new Set(['.gitignore', '.npmrc', '.npmignore']);
+
+describe('shipped asset dirs', () => {
+  it('carry no filename npm strips from published tarballs', () => {
+    const offenders = [];
+    const walk = (dir, rel) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (entry.isDirectory()) walk(join(dir, entry.name), `${rel}/${entry.name}`);
+        else if (NPM_STRIPPED.has(entry.name)) offenders.push(`${rel}/${entry.name}`);
+      }
+    };
+    for (const d of ['global', 'skills', 'scripts', 'project-template']) walk(join(root, d), d);
+    expect(offenders).toEqual([]);
   });
 });
