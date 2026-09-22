@@ -407,3 +407,94 @@ Replace `install.sh` (1563 lines) + `install.ps1` (918 lines) with one bundled N
 
 ### Version
 1.23.0 published to npm as @yeison.restrepo.r/code-conductor — FEAT-023 complete.
+
+## Spec: claude-md-merge-and-skill-registration 2026-09-22
+
+Fix two install-time defects: `CLAUDE.md` clobbered on deploy, and bundled skills never registered.
+Spec (r4): `docs/superpowers/specs/2026-09-22-claude-md-merge-and-skill-registration-design.md`
+
+### Decisions
+- **Managed-block sentinel** chosen over merge-only: conductor content lives between
+  `<!-- cc:managed:start -->` / `<!-- cc:managed:end -->` and is replaced wholesale each
+  upgrade; sections outside are host-owned and append-only. Merge-only would have frozen
+  every future CLAUDE.md improvement for anyone already installed — silent staleness is a
+  worse failure than the clobber it replaces.
+- Migration from a sentinel-less host is the single destructive path: host sections matching
+  a managed heading are removed to avoid duplicates; the timestamped backup is the recovery.
+  Must be documented in README, not discovered by surprise.
+- CLAUDE.md target validation is hoisted into `run()` pre-flight (before `writing = true`)
+  so exit 1 falls out of the existing contract without touching the catch allowlist.
+- Symlinked `CLAUDE.md`/`.gitignore` are resolved via `realpath` and merged through, temp
+  file beside the resolved path so `renameSync` never replaces the link. Fatal exit 1 is
+  reserved for the directory case.
+- Frontmatter added to `code-simplifier` and `verbosity` (they have none, so they cannot
+  register at all); Out of Scope amended to permit frontmatter-only edits.
+- Stale flat-skill sweep compares against `SKILL.md` **and** `SKILL.md` minus frontmatter —
+  otherwise the frontmatter addition permanently defeats the sweep.
+
+### Conventions
+- Backups: `<name>.installer-backup.<utcStamp>`, reusing the exported fixed-width `utcStamp`
+  from `settings.mjs` (the pruner depends on lexical == chronological); retention 5 via a
+  generalized `pruneBackups(path, suffix, keep)`. Never duplicate `utcStamp`.
+- CLAUDE.md parsing: `/^## /` at column 0, outside fences (``` and ~~~, info strings
+  allowed, unclosed fence runs to EOF); heading match normalizes case, inner whitespace,
+  `\r` and trailing `#`. Setext H2 is explicitly unsupported.
+- Writer discipline: host EOL detected and matched (LF default when no terminator),
+  currency comparison EOL-normalized, trailing newline forced before append, atomic
+  temp+rename in the target's own directory, whole-file copy path uses the same writer.
+- `~/.claude/skills/<name>` must be unlinked *before* the skills `cpSync`, never after.
+- `tests/plugin/code-conductor-plugin.test.js` gates on the real `homedir()` and is skipped
+  in CI — CI coverage requires a hermetic `deployGlobal`-into-temp-home test.
+
+### Technical Debt
+- Same-second backup suffixes misorder lexically at `-10` vs `-2` (needs 11+ installs in one
+  UTC second); accepted, not zero-padded.
+- Managed block moved above host sections makes new sections insert above it rather than at
+  EOF; cosmetic, accepted.
+
+### Scope
+Complexity L. Out of scope: PR Review and QA Review commands (item 3 of the original
+report) — separate spec. VERSION → 1.24.0; both defects to be tracked in
+`AGENT-READABLE BACKLOG.md`.
+
+## Checkpoint 2026-09-22 11:53
+
+### Decisions
+- Spec `2026-09-22-claude-md-merge-and-skill-registration-design.md` approved at revision 4 after three adversarial review rounds; it is the binding authority for the next `/cc-plan`.
+- Item 3 of the original defect report (PR Review + QA Review commands: unit, e2e, Playwright browser) is deferred to its own spec, not folded into this one.
+- Two decisions in the spec's Decisions Taken table remain user-unconfirmed and carry the recommendation as default: adding frontmatter to `code-simplifier`/`verbosity`, and resolving symlinked CLAUDE.md via `realpath` rather than rejecting it.
+
+### Conventions
+- New installer validation must be hoisted into the pre-flight block in `bin/code-conductor.mjs` *before* `writing = true`; anything thrown after that flips the process exit code from 1 to 2 (partial-write contract).
+- Session handoff blobs are built with `node scripts/snap-build.mjs` in this source repo — the `.claude/scripts/` path in the command text is the deployed layout, not the source layout.
+
+### Technical Debt
+- Neither defect is tracked in `AGENT-READABLE BACKLOG.md`; both entries still need to be added.
+- `tests/installer/deploy.test.js` fixtures are single-token strings with no `##` headings, so the merge acceptance criteria would pass vacuously against them — fixtures must be rebuilt during implementation.
+
+### Deferred reads (for /cc-plan)
+- `tests/installer/deploy.test.js`, `lib/installer/settings.mjs`, and `bin/code-conductor.mjs` beyond lines 75-105 were never read in full under the spec read budget.
+
+## Checkpoint 2026-09-22 13:22
+
+### Decisions
+- Plan `2026-09-22-claude-md-merge-and-skill-registration.md` executed end to end via `/cc-implement` (inline surgical ritual), not subagent-driven — the pending "choose execution mode" question is resolved and closed.
+- `CLAUDE.md` and `.gitignore` are the only two merged root files (`MERGED_ROOT_FILES`); every other shipped asset keeps its force-overwrite.
+- An absent bundled template is a skip (`'skipped-missing'`), not a fatal error: npm strips `.gitignore` from every tarball, so `project-template/.gitignore` is legitimately missing at install time. This preserves the pre-1.24 copy loop's behaviour, which simply never saw the file.
+- Bundled skill names are derived from `readdirSync(assetRoot/skills)` directories at runtime rather than a constant list, so the unblock and stale-sweep passes cannot drift when a skill is added or renamed.
+- Released as 1.24.0; `[BUG-027]` and `[BUG-028]` filed closed, `[BUG-029]` filed open. Backlog ceiling re-verified against `origin/main` immediately before appending each.
+
+### Conventions
+- The plan file's task lines are `- [ ] **[T-NNN]**` (bold-wrapped), so the `/cc-implement` locator pattern `\[ \] \[T-\d{3,}\]` does not match them — the bold markers must be allowed for in the pattern. Plans generated by `/cc-plan` should either drop the `**` or the ritual pattern should tolerate it.
+- Numeric backlog ceilings must be read with `grep -oE '[0-9]+$' | sort -n | tail`, never `sort -u | tail` on the full ID: lexical order puts `BUG-027` before `FEAT-024` and hides the real maximum.
+- Plan code blocks are extracted programmatically (locate the ```js fence, copy verbatim to the target path) rather than retyped — it eliminates transcription drift between plan and implementation.
+- `docs/` is gitignored, so the plan's checkbox state is on-disk only and is never committed; the git history is the authoritative record of what shipped.
+
+### Technical Debt
+- `[BUG-029]` is open: `project-template/.gitignore` has never shipped to npm installs, so the 1.24.0 `*.installer-backup.*` / `*.installer-tmp.*` patterns do not reach npm users. The `skipped-missing` guard hides the crash, not the gap.
+- `deployGlobal` merges `CLAUDE.md` *after* the asset `cpSync`, so a failure between the two leaves assets copied and the merge undone — repaired only by an idempotent re-run.
+- `tests/plugin/code-conductor-plugin.test.js` still gates on the real `homedir()` and stays skipped in CI; the hermetic `deployGlobal`-into-temp-home coverage added in Task 5 is what actually proves the fix.
+- The global template's managed block opens above its intro sentence, so a pre-sentinel host keeps a duplicate of that one line after the first upgrade — cosmetic, documented in the README rather than fixed.
+
+### Workarounds
+- The "replaces a FILE occupying skills/<name>" test aborts the whole vitest process natively (`libc++abi` filesystem_error from `cpSync`) in the pre-implementation red state; that hard abort is the expected failure signal, not a broken test.
