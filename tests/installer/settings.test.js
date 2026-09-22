@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync, readdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { verbosityHookCommand, mergeVerbosityHook, pruneMalformedBackups } from '../../lib/installer/settings.mjs';
+import { verbosityHookCommand, mergeVerbosityHook, pruneMalformedBackups, utcStamp, pruneBackups } from '../../lib/installer/settings.mjs';
 
 let dir, sp;
 const CMD = 'bash /h/.claude/hooks/verbosity-remind.sh';
@@ -89,5 +89,34 @@ describe('pruneMalformedBackups', () => {
     const left = readdirSync(dir).filter(n => n.includes('malformed-backup')).sort();
     expect(left).toHaveLength(5);
     expect(left[0]).toContain('20260102');
+  });
+});
+
+describe('utcStamp + pruneBackups', () => {
+  it('formats a fixed-width UTC stamp whose lexical order is chronological', () => {
+    const a = utcStamp(new Date('2026-07-05T12:34:56.789Z'));
+    const b = utcStamp(new Date('2026-07-05T12:34:57.001Z'));
+    expect(a).toBe('20260705T123456Z');
+    expect(a.length).toBe(b.length);
+    expect(a < b).toBe(true);
+  });
+  it('prunes an arbitrary suffix family down to keep, oldest first', () => {
+    const target = join(dir, 'CLAUDE.md');
+    writeFileSync(target, 'x');
+    for (const s of ['20260101T000000Z', '20260102T000000Z', '20260103T000000Z']) {
+      writeFileSync(`${target}.installer-backup.${s}`, s);
+    }
+    pruneBackups(target, '.installer-backup.', 2);
+    const left = readdirSync(dir).filter(n => n.includes('.installer-backup.')).sort();
+    expect(left).toEqual(['CLAUDE.md.installer-backup.20260102T000000Z', 'CLAUDE.md.installer-backup.20260103T000000Z']);
+  });
+  it('leaves an unrelated suffix family untouched', () => {
+    const target = join(dir, 'CLAUDE.md');
+    writeFileSync(target, 'x');
+    writeFileSync(`${target}.malformed-backup.20260101T000000Z`, 'a');
+    writeFileSync(`${target}.installer-backup.20260101T000000Z`, 'b');
+    pruneBackups(target, '.installer-backup.', 0);
+    expect(existsSync(`${target}.malformed-backup.20260101T000000Z`)).toBe(true);
+    expect(existsSync(`${target}.installer-backup.20260101T000000Z`)).toBe(false);
   });
 });

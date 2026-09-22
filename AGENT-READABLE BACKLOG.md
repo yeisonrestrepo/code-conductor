@@ -204,3 +204,21 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Components Affected:** `project-template/.claude/commands/cc-spec.md` / `cc-plan.md` (trigger point), possible new `cc-branch` command, both command mirrors.
 * **Acceptance Criteria:** The agent proposes a branch name and drafts a commit message automatically, but still requires explicit user confirmation before running `git checkout -b`, `git commit`, `git push`, or opening a PR — matching this project's existing Git safety protocol (never push or open PRs without confirmation).
 
+
+### [X] `[BUG-027]` Installer Destroys an Existing CLAUDE.md
+* **Description:** `deployProject` copied every non-`.claude` entry of `project-template/` onto the host project root with `{ force: true }`, and `deployGlobal` did the same to `~/.claude/CLAUDE.md`, replacing a hand-authored configuration with the empty-section template. `.gitignore` was clobbered by the same loop.
+* **Impact:** Every project convention, architecture note and stack profile is lost on install; installing on a second device wipes the developer's global configuration.
+* **Components Affected:** `lib/installer/deploy.mjs`, `bin/code-conductor.mjs`, `global/CLAUDE.md`, `project-template/`.
+* **Acceptance Criteria:** Conductor-owned content is delimited by `<!-- cc:managed:start -->` / `<!-- cc:managed:end -->` and refreshed wholesale on upgrade; content outside the block is preserved byte-for-byte; missing template sections are appended once above the block; every change is backed up and written atomically; a symlinked target keeps its link.
+
+### [X] `[BUG-028]` Bundled Skills Never Register
+* **Description:** `deployGlobal` copied `skills/*.md` as flat files into `~/.claude/skills/`, but Claude Code discovers personal skills only at `~/.claude/skills/<name>/SKILL.md`. Two of the five skills additionally shipped with no frontmatter.
+* **Impact:** `/cc-spec`, `/cc-plan`, `/cc-review`, `/cc-debug` and `/cc-refactor` silently skip the skill they invoke, so a fresh install runs without the adversarial-review, simplification and verbosity protocols the project advertises.
+* **Components Affected:** `lib/installer/deploy.mjs`, `skills/`, `tests/plugin/code-conductor-plugin.test.js`.
+* **Acceptance Criteria:** All five skills deploy to `~/.claude/skills/<name>/SKILL.md`, non-empty, with `name:` and `description:` frontmatter; a file blocking `skills/<name>` is removed before the copy; a stale flat `<name>.md` matching the bundled content is swept; a hermetic test proves the contract in CI.
+
+### [ ] `[BUG-029]` project-template/.gitignore Never Ships to npm Installs
+* **Description:** npm unconditionally excludes `.gitignore` from every published tarball, so `project-template/.gitignore` is absent from the package despite `project-template/` being listed in `package.json`'s `files` array. A `--project` install from npm therefore never delivers the template's ignore rules — including the `*.installer-backup.*` and `*.installer-tmp.*` patterns added in 1.24.0. Only a git-clone install has ever received the file. Surfaced when 1.24.0's `mergeFileInto` call hit `ENOENT`; the crash was worked around by skipping an absent bundled template (`'skipped-missing'`), which restores the pre-1.24 behaviour but not the missing content.
+* **Impact:** npm-installed projects leak installer backup and temp files into `git status` and can commit them; the README's `.gitignore Note` documents behaviour that does not occur on the npm path.
+* **Components Affected:** `package.json` (`files`), `project-template/.gitignore`, `lib/installer/deploy.mjs`, `lib/installer/file-merge.mjs`, `tests/installer/smoke.test.js`.
+* **Acceptance Criteria:** The template's ignore rules ship in the tarball (e.g. stored as `project-template/gitignore` and mapped to `.gitignore` on deploy); a smoke test asserts the file is physically present in `npm pack` output and that a `--project` install from the packed tarball produces a `.gitignore` containing both installer patterns; the `skipped-missing` guard remains as defence in depth.

@@ -4,7 +4,7 @@ import { join } from 'path';
 import { homedir } from 'os';
 
 const SKILLS_DIR = join(homedir(), '.claude', 'skills');
-const SKILLS = ['critical-review', 'memory-first', 'agent-delegation'];
+const SKILLS = ['agent-delegation', 'code-simplifier', 'critical-review', 'memory-first', 'verbosity'];
 const SKILLS_INSTALLED = SKILLS.every((s) => existsSync(join(SKILLS_DIR, s, 'SKILL.md')));
 
 const describeIf = SKILLS_INSTALLED ? describe : describe.skip;
