@@ -18,8 +18,12 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
-      # OIDC trusted publishing requires npm >= 11.5.1; Node 20 bundles npm 10.x.
-      - run: npm install -g npm@latest
+      # Two bounds, both load-bearing: OIDC trusted publishing needs npm >= 11.5.1,
+      # and npm 12 dropped Node 20 entirely (engines ^22.22.2 || ^24.15.0 || >=26),
+      # so an unpinned @latest fails this job with EBADENGINE. npm 11 accepts
+      # ^20.17.0 || >=22.9.0. The runner stays on Node 20 to match engines.node's
+      # floor, so the tarball is validated on the oldest Node the package supports.
+      - run: npm install -g npm@^11.5.1
       - run: npm ci
       - run: npx vitest run
       - name: Verify package version matches the release tag
