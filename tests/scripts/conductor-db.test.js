@@ -747,3 +747,92 @@ describe.skipIf(!HAS_SQLITE)('conductor-db query degradation + isolation', () =>
     } finally { check.close(); }
   });
 });
+
+describe.skipIf(!HAS_SQLITE)('conductor-db retention purge', () => {
+  const dbPath = () => join(repo, '.conductor', 'cache.db');
+
+  // Boundary cases need hundreds of rows. Driving that through the CLI is
+  // hundreds of process spawns, so rows are bulk inserted on the runner's own
+  // connection and ONE real CLI write then triggers the purge. Every seed count
+  // below is stated net of that write.
+  async function withRunnerDb(fn) {
+    const { DatabaseSync } = await import('node:sqlite');
+    const db = new DatabaseSync(dbPath());
+    try { return fn(db); } finally { db.close(); }
+  }
+
+  const seedSnapshots = (hashes, createdAt = new Date().toISOString()) => withRunnerDb((db) => {
+    db.exec('BEGIN');
+    const st = db.prepare('INSERT INTO snapshots (git_commit_hash, created_at, snap_json) VALUES (?, ?, ?)');
+    for (const h of hashes) st.run(h, createdAt, `seed-${h}`);
+    db.exec('COMMIT');
+  });
+
+  const seedHistory = (sessions) => withRunnerDb((db) => {
+    db.exec('BEGIN');
+    const st = db.prepare("INSERT INTO raw_history (session_id, created_at, kind, content) VALUES (?, ?, 'k', 'c')");
+    for (const s of sessions) st.run(s, new Date().toISOString());
+    db.exec('COMMIT');
+  });
+
+  const countOf = (table) => withRunnerDb((db) => db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n);
+  const distinctHashes = () => withRunnerDb((db) =>
+    db.prepare('SELECT COUNT(DISTINCT git_commit_hash) AS n FROM snapshots').get().n);
+  const rowsForHash = (h) => withRunnerDb((db) =>
+    db.prepare('SELECT snap_json FROM snapshots WHERE git_commit_hash = ? ORDER BY id').all(h));
+
+  beforeEach(() => { runDb(['init'], { cwd: repo }); });   // schema must exist before out-of-band seeding
+
+  it('bound 1 boundary: 2 seeded + 1 write = 3 rows on one hash, nothing deleted', async () => {
+    await seedSnapshots(['h1', 'h1']);
+    const w = runDb(['snapshot', 'h1'], { cwd: repo, input: 'newest' });
+    expect(w.status).toBe(0);
+    expect(await countOf('snapshots')).toBe(3);
+  });
+
+  it('bound 1 boundary: 3 seeded + 1 write = 4 rows, trimmed to the newest 3', async () => {
+    await seedSnapshots(['h1', 'h1', 'h1']);
+    runDb(['snapshot', 'h1'], { cwd: repo, input: 'newest' });
+    const rows = await rowsForHash('h1');
+    expect(rows.map(r => r.snap_json)).toEqual(['seed-h1', 'seed-h1', 'newest']);
+  });
+
+  it('never deletes the row the current command inserted', async () => {
+    await seedSnapshots(Array(10).fill('h1'));
+    runDb(['snapshot', 'h1'], { cwd: repo, input: 'newest' });
+    expect(await countOf('snapshots')).toBe(3);
+    expect(runDb(['get-snapshot', 'h1'], { cwd: repo }).stdout).toBe('newest\n');
+  });
+
+  it('get-snapshot is unaffected for every hash that still has a row', async () => {
+    await seedSnapshots(['a', 'a', 'a', 'b']);
+    runDb(['snapshot', 'a'], { cwd: repo, input: 'a-new' });
+    expect(runDb(['get-snapshot', 'a'], { cwd: repo }).stdout).toBe('a-new\n');
+    expect(runDb(['get-snapshot', 'b'], { cwd: repo }).stdout).toBe('seed-b\n');
+  });
+
+  it('ignores the clock: 1970-stamped rows under every bound survive', async () => {
+    await seedSnapshots(['c1', 'c2', 'c3'], '1970-01-01T00:00:00.000Z');
+    runDb(['snapshot', 'c4'], { cwd: repo, input: 'now' });
+    expect(await countOf('snapshots')).toBe(4);
+  });
+
+  it('a purge failure exits 0, keeps the inserted row, and warns exactly once', async () => {
+    // A BEFORE DELETE trigger fires per row, so the fixture must seed PAST a
+    // bound: 3 rows on one hash make the CLI write a 4th and give bound 1 a row
+    // to delete. A 2-row fixture produces a DELETE that matches nothing, a
+    // trigger that never fires, and a green test that asserted nothing.
+    await seedSnapshots(['boom', 'boom', 'boom']);
+    await withRunnerDb((db) => db.exec(
+      "CREATE TRIGGER purge_boom BEFORE DELETE ON snapshots BEGIN SELECT RAISE(ABORT, 'boom'); END;"
+    ));
+    const w = runDb(['snapshot', 'boom'], { cwd: repo, input: 'survivor' });
+    expect(w.status).toBe(0);
+    expect(w.stdout).toBe('');
+    // Scoped count: other legitimate non-fatal warns may co-occur on some hosts.
+    const hits = w.stderr.split('\n').filter(l => l.includes('retention purge skipped (snapshots):'));
+    expect(hits).toHaveLength(1);
+    expect(await countOf('snapshots')).toBe(4);           // insert committed, nothing deleted
+    expect(runDb(['get-snapshot', 'boom'], { cwd: repo }).stdout).toBe('survivor\n');
+  });
+});
