@@ -142,7 +142,7 @@ Expected: exactly one match, reading `[ ]`. Then the surgical single-line edit (
 invariant): `[ ]` becomes `[>]` on that heading, changing nothing else on the line. If the
 grep returns zero or more than one match, stop and report rather than guessing.
 
-- [>] [T-000-E] Commit the plan and the in-progress mark
+- [X] [T-000-E] Commit the plan and the in-progress mark
 
 `docs/` is gitignored, so the plan needs `-f`. The spec is deliberately left uncommitted.
 
@@ -171,7 +171,7 @@ hook runs the full suite; it must pass before this commit lands.
 - Consumes: nothing from Task 0 beyond the committed plan file.
 - Produces: the `cc-plan mirrors` describe block that Task 2 turns green. No exported symbols.
 
-- [ ] [T-001-A] Write the failing test
+- [X] [T-001-A] Write the failing test
 
 Create `tests/installer/commands-parity.test.js` with exactly this content:
 
@@ -231,7 +231,7 @@ describe('cc-plan mirrors', () => {
 });
 ```
 
-- [ ] [T-001-B] Run it and confirm it fails
+- [X] [T-001-B] Run it and confirm it fails
 
 Run: `npx vitest run tests/installer/commands-parity.test.js`
 
@@ -252,7 +252,7 @@ Do not commit here. The pre-commit hook runs the full suite and would reject a r
 - Consumes: the test from Task 1.
 - Produces: the `### Branch gate (runs before Task 0)` subsection, byte-identical in both files.
 
-- [ ] [T-002-A] Replace the `## Phase exit` section in `.claude/commands/cc-plan.md`
+- [X] [T-002-A] Replace the `## Phase exit` section in `.claude/commands/cc-plan.md`
 
 Replace these seven lines (108-114):
 
@@ -277,9 +277,10 @@ Once the plan is approved and saved, work through this gate, then print the exit
 instruction in step 7.
 
 **Precondition on Task 0.** This gate runs to completion — the warning, the offer, and
-either the confirmed `git switch` or an explicit decline — **before any step of the
-approved plan's Task 0 executes**, including its `git add` / `git add -f` and its
-`git commit`. Its position in this file is not the guarantee; the execution order is.
+either the confirmed `git switch` or an explicit decline —
+**before any step of the approved plan's Task 0 executes**, including its `git add` /
+`git add -f` and its `git commit`. Its position in this file is not the guarantee; the
+execution order is.
 Under the plan-commit ritual, Task 0 runs at approval, which is exactly when a plan commit
 lands on the wrong branch.
 
@@ -379,7 +380,7 @@ subject.
 Do not proceed to implementation without user confirmation that `/cc-compact` has been run.
 ```
 
-- [ ] [T-002-B] Mirror the same block into the template
+- [X] [T-002-B] Mirror the same block into the template
 
 Apply the identical replacement to `project-template/.claude/commands/cc-plan.md`. The block
 contains no script path, so it is byte-identical; do not adjust anything inside it. The
@@ -408,19 +409,19 @@ diff .claude/commands/cc-plan.md project-template/.claude/commands/cc-plan.md
 
 Expected: three changed lines, all `scripts/resume-read.mjs` → `.claude/scripts/resume-read.mjs`.
 
-- [ ] [T-002-C] Run the new test and confirm it passes
+- [X] [T-002-C] Run the new test and confirm it passes
 
 Run: `npx vitest run tests/installer/commands-parity.test.js`
 
 Expected: PASS, 7 tests.
 
-- [ ] [T-002-D] Run the full suite
+- [X] [T-002-D] Run the full suite
 
 Run: `npm test`
 
 Expected: the pre-existing 522 passed / 12 skipped, plus the 7 new tests — 529 passed / 12 skipped.
 
-- [ ] [T-002-E] Commit
+- [X] [T-002-E] Commit
 
 ```bash
 git add .claude/commands/cc-plan.md project-template/.claude/commands/cc-plan.md tests/installer/commands-parity.test.js
@@ -443,7 +444,7 @@ MSG
 - Consumes: the merged behavior from Task 2.
 - Produces: version `1.26.0` and the `[X]` backlog state.
 
-- [ ] [T-003-A] Bump the version
+- [X] [T-003-A] Bump the version
 
 `VERSION` → `1.26.0`. `package.json` `"version"` → `1.26.0`. Then regenerate the lockfile's
 two self-referential version fields:
@@ -452,7 +453,7 @@ two self-referential version fields:
 npm install --package-lock-only --ignore-scripts
 ```
 
-- [ ] [T-003-B] Add the changelog entry
+- [X] [T-003-B] Add the changelog entry
 
 Insert directly under `# Changelog`, above `## [1.25.0] - 2026-09-24`:
 
@@ -464,13 +465,13 @@ Insert directly under `# Changelog`, above `## [1.25.0] - 2026-09-24`:
 - **[FEAT-026]** A branch gate at the `/cc-plan` phase exit. Before any step of the approved plan's Task 0 runs — force-add and commit included — the agent reads `git branch --show-current`, resolves the default branch from `refs/remotes/origin/HEAD` (falling back to `{main, master}`, never hardcoded), and warns when HEAD sits on it or is detached. It derives a conventional branch name from the active spec stem (`2026-09-22-feat025-…-design` → `feat/feat-025-conductor-db-retention-purge`), sanitizes it and defers to `git check-ref-format`, and validates the commit message the plan's own Task 0 already carries against `CONTRIBUTING.md`'s Conventional-Commits rule, synthesizing one only when the plan has none. Staying silent requires an exact branch-name match or a feature-shaped branch whose embedded id matches the current item — shape alone is not enough. Every git write stays behind an explicit confirmation; declining is a no-op, and an absent repository or any git failure skips the gate without blocking the phase exit.
 ```
 
-- [ ] [T-003-C] Run the full suite
+- [X] [T-003-C] Run the full suite
 
 Run: `npm test`
 
 Expected: 529 passed / 12 skipped.
 
-- [ ] [T-003-D] Flip the backlog entry to complete
+- [X] [T-003-D] Flip the backlog entry to complete
 
 Re-locate by heading, never by line number. Pre-check uniqueness first:
 
@@ -483,7 +484,7 @@ invariant): `[>]` → `[X]` on that heading, changing nothing else on the line. 
 left at `[>]` by **T-000-D**; if it still reads `[ ]`, stop — the plan-approval step did not
 run. If the grep returns zero or more than one match, stop and report rather than guessing.
 
-- [ ] [T-003-E] Commit the release
+- [X] [T-003-E] Commit the release
 
 ```bash
 git add VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md"
