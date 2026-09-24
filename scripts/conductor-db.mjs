@@ -503,6 +503,19 @@ async function cmdHistory(args) {
   await withDb(root, (db) => {
     db.prepare('INSERT INTO raw_history (session_id, created_at, kind, content) VALUES ($s, $c, $k, $ct)')
       .run({ $s: sessionId, $c: new Date().toISOString(), $k: kind, $ct: content });
+    // Bound 1 is disabled for this table: keeping only the newest few rows per
+    // session would destroy an ordered log rather than bound it. Same
+    // connection, same scoped catch as the snapshots call site.
+    try {
+      purgeTable(db, {
+        table: 'raw_history', key: 'session_id',
+        keepPerKey: HISTORY_KEEP_PER_SESSION,
+        softCap: HISTORY_SOFT_CAP,
+        hardMax: HISTORY_HARD_MAX,
+      });
+    } catch (e) {
+      warn(`retention purge skipped (raw_history): ${(e && e.code) || (e && e.message)}`);
+    }
   });
 }
 

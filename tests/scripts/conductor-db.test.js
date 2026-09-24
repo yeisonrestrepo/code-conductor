@@ -879,4 +879,55 @@ describe.skipIf(!HAS_SQLITE)('conductor-db retention purge', () => {
     expect(runDb(['get-snapshot', 'm9999'], { cwd: repo }).stdout).toBe('newest\n');   // newest survives
     expect(runDb(['get-snapshot', 'm0000'], { cwd: repo }).stdout).toBe('');           // oldest evicted
   });
+
+  it('raw_history keeps every row of a session: bound 1 is disabled', async () => {
+    await seedHistory(Array(10).fill('s1'));
+    runDb(['history', 's1', 'k'], { cwd: repo, input: 'tail' });
+    expect(await countOf('raw_history')).toBe(11);   // an ordered log is never thinned in place
+  });
+
+  it('raw_history bound 2 boundary: 999 seeded + 1 write = 1000 rows, nothing deleted', async () => {
+    await seedHistory(Array(999).fill('s1'));
+    runDb(['history', 's1', 'k'], { cwd: repo, input: 'tail' });
+    expect(await countOf('raw_history')).toBe(1000);
+  });
+
+  it('raw_history bound 2 boundary: 1000 seeded + 1 write = 1001 rows, oldest end truncated', async () => {
+    await seedHistory(Array(1000).fill('s1'));
+    runDb(['history', 's1', 'k'], { cwd: repo, input: 'tail' });
+    expect(await countOf('raw_history')).toBe(1000);
+    const newest = await withRunnerDb((db) =>
+      db.prepare('SELECT content FROM raw_history ORDER BY id DESC LIMIT 1').get());
+    expect(newest.content).toBe('tail');
+  });
+
+  it('raw_history bound 3 trims a floor-saturated table to hardMax', async () => {
+    await seedHistory(Array.from({ length: 2000 }, (_, i) => `s${i}`));   // 2000 distinct sessions
+    runDb(['history', 's2000', 'k'], { cwd: repo, input: 'tail' });       // 2001 rows, all floors
+    expect(await countOf('raw_history')).toBe(2000);
+  });
+
+  it('cross-table isolation: a snapshots purge deletes from no other table', async () => {
+    await seedSnapshots(['x', 'x', 'x']);
+    await seedHistory(['s1', 's1']);
+    runDb(['record', 'plan.md', 'T-001', 'X'], { cwd: repo });
+    runDb(['session', 'sess', 'plan', 'spec', 'x'], { cwd: repo });
+    runDb(['snapshot', 'x'], { cwd: repo, input: 'n' });   // fires bound 1
+    expect(await countOf('snapshots')).toBe(3);
+    expect(await countOf('raw_history')).toBe(2);
+    expect(await countOf('sessions')).toBe(1);
+    expect(await countOf('task_state')).toBe(1);
+  });
+
+  it('cross-table isolation: a raw_history purge deletes from no other table', async () => {
+    await seedSnapshots(['y', 'y']);
+    await seedHistory(Array(1000).fill('s1'));
+    runDb(['record', 'plan.md', 'T-001', 'X'], { cwd: repo });
+    runDb(['session', 'sess', 'plan', 'spec', 'y'], { cwd: repo });
+    runDb(['history', 's1', 'k'], { cwd: repo, input: 'tail' });   // fires bound 2
+    expect(await countOf('raw_history')).toBe(1000);
+    expect(await countOf('snapshots')).toBe(2);
+    expect(await countOf('sessions')).toBe(1);
+    expect(await countOf('task_state')).toBe(1);
+  });
 });
