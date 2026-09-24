@@ -835,4 +835,48 @@ describe.skipIf(!HAS_SQLITE)('conductor-db retention purge', () => {
     expect(await countOf('snapshots')).toBe(4);           // insert committed, nothing deleted
     expect(runDb(['get-snapshot', 'boom'], { cwd: repo }).stdout).toBe('survivor\n');
   });
+
+  it('bound 2 boundary: 199 seeded + 1 write = 200 rows, nothing deleted', async () => {
+    const seed = [];
+    for (let i = 0; i < 99; i++) seed.push(`s${i}`, `s${i}`);   // 198 rows over 99 hashes
+    seed.push('s99');                                           // 199 rows over 100 hashes
+    await seedSnapshots(seed);
+    runDb(['snapshot', 'fresh'], { cwd: repo, input: 'n' });
+    expect(await countOf('snapshots')).toBe(200);
+  });
+
+  it('bound 2 boundary: 200 seeded + 1 write = 201 rows, trimmed to the soft cap', async () => {
+    const seed = [];
+    for (let i = 0; i < 100; i++) seed.push(`s${i}`, `s${i}`);  // 200 rows over 100 hashes
+    await seedSnapshots(seed);
+    runDb(['snapshot', 'fresh'], { cwd: repo, input: 'n' });
+    expect(await countOf('snapshots')).toBe(200);
+    expect(await distinctHashes()).toBe(101);                   // every hash keeps its floor row
+  });
+
+  it('bound 2 settles at max(softCap, distinctKeys) when every row is a floor', async () => {
+    const seed = [];
+    for (let i = 0; i < 299; i++) seed.push(`k${i}`);           // 299 single-row hashes
+    await seedSnapshots(seed);
+    runDb(['snapshot', 'k299'], { cwd: repo, input: 'n' });     // 300 rows, 300 hashes
+    expect(await countOf('snapshots')).toBe(300);               // NOT 200 — the floor protects all of them
+  });
+
+  it('bound 3 boundary: 499 single-row hashes + 1 write = 500 rows, nothing deleted', async () => {
+    const seed = [];
+    for (let i = 0; i < 499; i++) seed.push(`m${String(i).padStart(4, '0')}`);
+    await seedSnapshots(seed);
+    runDb(['snapshot', 'm9999'], { cwd: repo, input: 'newest' });
+    expect(await countOf('snapshots')).toBe(500);
+  });
+
+  it('bound 3 trims a floor-saturated table to exactly hardMax, oldest-first', async () => {
+    const seed = [];
+    for (let i = 0; i < 600; i++) seed.push(`m${String(i).padStart(4, '0')}`);
+    await seedSnapshots(seed);
+    runDb(['snapshot', 'm9999'], { cwd: repo, input: 'newest' });   // 601 rows, 601 hashes
+    expect(await countOf('snapshots')).toBe(500);
+    expect(runDb(['get-snapshot', 'm9999'], { cwd: repo }).stdout).toBe('newest\n');   // newest survives
+    expect(runDb(['get-snapshot', 'm0000'], { cwd: repo }).stdout).toBe('');           // oldest evicted
+  });
 });

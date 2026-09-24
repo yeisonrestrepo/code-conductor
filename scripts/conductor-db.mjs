@@ -316,6 +316,32 @@ function purgeTable(db, { table, key, keepPerKey, softCap, hardMax }) {
     ).run({ $keep: keepPerKey });
     n = count();
   }
+
+  // Bound 2 — soft cap with a newest-per-key floor. `n` reflects bound 1's
+  // deletions: it was recounted iff bound 1 issued its DELETE, and is otherwise
+  // unchanged by definition. Only `n - distinctKeys` rows are eligible, so the
+  // table settles at max(softCap, distinctKeys) and every represented key keeps
+  // the row `get-snapshot` reads.
+  let excess = n - softCap;
+  if (excess > 0) {
+    db.prepare(
+      `DELETE FROM ${table} WHERE id IN (SELECT id FROM ${table} ` +
+      `WHERE id NOT IN (SELECT MAX(id) FROM ${table} GROUP BY ${key}) ` +
+      `ORDER BY id ASC LIMIT $excess)`
+    ).run({ $excess: excess });
+    n = count();
+  }
+
+  // Bound 3 — hard ceiling, no floor. Same rule: `n` was recounted iff bound 2
+  // issued its DELETE. Reachable only when more than `hardMax` distinct keys
+  // each hold a floor row bound 2 could not touch; the oldest keys' rows go,
+  // recent ones never do.
+  excess = n - hardMax;
+  if (excess > 0) {
+    db.prepare(
+      `DELETE FROM ${table} WHERE id IN (SELECT id FROM ${table} ORDER BY id ASC LIMIT $excess)`
+    ).run({ $excess: excess });
+  }
 }
 
 async function withDb(root, fn) {
