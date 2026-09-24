@@ -192,10 +192,10 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Acceptance Criteria:** Ensure robust test coverage across stack identification, template interpolation, and tool boundary filtering, binding test runs as a mandatory criteria before any backlog item change can be committed.
 
 
-### [ ] `[FEAT-025]` Retention Purge for the Conductor Cache DB (`snapshots` / `raw_history`)
+### [X] `[FEAT-025]` Retention Purge for the Conductor Cache DB (`snapshots` / `raw_history`)
 * **Description:** `scripts/conductor-db.mjs` inserts new rows into `snapshots` (one per checkpoint/compact, keyed by git commit hash) and `raw_history` (one per recorded event) with no eviction path — both tables grow without bound over the life of a repo. Add a bounded retention mechanism (e.g. keep only the last N rows per `session_id`/`git_commit_hash`, or a max-age window) so `.conductor/cache.db` stays small over time.
 * **Impact:** Prevents unbounded disk growth of the local cache DB without weakening context restoration: `get-snapshot` already only ever reads the most recent row per commit hash (`ORDER BY id DESC LIMIT 1`) and `sessions` is already upserted to one row per `session_id`, so purging older `snapshots`/`raw_history` rows does not remove data any current read path depends on.
-* **Components Affected:** `scripts/conductor-db.mjs` (`applySchema`, `upsert`/insert helpers, new purge routine), both `.claude/scripts/` and `project-template/.claude/scripts/` mirrors.
+* **Components Affected:** `scripts/conductor-db.mjs` (new `purgeTable` helper, two call sites), `tests/scripts/conductor-db.test.js`.
 * **Acceptance Criteria:** Writes to `snapshots`/`raw_history` trigger (or a scheduled path performs) a bounded purge that keeps the most recent N rows or rows within a max-age window per key; purge failures remain non-fatal (fail-open, matching the existing `CONDUCTOR_DB:` warn-and-continue convention); `get-snapshot`/`get-session` behavior is unaffected by the purge.
 
 ### [ ] `[FEAT-026]` Guided Branch Creation and Commit Drafting for Backlog Work
@@ -222,3 +222,9 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Impact:** npm-installed projects leak installer backup and temp files into `git status` and can commit them; the README's `.gitignore Note` documents behaviour that does not occur on the npm path.
 * **Components Affected:** `package.json` (`files`), `project-template/.gitignore`, `lib/installer/deploy.mjs`, `lib/installer/file-merge.mjs`, `tests/installer/smoke.test.js`.
 * **Acceptance Criteria:** The template's ignore rules ship in the tarball (e.g. stored as `project-template/gitignore` and mapped to `.gitignore` on deploy); a smoke test asserts the file is physically present in `npm pack` output and that a `--project` install from the packed tarball produces a `.gitignore` containing both installer patterns; the `skipped-missing` guard remains as defence in depth.
+
+### [ ] `[FEAT-030]` Byte-Sum Bound for the Conductor Cache DB `snapshots` Table
+* **Description:** FEAT-025 bounds `snapshots` by row count (3 per commit hash, soft 200, hard 500) and never by size. `snap_json` rows are not size-capped by that purge: a v2 checkpoint blob carries `pr` up to `snap-build.mjs`'s 10 MiB cap, so a single hash can legitimately hold 30 MiB and the table's theoretical ceiling is ~5 GB. Add an optional byte-sum bound that deletes oldest non-floor rows until `SUM(LENGTH(snap_json))` is under a budget.
+* **Impact:** Closes the one growth mode FEAT-025 deliberately left open, for repos that checkpoint long prose frequently.
+* **Components Affected:** `scripts/conductor-db.mjs` (`purgeTable`), `tests/scripts/conductor-db.test.js`.
+* **Acceptance Criteria:** A byte budget bounds `SUM(LENGTH(snap_json))` on `snapshots`, deleting oldest-first under the same newest-per-key floor as FEAT-025 bound 2; the scan cost is paid only when a cheap row-count precondition indicates it may be needed; purge failures stay fail-open. Pick up only if a real `.conductor/cache.db` is observed above a few hundred MB — 28 KB measured 2026-09-22.

@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.25.0] - 2026-09-24
+
+### Added
+
+- **[FEAT-025]** Bounded retention for the conductor cache DB. `scripts/conductor-db.mjs` now purges excess rows after each append to `snapshots` and `raw_history` via a shared `purgeTable` helper applying three id-ordered bounds — never the clock. `snapshots`: at most 3 rows per commit hash, a soft cap of 200 with a newest-per-hash floor, and a floorless hard ceiling of 500. `raw_history`: the per-session trim is disabled (an ordered log is truncated, never thinned) and the table is held by a soft cap of 1000 and a hard ceiling of 2000. Deletion is always oldest-first, so `get-snapshot` still returns the newest blob for every hash that has one. Purge failures stay fail-open — one `CONDUCTOR_DB: retention purge skipped (<table>):` line and exit 0, with the inserted row already committed. No schema change; `SCHEMA_VERSION` remains 2.
+
 ## [1.24.1] - 2026-09-22
 ### Fixed
 - The project template's ignore rules never reached an npm install: npm strips any file literally named `.gitignore` from every published tarball, so `project-template/.gitignore` was absent from the package despite `project-template/` being listed in `files`. Only a git-clone install ever received it. The rules now ship as `project-template/gitignore` and the installer maps that source name back to `.gitignore` when it merges into the host project, so 1.24.0's `*.installer-backup.*` and `*.installer-tmp.*` patterns finally arrive. A contract test fails the build if any shipped asset dir reintroduces a filename npm strips.

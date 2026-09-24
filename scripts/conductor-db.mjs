@@ -27,6 +27,15 @@ const SCHEMA_VERSION = 2;
 const MAX_SNAP_BYTES = 10 * 1024 * 1024;   // 10 MiB
 const MAX_CONTENT_BYTES = 1024 * 1024;     // 1 MiB
 const STDIN_CHUNK = 65536;
+
+// FEAT-025 retention bounds. Row counts, never the clock: an age window would
+// evict the only snapshot for a long-idle HEAD and silently break /cc-resume.
+const SNAPSHOT_KEEP_PER_HASH = 3;
+const SNAPSHOT_SOFT_CAP = 200;
+const SNAPSHOT_HARD_MAX = 500;
+const HISTORY_KEEP_PER_SESSION = null;   // an ordered log is truncated, never thinned
+const HISTORY_SOFT_CAP = 1000;
+const HISTORY_HARD_MAX = 2000;
 const U_SESSION = 'usage: conductor-db.mjs session <session_id> <phase> <spec> <git_commit_hash>';
 const U_GET_SESSION = 'usage: conductor-db.mjs get-session <session_id>';
 const U_SNAPSHOT = 'usage: conductor-db.mjs snapshot <git_commit_hash>';
@@ -280,6 +289,61 @@ function upsertSession(db, sessionId, phase, spec, gitHash) {
   ).run({ $session_id: sessionId, $started_at: now, $updated_at: now, $phase: phase, $spec: spec, $git_commit_hash: gitHash });
 }
 
+// Bounded retention for the two append-only tables (FEAT-025). Bounds are
+// applied in order and keyed on `id`; `table` and `key` are module constants,
+// never user input, so interpolating them is safe where a bound parameter
+// cannot be used.
+//
+// `id` is the rowid WITHOUT AUTOINCREMENT: SQLite assigns MAX(rowid) + 1, so
+// deleting the highest row would let the next insert reuse its id and silently
+// break `ORDER BY id DESC LIMIT 1` as a recency ordering. Every bound deletes
+// oldest-first only, which is what keeps that ordering true.
+function purgeTable(db, { table, key, keepPerKey, softCap, hardMax }) {
+  const count = () => db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n;
+  let n = count();
+
+  // Bound 1 — keep the newest `keepPerKey` rows per key. `null` skips it:
+  // thinning an ordered log in place would destroy it rather than bound it.
+  // `n <= keepPerKey` skips it too — a total at or under the per-key budget
+  // cannot have a key that exceeds it — so the ordinary write, which is every
+  // write on a healthy db, issues no DELETE at all rather than a windowed one
+  // matching zero rows. The recount runs only when the DELETE actually ran.
+  if (keepPerKey !== null && n > keepPerKey) {
+    db.prepare(
+      `DELETE FROM ${table} WHERE id IN (SELECT id FROM (` +
+      `SELECT id, ROW_NUMBER() OVER (PARTITION BY ${key} ORDER BY id DESC) AS rn FROM ${table}` +
+      `) WHERE rn > $keep)`
+    ).run({ $keep: keepPerKey });
+    n = count();
+  }
+
+  // Bound 2 — soft cap with a newest-per-key floor. `n` reflects bound 1's
+  // deletions: it was recounted iff bound 1 issued its DELETE, and is otherwise
+  // unchanged by definition. Only `n - distinctKeys` rows are eligible, so the
+  // table settles at max(softCap, distinctKeys) and every represented key keeps
+  // the row `get-snapshot` reads.
+  let excess = n - softCap;
+  if (excess > 0) {
+    db.prepare(
+      `DELETE FROM ${table} WHERE id IN (SELECT id FROM ${table} ` +
+      `WHERE id NOT IN (SELECT MAX(id) FROM ${table} GROUP BY ${key}) ` +
+      `ORDER BY id ASC LIMIT $excess)`
+    ).run({ $excess: excess });
+    n = count();
+  }
+
+  // Bound 3 — hard ceiling, no floor. Same rule: `n` was recounted iff bound 2
+  // issued its DELETE. Reachable only when more than `hardMax` distinct keys
+  // each hold a floor row bound 2 could not touch; the oldest keys' rows go,
+  // recent ones never do.
+  excess = n - hardMax;
+  if (excess > 0) {
+    db.prepare(
+      `DELETE FROM ${table} WHERE id IN (SELECT id FROM ${table} ORDER BY id ASC LIMIT $excess)`
+    ).run({ $excess: excess });
+  }
+}
+
 async function withDb(root, fn) {
   let DatabaseSync;
   try {
@@ -391,6 +455,21 @@ async function cmdSnapshot(args) {
   await withDb(root, (db) => {
     db.prepare('INSERT INTO snapshots (git_commit_hash, created_at, snap_json) VALUES ($h, $c, $j)')
       .run({ $h: gitHash, $c: new Date().toISOString(), $j: snapJson });
+    // Same connection, statement immediately after the already-autocommitted
+    // INSERT — never a second withDb open, which would pay the checkpoint/close
+    // cost twice and re-enter the recovery ladder for a best-effort cleanup.
+    // The catch wraps the purge ALONE: a throw reaching withDb's catch would
+    // misreport this committed write as "skipping cache write".
+    try {
+      purgeTable(db, {
+        table: 'snapshots', key: 'git_commit_hash',
+        keepPerKey: SNAPSHOT_KEEP_PER_HASH,
+        softCap: SNAPSHOT_SOFT_CAP,
+        hardMax: SNAPSHOT_HARD_MAX,
+      });
+    } catch (e) {
+      warn(`retention purge skipped (snapshots): ${(e && e.code) || (e && e.message)}`);
+    }
   });
 }
 
@@ -424,6 +503,19 @@ async function cmdHistory(args) {
   await withDb(root, (db) => {
     db.prepare('INSERT INTO raw_history (session_id, created_at, kind, content) VALUES ($s, $c, $k, $ct)')
       .run({ $s: sessionId, $c: new Date().toISOString(), $k: kind, $ct: content });
+    // Bound 1 is disabled for this table: keeping only the newest few rows per
+    // session would destroy an ordered log rather than bound it. Same
+    // connection, same scoped catch as the snapshots call site.
+    try {
+      purgeTable(db, {
+        table: 'raw_history', key: 'session_id',
+        keepPerKey: HISTORY_KEEP_PER_SESSION,
+        softCap: HISTORY_SOFT_CAP,
+        hardMax: HISTORY_HARD_MAX,
+      });
+    } catch (e) {
+      warn(`retention purge skipped (raw_history): ${(e && e.code) || (e && e.message)}`);
+    }
   });
 }
 
