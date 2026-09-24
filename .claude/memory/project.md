@@ -569,3 +569,37 @@ S — one rename, one constant reshaped, two call sites, three test files.
 
 ### Complexity
 S — one new helper, two call sites, no schema change, no new dependency.
+
+---
+
+## Spec: FEAT-026 — Guided branch creation and commit drafting at the plan gate [2026-09-24]
+
+**Spec file:** `docs/superpowers/specs/2026-09-24-feat026-guided-branch-and-commit-drafting-design.md` (revision 5, approved)
+
+### Problem
+Branch naming and commit-message formatting are conventions documented in `CONTRIBUTING.md:23` / `:37` and enforced nowhere. The failure is observed, not hypothetical: the FEAT-025 plan commit (`39f940e`) landed directly on `main` and had to be recovered with `git switch -c` plus `git branch -f main <prior>`. The plan phase is the exposure, because the plan commit is a feature's first write.
+
+### Decisions
+- **Trigger point: `cc-plan.md` and its `project-template/` mirror only — two files, one gate.** `/cc-spec` is deliberately untouched: the spec is never committed (`docs/` is gitignored; the shipped record is this summary), so no git write exists to protect at spec approval.
+- **No standalone `/cc-branch` command.** The offer composes with the existing workflow instead of adding a surface.
+- **Sequencing is the load-bearing requirement, not line position.** The block must run to completion — warning, offer, and either the confirmed `git switch` or an explicit decline — **before any step of the approved plan's Task 0 executes**, force-add and commit included. Under the FEAT-005/024 ritual Task 0 runs *at approval*; a block firing only at the phase-exit print would fire after the damage and reproduce the failure it exists to prevent. The AC asserts the ordering; "before the `/cc-compact` line in the Markdown" is necessary but not sufficient.
+- **Validate, don't duplicate.** The gate reads the commit message from the approved plan's Task 0 step (the plan is the single source of truth and Task 0 runs it verbatim), validates it, and surfaces it in the confirmation. It synthesizes a message only when the plan carries none, and writes that synthesis back into Task 0. A gate that merely prints a subject nobody consumes would satisfy a naive AC while shipping decoration.
+- **Validation rules anchored to what `CONTRIBUTING.md:37` literally says** — Conventional Commits, `feat:`/`fix:`/`docs:`/`chore:` as the documented set; other shipped types (`test:`, `ci:`, `refactor:`) pass with a note. **The id must appear in the subject; bracketed suffix and inline prose both pass.** A suffix-only rule would reject `docs: add the FEAT-025 retention purge implementation plan` — the only historical Task 0 message. Synthesis emits the suffix form; that is a synthesis choice, never a validation rule.
+- **Default branch resolved from `refs/remotes/origin/HEAD`**, falling back to the literal set `{main, master}` — never hardcoded to `main`. Detached HEAD prints empty and exits 0, so empty is warned on distinctly, never read as "not on main".
+- **Silence has exactly two conditions:** the current branch equals the derived name, or it is feature-shaped **and** its embedded id token matches the current item's id. Every other non-default branch reports both names and asks. Shape alone never buys silence: sitting on `feat/feat-025-…` while planning FEAT-026 is feature-shaped but unrelated, and is the second-most-likely version of the error. A hand-made branch with no extractable id token (`feat/retention-purge`) fails the id condition by design and falls through to report-and-ask — do not substitute fuzzy title matching.
+- **Branch name derived from the active spec stem** (the value `/cc-compact` writes as `sys.s`): strip the date and `-design`, read the id token, `FEAT`/`ARCH` → `feat/`, `BUG` → `fix/`. Backlog lookup is the fallback, not the primary source — installed projects ship no backlog file.
+- **Sanitization is two rules plus one gate:** lowercase + collapse non-alphanumerics to `-`, cap at 60 chars on a `-` boundary, then `git check-ref-format --branch "<name>"` as the authority. Per-character reject passes for `..`, `@{`, `~`, trailing `.lock` etc. are unreachable after rule one and are explicitly forbidden as speculative abstraction.
+- **Deliberate narrowing, recorded so the `[X]` flip does not hide it:** the backlog AC says the message is drafted "from the resulting diff"; at the plan gate there is no diff — the plan commit's content is the plan file itself — so drafting/validating from type + stem + id is the correct reading and diff-derived drafting is out of scope.
+- Every git write (`switch -c`, `switch`, `commit`) stays behind an explicit confirmation; declining is a no-op and the phase exits byte-identically to today. Absent git, absent repository, or any git failure skips the block without blocking the phase exit.
+
+### Conventions
+- The two `cc-plan.md` files are byte-identical **except** for `scripts/` vs `.claude/scripts/` script paths; any edit must preserve exactly that divergence, and the new test asserts it.
+- No installer change is needed for a command edit: `deployProject` copies `project-template/.claude/` wholesale, so a modified command file ships with no manifest edit.
+- Uncommitted-change refusal on `git switch -c` is reported verbatim and stops the gate — never stash, never force, never retry. (That refusal occurred in the FEAT-025 session.)
+
+### Debt
+- No test covers command-file *content* today — `tests/installer/templates.test.js` asserts only the `cc-stack:managed` marker — so FEAT-026 opens that surface with a mirror-parity test. Other command files remain uncovered.
+- The gate is instruction prose executed by the agent, not code: its correctness cannot be unit-tested end to end, only its presence and mirror parity. The ordering AC is verified by walking a plan whose Task 0 commits the plan file.
+
+### Complexity
+S — two Markdown blocks and one test; the entire risk surface is precise instruction wording, not code paths.
