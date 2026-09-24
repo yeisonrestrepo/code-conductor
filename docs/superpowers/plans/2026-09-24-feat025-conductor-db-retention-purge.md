@@ -53,7 +53,7 @@
 
 Surgical single-line edit in `AGENT-READABLE BACKLOG.md` (BUG-003 invariant): on the `### [ ] \`[FEAT-025]\`` heading, `[ ]` becomes `[>]`. Change nothing else on the line. This is the FEAT-005 / FEAT-024 convention — an approved-but-unfinished item is visibly distinct from an untouched one, and the closeout has a unique token to flip.
 
-- [>] [T-000-B] Commit the plan and the in-progress mark
+- [X] [T-000-B] Commit the plan and the in-progress mark
 
 `docs/` is gitignored, so the plan needs `-f`. The spec is deliberately left uncommitted.
 
@@ -75,7 +75,7 @@ git commit -m "docs: add the FEAT-025 retention purge implementation plan"
 - Consumes: nothing from Task 0 beyond the committed plan file.
 - Produces: `purgeTable(db, { table, key, keepPerKey, softCap, hardMax })` — returns `undefined`, throws on SQL failure; the constants `SNAPSHOT_KEEP_PER_HASH`, `SNAPSHOT_SOFT_CAP`, `SNAPSHOT_HARD_MAX`, `HISTORY_KEEP_PER_SESSION`, `HISTORY_SOFT_CAP`, `HISTORY_HARD_MAX`; and the test helpers `withRunnerDb`, `seedSnapshots`, `seedHistory`, `countOf`, `distinctHashes`, `rowsForHash`, which Tasks 2 and 3 reuse verbatim.
 
-- [ ] [T-001-A] Write the failing tests for bound 1 and the fail-open path
+- [X] [T-001-A] Write the failing tests for bound 1 and the fail-open path
 
 Append this block to the end of `tests/scripts/conductor-db.test.js`:
 
@@ -170,12 +170,12 @@ describe.skipIf(!HAS_SQLITE)('conductor-db retention purge', () => {
 });
 ```
 
-- [ ] [T-001-B] Run the new tests and verify they fail
+- [X] [T-001-B] Run the new tests and verify they fail
 
 Run: `npx vitest run tests/scripts/conductor-db.test.js -t 'retention purge'`
 Expected: FAIL — `bound 1 boundary: 3 seeded + 1 write` reports 4 rows instead of 3, and the fail-open test finds 0 matching stderr lines.
 
-- [ ] [T-001-C] Add the retention constants
+- [X] [T-001-C] Add the retention constants
 
 In `scripts/conductor-db.mjs`, immediately after the `const STDIN_CHUNK = 65536;` line:
 
@@ -190,7 +190,7 @@ const HISTORY_SOFT_CAP = 1000;
 const HISTORY_HARD_MAX = 2000;
 ```
 
-- [ ] [T-001-D] Add `purgeTable` with bound 1 only
+- [X] [T-001-D] Add `purgeTable` with bound 1 only
 
 In `scripts/conductor-db.mjs`, between `upsertSession` and `async function withDb`:
 
@@ -229,7 +229,7 @@ function purgeTable(db, { table, key, keepPerKey, softCap, hardMax }) {
 likewise destructured and unused until Task 2 — that is the TDD increment, not dead code
 to prune.
 
-- [ ] [T-001-E] Wire the snapshots call site with its scoped `try`/`catch`
+- [X] [T-001-E] Wire the snapshots call site with its scoped `try`/`catch`
 
 In `cmdSnapshot`, replace the `withDb` callback body so it reads:
 
@@ -255,12 +255,12 @@ In `cmdSnapshot`, replace the `withDb` callback body so it reads:
   });
 ```
 
-- [ ] [T-001-F] Run the full suite and verify it passes
+- [X] [T-001-F] Run the full suite and verify it passes
 
 Run: `npm test`
 Expected: PASS — the six new tests green, the existing 57 in this file and the rest of the suite unchanged.
 
-- [ ] [T-001-G] Commit
+- [X] [T-001-G] Commit
 
 ```bash
 git add scripts/conductor-db.mjs tests/scripts/conductor-db.test.js
@@ -281,7 +281,7 @@ git commit -m "feat: bound snapshots to 3 rows per commit hash [FEAT-025]"
 
 **Dependency:** requires Task 1.
 
-- [ ] [T-002-A] Write the failing tests for bounds 2 and 3
+- [X] [T-002-A] Write the failing tests for bounds 2 and 3
 
 Append inside the `conductor-db retention purge` describe block, after the fail-open test:
 
@@ -331,12 +331,12 @@ Append inside the `conductor-db retention purge` describe block, after the fail-
   });
 ```
 
-- [ ] [T-002-B] Run the new tests and verify they fail
+- [X] [T-002-B] Run the new tests and verify they fail
 
 Run: `npx vitest run tests/scripts/conductor-db.test.js -t 'bound 2'`
 Expected: FAIL — `bound 2 boundary: 200 seeded` reports 201 rows; `bound 3 trims` reports 601.
 
-- [ ] [T-002-C] Implement bounds 2 and 3
+- [X] [T-002-C] Implement bounds 2 and 3
 
 In `purgeTable`, append after the bound-1 block, consuming the `n` Task 1 already maintains:
 
@@ -357,9 +357,9 @@ In `purgeTable`, append after the bound-1 block, consuming the `n` Task 1 alread
   }
 
   // Bound 3 — hard ceiling, no floor. Same rule: `n` was recounted iff bound 2
-  // deleted. Reachable only when more than `hardMax` distinct keys each hold a
-  // floor row bound 2 could not touch; the oldest keys' rows go, recent ones
-  // never do.
+  // issued its DELETE. Reachable only when more than `hardMax` distinct keys
+  // each hold a floor row bound 2 could not touch; the oldest keys' rows go,
+  // recent ones never do.
   excess = n - hardMax;
   if (excess > 0) {
     db.prepare(
@@ -371,12 +371,12 @@ In `purgeTable`, append after the bound-1 block, consuming the `n` Task 1 alread
 A write on a healthy db now costs exactly one `COUNT(*)` and zero `DELETE`s, which is
 what the spec's "table under every bound" path describes.
 
-- [ ] [T-002-D] Run the full suite and verify it passes
+- [X] [T-002-D] Run the full suite and verify it passes
 
 Run: `npm test`
 Expected: PASS — eleven tests in the new block, everything else unchanged.
 
-- [ ] [T-002-E] Commit
+- [X] [T-002-E] Commit
 
 ```bash
 git add scripts/conductor-db.mjs tests/scripts/conductor-db.test.js
@@ -397,7 +397,7 @@ git commit -m "feat: add soft-cap and hard-ceiling bounds to the cache purge [FE
 
 **Dependency:** requires Task 2 (bound 1 is disabled here, so `raw_history` is held by bounds 2 and 3 alone).
 
-- [ ] [T-003-A] Write the failing tests for `raw_history` and isolation
+- [X] [T-003-A] Write the failing tests for `raw_history` and isolation
 
 Append inside the `conductor-db retention purge` describe block:
 
@@ -454,12 +454,12 @@ Append inside the `conductor-db retention purge` describe block:
   });
 ```
 
-- [ ] [T-003-B] Run the new tests and verify they fail
+- [X] [T-003-B] Run the new tests and verify they fail
 
 Run: `npx vitest run tests/scripts/conductor-db.test.js -t 'raw_history bound'`
 Expected: FAIL — `raw_history bound 2 boundary: 1000 seeded` reports 1001 rows.
 
-- [ ] [T-003-C] Wire the `raw_history` call site
+- [X] [T-003-C] Wire the `raw_history` call site
 
 In `cmdHistory`, replace the `withDb` callback body so it reads:
 
@@ -483,12 +483,12 @@ In `cmdHistory`, replace the `withDb` callback body so it reads:
   });
 ```
 
-- [ ] [T-003-D] Run the full suite and verify it passes
+- [X] [T-003-D] Run the full suite and verify it passes
 
 Run: `npm test`
 Expected: PASS — seventeen tests in the new block; the existing 57 in this file green.
 
-- [ ] [T-003-E] Commit
+- [X] [T-003-E] Commit
 
 ```bash
 git add scripts/conductor-db.mjs tests/scripts/conductor-db.test.js
@@ -508,7 +508,7 @@ git commit -m "feat: bound raw_history with the shared retention purge [FEAT-025
 
 **Dependency:** requires Tasks 1–3. Everything below lands in **one** commit.
 
-- [ ] [T-004-A] Bump `VERSION` and `package.json`
+- [X] [T-004-A] Bump `VERSION` and `package.json`
 
 `VERSION` becomes the single line `1.25.0` with a trailing newline. `package.json`'s `"version"` becomes `"1.25.0"`.
 
@@ -517,7 +517,7 @@ printf '1.25.0\n' > VERSION
 npm pkg set version=1.25.0
 ```
 
-- [ ] [T-004-B] Sync the lockfile
+- [X] [T-004-B] Sync the lockfile
 
 It is stale at 1.23.3 — neither the 1.24.0 nor the 1.24.1 release commit touched it — so this also repairs two missed bumps. Both the root `"version"` and the `packages[""]` entry must read 1.25.0, which is why the check counts hits instead of printing them: a half-synced lockfile prints `1` and must fail the step, not scroll past it.
 
@@ -526,7 +526,7 @@ npm install --package-lock-only
 grep -c '"version": "1.25.0"' package-lock.json   # expected: 2
 ```
 
-- [ ] [T-004-C] Add the CHANGELOG section
+- [X] [T-004-C] Add the CHANGELOG section
 
 Resolve the date at closeout time — never hardcode it from the spec (the FEAT-005 convention):
 
@@ -544,11 +544,11 @@ Insert directly above the existing `## [1.24.1]` heading in `CHANGELOG.md`, with
 - **[FEAT-025]** Bounded retention for the conductor cache DB. `scripts/conductor-db.mjs` now purges excess rows after each append to `snapshots` and `raw_history` via a shared `purgeTable` helper applying three id-ordered bounds — never the clock. `snapshots`: at most 3 rows per commit hash, a soft cap of 200 with a newest-per-hash floor, and a floorless hard ceiling of 500. `raw_history`: the per-session trim is disabled (an ordered log is truncated, never thinned) and the table is held by a soft cap of 1000 and a hard ceiling of 2000. Deletion is always oldest-first, so `get-snapshot` still returns the newest blob for every hash that has one. Purge failures stay fail-open — one `CONDUCTOR_DB: retention purge skipped (<table>):` line and exit 0, with the inserted row already committed. No schema change; `SCHEMA_VERSION` remains 2.
 ```
 
-- [ ] [T-004-D] Flip the FEAT-025 checkbox
+- [X] [T-004-D] Flip the FEAT-025 checkbox
 
 Surgical single-line edit in `AGENT-READABLE BACKLOG.md` (BUG-003 invariant): on the `### [>] \`[FEAT-025]\`` heading, `[>]` becomes `[X]`. Task 0 set that `[>]`; the uniqueness precheck looks for it, not for `[ ]`. Change nothing else on the line.
 
-- [ ] [T-004-E] Correct the FEAT-025 Components Affected line
+- [X] [T-004-E] Correct the FEAT-025 Components Affected line
 
 The same entry's **Components Affected** line names `.claude/scripts/` and `project-template/.claude/scripts/` mirrors that do not exist — `scripts/conductor-db.mjs` is the single source, deployed under `.claude/scripts/` by the installer. Replace that one line with:
 
@@ -556,7 +556,7 @@ The same entry's **Components Affected** line names `.claude/scripts/` and `proj
 * **Components Affected:** `scripts/conductor-db.mjs` (new `purgeTable` helper, two call sites), `tests/scripts/conductor-db.test.js`.
 ```
 
-- [ ] [T-004-F] Re-verify the backlog id ceiling
+- [X] [T-004-F] Re-verify the backlog id ceiling
 
 Run the **two-stage** pipeline — extract the bracketed ids, *then* the digits — over both the working tree and `origin/main`, taking the maximum. `origin/main` can carry an id filed on another branch since this one diverged; the working tree can carry one filed locally and not yet pushed, so checking either alone can miss a collision.
 
@@ -572,7 +572,7 @@ Expected: `029`, making 030 free. If it prints anything higher, file the follow-
 
 Never use the single-stage `grep -oE '[0-9]+$'` form recorded elsewhere in this repo: ids appear mid-line as `` `[FEAT-030]` ``, never at end-of-line, so the `$` anchor matches nothing and the pipeline exits 0 on empty output — a uniqueness guard that silently passes. Never `sort -u` the full id either; lexical order puts `BUG-027` above `FEAT-024`.
 
-- [ ] [T-004-G] File the FEAT-030 follow-up
+- [X] [T-004-G] File the FEAT-030 follow-up
 
 Append to the end of `AGENT-READABLE BACKLOG.md` (the tail of PILLAR 5), verbatim:
 
@@ -585,12 +585,12 @@ Append to the end of `AGENT-READABLE BACKLOG.md` (the tail of PILLAR 5), verbati
 * **Acceptance Criteria:** A byte budget bounds `SUM(LENGTH(snap_json))` on `snapshots`, deleting oldest-first under the same newest-per-key floor as FEAT-025 bound 2; the scan cost is paid only when a cheap row-count precondition indicates it may be needed; purge failures stay fail-open. Pick up only if a real `.conductor/cache.db` is observed above a few hundred MB — 28 KB measured 2026-09-22.
 ```
 
-- [ ] [T-004-H] Run the full suite
+- [X] [T-004-H] Run the full suite
 
 Run: `npm test`
 Expected: PASS, green before the commit.
 
-- [ ] [T-004-I] Commit
+- [X] [T-004-I] Commit
 
 Stage the five closeout files by name. Never `git add -A` here: it would sweep whatever
 else happens to be in the working tree at closeout time — a scratch file, an unrelated
@@ -607,19 +607,19 @@ git commit -m "chore: release 1.25.0"
 
 ## Test List
 
-- [ ] [T-TEST-001] Bound 1 boundary on `snapshots`: 2 seeded + 1 write stays at 3; 3 seeded + 1 write trims to the newest 3.
-- [ ] [T-TEST-002] The row inserted by the current command is never a deletion candidate (10 seeded on one hash → 3 rows, `get-snapshot` returns the new blob).
-- [ ] [T-TEST-003] `get-snapshot` is unaffected for every hash that still has a row.
-- [ ] [T-TEST-004] The purge ignores the clock: 1970-stamped rows under every bound survive.
-- [ ] [T-TEST-005] Fail-open: a `BEFORE DELETE … RAISE(ABORT)` trigger, seeded past bound 1, yields exit 0, the inserted row present, the row count otherwise unchanged, and exactly one stderr line matching `retention purge skipped (snapshots):`.
-- [ ] [T-TEST-006] Bound 2 boundary on `snapshots`: 199 + 1 = 200 untouched; 200 + 1 = 201 trims to 200 with every hash keeping its floor row.
-- [ ] [T-TEST-007] Bound 2 settles at `max(softCap, distinctKeys)`: 300 single-row hashes stay at 300, not 200.
-- [ ] [T-TEST-008] Bound 3 boundary: 499 + 1 = 500 untouched; 600 + 1 = 601 trims to exactly 500, newest hash present, oldest hash evicted.
-- [ ] [T-TEST-009] `raw_history` bound 1 disabled: 10 seeded on one session + 1 write = 11 rows.
-- [ ] [T-TEST-010] `raw_history` bound 2 boundary: 999 + 1 = 1000 untouched; 1000 + 1 = 1001 trims to 1000 with the just-written row newest.
-- [ ] [T-TEST-011] `raw_history` bound 3: 2000 distinct sessions + 1 write = 2001 floors, trimmed to 2000.
-- [ ] [T-TEST-012] Cross-table isolation in both directions: a `snapshots` purge and a `raw_history` purge each leave the other three tables' row counts unchanged.
-- [ ] [T-TEST-013] Non-regression: the existing 57 tests in `tests/scripts/conductor-db.test.js` — including `user_version = 2` — stay green, as does the rest of `npm test`.
+- [X] [T-TEST-001] Bound 1 boundary on `snapshots`: 2 seeded + 1 write stays at 3; 3 seeded + 1 write trims to the newest 3.
+- [X] [T-TEST-002] The row inserted by the current command is never a deletion candidate (10 seeded on one hash → 3 rows, `get-snapshot` returns the new blob).
+- [X] [T-TEST-003] `get-snapshot` is unaffected for every hash that still has a row.
+- [X] [T-TEST-004] The purge ignores the clock: 1970-stamped rows under every bound survive.
+- [X] [T-TEST-005] Fail-open: a `BEFORE DELETE … RAISE(ABORT)` trigger, seeded past bound 1, yields exit 0, the inserted row present, the row count otherwise unchanged, and exactly one stderr line matching `retention purge skipped (snapshots):`.
+- [X] [T-TEST-006] Bound 2 boundary on `snapshots`: 199 + 1 = 200 untouched; 200 + 1 = 201 trims to 200 with every hash keeping its floor row.
+- [X] [T-TEST-007] Bound 2 settles at `max(softCap, distinctKeys)`: 300 single-row hashes stay at 300, not 200.
+- [X] [T-TEST-008] Bound 3 boundary: 499 + 1 = 500 untouched; 600 + 1 = 601 trims to exactly 500, newest hash present, oldest hash evicted.
+- [X] [T-TEST-009] `raw_history` bound 1 disabled: 10 seeded on one session + 1 write = 11 rows.
+- [X] [T-TEST-010] `raw_history` bound 2 boundary: 999 + 1 = 1000 untouched; 1000 + 1 = 1001 trims to 1000 with the just-written row newest.
+- [X] [T-TEST-011] `raw_history` bound 3: 2000 distinct sessions + 1 write = 2001 floors, trimmed to 2000.
+- [X] [T-TEST-012] Cross-table isolation in both directions: a `snapshots` purge and a `raw_history` purge each leave the other three tables' row counts unchanged.
+- [X] [T-TEST-013] Non-regression: the existing 57 tests in `tests/scripts/conductor-db.test.js` — including `user_version = 2` — stay green, as does the rest of `npm test`.
 
 No integration seam outside this file and no UI is affected, so there is no E2E test.
 
