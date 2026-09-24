@@ -107,7 +107,109 @@ Execute one step at a time. Confirm between steps unless the developer explicitl
 
 ## Phase exit
 
-Once the plan is approved and saved, instruct the user:
+### Branch gate (runs before Task 0)
+
+Once the plan is approved and saved, work through this gate, then print the exit
+instruction in step 7.
+
+**Precondition on Task 0.** This gate runs to completion — the warning, the offer, and
+either the confirmed `git switch` or an explicit decline —
+**before any step of the approved plan's Task 0 executes**, including its `git add` /
+`git add -f` and its `git commit`. Its position in this file is not the guarantee; the
+execution order is.
+Under the plan-commit ritual, Task 0 runs at approval, which is exactly when a plan commit
+lands on the wrong branch.
+
+Skip the whole gate silently when `git rev-parse --git-dir` fails or `git` is absent. The
+gate is advisory: it must never block a completed plan from exiting its phase.
+
+**1. Read the current branch** — `git branch --show-current`.
+
+Empty output with exit 0 means **detached HEAD**. Warn with its own wording — "HEAD is
+detached at `<short sha>`; a commit here belongs to no branch" — and never read empty as
+"not on the default branch".
+
+**2. Resolve the default branch** — `git symbolic-ref --short refs/remotes/origin/HEAD`,
+stripping the leading `origin/`. On any non-zero exit, fall back to the literal set
+`{main, master}`. Never hardcode `main`. When the current branch equals it, warn: "You are
+on the default branch `<name>`; the plan commit would land there."
+
+**3. Derive the proposed branch name** from the active spec stem already in phase context
+(the same value `/cc-compact` writes as `sys.s`):
+
+- strip the leading `YYYY-MM-DD-` and the trailing `-design`;
+- read the leading id token — `feat025` → `FEAT-025`, `bug029` → `BUG-029`, `arch008` → `ARCH-008`;
+- prefix: `FEAT`/`ARCH` → `feat/`, `BUG` → `fix/` (`CONTRIBUTING.md:23`);
+- body: the rest of the stem, with the id token re-spelled `feat-025`;
+- `2026-09-22-feat025-conductor-db-retention-purge-design` → `feat/feat-025-conductor-db-retention-purge`.
+
+If the stem is missing or `none`, fall back to a root `AGENT-READABLE BACKLOG.md`: grep it
+for the id under discussion and derive from that heading's title. If neither source yields
+a name, still run steps 1-2 and their warnings, then ask the developer for a name rather
+than proposing one.
+
+**Sanitize before interpolating:** lowercase; collapse non-alphanumerics to a single `-`;
+trim leading and trailing `-`; cap the part after the prefix at 60 characters, truncated on
+a `-` boundary; always interpolate double-quoted. Then `git check-ref-format --branch
+"<name>"` is the authority — if it fails, or the sanitized name is empty, ask the developer
+for a name. **Do not write per-character reject passes** for `..`, `@{`, `~`, `^`, `\`, or a
+trailing `.lock`: the collapse rule already removes every one of them, so such passes are
+unreachable code.
+
+**4. Decide whether to stay silent.** Silence requires one of exactly two conditions:
+
+- (a) the current branch equals the derived name; or
+- (b) the current branch is feature-shaped (`feat/`, `fix/`, `chore/`, `docs/`) **and** the
+  id token embedded in its name matches the current item's id — `feat/feat-026-…` while
+  planning `FEAT-026`.
+
+Only then: no warning, no offer — go to step 7, because firing on every plan run is noise.
+In every other case, report both the current branch and the derived one and ask which to
+use; never switch silently. That explicitly includes a feature-shaped branch carrying a
+**different** id (`feat/feat-025-…` while planning `FEAT-026`) — shape never wins over id,
+or the new plan commit lands on the previous feature's branch. A feature-shaped branch with
+no extractable id token (a hand-made `feat/retention-purge`) fails (b) by design and falls
+through to report-and-ask; do not substitute fuzzy title matching.
+
+**5. Validate the Task 0 commit message from the approved plan.** The plan is the single
+source of truth for that message and Task 0 runs it verbatim, so this gate **validates** —
+it does not duplicate. Check the subject for:
+
+- **Conventional-Commits shape**, anchored to what `CONTRIBUTING.md:37` literally says:
+  "Commit messages follow Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`". Those
+  four are the documented set; another Conventional-Commits type this repository has shipped
+  (`test:`, `ci:`, `refactor:`) passes with a note, since `CONTRIBUTING.md` neither lists nor
+  forbids it.
+- **The id appears somewhere in the subject.** Bracketed suffix (`feat: bound raw_history
+  with the shared retention purge [FEAT-025]`) and inline prose (`docs: add the FEAT-025
+  retention purge implementation plan`) both pass. Do not demand the suffix.
+
+Report a malformed or absent message **before Task 0 begins**, proposing the corrected
+subject, so the plan is fixed at its source rather than patched at commit time.
+
+**Synthesize a message only when the plan carries none:** `<type>: <imperative summary>
+[<ID>]` — the suffix form, chosen for synthesis because it is unambiguous to generate; `type`
+is `docs` for a plan commit, since the plan file is documentation. On confirmation, write the
+synthesized message into the plan's Task 0 commit step; never hold it only in this gate.
+
+**6. Ask once, then act.** Present a single confirmation covering the current branch, the
+warning if one applies, the proposed branch name, and the validated or corrected Task 0
+subject.
+
+- Pre-check with `git rev-parse --verify --quiet "refs/heads/<name>"` before offering `-c`.
+  If the ref already exists, offer `git switch "<name>"` without `-c` instead, and name the
+  distinction in the prompt.
+- On **yes**: run `git switch -c "<name>"` (or the plain `git switch "<name>"`) and report
+  the resulting branch.
+- On **no**: print nothing further and continue. Declining is a no-op and the workflow
+  proceeds exactly as it did before this gate existed.
+- No git write — `switch -c`, `switch`, or `commit` — happens without this explicit
+  confirmation.
+- If `git switch` refuses because a tracked file would be overwritten, report git's own
+  message verbatim and stop. Do not stash, do not force, do not retry.
+- Any other git failure: warn once and continue to step 7.
+
+**7. Exit.** Only now instruct the user:
 
 > "Plan complete. Run `/cc-compact` now before starting implementation."
 

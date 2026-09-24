@@ -198,7 +198,7 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Components Affected:** `scripts/conductor-db.mjs` (new `purgeTable` helper, two call sites), `tests/scripts/conductor-db.test.js`.
 * **Acceptance Criteria:** Writes to `snapshots`/`raw_history` trigger (or a scheduled path performs) a bounded purge that keeps the most recent N rows or rows within a max-age window per key; purge failures remain non-fatal (fail-open, matching the existing `CONDUCTOR_DB:` warn-and-continue convention); `get-snapshot`/`get-session` behavior is unaffected by the purge.
 
-### [ ] `[FEAT-026]` Guided Branch Creation and Commit Drafting for Backlog Work
+### [X] `[FEAT-026]` Guided Branch Creation and Commit Drafting for Backlog Work
 * **Description:** No part of the project automates the Git side of picking up a backlog item: branch creation and commit-message drafting are manual, guided only by the naming/format convention documented in `CONTRIBUTING.md`. Add a step (e.g. at `/cc-spec` or `/cc-plan` approval, or a new `/cc-branch` helper) that offers to create a descriptively named branch (derived from the `[FEAT-XXX]`/`[BUG-XXX]` id and title) and drafts a Conventional-Commits-style commit message from the resulting diff.
 * **Impact:** Removes manual naming/formatting friction for routine backlog work while keeping every Git write auditable and explicit.
 * **Components Affected:** `project-template/.claude/commands/cc-spec.md` / `cc-plan.md` (trigger point), possible new `cc-branch` command, both command mirrors.
