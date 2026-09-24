@@ -192,7 +192,7 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Acceptance Criteria:** Ensure robust test coverage across stack identification, template interpolation, and tool boundary filtering, binding test runs as a mandatory criteria before any backlog item change can be committed.
 
 
-### [ ] `[FEAT-025]` Retention Purge for the Conductor Cache DB (`snapshots` / `raw_history`)
+### [>] `[FEAT-025]` Retention Purge for the Conductor Cache DB (`snapshots` / `raw_history`)
 * **Description:** `scripts/conductor-db.mjs` inserts new rows into `snapshots` (one per checkpoint/compact, keyed by git commit hash) and `raw_history` (one per recorded event) with no eviction path — both tables grow without bound over the life of a repo. Add a bounded retention mechanism (e.g. keep only the last N rows per `session_id`/`git_commit_hash`, or a max-age window) so `.conductor/cache.db` stays small over time.
 * **Impact:** Prevents unbounded disk growth of the local cache DB without weakening context restoration: `get-snapshot` already only ever reads the most recent row per commit hash (`ORDER BY id DESC LIMIT 1`) and `sessions` is already upserted to one row per `session_id`, so purging older `snapshots`/`raw_history` rows does not remove data any current read path depends on.
 * **Components Affected:** `scripts/conductor-db.mjs` (`applySchema`, `upsert`/insert helpers, new purge routine), both `.claude/scripts/` and `project-template/.claude/scripts/` mirrors.
