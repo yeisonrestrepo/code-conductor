@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.26.0] - 2026-09-24
+
+### Added
+
+- **[FEAT-026]** A branch gate at the `/cc-plan` phase exit. Before any step of the approved plan's Task 0 runs — force-add and commit included — the agent reads `git branch --show-current`, resolves the default branch from `refs/remotes/origin/HEAD` (falling back to `{main, master}`, never hardcoded), and warns when HEAD sits on it or is detached. It derives a conventional branch name from the active spec stem (`2026-09-22-feat025-…-design` → `feat/feat-025-conductor-db-retention-purge`), sanitizes it and defers to `git check-ref-format`, and validates the commit message the plan's own Task 0 already carries against `CONTRIBUTING.md`'s Conventional-Commits rule, synthesizing one only when the plan has none. Staying silent requires an exact branch-name match or a feature-shaped branch whose embedded id matches the current item — shape alone is not enough. Every git write stays behind an explicit confirmation; declining is a no-op, and an absent repository or any git failure skips the gate without blocking the phase exit.
+
 ## [1.25.0] - 2026-09-24
 
 ### Added
