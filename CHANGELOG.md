@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.28.0] - 2026-09-25
+
+### Fixed
+
+- **[BUG-036]** Code Conductor advertised four `pre-tool-use` guards. On a deployed machine none of them had ever fired, for four independent reasons. Both `settings.json` files wired `PreToolUse` with `matcher: "Write|Edit|create_file|write_file"`, so a `Read` never reached the hook at all and the two guards that exist to catch one were unreachable. The script read `CLAUDE_TOOL_NAME` and `CLAUDE_TOOL_INPUT` from the environment, but the platform passes `{tool_name, tool_input}` as JSON on stdin, and no environment contract is documented anywhere in the hooks reference. Blocking was attempted with `exit 1`, which the contract defines as a non-blocking error. Guard 4's path check shelled out to `python3 -c` with `2>/dev/null || true`, so a Python-free host produced neither `BLOCK` nor `OK` and the read was allowed. The hook is now a single zero-dependency Node front door, `pre-tool-use.mjs`, that parses stdin once, dispatches on `tool_name`, and denies through `hookSpecificOutput.permissionDecision` with exit 0 on every path. Guard 2 returns `"ask"`, which is what its three-option prompt always meant; it accepts `file_path` with `path` as a compatibility fallback, having previously read only `path`, which no tool sends; and it is scoped to `Write`, `create_file` and `write_file`, because gating `Edit` would prompt on the very action the guard recommends. Input the hook cannot parse fails closed with one stderr line and a `CC_HOOK_ALLOW=1` override whose scope is pinned by a test that proves a well-formed `graphify-out/` read is still denied with it set. A new integration harness invokes the hook exactly as Claude Code does, which is the layer the 125 existing guard tests never touched.
+- **[BUG-037] is not fixed here.** Guard 3, the twelve-pattern bash command scanner, has never shipped: the deployed template carried none of it. Its implementation is preserved as `tests/fixtures/guard3-reference.sh`, its 108 cases still run against it, and the front door's Guard 3 slot is declared and empty until that port lands.
+
+Existing installations: re-run the installer to apply. Be aware of `[BUG-035]` before you do: the installer force-copies `settings.json` over the host's, so any `UserPromptSubmit` entry you added yourself is lost in that re-run. Back the file up if it carries entries you own.
+
 ## [1.27.2] - 2026-09-25
 
 ### Fixed
