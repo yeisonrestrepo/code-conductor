@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.27.2] - 2026-09-25
+
+### Fixed
+
+- **[BUG-033]** The `UserPromptSubmit` graph refresh hook was wired as `python ~/.claude/hooks/graphify-ast-refresh.py`, but the script's own shebang is `python3` and Apple removed the bare `python` shim in macOS 12.3, so every single prompt printed `python: command not found`. Nothing was functionally lost, which is the worst version of this bug: it trains a developer to ignore hook output, and that is how a real hook failure gets missed. The interpreter name is corrected, and the wiring is now a zero-dependency Node wrapper (`global/hooks/graphify-ast-refresh.mjs`) that checks the sentinel's freshness first, then scans `PATH` for `python3` or `python` (override with `GRAPHIFY_PYTHON`) without executing anything, and exits 0 in silence when no interpreter exists. `CC_GRAPHIFY_DEBUG=1` reveals the single line it otherwise swallows. The command string moved out of the shipped `settings.json` and into the installer as an absolute forward-slash path, mirroring the verbosity hook: a hook command without `args` runs under PowerShell on a Windows host with no Git Bash, and PowerShell does not expand a bare `~/...` passed to an external program. The Python payload is unchanged. A new test reads the shipped `global/settings.json` directly, which nothing did before, which is why the wrong interpreter shipped unnoticed.
+
+Existing installations: re-run the installer to apply.
+
 ## [1.27.1] - 2026-09-25
 
 ### Fixed
