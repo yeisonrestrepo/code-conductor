@@ -87,6 +87,17 @@ Each step must include:
 - Action (create / modify / delete)
 - What changes and why
 - Whether it has a dependency on a previous step
+- **Step ordering within a task.** A step that stages a file - any form of `git add` (`-f`,
+  `-A`, `-u`, `--all`, `.`, or an explicit path) - must come after every step in the same
+  commit group that edits that file. A commit group is the contiguous run of steps ending at a
+  `git commit` step; a task with two commits has two groups. A step that stages implicitly,
+  such as `git commit -a`, counts as its own staging step, so every edit of a file it will
+  commit must precede it. A task that mixes edits with a commit orders its steps edit, then
+  stage, then commit. A staging step for a file the task never edits is unaffected by this
+  rule; never invent an edit step to satisfy it. `cc-implement` executes checkbox lines in file
+  order, so a staging step placed above its edit commits the file's previous content while
+  every checkbox still reports `[X]`, and the divergence surfaces only at whatever later task
+  asserts on that file's expected state, pointing at the wrong task.
 
 ## Test List
 - [ ] Unit tests for [unit]
