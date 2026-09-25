@@ -63,13 +63,13 @@ Use this checklist when your environment restricts hook execution (restricted Po
 
 ### Resetting the Pre-Commit Hook to Upstream
 
-If your local `.claude/hooks/pre-tool-use.sh` has diverged (e.g., manual edits, failed
+If your local `.claude/hooks/pre-tool-use.mjs` has diverged (e.g., manual edits, failed
 partial upgrade), delete it and re-run the installer to pull the current version from the
 project template:
 
 **macOS / Linux / Windows:**
 ```bash
-rm .claude/hooks/pre-tool-use.sh   # (PowerShell: Remove-Item .claude\hooks\pre-tool-use.sh)
+rm .claude/hooks/pre-tool-use.mjs   # (PowerShell: Remove-Item .claude\hooks\pre-tool-use.mjs)
 code-conductor --project
 ```
 

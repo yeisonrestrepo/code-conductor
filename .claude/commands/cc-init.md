@@ -90,16 +90,15 @@ Run `/graphify .` to build or refresh the project knowledge graph from the curre
 
 ## Step 6 — Hook integrity check
 
-Verify `.claude/hooks/pre-tool-use.sh` exists and is executable:
+Verify `.claude/hooks/pre-tool-use.mjs` exists. It is launched as `node <path>`, so it needs no execute bit:
 
 ```bash
-HOOK=".claude/hooks/pre-tool-use.sh"
+HOOK=".claude/hooks/pre-tool-use.mjs"
 if [ ! -f "$HOOK" ]; then
   echo "⚠️  Hook missing: $HOOK"
-  echo "Run: bash install.sh  (or copy from project-template/.claude/hooks/)"
+  echo "Run: npx code-conductor --project  (or copy from project-template/.claude/hooks/)"
   exit 1
 fi
-[ -x "$HOOK" ] || chmod +x "$HOOK"
 echo "✓ Hook OK: $HOOK"
 ```
 
