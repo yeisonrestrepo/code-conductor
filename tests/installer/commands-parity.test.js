@@ -51,3 +51,39 @@ describe('cc-plan mirrors', () => {
     }
   });
 });
+
+const INIT_MIRRORS = ['.claude/commands/cc-init.md', 'project-template/.claude/commands/cc-init.md'];
+
+describe('cc-init mirrors', () => {
+  it('differ only in the script path nesting', () => {
+    expect(unnest(read(INIT_MIRRORS[1]))).toBe(read(INIT_MIRRORS[0]));
+  });
+
+  it('the template resolves the scripts to their deployed location', () => {
+    expect(read(INIT_MIRRORS[1])).toContain('node .claude/scripts/init-wizard.mjs report');
+    expect(read(INIT_MIRRORS[1])).toContain('node .claude/scripts/detect-stack.mjs');
+  });
+
+  it.each(INIT_MIRRORS)('%s sequences report before check before apply', (rel) => {
+    const text = read(rel);
+    const report = text.indexOf('init-wizard.mjs report');
+    const check  = text.indexOf('init-wizard.mjs check build --value-stdin');
+    const apply  = text.indexOf('init-wizard.mjs apply build --value-stdin');
+    expect(report).toBeGreaterThan(-1);
+    expect(report).toBeLessThan(check);
+    expect(check).toBeLessThan(apply);
+  });
+
+  it.each(INIT_MIRRORS)('%s pins the quoted heredoc as the value channel', (rel) => {
+    const text = read(rel);
+    expect(text).toContain("<<'CC_VALUE'");
+    expect(text).toContain('--value-stdin');
+  });
+
+  it.each(INIT_MIRRORS)('%s no longer carries the superseded wording', (rel) => {
+    const text = read(rel);
+    expect(text).not.toContain('(any case)');          // the predicate is case-sensitive
+    expect(text).not.toContain('stdin is not a TTY');  // agent Bash never has one
+    expect(text).not.toContain('If **Name** is still empty');
+  });
+});
