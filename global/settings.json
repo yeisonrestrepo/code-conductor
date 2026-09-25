@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python ~/.claude/hooks/graphify-ast-refresh.py"
+            "command": "python3 ~/.claude/hooks/graphify-ast-refresh.py"
           }
         ]
       }

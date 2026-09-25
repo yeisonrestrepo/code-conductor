@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, readdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { verbosityHookCommand, mergeVerbosityHook, pruneMalformedBackups, utcStamp, pruneBackups } from '../../lib/installer/settings.mjs';
 
 let dir, sp;
@@ -24,7 +25,7 @@ describe('verbosityHookCommand', () => {
 describe('mergeVerbosityHook', () => {
   it('adds the hook to a graphify-only settings file (fresh install)', () => {
     writeFileSync(sp, JSON.stringify({ hooks: { UserPromptSubmit: [
-      { matcher: '', hooks: [{ type: 'command', command: 'python ~/.claude/hooks/graphify-ast-refresh.py' }] }
+      { matcher: '', hooks: [{ type: 'command', command: 'python3 ~/.claude/hooks/graphify-ast-refresh.py' }] }
     ] } }));
     expect(mergeVerbosityHook(sp, CMD).status).toBe('merged');
     const arr = JSON.parse(readFileSync(sp, 'utf8')).hooks.UserPromptSubmit;
@@ -118,5 +119,18 @@ describe('utcStamp + pruneBackups', () => {
     pruneBackups(target, '.installer-backup.', 0);
     expect(existsSync(`${target}.malformed-backup.20260101T000000Z`)).toBe(true);
     expect(existsSync(`${target}.installer-backup.20260101T000000Z`)).toBe(false);
+  });
+});
+
+// The first test in this suite that reads the SHIPPED asset rather than a temp
+// fixture. Line 27 above is fixture input to mergeVerbosityHook, not a claim
+// about what code-conductor ships, which is why the wrong interpreter shipped
+// unnoticed: nothing looked at global/settings.json at all.
+describe('shipped global/settings.json', () => {
+  const SHIPPED = resolve(dirname(fileURLToPath(import.meta.url)), '../../global/settings.json');
+  it('wires the graphify hook with python3, not the bare python macOS removed', () => {
+    const o = JSON.parse(readFileSync(SHIPPED, 'utf8'));
+    const cmds = o.hooks.UserPromptSubmit.flatMap(e => e.hooks.map(h => h.command));
+    expect(cmds).toContain('python3 ~/.claude/hooks/graphify-ast-refresh.py');
   });
 });
