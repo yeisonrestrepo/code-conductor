@@ -31,6 +31,16 @@ describe('run', () => {
     const hits = s.hooks.UserPromptSubmit.filter(e => e.hooks.some(h => h.command.includes('verbosity-remind.sh')));
     expect(hits).toHaveLength(1);
   });
+  it('writes the graphify hook as an absolute node command with no tilde', () => {
+    run([], { HOME: home }, { cwd, log });
+    const s = JSON.parse(readFileSync(join(home, '.claude', 'settings.json'), 'utf8'));
+    const graphify = s.hooks.UserPromptSubmit
+      .flatMap(e => e.hooks.map(h => h.command))
+      .filter(c => c.includes('graphify-ast-refresh'));
+    expect(graphify).toHaveLength(1);
+    expect(graphify[0]).toBe(`node ${join(home, '.claude', 'hooks', 'graphify-ast-refresh.mjs').replace(/\\/g, '/')}`);
+    expect(graphify[0]).not.toContain('~');
+  });
   it('with --project also deploys into cwd/.claude', () => {
     const rc = run(['--project'], { HOME: home }, { cwd, log });
     expect(rc).toBe(0);

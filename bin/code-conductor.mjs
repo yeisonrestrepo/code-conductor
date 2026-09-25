@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { resolveAssetRoot, resolveHome, nodeMajorAtLeast } from '../lib/installer/env.mjs';
 import { assertAssets, assertMergeTargets, deployGlobal, deployProject, chmodHooks } from '../lib/installer/deploy.mjs';
-import { verbosityHookCommand, mergeVerbosityHook } from '../lib/installer/settings.mjs';
+import { verbosityHookCommand, mergeVerbosityHook, graphifyHookCommand, mergeGraphifyHook } from '../lib/installer/settings.mjs';
 import { writeVerbosity, seedMemoryFile, writeVersionFile } from '../lib/installer/config.mjs';
 
 const USAGE = `Usage: code-conductor [--project] [--verbosity MIN|INFO|VERBOSE] [--version] [--help]`;
@@ -96,6 +96,7 @@ export function run(argv, env = process.env, { cwd = process.cwd(), log } = {}) 
     const v = writeVerbosity(home, assetRoot, opts.verbosity, opts.verbosityGiven);
     if (v.warn) emit('stderr', v.warn);
     mergeVerbosityHook(join(claudeDir, 'settings.json'), verbosityHookCommand(home));
+    mergeGraphifyHook(join(claudeDir, 'settings.json'), graphifyHookCommand(home));
     writeVersionFile(home, pkgVersion(assetRoot));
     if (opts.project) deployProject(assetRoot, cwd);
     return 0;

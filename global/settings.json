@@ -7,18 +7,5 @@
       "Bash(cat:*)"
     ],
     "deny": []
-  },
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python ~/.claude/hooks/graphify-ast-refresh.py"
-          }
-        ]
-      }
-    ]
   }
 }
