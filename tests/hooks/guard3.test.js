@@ -65,46 +65,26 @@ function runRead() {
   return result.status ?? -1
 }
 
+// The allowlist is now a file both subjects read, so the harness writes it into a
+// throwaway cwd instead of splicing the hook. Every spawn gets a fresh cwd, which
+// also guarantees the suite can never read the developer's own .claude/memory/.
 function runAllowlisted(cmd, entries) {
-  const lines = fs.readFileSync(HOOK, 'utf8').replace(/\r\n|\r/g, '\n').split('\n')
-  // Dynamically locate BASH_SCAN_ALLOWLIST block to preserve the actual script
-  // header. Handles both single-line `=()` and multi-line `=(\n...\n)` by
-  // tracking parenthesis depth rather than assuming line structure.
-  const startIdx = lines.findIndex(l => /^BASH_SCAN_ALLOWLIST\s*=/.test(l))
-  if (startIdx === -1) throw new Error('BASH_SCAN_ALLOWLIST= not found in hook')
-  let depth = 0
-  let endIdx = startIdx
-  let closeCharPos = -1
-  outer: for (let i = startIdx; i < lines.length; i++) {
-    for (let k = 0; k < lines[i].length; k++) {
-      const ch = lines[i][k]
-      if (ch === '(') depth++
-      else if (ch === ')') {
-        depth--
-        if (depth <= 0) { endIdx = i; closeCharPos = k; break outer }
-      }
-    }
-  }
-  // Preserve any content on the closing-paren line after `)` (e.g., inline comments).
-  const closingSuffix = closeCharPos >= 0 ? lines[endIdx].slice(closeCharPos + 1) : ''
-  const header = lines.slice(0, startIdx).join('\n')
-  const restLines = lines.slice(endIdx + 1).join('\n')
-  const tail = closingSuffix ? closingSuffix + (restLines ? '\n' + restLines : '') : restLines
-  const modified = `${header}\nBASH_SCAN_ALLOWLIST=(${entries})\n${tail}`
-  const tmpDir = fs.mkdtempSync(join(TESTS_TMP, 'cc-guard3-'))
-  const tmpHook = join(tmpDir, 'hook.sh')
+  const dir = fs.mkdtempSync(join(TESTS_TMP, 'cc-guard3-'))
   try {
-    fs.writeFileSync(tmpHook, modified, 'utf8')
-    const result = spawnSync(BASH, [tmpHook], {
+    if (entries && entries.length) {
+      fs.mkdirSync(join(dir, '.claude', 'memory'), { recursive: true })
+      fs.writeFileSync(join(dir, '.claude', 'memory', 'bash-scan-allowlist.txt'), entries.join('\n') + '\n', 'utf8')
+    }
+    const result = spawnSync(BASH, [HOOK], {
       stdio: 'pipe',
-      cwd: REPO_ROOT,
+      cwd: dir,
       timeout: 10000,
       env: { ...process.env, CLAUDE_TOOL_NAME: 'Bash', CLAUDE_TOOL_INPUT: jsonCmd(cmd) },
     })
     if (result.error) throw new Error(`bash spawn failed (${result.error.code}): ${result.error.message}`)
     return result.status ?? -1
   } finally {
-    fs.rmSync(tmpDir, { recursive: true, force: true })
+    fs.rmSync(dir, { recursive: true, force: true })
   }
 }
 
@@ -281,12 +261,12 @@ describe.skipIf(!BASH)('guard3 - pre-tool-use.sh', () => {
   })
 
   describe('allowlist', () => {
-    it('docs/ permits glob in docs/', () => expect(runAllowlisted('cat docs/*.md', '"docs/"')).toBe(0))
-    it('does NOT permit unrelated path', () => expect(runAllowlisted('cat src/*.ts', '"docs/"')).not.toBe(0))
-    it('trailing-comment bypass blocked', () => expect(runAllowlisted('cat *.ts # docs/', '"docs/"')).not.toBe(0))
-    it('path-traversal rejected', () => expect(runAllowlisted('cat docs/../../etc/*.conf', '"docs/"')).not.toBe(0))
-    it('exact match (no trailing slash)', () => expect(runAllowlisted('cat file.ts', '"file.ts"')).toBe(0))
-    it('substring not matched (docs vs doc_files)', () => expect(runAllowlisted('cat doc_files/*.ts', '"docs/"')).not.toBe(0))
+    it('docs/ permits glob in docs/', () => expect(runAllowlisted('cat docs/*.md', ['docs/'])).toBe(0))
+    it('does NOT permit unrelated path', () => expect(runAllowlisted('cat src/*.ts', ['docs/'])).not.toBe(0))
+    it('trailing-comment bypass blocked', () => expect(runAllowlisted('cat *.ts # docs/', ['docs/'])).not.toBe(0))
+    it('path-traversal rejected', () => expect(runAllowlisted('cat docs/../../etc/*.conf', ['docs/'])).not.toBe(0))
+    it('exact match (no trailing slash)', () => expect(runAllowlisted('cat file.ts', ['file.ts'])).toBe(0))
+    it('substring not matched (docs vs doc_files)', () => expect(runAllowlisted('cat doc_files/*.ts', ['docs/'])).not.toBe(0))
   })
 
 })

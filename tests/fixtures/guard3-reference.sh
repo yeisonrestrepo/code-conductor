@@ -6,6 +6,16 @@
 # slot is declared and empty. These twelve patterns are the behavioral authority
 # the [BUG-037] port is verified against, exercised unchanged by the 108 cases in
 # tests/hooks/guard3.test.js. Do not edit to make a port pass.
+#
+# Two sanctioned exceptions exist, both recorded in
+# docs/superpowers/specs/2026-09-25-bug037-guard3-port-and-first-ship-design.md:
+#   1. The allowlist is populated from .claude/memory/bash-scan-allowlist.txt
+#      instead of an array literal, so both subjects read one source.
+#   2. The port escapes allowlist entries and matches them literally, where this
+#      file interpolates them raw into an ERE. Entry file.ts therefore allows
+#      "cat fileXts" here and denies it there. That inequality is asserted by
+#      design in the corpus EXCEPTIONS table; it is not a port defect.
+# Nothing else in this file moves.
 
 set -euo pipefail
 # ── Guard 3 helpers (defined before Guard 3 block; added incrementally per task) ─
@@ -371,8 +381,24 @@ _g3_p3_xargs() {
 
 # ── Guard 3: Bash command scan ─────────────────────────────────────────────────
 # BASH_SCAN_ALLOWLIST: exact literal path tokens the guard permits.
-# Operators add entries here. Agents must NEVER modify this array.
+# Populated from .claude/memory/bash-scan-allowlist.txt, resolved against the
+# process cwd, so operator policy survives an installer re-run. Absent or
+# unreadable means an empty list. Blank lines and # comments are skipped, and
+# each entry is trimmed. This is one of the two sanctioned edits to this file;
+# see the header.
 BASH_SCAN_ALLOWLIST=()
+_g3_allowlist_file=".claude/memory/bash-scan-allowlist.txt"
+if [ -r "$_g3_allowlist_file" ]; then
+  while IFS= read -r _g3_line || [ -n "$_g3_line" ]; do
+    _g3_line="${_g3_line%$'\r'}"
+    _g3_line="${_g3_line#"${_g3_line%%[![:space:]]*}"}"
+    _g3_line="${_g3_line%"${_g3_line##*[![:space:]]}"}"
+    [ -z "$_g3_line" ] && continue
+    case "$_g3_line" in '#'*) continue ;; esac
+    BASH_SCAN_ALLOWLIST+=("$_g3_line")
+  done < "$_g3_allowlist_file"
+fi
+unset _g3_line _g3_allowlist_file
 
 if [ "${CLAUDE_TOOL_NAME:-}" = "Bash" ]; then
   _G3_CMD=$(_g3_extract_command "${CLAUDE_TOOL_INPUT:-}")
