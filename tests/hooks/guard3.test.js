@@ -7,7 +7,10 @@ import fs from 'fs'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const REPO_ROOT = resolve(__dirname, '../..')
-const HOOK = join(REPO_ROOT, '.claude/hooks/pre-tool-use.sh')
+// The frozen corpus subject, not a shipped artifact: the deployed hook is
+// pre-tool-use.mjs, whose Guard 3 slot is empty until [BUG-037]. These 108 cases are
+// the behavioral authority that port is verified against, so not one of them moves.
+const HOOK = join(REPO_ROOT, 'tests/fixtures/guard3-reference.sh')
 const TESTS_TMP = join(REPO_ROOT, 'tests', '.tmp')
 
 // Detect bash availability. On Windows without Git for Windows in PATH, all tests are skipped

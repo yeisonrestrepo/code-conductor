@@ -2,7 +2,7 @@
 # Guard 3 test harness. Run from repo root: bash tests/guard3-test.sh
 set -euo pipefail
 
-HOOK=".claude/hooks/pre-tool-use.sh"
+HOOK="tests/fixtures/guard3-reference.sh"
 PASS=0; FAIL=0
 
 # Pure-Bash JSON string builder: escapes a raw shell command for embedding in JSON.

@@ -178,13 +178,17 @@ Node hosts the check because Python is what is being probed: on a machine with n
 
 ### pre-tool-use
 
-Fires before every tool call. Three guards:
+Fires before `Read`, `Write`, `Edit`, `create_file`, `write_file` and `Bash`. A single zero-dependency Node front door (`pre-tool-use.mjs`) reads the `PreToolUse` payload from stdin, dispatches on `tool_name`, and returns its verdict as `hookSpecificOutput.permissionDecision`. Every path exits 0: a denial is data, never an exit code.
 
-**Large-file Read guard** — if Claude tries to read a file with more than 150 lines without specifying an `offset` and `limit`, the call is blocked and Claude is redirected to the orchestrator lookup chain (memory → graph → grep → targeted read). Prevents reading entire codebases when a targeted search would do.
+**Large-file Read guard (Guard 1)** - a `Read` of a file over 150 lines that names no `limit` is denied, and the reason redirects Claude to the orchestrator lookup chain (memory, graph, grep, targeted read). Prevents reading entire codebases when a targeted search would do.
 
-**Duplicate file guard** — if Claude tries to write or create a file that already exists, it prints a warning showing the file path, line count, and last-modified timestamp, then presents three options: overwrite, edit in place, or cancel. Prevents silently replacing files you've already configured.
+**Duplicate file guard (Guard 2)** - a `Write`, `create_file` or `write_file` naming a path that already exists returns `ask`, showing the path, line count and last-modified timestamp with three options: edit in place, confirm the overwrite, or cancel. `Edit` is deliberately not gated, because editing in place is the action this guard recommends.
 
-**Bash scan guard (Guard 3)** — intercepts every Bash tool call and pattern-matches the command string against 12 mass content-dump patterns before execution: deep `find` without `maxdepth 1`, `find -exec` with readers/shells, `xargs` with readers, `cat`/pager/grep with unquoted globs, command substitution with readers, shell loops, `mapfile`/`readarray`, `eval`/`source`/dot operator, alias remapping to readers, and obfuscation sequences. Commands over 8192 characters and unclosed quotes are blocked fail-closed. Operators can whitelist specific directory prefixes or exact tokens via `BASH_SCAN_ALLOWLIST` in the hook file.
+**Bash scan guard (Guard 3)** - not shipped yet. `Bash` already routes to the guard's slot and the slot is empty. The twelve-pattern scanner is verified in this repository against `tests/fixtures/guard3-reference.sh` and ships in `[BUG-037]`.
+
+**graphify-out and node_modules guard (Guard 4)** - a `Read` whose path carries `graphify-out` or `node_modules` as an exact path component is denied, with backslashes and `..` resolved first. Use Glob for existence checks and the graphify skill for graph questions.
+
+Input the hook cannot parse fails closed: it is denied with one stderr line naming `CC_HOOK_ALLOW=1`, which overrides that denial alone and leaves every guard fully active on every payload the hook can read. Set `CC_HOOK_DEBUG=1` to see the diagnostic lines it otherwise swallows.
 
 ### context-guard *(global + project)* — v1.15.0
 
@@ -298,7 +302,7 @@ code-conductor/
 │       │   ├── cc-test.md        /cc-test
 │       │   └── cc-docs.md        /cc-docs
 │       ├── hooks/
-│       │   ├── pre-tool-use.sh   Large-file read guard + duplicate file guard + bash scan guard
+│       │   ├── pre-tool-use.mjs  Node front door: large-file, duplicate-write and graphify-out guards
 │       │   ├── context-guard.sh  Turn-counter warning (.sh + .ps1)
 │       │   └── post-compact.sh   Checkpoint reminder + cache sweep after `/compact` (.sh + .ps1)
 │       └── memory/

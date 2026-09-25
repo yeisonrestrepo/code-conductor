@@ -82,3 +82,37 @@ describe('shipped asset dirs', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+const SETTINGS = ['.claude/settings.json', 'project-template/.claude/settings.json'];
+const HOOK_MIRRORS = ['.claude/hooks/pre-tool-use.mjs', 'project-template/.claude/hooks/pre-tool-use.mjs'];
+const readText = (rel) => readFileSync(join(root, rel), 'utf8').replace(/\r\n/g, '\n');
+
+describe('pre-tool-use wiring', () => {
+  it('ships the front door as one byte-identical mirrored pair', () => {
+    expect(readText(HOOK_MIRRORS[0])).toBe(readText(HOOK_MIRRORS[1]));
+  });
+
+  // Read and Bash are asserted by name: their absence from the matcher is the defect
+  // that made Guards 1, 3 and 4 unreachable on every deployed machine.
+  it.each(SETTINGS)('%s gates Read and Bash through one union matcher', (rel) => {
+    const entries = JSON.parse(readText(rel)).hooks.PreToolUse;
+    expect(entries).toHaveLength(1);
+    expect(entries[0].matcher).toBe('Read|Write|Edit|create_file|write_file|Bash');
+    expect(entries[0].matcher.split('|')).toContain('Read');
+    expect(entries[0].matcher.split('|')).toContain('Bash');
+    expect(entries[0].hooks.map(h => h.command)).toEqual(['node .claude/hooks/pre-tool-use.mjs']);
+  });
+
+  it('leaves no CLAUDE_TOOL_NAME or CLAUDE_TOOL_INPUT reference in the shipped tree', () => {
+    const offenders = [];
+    const walk = (dir, rel) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (entry.isDirectory()) { walk(join(dir, entry.name), `${rel}/${entry.name}`); continue; }
+        const text = readFileSync(join(dir, entry.name), 'utf8');
+        if (/CLAUDE_TOOL_(NAME|INPUT)/.test(text)) offenders.push(`${rel}/${entry.name}`);
+      }
+    };
+    for (const d of ['global', 'project-template']) walk(join(root, d), d);
+    expect(offenders).toEqual([]);
+  });
+});
