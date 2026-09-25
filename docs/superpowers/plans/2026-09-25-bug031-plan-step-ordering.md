@@ -385,7 +385,7 @@ grep -n '^### \[>\] `\[BUG-031\]`' "AGENT-READABLE BACKLOG.md"
 `Edit`, `### [>]` to `### [X]`, every byte after the checkbox unchanged. This edit lands
 **before** T-002-E stages the file.
 
-- [>] [T-002-E] Commit
+- [X] [T-002-E] Commit
 
 ```bash
 npm test
