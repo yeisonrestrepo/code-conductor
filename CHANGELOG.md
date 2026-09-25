@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.27.1] - 2026-09-25
+
+### Fixed
+
+- **[BUG-031]** `/cc-plan`'s generation rules said nothing about where a staging step belongs relative to the edits it captures, so a generated task could `git add` a tracking file before the step that flips it. `cc-implement` walks checkbox lines in file order, so such a plan commits the file's previous content while every checkbox still reports `[X]`, and the divergence surfaces only at whatever later task asserts on that file's state, pointing at the wrong task. The `## Ordered Steps` rules now carry an explicit step-ordering bullet that defines its own terms (a commit group is the contiguous run of steps ending at a `git commit`), covers any form of `git add` and the implicit stage of `git commit -a`, exempts staging a file the task never edits without inviting dummy edit steps, and names the consequence. The rule ships in both `cc-plan.md` mirrors and is pinned by an occurrence-counted anchor in the parity suite.
+
 ## [1.27.0] - 2026-09-24
 
 ### Added

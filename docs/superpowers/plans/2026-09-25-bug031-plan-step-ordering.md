@@ -57,7 +57,7 @@ meant. Then one surgical `Edit` on that line, `### [ ]` to `### [>]`, every byte
 checkbox unchanged. The edit must land **before** T-000-C stages it, or the flip never reaches
 the commit. This ordering is the defect BUG-031 exists to prevent; it is deliberate here.
 
-- [>] [T-000-C] Commit the plan, the spec memory, and the flipped backlog
+- [X] [T-000-C] Commit the plan, the spec memory, and the flipped backlog
 
 `.claude/` and `docs/` are both gitignored, so both need `-f`. `git add` under `.claude/` exits 1
 while still staging - keep `git commit` on its own line, never chained.
@@ -94,7 +94,7 @@ The spec file stays **untracked**; do not add `docs/superpowers/specs/2026-09-24
 - Consumes: the branch and the committed plan from Task 0.
 - Produces: the rule text in both mirrors; the test constants `NORM` (`(s) => s.replace(/\s+/g, ' ').trim()`) and `ORDERING_CLAUSE` (a single-quoted string) in `tests/installer/commands-parity.test.js`, both local to that file.
 
-- [ ] [T-001-A] Run the three preconditions
+- [X] [T-001-A] Run the three preconditions
 
 **(1) Mirror-`sed` hazard grep on the rule text.** The two live substitution patterns must not
 appear in the text being inserted, or regeneration would rewrite the rule in the template only
@@ -175,7 +175,7 @@ awk '/^- Whether it has a dependency on a previous step$/{a=NR} /^## Test List$/
 Expect **`1`**. `0` means the two anchors are no longer separated by exactly one blank line:
 halt and re-derive the `old_string` from the file rather than forcing the edit.
 
-- [ ] [T-001-B] Write the failing anchor test
+- [X] [T-001-B] Write the failing anchor test
 
 Add to `tests/installer/commands-parity.test.js`, inside the existing `describe('cc-plan mirrors', ...)`
 block, after the `pins the exact git invocations the gate depends on` test and before the
@@ -201,7 +201,7 @@ closing `});` of that describe:
   });
 ```
 
-- [ ] [T-001-C] Run the new test to verify it fails
+- [X] [T-001-C] Run the new test to verify it fails
 
 ```bash
 npx vitest run tests/installer/commands-parity.test.js
@@ -212,7 +212,7 @@ Expected: **FAIL**, two cases (`.claude/commands/cc-plan.md` and
 assertion in the file still passes. A failure of any other test means something unrelated broke:
 halt and report.
 
-- [ ] [T-001-D] Insert the rule as the last bullet of `## Ordered Steps`
+- [X] [T-001-D] Insert the rule as the last bullet of `## Ordered Steps`
 
 One `Edit` on `.claude/commands/cc-plan.md`. `old_string` is the located bullet plus the blank
 line and heading that follow it:
@@ -245,7 +245,7 @@ line and heading that follow it:
 Byte-for-byte from the spec's `## Rule Text (verbatim)` block: a `- ` bullet matching the rest
 of the section, hyphens not em dashes, two-space continuation indent.
 
-- [ ] [T-001-E] Regenerate the template mirror
+- [X] [T-001-E] Regenerate the template mirror
 
 Never hand-edit the template. Run from the repository root:
 
@@ -274,7 +274,7 @@ Expect **`0`**: no un-nested path survived the transform. A non-zero count here 
 halt-and-look this check is for - investigate before proceeding, do not edit the template to
 silence it.
 
-- [ ] [T-001-F] Run the parity suite immediately
+- [X] [T-001-F] Run the parity suite immediately
 
 ```bash
 npx vitest run tests/installer/commands-parity.test.js
@@ -285,7 +285,7 @@ Expected: **PASS**, including `differ only in the script path nesting` and both 
 commit gate means a dropped `sed -e` is reported against the step that caused it, not against a
 wall of release-gate output.
 
-- [ ] [T-001-G] Run the full suite
+- [X] [T-001-G] Run the full suite
 
 ```bash
 npm test
@@ -293,7 +293,7 @@ npm test
 
 Expected: **585 passed / 12 skipped** (the 583 baseline plus the two new `it.each` cases).
 
-- [ ] [T-001-H] Commit
+- [X] [T-001-H] Commit
 
 ```bash
 git add tests/installer/commands-parity.test.js project-template/.claude/commands/cc-plan.md
@@ -326,7 +326,7 @@ MSG
 `README.md` is **deliberately omitted**: BUG-031 changes no user-facing behavior, so the closeout
 chore commit does not touch it. The omission is intentional, not an oversight.
 
-- [ ] [T-002-A] Bump the version to 1.27.1
+- [X] [T-002-A] Bump the version to 1.27.1
 
 Patch bump (a fix, no new surface). Three files, surgical edits:
 
@@ -346,7 +346,7 @@ grep -c '"version": "1.27.1"' package-lock.json   # expect 2
 grep -c '"version": "1.27.0"' package-lock.json   # expect 0
 ```
 
-- [ ] [T-002-B] Add the CHANGELOG entry
+- [X] [T-002-B] Add the CHANGELOG entry
 
 Insert directly below the `# Changelog` heading, above `## [1.27.0] - 2026-09-24`:
 
@@ -358,7 +358,7 @@ Insert directly below the `# Changelog` heading, above `## [1.27.0] - 2026-09-24
 - **[BUG-031]** `/cc-plan`'s generation rules said nothing about where a staging step belongs relative to the edits it captures, so a generated task could `git add` a tracking file before the step that flips it. `cc-implement` walks checkbox lines in file order, so such a plan commits the file's previous content while every checkbox still reports `[X]`, and the divergence surfaces only at whatever later task asserts on that file's state, pointing at the wrong task. The `## Ordered Steps` rules now carry an explicit step-ordering bullet that defines its own terms (a commit group is the contiguous run of steps ending at a `git commit`), covers any form of `git add` and the implicit stage of `git commit -a`, exempts staging a file the task never edits without inviting dummy edit steps, and names the consequence. The rule ships in both `cc-plan.md` mirrors and is pinned by an occurrence-counted anchor in the parity suite.
 ```
 
-- [ ] [T-002-C] Append the closeout summary to `.claude/memory/project.md`
+- [X] [T-002-C] Append the closeout summary to `.claude/memory/project.md`
 
 One append at the end of the file, under a new heading:
 
@@ -373,7 +373,7 @@ One append at the end of the file, under a new heading:
 - Rejected under YAGNI: a mechanical validator that parses generated plan markdown and rejects a `git add` preceding an edit of the same path.
 ```
 
-- [ ] [T-002-D] Flip the backlog checkbox to done
+- [X] [T-002-D] Flip the backlog checkbox to done
 
 Re-locate by heading, expecting the `[>]` state T-000-B wrote:
 
@@ -385,7 +385,7 @@ grep -n '^### \[>\] `\[BUG-031\]`' "AGENT-READABLE BACKLOG.md"
 `Edit`, `### [>]` to `### [X]`, every byte after the checkbox unchanged. This edit lands
 **before** T-002-E stages the file.
 
-- [ ] [T-002-E] Commit
+- [>] [T-002-E] Commit
 
 ```bash
 npm test

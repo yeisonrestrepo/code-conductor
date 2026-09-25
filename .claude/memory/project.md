@@ -690,3 +690,12 @@ M — two new scripts with real unit coverage, one command file rewritten plus i
 - **Verified:** `.claude/commands/cc-plan.md` is tracked, so no repeat of FEAT-016's `git add -f` surprise. Both `-e` expressions are live for `cc-plan.md` (line 7 uses the second) - unlike `cc-init.md`, neither may be dropped. The anchor needle occurs 0 times in both mirrors today.
 - **Correction (standing):** no em-dashes in any output. The rule lives in `global/memory/personal.md:9` and deploys to `~/.claude/memory/personal.md`; it was missed because a grep of the project-scoped `.claude/memory/personal.md` and both `CLAUDE.md` files does not reach it.
 - **Debt (unfiled):** nothing in the documented lookup chain points at `~/.claude/memory/personal.md`. The Orchestrator Protocol starts at `.claude/memory/project.md` and the project CLAUDE.md calls `personal.md` "local only", so a project session never reads the global file where the tone rules live - a recorded rule the agent does not read is indistinguishable from no rule, which is the same failure shape BUG-031 fixes. Needs a backlog id (two-stage ceiling pipeline) when filed.
+
+## Closeout: BUG-031 Plan Step Ordering 2026-09-25
+
+- Shipped in `1.27.1`: one prose bullet appended to `## Ordered Steps` in both `cc-plan.md` mirrors, pinned by an occurrence-counted anchor in `tests/installer/commands-parity.test.js`.
+- Convention reinforced: the template mirror is regenerated with the two-expression `sed` and the parity suite runs immediately after regeneration, not at the commit gate.
+- Convention reinforced: a generation rule defines its own terms, because the generator reads only `cc-plan.md`.
+- Anchor discipline: whitespace-normalize both sides, count literally with `split`, hold a backtick-bearing needle in a quoted string, never build a regex from prose.
+- Open debt (unfiled): nothing in the documented lookup chain points at `~/.claude/memory/personal.md`, so `global/memory/personal.md` is a rule the executing agent may never read. Needs a backlog id via the two-stage ceiling pipeline.
+- Rejected under YAGNI: a mechanical validator that parses generated plan markdown and rejects a `git add` preceding an edit of the same path.
