@@ -91,7 +91,7 @@ meant. Then one surgical `Edit` on that line, `### [ ]` → `### [>]`, every byt
 checkbox unchanged. The edit must land **before** T-000-C stages it, or the flip never reaches
 the commit.
 
-- [>] [T-000-C] Commit the plan, the spec memory, and the flipped backlog
+- [X] [T-000-C] Commit the plan, the spec memory, and the flipped backlog
 
 `.claude/` and `docs/` are both gitignored, so both need `-f`. `git add` under `.claude/` exits 1
 while still staging — keep `git commit` on its own line, never chained.
@@ -125,7 +125,7 @@ MSG
 - Consumes: nothing.
 - Produces: `FIELDS: {key, label}[]`, `FIELD_KEYS: string[]`, `fieldByKey(key) → field | undefined`, `canonicalLine(field) → string`, `unresolvedReason(value) → 'empty' | 'placeholder' | null`, `isResolved(value) → boolean`.
 
-- [ ] [T-001-A] Write the failing test
+- [X] [T-001-A] Write the failing test
 
 Create `tests/scripts/init-wizard.test.js`:
 
@@ -170,12 +170,12 @@ describe('claude-md-fields', () => {
 });
 ```
 
-- [ ] [T-001-B] Run it to verify it fails
+- [X] [T-001-B] Run it to verify it fails
 
 Run: `npx vitest run tests/scripts/init-wizard.test.js`
 Expected: FAIL — `Failed to resolve import "../../scripts/claude-md-fields.mjs"`.
 
-- [ ] [T-001-C] Write the module
+- [X] [T-001-C] Write the module
 
 Create `scripts/claude-md-fields.mjs`:
 
@@ -224,12 +224,12 @@ export function isResolved(value) {
 }
 ```
 
-- [ ] [T-001-D] Run it to verify it passes
+- [X] [T-001-D] Run it to verify it passes
 
 Run: `npx vitest run tests/scripts/init-wizard.test.js`
 Expected: PASS.
 
-- [ ] [T-001-E] Commit
+- [X] [T-001-E] Commit
 
 ```bash
 npm test
@@ -254,7 +254,7 @@ MSG
 - Consumes: `FIELDS`, `canonicalLine`, `unresolvedReason` from Task 1.
 - Produces: `lineMatcher(field) → RegExp`, `buildReport(text) → { unresolved: {field, raw, reason}[], resolved: string[], absent: {field, expected}[] }`, and the `report` subcommand (JSON on stdout, advisory summary on stderr, exit 0; exit 1 when `CLAUDE.md` is unreadable).
 
-- [ ] [T-002-A] Write the failing test
+- [X] [T-002-A] Write the failing test
 
 Append to `tests/scripts/init-wizard.test.js` — the header additions first:
 
@@ -373,12 +373,12 @@ describe('mode blindness', () => {
 
 Add `FIELD_KEYS` to the Task 1 import line if it is not already there.
 
-- [ ] [T-002-B] Run it to verify it fails
+- [X] [T-002-B] Run it to verify it fails
 
 Run: `npx vitest run tests/scripts/init-wizard.test.js`
 Expected: FAIL — `Failed to resolve import "../../scripts/init-wizard.mjs"`.
 
-- [ ] [T-002-C] Write the module with `report` only
+- [X] [T-002-C] Write the module with `report` only
 
 Create `scripts/init-wizard.mjs`:
 
@@ -464,12 +464,12 @@ const __filename = fileURLToPath(import.meta.url);
 if (process.argv[1] === __filename) main();
 ```
 
-- [ ] [T-002-D] Run it to verify it passes
+- [X] [T-002-D] Run it to verify it passes
 
 Run: `npx vitest run tests/scripts/init-wizard.test.js`
 Expected: PASS.
 
-- [ ] [T-002-E] Commit
+- [X] [T-002-E] Commit
 
 ```bash
 npm test
@@ -494,7 +494,7 @@ MSG
 - Consumes: `lineMatcher`, `canonicalLine` from Task 2.
 - Produces: `stripOneTerminator(raw) → string`, `applyToText(text, field, value) → string` (throws `err.code === 'LINE_ABSENT'`), and the `apply` subcommand.
 
-- [ ] [T-003-A] Write the failing test
+- [X] [T-003-A] Write the failing test
 
 Append to `tests/scripts/init-wizard.test.js`:
 
@@ -574,12 +574,12 @@ describe('apply', () => {
 
 Add `stripOneTerminator` to the `init-wizard.mjs` import line.
 
-- [ ] [T-003-B] Run it to verify it fails
+- [X] [T-003-B] Run it to verify it fails
 
 Run: `npx vitest run tests/scripts/init-wizard.test.js`
 Expected: FAIL — `stripOneTerminator is not a function`, plus non-zero-status assertions failing on the unknown subcommand path.
 
-- [ ] [T-003-C] Implement `apply`
+- [X] [T-003-C] Implement `apply`
 
 In `scripts/init-wizard.mjs`, extend the import to `import { readFileSync, writeFileSync } from 'node:fs';`, add the helpers after `buildReport`:
 
@@ -659,12 +659,12 @@ and the branch in `main()`, before the final `fail`:
   }
 ```
 
-- [ ] [T-003-D] Run it to verify it passes
+- [X] [T-003-D] Run it to verify it passes
 
 Run: `npx vitest run tests/scripts/init-wizard.test.js`
 Expected: PASS.
 
-- [ ] [T-003-E] Commit
+- [X] [T-003-E] Commit
 
 ```bash
 npm test
@@ -689,7 +689,7 @@ MSG
 - Consumes: `readValue`, `requireField`, `requireValueStdin` from Task 3.
 - Produces: `scriptNameOf(value) → string | null`, `checkValue(value, pkgRaw) → string | null`, and the `check` subcommand (exit 0 once the arguments are valid; non-zero only on a usage error).
 
-- [ ] [T-004-A] Write the failing test
+- [X] [T-004-A] Write the failing test
 
 Append to `tests/scripts/init-wizard.test.js`:
 
@@ -753,12 +753,12 @@ describe('check', () => {
 
 Add `scriptNameOf` and `checkValue` to the `init-wizard.mjs` import line.
 
-- [ ] [T-004-B] Run it to verify it fails
+- [X] [T-004-B] Run it to verify it fails
 
 Run: `npx vitest run tests/scripts/init-wizard.test.js`
 Expected: FAIL — `scriptNameOf is not a function`.
 
-- [ ] [T-004-C] Implement `check`
+- [X] [T-004-C] Implement `check`
 
 Add to `scripts/init-wizard.mjs`, after `applyToText`:
 
@@ -816,12 +816,12 @@ and the branch in `main()`, before the `apply` branch:
   }
 ```
 
-- [ ] [T-004-D] Run it to verify it passes
+- [X] [T-004-D] Run it to verify it passes
 
 Run: `npx vitest run tests/scripts/init-wizard.test.js`
 Expected: PASS.
 
-- [ ] [T-004-E] Commit
+- [X] [T-004-E] Commit
 
 ```bash
 npm test
@@ -848,7 +848,7 @@ MSG
 
 **Why this is safe.** `MERGE_FIELDS` drives one loop: `if (merged[f] === undefined && d[f] !== undefined) merged[f] = d[f]`. The fields are independent, so their order is irrelevant, and adding `description` is a no-op — no detector returns a `description` key, and `merged.description` is set afterwards from `rootPkg.description` regardless. The existing `detect-stack.test.js` suite is the regression guard.
 
-- [ ] [T-005-A] Confirm `detect-stack.mjs` is safe to import
+- [X] [T-005-A] Confirm `detect-stack.mjs` is safe to import
 
 T-005-B imports `MERGE_FIELDS` at module top. If `detect-stack.mjs` ran `main()`
 unconditionally, that import would launch a full detection against the test runner's cwd on
@@ -872,7 +872,7 @@ it('imports without running detection', () => {
 });
 ```
 
-- [ ] [T-005-B] Write the failing test
+- [X] [T-005-B] Write the failing test
 
 Append to `tests/scripts/init-wizard.test.js`:
 
@@ -887,12 +887,12 @@ describe('detect-stack shares the field list', () => {
 });
 ```
 
-- [ ] [T-005-C] Run it to verify it fails
+- [X] [T-005-C] Run it to verify it fails
 
 Run: `npx vitest run tests/scripts/init-wizard.test.js`
 Expected: FAIL — `expected undefined to contain 'name'` (`MERGE_FIELDS` is not exported).
 
-- [ ] [T-005-D] Lift and share the constant
+- [X] [T-005-D] Lift and share the constant
 
 In `scripts/detect-stack.mjs`, add to the import block at the top:
 
@@ -914,12 +914,12 @@ Delete the local declaration inside `main()`:
   const MERGE_FIELDS = ['stack','build','test','lint','format','setup','name','goVersion'];
 ```
 
-- [ ] [T-005-E] Run the whole suite to verify nothing regressed
+- [X] [T-005-E] Run the whole suite to verify nothing regressed
 
 Run: `npm test`
 Expected: PASS — `detect-stack.test.js` included, with no change to its expectations.
 
-- [ ] [T-005-F] Commit
+- [X] [T-005-F] Commit
 
 ```bash
 git add scripts/detect-stack.mjs tests/scripts/init-wizard.test.js
@@ -946,7 +946,7 @@ MSG
 
 **[BUG] `project-template/.claude/commands/cc-init.md:16` — the template tells a scaffolded project to run `node scripts/detect-stack.mjs`, but `deployProject` copies the scripts to `.claude/scripts/` (`lib/installer/deploy.mjs:165`), so detection has never run in an installed project.** The mandated regeneration fixes it: the `node scripts/` → `node .claude/scripts/` substitution now reaches that line too. For the substitution to cover the whole file, the path may appear **only** inside a `node …` invocation — so the source's two *prose* mentions (lines 13 and 27 today, both inside the range T-006-C rewrites) go with the rewrite, and T-006-D fails loudly if any survives. `cc-init.md` has no ``running `scripts/`` occurrence, so the second substitution rule `cc-plan.md` needs is dead code here and is **not** carried over: a rule that must never fire is a rule nobody can verify.
 
-- [ ] [T-006-A] Write the failing test
+- [X] [T-006-A] Write the failing test
 
 Append to `tests/installer/commands-parity.test.js`:
 
@@ -988,12 +988,12 @@ describe('cc-init mirrors', () => {
 });
 ```
 
-- [ ] [T-006-B] Run it to verify it fails
+- [X] [T-006-B] Run it to verify it fails
 
 Run: `npx vitest run tests/installer/commands-parity.test.js`
 Expected: FAIL — the sequencing and heredoc assertions, plus the superseded-wording assertions.
 
-- [ ] [T-006-C] Rewrite Step 2 in the source file
+- [X] [T-006-C] Rewrite Step 2 in the source file
 
 In `.claude/commands/cc-init.md`, replace everything from `## Step 2 — Auto-detect and collect project identity` (line 11) through the `**CI mode:** …` line (line 44) with:
 
@@ -1067,7 +1067,7 @@ A skipped question applies the literal `N/A`. Never leave a `<command>` placehol
 Finally, for every entry in `absent`, tell the developer that the line is gone from `CLAUDE.md` and quote its `expected` text as the line to restore by hand. `apply` refuses an absent field; it never inserts one.
 ````
 
-- [ ] [T-006-D] Regenerate the template mirror
+- [X] [T-006-D] Regenerate the template mirror
 
 Never hand-edit the mirror. First prove every path mention is covered by the one substitution
 rule — `unnest` reverses only `node .claude/scripts/`, so any other mention becomes an
@@ -1088,12 +1088,12 @@ diff <(sed 's|node .claude/scripts/|node scripts/|g' project-template/.claude/co
      .claude/commands/cc-init.md && echo PARITY-OK
 ```
 
-- [ ] [T-006-E] Run the tests to verify they pass
+- [X] [T-006-E] Run the tests to verify they pass
 
 Run: `npm test`
 Expected: PASS.
 
-- [ ] [T-006-F] Commit
+- [X] [T-006-F] Commit
 
 ```bash
 git add .claude/commands/cc-init.md project-template/.claude/commands/cc-init.md tests/installer/commands-parity.test.js
@@ -1125,7 +1125,7 @@ MSG
 - Consumes: the shipped behavior from Tasks 1-6.
 - Produces: version `1.27.0` and the `[X]` backlog state.
 
-- [ ] [T-007-A] Bump the version
+- [X] [T-007-A] Bump the version
 
 `VERSION` → `1.27.0`. `package.json` `"version"` → `1.27.0`. Then regenerate the lockfile's two self-referential version fields:
 
@@ -1133,7 +1133,7 @@ MSG
 npm install --package-lock-only --ignore-scripts
 ```
 
-- [ ] [T-007-B] Add the changelog entry
+- [X] [T-007-B] Add the changelog entry
 
 Insert directly under `# Changelog`, above `## [1.26.0] - 2026-09-24`:
 
@@ -1149,7 +1149,7 @@ Insert directly under `# Changelog`, above `## [1.26.0] - 2026-09-24`:
 - The scaffolded template told a project to run `node scripts/detect-stack.mjs`, but the installer deploys the scripts to `.claude/scripts/`, so stack detection silently never ran in an installed project. The template mirror now resolves the deployed path, and a parity test covers both `cc-init.md` files.
 ```
 
-- [ ] [T-007-C] Correct the backlog's stale component line
+- [X] [T-007-C] Correct the backlog's stale component line
 
 The `[FEAT-016]` entry's **Components Affected** line names `low-cost model API bindings`, which
 predates the npm CLI — this repo ships `dependencies: {}` with no network call. Re-locate it from
@@ -1167,7 +1167,7 @@ one line with:
 * **Components Affected:** `scripts/init-wizard.mjs`, `scripts/claude-md-fields.mjs`, `/cc-init` Step 2 (both mirrors). *No model API binding: the agent running the session does the asking.*
 ```
 
-- [ ] [T-007-D] Flip the backlog checkbox to done
+- [X] [T-007-D] Flip the backlog checkbox to done
 
 Re-locate by heading again, expecting the `[>]` state T-000-B wrote:
 
@@ -1178,7 +1178,7 @@ grep -n '^### \[>\] `\[FEAT-016\]`' "AGENT-READABLE BACKLOG.md"
 **Exactly one** match, else halt — a `[ ]` here means T-000-B never ran. Then one surgical `Edit`,
 `### [>]` → `### [X]`.
 
-- [ ] [T-007-E] Commit
+- [>] [T-007-E] Commit
 
 ```bash
 npm test
@@ -1195,7 +1195,7 @@ MSG
 )"
 ```
 
-- [ ] [T-007-F] Carry the residual live verification forward
+- [X] [T-007-F] Carry the residual live verification forward
 
 **This checkbox records the obligation, not its discharge, and never blocks the release.** The
 asking half is prose an agent executes; only its presence, ordering and mirror parity are testable.

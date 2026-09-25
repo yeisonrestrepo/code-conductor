@@ -151,10 +151,10 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Components Affected:** `project-template/CLAUDE.md`, `/cc-init` command logic.
 * **Acceptance Criteria:** Read actual project dependencies during setup and auto-generate a `CLAUDE.md` tailored with the precise commands for the project's build, format, and test scripts.
 
-### [>] `[FEAT-016]` Interactive Assisted Onboarding (Interactive Fallback Wizard)
+### [X] `[FEAT-016]` Interactive Assisted Onboarding (Interactive Fallback Wizard)
 * **Description:** Implement an interactive terminal setup wizard for the `/cc-init` command to handle blank workspaces or legacy codebases lacking standard package manifests.
 * **Impact:** Guides the environment initialization safely through user input prompts, leveraging low-cost models to format the initial developer brief.
-* **Components Affected:** CLI init interactive layer, low-cost model API bindings.
+* **Components Affected:** `scripts/init-wizard.mjs`, `scripts/claude-md-fields.mjs`, `/cc-init` Step 2 (both mirrors). *No model API binding: the agent running the session does the asking.*
 * **Acceptance Criteria:** Gracefully fall back to an interactive console questionnaire if automated file discovery yields no metadata, resulting in a structured, clean `CLAUDE.md` output.
 
 ---
