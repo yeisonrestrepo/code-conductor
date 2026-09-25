@@ -2,6 +2,7 @@
 import { readdir, readFile, stat, realpath } from 'node:fs/promises';
 import { join, resolve, basename, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { FIELD_KEYS } from './claude-md-fields.mjs';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 export const GLOBAL_IGNORE = new Set([
@@ -20,6 +21,10 @@ export const globDepth = (() => {
   if (!Number.isFinite(v)) return DEFAULT_DEPTH;
   return Math.max(1, Math.min(MAX_DEPTH, v));
 })();
+
+// The CLAUDE.md fields come from the shared list, so detection and init-wizard can never
+// disagree about what a field is. `goVersion` is detect-stack's own extra.
+export const MERGE_FIELDS = [...FIELD_KEYS, 'goVersion'];
 
 // ── Low-level helpers ─────────────────────────────────────────────────────────
 export function stripBOM(s) { return s.replace(/^﻿/, ''); }
@@ -575,7 +580,6 @@ async function main() {
   ];
 
   const merged = {};
-  const MERGE_FIELDS = ['stack','build','test','lint','format','setup','name','goVersion'];
   for (const d of detectorResults) {
     for (const f of MERGE_FIELDS) {
       if (merged[f] === undefined && d[f] !== undefined) merged[f] = d[f];

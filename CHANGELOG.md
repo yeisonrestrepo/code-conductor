@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.27.0] - 2026-09-24
+
+### Added
+
+- **[FEAT-016]** An assisted fallback for `/cc-init` when no manifest exists to detect. A new `scripts/init-wizard.mjs` reports which `CLAUDE.md` fields are still unresolved as JSON (`empty`, `placeholder`, or a canonical line a developer deleted), optionally checks a proposed answer against `package.json`'s scripts, and writes it back under BUG-015's fill semantics — first occurrence of the canonical line, single-line replacement, never an insertion. `scripts/claude-md-fields.mjs` holds the field list and the one resolved predicate (`N/A` is an answer; only the lowercase `<command>` is a placeholder), shared with `detect-stack.mjs`. Step 2 of `/cc-init` now asks about every unresolved field rather than only when `Name` is blank, and each answer travels on stdin inside a quoted heredoc so backticks and `$(...)` in an answer can never reach a shell. The script is mode-blind by construction — no TTY or `CI` probe — because agent-executed Bash never has a TTY; CI callers run `report` and stop. No new dependency, no network call, no model binding.
+
+### Fixed
+
+- The scaffolded template told a project to run `node scripts/detect-stack.mjs`, but the installer deploys the scripts to `.claude/scripts/`, so stack detection silently never ran in an installed project. The template mirror now resolves the deployed path, and a parity test covers both `cc-init.md` files — the source of which was itself untracked until now, so a fresh clone had only one half of the pair.
+
 ## [1.26.0] - 2026-09-24
 
 ### Added
