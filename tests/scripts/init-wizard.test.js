@@ -270,3 +270,12 @@ describe('check', () => {
     expect(res.status).not.toBe(0);
   });
 });
+
+import { MERGE_FIELDS } from '../../scripts/detect-stack.mjs';
+
+describe('detect-stack shares the field list', () => {
+  it('merges every canonical field, plus its own extras', () => {
+    for (const key of FIELD_KEYS) expect(MERGE_FIELDS).toContain(key);
+    expect(MERGE_FIELDS).toContain('goVersion');
+  });
+});
