@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import {
   FIELDS, FIELD_KEYS, fieldByKey, canonicalLine, unresolvedReason, isResolved,
 } from '../../scripts/claude-md-fields.mjs';
-import { buildReport } from '../../scripts/init-wizard.mjs';
+import { buildReport, stripOneTerminator } from '../../scripts/init-wizard.mjs';
 
 const SCRIPT = fileURLToPath(new URL('../../scripts/init-wizard.mjs', import.meta.url));
 
@@ -140,5 +140,77 @@ describe('mode blindness', () => {
     expect(src).not.toMatch(/isTTY/);
     expect(src).not.toMatch(/\bprocess\.env\.CI\b/);
     expect(src).not.toMatch(/\benv\.CI\b/);
+  });
+});
+
+describe('apply', () => {
+  it('replaces the first canonical line and leaves every other byte alone', () => {
+    const before = fixture();
+    const cwd = sandbox(before);
+    const res = run(['apply', 'build', '--value-stdin'], { cwd, input: 'npm run build\n' });
+    expect(res.status).toBe(0);
+    const after = readFileSync(join(cwd, 'CLAUDE.md'), 'utf8');
+    expect(after).toBe(before.replace('- Build: <command>', '- Build: npm run build'));
+  });
+
+  it('round-trips a value full of shell metacharacters byte-exact', () => {
+    const nasty = `echo \`id\` $(whoami) "q" 'q' && rm -rf /`;
+    const cwd = sandbox(fixture());
+    const res = run(['apply', 'build', '--value-stdin'], { cwd, input: `${nasty}\n` });
+    expect(res.status).toBe(0);
+    expect(readFileSync(join(cwd, 'CLAUDE.md'), 'utf8')).toContain(`- Build: ${nasty}`);
+  });
+
+  it('does not expand $& or $1 in the value', () => {
+    const cwd = sandbox(fixture());
+    run(['apply', 'build', '--value-stdin'], { cwd, input: 'make $& $1 $`\n' });
+    expect(readFileSync(join(cwd, 'CLAUDE.md'), 'utf8')).toContain('- Build: make $& $1 $`');
+  });
+
+  it('strips exactly one trailing terminator and no other whitespace', () => {
+    expect(stripOneTerminator('x\n')).toBe('x');
+    expect(stripOneTerminator('x\r\n')).toBe('x');
+    expect(stripOneTerminator('x\n\n')).toBe('x\n');
+    expect(stripOneTerminator('  x  \n')).toBe('  x  ');
+    expect(stripOneTerminator('x')).toBe('x');
+  });
+
+  it('refuses an empty value without touching the file', () => {
+    const before = fixture();
+    const cwd = sandbox(before);
+    const res = run(['apply', 'build', '--value-stdin'], { cwd, input: '\n' });
+    expect(res.status).not.toBe(0);
+    expect(res.stderr).toContain('N/A');
+    expect(readFileSync(join(cwd, 'CLAUDE.md'), 'utf8')).toBe(before);
+  });
+
+  it('refuses an embedded newline without touching the file', () => {
+    const before = fixture();
+    const cwd = sandbox(before);
+    const res = run(['apply', 'build', '--value-stdin'], { cwd, input: 'make a\nmake b\n' });
+    expect(res.status).not.toBe(0);
+    expect(readFileSync(join(cwd, 'CLAUDE.md'), 'utf8')).toBe(before);
+  });
+
+  it('refuses an absent line, naming it, and never inserts', () => {
+    const before = fixture(['setup']);
+    const cwd = sandbox(before);
+    const res = run(['apply', 'setup', '--value-stdin'], { cwd, input: 'make setup\n' });
+    expect(res.status).not.toBe(0);
+    expect(res.stderr).toContain('- Setup:');
+    expect(readFileSync(join(cwd, 'CLAUDE.md'), 'utf8')).toBe(before);
+  });
+
+  it('refuses a value passed as an argv word', () => {
+    const cwd = sandbox(fixture());
+    const res = run(['apply', 'build', 'npm run build'], { cwd });
+    expect(res.status).not.toBe(0);
+    expect(res.stderr).toContain('--value-stdin');
+  });
+
+  it('refuses an unknown field', () => {
+    const res = run(['apply', 'nope', '--value-stdin'], { cwd: sandbox(fixture()), input: 'x\n' });
+    expect(res.status).not.toBe(0);
+    expect(res.stderr).toContain('unknown field');
   });
 });

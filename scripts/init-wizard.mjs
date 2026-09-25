@@ -7,7 +7,7 @@
 // terminal, so such a probe would pin the interactive path into non-interactive mode
 // forever. The split lives in the caller: cc-init.md asks and applies, CI runs report
 // and stops.
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FIELDS, FIELD_KEYS, fieldByKey, canonicalLine, unresolvedReason } from './claude-md-fields.mjs';
@@ -39,9 +39,53 @@ export function buildReport(text) {
   return report;
 }
 
+// Exactly one trailing line terminator is stripped — the one the heredoc adds. CRLF
+// counts as that one terminator; leaving the CR would write a stray carriage return into
+// a single-line field. No other whitespace is touched: apply writes what it was given,
+// and the predicate judges it trimmed.
+export function stripOneTerminator(raw) {
+  if (raw.endsWith('\r\n')) return raw.slice(0, -2);
+  if (raw.endsWith('\n')) return raw.slice(0, -1);
+  return raw;
+}
+
+export function applyToText(text, field, value) {
+  const re = lineMatcher(field);
+  if (!re.test(text)) {
+    const err = new Error(
+      `${canonicalLine(field)} is missing from CLAUDE.md — restore that line by hand, then re-run. apply never inserts.`,
+    );
+    err.code = 'LINE_ABSENT';
+    throw err;
+  }
+  // A function replacer: a value may legitimately contain `$&` or `$1`, which a
+  // replacement string would expand.
+  return text.replace(re, () => `${canonicalLine(field)} ${value}`);
+}
+
 function fail(msg, code) {
   process.stderr.write(`init-wizard: ${msg}\n`);
   process.exit(code);
+}
+
+function requireField(name) {
+  const field = fieldByKey(name);
+  if (!field) fail(`unknown field ${name ? `"${name}"` : '(none)'}\n${USAGE}`, 2);
+  return field;
+}
+
+// argv is the wrong channel for a developer's answer: quotes, backticks and $(...) in an
+// agent-composed command line are an injection surface. stdin has no such edge.
+function requireValueStdin(argv) {
+  if (!argv.includes('--value-stdin')) fail(`the value must arrive on stdin via --value-stdin\n${USAGE}`, 2);
+}
+
+function readValue() {
+  try {
+    return stripOneTerminator(readFileSync(0, 'utf8'));
+  } catch (err) {
+    fail(`cannot read the value from stdin: ${err.message}`, 2);
+  }
 }
 
 function readClaudeMd(root) {
@@ -68,6 +112,28 @@ function main() {
     }
     if (report.absent.length) {
       process.stderr.write(`init-wizard: absent from CLAUDE.md: ${report.absent.map(a => a.field).join(', ')}\n`);
+    }
+    return;
+  }
+
+  if (sub === 'apply') {
+    const rest = process.argv.slice(3);
+    const field = requireField(rest[0]);
+    requireValueStdin(rest);
+    const value = readValue();
+    if (value === '') fail(`refusing an empty value for "${field.key}" — a skipped question applies the literal N/A`, 3);
+    if (/[\r\n]/.test(value)) fail(`refusing a multi-line value for "${field.key}" — the canonical line is single-line`, 3);
+    const { path, text } = readClaudeMd(root);
+    let next;
+    try {
+      next = applyToText(text, field, value);
+    } catch (err) {
+      fail(err.message, 4);
+    }
+    try {
+      writeFileSync(path, next);
+    } catch (err) {
+      fail(`cannot write ${path}: ${err.message}`, 5);
     }
     return;
   }
