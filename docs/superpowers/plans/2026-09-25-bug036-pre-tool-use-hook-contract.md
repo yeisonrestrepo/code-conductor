@@ -68,20 +68,20 @@ The bash file ran Guard 1 first. Both guards exited 1 there, which never blocked
 - Consumes: nothing.
 - Produces: the plan file tracked in git, on the feature branch.
 
-- [>] [T-000-A] Stage the plan file. `docs/` is gitignored, so it must be force-added.
+- [X] [T-000-A] Stage the plan file. `docs/` is gitignored, so it must be force-added.
 
 ```bash
 git add -f "docs/superpowers/plans/2026-09-25-bug036-pre-tool-use-hook-contract.md"
 ```
 
-- [ ] [T-000-B] Verify exactly one path is staged.
+- [X] [T-000-B] Verify exactly one path is staged.
 
 ```bash
 git diff --cached --name-only
 ```
 Expected: one line, `docs/superpowers/plans/2026-09-25-bug036-pre-tool-use-hook-contract.md`.
 
-- [ ] [T-000-C] Commit the plan.
+- [X] [T-000-C] Commit the plan.
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -109,7 +109,7 @@ Guard 4's two flipped verdicts land in this commit, beside the parser that justi
 - Consumes: nothing from earlier tasks.
 - Produces: the hook at `project-template/.claude/hooks/pre-tool-use.mjs` and its mirror at `.claude/hooks/pre-tool-use.mjs`. It is invoked as `node <path>` with the `PreToolUse` payload on stdin, writes at most one JSON object to stdout with the shape `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"|"ask","permissionDecisionReason":"<text>"}}`, and always exits 0. Environment: `CC_HOOK_ALLOW` (non-empty overrides the Case B denial only), `CC_HOOK_DEBUG` (non-empty enables `PRE_TOOL_USE:` stderr diagnostics).
 
-- [ ] [T-001-A] Reconcile the spec with the code this plan is about to write. Four edits to `docs/superpowers/specs/2026-09-25-bug036-pre-tool-use-hook-contract-design.md`, all before a line of code exists: the two documents must name the same behavior first.
+- [X] [T-001-A] Reconcile the spec with the code this plan is about to write. Four edits to `docs/superpowers/specs/2026-09-25-bug036-pre-tool-use-hook-contract-design.md`, all before a line of code exists: the two documents must name the same behavior first.
 
 **Edit 1, the inverted row reference.** Replace:
 
@@ -178,7 +178,7 @@ This is a project hook resolved against the session cwd, the same cwd the guards
 calls resolve against, and the bash wiring it replaces was already relative.
 ```
 
-- [ ] [T-001-B] Write the failing integration harness. Create `tests/hooks/pre-tool-use-contract.test.js`:
+- [X] [T-001-B] Write the failing integration harness. Create `tests/hooks/pre-tool-use-contract.test.js`:
 
 ```js
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -338,7 +338,7 @@ describe('pre-tool-use contract harness', () => {
 });
 ```
 
-- [ ] [T-001-C] Re-point the Guard 4 suite at the new artifact and flip the two rows. Depends on T-001-B. Replace the whole of `tests/hooks/guard4.test.js` with:
+- [X] [T-001-C] Re-point the Guard 4 suite at the new artifact and flip the two rows. Depends on T-001-B. Replace the whole of `tests/hooks/guard4.test.js` with:
 
 ```js
 import { describe, it, expect } from 'vitest'
@@ -458,7 +458,7 @@ describe('Guard 4 — Read blocker for graphify-out/ and node_modules/', () => {
 
 The `describe.skipIf(!BASH_AVAILABLE)` wrapper is gone, because nothing in this file needs bash any more; on a Windows host these 16 non-skipped cases now run where they previously all skipped.
 
-- [ ] [T-001-D] Run both suites and confirm they fail for the right reason. Depends on T-001-C.
+- [X] [T-001-D] Run both suites and confirm they fail for the right reason. Depends on T-001-C.
 
 Run: `npx vitest run tests/hooks/pre-tool-use-contract.test.js tests/hooks/guard4.test.js`
 Expected: **30 failed | 0 passed**. The hook file does not exist yet, so `spawnSync` succeeds (the `node` binary is real) and `result.error` is undefined; node itself exits 1 with `Cannot find module` on stderr. Every case therefore fails at `expected 1 to be 0` on the status assertion. A module-resolution error inside Vitest, or any passing case, means a suite is not exercising the artifact and must be fixed before proceeding.
@@ -466,7 +466,7 @@ Expected: **30 failed | 0 passed**. The hook file does not exist yet, so `spawnS
 Run: `npm test`
 Expected: **583 passed | 30 failed | 12 skipped**. Guard 4's 17 leave the passing column because they are re-pointed, not because anything regressed.
 
-- [ ] [T-001-E] Create the shipped hook. Depends on T-001-D.
+- [X] [T-001-E] Create the shipped hook. Depends on T-001-D.
 
 Create `project-template/.claude/hooks/pre-tool-use.mjs`:
 
@@ -643,7 +643,7 @@ function main() {
 try { main(); } catch (e) { unreadable(`the hook threw (${e && e.message})`); }
 ```
 
-- [ ] [T-001-F] Mirror the hook into this repository's own `.claude/hooks/`, so the project runs the artifact it ships. Depends on T-001-E.
+- [X] [T-001-F] Mirror the hook into this repository's own `.claude/hooks/`, so the project runs the artifact it ships. Depends on T-001-E.
 
 ```bash
 cp project-template/.claude/hooks/pre-tool-use.mjs .claude/hooks/pre-tool-use.mjs
@@ -651,30 +651,30 @@ cmp project-template/.claude/hooks/pre-tool-use.mjs .claude/hooks/pre-tool-use.m
 ```
 Expected: `IDENTICAL`.
 
-- [ ] [T-001-G] Run both hook suites green. Depends on T-001-F.
+- [X] [T-001-G] Run both hook suites green. Depends on T-001-F.
 
 Run: `npx vitest run tests/hooks/pre-tool-use-contract.test.js tests/hooks/guard4.test.js`
 Expected: **30 passed** (13 harness, 17 Guard 4). If a Guard 4 case other than row14 or row16 fails, the translation drifted; fix the hook, never the case.
 
-- [ ] [T-001-H] Run the full suite. Depends on T-001-G.
+- [X] [T-001-H] Run the full suite. Depends on T-001-G.
 
 Run: `npm test`
 Expected: **613 passed | 12 skipped**. Guard 4's 17 cases are re-pointed rather than added, so the arithmetic is the 600 baseline plus the 13 new harness cases.
 
-- [ ] [T-001-I] Stage the four tracked paths this task changed. Depends on T-001-H. The spec correction lives under gitignored `docs/` and is not staged.
+- [X] [T-001-I] Stage the four tracked paths this task changed. Depends on T-001-H. The spec correction lives under gitignored `docs/` and is not staged.
 
 ```bash
 git add tests/hooks/pre-tool-use-contract.test.js tests/hooks/guard4.test.js project-template/.claude/hooks/pre-tool-use.mjs .claude/hooks/pre-tool-use.mjs
 ```
 
-- [ ] [T-001-J] Verify exactly four staged paths. Depends on T-001-I.
+- [X] [T-001-J] Verify exactly four staged paths. Depends on T-001-I.
 
 ```bash
 git diff --cached --name-only
 ```
 Expected: exactly four lines, `.claude/hooks/pre-tool-use.mjs`, `project-template/.claude/hooks/pre-tool-use.mjs`, `tests/hooks/guard4.test.js`, `tests/hooks/pre-tool-use-contract.test.js`.
 
-- [ ] [T-001-K] Commit. Depends on T-001-J.
+- [X] [T-001-K] Commit. Depends on T-001-J.
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -707,7 +707,7 @@ EOF
 - Consumes: `.claude/hooks/pre-tool-use.mjs` and `project-template/.claude/hooks/pre-tool-use.mjs` from Task 1, invoked as `node <path>` with the payload on stdin.
 - Produces: `tests/fixtures/guard3-reference.sh`, a standalone bash script that reads `CLAUDE_TOOL_NAME` and `CLAUDE_TOOL_INPUT` from the environment, runs Guard 3 alone, exits 1 when a pattern fires and 0 otherwise, and still declares `BASH_SCAN_ALLOWLIST=()` on its own line for `runAllowlisted` to rewrite.
 
-- [ ] [T-002-A] Point the shipped settings entry at the `.mjs` and widen the matcher. Modify `project-template/.claude/settings.json`, replacing:
+- [X] [T-002-A] Point the shipped settings entry at the `.mjs` and widen the matcher. Modify `project-template/.claude/settings.json`, replacing:
 
 ```json
         "matcher": "Write|Edit|create_file|write_file",
@@ -733,15 +733,15 @@ with:
 
 The `bash -c` wrapper is dropped deliberately: a `command` with no `args` runs under PowerShell on a Windows host without Git Bash, where `bash -c` fails outright, so the curated "Hook missing" message was unreachable on exactly the hosts that needed it. A missing file now degrades to the platform's own non-blocking hook error, which is what exit 1 means in this contract.
 
-- [ ] [T-002-B] Apply the identical change to this repository's own settings. Modify `.claude/settings.json` with the same replacement as T-002-A.
+- [X] [T-002-B] Apply the identical change to this repository's own settings. Modify `.claude/settings.json` with the same replacement as T-002-A.
 
-- [ ] [T-002-C] Delete the shipped bash hook. Depends on T-002-A.
+- [X] [T-002-C] Delete the shipped bash hook. Depends on T-002-A.
 
 ```bash
 git rm project-template/.claude/hooks/pre-tool-use.sh
 ```
 
-- [ ] [T-002-D] Move the repository-local bash hook to the fixtures directory, preserving history.
+- [X] [T-002-D] Move the repository-local bash hook to the fixtures directory, preserving history.
 
 ```bash
 mkdir -p tests/fixtures
@@ -750,7 +750,7 @@ git mv .claude/hooks/pre-tool-use.sh tests/fixtures/guard3-reference.sh
 
 `git mv` stages the rename, and T-002-E then edits the moved file, so the index holds the pre-strip content until T-002-M re-stages it. That is the one place in this plan where a staging operation precedes an edit of the same path, and it is the reason T-002-N verifies `git status --porcelain` as well as the staged list: an unstaged modification there means the strip was never committed.
 
-- [ ] [T-002-E] Strip the fixture to Guard 3 alone and give it a header that records what it is. Depends on T-002-D. Lines 29 through 465 of the original are the Guard 3 helpers, the `_G3_*` regex constants, the twelve pattern functions, the allowlist matcher and the Guard 3 block itself; lines 6 to 27 are Guard 1 and lines 466 to 519 are Guards 4 and 2.
+- [X] [T-002-E] Strip the fixture to Guard 3 alone and give it a header that records what it is. Depends on T-002-D. Lines 29 through 465 of the original are the Guard 3 helpers, the `_G3_*` regex constants, the twelve pattern functions, the allowlist matcher and the Guard 3 block itself; lines 6 to 27 are Guard 1 and lines 466 to 519 are Guards 4 and 2.
 
 ```bash
 {
@@ -770,7 +770,7 @@ git mv .claude/hooks/pre-tool-use.sh tests/fixtures/guard3-reference.sh
 mv tests/fixtures/guard3-reference.sh.tmp tests/fixtures/guard3-reference.sh
 ```
 
-- [ ] [T-002-F] Verify the fixture carries Guard 3 and nothing else. Depends on T-002-E.
+- [X] [T-002-F] Verify the fixture carries Guard 3 and nothing else. Depends on T-002-E.
 
 ```bash
 bash -n tests/fixtures/guard3-reference.sh && echo "PARSES"
@@ -782,7 +782,7 @@ echo "lines: $(wc -l < tests/fixtures/guard3-reference.sh)"
 ```
 Expected: `PARSES`, `python3: 0`, `guard2: 0`, `guard1: 0`, `allowlist decl: 1`, `lines: 446`. A non-zero count on any of the three guards means the line range was wrong; halt and re-derive it rather than deleting by hand.
 
-- [ ] [T-002-G] Re-point the Guard 3 suite at the fixture without touching a case. Depends on T-002-F. Modify `tests/hooks/guard3.test.js`, replacing line 10:
+- [X] [T-002-G] Re-point the Guard 3 suite at the fixture without touching a case. Depends on T-002-F. Modify `tests/hooks/guard3.test.js`, replacing line 10:
 
 ```js
 const HOOK = join(REPO_ROOT, '.claude/hooks/pre-tool-use.sh')
@@ -797,7 +797,7 @@ with:
 const HOOK = join(REPO_ROOT, 'tests/fixtures/guard3-reference.sh')
 ```
 
-- [ ] [T-002-H] Re-point the standalone bash harness. Modify `tests/guard3-test.sh`, replacing line 5:
+- [X] [T-002-H] Re-point the standalone bash harness. Modify `tests/guard3-test.sh`, replacing line 5:
 
 ```bash
 HOOK=".claude/hooks/pre-tool-use.sh"
@@ -809,12 +809,12 @@ with:
 HOOK="tests/fixtures/guard3-reference.sh"
 ```
 
-- [ ] [T-002-I] Run the Guard 3 suite. Depends on T-002-G.
+- [X] [T-002-I] Run the Guard 3 suite. Depends on T-002-G.
 
 Run: `npx vitest run tests/hooks/guard3.test.js`
 Expected: **108 passed**. Any failure here means the strip removed something Guard 3 depends on; fix the fixture, never the case.
 
-- [ ] [T-002-J] Pin the wiring and the mirror. Depends on T-002-B. Append to `tests/installer/templates.test.js`:
+- [X] [T-002-J] Pin the wiring and the mirror. Depends on T-002-B. Append to `tests/installer/templates.test.js`:
 
 ```js
 const SETTINGS = ['.claude/settings.json', 'project-template/.claude/settings.json'];
@@ -852,17 +852,17 @@ describe('pre-tool-use wiring', () => {
 });
 ```
 
-- [ ] [T-002-K] Run the templates suite. Depends on T-002-J.
+- [X] [T-002-K] Run the templates suite. Depends on T-002-J.
 
 Run: `npx vitest run tests/installer/templates.test.js`
 Expected: **19 passed** (15 existing plus 4 new).
 
-- [ ] [T-002-L] Run the full suite. Depends on T-002-K.
+- [X] [T-002-L] Run the full suite. Depends on T-002-K.
 
 Run: `npm test`
 Expected: **617 passed | 12 skipped**.
 
-- [ ] [T-002-M] Stage everything this task touched. Depends on T-002-L. `git rm` and `git mv` already staged their own deletions and renames; this picks up the edits.
+- [X] [T-002-M] Stage everything this task touched. Depends on T-002-L. `git rm` and `git mv` already staged their own deletions and renames; this picks up the edits.
 
 ```bash
 git add project-template/.claude/settings.json .claude/settings.json \
@@ -870,7 +870,7 @@ git add project-template/.claude/settings.json .claude/settings.json \
   tests/installer/templates.test.js
 ```
 
-- [ ] [T-002-N] Verify the staged set. Depends on T-002-M.
+- [X] [T-002-N] Verify the staged set. Depends on T-002-M.
 
 ```bash
 git diff --cached --name-only | sort
@@ -878,7 +878,7 @@ git status --porcelain
 ```
 Expected from the first command, eight paths: `.claude/hooks/pre-tool-use.sh` (deleted), `.claude/settings.json`, `project-template/.claude/hooks/pre-tool-use.sh` (deleted), `project-template/.claude/settings.json`, `tests/fixtures/guard3-reference.sh`, `tests/guard3-test.sh`, `tests/hooks/guard3.test.js`, `tests/installer/templates.test.js`. The second must show no unstaged modification to any of them.
 
-- [ ] [T-002-O] Commit. Depends on T-002-N.
+- [X] [T-002-O] Commit. Depends on T-002-N.
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -908,7 +908,7 @@ EOF
 - Consumes: the shipped state produced by Tasks 1 and 2.
 - Produces: no code interface. The `cc-init.md` pair must stay parity-clean under `tests/installer/commands-parity.test.js`, which compares the two files after rewriting `node .claude/scripts/` to `node scripts/`; the hook path is identical in both mirrors, so both edits must be byte-identical.
 
-- [ ] [T-003-A] Replace the README hook section. Modify `README.md`, replacing the block that begins `### pre-tool-use` and ends with the Guard 3 paragraph (`... BASH_SCAN_ALLOWLIST` in the hook file.`) with:
+- [X] [T-003-A] Replace the README hook section. Modify `README.md`, replacing the block that begins `### pre-tool-use` and ends with the Guard 3 paragraph (`... BASH_SCAN_ALLOWLIST` in the hook file.`) with:
 
 ```markdown
 ### pre-tool-use
@@ -926,7 +926,7 @@ Fires before `Read`, `Write`, `Edit`, `create_file`, `write_file` and `Bash`. A 
 Input the hook cannot parse fails closed: it is denied with one stderr line naming `CC_HOOK_ALLOW=1`, which overrides that denial alone and leaves every guard fully active on every payload the hook can read. Set `CC_HOOK_DEBUG=1` to see the diagnostic lines it otherwise swallows.
 ```
 
-- [ ] [T-003-B] Update the file tree entry. Modify `README.md`, replacing:
+- [X] [T-003-B] Update the file tree entry. Modify `README.md`, replacing:
 
 ```
 │       │   ├── pre-tool-use.sh   Large-file read guard + duplicate file guard + bash scan guard
@@ -938,7 +938,7 @@ with:
 │       │   ├── pre-tool-use.mjs  Node front door: large-file, duplicate-write and graphify-out guards
 ```
 
-- [ ] [T-003-C] Correct the filename in the hard constraint. Modify `CLAUDE.md`, replacing:
+- [X] [T-003-C] Correct the filename in the hard constraint. Modify `CLAUDE.md`, replacing:
 
 ```
 - Never skip the pre-tool-use.sh hook; if it blocks a tool invocation, investigate — do not bypass.
@@ -952,9 +952,9 @@ with:
 
 The line `Guard 4 blocks such reads at the hook level` at `CLAUDE.md:38` is left alone: this release is what makes it true.
 
-- [ ] [T-003-D] Apply the identical edit to `project-template/CLAUDE.md`, replacing the same `Never skip the pre-tool-use.sh hook` line with the same replacement as T-003-C.
+- [X] [T-003-D] Apply the identical edit to `project-template/CLAUDE.md`, replacing the same `Never skip the pre-tool-use.sh hook` line with the same replacement as T-003-C.
 
-- [ ] [T-003-E] Update the `/cc-init` hook integrity check in the template mirror. Modify `project-template/.claude/commands/cc-init.md`, replacing:
+- [X] [T-003-E] Update the `/cc-init` hook integrity check in the template mirror. Modify `project-template/.claude/commands/cc-init.md`, replacing:
 
 ````markdown
 Verify `.claude/hooks/pre-tool-use.sh` exists and is executable:
@@ -987,9 +987,9 @@ echo "✓ Hook OK: $HOOK"
 ```
 ````
 
-- [ ] [T-003-F] Apply the byte-identical edit to `.claude/commands/cc-init.md`. Depends on T-003-E. The parity suite compares the two files after rewriting script paths only, so any divergence in this block fails `tests/installer/commands-parity.test.js`.
+- [X] [T-003-F] Apply the byte-identical edit to `.claude/commands/cc-init.md`. Depends on T-003-E. The parity suite compares the two files after rewriting script paths only, so any divergence in this block fails `tests/installer/commands-parity.test.js`.
 
-- [ ] [T-003-G] Update the reset instructions. Modify `CONTRIBUTING.md`, replacing:
+- [X] [T-003-G] Update the reset instructions. Modify `CONTRIBUTING.md`, replacing:
 
 ````markdown
 If your local `.claude/hooks/pre-tool-use.sh` has diverged (e.g., manual edits, failed
@@ -1017,33 +1017,33 @@ code-conductor --project
 ```
 ````
 
-- [ ] [T-003-H] Confirm no stale filename survives outside the frozen fixture and the backlog's historical record. Depends on T-003-G.
+- [X] [T-003-H] Confirm no stale filename survives outside the frozen fixture and the backlog's historical record. Depends on T-003-G.
 
 ```bash
 grep -rn "pre-tool-use\.sh" README.md CLAUDE.md CONTRIBUTING.md project-template/ .claude/commands/ skills/ global/ || echo "NONE"
 ```
 Expected: `NONE`.
 
-- [ ] [T-003-I] Run the full suite. Depends on T-003-H.
+- [X] [T-003-I] Run the full suite. Depends on T-003-H.
 
 Run: `npm test`
 Expected: **617 passed | 12 skipped**. The `cc-init.md` parity cases are the ones at risk here; a failure means the two mirrors diverged in T-003-E / T-003-F.
 
-- [ ] [T-003-J] Stage the documentation set. Depends on T-003-I.
+- [X] [T-003-J] Stage the documentation set. Depends on T-003-I.
 
 ```bash
 git add README.md CLAUDE.md project-template/CLAUDE.md CONTRIBUTING.md \
   .claude/commands/cc-init.md project-template/.claude/commands/cc-init.md
 ```
 
-- [ ] [T-003-K] Verify exactly six staged paths. Depends on T-003-J.
+- [X] [T-003-K] Verify exactly six staged paths. Depends on T-003-J.
 
 ```bash
 git diff --cached --name-only
 ```
 Expected: six lines, the six files listed in T-003-J.
 
-- [ ] [T-003-L] Commit. Depends on T-003-K.
+- [X] [T-003-L] Commit. Depends on T-003-K.
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -1073,19 +1073,19 @@ EOF
 - Consumes: the working tree produced by Tasks 1 to 3.
 - Produces: version `1.28.0` recorded identically in `VERSION`, `package.json` and `package-lock.json`.
 
-- [ ] [T-004-A] Bump the manifest and the lockfile together. `npm version` is used rather than a hand edit because the lockfile records the version twice (root and `packages[""]`).
+- [X] [T-004-A] Bump the manifest and the lockfile together. `npm version` is used rather than a hand edit because the lockfile records the version twice (root and `packages[""]`).
 
 ```bash
 npm version 1.28.0 --no-git-tag-version
 ```
 
-- [ ] [T-004-B] Bump the `VERSION` file. Depends on T-004-A.
+- [X] [T-004-B] Bump the `VERSION` file. Depends on T-004-A.
 
 ```bash
 printf '1.28.0\n' > VERSION
 ```
 
-- [ ] [T-004-C] Verify all three agree. Depends on T-004-B.
+- [X] [T-004-C] Verify all three agree. Depends on T-004-B.
 
 ```bash
 cat VERSION
@@ -1094,7 +1094,7 @@ node -p "require('./package-lock.json').version + ' / ' + require('./package-loc
 ```
 Expected: `1.28.0` from each of the four readings.
 
-- [ ] [T-004-D] Add the changelog entry. Modify `CHANGELOG.md`, inserting immediately after the `# Changelog` line and its blank line:
+- [X] [T-004-D] Add the changelog entry. Modify `CHANGELOG.md`, inserting immediately after the `# Changelog` line and its blank line:
 
 ```markdown
 ## [1.28.0] - 2026-09-25
@@ -1107,7 +1107,7 @@ Expected: `1.28.0` from each of the four readings.
 Existing installations: re-run the installer to apply. Be aware of `[BUG-035]` before you do: the installer force-copies `settings.json` over the host's, so any `UserPromptSubmit` entry you added yourself is lost in that re-run. Back the file up if it carries entries you own.
 ```
 
-- [ ] [T-004-E] Flip the backlog entry. Modify `AGENT-READABLE BACKLOG.md`, replacing:
+- [X] [T-004-E] Flip the backlog entry. Modify `AGENT-READABLE BACKLOG.md`, replacing:
 
 ```
 ### [ ] `[BUG-036]` The pre-tool-use Hook Speaks a Contract Claude Code Does Not Use, So No Guard Has Ever Fired
@@ -1121,32 +1121,32 @@ with:
 
 `[BUG-034]` keeps its `[~]` superseded state and is not marked done. `[BUG-035]` and `[BUG-037]` stay `[ ]`.
 
-- [ ] [T-004-F] Verify the flip is exactly one line changed. Depends on T-004-E.
+- [X] [T-004-F] Verify the flip is exactly one line changed. Depends on T-004-E.
 
 ```bash
 git diff --numstat "AGENT-READABLE BACKLOG.md"
 ```
 Expected: `1	1	AGENT-READABLE BACKLOG.md`.
 
-- [ ] [T-004-G] Run the full suite. Depends on T-004-F.
+- [X] [T-004-G] Run the full suite. Depends on T-004-F.
 
 Run: `npm test`
 Expected: **617 passed | 12 skipped**.
 
-- [ ] [T-004-H] Stage the release set. Depends on T-004-G.
+- [X] [T-004-H] Stage the release set. Depends on T-004-G.
 
 ```bash
 git add VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md"
 ```
 
-- [ ] [T-004-I] Verify exactly five staged paths. Depends on T-004-H.
+- [X] [T-004-I] Verify exactly five staged paths. Depends on T-004-H.
 
 ```bash
 git diff --cached --name-only
 ```
 Expected: five lines, `AGENT-READABLE BACKLOG.md`, `CHANGELOG.md`, `VERSION`, `package-lock.json`, `package.json`.
 
-- [ ] [T-004-J] Commit. Depends on T-004-I.
+- [X] [T-004-J] Commit. Depends on T-004-I.
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -1172,13 +1172,13 @@ EOF
 - Consumes: the four commits from Tasks 0 to 4.
 - Produces: a pushed branch and an open pull request.
 
-- [ ] [T-005-A] Push the branch.
+- [X] [T-005-A] Push the branch.
 
 ```bash
 git push -u origin HEAD
 ```
 
-- [ ] [T-005-B] Open the pull request. Depends on T-005-A.
+- [X] [T-005-B] Open the pull request. Depends on T-005-A.
 
 ```bash
 gh pr create --title "fix: repair the pre-tool-use hook contract so the guards actually fire [BUG-036]" --body "$(cat <<'EOF'
@@ -1217,7 +1217,7 @@ EOF
 )"
 ```
 
-- [ ] [T-005-C] Report the PR URL and hand off. Depends on T-005-B. The terminal checkbox state of this plan lands as its own closing `docs:` commit after every box above reads `[X]`, never as an amend of the release commit.
+- [X] [T-005-C] Report the PR URL and hand off. Depends on T-005-B. The terminal checkbox state of this plan lands as its own closing `docs:` commit after every box above reads `[X]`, never as an amend of the release commit.
 
 ---
 
