@@ -63,6 +63,38 @@ export function applyToText(text, field, value) {
   return text.replace(re, () => `${canonicalLine(field)} ${value}`);
 }
 
+const NPM_RUN = /^(?:npm|pnpm)\s+run\s+(\S+)$/;
+const YARN    = /^yarn\s+(\S+)$/;
+
+// Only the shapes a package.json can actually answer. Everything else — make, cargo, go,
+// a bare binary — is not checkable, and not checkable is not suspicious.
+export function scriptNameOf(value) {
+  const v = value.trim();
+  const m = v.match(NPM_RUN) ?? v.match(YARN);
+  return m ? m[1] : null;
+}
+
+// Returns one warning string, or null for silence. Never executes anything, never reaches
+// the network. An absent or unparseable manifest is silence, not a warning: that is the
+// normal case this whole feature exists to serve.
+export function checkValue(value, pkgRaw) {
+  if (value.trim() === 'N/A') return null;
+  const script = scriptNameOf(value);
+  if (!script || pkgRaw === null) return null;
+  let pkg;
+  try {
+    pkg = JSON.parse(pkgRaw);
+  } catch {
+    return null;
+  }
+  if (typeof pkg !== 'object' || pkg === null || Array.isArray(pkg)) return null;
+  const scripts = (typeof pkg.scripts === 'object' && pkg.scripts !== null && !Array.isArray(pkg.scripts))
+    ? pkg.scripts
+    : {};
+  if (Object.prototype.hasOwnProperty.call(scripts, script)) return null;
+  return `no script named "${script}" in package.json`;
+}
+
 function fail(msg, code) {
   process.stderr.write(`init-wizard: ${msg}\n`);
   process.exit(code);
@@ -113,6 +145,22 @@ function main() {
     if (report.absent.length) {
       process.stderr.write(`init-wizard: absent from CLAUDE.md: ${report.absent.map(a => a.field).join(', ')}\n`);
     }
+    return;
+  }
+
+  if (sub === 'check') {
+    const rest = process.argv.slice(3);
+    const field = requireField(rest[0]);
+    requireValueStdin(rest);
+    const value = readValue();
+    let pkgRaw = null;
+    try {
+      pkgRaw = readFileSync(join(root, 'package.json'), 'utf8');
+    } catch {
+      pkgRaw = null;
+    }
+    const warning = checkValue(value, pkgRaw);
+    if (warning) process.stderr.write(`init-wizard: ${field.key}: ${warning}\n`);
     return;
   }
 

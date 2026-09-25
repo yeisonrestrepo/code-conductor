@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import {
   FIELDS, FIELD_KEYS, fieldByKey, canonicalLine, unresolvedReason, isResolved,
 } from '../../scripts/claude-md-fields.mjs';
-import { buildReport, stripOneTerminator } from '../../scripts/init-wizard.mjs';
+import { buildReport, stripOneTerminator, scriptNameOf, checkValue } from '../../scripts/init-wizard.mjs';
 
 const SCRIPT = fileURLToPath(new URL('../../scripts/init-wizard.mjs', import.meta.url));
 
@@ -212,5 +212,61 @@ describe('apply', () => {
     const res = run(['apply', 'nope', '--value-stdin'], { cwd: sandbox(fixture()), input: 'x\n' });
     expect(res.status).not.toBe(0);
     expect(res.stderr).toContain('unknown field');
+  });
+});
+
+describe('check', () => {
+  const pkg = JSON.stringify({ scripts: { build: 'tsc', test: 'vitest run' } });
+
+  it.each([
+    ['npm run build',  'build'],
+    ['pnpm run build', 'build'],
+    ['yarn build',     'build'],
+    ['  npm run build  ', 'build'],
+    ['make build',     null],
+    ['cargo build',    null],
+    ['go test ./...',  null],
+    ['npm run',        null],
+    ['npm run a b',    null],
+  ])('scriptNameOf(%j) === %j', (value, expected) => {
+    expect(scriptNameOf(value)).toBe(expected);
+  });
+
+  it('warns once for a script package.json does not have', () => {
+    expect(checkValue('npm run dist', pkg)).toContain('dist');
+  });
+
+  it('stays silent for a script it does have', () => {
+    expect(checkValue('npm run build', pkg)).toBeNull();
+  });
+
+  it('stays silent with no manifest, an unparseable one, or a non-object one', () => {
+    expect(checkValue('npm run dist', null)).toBeNull();
+    expect(checkValue('npm run dist', '{ not json')).toBeNull();
+    expect(checkValue('npm run dist', '[]')).toBeNull();
+  });
+
+  it('warns when a parseable manifest simply has no scripts block', () => {
+    expect(checkValue('npm run dist', '{"name":"x"}')).toContain('dist');
+  });
+
+  it('skips N/A entirely', () => {
+    expect(checkValue('N/A', pkg)).toBeNull();
+  });
+
+  it('exits 0 and warns on stderr, writing nothing', () => {
+    const before = fixture();
+    const cwd = sandbox(before);
+    writeFileSync(join(cwd, 'package.json'), pkg);
+    const res = run(['check', 'build', '--value-stdin'], { cwd, input: 'npm run dist\n' });
+    expect(res.status).toBe(0);
+    expect(res.stderr).toContain('dist');
+    expect(res.stdout).toBe('');
+    expect(readFileSync(join(cwd, 'CLAUDE.md'), 'utf8')).toBe(before);
+  });
+
+  it('exits non-zero on an invalid argument', () => {
+    const res = run(['check', 'nope', '--value-stdin'], { cwd: sandbox(fixture()), input: 'x\n' });
+    expect(res.status).not.toBe(0);
   });
 });
