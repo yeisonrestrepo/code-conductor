@@ -654,3 +654,27 @@ Approved 2026-09-24. Full spec on disk at `docs/superpowers/specs/2026-09-24-fea
 
 ### Complexity
 M — two new scripts with real unit coverage, one command file rewritten plus its regenerated mirror, one existing test file extended. Risk concentrates in `apply`'s byte-exactness and the stdin value path, both directly testable.
+
+## Checkpoint 2026-09-24 20:22
+
+### Decisions
+
+- **FEAT-016 shipped as specified** (PR #26, squash-merged as `6857596`, v1.27.0). Two new zero-dependency scripts: `scripts/claude-md-fields.mjs` (the eight canonical fields + the one resolved predicate) and `scripts/init-wizard.mjs` (`report | check | apply`). `dependencies: {}` is preserved — the backlog's "low-cost model API bindings" component was **not** implemented and its Components Affected line is corrected in the backlog itself.
+- **`init-wizard.mjs` is mode-blind, permanently.** No TTY probe, no `process.stdin.isTTY`, no `CI` read — pinned by a test that greps the *whole source, comments included*. Agent-executed Bash never has a TTY, so any probe pins the interactive path into non-interactive mode forever. When that test tripped on a header comment that merely *spelled* the API, the comment was reworded rather than the grep narrowed: a comment-skipping grep is cleverness that rots, and the blunt form is the stronger guarantee.
+- **Values reach `apply`/`check` on stdin only** (`--value-stdin` + a quoted heredoc delimiter), never argv. Argv would put a developer-typed string into an agent-composed command line — a quoting/injection surface and a guard-3 collision. A test round-trips backticks, `$(...)` and both quote species into `CLAUDE.md` byte-exact.
+- **`writeFileSync` without temp+rename is accepted** for `apply`: one small single-line rewrite, every refusal path fails before the file is opened, and each refusal test asserts `CLAUDE.md` is untouched. Revisit only if a real truncation is observed.
+- **`.claude/commands/cc-init.md` is now tracked.** `.claude/` is gitignored and only four command files had ever been force-added; the new parity test reads `cc-init.md`, so an untracked source would have failed in every fresh clone. Force-added in the same commit that created the divergence.
+
+### Conventions
+
+- **A substitution rule that must never fire is dead code and is not carried over.** `cc-init.md`'s mirror is regenerated with the single rule `node scripts/` → `node .claude/scripts/`; `cc-plan.md`'s second rule (`` running `scripts/ ``) has no occurrence here and was dropped rather than shipped unverifiable. The regeneration step first greps the source for any `scripts/` mention *outside* a `node …` invocation and halts on a hit, because `unnest` reverses only the `node ` form.
+- **Backlog and tracking-file edits relocate by heading grep, never by line number** — reaffirmed across all three FEAT-016 backlog edits (`grep -n '^### \[ \] `\[FEAT-016\]`'`, an `awk` block scan for the Components line), each expecting exactly one match and halting on zero or many.
+- **Within a task, edit before staging.** The FEAT-016 plan initially staged the backlog in step B and flipped its checkbox in step C; `cc-implement` executes in file order, so the flip would never have reached the commit. Filed as `[BUG-031]` so the *generator* stops emitting that order.
+- **Template mirror parity now covers two command pairs.** `tests/installer/commands-parity.test.js` reuses one `unnest` inverse for both `cc-plan.md` and `cc-init.md` rather than forking the rule.
+
+### Debt
+
+- **T-T07 is DISCHARGED.** FEAT-026's branch gate ran live at FEAT-016's plan approval and all three observations are recorded in PR #26's body (discoverable from `main`): the gate resolved before any Task 0 write including `git add -f` and `git commit`; it derived `feat/feat-016-interactive-assisted-onboarding` from the spec stem; and it *validated* — did not synthesize — the subject `docs: add the FEAT-016 interactive assisted onboarding implementation plan`. It also correctly refused silence on `main`. Do not re-open this.
+- **New residual, T-T07-shaped: FEAT-016's interactive half.** The asking prose cannot be tested end to end — only presence, ordering and mirror parity. **Discharge condition:** the first real `/cc-init` against a manifest-less repo records one line — the fields `report` returned, the questions asked, the resulting `CLAUDE.md` command lines. Not a release gate; v1.27.0 shipped without it by design.
+- **`[BUG-031]` filed** against `/cc-plan`'s generation rules (edit-before-stage ordering). Id ceiling was 030, read with the two-stage pipeline over working tree ∪ `origin/main` after `git fetch`.
+- Test baseline is now **583 passed / 12 skipped** (was 529/12).
