@@ -60,7 +60,7 @@ git branch --show-current && git status --porcelain
 ```
 Expected: `fix/bug-033-hook-interpreter-wiring`, and a status listing exactly `M .claude/memory/project.md` plus the untracked plan and spec files under `docs/`. If the branch is `main`, stop: the `/cc-plan` branch gate did not run.
 
-- [>] [T-000-B] Stage the plan and the spec-phase memory
+- [X] [T-000-B] Stage the plan and the spec-phase memory
 
 Run:
 ```bash
@@ -70,7 +70,7 @@ git diff --cached --name-only
 ```
 Expected: exactly two staged paths. No edit step precedes this stage because this task edits neither file; both were written in earlier phases.
 
-- [ ] [T-000-C] Commit
+- [X] [T-000-C] Commit
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -94,7 +94,7 @@ EOF
 - Consumes: nothing.
 - Produces: a `describe('shipped global/settings.json')` block in `tests/installer/settings.test.js`. Task 2 rewrites its single `it` rather than adding a second block.
 
-- [ ] [T-001-A] Write the failing shipped-asset test
+- [X] [T-001-A] Write the failing shipped-asset test
 
 Add these three names to the existing imports at the top of `tests/installer/settings.test.js`. Line 4 becomes:
 
@@ -120,12 +120,12 @@ describe('shipped global/settings.json', () => {
 });
 ```
 
-- [ ] [T-001-B] Run the new test and watch it fail
+- [X] [T-001-B] Run the new test and watch it fail
 
 Run: `npx vitest run tests/installer/settings.test.js -t 'wires the graphify hook with python3'`
 Expected: 1 failed. The failure names the received array containing `python ~/.claude/hooks/graphify-ast-refresh.py`. A pass here means the asset was already edited out of order; stop and re-read `global/settings.json`.
 
-- [ ] [T-001-C] Correct the shipped command
+- [X] [T-001-C] Correct the shipped command
 
 In `global/settings.json`, change line 18 from:
 
@@ -141,16 +141,16 @@ to:
 
 Nothing else in the file changes.
 
-- [ ] [T-001-D] Correct the test fixture
+- [X] [T-001-D] Correct the test fixture
 
 In `tests/installer/settings.test.js`, line 27, change the fixture command from `'python ~/.claude/hooks/graphify-ast-refresh.py'` to `'python3 ~/.claude/hooks/graphify-ast-refresh.py'`. The surrounding assertions are unchanged: that test asserts `mergeVerbosityHook` preserves a graphify entry, and it must not pin a command string the project no longer ships.
 
-- [ ] [T-001-E] Run the full suite
+- [X] [T-001-E] Run the full suite
 
 Run: `npm test`
 Expected: **586 passed / 12 skipped** (585 plus the new shipped-asset test).
 
-- [ ] [T-001-F] Stage both files
+- [X] [T-001-F] Stage both files
 
 ```bash
 git add global/settings.json tests/installer/settings.test.js
@@ -158,7 +158,7 @@ git diff --cached --name-only
 ```
 Expected: exactly two staged paths. This step follows T-001-C and T-001-D, the only steps in this commit group that edit those files.
 
-- [ ] [T-001-G] Commit
+- [X] [T-001-G] Commit
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -196,7 +196,7 @@ EOF
   - `mergeGraphifyHook(settingsPath: string, hookCmd: string, now?: Date) => { status: 'merged' | 'idempotent-skip' | 'malformed-skipped' }`.
   - `mergeVerbosityHook` keeps its exact signature and behavior; only its body moves into the shared core.
 
-- [ ] [T-002-A] Write the wrapper test file
+- [X] [T-002-A] Write the wrapper test file
 
 Create `tests/hooks/graphify-refresh.test.js`:
 
@@ -325,12 +325,12 @@ describe('graphify-ast-refresh.mjs', () => {
 });
 ```
 
-- [ ] [T-002-B] Run the wrapper tests and watch them fail
+- [X] [T-002-B] Run the wrapper tests and watch them fail
 
 Run: `npx vitest run tests/hooks/graphify-refresh.test.js`
 Expected: **6 failed**, every one on `expect(r.status).toBe(0)` receiving `1`, because `node` cannot find the module. If a test passes here, the wrapper already exists; stop and inspect `global/hooks/`.
 
-- [ ] [T-002-C] Create the wrapper
+- [X] [T-002-C] Create the wrapper
 
 Create `global/hooks/graphify-ast-refresh.mjs`:
 
@@ -428,12 +428,12 @@ try {
 }
 ```
 
-- [ ] [T-002-D] Run the wrapper tests and watch them pass
+- [X] [T-002-D] Run the wrapper tests and watch them pass
 
 Run: `npx vitest run tests/hooks/graphify-refresh.test.js`
 Expected: **6 passed** on macOS and Linux (4 skipped, 2 passed on Windows).
 
-- [ ] [T-002-E] Write the installer tests and flip the shipped-asset assertion
+- [X] [T-002-E] Write the installer tests and flip the shipped-asset assertion
 
 In `tests/installer/settings.test.js`, extend the import on line 5 to:
 
@@ -533,12 +533,12 @@ Then replace the whole `it` inside the `describe('shipped global/settings.json')
   });
 ```
 
-- [ ] [T-002-F] Run the settings suite and watch it fail
+- [X] [T-002-F] Run the settings suite and watch it fail
 
 Run: `npx vitest run tests/installer/settings.test.js`
 Expected: the file fails to collect, with `does not provide an export named 'graphifyHookCommand'`. A collection error, not an assertion failure, is the correct red state here because the import is at module scope.
 
-- [ ] [T-002-G] Add the builder and the shared merge core
+- [X] [T-002-G] Add the builder and the shared merge core
 
 In `lib/installer/settings.mjs`, add a second fingerprint beside line 4:
 
@@ -614,7 +614,7 @@ export function mergeGraphifyHook(settingsPath, hookCmd, now = new Date()) {
 }
 ```
 
-- [ ] [T-002-H] Remove the graphify entry from the shipped asset
+- [X] [T-002-H] Remove the graphify entry from the shipped asset
 
 Replace the entire contents of `global/settings.json` with:
 
@@ -634,12 +634,12 @@ Replace the entire contents of `global/settings.json` with:
 
 The `hooks` key goes away entirely. `mergeHook` already handles a settings file with no `hooks` key, which the `'{}'` cases in the suite cover.
 
-- [ ] [T-002-I] Run the settings suite and watch it pass
+- [X] [T-002-I] Run the settings suite and watch it pass
 
 Run: `npx vitest run tests/installer/settings.test.js`
 Expected: **22 passed** (14 before this release, plus 1 from Task 1, plus 7 here).
 
-- [ ] [T-002-J] Wire the call site
+- [X] [T-002-J] Wire the call site
 
 In `bin/code-conductor.mjs`, line 7 becomes:
 
@@ -655,7 +655,7 @@ And immediately after the existing `mergeVerbosityHook(...)` call at line 98, ad
 
 Order matters only in that both run after `deployGlobal`, which force-copies the shipped `settings.json` over the host's.
 
-- [ ] [T-002-K] Assert what the installer actually writes
+- [X] [T-002-K] Assert what the installer actually writes
 
 In `tests/installer/cli.test.js`, add this test immediately after the existing `it('registers the verbosity hook idempotently across two runs', ...)` block:
 
@@ -672,12 +672,12 @@ In `tests/installer/cli.test.js`, add this test immediately after the existing `
   });
 ```
 
-- [ ] [T-002-L] Run the full suite
+- [X] [T-002-L] Run the full suite
 
 Run: `npm test`
 Expected: **600 passed / 12 skipped** (586 after Task 1, plus 6 wrapper tests, plus 7 settings tests, plus 1 CLI test).
 
-- [ ] [T-002-M] Update the README
+- [X] [T-002-M] Update the README
 
 Replace the paragraph at `README.md:175` and the sentence at `:177` with:
 
@@ -694,7 +694,7 @@ Then replace the file tree line at `README.md:279` with these two lines, preserv
 │   │   └── graphify-ast-refresh.py  Background AST refresh on UserPromptSubmit
 ```
 
-- [ ] [T-002-N] Stage the eight changed paths
+- [X] [T-002-N] Stage the eight changed paths
 
 ```bash
 git add global/hooks/graphify-ast-refresh.mjs global/settings.json \
@@ -705,7 +705,7 @@ git diff --cached --name-only
 ```
 Expected: exactly eight staged paths. This step follows every edit step in this commit group (T-002-A, C, E, G, H, J, K, M).
 
-- [ ] [T-002-O] Commit
+- [X] [T-002-O] Commit
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -738,16 +738,16 @@ EOF
 - Consumes: Tasks 1 and 2, both committed.
 - Produces: the release commit and the pull request.
 
-- [ ] [T-003-A] Bump `VERSION`
+- [X] [T-003-A] Bump `VERSION`
 
 Replace the sole line of `VERSION` with `1.27.2`.
 
-- [ ] [T-003-B] Bump the manifest and the lockfile together
+- [X] [T-003-B] Bump the manifest and the lockfile together
 
 Run: `npm version 1.27.2 --no-git-tag-version`
 Expected: `v1.27.2` on stdout, and `git status --porcelain` shows `package.json` and `package-lock.json` modified. This edits both lockfile `"version": "1.27.1"` occurrences (root and `packages[""]`) in one step, which a hand edit routinely misses.
 
-- [ ] [T-003-C] Add the changelog entry
+- [X] [T-003-C] Add the changelog entry
 
 Insert this section into `CHANGELOG.md` immediately after the `# Changelog` heading and before `## [1.27.1] - 2026-09-25`:
 
@@ -761,7 +761,7 @@ Insert this section into `CHANGELOG.md` immediately after the `# Changelog` head
 Existing installations: re-run the installer to apply.
 ```
 
-- [ ] [T-003-D] Flip the backlog entry
+- [X] [T-003-D] Flip the backlog entry
 
 In `AGENT-READABLE BACKLOG.md`, line 246, change the single leading checkbox from `### [ ]` to `### [X]`, leaving the rest of the heading byte for byte identical:
 
@@ -771,12 +771,12 @@ In `AGENT-READABLE BACKLOG.md`, line 246, change the single leading checkbox fro
 
 This is a surgical single-line edit (BUG-003). Do not rewrite the entry's body.
 
-- [ ] [T-003-E] Run the full suite one last time
+- [X] [T-003-E] Run the full suite one last time
 
 Run: `npm test`
 Expected: **600 passed / 12 skipped**, unchanged from T-002-L.
 
-- [ ] [T-003-F] Stage the five release paths
+- [X] [T-003-F] Stage the five release paths
 
 ```bash
 git add VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md"
@@ -784,7 +784,7 @@ git diff --cached --name-only
 ```
 Expected: exactly five staged paths. This step follows T-003-A through T-003-D, every edit step in this commit group.
 
-- [ ] [T-003-G] Commit
+- [X] [T-003-G] Commit
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -795,7 +795,7 @@ EOF
 )"
 ```
 
-- [ ] [T-003-H] Push and open the pull request
+- [X] [T-003-H] Push and open the pull request
 
 ```bash
 git push -u origin fix/bug-033-hook-interpreter-wiring
