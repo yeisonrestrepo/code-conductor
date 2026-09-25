@@ -699,3 +699,26 @@ M — two new scripts with real unit coverage, one command file rewritten plus i
 - Anchor discipline: whitespace-normalize both sides, count literally with `split`, hold a backtick-bearing needle in a quoted string, never build a regex from prose.
 - Open debt (unfiled): nothing in the documented lookup chain points at `~/.claude/memory/personal.md`, so `global/memory/personal.md` is a rule the executing agent may never read. Needs a backlog id via the two-stage ceiling pipeline.
 - Rejected under YAGNI: a mechanical validator that parses generated plan markdown and rejects a `git add` preceding an edit of the same path.
+
+## Checkpoint 2026-09-25 09:24
+
+### Decisions
+
+- **BUG-031 shipped as `1.27.1`** on `fix/bug-031-plan-step-ordering` in four commits: the plan (`746fbe7`), the rule plus regenerated mirror plus anchor (`b11e1f6`), the release closeout (`4cb2b20`), and the plan's terminal checkbox state (`4691f98`).
+- **The fix is prose, not machinery.** One bullet at the end of `## Ordered Steps` in `cc-plan.md`, defining its own terms (a commit group is the contiguous run of steps ending at a `git commit` step), covering every `git add` form plus the implicit stage of `git commit -a`, exempting a file the task never edits, and naming the consequence. A mechanical plan-markdown validator was rejected under YAGNI and the rejection is recorded in the spec's Out of Scope.
+- **A completed plan's terminal checkbox state lands as a closing `docs:` commit**, never as an amend of the release commit and never left dirty. The `[X]` state is terminal, the plan file is already tracked from Task 0, and a merged branch whose plan file misreports its own last step is worse than one extra commit.
+
+### Conventions
+
+- **Guards must be portable or they are theatre.** `\|` alternation is a GNU BRE extension; BSD `grep` (macOS default) reads it as a literal pipe, so an alternation guard matches nothing and "expect 0" is a guaranteed false pass. Every hazard grep in this cycle uses `grep -c -e PAT1 -e PAT2`.
+- **A needle containing an apostrophe never travels inside `node -e '...'`.** Feed the script through `node --input-type=commonjs <<'JS' … JS`, the same inert-quoting trick the commit-message heredoc uses.
+- **Regeneration is checked on both halves:** a positive grep proving the nested paths are present and a residual grep proving no bare path survived. A surprise residual hit is halt-and-look, never silenced by editing the template.
+- **Anchor discipline (reaffirmed live):** whitespace-normalize both sides, count with `split(needle).length - 1`, assert exactly once, hold a backtick-bearing needle in a single-quoted string, and anchor both mirrors rather than trusting transform-equivalence.
+- **Preconditions are dry-run before the edit, not discovered mid-edit.** The `awk` adjacency check proving `## Test List` sits at the bullet line + 2 turned T-001-D's three-line `old_string` from an assumption into a verified fact.
+
+### Debt
+
+- **Open, unfiled:** nothing in the documented lookup chain points at `~/.claude/memory/personal.md`. The Orchestrator Protocol starts at `.claude/memory/project.md` and the project `CLAUDE.md` calls `personal.md` "local only", so a project session never reads the global file where the tone rules live. A recorded rule the agent does not read is indistinguishable from no rule, the same failure shape BUG-031 fixed. To be filed at the next free id via the two-stage ceiling pipeline.
+- **Residual, advisory by design:** the step-ordering rule is prose the generator must read. One confirming observation of a generated Task 0 obeying it (next cycle, `FEAT-009`) is worth recording in that plan's report, the way T-T07 was discharged.
+- **Still open from FEAT-016:** the interactive `/cc-init` live-verification line, to be recorded at the first real run against a manifest-less repo. Not a release gate.
+- Test baseline is now **585 passed / 12 skipped** (was 583/12).
