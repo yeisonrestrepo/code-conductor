@@ -50,6 +50,24 @@ describe('cc-plan mirrors', () => {
       expect(text).toContain(cmd);
     }
   });
+
+  // Whitespace-normalized so a rewrap of the hard-wrapped rule cannot break the anchor, and
+  // counted with a literal `split` because the clause contains `[X]`, which `new RegExp` would
+  // read as a character class and silently miscount. The constant is single-quoted, never a
+  // template literal: it contains backticks.
+  const NORM = (s) => s.replace(/\s+/g, ' ').trim();
+  const ORDERING_CLAUSE =
+    'a staging step placed above its edit commits the file\'s previous content ' +
+    'while every checkbox still reports `[X]`';
+
+  // Asserted on BOTH mirrors, not just the source. The `differ only in the script path nesting`
+  // test already implies the mirror, but transform-equivalence is a relative property: if that
+  // assertion is ever relaxed, or the transform gains an expression touching this text, the
+  // two-sided anchor is what keeps the mirror honest. Do not remove either side as dead.
+  it.each(MIRRORS)('%s carries the step-ordering rule exactly once', (rel) => {
+    const count = NORM(read(rel)).split(NORM(ORDERING_CLAUSE)).length - 1;
+    expect(count).toBe(1);
+  });
 });
 
 const INIT_MIRRORS = ['.claude/commands/cc-init.md', 'project-template/.claude/commands/cc-init.md'];
