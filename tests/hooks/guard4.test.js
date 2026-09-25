@@ -8,148 +8,106 @@ import { dirname, join, resolve } from 'path'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const REPO_ROOT = resolve(__dirname, '../..')
-// Use a relative path so bash on Windows can locate the script from the cwd it inherits
-const HOOK = '.claude/hooks/pre-tool-use.sh'
-
-// Use stdio:'pipe' + timeout so WSL bash (which hangs when piped) is treated as unavailable,
-// matching the guard3 skip pattern on Windows.
-const _bashCheck = spawnSync('bash', ['--version'], { stdio: 'pipe', timeout: 5000 })
-const BASH_AVAILABLE = !_bashCheck.error && _bashCheck.status === 0
+const HOOK = join(REPO_ROOT, '.claude/hooks/pre-tool-use.mjs')
 
 const WIN32 = process.platform === 'win32'
-// Resolve bash's absolute path so row16 can pass an empty PATH without ENOENT.
-const _whichBash = WIN32 ? null : spawnSync('which', ['bash'], { stdio: 'pipe', timeout: 5000 })
-const BASH_PATH = (_whichBash?.status === 0) ? _whichBash.stdout.toString().trim() : 'bash'
 
-function runRead(filePath, { toolName = 'Read', input = null } = {}) {
-  const finalInput = input ?? JSON.stringify({ file_path: filePath })
-  const result = spawnSync('bash', [HOOK], {
+// These 17 cases are Guard 4's logic of record. The runtime and the input contract both
+// changed under them, so the mechanics move (JSON on stdin, decision in stdout, exit 0
+// always) while the verdicts do not, except at row14 and row16, which the contract itself
+// flips and which are named in the plan rather than quietly adjusted.
+function runRead(filePath, { toolName = 'Read', input = null, env = {} } = {}) {
+  const payload = input ?? JSON.stringify({ tool_name: toolName, tool_input: { file_path: filePath } })
+  const result = spawnSync(process.execPath, [HOOK], {
     stdio: 'pipe',
     cwd: REPO_ROOT,
     timeout: 15000,
-    env: { ...process.env, CLAUDE_TOOL_NAME: toolName, CLAUDE_TOOL_INPUT: finalInput },
+    input: payload,
+    env: { ...process.env, ...env },
   })
-  if (result.error) throw new Error(`bash spawn failed: ${result.error.message}`)
+  if (result.error) throw new Error(`hook spawn failed: ${result.error.message}`)
   const strip = s => s.replace(/\r\n|\r/g, '\n').replace(/\x1b\[[0-9;]*m/g, '')
+  const stdout = strip((result.stdout ?? Buffer.alloc(0)).toString())
   return {
     status: result.status ?? -1,
-    stdout: strip((result.stdout ?? Buffer.alloc(0)).toString()),
+    stdout,
     stderr: strip((result.stderr ?? Buffer.alloc(0)).toString()),
+    decision: stdout.trim() === '' ? null : JSON.parse(stdout).hookSpecificOutput,
   }
 }
 
-describe.skipIf(!BASH_AVAILABLE)('Guard 4 — Read blocker for graphify-out/ and node_modules/', () => {
+const expectBlocked = (r, matcher = /Guard 4/) => {
+  expect(r.status).toBe(0)
+  expect(r.decision.permissionDecision).toBe('deny')
+  expect(r.decision.permissionDecisionReason).toMatch(matcher)
+}
+const expectAllowed = (r) => {
+  expect(r.status).toBe(0)
+  expect(r.decision).toBeNull()
+}
+
+describe('Guard 4 — Read blocker for graphify-out/ and node_modules/', () => {
   it('row1: blocks graphify-out/graph.json', () => {
-    const r = runRead('graphify-out/graph.json')
-    expect(r.status).toBe(1)
-    const p = JSON.parse(r.stdout.trim())
-    expect(p.decision).toBe('block')
-    expect(p.reason).toMatch(/Guard 4/)
+    expectBlocked(runRead('graphify-out/graph.json'))
   })
   it('row2: blocks graphify-out/cache/ast/abc.json', () => {
-    const r = runRead('graphify-out/cache/ast/abc.json')
-    expect(r.status).toBe(1)
-    const p = JSON.parse(r.stdout.trim())
-    expect(p.decision).toBe('block')
-    expect(p.reason).toMatch(/Guard 4/)
+    expectBlocked(runRead('graphify-out/cache/ast/abc.json'))
   })
   it('row3: blocks node_modules/vitest/dist/index.js', () => {
-    const r = runRead('node_modules/vitest/dist/index.js')
-    expect(r.status).toBe(1)
-    const p = JSON.parse(r.stdout.trim())
-    expect(p.decision).toBe('block')
-    expect(p.reason).toMatch(/Guard 4/)
+    expectBlocked(runRead('node_modules/vitest/dist/index.js'))
   })
   it('row4: blocks absolute path /abs/path/graphify-out/file.json', () => {
-    const r = runRead('/abs/path/graphify-out/file.json')
-    expect(r.status).toBe(1)
-    const p = JSON.parse(r.stdout.trim())
-    expect(p.decision).toBe('block')
-    expect(p.reason).toMatch(/Guard 4/)
+    expectBlocked(runRead('/abs/path/graphify-out/file.json'))
   })
   it('row5: blocks Windows backslash path graphify-out\\cache\\file.json', () => {
-    const r = runRead('graphify-out\\cache\\file.json')
-    expect(r.status).toBe(1)
-    const p = JSON.parse(r.stdout.trim())
-    expect(p.decision).toBe('block')
-    expect(p.reason).toMatch(/Guard 4/)
+    expectBlocked(runRead('graphify-out\\cache\\file.json'))
   })
   it('row6: blocks case variant Graphify-Out/graph.json', () => {
-    const r = runRead('Graphify-Out/graph.json')
-    expect(r.status).toBe(1)
-    const p = JSON.parse(r.stdout.trim())
-    expect(p.decision).toBe('block')
-    expect(p.reason).toMatch(/Guard 4/)
+    expectBlocked(runRead('Graphify-Out/graph.json'))
   })
   it('row7: blocks NODE_MODULES/pkg/index.js (uppercase)', () => {
-    const r = runRead('NODE_MODULES/pkg/index.js')
-    expect(r.status).toBe(1)
-    const p = JSON.parse(r.stdout.trim())
-    expect(p.decision).toBe('block')
-    expect(p.reason).toMatch(/Guard 4/)
+    expectBlocked(runRead('NODE_MODULES/pkg/index.js'))
   })
-  it('row8: allows graphify-out/../src/main.js (normpath resolves to src/main.js)', () => {
-    const r = runRead('graphify-out/../src/main.js')
-    expect(r.status).toBe(0)
+  it('row8: allows graphify-out/../src/main.js (normalize resolves to src/main.js)', () => {
+    expectAllowed(runRead('graphify-out/../src/main.js'))
   })
-  it('row9: blocks graphify-out/ (trailing slash — normpath yields graphify-out, component matched)', () => {
-    const r = runRead('graphify-out/')
-    expect(r.status).toBe(1)
-    const p = JSON.parse(r.stdout.trim())
-    expect(p.decision).toBe('block')
-    expect(p.reason).toMatch(/Guard 4/)
+  it('row9: blocks graphify-out/ (trailing slash: component still matched)', () => {
+    expectBlocked(runRead('graphify-out/'))
   })
-  it('row10: blocks "  graphify-out/graph.json" (leading spaces stripped by .strip())', () => {
-    const r = runRead('  graphify-out/graph.json')
-    expect(r.status).toBe(1)
-    const p = JSON.parse(r.stdout.trim())
-    expect(p.decision).toBe('block')
-    expect(p.reason).toMatch(/Guard 4/)
+  it('row10: blocks "  graphify-out/graph.json" (leading spaces trimmed)', () => {
+    expectBlocked(runRead('  graphify-out/graph.json'))
   })
   it('row11: allows graphify-out-backup/file.json (not an exact component match)', () => {
-    const r = runRead('graphify-out-backup/file.json')
-    expect(r.status).toBe(0)
+    expectAllowed(runRead('graphify-out-backup/file.json'))
   })
   it('row12: allows src/utils/graphify-out-helper.js (no blocked component)', () => {
-    const r = runRead('src/utils/graphify-out-helper.js')
-    expect(r.status).toBe(0)
+    expectAllowed(runRead('src/utils/graphify-out-helper.js'))
   })
   it('row13: allows src/index.js (normal file)', () => {
-    const r = runRead('src/index.js')
-    expect(r.status).toBe(0)
+    expectAllowed(runRead('src/index.js'))
   })
-  it('row14: fail-open on malformed JSON input {invalid json}', () => {
+  // FLIPPED. Was "fail-open on malformed JSON". Unparseable stdin is not "nothing to
+  // verify", it is "the verifier could not run", which is the condition that fails closed.
+  it('row14: denies malformed JSON input {invalid json} and names the override', () => {
     const r = runRead('', { input: '{invalid json}' })
-    expect(r.status).toBe(0)
+    expectBlocked(r, /CC_HOOK_ALLOW/)
   })
-  it('row15: fail-open on missing file_path key (empty object {})', () => {
-    const r = runRead('', { input: '{}' })
-    expect(r.status).toBe(0)
+  // UNCHANGED verdict. A payload that names no file_path carries no path that could reach
+  // graphify-out/, so there is nothing to deny (Case A).
+  it('row15: allows a valid Read payload with no file_path', () => {
+    expectAllowed(runRead('', { input: JSON.stringify({ tool_name: 'Read', tool_input: {} }) }))
   })
-  it.skipIf(WIN32)('row16: fail-open when python3 absent (PATH restricted to empty dir)', () => {
-    // /bin → /usr/bin on modern Linux (Ubuntu CI), so python3 would be found there.
-    // Use a temp empty dir to guarantee python3 is truly absent on any OS.
-    const fakeBin = mkdtempSync(join(tmpdir(), 'guard4-nopy-'))
+  // FLIPPED. Was "fail-open when python3 absent". The path check is now pure JavaScript
+  // over an already-parsed string, so an empty PATH cannot disarm it.
+  it.skipIf(WIN32)('row16: denies with PATH restricted to an empty dir', () => {
+    const fakeBin = mkdtempSync(join(tmpdir(), 'guard4-nopath-'))
     try {
-      const result = spawnSync(BASH_PATH, [HOOK], {
-        stdio: 'pipe',
-        cwd: REPO_ROOT,
-        timeout: 15000,
-        env: {
-          ...process.env,
-          PATH: fakeBin,
-          CLAUDE_TOOL_NAME: 'Read',
-          CLAUDE_TOOL_INPUT: JSON.stringify({ file_path: 'graphify-out/graph.json' }),
-        },
-      })
-      if (result.error) throw new Error(`bash spawn failed: ${result.error.message}`)
-      expect(result.status ?? -1).toBe(0)
+      expectBlocked(runRead('graphify-out/graph.json', { env: { PATH: fakeBin } }))
     } finally {
       rmdirSync(fakeBin)
     }
   })
-  it('row17: does NOT fire Guard 4 when CLAUDE_TOOL_NAME is Bash (Guard 3 handles; exits 0)', () => {
-    const r = runRead('graphify-out/graph.json', { toolName: 'Bash' })
-    expect(r.status).toBe(0)
+  it('row17: does NOT fire Guard 4 when tool_name is Bash (Guard 3 slot handles it)', () => {
+    expectAllowed(runRead('graphify-out/graph.json', { toolName: 'Bash' }))
   })
 })
