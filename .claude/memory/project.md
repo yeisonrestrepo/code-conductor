@@ -619,5 +619,38 @@ FEAT-026 shipped on `feat/feat-026-guided-branch-and-commit-drafting`; PR #25 op
 - PR bodies must not carry merge-strategy constraints unless a live mechanism actually depends on commit identity. State the mechanism or omit the caution.
 
 ### Debt
-- **T-T07 is open and unautomated by design.** The branch gate is instruction prose executed by the agent, so its runtime behavior cannot be unit-tested; `tests/installer/commands-parity.test.js` pins only its presence, mirror parity, ordering precondition, and the exact git invocations. **Discharge condition:** at the next real `/cc-plan` approval, record in the task report (a) the observed execution order — that the gate resolved before any Task 0 write, `git add -f` and `git commit` included, (b) the derived branch name, and (c) the validated Task 0 commit subject. Until those three are recorded, the acceptance criterion is unverified.
+- **T-T07 is open and unautomated by design.** The branch gate is instruction prose executed by the agent, so its runtime behavior cannot be unit-tested; `tests/installer/commands-parity.test.js` pins only its presence, mirror parity, ordering precondition, and the exact git invocations. **Discharge condition:** at the next real `/cc-plan` approval — now known to be **FEAT-016's plan** (spec approved 2026-09-24) — record in the task report (a) the observed execution order — that the gate resolved before any Task 0 write, `git add -f` and `git commit` included, (b) the derived branch name, and (c) the validated Task 0 commit subject. Until those three are recorded, the acceptance criterion is unverified.
 - `git add` on a path under `.claude/` exits 1 with "paths are ignored by one of your .gitignore files" yet still stages the tracked file; it breaks `&&` chains. Run the `git commit` separately.
+
+---
+
+## Spec: FEAT-016 Interactive Assisted Onboarding (Interactive Fallback Wizard) [2026-09-24]
+
+Approved 2026-09-24. Full spec on disk at `docs/superpowers/specs/2026-09-24-feat016-interactive-assisted-onboarding-design.md` (gitignored; this summary is the shipped record).
+
+### Problem
+`/cc-init` fills `CLAUDE.md` from `scripts/detect-stack.mjs`, which reads manifests. With no manifest — blank workspace or legacy codebase — there is no recovery path: Step 2's questionnaire is gated on `Name` being blank (wrong trigger), never covers the command fields, and `- Build: <command>` ships verbatim. The agent then reads the placeholder as an instruction and guesses — the exact BUG-015 failure that FEAT-013/BUG-015 closed only for manifest-bearing repos.
+
+### Decisions
+- **No LLM API binding.** The backlog's "low-cost model API bindings" component predates the npm CLI and is explicitly not implemented; the model already running the session does the formatting. `dependencies: {}` stays intact — zero network, zero API keys.
+- **Split the wizard:** `scripts/init-wizard.mjs` (new) owns the deterministic half via subcommand argv — `report` | `check` | `apply`; `cc-init.md` prose keeps only the asking. `scripts/claude-md-fields.mjs` (new) exports the canonical field list and the `isResolved` predicate, imported by both it and `detect-stack.mjs`.
+- **The script is mode-blind — no TTY probe, no `CI` check, asserted by test.** Agent-executed Bash never has a TTY, so a TTY probe would pin the interactive path permanently into non-interactive mode. The mode split lives entirely in the caller: prose asks and applies; CI runs `report` and stops.
+- **Trigger is the observed end state**, not a guess at why: any field still blank or still `<command>` after detection gets asked about. A fully-detected repo asks nothing; a half-filled `CLAUDE.md` self-heals on re-run.
+- **Skip writes the literal `N/A`, never leaves `<command>`.** `N/A` means "asked, there is none"; `<command>` means "never asked". The distinction is what stops the agent guessing at a tool that does not exist, and what stops a re-run re-asking.
+- **Values pass on stdin, never argv** (`apply|check <field> --value-stdin`), pinned in prose as a quoted-delimiter heredoc (`<<'CC_VALUE'`) which disables all expansion. A developer answer is an arbitrary string reaching an agent-composed shell line; argv would make quotes/backticks/`$(...)` an injection surface and a guard-3 collision.
+- **`check` is static and advisory only:** `npm run X` / `yarn X` / `pnpm run X` against `package.json` scripts. Other command shapes pass silently; no or unparseable manifest is silence, **not** a warning; `N/A` skipped. Never executes, never reaches the network.
+- **Predicate is case-sensitive and trims surrounding whitespace.** Only exact lowercase `<command>` is a placeholder; `<COMMAND>` is a developer-authored value. Contradicts the `(any case)` wording currently in `cc-init.md` — that stale wording is struck in the same change. Trimming matters: without it `- Build: <command> ` slips through as resolved.
+
+### Conventions
+- The report contract is the one interface: `{ unresolved: [{field, raw, reason}], resolved: [field], absent: [{field, expected}] }`, `reason` restricted to `empty | placeholder`. stdout is pure JSON; any human-readable summary goes to stderr.
+- `absent` is a third state — the canonical line was deleted. `apply` **refuses rather than inserts**, naming the line to restore; `expected` carries it verbatim so the prose never reconstructs it from a label.
+- Fill semantics inherited verbatim from BUG-015: first occurrence of the canonical line, single-line replacement, no `g` flag, never an insertion.
+- `apply` refuses an embedded newline (would break the fixed line layout everything greps by) and refuses an empty value (a skip maps to `N/A` at the caller, so empty stdin is always a caller bug).
+- `cc-init.md`'s two mirrors are byte-identical today; referencing `node scripts/init-wizard.mjs` creates their first divergence, joining the existing `commands-parity.test.js` suite with the same `unnest` inverse rather than a second implementation of the rule. The template mirror is regenerated, never hand-edited.
+
+### Debt
+- **Deferred full read:** `scripts/detect-stack.mjs` (679 lines; only 30 read under the spec budget). `/cc-plan` must read its JSON emission path in full before wiring the shared field-list import. The spec assumes it can import a new sibling module without disturbing detection logic — unverified until plan time.
+- **Residual live verification (T-T07-shaped):** the asking half is prose and cannot be tested end to end, only presence, ordering, and mirror parity. The first real `/cc-init` against a manifest-less repo records one line in the task report — the fields `report` returned, the questions asked, the resulting `CLAUDE.md` command lines. Until then the interactive AC is unverified.
+
+### Complexity
+M — two new scripts with real unit coverage, one command file rewritten plus its regenerated mirror, one existing test file extended. Risk concentrates in `apply`'s byte-exactness and the stdin value path, both directly testable.
