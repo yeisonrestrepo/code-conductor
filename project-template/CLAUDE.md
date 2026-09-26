@@ -36,6 +36,8 @@ You are a Senior Full-Stack Architect and Orchestrator specialized in spec-drive
 ## Session Initialization
 - At session start: use **Glob** (NEVER use Read) to check that `project.md` and
   `graphify-out/graph.json` exist; run `/cc-init` if absent.
+- Guard 3 scans every `Bash` command for mass content-dump patterns and denies a match;
+  prefer Grep, Glob and a bounded Read. See README.md for the pattern list.
 - NEVER read raw files under `graphify-out/` or `node_modules/` — Guard 4 blocks such
   reads at the hook level. For graph queries, invoke the graphify skill:
   `/graphify query "<question>"`.
