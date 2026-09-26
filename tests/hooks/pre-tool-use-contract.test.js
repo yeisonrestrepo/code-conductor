@@ -89,8 +89,18 @@ describe('pre-tool-use contract harness', () => {
     expect(r.decision).toBeNull();
   });
 
-  it('routes a Bash payload to the empty Guard 3 slot and allows it', () => {
+  // This pair replaces the 1.28.0 assertion that the Bash route reached an EMPTY
+  // Guard 3 slot. [BUG-037] filled the slot, so the route is now proven live by a
+  // real verdict, and the second half keeps that from degrading into a blanket deny.
+  it('routes a Bash payload to Guard 3, which denies a mass-dump command', () => {
     const r = fire({ tool_name: 'Bash', tool_input: { command: 'cat *.ts' } });
+    expect(r.status).toBe(0);
+    expect(r.decision.permissionDecision).toBe('deny');
+    expect(r.decision.permissionDecisionReason).toMatch(/BASH SCAN BLOCKED/);
+  });
+
+  it('leaves an ordinary Bash command alone', () => {
+    const r = fire({ tool_name: 'Bash', tool_input: { command: 'git status --porcelain' } });
     expect(r.status).toBe(0);
     expect(r.decision).toBeNull();
   });

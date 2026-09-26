@@ -159,3 +159,43 @@ export const CORPUS = [
   { label: 'exact match (no trailing slash)', command: 'cat file.ts', allowlist: ['file.ts'], verdict: 'allow' },
   { label: 'substring not matched (docs vs doc_files)', command: 'cat doc_files/*.ts', allowlist: ['docs/'], verdict: 'deny' },
 ];
+
+// Rows that exist because the translation could have gone wrong in a specific way.
+// The first three fail the moment anyone replaces an explicit class with \s: in
+// JavaScript \s matches U+00A0 and U+2028, in the C locale [[:space:]] does not, so
+// the guard would see a command separator where the authority sees an ordinary
+// character. The separators are written as \u escapes so this file stays ASCII and
+// the character under test cannot be lost to a copy. The last four pin the checks
+// that consume a match extent, where POSIX leftmost-longest and JavaScript
+// leftmost-first could have disagreed.
+export const DIALECT = [
+  { label: 'dialect: U+00A0 after cat is not a separator', command: 'cat *.ts', verdict: 'allow' },
+  { label: 'dialect: U+2028 after cat is not a separator', command: 'cat *.ts', verdict: 'allow' },
+  { label: 'dialect: U+00A0 after ls is not a separator', command: 'ls -R .', verdict: 'allow' },
+  { label: 'dialect extent P4: command cat x', command: 'command cat *.ts', verdict: 'deny' },
+  { label: 'dialect extent P5: env assignment then reader', command: 'env A=1 B=2 cat $(ls)', verdict: 'deny' },
+  { label: 'dialect extent P6: git grep after a semicolon', command: "echo x; git grep '.*'", verdict: 'deny' },
+  { label: 'dialect extent P7: path-invoked pager', command: '/usr/bin/less *.ts', verdict: 'deny' },
+];
+
+// The ONE sanctioned divergence between the two subjects, recorded in
+// docs/superpowers/specs/2026-09-25-bug037-guard3-port-and-first-ship-design.md.
+// The authority interpolates allowlist entries raw into an ERE, so entry file.ts
+// matches fileXts as well. The port escapes entries and matches them literally,
+// which is the fix, and therefore denies where the authority allows. This is an
+// inequality by design, not a port defect. Adding a second member to this list
+// without amending the spec is what the length assertion exists to stop.
+//
+// The glob is load-bearing. The allowlist is consulted only after a check fires, so
+// `cat fileXts` on its own is allowed by both subjects and would prove nothing. The
+// trailing *.md fires P4, and the verdict then turns entirely on whether entry
+// file.ts covers the fileXts token: raw ERE says yes, literal matching says no.
+export const EXCEPTIONS = [
+  {
+    label: 'allowlist entry file.ts does not match fileXts in the port',
+    command: 'cat fileXts *.md',
+    allowlist: ['file.ts'],
+    fixtureVerdict: 'allow',
+    portVerdict: 'deny',
+  },
+];
