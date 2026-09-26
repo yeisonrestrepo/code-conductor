@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.29.0] - 2026-09-25
+
+### Added
+
+- **[BUG-037]** Guard 3, the bash command scanner, ships for the first time. It was advertised in `README.md` from the beginning and existed only in this repository's own copy of the hook; the file the installer deployed never contained a line of it, so no user has ever had it. Every `Bash` command is now matched against twelve mass content-dump patterns before it runs, and a match is denied through `hookSpecificOutput.permissionDecision` with the matched pattern ids in the reason. Commands over 8192 characters and unclosed quotes are denied fail-closed. **This release begins blocking commands that previously ran.** Permanent exceptions live in `.claude/memory/bash-scan-allowlist.txt`, a file the installer never ships or overwrites, one entry per line with `#` comments; entries match literally, so a metacharacter in an entry has no special meaning, which is a deliberate divergence from the reference implementation that interpolated them as regular expressions. For a block you believe is wrong, `CC_GUARD3_WARN=1` makes Guard 3 ask instead of deny, carrying the same reason, so you can keep working and report the command; it affects Guard 3 alone and has no relationship to `CC_HOOK_ALLOW`. The twelve patterns were translated from the frozen reference character class by character class, and one shared corpus of 115 cases drives both the reference and the port, asserting they agree on every one.
+
+Existing installations: re-run the installer to apply. `[BUG-035]` still applies to that re-run: the installer force-copies `settings.json` over the host's, so back it up if it carries entries you added yourself.
+
 ## [1.28.0] - 2026-09-25
 
 ### Fixed
