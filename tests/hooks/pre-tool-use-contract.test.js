@@ -89,8 +89,18 @@ describe('pre-tool-use contract harness', () => {
     expect(r.decision).toBeNull();
   });
 
-  it('routes a Bash payload to the empty Guard 3 slot and allows it', () => {
+  // This pair replaces the 1.28.0 assertion that the Bash route reached an EMPTY
+  // Guard 3 slot. [BUG-037] filled the slot, so the route is now proven live by a
+  // real verdict, and the second half keeps that from degrading into a blanket deny.
+  it('routes a Bash payload to Guard 3, which denies a mass-dump command', () => {
     const r = fire({ tool_name: 'Bash', tool_input: { command: 'cat *.ts' } });
+    expect(r.status).toBe(0);
+    expect(r.decision.permissionDecision).toBe('deny');
+    expect(r.decision.permissionDecisionReason).toMatch(/BASH SCAN BLOCKED/);
+  });
+
+  it('leaves an ordinary Bash command alone', () => {
+    const r = fire({ tool_name: 'Bash', tool_input: { command: 'git status --porcelain' } });
     expect(r.status).toBe(0);
     expect(r.decision).toBeNull();
   });
@@ -151,5 +161,37 @@ describe('pre-tool-use contract harness', () => {
       expect(r.status).toBe(0);
       expect(r.stdout).not.toMatch(/"decision"\s*:/);
     }
+  });
+});
+
+describe('CC_GUARD3_WARN', () => {
+  it('converts Guard 3 denial into ask, carrying the same reason', () => {
+    const denied = fire({ tool_name: 'Bash', tool_input: { command: 'cat *.ts' } });
+    expect(denied.decision.permissionDecision).toBe('deny');
+    const warned = fire({ tool_name: 'Bash', tool_input: { command: 'cat *.ts' } }, { CC_GUARD3_WARN: '1' });
+    expect(warned.status).toBe(0);
+    expect(warned.decision.permissionDecision).toBe('ask');
+    expect(warned.decision.permissionDecisionReason).toBe(denied.decision.permissionDecisionReason);
+  });
+
+  // The scope pin. The project now carries two override variables, so their
+  // interaction is a contract rather than folklore. These four assertions are what
+  // stop a refactor from widening a per-guard triage aid into a product-wide off
+  // switch. They pass before the feature exists, because they assert absences; their
+  // value is as a regression guard from here on.
+  it('changes nothing except Guard 3', () => {
+    const env = { CC_GUARD3_WARN: '1' };
+    const blockedRead = fire(readPayload('graphify-out/graph.json'), env);
+    expect(blockedRead.decision.permissionDecision).toBe('deny');
+
+    const p = writeLines('existing.txt', 4);
+    const write = fire({ tool_name: 'Write', tool_input: { file_path: p, content: 'x' } }, env);
+    expect(write.decision.permissionDecision).toBe('ask');
+
+    const malformed = fire('{not json', env);
+    expect(malformed.decision.permissionDecision).toBe('deny');
+
+    const overridden = fire('{not json', { ...env, CC_HOOK_ALLOW: '1' });
+    expect(overridden.decision).toBeNull();
   });
 });

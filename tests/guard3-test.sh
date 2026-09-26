@@ -3,6 +3,7 @@
 set -euo pipefail
 
 HOOK="tests/fixtures/guard3-reference.sh"
+REPO_ROOT="$(pwd)"
 PASS=0; FAIL=0
 
 # Pure-Bash JSON string builder: escapes a raw shell command for embedding in JSON.
@@ -169,21 +170,14 @@ run "malformed: unclosed double quote"     'grep -r "pat .'               "block
 # ── Allowlist ─────────────────────────────────────────────────────────────────
 _run_allowlisted() {
   local label="$1" cmd="$2" entries="$3" expect="$4" rc=0
-  local json
-  json="$(_json_cmd "$cmd")"
-  local tmp
-  tmp=$(mktemp)
-  {
-    printf '#!/usr/bin/env bash\nset -euo pipefail\n'
-    printf 'BASH_SCAN_ALLOWLIST=(%s)\n' "$entries"
-    # Skip shebang + strip the hook's own BASH_SCAN_ALLOWLIST= assignment so our
-    # injected value is not overwritten.
-    tail -n +2 "$HOOK" | grep -v '^BASH_SCAN_ALLOWLIST='
-  } > "$tmp"
-  chmod +x "$tmp"
-  export CLAUDE_TOOL_NAME="Bash"; export CLAUDE_TOOL_INPUT="$json"
-  bash "$tmp" >/dev/null 2>&1 && rc=0 || rc=$?
-  unset CLAUDE_TOOL_NAME CLAUDE_TOOL_INPUT; rm -f "$tmp"
+  local dir; dir="$(mktemp -d)"
+  mkdir -p "$dir/.claude/memory"
+  printf '%s\n' $entries > "$dir/.claude/memory/bash-scan-allowlist.txt"
+  export CLAUDE_TOOL_NAME="Bash"
+  export CLAUDE_TOOL_INPUT="$(_json_cmd "$cmd")"
+  ( cd "$dir" && bash "$REPO_ROOT/$HOOK" ) >/dev/null 2>&1 && rc=0 || rc=$?
+  unset CLAUDE_TOOL_NAME CLAUDE_TOOL_INPUT
+  rm -rf "$dir"
   if { [[ "$expect" == "block" ]] && (( rc != 0 )); } \
   || { [[ "$expect" == "pass"  ]] && (( rc == 0 )); }; then
     echo "  PASS: $label"; PASS=$((PASS+1))
@@ -193,17 +187,17 @@ _run_allowlisted() {
 }
 
 _run_allowlisted "allowlist docs/ permits glob in docs/" \
-  'cat docs/*.md' '"docs/"' "pass"
+  'cat docs/*.md' 'docs/' "pass"
 _run_allowlisted "allowlist does NOT permit unrelated path" \
-  'cat src/*.ts' '"docs/"' "block"
+  'cat src/*.ts' 'docs/' "block"
 _run_allowlisted "allowlist trailing-comment bypass blocked" \
-  'cat *.ts # docs/' '"docs/"' "block"
+  'cat *.ts # docs/' 'docs/' "block"
 _run_allowlisted "allowlist path-traversal rejected" \
-  'cat docs/../../etc/*.conf' '"docs/"' "block"
+  'cat docs/../../etc/*.conf' 'docs/' "block"
 _run_allowlisted "allowlist exact match (no trailing slash)" \
-  'cat file.ts' '"file.ts"' "pass"
+  'cat file.ts' 'file.ts' "pass"
 _run_allowlisted "allowlist substring not matched (docs vs doc_files)" \
-  'cat doc_files/*.ts' '"docs/"' "block"
+  'cat doc_files/*.ts' 'docs/' "block"
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"

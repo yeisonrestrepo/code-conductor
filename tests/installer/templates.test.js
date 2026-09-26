@@ -116,3 +116,26 @@ describe('pre-tool-use wiring', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe('guard 3 pattern block', () => {
+  // The character-class trap, made structurally unrepeatable. [[:space:]] is
+  // [ \t\n\r\f\v] in the C locale; JavaScript \s also matches U+00A0 and U+2028, so
+  // one shorthand would silently widen every check and the port would disagree with
+  // its own authority on input no reviewer would think to try.
+  it('uses explicit character classes, never regex shorthands', () => {
+    const text = readText('project-template/.claude/hooks/pre-tool-use.mjs');
+    const start = text.indexOf('// ── Guard 3 constants');
+    expect(start).toBeGreaterThan(-1);
+    // Whole-line comments are excluded because the block's own header names the six
+    // shorthands in order to forbid them. Asserting over prose would make the rule
+    // unstatable in the one place a reader looks for it.
+    const code = text.slice(start).split('\n').filter(l => !l.trim().startsWith('//')).join('\n');
+    expect(code).not.toMatch(/\\[sSwWdD]/);
+  });
+
+  // Not shipping the filename is the whole mechanism that keeps the installer from
+  // overwriting operator policy, since deployProject copies the template wholesale.
+  it('ships no allowlist file, so the installer can never overwrite one', () => {
+    expect(existsSync(join(root, 'project-template/.claude/memory/bash-scan-allowlist.txt'))).toBe(false);
+  });
+});

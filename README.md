@@ -184,7 +184,11 @@ Fires before `Read`, `Write`, `Edit`, `create_file`, `write_file` and `Bash`. A 
 
 **Duplicate file guard (Guard 2)** - a `Write`, `create_file` or `write_file` naming a path that already exists returns `ask`, showing the path, line count and last-modified timestamp with three options: edit in place, confirm the overwrite, or cancel. `Edit` is deliberately not gated, because editing in place is the action this guard recommends.
 
-**Bash scan guard (Guard 3)** - not shipped yet. `Bash` already routes to the guard's slot and the slot is empty. The twelve-pattern scanner is verified in this repository against `tests/fixtures/guard3-reference.sh` and ships in `[BUG-037]`.
+**Bash scan guard (Guard 3)** - every `Bash` command is matched against twelve mass content-dump patterns before it runs: deep `find` without `-maxdepth 1`, `find -exec` with readers or shells, `xargs` with readers, `cat` or a pager followed by an unquoted glob, command substitution as a reader's argument, `grep -r` with a match-all pattern, `ls -R`, shell loops, `mapfile` and `readarray`, `eval`, `source` and the dot operator, alias remapping to a reader, and obfuscation sequences. Commands over 8192 characters and unclosed quotes are denied fail-closed.
+
+Permanent exceptions live in `.claude/memory/bash-scan-allowlist.txt`, one entry per line, blank lines and `#` comments ignored and whitespace trimmed. An entry ending in `/` covers paths under that prefix, rejecting any suffix that walks up the tree with `..`; any other entry matches a whole command token. **Entries match literally: regex metacharacters carry no special meaning, so `file.ts` matches `file.ts` and nothing else.** The installer never ships or overwrites this file. Every line in it disarms patterns for matching commands, so give each entry a comment saying why it exists; an uncommented entry is a review smell.
+
+Hit a block you believe is wrong? Re-run the command with `CC_GUARD3_WARN=1` and the guard asks instead of denying, carrying the same pattern ids. That is a triage aid for reporting a false positive while you keep working, not a configuration mode: the allowlist is the sanctioned permanent exception. The variable affects Guard 3 alone.
 
 **graphify-out and node_modules guard (Guard 4)** - a `Read` whose path carries `graphify-out` or `node_modules` as an exact path component is denied, with backslashes and `..` resolved first. Use Glob for existence checks and the graphify skill for graph questions.
 
