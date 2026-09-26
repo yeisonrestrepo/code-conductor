@@ -12,9 +12,10 @@
 #   1. The allowlist is populated from .claude/memory/bash-scan-allowlist.txt
 #      instead of an array literal, so both subjects read one source.
 #   2. The port escapes allowlist entries and matches them literally, where this
-#      file interpolates them raw into an ERE. Entry file.ts therefore allows
-#      "cat fileXts" here and denies it there. That inequality is asserted by
-#      design in the corpus EXCEPTIONS table; it is not a port defect.
+#      file interpolates them raw into an ERE. With entry file.ts, the command
+#      "cat fileXts *.md" is therefore allowed here and denied there. That
+#      inequality is asserted by design in the corpus EXCEPTIONS table; it is
+#      not a port defect.
 # Nothing else in this file moves.
 
 set -euo pipefail
