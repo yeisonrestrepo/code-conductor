@@ -163,3 +163,35 @@ describe('pre-tool-use contract harness', () => {
     }
   });
 });
+
+describe('CC_GUARD3_WARN', () => {
+  it('converts Guard 3 denial into ask, carrying the same reason', () => {
+    const denied = fire({ tool_name: 'Bash', tool_input: { command: 'cat *.ts' } });
+    expect(denied.decision.permissionDecision).toBe('deny');
+    const warned = fire({ tool_name: 'Bash', tool_input: { command: 'cat *.ts' } }, { CC_GUARD3_WARN: '1' });
+    expect(warned.status).toBe(0);
+    expect(warned.decision.permissionDecision).toBe('ask');
+    expect(warned.decision.permissionDecisionReason).toBe(denied.decision.permissionDecisionReason);
+  });
+
+  // The scope pin. The project now carries two override variables, so their
+  // interaction is a contract rather than folklore. These four assertions are what
+  // stop a refactor from widening a per-guard triage aid into a product-wide off
+  // switch. They pass before the feature exists, because they assert absences; their
+  // value is as a regression guard from here on.
+  it('changes nothing except Guard 3', () => {
+    const env = { CC_GUARD3_WARN: '1' };
+    const blockedRead = fire(readPayload('graphify-out/graph.json'), env);
+    expect(blockedRead.decision.permissionDecision).toBe('deny');
+
+    const p = writeLines('existing.txt', 4);
+    const write = fire({ tool_name: 'Write', tool_input: { file_path: p, content: 'x' } }, env);
+    expect(write.decision.permissionDecision).toBe('ask');
+
+    const malformed = fire('{not json', env);
+    expect(malformed.decision.permissionDecision).toBe('deny');
+
+    const overridden = fire('{not json', { ...env, CC_HOOK_ALLOW: '1' });
+    expect(overridden.decision).toBeNull();
+  });
+});

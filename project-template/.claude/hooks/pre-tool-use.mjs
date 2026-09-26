@@ -419,8 +419,14 @@ function g3AllowlistCovers(s, entries) {
 // stops matching P6 and `ls | xargs cat` stops matching P3.
 const g3Chomp = (s) => s.replace(/\n+$/, '');
 
+// CC_GUARD3_WARN converts THIS guard's denial into an ask carrying the identical
+// reason, so a developer who hits a false positive mid-task sees the pattern ids and
+// keeps working instead of filing an uninstall. It is documented as triage, not as
+// configuration: the allowlist is the sanctioned permanent exception. It has no
+// relationship to CC_HOOK_ALLOW, whose scope stays the two pre-verdict conditions.
 function g3Blocked(detail) {
-  return deny(
+  const decide = process.env.CC_GUARD3_WARN ? ask : deny;
+  return decide(
     `BASH SCAN BLOCKED. ${detail} ` +
     'Authorized alternatives: 1. Grep for targeted content search with file and pattern scope. ' +
     '2. Glob for path listing without file content. 3. Read with an explicit offset and limit. ' +
