@@ -79,20 +79,20 @@
 - Consumes: nothing.
 - Produces: the plan tracked in git on the feature branch.
 
-- [>] [T-000-A] Stage the plan file. `docs/` is gitignored, so it must be force-added.
+- [X] [T-000-A] Stage the plan file. `docs/` is gitignored, so it must be force-added.
 
 ```bash
 git add -f "docs/superpowers/plans/2026-09-25-bug037-guard3-port-and-first-ship.md"
 ```
 
-- [ ] [T-000-B] Verify exactly one path is staged. Depends on T-000-A.
+- [X] [T-000-B] Verify exactly one path is staged. Depends on T-000-A.
 
 ```bash
 git diff --cached --name-only
 ```
 Expected: one line, the plan file.
 
-- [ ] [T-000-C] Commit the plan. Depends on T-000-B.
+- [X] [T-000-C] Commit the plan. Depends on T-000-B.
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -118,7 +118,7 @@ EOF
 
 This task lands before any ported pattern so that a break in the authority surfaces against the authority alone.
 
-- [ ] [T-001-A] Teach the fixture to read the allowlist file. Modify `tests/fixtures/guard3-reference.sh`, replacing:
+- [X] [T-001-A] Teach the fixture to read the allowlist file. Modify `tests/fixtures/guard3-reference.sh`, replacing:
 
 ```bash
 # BASH_SCAN_ALLOWLIST: exact literal path tokens the guard permits.
@@ -152,7 +152,7 @@ unset _g3_line _g3_allowlist_file
 
 `unset` on a name that was never set is not an error under `set -u`, so the trailing cleanup is safe whether or not the file existed.
 
-- [ ] [T-001-B] Amend the fixture header so it stays true. Depends on T-001-A. Modify `tests/fixtures/guard3-reference.sh`, replacing:
+- [X] [T-001-B] Amend the fixture header so it stays true. Depends on T-001-A. Modify `tests/fixtures/guard3-reference.sh`, replacing:
 
 ```bash
 # tests/hooks/guard3.test.js. Do not edit to make a port pass.
@@ -174,7 +174,7 @@ with:
 # Nothing else in this file moves.
 ```
 
-- [ ] [T-001-C] Re-point the Vitest allowlist harness at the file. Depends on T-001-A. In `tests/hooks/guard3.test.js`, replace the whole `runAllowlisted` function (the block beginning `function runAllowlisted(cmd, entries) {` and ending at its closing brace) with:
+- [X] [T-001-C] Re-point the Vitest allowlist harness at the file. Depends on T-001-A. In `tests/hooks/guard3.test.js`, replace the whole `runAllowlisted` function (the block beginning `function runAllowlisted(cmd, entries) {` and ending at its closing brace) with:
 
 ```js
 // The allowlist is now a file both subjects read, so the harness writes it into a
@@ -201,7 +201,7 @@ function runAllowlisted(cmd, entries) {
 }
 ```
 
-- [ ] [T-001-D] Update the six allowlist call sites to pass an array. Depends on T-001-C. The verdicts do not move; only the argument's shape does. In `tests/hooks/guard3.test.js`, replace the `describe('allowlist', ...)` block with:
+- [X] [T-001-D] Update the six allowlist call sites to pass an array. Depends on T-001-C. The verdicts do not move; only the argument's shape does. In `tests/hooks/guard3.test.js`, replace the `describe('allowlist', ...)` block with:
 
 ```js
   describe('allowlist', () => {
@@ -214,7 +214,7 @@ function runAllowlisted(cmd, entries) {
   })
 ```
 
-- [ ] [T-001-E] Re-point the standalone bash harness. Depends on T-001-A. In `tests/guard3-test.sh`, replace the block that splices the allowlist into a temporary hook copy (the lines around `printf 'BASH_SCAN_ALLOWLIST=(%s)\n'` and `tail -n +2 "$HOOK" | grep -v '^BASH_SCAN_ALLOWLIST='`) with a temp-cwd file write:
+- [X] [T-001-E] Re-point the standalone bash harness. Depends on T-001-A. In `tests/guard3-test.sh`, replace the block that splices the allowlist into a temporary hook copy (the lines around `printf 'BASH_SCAN_ALLOWLIST=(%s)\n'` and `tail -n +2 "$HOOK" | grep -v '^BASH_SCAN_ALLOWLIST='`) with a temp-cwd file write:
 
 ```bash
 run_allowlisted() {
@@ -238,30 +238,30 @@ run_allowlisted() {
 
 Add `REPO_ROOT="$(pwd)"` immediately after the existing `HOOK=` assignment, since the subshell changes directory and `HOOK` is a relative path.
 
-- [ ] [T-001-F] Run the Guard 3 suite against the edited authority. Depends on T-001-D.
+- [X] [T-001-F] Run the Guard 3 suite against the edited authority. Depends on T-001-D.
 
 Run: `npx vitest run tests/hooks/guard3.test.js`
 Expected: **108 passed**. A failure here is a defect in the fixture edit, not in any port, because no port exists yet. That separation is the whole reason this task is first.
 
-- [ ] [T-001-G] Run the full suite. Depends on T-001-F.
+- [X] [T-001-G] Run the full suite. Depends on T-001-F.
 
 Run: `npm test`
 Expected: **617 passed | 12 skipped**, unchanged from baseline.
 
-- [ ] [T-001-H] Stage the three files. Depends on T-001-G.
+- [X] [T-001-H] Stage the three files. Depends on T-001-G.
 
 ```bash
 git add tests/fixtures/guard3-reference.sh tests/hooks/guard3.test.js tests/guard3-test.sh
 ```
 
-- [ ] [T-001-I] Verify exactly three staged paths. Depends on T-001-H.
+- [X] [T-001-I] Verify exactly three staged paths. Depends on T-001-H.
 
 ```bash
 git diff --cached --name-only
 ```
 Expected: three lines, `tests/fixtures/guard3-reference.sh`, `tests/guard3-test.sh`, `tests/hooks/guard3.test.js`.
 
-- [ ] [T-001-J] Commit. Depends on T-001-I.
+- [X] [T-001-J] Commit. Depends on T-001-I.
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -290,7 +290,7 @@ EOF
 - Consumes: the file-based allowlist harness from Task 1.
 - Produces: `tests/fixtures/guard3-corpus.js` exporting `CORPUS`, an array of 108 rows shaped `{ label, command, verdict, toolName?, allowlist? }` where `verdict` is `'deny'` or `'allow'`, `toolName` defaults to `'Bash'`, and `allowlist` is an optional array of entry strings. Task 3 adds `DIALECT` and `EXCEPTIONS` to the same module.
 
-- [ ] [T-002-A] Create the shared corpus table. Create `tests/fixtures/guard3-corpus.js`:
+- [X] [T-002-A] Create the shared corpus table. Create `tests/fixtures/guard3-corpus.js`:
 
 ```js
 // The Guard 3 corpus, converted once from the inline cases that lived in
@@ -456,7 +456,7 @@ export const CORPUS = [
 ];
 ```
 
-- [ ] [T-002-B] Make the bash suite table-driven. Depends on T-002-A. In `tests/hooks/guard3.test.js`, add the import beside the existing ones:
+- [X] [T-002-B] Make the bash suite table-driven. Depends on T-002-A. In `tests/hooks/guard3.test.js`, add the import beside the existing ones:
 
 ```js
 import { CORPUS } from '../fixtures/guard3-corpus.js'
@@ -505,30 +505,30 @@ function runRow(row) {
 }
 ```
 
-- [ ] [T-002-C] Run the Guard 3 suite. Depends on T-002-B.
+- [X] [T-002-C] Run the Guard 3 suite. Depends on T-002-B.
 
 Run: `npx vitest run tests/hooks/guard3.test.js`
 Expected: **109 passed** (108 rows plus the row-count assertion). **There is no red state for this task by design:** the conversion is a refactor of green cases, and the fixture staying green on all 108 is exactly the evidence that the conversion is faithful. A failure here means a row was transcribed wrongly; fix the row against git history, never the fixture.
 
-- [ ] [T-002-D] Run the full suite. Depends on T-002-C.
+- [X] [T-002-D] Run the full suite. Depends on T-002-C.
 
 Run: `npm test`
 Expected: **618 passed | 12 skipped**.
 
-- [ ] [T-002-E] Stage both files. Depends on T-002-D.
+- [X] [T-002-E] Stage both files. Depends on T-002-D.
 
 ```bash
 git add tests/fixtures/guard3-corpus.js tests/hooks/guard3.test.js
 ```
 
-- [ ] [T-002-F] Verify exactly two staged paths. Depends on T-002-E.
+- [X] [T-002-F] Verify exactly two staged paths. Depends on T-002-E.
 
 ```bash
 git diff --cached --name-only
 ```
 Expected: two lines, `tests/fixtures/guard3-corpus.js` and `tests/hooks/guard3.test.js`.
 
-- [ ] [T-002-G] Commit. Depends on T-002-F.
+- [X] [T-002-G] Commit. Depends on T-002-F.
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -560,7 +560,7 @@ EOF
 - Consumes: `CORPUS` from Task 2, the file-based allowlist from Task 1.
 - Produces: `guard3BashScan(input)` inside the hook, returning `null` or a decision object `{ permissionDecision, permissionDecisionReason }`. Reads `.claude/memory/bash-scan-allowlist.txt` relative to `process.cwd()`. `DIALECT` and `EXCEPTIONS` exported from the corpus module.
 
-- [ ] [T-003-A] Add the dialect rows and the exception row. Depends on T-002-G. Append to `tests/fixtures/guard3-corpus.js`:
+- [X] [T-003-A] Add the dialect rows and the exception row. Depends on T-002-G. Append to `tests/fixtures/guard3-corpus.js`:
 
 ```js
 // Rows that exist because the translation could have gone wrong in a specific way.
@@ -597,7 +597,7 @@ export const EXCEPTIONS = [
 ];
 ```
 
-- [ ] [T-003-B] Run the dialect rows against the authority too. Depends on T-003-A. In `tests/hooks/guard3.test.js`, change the import to:
+- [X] [T-003-B] Run the dialect rows against the authority too. Depends on T-003-A. In `tests/hooks/guard3.test.js`, change the import to:
 
 ```js
 import { CORPUS, DIALECT } from '../fixtures/guard3-corpus.js'
@@ -613,7 +613,7 @@ and add after the existing `it.each` block:
   })
 ```
 
-- [ ] [T-003-C] Write the port's failing suite. Depends on T-003-A. Create `tests/hooks/guard3-port.test.js`:
+- [X] [T-003-C] Write the port's failing suite. Depends on T-003-A. Create `tests/hooks/guard3-port.test.js`:
 
 ```js
 import { describe, it, expect } from 'vitest';
@@ -688,12 +688,12 @@ describe('Guard 3 port', () => {
 });
 ```
 
-- [ ] [T-003-D] Run the port suite and confirm the red state. Depends on T-003-C.
+- [X] [T-003-D] Run the port suite and confirm the red state. Depends on T-003-C.
 
 Run: `npx vitest run tests/hooks/guard3-port.test.js`
 Expected: **74 failed | 43 passed**. Guard 3's slot still returns allow, so every row whose verdict is `deny` fails at `expected null to be defined` or at the `permissionDecision` assertion, and every `allow` row passes. The 74 is 69 deny rows in `CORPUS`, 4 deny rows in `DIALECT`, and the exception row. A different failure count means the table or the harness is wrong, not the port; stop and reconcile before writing the guard.
 
-- [ ] [T-003-E] Write the constants block and the preprocessing chain. Depends on T-003-D.
+- [X] [T-003-E] Write the constants block and the preprocessing chain. Depends on T-003-D.
 
 First widen the path import, because the allowlist reader needs `join` and the file currently imports only `posix`. In `project-template/.claude/hooks/pre-tool-use.mjs`, replace:
 
@@ -795,7 +795,7 @@ function g3Scan(mode, input) {
 }
 ```
 
-- [ ] [T-003-F] Write the thirteen checks. Depends on T-003-E. Insert immediately below the scanner:
+- [X] [T-003-F] Write the thirteen checks. Depends on T-003-E. Insert immediately below the scanner:
 
 ```js
 // Each check returns true when it FIRES (the authority's shell functions returned 1).
@@ -972,7 +972,7 @@ const G3_CHECKS = [
 ];
 ```
 
-- [ ] [T-003-G] Write the allowlist reader and the guard body. Depends on T-003-F. Replace the existing slot:
+- [X] [T-003-G] Write the allowlist reader and the guard body. Depends on T-003-F. Replace the existing slot:
 
 ```js
 // Guard 3: declared and empty. The twelve-pattern bash scanner has never shipped; its
@@ -1064,7 +1064,7 @@ function guard3BashScan(input) {
 }
 ```
 
-- [ ] [T-003-H] Mirror the hook. Depends on T-003-G.
+- [X] [T-003-H] Mirror the hook. Depends on T-003-G.
 
 ```bash
 cp project-template/.claude/hooks/pre-tool-use.mjs .claude/hooks/pre-tool-use.mjs
@@ -1072,12 +1072,12 @@ cmp project-template/.claude/hooks/pre-tool-use.mjs .claude/hooks/pre-tool-use.m
 ```
 Expected: `IDENTICAL`.
 
-- [ ] [T-003-I] Run both Guard 3 suites. Depends on T-003-H.
+- [X] [T-003-I] Run both Guard 3 suites. Depends on T-003-H.
 
 Run: `npx vitest run tests/hooks/guard3.test.js tests/hooks/guard3-port.test.js`
 Expected: **233 passed** (116 in the authority suite, 117 in the port suite). A row that fails on the port but passes on the authority is a translation defect: fix the port, never the row and never the authority.
 
-- [ ] [T-003-I2] Measure the per-invocation allowlist read cost and record it. Depends on T-003-I. The spec ships no caching in v1 and requires the number instead, so the topic closes on evidence rather than on a guess.
+- [X] [T-003-I2] Measure the per-invocation allowlist read cost and record it. Depends on T-003-I. The spec ships no caching in v1 and requires the number instead, so the topic closes on evidence rather than on a guess.
 
 ```bash
 node --input-type=module -e "
@@ -1100,7 +1100,7 @@ rmSync(dir, { recursive: true, force: true });
 ```
 Expected: a sub-millisecond figure. Carry it verbatim into the implementation report, as the 0.13 ms backtracking measurement was carried into the spec. A figure that is not sub-millisecond is a finding for its own backlog id, not a reason to add caching inside this release.
 
-- [ ] [T-003-J] Pin the character-class rule and the unshipped allowlist. Depends on T-003-H. Append to `tests/installer/templates.test.js`:
+- [X] [T-003-J] Pin the character-class rule and the unshipped allowlist. Depends on T-003-H. Append to `tests/installer/templates.test.js`:
 
 ```js
 describe('guard 3 pattern block', () => {
@@ -1124,12 +1124,12 @@ describe('guard 3 pattern block', () => {
 });
 ```
 
-- [ ] [T-003-K] Run the full suite. Depends on T-003-J.
+- [X] [T-003-K] Run the full suite. Depends on T-003-J.
 
 Run: `npm test`
 Expected: **744 passed | 12 skipped**.
 
-- [ ] [T-003-L] Stage the six paths. Depends on T-003-K. The repository mirror lives under the gitignored `.claude/`, so it needs a force-add.
+- [X] [T-003-L] Stage the six paths. Depends on T-003-K. The repository mirror lives under the gitignored `.claude/`, so it needs a force-add.
 
 ```bash
 git add tests/fixtures/guard3-corpus.js tests/hooks/guard3-port.test.js tests/hooks/guard3.test.js \
@@ -1137,14 +1137,14 @@ git add tests/fixtures/guard3-corpus.js tests/hooks/guard3-port.test.js tests/ho
 git add -f .claude/hooks/pre-tool-use.mjs
 ```
 
-- [ ] [T-003-M] Verify exactly six staged paths. Depends on T-003-L.
+- [X] [T-003-M] Verify exactly six staged paths. Depends on T-003-L.
 
 ```bash
 git diff --cached --name-only | sort
 ```
 Expected: six lines, `.claude/hooks/pre-tool-use.mjs`, `project-template/.claude/hooks/pre-tool-use.mjs`, `tests/fixtures/guard3-corpus.js`, `tests/hooks/guard3-port.test.js`, `tests/hooks/guard3.test.js`, `tests/installer/templates.test.js`.
 
-- [ ] [T-003-N] Commit. Depends on T-003-M.
+- [X] [T-003-N] Commit. Depends on T-003-M.
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -1177,7 +1177,7 @@ EOF
 - Consumes: `g3Blocked` from Task 3.
 - Produces: `CC_GUARD3_WARN` (non-empty) converts Guard 3's `deny` into `ask` with the identical reason. No other guard and no other variable changes behavior.
 
-- [ ] [T-004-A] Write the failing tests. Depends on T-003-N. Append to `tests/hooks/pre-tool-use-contract.test.js`:
+- [X] [T-004-A] Write the failing tests. Depends on T-003-N. Append to `tests/hooks/pre-tool-use-contract.test.js`:
 
 ```js
 describe('CC_GUARD3_WARN', () => {
@@ -1213,12 +1213,12 @@ describe('CC_GUARD3_WARN', () => {
 });
 ```
 
-- [ ] [T-004-B] Run the contract suite and confirm the red state. Depends on T-004-A.
+- [X] [T-004-B] Run the contract suite and confirm the red state. Depends on T-004-A.
 
 Run: `npx vitest run tests/hooks/pre-tool-use-contract.test.js`
 Expected: **1 failed | 14 passed**. Only the conversion test fails, at `expected 'deny' to be 'ask'`. The scope test passes already, for the reason its own comment gives: it asserts absences, and the absence is trivially true while the feature does not exist. Two failures here would mean the scope test is coupled to Guard 3's warn path, which it must not be.
 
-- [ ] [T-004-C] Implement the escape. Depends on T-004-B. In `project-template/.claude/hooks/pre-tool-use.mjs`, replace:
+- [X] [T-004-C] Implement the escape. Depends on T-004-B. In `project-template/.claude/hooks/pre-tool-use.mjs`, replace:
 
 ```js
 function g3Blocked(detail) {
@@ -1238,7 +1238,7 @@ function g3Blocked(detail) {
   return decide(
 ```
 
-- [ ] [T-004-D] Mirror the hook. Depends on T-004-C.
+- [X] [T-004-D] Mirror the hook. Depends on T-004-C.
 
 ```bash
 cp project-template/.claude/hooks/pre-tool-use.mjs .claude/hooks/pre-tool-use.mjs
@@ -1246,31 +1246,31 @@ cmp project-template/.claude/hooks/pre-tool-use.mjs .claude/hooks/pre-tool-use.m
 ```
 Expected: `IDENTICAL`.
 
-- [ ] [T-004-E] Run the contract suite green. Depends on T-004-D.
+- [X] [T-004-E] Run the contract suite green. Depends on T-004-D.
 
 Run: `npx vitest run tests/hooks/pre-tool-use-contract.test.js`
 Expected: **15 passed**.
 
-- [ ] [T-004-F] Run the full suite. Depends on T-004-E.
+- [X] [T-004-F] Run the full suite. Depends on T-004-E.
 
 Run: `npm test`
 Expected: **746 passed | 12 skipped**.
 
-- [ ] [T-004-G] Stage the three paths. Depends on T-004-F.
+- [X] [T-004-G] Stage the three paths. Depends on T-004-F.
 
 ```bash
 git add project-template/.claude/hooks/pre-tool-use.mjs tests/hooks/pre-tool-use-contract.test.js
 git add -f .claude/hooks/pre-tool-use.mjs
 ```
 
-- [ ] [T-004-H] Verify exactly three staged paths. Depends on T-004-G.
+- [X] [T-004-H] Verify exactly three staged paths. Depends on T-004-G.
 
 ```bash
 git diff --cached --name-only | sort
 ```
 Expected: three lines, `.claude/hooks/pre-tool-use.mjs`, `project-template/.claude/hooks/pre-tool-use.mjs`, `tests/hooks/pre-tool-use-contract.test.js`.
 
-- [ ] [T-004-I] Commit. Depends on T-004-H.
+- [X] [T-004-I] Commit. Depends on T-004-H.
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -1299,7 +1299,7 @@ EOF
 - Consumes: the shipped behavior from Tasks 3 and 4.
 - Produces: no code interface.
 
-- [ ] [T-005-A] Replace the Guard 3 paragraph. Modify `README.md`, replacing:
+- [X] [T-005-A] Replace the Guard 3 paragraph. Modify `README.md`, replacing:
 
 ```markdown
 **Bash scan guard (Guard 3)** - not shipped yet. `Bash` already routes to the guard's slot and the slot is empty. The twelve-pattern scanner is verified in this repository against `tests/fixtures/guard3-reference.sh` and ships in `[BUG-037]`.
@@ -1315,7 +1315,7 @@ Permanent exceptions live in `.claude/memory/bash-scan-allowlist.txt`, one entry
 Hit a block you believe is wrong? Re-run the command with `CC_GUARD3_WARN=1` and the guard asks instead of denying, carrying the same pattern ids. That is a triage aid for reporting a false positive while you keep working, not a configuration mode: the allowlist is the sanctioned permanent exception. The variable affects Guard 3 alone.
 ```
 
-- [ ] [T-005-B] State Guard 3 as active in the project instructions. Modify `CLAUDE.md`, replacing:
+- [X] [T-005-B] State Guard 3 as active in the project instructions. Modify `CLAUDE.md`, replacing:
 
 ```
 - NEVER read raw files under `graphify-out/` or `node_modules/` — Guard 4 blocks such
@@ -1329,27 +1329,27 @@ with:
 - NEVER read raw files under `graphify-out/` or `node_modules/` — Guard 4 blocks such
 ```
 
-- [ ] [T-005-C] Apply the identical edit to `project-template/CLAUDE.md`, replacing the same `NEVER read raw files under` line with the same two-line replacement as T-005-B. Depends on T-005-B.
+- [X] [T-005-C] Apply the identical edit to `project-template/CLAUDE.md`, replacing the same `NEVER read raw files under` line with the same two-line replacement as T-005-B. Depends on T-005-B.
 
-- [ ] [T-005-D] Run the full suite. Depends on T-005-C.
+- [X] [T-005-D] Run the full suite. Depends on T-005-C.
 
 Run: `npm test`
 Expected: **746 passed | 12 skipped**. The `CLAUDE.md` templates suite is the one at risk here; a failure means the managed-block invariants were disturbed.
 
-- [ ] [T-005-E] Stage the three files. Depends on T-005-D.
+- [X] [T-005-E] Stage the three files. Depends on T-005-D.
 
 ```bash
 git add README.md CLAUDE.md project-template/CLAUDE.md
 ```
 
-- [ ] [T-005-F] Verify exactly three staged paths. Depends on T-005-E.
+- [X] [T-005-F] Verify exactly three staged paths. Depends on T-005-E.
 
 ```bash
 git diff --cached --name-only | sort
 ```
 Expected: three lines, `CLAUDE.md`, `README.md`, `project-template/CLAUDE.md`.
 
-- [ ] [T-005-G] Commit. Depends on T-005-F.
+- [X] [T-005-G] Commit. Depends on T-005-F.
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -1376,19 +1376,19 @@ EOF
 - Consumes: the working tree from Tasks 1 to 5.
 - Produces: version `1.29.0` recorded identically in all three places.
 
-- [ ] [T-006-A] Bump the manifest and the lockfile together.
+- [X] [T-006-A] Bump the manifest and the lockfile together.
 
 ```bash
 npm version 1.29.0 --no-git-tag-version
 ```
 
-- [ ] [T-006-B] Bump the `VERSION` file. Depends on T-006-A.
+- [X] [T-006-B] Bump the `VERSION` file. Depends on T-006-A.
 
 ```bash
 printf '1.29.0\n' > VERSION
 ```
 
-- [ ] [T-006-C] Verify all three agree. Depends on T-006-B.
+- [X] [T-006-C] Verify all three agree. Depends on T-006-B.
 
 ```bash
 cat VERSION
@@ -1397,7 +1397,7 @@ node -p "require('./package-lock.json').version + ' / ' + require('./package-loc
 ```
 Expected: `1.29.0` from each of the four readings.
 
-- [ ] [T-006-D] Add the changelog entry. Depends on T-006-C. Modify `CHANGELOG.md`, inserting immediately after the `# Changelog` line and its blank line:
+- [X] [T-006-D] Add the changelog entry. Depends on T-006-C. Modify `CHANGELOG.md`, inserting immediately after the `# Changelog` line and its blank line:
 
 ```markdown
 ## [1.29.0] - 2026-09-25
@@ -1409,7 +1409,7 @@ Expected: `1.29.0` from each of the four readings.
 Existing installations: re-run the installer to apply. `[BUG-035]` still applies to that re-run: the installer force-copies `settings.json` over the host's, so back it up if it carries entries you added yourself.
 ```
 
-- [ ] [T-006-E] Flip the backlog entry. Depends on T-006-D. Modify `AGENT-READABLE BACKLOG.md`, replacing:
+- [X] [T-006-E] Flip the backlog entry. Depends on T-006-D. Modify `AGENT-READABLE BACKLOG.md`, replacing:
 
 ```
 ### [ ] `[BUG-037]` Guard 3 Has Never Shipped: Port the Bash Command Scanner and Deliver It
@@ -1423,32 +1423,32 @@ with:
 
 `[BUG-034]` keeps `[~]`; `[BUG-035]`, `[BUG-038]` and `[BUG-039]` stay `[ ]`.
 
-- [ ] [T-006-F] Verify the four neighbouring checkbox states. Depends on T-006-E. A `--numstat` count is the wrong instrument here, as the BUG-036 cycle established; assert the semantics.
+- [X] [T-006-F] Verify the four neighbouring checkbox states. Depends on T-006-E. A `--numstat` count is the wrong instrument here, as the BUG-036 cycle established; assert the semantics.
 
 ```bash
 grep -nE '^### \[.\] `\[BUG-03[4-9]\]`' "AGENT-READABLE BACKLOG.md" | cut -c1-60
 ```
 Expected: `[~]` for BUG-034, `[ ]` for BUG-035, `[X]` for BUG-036, `[X]` for BUG-037, `[ ]` for BUG-038, `[ ]` for BUG-039.
 
-- [ ] [T-006-G] Run the full suite. Depends on T-006-F.
+- [X] [T-006-G] Run the full suite. Depends on T-006-F.
 
 Run: `npm test`
 Expected: **746 passed | 12 skipped**.
 
-- [ ] [T-006-H] Stage the release set. Depends on T-006-G.
+- [X] [T-006-H] Stage the release set. Depends on T-006-G.
 
 ```bash
 git add VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md"
 ```
 
-- [ ] [T-006-I] Verify exactly five staged paths. Depends on T-006-H.
+- [X] [T-006-I] Verify exactly five staged paths. Depends on T-006-H.
 
 ```bash
 git diff --cached --name-only | sort
 ```
 Expected: five lines, `AGENT-READABLE BACKLOG.md`, `CHANGELOG.md`, `VERSION`, `package-lock.json`, `package.json`.
 
-- [ ] [T-006-J] Commit. Depends on T-006-I.
+- [X] [T-006-J] Commit. Depends on T-006-I.
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -1473,13 +1473,13 @@ EOF
 - Consumes: the six commits from Tasks 0 to 6.
 - Produces: a pushed branch and an open pull request.
 
-- [ ] [T-007-A] Push the branch.
+- [X] [T-007-A] Push the branch.
 
 ```bash
 git push -u origin HEAD
 ```
 
-- [ ] [T-007-B] Open the pull request. Depends on T-007-A.
+- [X] [T-007-B] Open the pull request. Depends on T-007-A.
 
 ```bash
 gh pr create --title "feat: ship Guard 3, the bash command scanner, for the first time [BUG-037]" --body "$(cat <<'EOF'
@@ -1516,19 +1516,19 @@ EOF
 )"
 ```
 
-- [ ] [T-007-C] Report the PR URL and hand off. Depends on T-007-B. The terminal checkbox state of this plan lands as its own closing `docs:` commit once every box above reads `[X]`, never as an amend of the release commit.
+- [X] [T-007-C] Report the PR URL and hand off. Depends on T-007-B. The terminal checkbox state of this plan lands as its own closing `docs:` commit once every box above reads `[X]`, never as an amend of the release commit.
 
 ---
 
 ## Test List
 
-- [ ] [T-T01] The 108-row shared corpus, run against the frozen bash authority (Task 2) and against the port (Task 3), asserting identical verdicts.
-- [ ] [T-T02] Seven dialect rows: three that fail if any explicit character class is replaced by a shorthand, four that pin the checks consuming a match extent.
-- [ ] [T-T03] One exception row asserting the single sanctioned divergence, plus an assertion that the exception list has exactly one member.
-- [ ] [T-T04] A static assertion that the guard's pattern block contains no `\s \S \w \W \d \D`.
-- [ ] [T-T05] A static assertion that no allowlist file ships under `project-template/`.
-- [ ] [T-T06] `CC_GUARD3_WARN` converts deny to ask with an identical reason, and a four-boundary test that it changes nothing else.
-- [ ] [T-T07] No E2E test: this project ships no UI.
+- [X] [T-T01] The 108-row shared corpus, run against the frozen bash authority (Task 2) and against the port (Task 3), asserting identical verdicts.
+- [X] [T-T02] Seven dialect rows: three that fail if any explicit character class is replaced by a shorthand, four that pin the checks consuming a match extent.
+- [X] [T-T03] One exception row asserting the single sanctioned divergence, plus an assertion that the exception list has exactly one member.
+- [X] [T-T04] A static assertion that the guard's pattern block contains no `\s \S \w \W \d \D`.
+- [X] [T-T05] A static assertion that no allowlist file ships under `project-template/`.
+- [X] [T-T06] `CC_GUARD3_WARN` converts deny to ask with an identical reason, and a four-boundary test that it changes nothing else.
+- [X] [T-T07] No E2E test: this project ships no UI.
 
 ## Commit Order
 
