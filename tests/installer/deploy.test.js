@@ -66,7 +66,9 @@ describe('deployGlobal', () => {
     expect(readFileSync(join(dir, 'CLAUDE.md'), 'utf8')).toBe(TPL_GLOBAL);
     expect(existsSync(join(dir, 'skills', 'critical-review', 'SKILL.md'))).toBe(true);
     expect(existsSync(join(dir, 'hooks', 'h.sh'))).toBe(true);
-    expect(existsSync(join(dir, 'memory', 'personal.md'))).toBe(false);
+    // deployGlobal now seeds this itself (BUG-039): the copy is still
+    // filtered, and the re-run case below is what proves it.
+    expect(readFileSync(join(dir, 'memory', 'personal.md'), 'utf8')).toBe('BUNDLED');
     expect(existsSync(join(dir, 'memory'))).toBe(true); // dir created despite the filter
   });
 });
@@ -246,5 +248,211 @@ describe('chmodHooks', () => {
       const { statSync } = require('node:fs');
       expect(statSync(join(dir, 'hooks', 'h.sh')).mode & 0o111).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('deployGlobal: host-owned state', () => {
+  const GLOBAL_SETTINGS = { permissions: { allow: ['Bash(grep:*)'], deny: [] } };
+  const HOST_ENTRY = { matcher: '', hooks: [{ type: 'command', command: 'bash /home/me/my-own-hook.sh' }] };
+  beforeEach(() => {
+    writeFileSync(join(asset, 'global', 'memory', 'verbosity.md'), 'VERBOSITY: MIN\n');
+    writeFileSync(join(asset, 'global', 'settings.json'), `${JSON.stringify(GLOBAL_SETTINGS, null, 2)}\n`);
+  });
+
+  it('seeds personal.md and verbosity.md on a fresh install', () => {
+    const dir = deployGlobal(asset, home);
+    expect(readFileSync(join(dir, 'memory', 'personal.md'), 'utf8')).toBe('BUNDLED');
+    expect(readFileSync(join(dir, 'memory', 'verbosity.md'), 'utf8')).toBe('VERBOSITY: MIN\n');
+  });
+
+  it('leaves host-edited memory files byte-identical on a re-run', () => {
+    deployGlobal(asset, home);
+    const p = join(home, '.claude', 'memory', 'personal.md');
+    writeFileSync(p, 'MY OWN NOTES');
+    deployGlobal(asset, home);
+    expect(readFileSync(p, 'utf8')).toBe('MY OWN NOTES');
+  });
+
+  it('writes settings.json whole on a fresh install, permissions included', () => {
+    const dir = deployGlobal(asset, home);
+    expect(JSON.parse(readFileSync(join(dir, 'settings.json'), 'utf8')).permissions)
+      .toEqual({ allow: ['Bash(grep:*)'], deny: [] });
+  });
+
+  it('leaves a host-added UserPromptSubmit entry present and unmodified on a re-run', () => {
+    const dir = deployGlobal(asset, home);
+    const sp = join(dir, 'settings.json');
+    writeFileSync(sp, `${JSON.stringify({ hooks: { UserPromptSubmit: [HOST_ENTRY] }, permissions: { allow: [], deny: [] } }, null, 2)}\n`);
+    deployGlobal(asset, home);
+    expect(JSON.parse(readFileSync(sp, 'utf8')).hooks.UserPromptSubmit).toEqual([HOST_ENTRY]);
+  });
+
+  it('leaves a host-owned settings.local.json untouched', () => {
+    const dir = join(home, '.claude');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'settings.local.json'), '{"local":true}');
+    writeFileSync(join(asset, 'global', 'settings.local.json'), '{"template":true}');
+    deployGlobal(asset, home);
+    expect(readFileSync(join(dir, 'settings.local.json'), 'utf8')).toBe('{"local":true}');
+  });
+
+  it('still force-copies managed assets alongside the host-owned exclusions', () => {
+    const dir = deployGlobal(asset, home);
+    writeFileSync(join(dir, 'hooks', 'h.sh'), 'TAMPERED');
+    deployGlobal(asset, home);
+    expect(readFileSync(join(dir, 'hooks', 'h.sh'), 'utf8')).toBe('#!/bin/sh\n');
+  });
+});
+
+describe('deployProject: host-owned state', () => {
+  const STUB = '# Project Memory\n\n## Decisions\n';
+  const THRESHOLD = '75\n';
+  const PROJECT_SETTINGS = {
+    hooks: { PreToolUse: [{ matcher: 'Read|Bash', hooks: [{ type: 'command', command: 'node .claude/hooks/pre-tool-use.mjs' }] }] },
+    permissions: { allow: [], deny: [] },
+  };
+  const HOST_ENTRY = { matcher: '', hooks: [{ type: 'command', command: 'bash ./my-own-hook.sh' }] };
+  let claude;
+  beforeEach(() => {
+    mkdirSync(join(asset, 'project-template', '.claude', 'memory'), { recursive: true });
+    writeFileSync(join(asset, 'project-template', '.claude', 'memory', 'project.md'), STUB);
+    writeFileSync(join(asset, 'project-template', '.claude', 'memory', 'context-threshold.txt'), THRESHOLD);
+    writeFileSync(join(asset, 'project-template', '.claude', 'settings.json'), `${JSON.stringify(PROJECT_SETTINGS, null, 2)}\n`);
+    claude = join(home, '.claude');
+  });
+
+  it('seeds project.md, context-threshold.txt and settings.json on a fresh scaffold', () => {
+    deployProject(asset, home);
+    expect(readFileSync(join(claude, 'memory', 'project.md'), 'utf8')).toBe(STUB);
+    expect(readFileSync(join(claude, 'memory', 'context-threshold.txt'), 'utf8')).toBe(THRESHOLD);
+    expect(JSON.parse(readFileSync(join(claude, 'settings.json'), 'utf8')).permissions).toEqual({ allow: [], deny: [] });
+  });
+
+  it('leaves a host-modified project.md byte-identical on a re-run', () => {
+    deployProject(asset, home);
+    const p = join(claude, 'memory', 'project.md');
+    writeFileSync(p, '# Project Memory\n\n## Decisions\n\n- We chose X over Y.\n');
+    deployProject(asset, home);
+    expect(readFileSync(p, 'utf8')).toBe('# Project Memory\n\n## Decisions\n\n- We chose X over Y.\n');
+  });
+
+  it('leaves a host-modified context-threshold.txt byte-identical on a re-run', () => {
+    deployProject(asset, home);
+    const p = join(claude, 'memory', 'context-threshold.txt');
+    writeFileSync(p, '40\n');
+    deployProject(asset, home);
+    expect(readFileSync(p, 'utf8')).toBe('40\n');
+  });
+
+  it('leaves a host-created bash-scan-allowlist.txt byte-identical even when the template ships one', () => {
+    deployProject(asset, home);
+    const p = join(claude, 'memory', 'bash-scan-allowlist.txt');
+    writeFileSync(p, '# operator policy\ndocs/\n');
+    writeFileSync(join(asset, 'project-template', '.claude', 'memory', 'bash-scan-allowlist.txt'), 'TEMPLATE POLICY\n');
+    deployProject(asset, home);
+    expect(readFileSync(p, 'utf8')).toBe('# operator policy\ndocs/\n');
+  });
+
+  it('leaves every latent runtime-written file byte-identical on a re-run', () => {
+    deployProject(asset, home);
+    const files = {
+      [join(claude, 'memory', 'personal.md')]: 'MY PREFS\n',
+      [join(claude, 'memory', 'session-snapshot.json')]: '{"v":1}\n',
+      [join(claude, 'memory', 'session-snapshot.md')]: '# snapshot\n',
+      [join(claude, 'memory', 'turn-count.txt')]: '17\n',
+      [join(claude, 'settings.local.json')]: '{"local":true}\n',
+    };
+    for (const [p, body] of Object.entries(files)) writeFileSync(p, body);
+    // Ship every one of them from the template, which is the future this table exists to survive.
+    writeFileSync(join(asset, 'project-template', '.claude', 'memory', 'personal.md'), 'TEMPLATE\n');
+    writeFileSync(join(asset, 'project-template', '.claude', 'memory', 'session-snapshot.json'), 'TEMPLATE\n');
+    writeFileSync(join(asset, 'project-template', '.claude', 'memory', 'session-snapshot.md'), 'TEMPLATE\n');
+    writeFileSync(join(asset, 'project-template', '.claude', 'memory', 'turn-count.txt'), 'TEMPLATE\n');
+    writeFileSync(join(asset, 'project-template', '.claude', 'settings.local.json'), 'TEMPLATE\n');
+    deployProject(asset, home);
+    for (const [p, body] of Object.entries(files)) expect(readFileSync(p, 'utf8')).toBe(body);
+  });
+
+  it('leaves a host-added settings.json entry present and unmodified on a re-run', () => {
+    deployProject(asset, home);
+    const sp = join(claude, 'settings.json');
+    const host = JSON.parse(readFileSync(sp, 'utf8'));
+    host.hooks.UserPromptSubmit = [HOST_ENTRY];
+    writeFileSync(sp, `${JSON.stringify(host, null, 2)}\n`);
+    deployProject(asset, home);
+    expect(JSON.parse(readFileSync(sp, 'utf8')).hooks.UserPromptSubmit).toEqual([HOST_ENTRY]);
+  });
+
+  it('leaves a host-modified permissions block byte-identical, including a removed grant', () => {
+    deployProject(asset, home);
+    const sp = join(claude, 'settings.json');
+    const host = JSON.parse(readFileSync(sp, 'utf8'));
+    host.permissions = { allow: ['Bash(ls:*)'], deny: ['Bash(curl:*)'] };
+    writeFileSync(sp, `${JSON.stringify(host, null, 2)}\n`);
+    deployProject(asset, home);
+    expect(JSON.parse(readFileSync(sp, 'utf8')).permissions).toEqual({ allow: ['Bash(ls:*)'], deny: ['Bash(curl:*)'] });
+  });
+
+  it('updates a conductor-owned entry whose template command changed', () => {
+    deployProject(asset, home);
+    const sp = join(claude, 'settings.json');
+    const changed = JSON.parse(JSON.stringify(PROJECT_SETTINGS));
+    changed.hooks.PreToolUse[0].matcher = 'Read|Write|Bash';
+    writeFileSync(join(asset, 'project-template', '.claude', 'settings.json'), `${JSON.stringify(changed, null, 2)}\n`);
+    deployProject(asset, home);
+    const arr = JSON.parse(readFileSync(sp, 'utf8')).hooks.PreToolUse;
+    expect(arr).toHaveLength(1);
+    expect(arr[0].matcher).toBe('Read|Write|Bash');
+  });
+
+  it('produces a byte-identical settings.json on a re-run of an unchanged release', () => {
+    deployProject(asset, home);
+    const sp = join(claude, 'settings.json');
+    const first = readFileSync(sp, 'utf8');
+    deployProject(asset, home);
+    expect(readFileSync(sp, 'utf8')).toBe(first);
+  });
+});
+
+describe('deployProject: overwritten project.md detection', () => {
+  const STUB = '# Project Memory\n\n## Decisions\n';
+  let warned;
+  const warn = (m) => warned.push(m);
+  beforeEach(() => {
+    warned = [];
+    mkdirSync(join(asset, 'project-template', '.claude', 'memory'), { recursive: true });
+    writeFileSync(join(asset, 'project-template', '.claude', 'memory', 'project.md'), STUB);
+  });
+
+  it('says nothing on a fresh scaffold, whose stub it just wrote', () => {
+    deployProject(asset, home, { warn });
+    expect(warned).toEqual([]);
+    expect(readFileSync(join(home, '.claude', 'memory', 'project.md'), 'utf8')).toBe(STUB);
+  });
+
+  it('prints the recovery line exactly once when the host copy equals the stub', () => {
+    deployProject(asset, home, { warn });
+    warned.length = 0;
+    deployProject(asset, home, { warn });
+    expect(warned).toHaveLength(1);
+    expect(warned[0]).toContain('may have been overwritten');
+    expect(warned[0]).toContain('git log --oneline -- .claude/memory/project.md');
+    expect(warned[0]).toContain('git checkout <commit> -- .claude/memory/project.md');
+  });
+
+  it('writes nothing when it warns', () => {
+    deployProject(asset, home, { warn });
+    const p = join(home, '.claude', 'memory', 'project.md');
+    const before = readFileSync(p, 'utf8');
+    deployProject(asset, home, { warn });
+    expect(readFileSync(p, 'utf8')).toBe(before);
+  });
+
+  it('stays silent once the host has written real prose', () => {
+    deployProject(asset, home, { warn });
+    writeFileSync(join(home, '.claude', 'memory', 'project.md'), `${STUB}\n- We chose X.\n`);
+    warned.length = 0;
+    deployProject(asset, home, { warn });
+    expect(warned).toEqual([]);
   });
 });

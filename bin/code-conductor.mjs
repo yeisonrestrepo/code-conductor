@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { resolveAssetRoot, resolveHome, nodeMajorAtLeast } from '../lib/installer/env.mjs';
 import { assertAssets, assertMergeTargets, deployGlobal, deployProject, chmodHooks } from '../lib/installer/deploy.mjs';
 import { verbosityHookCommand, mergeVerbosityHook, graphifyHookCommand, mergeGraphifyHook } from '../lib/installer/settings.mjs';
-import { writeVerbosity, seedMemoryFile, writeVersionFile } from '../lib/installer/config.mjs';
+import { writeVerbosity, writeVersionFile } from '../lib/installer/config.mjs';
 
 const USAGE = `Usage: code-conductor [--project] [--verbosity MIN|INFO|VERBOSE] [--version] [--help]`;
 
@@ -92,13 +92,12 @@ export function run(argv, env = process.env, { cwd = process.cwd(), log } = {}) 
     writing = true;                                                    // copy phase begins
     const claudeDir = deployGlobal(assetRoot, home);
     chmodHooks(claudeDir);
-    seedMemoryFile(home, 'personal.md', assetRoot);
     const v = writeVerbosity(home, assetRoot, opts.verbosity, opts.verbosityGiven);
     if (v.warn) emit('stderr', v.warn);
     mergeVerbosityHook(join(claudeDir, 'settings.json'), verbosityHookCommand(home));
     mergeGraphifyHook(join(claudeDir, 'settings.json'), graphifyHookCommand(home));
     writeVersionFile(home, pkgVersion(assetRoot));
-    if (opts.project) deployProject(assetRoot, cwd);
+    if (opts.project) deployProject(assetRoot, cwd, { warn: (m) => emit('stderr', m) });
     return 0;
   } catch (err) {
     // Pre-flight failures (nothing written yet) → exit 1.
