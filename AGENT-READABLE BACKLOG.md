@@ -306,3 +306,55 @@ This document is the single source of truth for the evolutionary engineering of 
   1. **Adjust the ignore rule.** Anchor or narrow the `.claude/` pattern so tracked files beneath it stop tripping the ancestor warning, for example by excluding the specific untracked paths rather than the whole directory. This removes the cause for all three family members at once, and its risk is that the directory exclusion is currently doing real work for untracked local state, which the spec must enumerate before narrowing it.
   2. **Adjust the staging convention.** Make `git add -f` the standing form for any path under `.claude/`, tracked or not, as the checkpoint convention already does for new files; or forbid chaining a staging step with `&&` in generated plans. This is the smaller change and leaves the misleading exit code in place.
 * **Acceptance Criteria:** Staging a tracked, modified file under `.claude/` either exits 0, or the repository's own conventions and generated plan steps never depend on its exit code. A test or a documented convention covers the case specifically, since the failure only appears on a *modified tracked* file, never on a fresh add, and is therefore invisible to a first-run check.
+
+### [ ] `[BUG-041]` Guard 3 Denies Ordinary Agent Commands: Three Faithful False Positives, With P7 Firing on Commands That Contain No Glob
+
+* **Evidence-only filing. No pattern changes here.** `[BUG-037]`'s Out of Scope named pattern refinement as separate work and asked for specimens before speculation. This is that evidence: three production denials captured verbatim, each run through both subjects, each root-caused to a component rather than to a pattern name. The refinement spec decides what to change; this entry decides nothing.
+* **Differential classification: all three are FAITHFUL false positives.** Every specimen was replayed through the frozen authority (`tests/fixtures/guard3-reference.sh`, env-var contract, `LC_ALL=C`, throwaway cwd) and the shipped port (`.claude/hooks/pre-tool-use.mjs`, stdin JSON contract, throwaway cwd). Result: **0 disagreements of 3**, both subjects deny all three. The patterns were always this aggressive and the port reproduced them correctly, so this is refinement work, not a port defect, and it does **not** re-prioritize ahead of `[BUG-038]` and `[BUG-040]`.
+
+**Specimen P7-1, 2026-09-27, first live P7 denial of the session.** Both subjects deny; port reports `P7`.
+
+```
+cd /Users/yeison/Projects/code-conductor && grep -n "seedMemoryFile" -r lib bin tests && echo "=== changelog head ===" && sed -n '1,30p' CHANGELOG.md
+```
+
+**Specimen P7-2, 2026-09-27, post-merge cleanup.** Both subjects deny; port reports `P7`.
+
+```
+cd /Users/yeison/Projects/code-conductor
+git branch -d fix/bug-039-installer-host-owned-state 2>&1 | tail -3
+git remote prune origin 2>&1 | tail -3
+printf '=== status ===\n'
+git status --porcelain
+printf '=== suite on merged main ===\n'
+npx vitest run 2>&1 | tail -5
+```
+
+**Specimen P9-1, 2026-09-27, carried over from the `[BUG-039]` plan's Global Constraints.** Both subjects deny; port reports `P9`.
+
+```
+cd /Users/yeison/Projects/code-conductor && git commit -q -m "refactor: retire seedMemoryFile and wire the deploy warn channel [BUG-039]
+
+The table's seed policy is now the single write-if-absent mechanism, so
+the standalone helper and its coverage go with it, classified as coverage
+for deleted code with a tombstone comment naming where that coverage
+moved. deployProject gets the CLI's stderr emitter, and end-to-end cases
+pin the re-run behavior against the real bundled assets, which is the
+only layer where the old copy-then-merge ordering was observable.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HLS5KAHkhpMChyqNTbqrhe"
+printf 'commit_rc=%s\n' "$?"
+git log --oneline -1
+```
+
+* **Root cause, P7 (both specimens): the glob scanner's fail-closed unterminated-quote branch, reached because the slice-by-length quirk desynchronizes the after-text from every token boundary. Neither command contains a glob character.** `g3P7PagerGlob` is `g3GlobWalk(s, rePager)` (`pre-tool-use.mjs:239-252`). Each iteration computes `after = rest.slice(m[0].length)`, slicing by the match LENGTH from position 0 rather than from the match index. That is the preserved authority quirk, and **it participates directly here**: the match is found far to the right (`"&& sed "` at index 119 in P7-1, `"| tail "` at index 99 in P7-2) but only 7 characters come off the FRONT, so the walk marches a cursor leftward-to-rightward through the command 7 bytes at a time, re-finding the same token. P7-1 needs 8 iterations, P7-2 needs 23. The walk terminates when the shaved front lands **inside a quoted region**: `after` then begins mid-string, `g3Scan('glob', after)` runs off the end still in `DOUBLE_QUOTED` (P7-1, inside `"seedMemoryFile"`) or `SINGLE_QUOTED` (P7-2, inside `'=== status ==='`), and the fail-closed clause at `pre-tool-use.mjs:192` returns `{ glob: true }`. The reported "unquoted glob" is not a glob at all; it is an unbalanced quote produced by the slicing itself.
+* **Consequence worth stating precisely, because it sizes the problem:** for any command containing a pager or reader token, the false-positive probability rises with command length and with the number of quoted regions to the right of that token, and is **independent of whether a glob is present**. `g3P4CatGlob` shares `g3GlobWalk` verbatim, so P4 inherits the identical mechanism and is a suspect on structure rather than on observation.
+* **Root cause, P9: the line-joining step feeds quoted argv prose into command-position analysis.** `guard3BashScan` joins physical lines with `;` (`pre-tool-use.mjs:451`), and `;` is a command-position anchor in `G3_POS`. A prose line inside a quoted commit message that merely begins with `for` becomes `;for `, which `g3P9ShellLoop` (`:318-320`) reads as a shell loop. The matched substring is `";for "`, at index 283, in context `"...classified as coverage;for deleted code with a tombstone comme..."`. **No quirk participates.** The deeper component is that `g3Scan` maintains full quote state during the strip pass but the thirteen checks then run over the whole preprocessed string with no record of which spans were quoted, so argv text is analyzed as though it were code.
+* **The control that proves P9 is doing its job:** later in the same session a genuine `for id in T-100 T-101 ...; do ... done` was denied by P9 correctly. The pattern is not broken; its input is over-broad.
+* **Frequency signal: P7 is first in priority, by a wide margin.** Across the `[BUG-039]` implementation session this repository's own agent hit **six P7 denials**, two P4, two OBF, and two P9 (one of which was the legitimate loop above). Two of the six P7s occurred while gathering the evidence for this very filing, which is itself the signal: the pattern fires on the shape of routine investigative commands. The three specimens above are the designated set; the fuller tally is recorded here so the refinement spec sizes P7 correctly rather than treating the three as equally weighted.
+* **Corpus rows already exist.** The three specimens are in `tests/fixtures/guard3-corpus.js` as `KNOWN-FP` rows asserting the CURRENT verdict (`deny`), driving both subjects, with the corpus count assertion moved 108 to 111 and both suites moved 116 to 119 and 117 to 120. The authority arbitrates until the refinement spec deliberately flips them. The refinement work therefore **inherits its acceptance cases pre-written**: each flip is a row whose expected verdict changes from `deny` to `allow`, with a predicted red state recorded before the change.
+* **Scope fence, carried from `[BUG-037]`'s Out of Scope.** The port was behavior PRESERVATION and its contract was that not one verdict moved. Refinement is behavior **REVISION**: it changes verdicts on purpose. That inverts the contract, so it needs the opposite discipline, per pattern: the flip, its predicted red state, its rationale, and the corpus rows it moves, all recorded before the pattern is touched. A refinement that cannot name which rows it flips is not scoped.
+* **OBF and P4 stay on watch, with no speculative fix.** OBF has two denials in the session and P4 has two, but neither has a captured specimen with a differential run behind it, and P4's suspicion is structural inference from sharing `g3GlobWalk` rather than an observation. Neither gets a pattern change in the refinement spec without its own specimen, on the same evidence-first rule that produced this filing.
+* **Components Affected:** `.claude/hooks/pre-tool-use.mjs` and its byte-identical mirror `project-template/.claude/hooks/pre-tool-use.mjs` (`g3GlobWalk` at `:239`, `g3Scan`'s fail-closed clause at `:192`, `g3P4CatGlob` and `g3P7PagerGlob` at `:251-252`, `g3P9ShellLoop` at `:318`, the line-join at `:451`), `tests/fixtures/guard3-corpus.js`, `tests/fixtures/guard3-reference.sh` (the authority, which must move in lockstep with any deliberate flip or the single-divergence contract breaks), `tests/hooks/guard3.test.js`, `tests/hooks/guard3-port.test.js`, and `README.md`'s pattern list.
+* **Acceptance Criteria (for the refinement spec, not for this filing):** Each of the three specimens is allowed, with its corpus row flipped from `deny` to `allow` and its predicted red state recorded before the change. No currently-denied row in the 108 translation cases flips to `allow` as a side effect, and any that must is an explicit, separately justified decision. The authority and the port still agree on every row, so the single sanctioned divergence stays at exactly one. A genuine `for ... ; do` loop, a genuine `cat *.ts`, and a genuine `sed -n '1,200p' bigfile | head` all remain denied, since the point is to stop denying prose and mis-sliced quotes, not to stop denying mass content dumps.

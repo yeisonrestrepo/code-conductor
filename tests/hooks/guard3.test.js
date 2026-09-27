@@ -76,8 +76,11 @@ afterAll(() => {
 
 describe.skipIf(!BASH)('guard3 - pre-tool-use.sh', () => {
 
-  it('the corpus table carries exactly 108 rows', () => {
-    expect(CORPUS).toHaveLength(108)
+  // 108 translation rows plus the 3 KNOWN-FP specimens added under [BUG-041].
+  // The specimens assert the CURRENT verdict, which both subjects agree on, so
+  // they belong in the shared corpus rather than in a divergence list.
+  it('the corpus table carries exactly 111 rows', () => {
+    expect(CORPUS).toHaveLength(111)
   })
 
   it.each(CORPUS.map(r => [r.label, r]))('%s', (_label, row) => {
