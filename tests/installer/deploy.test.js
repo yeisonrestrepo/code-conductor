@@ -413,3 +413,46 @@ describe('deployProject: host-owned state', () => {
     expect(readFileSync(sp, 'utf8')).toBe(first);
   });
 });
+
+describe('deployProject: overwritten project.md detection', () => {
+  const STUB = '# Project Memory\n\n## Decisions\n';
+  let warned;
+  const warn = (m) => warned.push(m);
+  beforeEach(() => {
+    warned = [];
+    mkdirSync(join(asset, 'project-template', '.claude', 'memory'), { recursive: true });
+    writeFileSync(join(asset, 'project-template', '.claude', 'memory', 'project.md'), STUB);
+  });
+
+  it('says nothing on a fresh scaffold, whose stub it just wrote', () => {
+    deployProject(asset, home, { warn });
+    expect(warned).toEqual([]);
+    expect(readFileSync(join(home, '.claude', 'memory', 'project.md'), 'utf8')).toBe(STUB);
+  });
+
+  it('prints the recovery line exactly once when the host copy equals the stub', () => {
+    deployProject(asset, home, { warn });
+    warned.length = 0;
+    deployProject(asset, home, { warn });
+    expect(warned).toHaveLength(1);
+    expect(warned[0]).toContain('may have been overwritten');
+    expect(warned[0]).toContain('git log --oneline -- .claude/memory/project.md');
+    expect(warned[0]).toContain('git checkout <commit> -- .claude/memory/project.md');
+  });
+
+  it('writes nothing when it warns', () => {
+    deployProject(asset, home, { warn });
+    const p = join(home, '.claude', 'memory', 'project.md');
+    const before = readFileSync(p, 'utf8');
+    deployProject(asset, home, { warn });
+    expect(readFileSync(p, 'utf8')).toBe(before);
+  });
+
+  it('stays silent once the host has written real prose', () => {
+    deployProject(asset, home, { warn });
+    writeFileSync(join(home, '.claude', 'memory', 'project.md'), `${STUB}\n- We chose X.\n`);
+    warned.length = 0;
+    deployProject(asset, home, { warn });
+    expect(warned).toEqual([]);
+  });
+});
