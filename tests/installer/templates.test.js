@@ -3,6 +3,11 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { scanLines, SENTINEL_START } from '../../lib/installer/merge-md.mjs';
+import {
+  GLOBAL_HOST_OWNED, PROJECT_HOST_OWNED,
+  GLOBAL_SETTINGS_FINGERPRINTS, PROJECT_SETTINGS_FINGERPRINTS,
+} from '../../lib/installer/host-owned.mjs';
+import { matchingFingerprints } from '../../lib/installer/settings-merge.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SKILLS = ['agent-delegation', 'code-simplifier', 'critical-review', 'memory-first', 'verbosity'];
@@ -137,5 +142,105 @@ describe('guard 3 pattern block', () => {
   // overwriting operator policy, since deployProject copies the template wholesale.
   it('ships no allowlist file, so the installer can never overwrite one', () => {
     expect(existsSync(join(root, 'project-template/.claude/memory/bash-scan-allowlist.txt'))).toBe(false);
+  });
+});
+
+const SURFACES = [
+  { name: 'global', dir: 'global', table: GLOBAL_HOST_OWNED, fingerprints: GLOBAL_SETTINGS_FINGERPRINTS },
+  { name: 'project', dir: 'project-template/.claude', table: PROJECT_HOST_OWNED, fingerprints: PROJECT_SETTINGS_FINGERPRINTS },
+];
+const HOST_OWNED_ANYWHERE = new Set([...GLOBAL_HOST_OWNED.keys(), ...PROJECT_HOST_OWNED.keys()]);
+
+function shippedPaths(absDir) {
+  const out = [];
+  const walk = (dir, rel) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const next = rel ? `${rel}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) walk(join(dir, entry.name), next);
+      else out.push(next);
+    }
+  };
+  walk(absDir, '');
+  return out;
+}
+
+describe('host-owned tables cover the shipped trees', () => {
+  it.each(SURFACES)('$name ships nothing marked skip', ({ dir, table }) => {
+    const offenders = shippedPaths(join(root, dir)).filter((p) => table.get(p) === 'skip');
+    expect(offenders).toEqual([]);
+  });
+
+  it.each(SURFACES)('$name has a template source for every seed and merge entry', ({ dir, table }) => {
+    const missing = [];
+    for (const [rel, policy] of table) {
+      if (policy === 'skip') continue;
+      if (!existsSync(join(root, dir, ...rel.split('/')))) missing.push(rel);
+    }
+    expect(missing).toEqual([]);
+  });
+
+  it.each(SURFACES)('$name declares a policy for every shipped path host-owned on either surface', ({ dir, table }) => {
+    const undeclared = shippedPaths(join(root, dir)).filter((p) => HOST_OWNED_ANYWHERE.has(p) && !table.has(p));
+    expect(undeclared).toEqual([]);
+  });
+});
+
+describe('settings fingerprint coverage', () => {
+  const entriesOf = (rel) => {
+    const hooks = JSON.parse(readText(rel)).hooks;
+    if (!hooks) return [];
+    return Object.values(hooks).flatMap((v) => (Array.isArray(v) ? v : []));
+  };
+  const SHIPPED = [
+    { rel: 'global/settings.json', fingerprints: GLOBAL_SETTINGS_FINGERPRINTS },
+    { rel: 'project-template/.claude/settings.json', fingerprints: PROJECT_SETTINGS_FINGERPRINTS },
+  ];
+
+  // Backward: a fingerprint that matches nothing is dead, which happens when a
+  // hook is renamed and the constant is not.
+  it.each(SHIPPED)('$rel leaves no fingerprint dead', ({ rel, fingerprints }) => {
+    const entries = entriesOf(rel);
+    const dead = fingerprints.filter((fp) => !entries.some((e) => matchingFingerprints(e, [fp]).length === 1));
+    expect(dead).toEqual([]);
+  });
+
+  // Forward: every shipped entry is by definition conductor-owned, so exhaustive
+  // forward coverage is assertable today. Without it, a release can add a
+  // template entry and forget its fingerprint, after which the merge either
+  // never delivers it to existing installs or appends it beside itself on every
+  // re-run. The two directions together are the contract; either alone is half.
+  it.each(SHIPPED)('$rel matches every shipped entry to exactly one fingerprint', ({ rel, fingerprints }) => {
+    const wrong = entriesOf(rel)
+      .map((e, i) => ({ i, hits: matchingFingerprints(e, fingerprints) }))
+      .filter((r) => r.hits.length !== 1);
+    expect(wrong).toEqual([]);
+  });
+
+  // Vacuity asserted, not tolerated. global/settings.json ships permissions and
+  // no hooks: its two entries are synthesized from the host's absolute home, so
+  // a bare ~ cannot be shipped (settings.mjs:27-35) and the two mergers in
+  // settings.mjs own them with their own tested fingerprints. Empty equals empty
+  // today, and the day that file ships a hook entry this case fails first, ahead
+  // of the forward assertion it would otherwise silently satisfy.
+  it('global/settings.json ships no hook entry, matching its empty fingerprint list', () => {
+    expect(entriesOf('global/settings.json')).toEqual([]);
+    expect(GLOBAL_SETTINGS_FINGERPRINTS).toEqual([]);
+  });
+});
+
+describe('seeded permissions', () => {
+  // permissions is written exactly once, at seed time, and never again, so the
+  // template's grant list is the only chance to deliver one. Pinning it verbatim
+  // makes changing it force a touch of this test, and the review of that touch is
+  // where the changelog's manual-add instruction gets written. Forgetting becomes
+  // a failing test rather than a silent gap.
+  it('global/settings.json ships exactly the four read-only grants', () => {
+    expect(JSON.parse(readText('global/settings.json')).permissions).toEqual({
+      allow: ['Bash(grep:*)', 'Bash(find:*)', 'Bash(ls:*)', 'Bash(cat:*)'],
+      deny: [],
+    });
+  });
+  it('project-template/.claude/settings.json ships an empty grant list', () => {
+    expect(JSON.parse(readText('project-template/.claude/settings.json')).permissions).toEqual({ allow: [], deny: [] });
   });
 });
