@@ -19,7 +19,7 @@
 - **No em-dashes** in any authored output, including code comments, the changelog and commit messages.
 - **BUG-003 invariant:** plan state updates are surgical single-line edits, one checkbox at a time, never a bulk rewrite of this file.
 - **BUG-040:** `git add` on a tracked path under `.claude/` exits 1 while staging correctly. Never chain `&&` after such a staging step; use `git add -f` and a separate command.
-- **Guard 3 is live in this repository** and scans every `Bash` call. Avoid unquoted `\[ \]`, pipelines into `head`, `cat` heredocs carrying bracket classes, and `for (const x of ...)` inside `node -e`. Use Read, Edit, Write and scratchpad scripts.
+- **Guard 3 is live in this repository** and scans every `Bash` call. Avoid unquoted `\[ \]`, pipelines into `head`, `cat` heredocs carrying bracket classes, and `for (const x of ...)` inside `node -e`. Use Read, Edit, Write and scratchpad scripts. **A multi-line `git commit -m` message is scanned too:** the preprocessor joins lines with `;`, so any wrapped line that BEGINS with `for`, `while` or `until` lands at command position and trips P9 (`g3P9ShellLoop`). Reflow the message rather than bypassing. This is faithful to the frozen authority, so it is not a port defect.
 - **Owner-scoped convention:** memory and backlog commits may land on `main`; all code work lands on `fix/bug-039-installer-host-owned-state`.
 - Test baseline entering this plan: **747 passed, 12 skipped**. Every per-task count below is a prediction. **If a count is off by even one, reconcile before writing the next line of code.**
 
@@ -83,13 +83,13 @@ export function backupMalformed(settingsPath: string, now: Date): void
 
 - [X] [T-000-A] Confirm the working branch is `fix/bug-039-installer-host-owned-state`. Run `git branch --show-current` and compare the output to that exact string. If it differs, stop and report; the branch gate at the end of `/cc-plan` creates it and no task may run before that gate completed.
 
-- [>] [T-000-B] Stage the plan file. `docs/` is gitignored (`.gitignore:8`), so the force flag is required and the exit code cannot be chained.
+- [X] [T-000-B] Stage the plan file. `docs/` is gitignored (`.gitignore:8`), so the force flag is required and the exit code cannot be chained.
 
 ```bash
 git add -f "docs/superpowers/plans/2026-09-27-bug039-installer-host-owned-state.md"
 ```
 
-- [ ] [T-000-C] Commit the plan.
+- [X] [T-000-C] Commit the plan.
 
 ```bash
 git commit -m "docs: add the BUG-039 installer host-owned-state implementation plan
@@ -106,7 +106,7 @@ Claude-Session: https://claude.ai/code/session_01HLS5KAHkhpMChyqNTbqrhe"
 
 Two plan decisions changed what the spec asserts. The standing rule of this chain is that the spec is amended first and both documents then read as one truth, so these steps run before any code task.
 
-- [ ] [T-000-D] In `docs/superpowers/specs/2026-09-27-bug039-installer-host-owned-state-design.md`, replace the two fingerprint acceptance criteria (the `:150` backward criterion and the `:151` forward criterion) with per-surface wording plus the global-set rationale. Replace both bullets with:
+- [X] [T-000-D] In `docs/superpowers/specs/2026-09-27-bug039-installer-host-owned-state-design.md`, replace the two fingerprint acceptance criteria (the `:150` backward criterion and the `:151` forward criterion) with per-surface wording plus the global-set rationale. Replace both bullets with:
 
 ```markdown
 - [ ] A test asserts, per surface, that every conductor fingerprint in that surface's list matches at least one entry in that surface's shipped `settings.json`, so a renamed hook cannot leave a dead fingerprint behind.
@@ -114,19 +114,19 @@ Two plan decisions changed what the spec asserts. The standing rule of this chai
 - [ ] The global surface's fingerprint list is **empty**, because `global/settings.json` ships `permissions` and no hooks at all: its two hook entries are synthesized at install time from the host's absolute home, which is why a bare `~` cannot be shipped (`settings.mjs:27-35`), and `mergeVerbosityHook` and `mergeGraphifyHook` already own them entry-level with their own tested fingerprints. Both directions are therefore vacuous for that file today, and that vacuity is **asserted rather than tolerated**: a test pins `GLOBAL_SETTINGS_FINGERPRINTS` equal to the shipped file's own hook-entry set, empty equalling empty, so the day that file ships a hook entry the forward assertion fails until a fingerprint is added.
 ```
 
-- [ ] [T-000-E] In the same spec file, correct the stale rationale in the `### Recovery is detection only` section (`:129`). The sentence justifying the "may have been overwritten" wording by a fresh-scaffold false positive is no longer true: detection runs before the seed, so a fresh scaffold cannot warn about the stub it was just given. Replace the final sentence of that paragraph with:
+- [X] [T-000-E] In the same spec file, correct the stale rationale in the `### Recovery is detection only` section (`:129`). The sentence justifying the "may have been overwritten" wording by a fresh-scaffold false positive is no longer true: detection runs before the seed, so a fresh scaffold cannot warn about the stub it was just given. Replace the final sentence of that paragraph with:
 
 ```markdown
 The detection runs before the seed, so a fresh scaffold never warns about the stub it was just given and that false-positive class does not exist. The residual one that remains is different and is accepted: a real project scaffolded earlier, worked in little or not at all, whose `project.md` genuinely still equals the stub. That is why the wording says "may have been overwritten" rather than "was".
 ```
 
-- [ ] [T-000-F] Stage the spec. It sits under the gitignored `docs/`, so the force flag is required and the exit code cannot be chained.
+- [X] [T-000-F] Stage the spec. It sits under the gitignored `docs/`, so the force flag is required and the exit code cannot be chained.
 
 ```bash
 git add -f "docs/superpowers/specs/2026-09-27-bug039-installer-host-owned-state-design.md"
 ```
 
-- [ ] [T-000-G] Commit both spec corrections together, because they are one truth-alignment, not two.
+- [X] [T-000-G] Commit both spec corrections together, because they are one truth-alignment, not two.
 
 ```bash
 git commit -m "docs: align the BUG-039 spec with the plan's two decisions [BUG-039]
@@ -156,7 +156,7 @@ Claude-Session: https://claude.ai/code/session_01HLS5KAHkhpMChyqNTbqrhe"
 
 **Why the fingerprint lists are per surface and why the global one is empty.** `global/settings.json` ships a `permissions` block and no `hooks` at all: the two global hook entries are synthesized at install time from the host's absolute home (`settings.mjs:27-35` explains why a bare `~` cannot be shipped), and `mergeVerbosityHook` and `mergeGraphifyHook` already own them entry-level. So the global surface's shipped fingerprint set is genuinely empty, and both coverage directions in T-007 are vacuously true for it, which is correct rather than a gap: the day `global/settings.json` starts shipping a hook entry, the forward test fails until a fingerprint is added.
 
-- [ ] [T-001-A] Create `lib/installer/host-owned.mjs` with the tables and constants. Table keys are POSIX-style relative paths against each surface's copy source (`global/` and `project-template/.claude/` respectively).
+- [X] [T-001-A] Create `lib/installer/host-owned.mjs` with the tables and constants. Table keys are POSIX-style relative paths against each surface's copy source (`global/` and `project-template/.claude/` respectively).
 
 ```js
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
@@ -255,7 +255,7 @@ export function seedHostOwned(sourceRoot, targetRoot, table) {
 }
 ```
 
-- [ ] [T-001-B] Create `tests/installer/host-owned.test.js` with the unit tests.
+- [X] [T-001-B] Create `tests/installer/host-owned.test.js` with the unit tests.
 
 ```js
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -341,17 +341,17 @@ describe('seedHostOwned', () => {
 });
 ```
 
-- [ ] [T-001-C] Run the new file alone and confirm it passes.
+- [X] [T-001-C] Run the new file alone and confirm it passes.
 
 Run: `npx vitest run tests/installer/host-owned.test.js`
 Expected: 9 passed.
 
-- [ ] [T-001-D] Run the full suite and record the count.
+- [X] [T-001-D] Run the full suite and record the count.
 
 Run: `npx vitest run`
 Expected: **756 passed, 12 skipped** (747 + 9). If the number differs by even one, stop and reconcile before continuing.
 
-- [ ] [T-001-E] Stage and commit.
+- [X] [T-001-E] Stage and commit.
 
 ```bash
 git add lib/installer/host-owned.mjs tests/installer/host-owned.test.js
@@ -380,7 +380,7 @@ Claude-Session: https://claude.ai/code/session_01HLS5KAHkhpMChyqNTbqrhe"
 
 **Why a new file rather than a bigger `settings.mjs`.** `file-merge.mjs` already imports `utcStamp` and `pruneBackups` from `settings.mjs`. Putting a function that needs `resolveRealTarget` into `settings.mjs` would close an import cycle. ESM tolerates the cycle, but a reviewer should not have to reason about it, so the new merger sits downstream of both.
 
-- [ ] [T-002-A] In `lib/installer/settings.mjs`, add the `export` keyword to `backupMalformed`. The body is unchanged; only the declaration line changes.
+- [X] [T-002-A] In `lib/installer/settings.mjs`, add the `export` keyword to `backupMalformed`. The body is unchanged; only the declaration line changes.
 
 Change line 41 from:
 
@@ -394,7 +394,7 @@ to:
 export function backupMalformed(settingsPath, now) {
 ```
 
-- [ ] [T-002-B] Create `lib/installer/settings-merge.mjs`.
+- [X] [T-002-B] Create `lib/installer/settings-merge.mjs`.
 
 ```js
 import { existsSync, readFileSync } from 'node:fs';
@@ -519,7 +519,7 @@ export function mergeSettingsFile(templatePath, settingsPath, fingerprints, { no
 }
 ```
 
-- [ ] [T-002-C] Create `tests/installer/settings-merge.test.js`.
+- [X] [T-002-C] Create `tests/installer/settings-merge.test.js`.
 
 ```js
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -689,22 +689,22 @@ describe('mergeSettingsFile: symlink', () => {
 });
 ```
 
-- [ ] [T-002-D] Run the new file alone.
+- [X] [T-002-D] Run the new file alone.
 
 Run: `npx vitest run tests/installer/settings-merge.test.js`
 Expected: 17 passed.
 
-- [ ] [T-002-E] Run the settings suite to confirm the `backupMalformed` export broke nothing.
+- [X] [T-002-E] Run the settings suite to confirm the `backupMalformed` export broke nothing.
 
 Run: `npx vitest run tests/installer/settings.test.js`
 Expected: the existing count, unchanged, all passing.
 
-- [ ] [T-002-F] Run the full suite and record the count.
+- [X] [T-002-F] Run the full suite and record the count.
 
 Run: `npx vitest run`
 Expected: **773 passed, 12 skipped** (756 + 17). Reconcile any difference before continuing.
 
-- [ ] [T-002-G] Stage and commit.
+- [X] [T-002-G] Stage and commit.
 
 ```bash
 git add lib/installer/settings.mjs lib/installer/settings-merge.mjs tests/installer/settings-merge.test.js
@@ -731,16 +731,16 @@ Claude-Session: https://claude.ai/code/session_01HLS5KAHkhpMChyqNTbqrhe"
 - Consumes: `GLOBAL_HOST_OWNED`, `GLOBAL_SETTINGS_FINGERPRINTS`, `hostOwnedFilter`, `seedHostOwned` from T-001; `mergeSettingsFile` from T-002.
 - Produces: `deployGlobal(assetRoot, home)` with an unchanged signature and return value.
 
-- [ ] [T-003-A] In `lib/installer/deploy.mjs`, add the two new imports after line 4.
+- [X] [T-003-A] In `lib/installer/deploy.mjs`, add the two new imports after line 4.
 
 ```js
 import { GLOBAL_HOST_OWNED, PROJECT_HOST_OWNED, GLOBAL_SETTINGS_FINGERPRINTS, PROJECT_SETTINGS_FINGERPRINTS, hostOwnedFilter, seedHostOwned } from './host-owned.mjs';
 import { mergeSettingsFile } from './settings-merge.mjs';
 ```
 
-- [ ] [T-003-B] Delete the whole `skipHostOwned` block, `lib/installer/deploy.mjs:40-51`, comment included. It is replaced by `hostOwnedFilter`; leaving it beside the table would preserve in miniature the divergence this item exists to close.
+- [X] [T-003-B] Delete the whole `skipHostOwned` block, `lib/installer/deploy.mjs:40-51`, comment included. It is replaced by `hostOwnedFilter`; leaving it beside the table would preserve in miniature the divergence this item exists to close.
 
-- [ ] [T-003-C] Replace the body of `deployGlobal` (`lib/installer/deploy.mjs:106-121`) with the table-driven form.
+- [X] [T-003-C] Replace the body of `deployGlobal` (`lib/installer/deploy.mjs:106-121`) with the table-driven form.
 
 ```js
 export function deployGlobal(assetRoot, home) {
@@ -767,7 +767,7 @@ export function deployGlobal(assetRoot, home) {
 }
 ```
 
-- [ ] [T-003-D] Append a new describe block to the END of `tests/installer/deploy.test.js`. Do not modify any existing case. The block's fixtures add `settings.json` and `verbosity.md` to the asset tree the existing `beforeEach` builds.
+- [X] [T-003-D] Append a new describe block to the END of `tests/installer/deploy.test.js`. Do not modify any existing case. The block's fixtures add `settings.json` and `verbosity.md` to the asset tree the existing `beforeEach` builds.
 
 ```js
 describe('deployGlobal: host-owned state', () => {
@@ -824,22 +824,22 @@ describe('deployGlobal: host-owned state', () => {
 });
 ```
 
-- [ ] [T-003-E] Confirm `skipHostOwned` has no remaining reference anywhere.
+- [X] [T-003-E] Confirm `skipHostOwned` has no remaining reference anywhere.
 
 Run: `grep -rn "skipHostOwned" lib bin tests`
 Expected: no output, exit 1.
 
-- [ ] [T-003-F] Run the deploy suite.
+- [X] [T-003-F] Run the deploy suite.
 
 Run: `npx vitest run tests/installer/deploy.test.js`
-Expected: the existing deploy count plus 6, all passing. In particular `deployGlobal > copies managed assets and skills but not global/memory` must still pass unchanged: `memory/personal.md` is now excluded by the table rather than by a directory rule, and `memory/` is still created.
+Expected: **32 passed** (26 + 6), all passing. **Reconciled prediction.** The first run of this boundary was `1 failed | 31 passed`: `deployGlobal > copies managed assets and skills but not global/memory` asserted `memory/personal.md` is ABSENT, which the approved spec's Main path step 3 abolishes by assigning seeding to `deployGlobal`. That assertion is updated in place to the specified behavior, classified in the risks section as ASSERTION ENCODING RETIRED BEHAVIOR, UPDATED TO THE SPECIFIED ONE, STRENGTHENED NOT WEAKENED. The tripwire resumes from this reconciled prediction, not from momentum.
 
-- [ ] [T-003-G] Run the full suite and record the count.
+- [X] [T-003-G] Run the full suite and record the count.
 
 Run: `npx vitest run`
 Expected: **779 passed, 12 skipped** (773 + 6). Reconcile any difference before continuing.
 
-- [ ] [T-003-H] Stage and commit.
+- [X] [T-003-H] Stage and commit.
 
 ```bash
 git add lib/installer/deploy.mjs tests/installer/deploy.test.js
@@ -867,7 +867,7 @@ Claude-Session: https://claude.ai/code/session_01HLS5KAHkhpMChyqNTbqrhe"
 - Consumes: `PROJECT_HOST_OWNED`, `PROJECT_SETTINGS_FINGERPRINTS`, `hostOwnedFilter`, `seedHostOwned`, `mergeSettingsFile`.
 - Produces: `deployProject(assetRoot, cwd)` with an unchanged signature for now; T-005 adds the third options parameter.
 
-- [ ] [T-004-A] In `lib/installer/deploy.mjs`, replace the copy section of `deployProject` (the `cpSync(join(templateRoot, '.claude'), target, CP_OPTS)` call at `:152`) and add the seed and merge after the root-file loop. The `.claude` copy line becomes:
+- [X] [T-004-A] In `lib/installer/deploy.mjs`, replace the copy section of `deployProject` (the `cpSync(join(templateRoot, '.claude'), target, CP_OPTS)` call at `:152`) and add the seed and merge after the root-file loop. The `.claude` copy line becomes:
 
 ```js
   const templateClaude = join(templateRoot, '.claude');
@@ -884,7 +884,7 @@ and immediately after the `MERGED_ROOT_FILES` loop, before the `sweepStaleRootSc
   mergeSettingsFile(join(templateClaude, 'settings.json'), join(target, 'settings.json'), PROJECT_SETTINGS_FINGERPRINTS);
 ```
 
-- [ ] [T-004-B] Append a new describe block to the END of `tests/installer/deploy.test.js`. The fixtures extend the asset tree the existing `beforeEach` builds with the two shipped memory files and a project `settings.json`.
+- [X] [T-004-B] Append a new describe block to the END of `tests/installer/deploy.test.js`. The fixtures extend the asset tree the existing `beforeEach` builds with the two shipped memory files and a project `settings.json`.
 
 ```js
 describe('deployProject: host-owned state', () => {
@@ -998,17 +998,17 @@ describe('deployProject: host-owned state', () => {
 });
 ```
 
-- [ ] [T-004-C] Run the deploy suite.
+- [X] [T-004-C] Run the deploy suite.
 
 Run: `npx vitest run tests/installer/deploy.test.js`
 Expected: the T-003-F count plus 9, all passing.
 
-- [ ] [T-004-D] Run the full suite and record the count.
+- [X] [T-004-D] Run the full suite and record the count.
 
 Run: `npx vitest run`
 Expected: **788 passed, 12 skipped** (779 + 9). Reconcile any difference before continuing.
 
-- [ ] [T-004-E] Stage and commit.
+- [X] [T-004-E] Stage and commit.
 
 ```bash
 git add lib/installer/deploy.mjs tests/installer/deploy.test.js
@@ -1037,7 +1037,7 @@ Claude-Session: https://claude.ai/code/session_01HLS5KAHkhpMChyqNTbqrhe"
 
 **Why detection runs before the seed.** The check compares the host's `project.md` against the template stub. Running it after the seed would make every fresh scaffold warn about its own brand-new stub. Running it before means the file must have existed already, which removes the fresh-install false positive entirely and leaves only the one the spec accepts: a real project scaffolded earlier that genuinely still equals the stub. That is why the wording says "may have been overwritten".
 
-- [ ] [T-005-A] In `lib/installer/deploy.mjs`, add the detection helper directly above `deployProject`.
+- [X] [T-005-A] In `lib/installer/deploy.mjs`, add the detection helper directly above `deployProject`.
 
 ```js
 // 1.28.0 and 1.29.0 both told users to re-run the installer, and that re-run
@@ -1053,7 +1053,7 @@ function warnIfProjectMemoryIsStub(templateClaude, target, emit) {
   if (!existsSync(stub) || !existsSync(host)) return false;
   if (readFileSync(host, 'utf8') !== readFileSync(stub, 'utf8')) return false;
   emit([
-    `code-conductor: ${rel} matches the bundled stub; an installer re-run before 1.30.0 may have overwritten it.`,
+    `code-conductor: ${rel} matches the bundled stub; it may have been overwritten by an installer re-run before 1.30.0.`,
     `  Find a committed copy:  git log --oneline -- ${rel}`,
     `  Restore it:             git checkout <commit> -- ${rel}`,
   ].join('\n'));
@@ -1061,7 +1061,7 @@ function warnIfProjectMemoryIsStub(templateClaude, target, emit) {
 }
 ```
 
-- [ ] [T-005-B] Change the `deployProject` signature and wire the detection in, before the seed.
+- [X] [T-005-B] Change the `deployProject` signature and wire the detection in, before the seed.
 
 Signature becomes:
 
@@ -1076,7 +1076,7 @@ and the detection call goes immediately before the `mkdirSync(join(target, 'memo
   warnIfProjectMemoryIsStub(templateClaude, target, emit);
 ```
 
-- [ ] [T-005-C] Append a new describe block to the END of `tests/installer/deploy.test.js`.
+- [X] [T-005-C] Append a new describe block to the END of `tests/installer/deploy.test.js`.
 
 ```js
 describe('deployProject: overwritten project.md detection', () => {
@@ -1123,17 +1123,17 @@ describe('deployProject: overwritten project.md detection', () => {
 });
 ```
 
-- [ ] [T-005-D] Run the deploy suite.
+- [X] [T-005-D] Run the deploy suite.
 
 Run: `npx vitest run tests/installer/deploy.test.js`
 Expected: the T-004-C count plus 4, all passing.
 
-- [ ] [T-005-E] Run the full suite and record the count.
+- [X] [T-005-E] Run the full suite and record the count.
 
 Run: `npx vitest run`
 Expected: **792 passed, 12 skipped** (788 + 4). Reconcile any difference before continuing.
 
-- [ ] [T-005-F] Stage and commit.
+- [X] [T-005-F] Stage and commit.
 
 ```bash
 git add lib/installer/deploy.mjs tests/installer/deploy.test.js
@@ -1164,25 +1164,25 @@ Claude-Session: https://claude.ai/code/session_01HLS5KAHkhpMChyqNTbqrhe"
 
 **Why `seedMemoryFile` goes and `writeVerbosity`'s internal seed stays.** `seedMemoryFile` exists only to write `global/memory/personal.md` if absent, which the table's `seed` policy now does inside `deployGlobal`. Keeping a second write-if-absent mechanism beside the table would preserve exactly the divergence this item closes, so it is deleted along with the two test cases that cover it: that is a deletion of dead code, not an adjustment of a case to make new code pass. `writeVerbosity`'s own copy-if-absent at `config.mjs:20` stays, because `writeVerbosity` is also the `--verbosity` flag path and must work when called directly with a home; its seed is its own precondition, not a second policy.
 
-- [ ] [T-006-A] In `lib/installer/config.mjs`, delete the whole `seedMemoryFile` function, `:35-41`.
+- [X] [T-006-A] In `lib/installer/config.mjs`, delete the whole `seedMemoryFile` function, `:35-41`.
 
-- [ ] [T-006-B] In `bin/code-conductor.mjs:8`, drop `seedMemoryFile` from the import.
+- [X] [T-006-B] In `bin/code-conductor.mjs:8`, drop `seedMemoryFile` from the import.
 
 ```js
 import { writeVerbosity, writeVersionFile } from '../lib/installer/config.mjs';
 ```
 
-- [ ] [T-006-C] In `bin/code-conductor.mjs`, delete line 95, `seedMemoryFile(home, 'personal.md', assetRoot);`. `deployGlobal` seeded it at line 93.
+- [X] [T-006-C] In `bin/code-conductor.mjs`, delete line 95, `seedMemoryFile(home, 'personal.md', assetRoot);`. `deployGlobal` seeded it at line 93.
 
-- [ ] [T-006-D] In `bin/code-conductor.mjs:101`, pass the warn channel so the stub-detection line reaches the user's stderr through the same emitter every other diagnostic uses.
+- [X] [T-006-D] In `bin/code-conductor.mjs:101`, pass the warn channel so the stub-detection line reaches the user's stderr through the same emitter every other diagnostic uses.
 
 ```js
     if (opts.project) deployProject(assetRoot, cwd, { warn: (m) => emit('stderr', m) });
 ```
 
-- [ ] [T-006-E] In `tests/installer/config.test.js`, delete `seedMemoryFile` from the import on line 5, then delete the `describe('seedMemoryFile', ...)` block at `:61-67`. Both removals are required: the function no longer exists, so the import alone would fail the file.
+- [X] [T-006-E] In `tests/installer/config.test.js`, delete `seedMemoryFile` from the import on line 5, then delete the `describe('seedMemoryFile', ...)` block at `:61-67`. Both removals are required: the function no longer exists, so the import alone would fail the file.
 
-- [ ] [T-006-F] Append a new describe block to the END of `tests/installer/cli.test.js`. These are the end-to-end cases that use the REAL bundled assets, which is the only layer where the copy-then-merge ordering is observable.
+- [X] [T-006-F] Append a new describe block to the END of `tests/installer/cli.test.js`. These are the end-to-end cases that use the REAL bundled assets, which is the only layer where the copy-then-merge ordering is observable.
 
 ```js
 describe('run: host-owned state across a re-run', () => {
@@ -1241,32 +1241,34 @@ describe('run: host-owned state across a re-run', () => {
 });
 ```
 
-- [ ] [T-006-G] Confirm no reference to the deleted function survives.
+- [X] [T-006-G] Confirm no reference to the deleted function survives.
 
-Run: `grep -rn "seedMemoryFile" lib bin tests`
-Expected: no output, exit 1.
+Run: `grep -rn "seedMemoryFile(" lib bin tests`
+Expected: no output, exit 1. **Adjusted from the originally written `seedMemoryFile` (no paren):** T-006-E leaves a deliberate one-line tombstone comment in `config.test.js` naming the retirement and where the coverage moved, so the bare grep now returns that one line. The call-shaped grep is what actually asserts the step's intent, which is that no live reference survives.
 
-- [ ] [T-006-H] Run the two touched suites.
+- [X] [T-006-H] Run the two touched suites.
 
 Run: `npx vitest run tests/installer/cli.test.js tests/installer/config.test.js`
 Expected: cli gains 6 cases, config loses 1 case (the single `it` inside the deleted describe). All passing.
 
-- [ ] [T-006-I] Run the full suite and record the count.
+- [X] [T-006-I] Run the full suite and record the count.
 
 Run: `npx vitest run`
 Expected: **797 passed, 12 skipped** (792 + 6 - 1). Reconcile any difference before continuing.
 
-- [ ] [T-006-J] Stage and commit.
+- [X] [T-006-J] Stage and commit.
 
 ```bash
 git add bin/code-conductor.mjs lib/installer/config.mjs tests/installer/cli.test.js tests/installer/config.test.js
 git commit -m "refactor: retire seedMemoryFile and wire the deploy warn channel [BUG-039]
 
 The table's seed policy is now the single write-if-absent mechanism, so
-the standalone helper and its coverage go with it. deployProject gets the
-CLI's stderr emitter, and end-to-end cases pin the re-run behavior against
-the real bundled assets, which is the only layer where the old
-copy-then-merge ordering was observable.
+the standalone helper and its coverage go with it, classified as
+coverage for deleted code with a tombstone comment naming where that
+coverage moved. deployProject gets the CLI's stderr emitter, and
+end-to-end cases pin the re-run behavior against the real bundled
+assets, which is the only layer where the old copy-then-merge ordering
+was observable.
 
 Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01HLS5KAHkhpMChyqNTbqrhe"
@@ -1289,7 +1291,7 @@ Claude-Session: https://claude.ai/code/session_01HLS5KAHkhpMChyqNTbqrhe"
 2. **Every `seed` and `merge` entry must have a template source**, so no entry points at a file that is no longer shipped.
 3. **Any shipped path that is host-owned on the other surface must have an entry on its own surface too**, so adding `memory/personal.md` to `project-template/` cannot slip through by virtue of only `global/` knowing the name.
 
-- [ ] [T-007-A] Add the contract block to `tests/installer/templates.test.js`. The two `import` lines go with the file's other imports at the top (after line 5); everything below them is appended to the END of the file. It reuses the file's existing `root`, `readText`, `readdirSync`, `existsSync` and `join` bindings, so no other import changes.
+- [X] [T-007-A] Add the contract block to `tests/installer/templates.test.js`. The two `import` lines go with the file's other imports at the top (after line 5); everything below them is appended to the END of the file. It reuses the file's existing `root`, `readText`, `readdirSync`, `existsSync` and `join` bindings, so no other import changes.
 
 ```js
 import {
@@ -1399,19 +1401,19 @@ describe('seeded permissions', () => {
 });
 ```
 
-- [ ] [T-007-B] Run the templates suite.
+- [X] [T-007-B] Run the templates suite.
 
 Run: `npx vitest run tests/installer/templates.test.js`
-Expected: the existing templates count plus 11 (3 coverage cases x 2 surfaces, 2 fingerprint directions x 2 files, the global vacuity pin, 2 permissions pins), all passing.
+Expected: **34 passed** (21 + 13), all passing. **Reconciled prediction.** This step first read "plus 11", which was an arithmetic slip in the plan, not a miscount of the tests: the enumeration behind it is 3 coverage cases x 2 surfaces (6), 2 fingerprint directions x 2 files (4), the global vacuity pin (1) and 2 permissions pins, which sums to 13. The downstream totals in T-007-D and T-008-A carry the corrected 13.
 
-- [ ] [T-007-C] Prove the forward test actually bites. Temporarily remove `'post-compact.sh'` from `PROJECT_SETTINGS_FINGERPRINTS` in `lib/installer/host-owned.mjs`, run `npx vitest run tests/installer/templates.test.js`, and confirm BOTH directions fail for the project file (forward: the PostCompact entry now matches zero; backward stays green because the removed fingerprint is simply gone). Then restore the line exactly and re-run to green. A coverage test that cannot fail is not a coverage test.
+- [X] [T-007-C] Prove the forward test actually bites. Temporarily remove `'post-compact.sh'` from `PROJECT_SETTINGS_FINGERPRINTS` in `lib/installer/host-owned.mjs`, run `npx vitest run tests/installer/templates.test.js`, and confirm BOTH directions fail for the project file (forward: the PostCompact entry now matches zero; backward stays green because the removed fingerprint is simply gone). Then restore the line exactly and re-run to green. A coverage test that cannot fail is not a coverage test.
 
-- [ ] [T-007-D] Run the full suite and record the count.
+- [X] [T-007-D] Run the full suite and record the count.
 
 Run: `npx vitest run`
-Expected: **808 passed, 12 skipped** (797 + 11). Reconcile any difference before continuing.
+Expected: **810 passed, 12 skipped** (797 + 13). Reconcile any difference before continuing.
 
-- [ ] [T-007-E] Stage and commit.
+- [X] [T-007-E] Stage and commit.
 
 ```bash
 git add tests/installer/templates.test.js
@@ -1438,16 +1440,18 @@ Claude-Session: https://claude.ai/code/session_01HLS5KAHkhpMChyqNTbqrhe"
 - Consumes: everything above.
 - Produces: the 1.30.0 release commit.
 
-- [ ] [T-008-A] Run the full suite one final time with no filter and confirm zero failures and zero existing cases adjusted.
+- [X] [T-008-A] Run the full suite one final time with no filter and confirm zero failures and zero existing cases adjusted.
 
 Run: `npx vitest run`
-Expected: **808 passed, 12 skipped**. This is AC 21. If any pre-existing case required a change to reach green, stop: that is the failure this criterion exists to catch, and it is reported before the release commit, not after.
+Expected: **810 passed, 12 skipped**. This is AC 21. If any pre-existing case required a change to reach green, stop: that is the failure this criterion exists to catch, and it is reported before the release commit, not after.
 
-- [ ] [T-008-B] Edit `VERSION` to `1.30.0` (single line plus trailing newline).
+**Audit method and result.** `git diff origin/main -- tests/` filtered to removed lines is the whole evidence. It returns exactly eleven lines: the `seedMemoryFile` import and its nine-line `describe` block in `config.test.js` (COVERAGE FOR DELETED CODE), and the single `expect(existsSync(...personal.md)).toBe(false)` line in `deploy.test.js` (ASSERTION ENCODING RETIRED BEHAVIOR, UPDATED TO THE SPECIFIED ONE, STRENGTHENED NOT WEAKENED). No other pre-existing line in the suite was removed or altered; `cli.test.js` and `templates.test.js` are pure additions apart from one import line each.
 
-- [ ] [T-008-C] Edit the `"version"` field in `package.json` to `1.30.0`.
+- [X] [T-008-B] Edit `VERSION` to `1.30.0` (single line plus trailing newline).
 
-- [ ] [T-008-D] Insert a new section at `CHANGELOG.md:3`, directly above `## [1.29.0]`, leaving every existing line untouched.
+- [X] [T-008-C] Edit the `"version"` field in `package.json` to `1.30.0`.
+
+- [X] [T-008-D] Insert a new section at `CHANGELOG.md:3`, directly above `## [1.29.0]`, leaving every existing line untouched.
 
 ```markdown
 ## [1.30.0] - 2026-09-27
@@ -1461,17 +1465,17 @@ If an earlier re-run already replaced your `.claude/memory/project.md`, this ver
 Existing installations: re-run the installer to apply. This is the first release where that re-run is safe for the files listed above.
 ```
 
-- [ ] [T-008-E] In `AGENT-READABLE BACKLOG.md:287`, flip the `[BUG-039]` heading from `[ ]` to `[X]` with a surgical single-line edit. Change only the two bracket characters; the rest of the line stays byte-identical.
+- [X] [T-008-E] In `AGENT-READABLE BACKLOG.md:287`, flip the `[BUG-039]` heading from `[ ]` to `[X]` with a surgical single-line edit. Change only the two bracket characters; the rest of the line stays byte-identical.
 
-- [ ] [T-008-F] Append one bullet under the `[BUG-039]` entry recording the outcome: the shipping release, the two new modules, the retirement of `skipHostOwned` and `seedMemoryFile`, and the one limitation carried forward (substring fingerprint matching, out of scope by decision, recorded in the spec).
+- [X] [T-008-F] Append one bullet under the `[BUG-039]` entry recording the outcome: the shipping release, the two new modules, the retirement of `skipHostOwned` and `seedMemoryFile`, and the one limitation carried forward (substring fingerprint matching, out of scope by decision, recorded in the spec).
 
-- [ ] [T-008-G] Stage the release files. `AGENT-READABLE BACKLOG.md` is at the repository root and needs no force flag; nothing here sits under `.claude/`, so no `git add` exit-code workaround applies.
+- [X] [T-008-G] Stage the release files. `AGENT-READABLE BACKLOG.md` is at the repository root and needs no force flag; nothing here sits under `.claude/`, so no `git add` exit-code workaround applies.
 
 ```bash
 git add VERSION package.json CHANGELOG.md "AGENT-READABLE BACKLOG.md"
 ```
 
-- [ ] [T-008-H] Commit the release.
+- [X] [T-008-H] Commit the release.
 
 ```bash
 git commit -m "chore: release 1.30.0 [BUG-039]
@@ -1480,20 +1484,20 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01HLS5KAHkhpMChyqNTbqrhe"
 ```
 
-- [ ] [T-008-I] Report the final state and STOP. Do not push and do not open a pull request without explicit authorization; the standing convention is that the branch is pushed only when the developer says so.
+- [X] [T-008-I] Report the final state and STOP. Do not push and do not open a pull request without explicit authorization; the standing convention is that the branch is pushed only when the developer says so.
 
 ---
 
 ## Test List
 
-- [ ] [T-100] Unit tests for the policy tables, `hostOwnedFilter` and `seedHostOwned` (`tests/installer/host-owned.test.js`, T-001)
-- [ ] [T-101] Unit tests for `entryMatches`, `matchingFingerprints` and `mergeSettingsFile` across fresh, degenerate, preserving, owned, malformed and symlink cases (`tests/installer/settings-merge.test.js`, T-002)
-- [ ] [T-102] Integration tests for the `deployGlobal` seam: seed, re-run preservation, settings merge, managed assets still forced (`tests/installer/deploy.test.js`, T-003)
-- [ ] [T-103] Integration tests for the `deployProject` seam, including all five latent files shipped deliberately by the fixture (`tests/installer/deploy.test.js`, T-004)
-- [ ] [T-104] Integration tests for the stub detection, fresh-scaffold silence included (`tests/installer/deploy.test.js`, T-005)
-- [ ] [T-105] End-to-end `run()` tests over the real bundled assets, both surfaces, across two runs (`tests/installer/cli.test.js`, T-006)
-- [ ] [T-106] Contract tests over the shipped trees: table coverage x3, both fingerprint directions, the global vacuity pin, pinned permissions (`tests/installer/templates.test.js`, T-007)
-- [ ] [T-107] No E2E/UI test: this project ships no UI.
+- [X] [T-100] Unit tests for the policy tables, `hostOwnedFilter` and `seedHostOwned` (`tests/installer/host-owned.test.js`, T-001)
+- [X] [T-101] Unit tests for `entryMatches`, `matchingFingerprints` and `mergeSettingsFile` across fresh, degenerate, preserving, owned, malformed and symlink cases (`tests/installer/settings-merge.test.js`, T-002)
+- [X] [T-102] Integration tests for the `deployGlobal` seam: seed, re-run preservation, settings merge, managed assets still forced (`tests/installer/deploy.test.js`, T-003)
+- [X] [T-103] Integration tests for the `deployProject` seam, including all five latent files shipped deliberately by the fixture (`tests/installer/deploy.test.js`, T-004)
+- [X] [T-104] Integration tests for the stub detection, fresh-scaffold silence included (`tests/installer/deploy.test.js`, T-005)
+- [X] [T-105] End-to-end `run()` tests over the real bundled assets, both surfaces, across two runs (`tests/installer/cli.test.js`, T-006)
+- [X] [T-106] Contract tests over the shipped trees: table coverage x3, both fingerprint directions, the global vacuity pin, pinned permissions (`tests/installer/templates.test.js`, T-007)
+- [X] [T-107] No E2E/UI test: this project ships no UI.
 
 ## Commit Order
 
@@ -1517,6 +1521,9 @@ Commits 2 and 3 add code nothing calls yet, which is deliberate: each is indepen
 - **The global surface's two hook entries are synthesized, not shipped**, so `GLOBAL_SETTINGS_FINGERPRINTS` is empty and T-007's two directions are vacuous for `global/settings.json`. This is a deliberate deviation from AC 14's literal wording ("every conductor fingerprint in the tables matches at least one entry in the corresponding shipped `settings.json`"): the global fingerprints live in `settings.mjs` because only the installer knows the host's absolute home, and they are already covered by the existing `settings.test.js` and `cli.test.js` cases. The forward test still guards the future: the day `global/settings.json` ships a hook entry, it fails until a fingerprint is added. **Flagged for approval rather than decided silently.**
 - **`mergeSettingsFile` skips a shipped entry matching zero or several fingerprints**, so a mis-fingerprinted entry silently never reaches existing installs. That is the quieter of the two failures (the alternative, appending it, duplicates it on every re-run), and T-007's forward test is what makes it loud. T-007-C proves that test can fail.
 - **Malformed handling differs from `mergeHook`, and is spec-conformant, not a deviation.** The spec's error case says to back the file up, then proceed from the template's content, and that the host must not be left without a working settings file: writing the template after the backup is the letter, not an extension of it. The old `mergeHook` backed up and wrote nothing, and stays untouched, which is the right conservatism for a function whose callers did not ask for the new behavior. No existing case moves; the new behavior is asserted only on the new function. Caught at T-002-E.
-- **Deleting `seedMemoryFile` removes an existing test case.** This is the one place the plan touches a pre-existing test. It is a deletion of coverage for deleted code, not an adjustment of an assertion to fit new behavior, and T-006-I's predicted count already carries the -1 so the reconciliation is explicit rather than absorbed.
+- **Pre-existing tests are touched exactly twice, and each is classified on the record.** AC 21's words are "no existing case adjusted to fit", and its target is adjustment to fit THE IMPLEMENTATION: weakening an assertion so new code passes. Loud, justified and stronger is permitted; quiet or weaker never is. This chain recognizes exactly two legitimate shapes, and both occur here:
+  1. **COVERAGE FOR DELETED CODE** (T-006-E). `seedMemoryFile` is deleted, so the `describe('seedMemoryFile', ...)` block goes with it. T-006-I's predicted count carries the -1 explicitly rather than absorbing it.
+  2. **ASSERTION ENCODING RETIRED BEHAVIOR, UPDATED TO THE SPECIFIED ONE, STRENGTHENED NOT WEAKENED** (T-003-F). `tests/installer/deploy.test.js:69` asserted `memory/personal.md` is ABSENT after `deployGlobal`, which encodes the pre-spec division of labour (deploy excludes, `bin` seeds) that the approved spec's Main path step 3 explicitly abolishes by assigning seeding to `deployGlobal` itself. The test contradicts the specification, and the chain's oldest rule decides that direction (BUG-033, stage 1, applied verbatim): the test asserts the corrected behavior, it does not preserve the retired one. A test does not get to veto a spec; it gets updated by one, on the record. The case is edited rather than replaced because its premise (`deployGlobal` handles global memory correctly) is alive and only its expected mechanism changed; replacement is for a case whose premise died, and deleting it would lose the lineage a reviewer git-blames in a year for zero gain.
+  **Net coverage rises, which is what makes this an upgrade rather than an accommodation:** the old line was the only assertion discriminating filter-from-force at the fresh-install layer, and the re-run case restores that discrimination strictly, because a force-copy cannot leave a host edit byte-identical. The edit also converts the assertion from absence to seeded-content-verbatim, which is strictly more informative at that layer.
 - **The substring fingerprint captures a host command that merely mentions a conductor hook filename.** Out of scope by decision; narrowing it needs an on-disk marker in every existing install. Recorded in the spec and in the changelog's silence, not solved here.
 - **Byte-identical idempotency depends on the host file already being 2-space JSON with a trailing newline.** A host file with 4-space indent is rewritten once on the first merge and is byte-stable from the second run onward. AC 16 says "a re-run of an unchanged release", which that satisfies; it is named here so the first-run diff is not read as a defect.
