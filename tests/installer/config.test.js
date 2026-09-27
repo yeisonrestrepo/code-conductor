@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { normalizeVerbosity, writeVerbosity, seedMemoryFile, writeVersionFile } from '../../lib/installer/config.mjs';
+import { normalizeVerbosity, writeVerbosity, writeVersionFile } from '../../lib/installer/config.mjs';
 
 let home, asset;
 beforeEach(() => {
@@ -58,15 +58,10 @@ describe('writeVerbosity', () => {
   });
 });
 
-describe('seedMemoryFile', () => {
-  it('writes when absent and skips when present', () => {
-    expect(seedMemoryFile(home, 'personal.md', asset)).toBe(true);
-    expect(readFileSync(join(home, '.claude', 'memory', 'personal.md'), 'utf8')).toBe('BUNDLED-PERSONAL');
-    writeFileSync(join(home, '.claude', 'memory', 'personal.md'), 'USER-EDIT');
-    expect(seedMemoryFile(home, 'personal.md', asset)).toBe(false);
-    expect(readFileSync(join(home, '.claude', 'memory', 'personal.md'), 'utf8')).toBe('USER-EDIT');
-  });
-});
+// seedMemoryFile was retired in 1.30.0 (BUG-039): the host-owned policy table's
+// 'seed' entries are the one write-if-absent mechanism, exercised through
+// deployGlobal in deploy.test.js and host-owned.test.js. This block is deleted
+// as coverage for deleted code, not adjusted to fit new behavior.
 
 describe('writeVersionFile', () => {
   it('recursively creates .claude/memory on a fresh home, then writes the bare version', () => {

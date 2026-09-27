@@ -157,3 +157,58 @@ describe('committed entry script', () => {
     expect(readFileSync(binPath, 'utf8').startsWith('#!/usr/bin/env node\n')).toBe(true);
   });
 });
+
+describe('run: host-owned state across a re-run', () => {
+  it('still seeds personal.md into a fresh global install', () => {
+    run([], { HOME: home }, { cwd, log });
+    expect(existsSync(join(home, '.claude', 'memory', 'personal.md'))).toBe(true);
+  });
+
+  it('keeps a host-added global settings.json entry across a re-run', () => {
+    run([], { HOME: home }, { cwd, log });
+    const sp = join(home, '.claude', 'settings.json');
+    const s = JSON.parse(readFileSync(sp, 'utf8'));
+    s.hooks.UserPromptSubmit.push({ matcher: '', hooks: [{ type: 'command', command: 'bash /home/me/mine.sh' }] });
+    writeFileSync(sp, `${JSON.stringify(s, null, 2)}\n`);
+    run([], { HOME: home }, { cwd, log });
+    const after = JSON.parse(readFileSync(sp, 'utf8'));
+    expect(after.hooks.UserPromptSubmit.some(e => e.hooks.some(h => h.command === 'bash /home/me/mine.sh'))).toBe(true);
+  });
+
+  it('keeps a host-modified global permissions block across a re-run', () => {
+    run([], { HOME: home }, { cwd, log });
+    const sp = join(home, '.claude', 'settings.json');
+    const s = JSON.parse(readFileSync(sp, 'utf8'));
+    s.permissions = { allow: ['Bash(grep:*)'], deny: ['Bash(curl:*)'] };
+    writeFileSync(sp, `${JSON.stringify(s, null, 2)}\n`);
+    run([], { HOME: home }, { cwd, log });
+    expect(JSON.parse(readFileSync(sp, 'utf8')).permissions).toEqual({ allow: ['Bash(grep:*)'], deny: ['Bash(curl:*)'] });
+  });
+
+  it('keeps a host-modified project.md and context-threshold.txt across a --project re-run', () => {
+    run(['--project'], { HOME: home }, { cwd, log });
+    const pm = join(cwd, '.claude', 'memory', 'project.md');
+    const ct = join(cwd, '.claude', 'memory', 'context-threshold.txt');
+    writeFileSync(pm, '# Ours\n\n- decision one\n');
+    writeFileSync(ct, '40\n');
+    run(['--project'], { HOME: home }, { cwd, log });
+    expect(readFileSync(pm, 'utf8')).toBe('# Ours\n\n- decision one\n');
+    expect(readFileSync(ct, 'utf8')).toBe('40\n');
+  });
+
+  it('keeps a host-created bash-scan-allowlist.txt across a --project re-run', () => {
+    run(['--project'], { HOME: home }, { cwd, log });
+    const p = join(cwd, '.claude', 'memory', 'bash-scan-allowlist.txt');
+    writeFileSync(p, '# operator policy\ndocs/\n');
+    run(['--project'], { HOME: home }, { cwd, log });
+    expect(readFileSync(p, 'utf8')).toBe('# operator policy\ndocs/\n');
+  });
+
+  it('produces a byte-identical project settings.json on a second --project run', () => {
+    run(['--project'], { HOME: home }, { cwd, log });
+    const sp = join(cwd, '.claude', 'settings.json');
+    const first = readFileSync(sp, 'utf8');
+    run(['--project'], { HOME: home }, { cwd, log });
+    expect(readFileSync(sp, 'utf8')).toBe(first);
+  });
+});
