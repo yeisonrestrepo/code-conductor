@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.30.0] - 2026-09-27
+
+### Fixed
+
+- **[BUG-039]** (superseding **[BUG-035]**) The installer deployed its bundled trees by force-copying them over the host's `.claude/` directories, with no general notion of which paths belong to the installer and which belong to the host. Every re-run destroyed host-authored state that happened to share a filename with something the template ships: a team's `.claude/memory/project.md` replaced by the template stub, an operator's tuned `context-threshold.txt` reverted, and `settings.json` overwritten on both surfaces. The `settings.json` case was worse than a plain overwrite: the global install force-copied the file and then merged the verbosity and graphify hook entries into it, so the machinery built to preserve host entries was merging into a file whose host entries had died six lines earlier, and on the project surface no merger ran at all. Both surfaces now consult one pinned policy table mapping each host-owned path to `skip`, `seed` or `merge`, and `skipHostOwned` is gone. `settings.json` gains a real merge: conductor-owned hook entries are matched by a fingerprint in their command and rewritten where they already sit, every other entry is left exactly as it was, and no top-level key outside `MERGE_OWNED_KEYS` (which is `hooks` and nothing else) is ever written. `permissions` is therefore written exactly once, on a fresh install, and never again, including a grant you deliberately removed: a permission list whose removals do not stick is a ratchet that only loosens. A future release that adds a template grant will say so here with the manual-add instruction, because a test pins the shipped grant list verbatim. The five latent files protected until now only by the template not shipping their names (`memory/personal.md`, `memory/bash-scan-allowlist.txt`, both `session-snapshot` variants, `memory/turn-count.txt`, plus `settings.local.json`) are now protected by the table instead, and coverage tests in both directions fail the build if a template starts shipping one without declaring its policy.
+
+If an earlier re-run already replaced your `.claude/memory/project.md`, this version detects it: when the file is byte-identical to the bundled stub, the deploy prints the two `git` commands that recover a committed copy. It writes nothing; recovery is yours to run.
+
+Existing installations: re-run the installer to apply. This is the first release where that re-run is safe for the files listed above.
+
 ## [1.29.0] - 2026-09-25
 
 ### Added
