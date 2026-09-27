@@ -66,7 +66,9 @@ describe('deployGlobal', () => {
     expect(readFileSync(join(dir, 'CLAUDE.md'), 'utf8')).toBe(TPL_GLOBAL);
     expect(existsSync(join(dir, 'skills', 'critical-review', 'SKILL.md'))).toBe(true);
     expect(existsSync(join(dir, 'hooks', 'h.sh'))).toBe(true);
-    expect(existsSync(join(dir, 'memory', 'personal.md'))).toBe(false);
+    // deployGlobal now seeds this itself (BUG-039): the copy is still
+    // filtered, and the re-run case below is what proves it.
+    expect(readFileSync(join(dir, 'memory', 'personal.md'), 'utf8')).toBe('BUNDLED');
     expect(existsSync(join(dir, 'memory'))).toBe(true); // dir created despite the filter
   });
 });
@@ -246,5 +248,58 @@ describe('chmodHooks', () => {
       const { statSync } = require('node:fs');
       expect(statSync(join(dir, 'hooks', 'h.sh')).mode & 0o111).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('deployGlobal: host-owned state', () => {
+  const GLOBAL_SETTINGS = { permissions: { allow: ['Bash(grep:*)'], deny: [] } };
+  const HOST_ENTRY = { matcher: '', hooks: [{ type: 'command', command: 'bash /home/me/my-own-hook.sh' }] };
+  beforeEach(() => {
+    writeFileSync(join(asset, 'global', 'memory', 'verbosity.md'), 'VERBOSITY: MIN\n');
+    writeFileSync(join(asset, 'global', 'settings.json'), `${JSON.stringify(GLOBAL_SETTINGS, null, 2)}\n`);
+  });
+
+  it('seeds personal.md and verbosity.md on a fresh install', () => {
+    const dir = deployGlobal(asset, home);
+    expect(readFileSync(join(dir, 'memory', 'personal.md'), 'utf8')).toBe('BUNDLED');
+    expect(readFileSync(join(dir, 'memory', 'verbosity.md'), 'utf8')).toBe('VERBOSITY: MIN\n');
+  });
+
+  it('leaves host-edited memory files byte-identical on a re-run', () => {
+    deployGlobal(asset, home);
+    const p = join(home, '.claude', 'memory', 'personal.md');
+    writeFileSync(p, 'MY OWN NOTES');
+    deployGlobal(asset, home);
+    expect(readFileSync(p, 'utf8')).toBe('MY OWN NOTES');
+  });
+
+  it('writes settings.json whole on a fresh install, permissions included', () => {
+    const dir = deployGlobal(asset, home);
+    expect(JSON.parse(readFileSync(join(dir, 'settings.json'), 'utf8')).permissions)
+      .toEqual({ allow: ['Bash(grep:*)'], deny: [] });
+  });
+
+  it('leaves a host-added UserPromptSubmit entry present and unmodified on a re-run', () => {
+    const dir = deployGlobal(asset, home);
+    const sp = join(dir, 'settings.json');
+    writeFileSync(sp, `${JSON.stringify({ hooks: { UserPromptSubmit: [HOST_ENTRY] }, permissions: { allow: [], deny: [] } }, null, 2)}\n`);
+    deployGlobal(asset, home);
+    expect(JSON.parse(readFileSync(sp, 'utf8')).hooks.UserPromptSubmit).toEqual([HOST_ENTRY]);
+  });
+
+  it('leaves a host-owned settings.local.json untouched', () => {
+    const dir = join(home, '.claude');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'settings.local.json'), '{"local":true}');
+    writeFileSync(join(asset, 'global', 'settings.local.json'), '{"template":true}');
+    deployGlobal(asset, home);
+    expect(readFileSync(join(dir, 'settings.local.json'), 'utf8')).toBe('{"local":true}');
+  });
+
+  it('still force-copies managed assets alongside the host-owned exclusions', () => {
+    const dir = deployGlobal(asset, home);
+    writeFileSync(join(dir, 'hooks', 'h.sh'), 'TAMPERED');
+    deployGlobal(asset, home);
+    expect(readFileSync(join(dir, 'hooks', 'h.sh'), 'utf8')).toBe('#!/bin/sh\n');
   });
 });
