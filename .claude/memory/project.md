@@ -981,3 +981,42 @@ Shipped as **1.31.1** on `fix/bug-040-staging-convention` in six commits (`bb34a
 - **Amending any commit requires an explicit go-ahead; the default is to fold the change into the next commit.** Established after I amended an unpushed plan-state commit at `T-005-A` to absorb its own checkbox flip. It was local-only and the resulting tree was identical either way, so nothing was lost and nothing anyone had seen was rewritten. It was still the wrong call to make unasked: **a history rewrite belongs to whoever owns the history, and tidiness is not the agent's reason to reach for one.** The tell is any `--amend`, rebase or reset reached for to make a record look neater rather than to fix a stated defect.
 - **`[BUG-041]` now arrives with FOUR characterized patterns, not three.** The three filed specimens (two P7, one P9) plus a fourth captured during the `[BUG-038]` and `[BUG-040]` work: **P9 fires on `until [ ... ]; do` at command position**, a legitimate shell loop in an ordinary agent command, denied correctly by the pattern's own rule. It joins the corpus on the same evidence-first footing as the others. The uncaptured P5 backtick specimen did NOT recur across either release and stays unfiled under that entry's own rule.
 - **A poller that hardcodes its target reports the wrong thing confidently.** The PR-approval helper written for PR #32 was re-run for #34 with the number still baked in, which would have read an already-merged PR's state as the new one's. It now takes the number as an argument and returns `POLL_ERROR` on a non-zero `gh` exit instead of letting an error string fall through as a state. Same failure-path discipline the `id-ceiling` guard needed: **a tool that cannot tell "I failed" from "the answer is no" is the archetype in miniature.**
+
+## Spec: BUG-041 Guard 3 refinement [2026-09-28]
+
+**Spec file:** `docs/superpowers/specs/2026-09-28-bug041-guard3-refinement-design.md` (approved 2026-09-28 with two required additions, both applied).
+
+### The audit replaced memory with measurement
+
+The filing described three characterized specimens. Recovering every Guard 3 denial from the session transcript and re-scanning each command against the shipped hook gave **47 denial events, 43 unique commands**. The population grew from 41 to 43 mid-measurement because two of the scripts written to perform the measurement were themselves denied by the bug they were measuring.
+
+Three premises the audit held were wrong, and the transcript said so:
+- **OBF is not zero-specimen.** Six specimens, all escape runs such as `\[ \]` inside a single-quoted `grep -E` pattern.
+- **The P5 backtick specimen was never lost.** It is in the transcript verbatim: a backslash-escaped backtick inside a double-quoted grep pattern.
+- **The `until` poller is not a false positive.** It is a genuine loop correctly denied, so it is a **control** row beside `for id in ...; do`, not a KNOWN-FP row. A later refinement that silences either is a recall regression.
+
+**Convention established: measure a guard fix by copying the artifact to scratch, never by patching the repository before approval.** Both hooks were copied to scratch files with the one-line change applied and run over every recovered denial plus all 118 corpus rows. Nothing in the repository was modified to produce the numbers below, so the spec argued from measurement while the tree stayed clean.
+
+| configuration | denials flipping deny to allow | corpus rows whose verdict moves |
+|---|---|---|
+| walk fix only | 20 of 41 | 2 of 118, both pre-declared KNOWN-FP |
+| walk fix plus targeted quote mask | 36 of 43 | 3 of 118, the same two plus P9-1 |
+
+The rows that move are exactly the rows `guard3-corpus.js:162-185` wrote down in advance as this item's acceptance cases. Zero unplanned regressions in either configuration.
+
+### Gate 1, ruled (a): patch the frozen authority
+
+`guard3-reference.sh:159` becomes `rest="${rest#*"${BASH_REMATCH[0]}"}"` and `pre-tool-use.mjs:244` becomes `rest.slice(m.index + m[0].length)`. **The authority is an oracle of intent, not a snapshot of behavior**, and the walk was never intended: bash's `[[ =~ ]]` reports the matched text and no index, so `${#BASH_REMATCH[0]}` was the only slice available to whoever wrote it. Option (b) was rejected because the one existing sanctioned divergence is enumerable while this one is a function of command length and quote count, so a count assertion over an open-ended set would be a fiction. `EXCEPTIONS` stays at one member.
+
+### Gate 2, ruled split: the two mechanisms sever
+
+Mechanism 1 is the walk. Mechanism 2 is the pattern checks reading quoted text as code, which fires P9, OBF and P5. They ship separately, and the decisive argument is measured: **a blanket quote mask breaks seven genuine denials**, four P6 rows, the P6 dialect row, and two P12 alias rows. **P6 and P12 inspect quoted content by design**, since a grep pattern and an alias value are the data those checks exist to read. That makes mechanism 2 a per-check design question rather than a preprocessing patch, and it needs a second five-state scanner written in bash for the authority. It files as `BUG-043`.
+
+### The two required additions at approval
+
+- **P4 must be arbitrated by the corpus, not only by the scratch measurement.** Both flipping corpus rows are P7, so post-ship the oracle would guard the walk fix on one of its two patterns. P4 carried zero specimens when the filing was written and five by the time the spec was, three of them pure mechanism-1 flips. AC13 adds one verbatim P4 row, chosen because it carries unquoted globs **earlier** in the command while the text after `cat VERSION` has none: the row pins that the after-text begins at the end of the match, and a later "fix" that scans the whole string for globs turns it red.
+- **The deny message naming a file that does not exist gets an id, not a paragraph.** Across 47 denials the allowlist was added zero times and `CC_GUARD3_WARN` was set zero times, and `.claude/memory/bash-scan-allowlist.txt` exists in no installation while the deny message names it as the remedy. That is a product defect independent of any pattern, **documentation lying about the remedy**, and it files as `BUG-044` carrying its own candidate shapes. **Unhomed findings do not stay found**, which is why "the remedy is not a pattern change" justifies moving it rather than dropping it.
+
+### Standing constraint this spec inherits
+
+No acceptance criterion may be satisfied by "the operator can allowlist it." A remedy that nobody invoked across 47 denials, including the agent that wrote it, is not a remedy.
