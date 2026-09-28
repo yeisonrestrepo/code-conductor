@@ -314,6 +314,7 @@ code-conductor/
 ├── scripts/
 │   ├── conductor-db.mjs          Zero-dep node:sqlite engine (.conductor/cache.db)
 │   ├── resume-read.mjs           Phase-entry resume reader (DB snapshot → handoff fallback)
+│   ├── snap-contract.mjs         SNAP limits, caps, field sets, version ceiling
 │   ├── snap-build.mjs            SNAP v1/v2 handoff serializer
 │   ├── snap-validate.mjs         SNAP schema validator
 │   ├── session-id.mjs            Stable session-id resolver
