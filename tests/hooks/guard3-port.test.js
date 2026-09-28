@@ -88,6 +88,56 @@ describe('Guard 3 port', () => {
     expect(r.decision).toBeNull();
   });
 
+  // The next four pin what no verdict can reach. The hook exports nothing and runs
+  // main() at load, so the masked copy is unobservable from a test; these assert the
+  // contract in the source, the way templates.test.js pins the character-class trap.
+  // [BUG-043].
+  it('builds the mask from the stripped string, before the newline join', () => {
+    const src = readFileSync(HOOK, 'utf8');
+    expect(src).toContain('const chomped = g3Chomp(scan.result);');
+    expect(src).toContain("const masked = g3Scan('mask', chomped).result.split('\\n').join(';');");
+  });
+
+  // AC8 has NO behavioral discriminator: a variant emitting one character per escaped
+  // pair agreed with the correct mask on all 124 corpus rows and four constructed cases,
+  // because the masked string is consumed alone and never compared offset-wise with the
+  // unmasked one. Length preservation is pinned here and nowhere else, and this comment
+  // records that honestly. AC9 is different: its discriminator was measured. The corpus
+  // row c'a't turns green if quote characters stop surviving, because OBF's
+  // [a-zA-Z]'[a-zA-Z]+'[a-zA-Z] needs them.
+  it('emits one mask character per input character and keeps the quote characters', () => {
+    const src = readFileSync(HOOK, 'utf8');
+    expect(src).toContain("result += 'xx'");
+    expect(src).toContain('result += ch === "\'" ? ch : \'x\'');
+    expect(src).not.toContain("mode === 'mask') result += 'x'; i += 2");
+  });
+
+  it('keeps the authority on the same mask contract, in the same order', () => {
+    const src = readFileSync(join(REPO_ROOT, 'tests/fixtures/guard3-reference.sh'), 'utf8');
+    expect(src).toContain('_G3_MASK=$(_g3_scan "mask" "$_G3_PRE")');
+    expect(src).toContain('_G3_MASK="${_G3_MASK//$\'\\n\'/;}"');
+    expect(src).toContain('result+="xx"');
+    // The ordering pin: the mask is built before the newline substitution, which is the
+    // one place that order is visible. A quoted newline must never become an anchor.
+    expect(src.indexOf('_G3_MASK=$(_g3_scan "mask"'))
+      .toBeLessThan(src.indexOf('_G3_PRE="${_G3_PRE//$\'\\n\'/;}"'));
+  });
+
+  // The by-design boundary as a COUNT, not a comment. In the port it is a Set; in the
+  // authority it is how many call sites read each variable, which is what makes a drift
+  // to a twelfth masked check impossible to miss.
+  it('gives exactly two checks the unmasked string in both subjects', () => {
+    const port = readFileSync(HOOK, 'utf8');
+    expect(port).toContain("const UNMASKED_CHECKS = new Set(['P6', 'P12']);");
+    expect(port).toContain('g3AllowlistCovers(pre,');
+    const ref = readFileSync(join(REPO_ROOT, 'tests/fixtures/guard3-reference.sh'), 'utf8');
+    const sites = ref.split('\n').filter(l => /^\s*_g3_(p[0-9]+|obfuscation)[a-z_0-9]*\s+"\$_G3_(PRE|MASK)"/.test(l));
+    expect(sites).toHaveLength(13);
+    expect(sites.filter(l => l.includes('_G3_PRE'))).toHaveLength(2);
+    expect(sites.filter(l => l.includes('_G3_MASK'))).toHaveLength(11);
+    expect(ref).toContain('_g3_check_allowlist "$_G3_PRE"');
+  });
+
   // Guarding the guard: a second entry here would mean a second place where the port
   // silently disagrees with its own authority, which the spec forbids.
   it('carries exactly one sanctioned divergence from the authority', () => {
