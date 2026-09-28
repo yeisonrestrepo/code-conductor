@@ -155,6 +155,7 @@ function g3JoinContinuations(input) {
 // unclosed quote). "glob" reports whether an unquoted glob character appears, and
 // treats malformed input as a glob, which is the authority's fail-closed choice.
 function g3Scan(mode, input) {
+  const emit = mode === 'strip' || mode === 'mask';
   let state = 'UNQUOTED';
   let result = '';
   let i = 0;
@@ -163,34 +164,35 @@ function g3Scan(mode, input) {
     const ch = input[i];
     const two = input.slice(i, i + 2);
     if (state === 'UNQUOTED') {
-      if (two === "$'") { if (mode === 'strip') result += two; i += 2; state = 'ANSI_C_QUOTED'; }
-      else if (two === '$"') { if (mode === 'strip') result += two; i += 2; state = 'LOCALE_QUOTED'; }
-      else if (ch === '\\') { if (mode === 'strip') result += input.slice(i, i + 2); i += 2; }
-      else if (ch === "'") { if (mode === 'strip') result += ch; i += 1; state = 'SINGLE_QUOTED'; }
-      else if (ch === '"') { if (mode === 'strip') result += ch; i += 1; state = 'DOUBLE_QUOTED'; }
+      if (two === "$'") { if (emit) result += two; i += 2; state = 'ANSI_C_QUOTED'; }
+      else if (two === '$"') { if (emit) result += two; i += 2; state = 'LOCALE_QUOTED'; }
+      else if (ch === '\\') { if (emit) result += input.slice(i, i + 2); i += 2; }
+      else if (ch === "'") { if (emit) result += ch; i += 1; state = 'SINGLE_QUOTED'; }
+      else if (ch === '"') { if (emit) result += ch; i += 1; state = 'DOUBLE_QUOTED'; }
       else if (ch === '#' && mode === 'strip') { while (i < len && input[i] !== '\n') i += 1; }
       else {
         if (mode === 'glob' && (ch === '*' || ch === '?' || ch === '{' || ch === '[')) return { glob: true };
-        if (mode === 'strip') result += ch;
+        if (emit) result += ch;
         i += 1;
       }
     } else if (state === 'SINGLE_QUOTED') {
       // Backslash is literal here and ANY quote exits: there is no escape mechanism.
       if (mode === 'strip') result += ch;
+      else if (mode === 'mask') result += ch === "'" ? ch : 'x';
       if (ch === "'") state = 'UNQUOTED';
       i += 1;
     } else if (state === 'DOUBLE_QUOTED' || state === 'LOCALE_QUOTED') {
-      if (ch === '\\') { if (mode === 'strip') result += input.slice(i, i + 2); i += 2; }
-      else if (ch === '"') { if (mode === 'strip') result += ch; i += 1; state = 'UNQUOTED'; }
-      else { if (mode === 'strip') result += ch; i += 1; }
+      if (ch === '\\') { if (mode === 'strip') result += input.slice(i, i + 2); else if (mode === 'mask') result += 'xx'; i += 2; }
+      else if (ch === '"') { if (emit) result += ch; i += 1; state = 'UNQUOTED'; }
+      else { if (mode === 'strip') result += ch; else if (mode === 'mask') result += 'x'; i += 1; }
     } else {
-      if (ch === '\\') { if (mode === 'strip') result += input.slice(i, i + 2); i += 2; }
-      else if (ch === "'") { if (mode === 'strip') result += ch; i += 1; state = 'UNQUOTED'; }
-      else { if (mode === 'strip') result += ch; i += 1; }
+      if (ch === '\\') { if (mode === 'strip') result += input.slice(i, i + 2); else if (mode === 'mask') result += 'xx'; i += 2; }
+      else if (ch === "'") { if (emit) result += ch; i += 1; state = 'UNQUOTED'; }
+      else { if (mode === 'strip') result += ch; else if (mode === 'mask') result += 'x'; i += 1; }
     }
   }
-  if (state !== 'UNQUOTED') return mode === 'strip' ? { result, malformed: true } : { glob: true };
-  return mode === 'strip' ? { result, malformed: false } : { glob: false };
+  if (state !== 'UNQUOTED') return emit ? { result, malformed: true } : { glob: true };
+  return emit ? { result, malformed: false } : { glob: false };
 }
 
 // Each check returns true when it FIRES (the authority's shell functions returned 1).
@@ -451,9 +453,18 @@ function guard3BashScan(input) {
   }
   // Real newlines become semicolons so a multi-line script reads as a command
   // sequence to every position-anchored pattern above.
-  const pre = g3Chomp(scan.result).split('\n').join(';');
+  //
+  // The mask is built from the STRIPPED string and BEFORE the newline join, so a
+  // newline inside a quoted region can never become a command-position anchor.
+  // Exactly two checks read quoted content BY DESIGN: P6 reads the grep pattern and
+  // P12 reads the alias value. Everything else reads code and gets the mask. The
+  // allowlist reads the unmasked string. [BUG-043].
+  const chomped = g3Chomp(scan.result);
+  const pre = chomped.split('\n').join(';');
+  const masked = g3Scan('mask', chomped).result.split('\n').join(';');
+  const UNMASKED_CHECKS = new Set(['P6', 'P12']);
   const ids = [];
-  for (const { id, check } of G3_CHECKS) if (check(pre)) ids.push(id);
+  for (const { id, check } of G3_CHECKS) if (check(UNMASKED_CHECKS.has(id) ? pre : masked)) ids.push(id);
   if (ids.length === 0) return null;
   if (g3AllowlistCovers(pre, g3ReadAllowlist())) return null;
   return g3Blocked(`The command triggered a mass content-dump pattern. Pattern ids: ${ids.join(' ')}.`);

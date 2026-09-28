@@ -1066,3 +1066,97 @@ Classification, agreed at the halt: a **plan defect, incomplete file enumeration
 - **A row should pin a property, not a verdict.** The P4 row was chosen over two shorter candidates because its unquoted globs sit BEFORE the reader and none after, so it fails if anyone ever "fixes" P4 by scanning the whole command.
 - **The id ceiling counts reservations.** After the plan file was committed naming BUG-043 and BUG-044, the ceiling read 44 and reported 045 as next. That is the tool working: a reservation that raises the ceiling cannot be double-minted.
 - **The bash offset form was chosen for its failure mode.** `${rest%%"${BASH_REMATCH[0]}"*}` yields an empty after-text when the needle is absent and the existing break ends the loop, where the `#*` strip form would spin forever and need a new guard. **A guard's inner loop must not be able to hang the guard.**
+
+## Closeout: 1.31.2 and the squash-vs-rebase lesson [2026-09-28]
+
+`1.31.2` merged as `d6e6316` (PR #35, squash). Verified on the merged `main`: the spec-approval anchor appears exactly once, the implementation record once, and all five version locations read `1.31.2`. Suite on the synced `main`: 873 passed, 12 skipped, 0 failed.
+
+### The rebase precedent has a scope, and a squash is outside it
+
+**`git rebase`'s already-upstream detection matches on patch-id, so it only holds for merge commits and rebase merges. A SQUASH merge destroys the patch-ids**: nine commits become one patch that matches none of them. Any record commit made on `main` **before** branching will therefore not be dropped automatically on sync. It will be re-applied, and it conflicts as a **duplicate append**, because the block is already upstream with later sections appended after it. That is what `c016199` did here, where `61b250d` was dropped cleanly under a merge at 1.31.0.
+
+**The sanctioned answer is `git rebase --skip`, and only with upstream-superset evidence gathered first:** the anchor counted exactly once on `origin/main`, and `git diff --numstat main origin/main -- <file>` showing insertions with **zero deletions**, which proves the upstream file is a strict superset sharing the same prefix. With that evidence, `--skip` is not conflict resolution: nothing is merged, no hunk is chosen, no file is edited. It is git declining to re-apply a patch whose content is already present.
+
+**The preventive form, which is better than the cure: a release's record commits land on the branch or after the merge, never on pre-branch `main`.** 1.31.1's flow already did this correctly. This incident is what happens when the older pattern meets a squash merge.
+
+**Second squash nuance, found at cleanup:** `git branch -d` succeeded but warned that the branch was merged to its **remote-tracking ref**, not to `HEAD`. Under a squash the branch tip is never an ancestor of `main`, so the "tip reachable from main" premise does not hold literally; `-d` passes on the upstream-merged check instead. No `-f` was needed or used.
+
+### Escalation discipline, confirmed twice in one closeout
+
+The sync was brought to the owner although the content was demonstrably upstream and nothing was at risk, because **history operations on `main` are owner-scoped regardless of risk**. The reservation exists so that "nothing is at risk" never becomes the thin end of unreviewed rewrites. When the rebase then behaved differently from its precedent, the standing instruction was to stop rather than resolve, and it was followed: `--abort` first, diagnosis second, authorization third. `git reset --hard` and `git branch -f` stayed unused for a stated reason: same result, **less evidence in the reflog**, and this repository's history discipline prefers the path that shows its work.
+
+## Spec: BUG-043 quoted-argv blindness [2026-09-28]
+
+**Spec file:** `docs/superpowers/specs/2026-09-28-bug043-quoted-argv-blindness-design.md` (15 ACs, approved 2026-09-28 with one addition). **Audit:** `scratchpad/bug043-audit-and-gates.md`.
+
+### Gate 1, ruled: patch both subjects in parallel, and the filing's price was wrong
+
+`[BUG-043]`'s entry priced this as needing "a second five-state scanner written in bash." **Reading `_g3_scan` at `guard3-reference.sh:82-158` disproves it.** That scanner exists, tracks all five states, and already takes a `mode` parameter. The fix is a third mode plus a dispatch-level argument swap, the identical seam in both subjects: one variable, one dispatch, thirteen consumers. The correction lands in the spec's problem statement AND as an amendment note on the backlog entry, with the original wording left visible, the same discipline BUG-038's who-writes correction used.
+
+**Binding ordering decision:** the mask applies BEFORE the newline-to-semicolon join, so a quoted newline never becomes a command anchor.
+
+### Gate 2, ruled: candidate A, the by-design boundary
+
+Mask the input to every check except **P6 and P12**, which read quoted content by design (a grep pattern and an alias value are the data those checks exist to inspect). Measured against 124 corpus rows and 26 still-denied commands:
+
+| candidate | masks | denials flipped | corpus rows moved | frontier moved |
+|---|---|---|---|---|
+| **A, by-design** | all but P6, P12 | **22 of 26** | 4 | **0** |
+| B, specimen list | P5, P9, OBF, P11 | 19 of 26 | 4 | 0 |
+
+**The deciding argument is stability, not the count: A's boundary falls out of what the checks are FOR, while B's falls out of a specimen list that grows every session.** P11 is the proof. It was not in B's list until this audit found it.
+
+The three denials A fixes that B does not are exactly the **P4/P7 fragment quote-parity** cases, including the residual BUG-041 named and deferred. **The scope fence's test returned yes: the residual shares the seam, so it is in scope at zero marginal cost.** That is the fence working, not scope growth.
+
+### Premise corrections to BUG-041's spec, recorded here and NOT back-edited
+
+- **P11 is a fourth accidental consumer**, unnamed there. Its specimen is **English sentence punctuation**: `did not. Apply the identical` inside a quoted JS string puts a period-and-space where `G3_POS` reads command position, and P11 sees the bash dot operator.
+- **P9 has three sub-shapes, not one**: quoted prose, quoted code, and a **quoted regex** (`"...|for pat|..."`). The third denied this audit while it was mapping the file the fix will edit.
+
+That spec stands as the knowledge of its day. **Records show their history; corrections land above them, never inside them.**
+
+### Two ACs that changed by being written
+
+- **AC7 could not be written as approved.** The ruling asked for a structural assertion that the masked copy carries no `;` anchor inside a quoted span. The masked copy is not observable from outside the hook, and worse, **mask-before-join and mask-after-join are observationally equivalent**: a quoted newline becomes `x` either way. AC7 therefore pins the property two ways, a textual contract assertion per subject plus a behavioral pair already in the corpus, and states the equivalence plainly rather than pretending to observe an order. **The AC10 lesson from BUG-041, applied before the mistake instead of after it.**
+- **AC2 found a live hole while being drafted.** P6's frontier is already guarded, because its rows use quoted patterns that a mistaken mask would break. **P12's is not:** `alias c=cat` and `alias g=grep` are unquoted values a mask would leave untouched, so nothing in the corpus discriminates P12's classification. `alias t='tail -50'` closes it.
+
+### The headline this release ships
+
+After 1.31.3 the 52 unique commands Guard 3 denied across this session reduce to **four denials**: one heredoc case (out of scope), one genuine `find` without `-maxdepth 1`, and the two pinned controls. **Three of the four are the guard working.**
+
+## Implementation: BUG-043 [2026-09-28]
+
+Shipped as `1.31.3`. Plan: `docs/superpowers/plans/2026-09-28-bug043-quoted-argv-blindness.md`, 6 tasks, 57 checkbox steps, six commits on `fix/bug-043-quoted-argv-blindness`.
+
+### Boundaries: six predicted with suites named, six hit exactly
+
+| point | predicted | actual |
+|---|---|---|
+| baseline | 873 / 0 | exact |
+| T-002, rows added | 893 / 0 | exact |
+| T-003, authority alone | 884 / 9, `guard3.test.js` only | **exact, and the nine were the right nine** |
+| T-004-D, port and mirror | 875 / 18, nine per suite | **exact** |
+| T-004-H, rows flipped | 893 / 0 | exact |
+| T-005, contract tests | 897 / 0 | exact |
+
+No tripwire fired. The table itself was superseded once **before** execution, from 873-to-889 to 873-to-897, because the AC set grew after the numbers were stated; that was declared in the plan's Risk 7 as a correction with its cause rather than discovered as a drift.
+
+### Two conventions this item earned
+
+- **An AC that asserts a property of an internal value must name its observation point at spec time, or be written as contract-plus-discriminator from the start.** Third occurrence of one lesson: BUG-041's AC10 found it at plan time, BUG-043's AC7 applied it preemptively, and AC8 needed it again anyway. Naming it here is what makes the fourth occurrence a spec-review catch instead of a pre-flight one.
+- **A discriminator is confirmed by BUILDING the defect it claims to catch** and scoring it against the full corpus. A discriminator that was never seen to fail is an assumption wearing a test's name. This act produced all three of this spec's honesty rulings in one sitting: AC9's guard was **confirmed** (a quote-replacing mask changes exactly one row, `c'a't`), AC8's was **proven absent** (a length-breaking mask changes nothing at all, because the masked string is never compared offset-wise with the unmasked one), and AC2-B's turned out to be **a fiction** (an allowlisted path inside quotes never matched, before or after, because `G3_BD` excludes quote characters).
+
+### What the premise gates caught, before anything shipped
+
+- **T-001-A found a defect in the plan, not the file.** The plan said five `case` arms and eleven emit guards; the file has four and thirteen. Numbers asserted from reading rather than counting, the same class as BUG-041's mirror omission. Corrected in place with a note.
+- **T-001-F caught a broken transform before the frozen file was touched.** The first version widened the replaced arms' strip guards as well, which would have made mask mode emit the real character **and** the mask character, doubling the output and masking nothing. The probe runs the transform on a full copy and scores nine cases including `c'a't`; three of the nine were wrong, and the frozen file never saw it. **The transform that was proved is the same function that shipped**, which is why the probe's verdict transfers.
+
+### Method notes worth keeping
+
+- **A row's label is its identity and does not move when its verdict does.** Rows still labelled "pending [BUG-043]" now assert `allow`; the comment block explains, exactly as P7-1 and P7-2 kept their labels under BUG-041.
+- **Two quoting styles coexist in the corpus** because hand-written rows use single quotes and script-inserted rows use the JSON form. The flip script learned to accept both after aborting on the first, and it writes only after every flip in a group succeeds, so a partial failure leaves the file untouched.
+- **A denied Bash call runs none of its chained steps.** A flip chained after a command the guard denied left the plan file briefly less accurate than reality; the next flip refused because it asserts its precondition. Assert-before-mutate is what made that recoverable rather than invisible.
+
+### The headline, measured against the live population
+
+**63 denial events, 56 unique commands, five still denied.** One heredoc body scanned as command text (out of scope, unfiled), one genuine `find` without `-maxdepth 1`, and **three genuine shell loops**, two of them the pinned controls and the third generated by this implementation's own work. **Four of the five are the guard working.** The spec predicted four residuals out of 52; the population grew during execution and the extra residual is another instance of the control class, which is the prediction holding rather than failing.
