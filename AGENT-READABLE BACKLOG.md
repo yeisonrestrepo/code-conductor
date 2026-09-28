@@ -428,3 +428,46 @@ git log --oneline -1
 * **Components Affected:** `.claude/hooks/pre-tool-use.mjs:427-435` (`g3Blocked`) and its mirror, `lib/installer/host-owned.mjs` (the `[BUG-039]` policy table), `tests/installer/templates.test.js`.
 * **Acceptance Criteria:** after the fix, a user who hits a Guard 3 denial can follow the message to a file that exists or to an instruction that creates it, without reading the source; the installer still cannot overwrite an existing allowlist.
 
+
+### DOSSIER (unfiled, no id yet): The Heredoc Family
+
+**Not an item. A dossier for an uncharacterized family**, opened because `[BUG-041]`'s Out of Scope named it with the explicit condition "it needs its own characterization before it is worth an id", and `[BUG-043]`'s Out of Scope kept it unfiled under the evidence-first rule. **An id is minted when the characterization audit below runs, not before.** Recorded here rather than in either spec because both are landed history and stand as the knowledge of their day.
+
+**Grouping rule this dossier exists to honor:** group by mechanism, not by file adjacency. The quoted-path defect (`[BUG-045]`, minted by `[BUG-044]`) and this family both live near `g3AllowlistCovers` and the same authority, and grouping them by that adjacency would have bundled an allow-path boundary change with a lexical-class gap. Keeping them apart is what kept this chain's work small.
+
+#### Specimens, two, independently reached
+
+1. **Read-shaped, 2026-09-28 (`[BUG-041]`'s session).** `cat >> tests/installer/templates.test.js <<'JSEOF'` denied under **P4**. The heredoc body contains `[` characters the scanner reads as unquoted globs.
+2. **Write-shaped, 2026-09-28 (`[BUG-044]`'s spec approval).** Writing a commit message file: `cat > <scratchpad>/msg-spec-044.txt <<'EOF'` with a prose body whose first line ends `[BUG-044]`. Denied under **P4**. **Disposition: routed around with the Write tool; the hook was not bypassed and the message text landed unchanged.** The specimen was reported to the owner rather than minted, which is the ruling that opened this dossier.
+
+#### Mechanism, measured rather than inferred
+
+The first report of specimen 2 guessed that possessive apostrophes in the prose body (`Guard 3's`, `audit's`) inverted the scanner's quote parity. **That guess was wrong and is corrected here.** A nine-case probe against the shipped hook:
+
+| verdict | ids | case |
+|---|---|---|
+| deny | P4 | `[` in body, no apostrophe |
+| allow | | apostrophes only, no `[` |
+| allow | | possessive apostrophes, no `[` |
+| deny | P4 | both, as specimen 2 |
+| deny | P4 | `[` in body, **unquoted** delimiter `<<EOF` |
+| allow | | `cat > f.txt` with no heredoc |
+| deny | P4 | `?` in body |
+| allow | | plain prose body, no metacharacters |
+| allow | | `tee` instead of `cat` |
+
+**The cause is a glob metacharacter anywhere in the heredoc body, read as an unquoted glob after a reader at command position.** Apostrophes are irrelevant. The trigger is not specific to `[`: `?` denies too. So specimen 2 is specimen 1's mechanism **exactly**, reached through a different lexical shape, which strengthens the family rather than adding a variant.
+
+**Why the `[BUG-043]` mask does not cover it:** the body is not quoted content. It is heredoc content, a lexical class `g3Scan` has no state for, so it is scanned as command text and never masked.
+
+**Severity upgrade over specimen 1:** P4 denying a file **write** is misclassification, not overreach. P4 exists to catch a reader dumping a glob's worth of content; `cat > file <<EOF` reads nothing and writes one file.
+
+#### Characterization audit, which is this family's opening gate
+
+- Heredoc delimiter handling in **both** subjects: `tests/fixtures/guard3-reference.sh` and the mirrored port.
+- What the scanner does at `<<'EOF'` versus `<<EOF`. A quoted delimiter suppresses expansion in bash; **the probe above already shows the port does not distinguish them**, so the open question is whether the authority agrees and whether the distinction should matter to a content-dump scanner at all.
+- Whether the remedy is a **third lexical mode** (alongside strip and mask) or **delimiter-aware skipping** of the body.
+
+#### Queue
+
+After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two specimens plus a traced mechanism plus a severity upgrade is half the minting condition; the audit is the other half.
