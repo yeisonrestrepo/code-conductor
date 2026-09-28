@@ -144,7 +144,7 @@ Nothing in this item changes a pattern's rule. Every verdict that moves, moves b
 ## Acceptance Criteria
 
 - [ ] **AC1.** `tests/fixtures/guard3-reference.sh:159` and `.claude/hooks/pre-tool-use.mjs:244` carry the index-aware slice. The authority edit lands **alone, in its own commit, ahead of every other change in this item**, with the file header's edit prohibition amended in the same commit, per the `cbe9a26` precedent.
-- [ ] **AC2.** The port's `g3GlobWalk` comment no longer describes the slice as a preserved quirk, and the block at `pre-tool-use.mjs:198-202` that instructs future readers not to fix it is replaced by a statement of the corrected contract.
+- [ ] **AC2.** The port's `g3GlobWalk` comment no longer describes the slice as a preserved quirk, and the block at `pre-tool-use.mjs:198-202` that instructs future readers not to fix it is replaced by a statement of the corrected contract. **The port ships as a byte-identical mirrored pair**, so this criterion and AC1's slice change cover both `.claude/hooks/pre-tool-use.mjs` and `project-template/.claude/hooks/pre-tool-use.mjs`, the copy the installer actually deploys. `tests/installer/templates.test.js:96-98` asserts the two are identical and is the guard that enforces it.
 - [ ] **AC3.** `EXCEPTIONS` still has exactly one member and `tests/hooks/guard3-port.test.js` still asserts it.
 - [ ] **AC4.** The KNOWN-FP rows P7-1 and P7-2 flip to `verdict: 'allow'` in `guard3-corpus.js`, **both subjects agree on the new verdict**, and the comment block above them is rewritten to say the walk was fixed rather than preserved.
 - [ ] **AC5.** Of the 118 corpus and dialect rows, **exactly those two move**. A test run before the corpus edit shows the two rows red, plus AC13's new row red, and every other row green; that three-red state is recorded in the plan as a predicted boundary.
@@ -193,6 +193,7 @@ Named with specimens, because an unnamed residual reads as an oversight.
 |---|---|---|
 | `tests/fixtures/guard3-reference.sh` | modify `:159`, amend header | mechanism 1 in the authority, its own commit |
 | `.claude/hooks/pre-tool-use.mjs` | modify `:244`, rewrite `:198-202` | mechanism 1 in the port |
+| `project-template/.claude/hooks/pre-tool-use.mjs` | the identical change | **the port ships as a mirrored pair**, and this member is the copy the installer deploys. BUG-037 shipped it this way with a byte-identity parity test so the deployed copy could never drift; a change to one member that is not made to the other reaches no user |
 | `tests/fixtures/guard3-corpus.js` | flip 2 rows, add 6 rows, rewrite 1 comment block | acceptance and inheritance |
 | `tests/hooks/guard3-port.test.js` | add the walk-progress test | AC10 |
 | `AGENT-READABLE BACKLOG.md` | close BUG-041, file BUG-043 and BUG-044 | record |

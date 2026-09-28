@@ -80,6 +80,7 @@ Writing a test that claims to count iterations would be a test asserting somethi
 |---|---|
 | `tests/fixtures/guard3-reference.sh` | the frozen authority. Two walk functions change, `:157-163` and `:230-236`, plus the header's sanctioned-exception list |
 | `.claude/hooks/pre-tool-use.mjs` | the shipped port. One expression at `:244`, plus the comment block at `:196-202` that currently instructs readers not to fix it |
+| `project-template/.claude/hooks/pre-tool-use.mjs` | **the other member of the pair**, and the copy the installer deploys. `tests/installer/templates.test.js:96-98` asserts byte identity. A change to one member alone reaches no user |
 | `tests/fixtures/guard3-corpus.js` | the shared oracle. Two rows flip, six rows are added, two comment blocks are rewritten |
 | `tests/hooks/guard3.test.js` | drives the authority over CORPUS + DIALECT. Gains one termination test |
 | `tests/hooks/guard3-port.test.js` | drives the port, plus EXCEPTIONS. Gains two contract tests and one termination test |
@@ -117,7 +118,7 @@ The spec edits are already applied on disk, made at plan approval rather than du
 - [X] [T-000-A] Verify the three spec-truth edits are present before committing them. Read the spec and confirm: AC10 now opens `The corrected walk is pinned where it can actually be seen`; the gate-1 diff block shows `local pre="${rest%%"${BASH_REMATCH[0]}"*}"`; and the error case is titled `The bash substitution cannot find the needle`. Any missing edit halts, because a spec-truth commit that does not carry the truth is worse than none.
 - [X] [T-000-B] Stage and commit the spec. `docs/` is ignored by `.gitignore:8` and this file is untracked, so it is the new-file-under-an-ignored-directory branch: `git add -f "docs/superpowers/specs/2026-09-28-bug041-guard3-refinement-design.md"`. This also restores the convention that held through BUG-039, where spec files were tracked; BUG-040's spec is the only one that is not, and that gap is a direct casualty of the staging defect BUG-040 itself fixed. Commit with subject `docs: correct AC10 and the bash walk form in the BUG-041 spec` and a body naming both corrections and why each was made before implementation rather than during it.
 - [X] [T-000-C] Stage this plan file. `docs/` is ignored by `.gitignore:8`, so this is the new-file-under-an-ignored-directory branch of the staging convention and takes `-f` with an explicit path. Run: `git add -f "docs/superpowers/plans/2026-09-28-bug041-guard3-refinement.md"` and confirm `add_rc=0`. This is the convention implementing itself on the plan that will use it four more times.
-- [>] [T-000-D] Write the commit message to `<scratchpad>/msg-t000.txt` with subject `docs: add the BUG-041 Guard 3 refinement implementation plan` and the two trailers, then run `git commit -F <scratchpad>/msg-t000.txt`. The gate runs green on both Task 0 commits; no source has changed yet.
+- [X] [T-000-D] Write the commit message to `<scratchpad>/msg-t000.txt` with subject `docs: add the BUG-041 Guard 3 refinement implementation plan` and the two trailers, then run `git commit -F <scratchpad>/msg-t000.txt`. The gate runs green on both Task 0 commits; no source has changed yet.
 
 ---
 
@@ -128,9 +129,9 @@ Run every step before a character of either subject changes. Each one re-opens t
 **Files:**
 - Read only: `tests/fixtures/guard3-reference.sh:153-165,226-238`, `.claude/hooks/pre-tool-use.mjs:239-252`
 
-- [ ] [T-001-A] Confirm the authority's two walk bodies are byte-for-byte what this plan expects. Read `tests/fixtures/guard3-reference.sh` at `offset: 152, limit: 14` and at `offset: 225, limit: 14`. Both must contain `local mlen=${#BASH_REMATCH[0]}` followed by `local after="${rest:mlen}"`. If either differs, halt: the plan's edits were written against a different file.
-- [ ] [T-001-B] Confirm the port's walk is what this plan expects. Read `.claude/hooks/pre-tool-use.mjs` at `offset: 238, limit: 15`. Line `:244` must read `    const after = rest.slice(m[0].length); // authority quirk: slice by length, not index`. If it differs, halt.
-- [ ] [T-001-C] Prove the bash index form works before editing the frozen file. Write `<scratchpad>/probe-bash-index.mjs` that writes a throwaway copy of `guard3-reference.sh` with both walk bodies replaced by the Task 2 form, then runs five commands through the copy with `LC_ALL=C LANG=C` and prints each verdict:
+- [X] [T-001-A] Confirm the authority's two walk bodies are byte-for-byte what this plan expects. Read `tests/fixtures/guard3-reference.sh` at `offset: 152, limit: 14` and at `offset: 225, limit: 14`. Both must contain `local mlen=${#BASH_REMATCH[0]}` followed by `local after="${rest:mlen}"`. If either differs, halt: the plan's edits were written against a different file.
+- [X] [T-001-B] Confirm the port's walk is what this plan expects. Read `.claude/hooks/pre-tool-use.mjs` at `offset: 238, limit: 15`. Line `:244` must read `    const after = rest.slice(m[0].length); // authority quirk: slice by length, not index`. If it differs, halt.
+- [X] [T-001-C] Prove the bash index form works before editing the frozen file. Write `<scratchpad>/probe-bash-index.mjs` that writes a throwaway copy of `guard3-reference.sh` with both walk bodies replaced by the Task 2 form, then runs five commands through the copy with `LC_ALL=C LANG=C` and prints each verdict:
 
   | command | expected |
   |---|---|
@@ -151,8 +152,9 @@ Run every step before a character of either subject changes. Each one re-opens t
 
   `%%` strips the longest trailing part after the first literal occurrence of the matched text, so `${#pre}` **is** the match index. POSIX ERE matching is leftmost, so an identical literal occurrence earlier in the string is impossible: the regex would have matched there. Quoting the needle keeps glob metacharacters literal. When the needle is somehow not found, `%%` returns `$rest` unchanged, `${#pre}` equals the whole length, `after` becomes empty, and the existing `[[ -z "$rest" ]] && break` ends the loop. **The form fails safe by terminating**, which is why it is chosen over the `#*` strip form that would loop forever on the same input and need an extra progress guard.
 
-- [ ] [T-001-D] Confirm the measured flip set still holds at this commit. Run `<scratchpad>/measure-walk-fix.mjs`. Expected, unchanged from the spec: `deny->allow=20` over the session denials, and `verdict_moved=2` over the 118 corpus rows, naming P7-1 and P7-2. A different corpus count halts the plan; a different denial count is reported but does not halt, because the denial population grows as this session produces more of them.
-- [ ] [T-001-E] Record the pre-edit test count. Run `npx vitest run --reporter=basic` and capture the summary line. Expected: `857 passed | 12 skipped`. Any other number replaces the baseline in the boundary table before Task 2 begins.
+- [X] [T-001-D] Confirm the measured flip set still holds at this commit. Run `<scratchpad>/measure-walk-fix.mjs`. Expected, unchanged from the spec: `deny->allow=20` over the session denials, and `verdict_moved=2` over the 118 corpus rows, naming P7-1 and P7-2. A different corpus count halts the plan; a different denial count is reported but does not halt, because the denial population grows as this session produces more of them.
+- [X] [T-001-E] Record the corpus-length assertion and its consequence. `tests/hooks/guard3.test.js:82-84` asserts `expect(CORPUS).toHaveLength(111)`. It is one test, in the authority suite only; `guard3-port.test.js` has no equivalent. **Every step that adds corpus rows must move that number in the same step**, or each suite run lands exactly one failure above the declared boundary table. Confirm the number currently reads `111` and that the port suite has no matching assertion, then proceed. This was found while running T-001-C, before any prediction was tested, so the table's numbers stand unchanged; what changed is the steps that make them true.
+- [X] [T-001-F] Record the pre-edit test count. Run `npx vitest run --reporter=basic` and capture the summary line. Expected: `857 passed | 12 skipped`. Any other number replaces the baseline in the boundary table before Task 2 begins.
 
 ---
 
@@ -164,7 +166,7 @@ Run every step before a character of either subject changes. Each one re-opens t
 **Interfaces:**
 - Produces: an authority in which `_g3_p4_cat_glob` and `_g3_p7_pager_glob` pass `_g3_scan "glob"` the text that follows the match, not a front-truncated string.
 
-- [ ] [T-002-A] In `_g3_p4_cat_glob`, replace the two-line slice. Old:
+- [X] [T-002-A] In `_g3_p4_cat_glob`, replace the two-line slice. Old:
 
   ```sh
       local mlen=${#BASH_REMATCH[0]}
@@ -180,8 +182,8 @@ Run every step before a character of either subject changes. Each one re-opens t
 
   Leave the `_g3_scan` line, the `rest="$after"` line and the empty-string break untouched, including the non-ASCII arrow in the existing trailing comment.
 
-- [ ] [T-002-B] Apply the identical replacement in `_g3_p7_pager_glob`. The two functions are the same loop over different regexes, so the same two lines change. Because the old text is identical in both places, construct each `Edit` with enough surrounding context to be unique, or perform them as one `replace_all` only after confirming the count is exactly 2.
-- [ ] [T-002-C] Amend the header's sanctioned-exception list. The file currently says two exceptions exist and closes with `# Nothing else in this file moves.` Insert a third entry before that line:
+- [X] [T-002-B] Apply the identical replacement in `_g3_p7_pager_glob`. The two functions are the same loop over different regexes, so the same two lines change. Because the old text is identical in both places, construct each `Edit` with enough surrounding context to be unique, or perform them as one `replace_all` only after confirming the count is exactly 2.
+- [X] [T-002-C] Amend the header's sanctioned-exception list. The file currently says two exceptions exist and closes with `# Nothing else in this file moves.` Insert a third entry before that line:
 
   ```
   #   3. The P4 and P7 walks slice from the END of the match rather than by the
@@ -196,8 +198,8 @@ Run every step before a character of either subject changes. Each one re-opens t
 
   Keep `# Nothing else in this file moves.` as the closing line.
 
-- [ ] [T-002-D] Run the full suite and record the result verbatim: `npx vitest run --reporter=basic`. **Expected: 855 passed, 2 failed, 12 skipped**, both failures in `tests/hooks/guard3.test.js`, labelled `corpus: KNOWN-FP P7-1: grep then sed with a quoted echo between` and `corpus: KNOWN-FP P7-2: multi-line cleanup piping into tail`. Any other failure count, or any failure in `tests/hooks/guard3-port.test.js`, halts the task.
-- [ ] [T-002-E] Stage and commit with the gate bypassed **once**, under the authorization Ruling 1 requests. `guard3-reference.sh` is tracked, so staging is `git add -u "tests/fixtures/guard3-reference.sh"`. Write `<scratchpad>/msg-t002.txt` with subject `fix: slice the Guard 3 walk from the end of the match [BUG-041]`, a body that names the defect, states the third sanctioned exception, and **pastes the two failing test names verbatim with the sentence that the port is deliberately one commit behind**, then run `git commit --no-verify -F <scratchpad>/msg-t002.txt`. Confirm `commit_rc=0` and that `git log --oneline -1` shows the subject.
+- [X] [T-002-D] Run the full suite and record the result verbatim: `npx vitest run --reporter=basic`. **Expected: 855 passed, 2 failed, 12 skipped**, both failures in `tests/hooks/guard3.test.js`, labelled `corpus: KNOWN-FP P7-1: grep then sed with a quoted echo between` and `corpus: KNOWN-FP P7-2: multi-line cleanup piping into tail`. Any other failure count, or any failure in `tests/hooks/guard3-port.test.js`, halts the task.
+- [X] [T-002-E] Stage and commit with the gate bypassed **once**, under the authorization Ruling 1 requests. `guard3-reference.sh` is tracked, so staging is `git add -u "tests/fixtures/guard3-reference.sh"`. Write `<scratchpad>/msg-t002.txt` with subject `fix: slice the Guard 3 walk from the end of the match [BUG-041]`, a body that names the defect, states the third sanctioned exception, and **pastes the two failing test names verbatim with the sentence that the port is deliberately one commit behind**, then run `git commit --no-verify -F <scratchpad>/msg-t002.txt`. Confirm `commit_rc=0` and that `git log --oneline -1` shows the subject.
 
 ---
 
@@ -205,13 +207,15 @@ Run every step before a character of either subject changes. Each one re-opens t
 
 **Files:**
 - Modify: `.claude/hooks/pre-tool-use.mjs:196-202`, `:244`
+- Modify: `project-template/.claude/hooks/pre-tool-use.mjs` (the identical change; the two ship as a byte-identical pair)
 - Modify: `tests/fixtures/guard3-corpus.js:162-185`
+- Modify: `tests/hooks/guard3.test.js:83` (the corpus-length assertion, moved three times: 112, 114, 117)
 
 **Interfaces:**
 - Consumes: the authority from Task 2, which now allows P7-1 and P7-2.
 - Produces: a corpus in which both subjects agree on every row, and six new rows.
 
-- [ ] [T-003-A] Add the AC13 P4 row FIRST, before either subject fix reaches the port. It goes immediately below the KNOWN-FP block, verbatim from the session:
+- [X] [T-003-A] Add the AC13 P4 row FIRST, before either subject fix reaches the port, and in the SAME step change `tests/hooks/guard3.test.js:83` from `toHaveLength(111)` to `toHaveLength(112)`, per T-001-E. It goes immediately below the KNOWN-FP block, verbatim from the session:
 
   ```js
   // P4 carried ZERO specimens when [BUG-041] was filed and five by the time its spec
@@ -224,7 +228,7 @@ Run every step before a character of either subject changes. Each one re-opens t
   { label: 'P4 walk: glob before the reader, none after it', command: 'wc -l tests/installer/*.js lib/installer/*.mjs && echo "--- VERSION ---" && cat VERSION && echo "--- node/test runner ---" && node -e \'const p=require("./package.json");console.log(JSON.stringify(p.scripts));console.log(p.version)\'', verdict: 'allow' },
   ```
 
-- [ ] [T-003-B] Run the full suite and record the **three-red observation**, the second of this plan's two declared red states. Run: `npx vitest run --reporter=basic`. **Expected: 856 passed, 3 failed, 12 skipped.** The three, by suite:
+- [X] [T-003-B] Run the full suite and record the **three-red observation**, the second of this plan's two declared red states. Run: `npx vitest run --reporter=basic`. **Expected: 856 passed, 3 failed, 12 skipped.** The three, by suite:
 
   | suite | test | why it is red |
   |---|---|---|
@@ -232,9 +236,9 @@ Run every step before a character of either subject changes. Each one re-opens t
   | `guard3.test.js` | `corpus: KNOWN-FP P7-2: ...` | authority fixed, row still records `deny` |
   | `guard3-port.test.js` | `corpus: P4 walk: glob before the reader, none after it` | **port not yet fixed**, so it still denies while the row records `allow` |
 
-  The new P4 row is GREEN in the authority suite at this moment and RED in the port suite, which is the whole point: it discriminates the walk fix on the pattern with no history, and it does so in the real harness rather than in a scratch script. Do not commit here. If the P4 row is red in BOTH suites, Task 2 did not take on the authority side; halt.
+  A fourth red here means T-003-A did not bump the corpus-length assertion. The new P4 row is GREEN in the authority suite at this moment and RED in the port suite, which is the whole point: it discriminates the walk fix on the pattern with no history, and it does so in the real harness rather than in a scratch script. Do not commit here. If the P4 row is red in BOTH suites, Task 2 did not take on the authority side; halt.
 
-- [ ] [T-003-C] Replace the walk expression at `:244`. Old:
+- [X] [T-003-C] Replace the walk expression at `:244`. Old:
 
   ```js
     const after = rest.slice(m[0].length); // authority quirk: slice by length, not index
@@ -246,7 +250,7 @@ Run every step before a character of either subject changes. Each one re-opens t
     const after = rest.slice(m.index + m[0].length);
   ```
 
-- [ ] [T-003-D] Replace the comment block at `:196-202`, which currently tells future readers the defect is not a bug. Old block, verbatim:
+- [X] [T-003-D] Replace the comment block at `:196-202`, which currently tells future readers the defect is not a bug. Old block, verbatim:
 
   ```js
   // Each check returns true when it FIRES (the authority's shell functions returned 1).
@@ -273,12 +277,13 @@ Run every step before a character of either subject changes. Each one re-opens t
   // sanctioned exception, so the corpus still arbitrates both subjects.
   ```
 
-- [ ] [T-003-E] Run the suite and record the intermediate state before any row moves: `npx vitest run --reporter=basic`. **Expected: 855 passed, 4 failed** - the same two labels, now failing in **both** suites, because both subjects allow while the rows still record `deny`. The P4 row added at T-003-A is now GREEN in both, which is the port fix proving itself on the pattern with no history. This is the boundary the approval asked to see before the rows flip. Do not commit here.
-- [ ] [T-003-F] Flip P7-1. In `tests/fixtures/guard3-corpus.js`, change that row's `verdict: 'deny'` to `verdict: 'allow'`. The row's command text does not change.
-- [ ] [T-003-G] Flip P7-2 the same way.
-- [ ] [T-003-H] Rewrite the KNOWN-FP comment block above them (`:162-176`). It currently says the rows assert the current verdict because the authority arbitrates until a refinement flips them, and explains the preserved quirk. Replace with a block that states: the walk was corrected in both subjects under BUG-041; these two rows are the flip it was measured to produce; P7-1 needed 8 leftward iterations and P7-2 needed 23 under the old form; and the rows now pin the corrected contract rather than a known defect.
-- [ ] [T-003-I] Amend the P9-1 comment block (`:179-184`) so the row is visibly a pre-written acceptance rather than an oversight. Keep `verdict: 'deny'`. Add that P9-1 is **mechanism 2**, the pattern checks reading quoted text as code, that it is filed as `[BUG-043]`, and that BUG-041 deliberately left it denying.
-- [ ] [T-003-J] Add the two control rows, quoted verbatim from this session, with the comment that makes their status unambiguous:
+- [X] [T-003-C2] **Tripwire repair, authorized 2026-09-28.** The first T-003-E run came back 854/5 instead of 855/4. The fifth failure was `tests/installer/templates.test.js > pre-tool-use wiring > ships the front door as one byte-identical mirrored pair`. The port is not one file: BUG-037 shipped it as a mirrored pair with a byte-identity parity test so the deployed copy could never drift, and this plan then reasoned about "the port" as a single file. **The parity test did its job; the file list did not.** Apply the identical two edits to `project-template/.claude/hooks/pre-tool-use.mjs`, the slice and the comment block, restoring byte identity. No new test is added: the parity assertion IS the contract guard, which is also why T-004-A stays as written. Verify with a byte comparison of the two members before re-running T-003-E.
+- [X] [T-003-E] Run the suite and record the intermediate state before any row moves: `npx vitest run --reporter=basic`. **Expected: 855 passed, 4 failed** - the same two labels, now failing in **both** suites, because both subjects allow while the rows still record `deny`. The P4 row added at T-003-A is now GREEN in both, which is the port fix proving itself on the pattern with no history. This is the boundary the approval asked to see before the rows flip. Do not commit here.
+- [X] [T-003-F] Flip P7-1. In `tests/fixtures/guard3-corpus.js`, change that row's `verdict: 'deny'` to `verdict: 'allow'`. The row's command text does not change.
+- [X] [T-003-G] Flip P7-2 the same way.
+- [X] [T-003-H] Rewrite the KNOWN-FP comment block above them (`:162-176`). It currently says the rows assert the current verdict because the authority arbitrates until a refinement flips them, and explains the preserved quirk. Replace with a block that states: the walk was corrected in both subjects under BUG-041; these two rows are the flip it was measured to produce; P7-1 needed 8 leftward iterations and P7-2 needed 23 under the old form; and the rows now pin the corrected contract rather than a known defect.
+- [X] [T-003-I] Amend the P9-1 comment block (`:179-184`) so the row is visibly a pre-written acceptance rather than an oversight. Keep `verdict: 'deny'`. Add that P9-1 is **mechanism 2**, the pattern checks reading quoted text as code, that it is filed as `[BUG-043]`, and that BUG-041 deliberately left it denying.
+- [X] [T-003-J] Add the two control rows, and in the SAME step change `tests/hooks/guard3.test.js:83` to `toHaveLength(114)`, per T-001-E. quoted verbatim from this session, with the comment that makes their status unambiguous:
 
   ```js
   // CONTROLS, not false positives. Both are genuine shell loops this repository's own
@@ -290,7 +295,7 @@ Run every step before a character of either subject changes. Each one re-opens t
   { label: 'control P9: genuine until loop polling a PR', command: 'until [ "$(gh pr view 32 --json reviewDecision --jq .reviewDecision)" = "APPROVED" ]; do sleep 30; done; echo "APPROVED"', verdict: 'deny' },
   ```
 
-- [ ] [T-003-K] Add the three mechanism-2 KNOWN-FP rows, each `verdict: 'deny'`, under one comment block naming `[BUG-043]` and stating that they are pre-written acceptances inherited by that item exactly as P7-1 and P7-2 were inherited by this one:
+- [X] [T-003-K] Add the three mechanism-2 KNOWN-FP rows, and in the SAME step change `tests/hooks/guard3.test.js:83` to `toHaveLength(117)`, its final value, per T-001-E. each `verdict: 'deny'`, under one comment block naming `[BUG-043]` and stating that they are pre-written acceptances inherited by that item exactly as P7-1 and P7-2 were inherited by this one:
 
   ```js
   { label: 'KNOWN-FP OBF: escape run inside a single-quoted grep pattern, pending [BUG-043]', command: 'grep -n -m 3 -E \'\\[ \\] \\[T-[0-9]{3,}(-[A-Z0-9]+)*\\]\' "docs/superpowers/plans/2026-09-27-bug038-handoff-contract.md"', verdict: 'deny' },
@@ -300,9 +305,10 @@ Run every step before a character of either subject changes. Each one re-opens t
 
   Escaping in this file is load-bearing and easy to get wrong. After adding all six rows, run `node -e "import('./tests/fixtures/guard3-corpus.js').then(m => console.log('rows', m.CORPUS.length, m.DIALECT.length, m.EXCEPTIONS.length))"` from the repo root and confirm `rows 117 7 1`.
 
-- [ ] [T-003-L] Confirm the new rows say what they are meant to say, before trusting the suite. Write `<scratchpad>/verify-new-rows.mjs` that imports the corpus, selects the six new rows by label, runs each through the **stock** hook at `HEAD~1` (a copy saved before Task 2) and through the current port, and prints both verdicts. Expected: the P4 row reads `deny` then `allow`; the five others read `deny` then `deny`. A control that already allows would mean the control is not a control.
-- [ ] [T-003-M] Run the full suite: `npx vitest run --reporter=basic`. **Expected: 869 passed, 12 skipped, 0 failed.** 857 plus six rows across two suites.
-- [ ] [T-003-N] Stage and commit. Both files are tracked, so: `git add -u ".claude/hooks/pre-tool-use.mjs" "tests/fixtures/guard3-corpus.js"`. Write `<scratchpad>/msg-t003.txt` with subject `fix: carry the corrected walk into the port and the corpus [BUG-041]`, a body naming the 20-of-41 measured flip, the two rows that moved, the six added, and the restoration of green. Run `git commit -F <scratchpad>/msg-t003.txt`. The gate runs and must pass.
+- [X] [T-003-L] Confirm the new rows say what they are meant to say, before trusting the suite. Write `<scratchpad>/verify-new-rows.mjs` that imports the corpus, selects the six new rows by label, runs each through the **stock** hook at `HEAD~1` (a copy saved before Task 2) and through the current port, and prints both verdicts. Expected: the P4 row reads `deny` then `allow`; the five others read `deny` then `deny`. A control that already allows would mean the control is not a control.
+- [X] [T-003-M] Run the full suite: `npx vitest run --reporter=basic`. **Expected: 869 passed, 12 skipped, 0 failed.** 857 plus six rows across two suites.
+- [X] [T-003-N] Stage and commit. Both files are tracked, so: `git add -u ".claude/hooks/pre-tool-use.mjs" "tests/fixtures/guard3-corpus.js"`. Write `<scratchpad>/msg-t003.txt` with subject `fix: carry the corrected walk into the port and the corpus [BUG-041]`, a body naming the 20-of-41 measured flip, the two rows that moved, the six added, and the restoration of green. Run `git commit -F <scratchpad>/msg-t003.txt`. The gate runs and must pass.
+- [>] [T-003-O] Commit the spec-truth and plan corrections the mirror repair obligated. This lands AFTER T-003-N rather than before the repair, because the suite is red by design across the whole crossover and the single authorized bypass is spent; the first green point is the earliest a commit can carry them. The documents were corrected on disk before the work resumed, which is what the rule protects. Both files are tracked: `git add -u "docs/superpowers/specs/2026-09-28-bug041-guard3-refinement-design.md" "docs/superpowers/plans/2026-09-28-bug041-guard3-refinement.md"`. Subject `docs: name the port mirror in the BUG-041 spec and plan`, with the finding in the body: BUG-037 shipped the port as a mirrored pair with a parity test so the deployed copy could never drift; the plan then reasoned about "the port" as one file; the parity test did its job and the file list did not.
 
 ---
 
