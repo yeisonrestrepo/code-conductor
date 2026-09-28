@@ -7,7 +7,7 @@
 # the [BUG-037] port is verified against, exercised unchanged by the 108 cases in
 # tests/hooks/guard3.test.js. Do not edit to make a port pass.
 #
-# Three sanctioned exceptions exist. The first two are recorded in
+# Four sanctioned exceptions exist. The first two are recorded in
 # docs/superpowers/specs/2026-09-25-bug037-guard3-port-and-first-ship-design.md:
 #   1. The allowlist is populated from .claude/memory/bash-scan-allowlist.txt
 #      instead of an array literal, so both subjects read one source.
@@ -25,6 +25,17 @@
 #      the index is in fact derivable, which is what the correction does.
 #      Corrected in both subjects under [BUG-041], recorded in
 #      docs/superpowers/specs/2026-09-28-bug041-guard3-refinement-design.md.
+#   4. _g3_scan gained a third mode, "mask", which emits a length-preserved copy of
+#      its input with every character inside a quoted span replaced by x and the
+#      quote characters themselves kept. The dispatch builds that copy BEFORE the
+#      newline-to-semicolon substitution and hands it to eleven of the thirteen
+#      checks. P6 and P12 keep the unmasked string because they read quoted content
+#      BY DESIGN: a grep pattern and an alias value are the data those checks exist
+#      to inspect. The allowlist also reads the unmasked string. Without this, quoted
+#      argv text was analyzed as code, which fired P9 on prose, code and regexes, OBF
+#      on escape runs inside quoted patterns, P5 on an escaped backtick and P11 on an
+#      English sentence's period. Added in both subjects under [BUG-043], recorded in
+#      docs/superpowers/specs/2026-09-28-bug043-quoted-argv-blindness-design.md.
 # Nothing else in this file moves.
 
 set -euo pipefail
@@ -94,19 +105,19 @@ _g3_scan() {
     case "$state" in
       UNQUOTED)
         if   [[ "$two" == "\$'" ]]; then
-          [[ "$mode" == "strip" ]] && result+="$two"
+          [[ "$mode" == "strip" || "$mode" == "mask" ]] && result+="$two"
           i=$((i+2)); state="ANSI_C_QUOTED"
         elif [[ "$two" == '$"' ]]; then
-          [[ "$mode" == "strip" ]] && result+="$two"
+          [[ "$mode" == "strip" || "$mode" == "mask" ]] && result+="$two"
           i=$((i+2)); state="LOCALE_QUOTED"
         elif [[ "$ch" == '\' ]]; then
-          [[ "$mode" == "strip" ]] && result+="${input:i:2}"
+          [[ "$mode" == "strip" || "$mode" == "mask" ]] && result+="${input:i:2}"
           i=$((i+2))
         elif [[ "$ch" == "'" ]]; then
-          [[ "$mode" == "strip" ]] && result+="$ch"
+          [[ "$mode" == "strip" || "$mode" == "mask" ]] && result+="$ch"
           i=$((i+1)); state="SINGLE_QUOTED"
         elif [[ "$ch" == '"' ]]; then
-          [[ "$mode" == "strip" ]] && result+="$ch"
+          [[ "$mode" == "strip" || "$mode" == "mask" ]] && result+="$ch"
           i=$((i+1)); state="DOUBLE_QUOTED"
         elif [[ "$ch" == '#' ]] && [[ "$mode" == "strip" ]]; then
           # Comment: discard to end of line (preserve \n as separator)
@@ -116,44 +127,51 @@ _g3_scan() {
           if [[ "$mode" == "glob" ]] && [[ "$ch" =~ [*?{[] ]]; then
             return 1  # unquoted glob found
           fi
-          [[ "$mode" == "strip" ]] && result+="$ch"
+          [[ "$mode" == "strip" || "$mode" == "mask" ]] && result+="$ch"
           i=$((i+1))
         fi ;;
       SINGLE_QUOTED)
         # \ is literal; any ' exits (there is no escape mechanism here)
         [[ "$mode" == "strip" ]] && result+="$ch"
+        if [[ "$mode" == "mask" ]]; then
+          if [[ "$ch" == "'" ]]; then result+="$ch"; else result+="x"; fi
+        fi
         [[ "$ch" == "'" ]] && state="UNQUOTED"
         i=$((i+1)) ;;
       DOUBLE_QUOTED|LOCALE_QUOTED)
         if [[ "$ch" == '\' ]]; then
           [[ "$mode" == "strip" ]] && result+="${input:i:2}"
+          [[ "$mode" == "mask" ]] && result+="xx"
           i=$((i+2))
         elif [[ "$ch" == '"' ]]; then
-          [[ "$mode" == "strip" ]] && result+="$ch"
+          [[ "$mode" == "strip" || "$mode" == "mask" ]] && result+="$ch"
           i=$((i+1)); state="UNQUOTED"
         else
           [[ "$mode" == "strip" ]] && result+="$ch"
+          [[ "$mode" == "mask" ]] && result+="x"
           i=$((i+1))
         fi ;;
       ANSI_C_QUOTED)
         if [[ "$ch" == '\' ]]; then
           [[ "$mode" == "strip" ]] && result+="${input:i:2}"
+          [[ "$mode" == "mask" ]] && result+="xx"
           i=$((i+2))
         elif [[ "$ch" == "'" ]]; then
-          [[ "$mode" == "strip" ]] && result+="$ch"
+          [[ "$mode" == "strip" || "$mode" == "mask" ]] && result+="$ch"
           i=$((i+1)); state="UNQUOTED"
         else
           [[ "$mode" == "strip" ]] && result+="$ch"
+          [[ "$mode" == "mask" ]] && result+="x"
           i=$((i+1))
         fi ;;
     esac
   done
   # Fail-closed: unclosed quote is malformed input
   if [[ "$state" != "UNQUOTED" ]]; then
-    [[ "$mode" == "strip" ]] && { printf '%s' "$result"; return 2; }
+    [[ "$mode" == "strip" || "$mode" == "mask" ]] && { printf '%s' "$result"; return 2; }
     return 1   # glob mode: fail-closed on malformed input
   fi
-  [[ "$mode" == "strip" ]] && printf '%s' "$result"
+  [[ "$mode" == "strip" || "$mode" == "mask" ]] && printf '%s' "$result"
   return 0
 }
 
@@ -441,23 +459,31 @@ if [ "${CLAUDE_TOOL_NAME:-}" = "Bash" ]; then
   fi
 
   # Normalise real newlines to semicolons (simplifies all pattern regexes)
+  # Build the masked copy BEFORE the newline substitution, so a newline inside a quoted
+  # region can never become a command-position anchor. [BUG-043].
+  _G3_MASK=$(_g3_scan "mask" "$_G3_PRE")
+
   _G3_PRE="${_G3_PRE//$'\n'/;}"
+  _G3_MASK="${_G3_MASK//$'\n'/;}"
 
   # Run pattern checks; accumulate triggered pattern IDs for diagnostics
+  # Exactly two checks read quoted content BY DESIGN and therefore receive the UNMASKED
+  # string: P6 reads the grep pattern, P12 reads the alias value. Every other check reads
+  # code and receives the mask. The allowlist also reads the unmasked string. [BUG-043].
   _G3_HIT=0; _G3_IDS=""
-  _g3_p1_find_depth "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P1 "; }
-  _g3_p2_find_exec  "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P2 "; }
-  _g3_p3_xargs      "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P3 "; }
-  _g3_p4_cat_glob      "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P4 "; }
-  _g3_p5_cmdsubst      "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P5 "; }
+  _g3_p1_find_depth "$_G3_MASK" || { _G3_HIT=1; _G3_IDS+="P1 "; }
+  _g3_p2_find_exec  "$_G3_MASK" || { _G3_HIT=1; _G3_IDS+="P2 "; }
+  _g3_p3_xargs      "$_G3_MASK" || { _G3_HIT=1; _G3_IDS+="P3 "; }
+  _g3_p4_cat_glob      "$_G3_MASK" || { _G3_HIT=1; _G3_IDS+="P4 "; }
+  _g3_p5_cmdsubst      "$_G3_MASK" || { _G3_HIT=1; _G3_IDS+="P5 "; }
   _g3_p6_grep_matchall "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P6 "; }
-  _g3_p7_pager_glob    "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P7 "; }
-  _g3_p8_ls_recursive    "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P8 "; }
-  _g3_p9_shell_loop      "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P9 "; }
-  _g3_p10_slurp_builtins "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P10 "; }
-  _g3_p11_dynamic_exec   "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P11 "; }
+  _g3_p7_pager_glob    "$_G3_MASK" || { _G3_HIT=1; _G3_IDS+="P7 "; }
+  _g3_p8_ls_recursive    "$_G3_MASK" || { _G3_HIT=1; _G3_IDS+="P8 "; }
+  _g3_p9_shell_loop      "$_G3_MASK" || { _G3_HIT=1; _G3_IDS+="P9 "; }
+  _g3_p10_slurp_builtins "$_G3_MASK" || { _G3_HIT=1; _G3_IDS+="P10 "; }
+  _g3_p11_dynamic_exec   "$_G3_MASK" || { _G3_HIT=1; _G3_IDS+="P11 "; }
   _g3_p12_alias          "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="P12 "; }
-  _g3_obfuscation        "$_G3_PRE" || { _G3_HIT=1; _G3_IDS+="OBF "; }
+  _g3_obfuscation        "$_G3_MASK" || { _G3_HIT=1; _G3_IDS+="OBF "; }
 
   if (( _G3_HIT )); then
     # Allowlist check: if the flagged command is covered by an explicit operator entry, pass it.
