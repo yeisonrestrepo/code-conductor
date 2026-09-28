@@ -955,3 +955,21 @@ Four corrections to the record, batched into one memory touch as the convention 
 - **Rejected: forbidding `&&` after a staging step in generated plans.** With the exit code no longer lying for the tracked case, the chain is safe; a blanket ban would be a workaround for the defect being removed.
 - **Landed fragments stay as written.** `project.md:623`, `:770` and `:883` each hold a partial version of this convention. The complete rule is appended at implementation time; no landed entry is edited.
 - **Deferred to `/cc-plan`:** full reads of `global/commands/cc-checkpoint.md` and `.claude/commands/cc-plan.md:80-135`.
+
+## Implementation: BUG-040 Staging Convention 2026-09-28
+
+Shipped as **1.31.1** on `fix/bug-040-staging-convention` in six commits (`bb34a69` plan, `b668fc1` git contract, `1134509` the convention prose, `2418bf9` prose anchors, `82f1ea4` release, `6bb919b` executed plan state). Suite **849 to 857 passed / 12 skipped**, **33 to 34 files**. Every predicted boundary hit exactly: 853, 853, 857, 857, 857. Second consecutive plan with no tripwire fire.
+
+### Conventions
+
+- **Stage by tracked-ness, never by habit, and never without an explicit path.** `git add -u <path>` for a tracked file, `git add -f <path>` for a new one under an ignored directory, plain `git add <path>` otherwise. The full rule with a reason per branch is in `CLAUDE.md`; `tests/unit/staging-convention.test.js` pins the four git facts it rests on. This supersedes the partial fragments at `project.md:623`, `:770` and `:883`, which stay as written because landed entries are never edited.
+- **Found in pre-flight, absent from the spec: bare `git add -u` stages every modified tracked file in the repository.** A generated step that omits the path would quietly widen its commit. All three homes require the explicit path and an anchor asserts that sentence exists.
+- **A fix for a defect one repository has must not be exported to repositories that do not have it.** `cc-checkpoint` is global and also runs in managed projects, which `project-template/gitignore` proves do not ignore `.claude/`. An unconditional `-u` there exits 128 on a fresh scaffold where plain `git add` exits 0 and is correct. The line is branch-aware and says so; the review caught this after the audit had already established the scope finding four paragraphs above the AC that contradicted it.
+- **Pin the disease, not only the cure.** `AC6` asserts plain `git add` still exits 1 while staging, so if a future git stops lying the convention's justification fails loudly in a test instead of rotting quietly in prose. This is `[BUG-037]`'s `KNOWN-FP` move applied to a dependency rather than to our own code, and it is the reusable shape whenever a convention exists because an external tool misbehaves.
+- **A release step list is derived from the previous release's plan, not from memory.** `T-004` edits `VERSION` and `package.json` as separate steps and `T-004-C` asserts they agree, halting on `false`. That gate exists because `1.31.0` shipped with the two disagreeing.
+
+### Evidence the toll is dead
+
+- `T-000-A`: `git add -f` on the new plan file under the ignored `docs/`, **rc 0**. The convention's first deliberate self-application.
+- `T-002-H`: `git add -u` over four tracked files including `.claude/commands/cc-plan.md`, **rc 0**, in the very commit that wrote the rule. The identical plain `git add` returned 1 six times earlier the same day.
+- `T-005-D`: `git add -u` over `project.md` and the backlog on `main`, **rc 0**. The release proving the toll dead in the act of shipping its abolition.
