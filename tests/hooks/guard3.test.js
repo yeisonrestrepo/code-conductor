@@ -80,7 +80,7 @@ describe.skipIf(!BASH)('guard3 - pre-tool-use.sh', () => {
   // The specimens assert the CURRENT verdict, which both subjects agree on, so
   // they belong in the shared corpus rather than in a divergence list.
   it('the corpus table carries exactly 111 rows', () => {
-    expect(CORPUS).toHaveLength(117)
+    expect(CORPUS).toHaveLength(127)
   })
 
   it.each(CORPUS.map(r => [r.label, r]))('%s', (_label, row) => {
