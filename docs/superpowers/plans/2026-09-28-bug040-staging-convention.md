@@ -378,13 +378,13 @@ Both steps land on `main` under the owner-scoped memory-and-backlog exception, n
 
 Stage with `git add -f` (the plan file is tracked in this branch but `docs/` is ignored, so `-u` also works; `-f` matches Task 0 and is what the branch gate expects). Subject: `docs: record the executed BUG-040 plan state`.
 
-- [ ] [T-005-B] Append the implementation record to `.claude/memory/project.md`
+- [X] [T-005-B] Append the implementation record to `.claude/memory/project.md`
 
 Cover: the measured boundaries against their predictions; the pre-flight finding that bare `git add -u` stages every modified tracked file, which is why the convention requires an explicit path; and the confirmation that AC6 passed, meaning git still lies.
 
-- [ ] [T-005-C] Flip `[BUG-040]` to `[X]` in `AGENT-READABLE BACKLOG.md` and add a DONE bullet naming the release, the plan path and the task count
+- [X] [T-005-C] Flip `[BUG-040]` to `[X]` in `AGENT-READABLE BACKLOG.md` and add a DONE bullet naming the release, the plan path and the task count
 
-- [ ] [T-005-D] Stage and commit both, on `main`
+- [X] [T-005-D] Stage and commit both, on `main`
 
 Stage with `git add -u ".claude/memory/project.md" "AGENT-READABLE BACKLOG.md"`. Both files are tracked, so this is the convention's first real use after it is written, and it must exit **0**. If it exits 1, the convention is wrong and the task halts.
 
