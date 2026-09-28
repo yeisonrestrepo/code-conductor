@@ -15,6 +15,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, existsSync, renameSync, unlinkSync, statSync, readSync } from 'node:fs';
 import { dirname, basename, join, resolve, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { PRE_PARSE_MAX_BYTES as MAX_SNAP_BYTES } from './snap-contract.mjs';
 
 const PREFIX = 'CONDUCTOR_DB:';
 const warn = (m) => process.stderr.write(`${PREFIX} ${m}\n`);
@@ -24,7 +25,6 @@ const MAX_KEY_LEN = 512;
 const WALK_CAP = 40;
 const USAGE = "usage: conductor-db.mjs record <plan_file> <task_id> <state> | init";
 const SCHEMA_VERSION = 2;
-const MAX_SNAP_BYTES = 10 * 1024 * 1024;   // 10 MiB
 const MAX_CONTENT_BYTES = 1024 * 1024;     // 1 MiB
 const STDIN_CHUNK = 65536;
 
