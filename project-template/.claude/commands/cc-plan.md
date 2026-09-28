@@ -225,3 +225,31 @@ subject.
 > "Plan complete. Run `/cc-compact` now before starting implementation."
 
 Do not proceed to implementation without user confirmation that `/cc-compact` has been run.
+
+---
+
+## Phase exit - session row
+
+The plan phase has completed, which is the only moment at which "phase `plan` just
+finished" is a fact rather than a deduction. Write it here, at its own boundary.
+Run this after step 7's exit instruction has been printed.
+
+<!-- SESSION-ROW-TAIL:BEGIN -->
+**Preconditions.** `c` is the full-40 `git rev-parse HEAD`, lowercased, matching `/^[0-9a-f]{7,40}$/`, `"0000000"` on any failure; `s` is the active spec stem or `"none"`. Both are derived exactly as this command's body already specifies.
+
+1. Ensure `.conductor/` exists (`mkdir -p .conductor`, best-effort). If that fails, skip the tail entirely.
+2. Resolve the session id: `id="$(node .claude/scripts/session-id.mjs 2>>.conductor/last-write.log)"`.
+3. Probe how to launch `node:sqlite`, the same probe the `cc-implement` Step 6 hook runs: no flag first, else `--experimental-sqlite --no-warnings`, else skip the write.
+4. Upsert the session row. Every argv scalar is double-quoted, because a repository path can contain spaces:
+
+   `node <probe-flags> .claude/scripts/conductor-db.mjs session "$id" "plan" "$s" "$c" >> .conductor/last-write.log 2>&1`
+5. **Loud degrade.** If the probe skipped the write, or the write exited non-zero, append one line naming the reason:
+
+   `printf '%s\n' "CC_DB_TAIL: session row not written (<reason>)" >> .conductor/last-write.log`
+
+   A row that is simply absent is the shape that let the recorded phase go stale across two boundaries unnoticed. The absence is always reported.
+
+Every redirect uses append mode (`>>`), never `>`, so a rapid or parallel second run never truncates a preceding trace. Any failure in this block is **non-fatal**: the command reports its normal outcome regardless.
+
+**Cross-platform note.** The forms above are Unix-canonical; the `.md` file is an agent instruction, not a literal script. On Windows/PowerShell realize the same semantics: set `$OutputEncoding = [System.Text.UTF8Encoding]::new($false)` first, capture `$id = node .claude/scripts/session-id.mjs`, and append the log with `… 2>&1 | Out-File -Append -Encoding utf8 .conductor/last-write.log`, never the bare `*>>`, whose default encoding is UTF-16LE on PS 5.1 and would corrupt the trace. Ensure the directory with `New-Item -ItemType Directory -Force .conductor`.
+<!-- SESSION-ROW-TAIL:END -->
