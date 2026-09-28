@@ -1186,3 +1186,38 @@ The rebase was authorized to `--skip` exactly three pre-enumerated commits. **It
 ### Branch deletion, second confirmation of the squash nuance
 
 `git branch -d` again warned that the branch was merged to its **remote-tracking ref** rather than to `HEAD`, and again passed on that check. Under a squash the branch tip is never an ancestor of `main`. No force was needed, twice.
+
+## Spec: BUG-044 deny-message phantom allowlist [2026-09-28]
+
+Spec: `docs/superpowers/specs/2026-09-28-bug044-deny-message-phantom-allowlist-design.md`, 21 ACs, approved as written after four gates were ruled before drafting. Targeting **1.32.0**. Baseline `main` at `b245636`, 897 passed / 12 skipped.
+
+Guard 3's deny message tells every reader to add an entry to `.claude/memory/bash-scan-allowlist.txt`, a file that exists in no installation. The audit's own first command was denied by that message, the fourth time the mechanism has tolled on the work auditing it.
+
+### Two findings the filing did not carry
+
+- **The remedy is inert on two of the three denials it prints on.** `g3AllowlistCovers` runs at `pre-tool-use.mjs:469`; the length denial returns at `:448` and the malformed denial at `:452`, both before it. On those two the sentence promises a remedy that cannot apply. Provable by reading control flow, independent of any telemetry.
+- **The message is port-only, so no fifth authority exception is needed.** `guard3-reference.sh:440/456/497` prints `BASH SCAN BLOCKED` plus a one-line detail and says nothing about an allowlist. The corpus arbitrates verdicts, never message text. `tests/fixtures/guard3-reference.sh` is untouched by this item and the sanctioned exception count stays at four.
+
+### The measure was wrong, and the correction is the deliverable
+
+The filing set the success measure as uptake moving off zero. **That is a premise error.** The reader at the moment of friction is the agent, and `CLAUDE.md` instructs it never to bypass the hook; adding an allowlist entry to clear one's own denial is that bypass. The operator who may legitimately set policy is not reading a 490-character reason string mid-tool-call.
+
+**Uptake remaining at zero is the design working: the agent adapts or reports, the operator legislates.** The measure is truthfulness instead: every sentence the denial prints is actionable by someone, and no sentence promises a remedy inapplicable to the denial it accompanies. The spec states this so a future maintainer cannot re-file the zero as a defect without first answering the argument.
+
+### Why shipping the filename is safe now and was not before
+
+BUG-037 rested the allowlist's safety on the template never shipping that filename, because `deployProject` copied the template wholesale. **BUG-039 replaced that mechanism**: `deploy.mjs:169` filters the copy through `hostOwnedFilter`, which excludes every table path regardless of policy, and `seedHostOwned` at `:183` writes only when the target is absent. The proof is already green: `tests/installer/deploy.test.js:347` ships a template allowlist, writes a host one, re-runs, and asserts the host file byte-identical.
+
+`templates.test.js:143` and `:172` contradict each other the instant the policy flips to `seed`. `:143`'s own comment names its dead premise. It is **replaced, never deleted**, classified **ASSERTION-RETIREMENT** (the BUG-039 shape) in the commit body per AC14.
+
+The seed's honest limit is stated rather than glossed: a comment-only file parses to zero entries and is behaviorally identical to no file. Its value is that the named path resolves and its header teaches the format. AC11 asserts the inertness by the loader's own rule.
+
+### Scope fence
+
+`G3_BD` (`:397`) and `G3_AD` (`:398`) contain no quote character, so entry `docs/` does not cover `cat "docs/x.md" *.md`; BUG-043 deliberately left `:469` reading the unmasked string. The finding stays in this spec, the fix mints **`[BUG-045]`** at implementation time with its full ritual named. The filing's "beside the measurement" wording is read as placement of the finding, not of the fix, and that reading is recorded so it is not re-litigated.
+
+### Conventions
+
+- **PATCH repairs, MINOR changes what ships, and the test is observability on a fresh install.** A release that adds a file to the shipped inventory or changes a documented installer contract is observable new behavior on every install and takes a minor bump; one that repairs behavior without changing what ships is a patch. `1.31.1`, `1.31.2` and `1.31.3` were patches by this rule; BUG-044 is `1.32.0` because it ships a template file and restates `README.md:189`. Cite this line instead of re-arguing the version.
+- **A measure that can only move by doing the thing the project forbids is not a measure.** Zero allowlist uptake was filed as a discoverability defect; the party in the friction loop is instructed never to bypass the hook, so moving the number would mean agents began self-serving exceptions. When a metric's improvement is prohibited behavior, correct the metric, not the number.
+- **A premise correction to a landed filing is noted in the new spec, never edited into the entry.** BUG-044's line references (`:433`, `:427-435`) went stale when BUG-043 shifted them to `:432-440` and `:438`. The entry receives an amendment note above its original text; the original wording stays intact.
