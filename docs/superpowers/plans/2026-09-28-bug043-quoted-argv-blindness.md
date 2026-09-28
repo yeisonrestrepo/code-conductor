@@ -388,16 +388,16 @@ Four tests, all in one file so a reader sees the differential's two halves toget
 
 ## Test List
 
-- [ ] [T-100] Ten rows added, each asserting its measured pre-fix verdict (T-002-A through T-002-D)
-- [ ] [T-101] Nine rows flip to allow, arbitrated in both suites (T-004-E, T-004-F)
-- [ ] [T-102] The seven P6/P12 true positives never move (every boundary run)
-- [ ] [T-103] Both P9 controls never move (every boundary run)
-- [ ] [T-104] `c'a't` still denies, which is AC9's measured guard (every boundary run)
-- [ ] [T-105] The mask is built from the stripped string, before the join (T-005-A, T-005-C)
-- [ ] [T-106] One mask character per input character, quote characters kept (T-005-B, T-005-C)
-- [ ] [T-107] Exactly two checks read the unmasked string, counted in both subjects (T-005-D)
-- [ ] [T-108] `EXCEPTIONS` still has exactly one member (existing test, green throughout)
-- [ ] [T-109] The mirrored pair stays byte-identical (existing test, green from T-004-C)
+- [X] [T-100] Ten rows added, each asserting its measured pre-fix verdict (T-002-A through T-002-D)
+- [X] [T-101] Nine rows flip to allow, arbitrated in both suites (T-004-E, T-004-F)
+- [X] [T-102] The seven P6/P12 true positives never move (every boundary run)
+- [X] [T-103] Both P9 controls never move (every boundary run)
+- [X] [T-104] `c'a't` still denies, which is AC9's measured guard (every boundary run)
+- [X] [T-105] The mask is built from the stripped string, before the join (T-005-A, T-005-C)
+- [X] [T-106] One mask character per input character, quote characters kept (T-005-B, T-005-C)
+- [X] [T-107] Exactly two checks read the unmasked string, counted in both subjects (T-005-D)
+- [X] [T-108] `EXCEPTIONS` still has exactly one member (existing test, green throughout)
+- [X] [T-109] The mirrored pair stays byte-identical (existing test, green from T-004-C)
 
 ## Commit Order
 
