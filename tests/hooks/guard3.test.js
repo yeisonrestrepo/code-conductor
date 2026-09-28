@@ -94,4 +94,15 @@ describe.skipIf(!BASH)('guard3 - pre-tool-use.sh', () => {
     if (row.verdict === 'deny') expect(status).not.toBe(0)
     else expect(status).toBe(0)
   })
+
+  // This is where the no-progress risk actually lives. The corrected walk advances by
+  // ${#pre}+${#BASH_REMATCH[0]}; if the needle were ever missed, %% returns rest
+  // unchanged, after becomes empty and the existing break ends the loop. A form that
+  // could fail to advance would hang the hook, and the harness would report a spawn
+  // timeout rather than a verdict, so the assertion is that a verdict comes back at
+  // all. Forty pager matches, each followed by a quoted span. [BUG-041].
+  it('terminates on a command built to maximize walk iterations', () => {
+    const command = Array.from({ length: 40 }, (_, i) => `head -1 "file ${i}.txt"`).join('; ')
+    expect(runRow({ command })).toBe(0)
+  })
 })

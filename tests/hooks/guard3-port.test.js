@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -56,6 +56,36 @@ describe('Guard 3 port', () => {
 
   it.each(DIALECT.map(r => [r.label, r]))('dialect: %s', (_label, row) => {
     assertVerdict(row, row.verdict);
+  });
+
+  // The walk's correctness has no behavioral shadow: g3Scan scans the WHOLE
+  // after-text, so a second iteration can never find a glob the first pass missed,
+  // and the hook exports nothing to call directly. The contract is therefore
+  // asserted where it lives, in the source, the same way tests/installer/
+  // templates.test.js pins the character-class trap. [BUG-041].
+  it('slices the glob walk from the end of the match, not by its length', () => {
+    const src = readFileSync(HOOK, 'utf8');
+    expect(src).toContain('rest.slice(m.index + m[0].length)');
+    expect(src).not.toContain('rest.slice(m[0].length)');
+  });
+
+  // The differential's other half, asserted in the same file so one reader sees both.
+  // The count of 2 is load-bearing: P4 and P7 are separate functions in the authority,
+  // and a fix applied to one of them is the regression [BUG-041] exists to prevent.
+  it('keeps the authority on the same corrected walk', () => {
+    const src = readFileSync(join(REPO_ROOT, 'tests/fixtures/guard3-reference.sh'), 'utf8');
+    expect(src).not.toContain('${rest:mlen}');
+    expect(src.match(/\$\{rest:\$\{#pre\}\+\$\{#BASH_REMATCH\[0\]\}\}/g) ?? []).toHaveLength(2);
+  });
+
+  // A walk that fails to advance hangs the hook, and a verdict assertion would never
+  // catch it: the harness would time out and report a spawn failure instead. This row
+  // is built to maximize iterations, 40 pager matches each followed by a quoted span.
+  it('terminates on a command built to maximize walk iterations', () => {
+    const command = Array.from({ length: 40 }, (_, i) => `head -1 "file ${i}.txt"`).join('; ');
+    const r = runRow({ command });
+    expect(r.status).toBe(0);
+    expect(r.decision).toBeNull();
   });
 
   // Guarding the guard: a second entry here would mean a second place where the port
