@@ -184,14 +184,20 @@ export const CORPUS = [
   // but the pattern checks run over the whole preprocessed string without
   // consulting it, so quoted argv text is analyzed as if it were code.
   //
-  // That is MECHANISM 2, filed as [BUG-043], and it is a separate defect from the
-  // walk: it fires P9, OBF and P5, and it cannot be fixed by one preprocessing
-  // change, because a blanket quote mask breaks seven genuine denials (four P6
-  // rows, the P6 dialect row, two P12 alias rows). P6 and P12 inspect quoted
-  // content BY DESIGN. This row and the three below are that item's pre-written
-  // acceptance cases, inherited exactly as P7-1 and P7-2 were inherited by
-  // [BUG-041]. Do not "fix" them here.
-  { label: 'KNOWN-FP P9-1: commit message body line beginning with for', command: 'cd /Users/yeison/Projects/code-conductor && git commit -q -m "refactor: retire seedMemoryFile and wire the deploy warn channel [BUG-039]\n\nThe table\'s seed policy is now the single write-if-absent mechanism, so\nthe standalone helper and its coverage go with it, classified as coverage\nfor deleted code with a tombstone comment naming where that coverage\nmoved. deployProject gets the CLI\'s stderr emitter, and end-to-end cases\npin the re-run behavior against the real bundled assets, which is the\nonly layer where the old copy-then-merge ordering was observable.\n\nCo-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01HLS5KAHkhpMChyqNTbqrhe"\nprintf \'commit_rc=%s\\n\' "$?"\ngit log --oneline -1', verdict: 'deny' },
+  // That was MECHANISM 2, and [BUG-043] fixed it. The scanner now emits a masked copy
+  // of the preprocessed string, with quoted content replaced and the quote characters
+  // kept, and eleven of the thirteen checks read that copy instead. P6 and P12 keep the
+  // unmasked string because they read quoted content BY DESIGN: a grep pattern and an
+  // alias value are the data those checks exist to inspect. That boundary is why the
+  // fix is not a blanket mask, which was measured to break seven genuine denials.
+  //
+  // The mechanism had FOUR accidental consumers, not three: P9 read quoted prose,
+  // quoted code and a quoted REGEX as a shell loop; OBF read a backslash run inside a
+  // quoted regex as evasion; P5 read an escaped backtick as a command substitution; and
+  // P11 read an English sentence's period-and-space as the bash dot operator. The
+  // labels below still say "pending" because a row's label is its identity and does not
+  // move when its verdict does, the same way P7-1 and P7-2 kept theirs under [BUG-041].
+  { label: 'KNOWN-FP P9-1: commit message body line beginning with for', command: 'cd /Users/yeison/Projects/code-conductor && git commit -q -m "refactor: retire seedMemoryFile and wire the deploy warn channel [BUG-039]\n\nThe table\'s seed policy is now the single write-if-absent mechanism, so\nthe standalone helper and its coverage go with it, classified as coverage\nfor deleted code with a tombstone comment naming where that coverage\nmoved. deployProject gets the CLI\'s stderr emitter, and end-to-end cases\npin the re-run behavior against the real bundled assets, which is the\nonly layer where the old copy-then-merge ordering was observable.\n\nCo-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01HLS5KAHkhpMChyqNTbqrhe"\nprintf \'commit_rc=%s\\n\' "$?"\ngit log --oneline -1', verdict: 'allow' },
 
   // P4 carried ZERO specimens when [BUG-041] was filed and five by the time its
   // spec was written. Both rows that the walk fix flips are P7, so without this row
@@ -218,9 +224,9 @@ export const CORPUS = [
   // double-quoted pattern as a command substitution; P9 reads a JavaScript for-of
   // inside a quoted program as a shell loop. Each denies today and is expected to
   // keep denying until that item lands, the same footing P7-1 and P7-2 stood on.
-  { label: "KNOWN-FP OBF: escape run inside a single-quoted grep pattern, pending [BUG-043]", command: "grep -n -m 3 -E '\\[ \\] \\[T-[0-9]{3,}(-[A-Z0-9]+)*\\]' \"docs/superpowers/plans/2026-09-27-bug038-handoff-contract.md\"", verdict: "deny" },
-  { label: "KNOWN-FP P5: escaped backtick inside a double-quoted grep pattern, pending [BUG-043]", command: "grep -n \"Components Affected:\\*\\* \\`.claude/hooks/pre-tool-use.mjs\\`\" \"AGENT-READABLE BACKLOG.md\"", verdict: "deny" },
-  { label: "KNOWN-FP P9: for-of inside a quoted node program, pending [BUG-043]", command: "node -e \"\nconst t=require('fs').readFileSync('tests/fixtures/guard3-reference.sh','utf8');\nfor (const fn of ['_g3_p3_xargs_reader','_g3_p8_ls_recursive','_g3_p12_alias']) {\n  const i=t.indexOf(fn+'()');\n  const j=t.indexOf('\\n}\\n', i);\n  console.log('=== '+fn); console.log(t.slice(i, j+2));\n}\"", verdict: "deny" },
+  { label: "KNOWN-FP OBF: escape run inside a single-quoted grep pattern, pending [BUG-043]", command: "grep -n -m 3 -E '\\[ \\] \\[T-[0-9]{3,}(-[A-Z0-9]+)*\\]' \"docs/superpowers/plans/2026-09-27-bug038-handoff-contract.md\"", verdict: "allow" },
+  { label: "KNOWN-FP P5: escaped backtick inside a double-quoted grep pattern, pending [BUG-043]", command: "grep -n \"Components Affected:\\*\\* \\`.claude/hooks/pre-tool-use.mjs\\`\" \"AGENT-READABLE BACKLOG.md\"", verdict: "allow" },
+  { label: "KNOWN-FP P9: for-of inside a quoted node program, pending [BUG-043]", command: "node -e \"\nconst t=require('fs').readFileSync('tests/fixtures/guard3-reference.sh','utf8');\nfor (const fn of ['_g3_p3_xargs_reader','_g3_p8_ls_recursive','_g3_p12_alias']) {\n  const i=t.indexOf(fn+'()');\n  const j=t.indexOf('\\n}\\n', i);\n  console.log('=== '+fn); console.log(t.slice(i, j+2));\n}\"", verdict: "allow" },
 
   // MASK-DESIGN rows, [BUG-043]. These two exist so the P6/P12 by-design boundary is
   // guarded by the oracle rather than by a matrix in a spec. Both read quoted content
@@ -238,16 +244,18 @@ export const CORPUS = [
   // P5 reads an escaped backtick as a command substitution; P11 reads an English
   // sentence's period-and-space as the bash dot operator. P11 and the regex sub-shape
   // are corrections to [BUG-041]'s spec, recorded here rather than back-edited into it.
-  { label: "KNOWN-FP OBF: escape run inside a perl -0pi -e substitution", command: "perl -0pi -e 's/- \\[>\\] \\[T-003-H\\]/- [X] [T-003-H]/; s/- \\[ \\] \\[T-003-I\\]/- [>] [T-003-I]/' \"docs/superpowers/plans/2026-09-25-bug037-guard3-port-and-first-ship.md\" && node scripts/conductor-db.mjs record \"docs/superpowers/plans/2026-09-25-bug037-guard3-port-and-first-ship.md\" \"T-003-H\" \"X\"; echo flipped", verdict: "deny" },
-  { label: "KNOWN-FP OBF: escape run inside a quoted node -e regex literal", command: "node -e \"\nconst t=require('fs').readFileSync('docs/superpowers/plans/2026-09-25-bug037-guard3-port-and-first-ship.md','utf8');\nconst n=(t.match(/^- \\[X\\] \\[T-/gm)||[]).length;\nconst p=(t.match(/^- \\[ \\] \\[T-/gm)||[]).length;\nconst g=(t.match(/^- \\[>\\] \\[T-/gm)||[]).length;\nconst b=(t.match(/^- \\[!\\] \\[T-/gm)||[]).length;\nconsole.log('done',n,'pending',p,'in-progress',g,'failed',b);\nt.split('\\n').forEach((l,i)=>{ if(/^- \\[ \\] \\[T-/.test(l)) console.log('  '+(i+1)+': '+l.slice(0,70)); });\"", verdict: "deny" },
-  { label: "KNOWN-FP P11: an English sentence period read as the dot operator", command: "node -e '\nconst fs=require(\"fs\");\nconst F=\"docs/superpowers/plans/2026-09-28-bug041-guard3-refinement.md\";\nlet t=fs.readFileSync(F,\"utf8\");\nconst anchor=\"- [ ] [T-003-E] Run the suite and record the intermediate state\";\nconst step=\"- [ ] [T-003-C2] **Tripwire repair, authorized 2026-09-28.** The T-003-E run came back 854/5 instead of 855/4. The fifth failure was `tests/installer/templates.test.js > pre-tool-use wiring > ships the front door as one byte-identical mirrored pair`. The port is not one file: BUG-037 shipped it as a mirrored pair with a byte-identity parity test so the deployed copy could never drift, and this plan then reasoned about \\\"the port\\\" as a single file. The parity test did its job; the file list did not. Apply the identical two edits to `project-template/.claude/hooks/pre-tool-use.mjs`, the slice and the comment block, restoring byte identity. No new test is added: the parity assertion IS the contract guard, which is also why T-004-A stays as written. Verify with a byte comparison of the two members before re-running.\\n\";\nconst n=t.split(anchor).length-1;\nif(n!==1){console.log(\"MISS x\"+n);process.exit(1)}\nt=t.split(anchor).join(step+anchor);\nfs.writeFileSync(F,t,\"utf8\");\nconsole.log(\"inserted T-003-C2 before T-003-E\");\n'", verdict: "deny" },
-  { label: "KNOWN-FP P9: for inside a quoted regex alternation", command: "node /private/tmp/claude-501/-Users-yeison-Projects-code-conductor/f7218b10-9217-4e9b-b140-a428add61d43/scratchpad/g.mjs \"tests/fixtures/guard3-reference.sh\" \"^_g3_|_g3_scan |_G3_PRE|for pat|ids=|_g3_p\" 60", verdict: "deny" },
+  { label: "KNOWN-FP OBF: escape run inside a perl -0pi -e substitution", command: "perl -0pi -e 's/- \\[>\\] \\[T-003-H\\]/- [X] [T-003-H]/; s/- \\[ \\] \\[T-003-I\\]/- [>] [T-003-I]/' \"docs/superpowers/plans/2026-09-25-bug037-guard3-port-and-first-ship.md\" && node scripts/conductor-db.mjs record \"docs/superpowers/plans/2026-09-25-bug037-guard3-port-and-first-ship.md\" \"T-003-H\" \"X\"; echo flipped", verdict: "allow" },
+  { label: "KNOWN-FP OBF: escape run inside a quoted node -e regex literal", command: "node -e \"\nconst t=require('fs').readFileSync('docs/superpowers/plans/2026-09-25-bug037-guard3-port-and-first-ship.md','utf8');\nconst n=(t.match(/^- \\[X\\] \\[T-/gm)||[]).length;\nconst p=(t.match(/^- \\[ \\] \\[T-/gm)||[]).length;\nconst g=(t.match(/^- \\[>\\] \\[T-/gm)||[]).length;\nconst b=(t.match(/^- \\[!\\] \\[T-/gm)||[]).length;\nconsole.log('done',n,'pending',p,'in-progress',g,'failed',b);\nt.split('\\n').forEach((l,i)=>{ if(/^- \\[ \\] \\[T-/.test(l)) console.log('  '+(i+1)+': '+l.slice(0,70)); });\"", verdict: "allow" },
+  { label: "KNOWN-FP P11: an English sentence period read as the dot operator", command: "node -e '\nconst fs=require(\"fs\");\nconst F=\"docs/superpowers/plans/2026-09-28-bug041-guard3-refinement.md\";\nlet t=fs.readFileSync(F,\"utf8\");\nconst anchor=\"- [ ] [T-003-E] Run the suite and record the intermediate state\";\nconst step=\"- [ ] [T-003-C2] **Tripwire repair, authorized 2026-09-28.** The T-003-E run came back 854/5 instead of 855/4. The fifth failure was `tests/installer/templates.test.js > pre-tool-use wiring > ships the front door as one byte-identical mirrored pair`. The port is not one file: BUG-037 shipped it as a mirrored pair with a byte-identity parity test so the deployed copy could never drift, and this plan then reasoned about \\\"the port\\\" as a single file. The parity test did its job; the file list did not. Apply the identical two edits to `project-template/.claude/hooks/pre-tool-use.mjs`, the slice and the comment block, restoring byte identity. No new test is added: the parity assertion IS the contract guard, which is also why T-004-A stays as written. Verify with a byte comparison of the two members before re-running.\\n\";\nconst n=t.split(anchor).length-1;\nif(n!==1){console.log(\"MISS x\"+n);process.exit(1)}\nt=t.split(anchor).join(step+anchor);\nfs.writeFileSync(F,t,\"utf8\");\nconsole.log(\"inserted T-003-C2 before T-003-E\");\n'", verdict: "allow" },
+  { label: "KNOWN-FP P9: for inside a quoted regex alternation", command: "node /private/tmp/claude-501/-Users-yeison-Projects-code-conductor/f7218b10-9217-4e9b-b140-a428add61d43/scratchpad/g.mjs \"tests/fixtures/guard3-reference.sh\" \"^_g3_|_g3_scan |_G3_PRE|for pat|ids=|_g3_p\" 60", verdict: "allow" },
 
-  // FRAGMENT QUOTE-PARITY, [BUG-041]'s named residual, in scope here because it shares
-  // the seam: P4 and P7 hand g3Scan a FRAGMENT that starts in UNQUOTED regardless of the
-  // state it really begins in, so quotes invert and an unquoted ? from a $? reads as a
-  // glob. Masking the input removes the content that inversion was misreading.
-  { label: "KNOWN-FP P7: fragment quote-parity inverts on a $? inside quotes", command: "echo \"current=$(git branch --show-current)\"; echo \"default=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')\"; git check-ref-format --branch \"fix/bug-040-staging-convention\" >/dev/null 2>&1; echo \"refformat_rc=$?\"; git rev-parse --verify --quiet \"refs/heads/fix/bug-040-staging-convention\" >/dev/null; echo \"branch_exists_rc=$? (1 = does not exist)\"", verdict: "deny" },
+  // FRAGMENT QUOTE-PARITY, [BUG-041]'s named residual, resolved by [BUG-043] at zero
+  // marginal cost because it shares the seam. P4 and P7 hand g3Scan a FRAGMENT that
+  // starts in UNQUOTED regardless of the state it really begins in, so quotes invert and
+  // an unquoted ? from a $? reads as a glob. Masking the input removes the content that
+  // the inversion was misreading, so the fragment has nothing left to misread. This row
+  // is the measured proof: it denied under the walk fix alone and allows under the mask.
+  { label: "KNOWN-FP P7: fragment quote-parity inverts on a $? inside quotes", command: "echo \"current=$(git branch --show-current)\"; echo \"default=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')\"; git check-ref-format --branch \"fix/bug-040-staging-convention\" >/dev/null 2>&1; echo \"refformat_rc=$?\"; git rev-parse --verify --quiet \"refs/heads/fix/bug-040-staging-convention\" >/dev/null; echo \"branch_exists_rc=$? (1 = does not exist)\"", verdict: "allow" },
 
   // CONSTRUCTED boundary rows, not transcript specimens. They pin the scanner exotic
   // openers and the escaped-pair branch through the mask, and each carries a real
