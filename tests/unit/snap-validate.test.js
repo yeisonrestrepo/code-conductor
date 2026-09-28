@@ -335,4 +335,90 @@ describe('snap-validate.mjs', () => {
     expect(r.status).toBe(1)
     expect(r.stderr).toBe('SNAP_ERROR: invalid sys.c format\n')
   })
+
+  // ---- BUG-038: two tiers, because one number cannot do both jobs ----
+
+  const pad = (n) => 'x'.repeat(n)
+
+  it('accepts a v2 payload larger than the v1 4096-character budget', () => {
+    const big = { v: 2, sys: { ph: 'impl', c: 'abc1234', s: 'feat010' }, ops: { n: [], f: [] }, mem: { d: [], x: [] }, pr: pad(6000) }
+    const r = run(fixture(j(big)))
+    expect(r.status).toBe(0)
+    expect(r.stderr).toBe('')
+  })
+
+  it('still rejects a v1 payload over 4096 characters, naming the v1 cap', () => {
+    const over = { ...VALID, mem: { d: [pad(300), pad(300), pad(300), pad(300), pad(300), pad(300), pad(300), pad(300), pad(300), pad(300)], x: [pad(200), pad(200), pad(200), pad(200), pad(200)] }, ops: { n: [pad(200), pad(200), pad(200)], f: [] } }
+    const text = j(over)
+    expect(text.length).toBeGreaterThan(4096)
+    const r = run(fixture(text))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toContain('payload too large')
+    expect(r.stderr).toContain('4096')
+    expect(r.stderr).toContain('(v1 cap)')
+  })
+
+  it('rejects a payload over the pre-parse ceiling WITHOUT parsing it', () => {
+    // Deliberately malformed JSON above the ceiling: if the ceiling were applied
+    // after JSON.parse, the reported error would be `malformed JSON` instead.
+    const r = run(fixture('{' + pad(10485760)))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toContain('pre-parse ceiling')
+    expect(r.stderr).not.toContain('malformed JSON')
+  })
+
+  it('accepts a v2 pr carrying newlines and keeps the payload one physical line', () => {
+    const withNl = { v: 2, sys: { ph: 'rev', c: 'abc1234', s: 'feat010' }, ops: { n: [], f: [] }, mem: { d: [], x: [] }, pr: 'line one\nline two\nline three' }
+    const text = j(withNl)
+    expect(text).not.toContain('\n')
+    const r = run(fixture(text))
+    expect(r.status).toBe(0)
+  })
+
+  it('rejects a payload carrying the Unicode replacement character', () => {
+    const r = run(fixture(j({ ...VALID, sys: { ...VALID.sys, s: 'ok' } }).replace('"ok"', '"o�k"')))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: encoding error\n')
+  })
+
+  it('rejects a payload with an internal newline', () => {
+    const r = run(fixture(j(VALID).replace('{"v"', '{\n"v"')))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: internal newline in payload\n')
+  })
+
+  // ---- BUG-038: field sets and the version ceiling come from the contract ----
+
+  it('resolves its per-version top-level field set from the contract module', async () => {
+    const { TOP_FIELDS } = await import('../../scripts/snap-contract.mjs')
+    const src = readFileSync(VALIDATOR, 'utf8')
+    expect(src).toContain('TOP_FIELDS')
+    expect(src).not.toMatch(/\['v', 'sys', 'ops', 'mem'\]/)
+    expect(TOP_FIELDS[2]).toContain('pr')
+    expect(TOP_FIELDS[1]).not.toContain('pr')
+    // v1 rejecting `pr` is the behavior that field set encodes
+    const r = run(fixture(j({ ...VALID, pr: 'prose' })))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: unexpected key: pr\n')
+  })
+
+  it('resolves its per-block field sets from the contract module', async () => {
+    const { BLOCK_FIELDS } = await import('../../scripts/snap-contract.mjs')
+    const src = readFileSync(VALIDATOR, 'utf8')
+    expect(src).toContain('BLOCK_FIELDS')
+    expect(BLOCK_FIELDS).toEqual({ sys: ['ph', 'c', 's'], ops: ['n', 'f'], mem: ['d', 'x'] })
+    const r = run(fixture(j({ ...VALID, sys: { ...VALID.sys, extra: 1 } })))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: unexpected key: sys.extra\n')
+  })
+
+  it('tracks the contract module for the SNAP_UNKNOWN_VERSION boundary', async () => {
+    const { MAX_VERSION } = await import('../../scripts/snap-contract.mjs')
+    const src = readFileSync(VALIDATOR, 'utf8')
+    expect(src).toContain('MAX_VERSION')
+    expect(src).not.toMatch(/snap\.v > 2/)
+    const over = run(fixture(j({ ...VALID, v: MAX_VERSION + 1 })))
+    expect(over.status).toBe(1)
+    expect(over.stderr).toBe('SNAP_ERROR: SNAP_UNKNOWN_VERSION\n')
+  })
 })
