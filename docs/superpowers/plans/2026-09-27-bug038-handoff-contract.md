@@ -1094,13 +1094,13 @@ EOF
 )"
 ```
 
-- [>] [T-006-F] Write the archetype paragraph into project memory
+- [X] [T-006-F] Write the archetype paragraph into project memory
 
 Append to `.claude/memory/project.md` a conventions paragraph titled **success semantics on failure paths**, naming its four instances: Guard 4 printing a block while exiting 1 (`[BUG-036]`), `git add` exiting 1 on a successful stage (`[BUG-040]`), the clean-miss resume that reported rc 3 for a rejected blob (`[BUG-038]`, fixed here), and `add_rc=1` under `.claude/`. Close with the standing instruction to grep for the fifth proactively rather than waiting for it to surface.
 
 Append the BUG-038 implementation summary in the same commit.
 
-- [ ] [T-006-G] Close the backlog entry
+- [X] [T-006-G] Close the backlog entry
 
 Modify `AGENT-READABLE BACKLOG.md`: flip `[BUG-038]`'s checkbox to `[X]` as a surgical single-line edit and add a DONE bullet naming the release, the plan path and the task count. Both this and T-006-F land on `main` under the owner-scoped memory-and-backlog exception, not on the feature branch.
 
