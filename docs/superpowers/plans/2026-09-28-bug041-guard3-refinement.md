@@ -308,7 +308,7 @@ Run every step before a character of either subject changes. Each one re-opens t
 - [X] [T-003-L] Confirm the new rows say what they are meant to say, before trusting the suite. Write `<scratchpad>/verify-new-rows.mjs` that imports the corpus, selects the six new rows by label, runs each through the **stock** hook at `HEAD~1` (a copy saved before Task 2) and through the current port, and prints both verdicts. Expected: the P4 row reads `deny` then `allow`; the five others read `deny` then `deny`. A control that already allows would mean the control is not a control.
 - [X] [T-003-M] Run the full suite: `npx vitest run --reporter=basic`. **Expected: 869 passed, 12 skipped, 0 failed.** 857 plus six rows across two suites.
 - [X] [T-003-N] Stage and commit. Both files are tracked, so: `git add -u ".claude/hooks/pre-tool-use.mjs" "tests/fixtures/guard3-corpus.js"`. Write `<scratchpad>/msg-t003.txt` with subject `fix: carry the corrected walk into the port and the corpus [BUG-041]`, a body naming the 20-of-41 measured flip, the two rows that moved, the six added, and the restoration of green. Run `git commit -F <scratchpad>/msg-t003.txt`. The gate runs and must pass.
-- [>] [T-003-O] Commit the spec-truth and plan corrections the mirror repair obligated. This lands AFTER T-003-N rather than before the repair, because the suite is red by design across the whole crossover and the single authorized bypass is spent; the first green point is the earliest a commit can carry them. The documents were corrected on disk before the work resumed, which is what the rule protects. Both files are tracked: `git add -u "docs/superpowers/specs/2026-09-28-bug041-guard3-refinement-design.md" "docs/superpowers/plans/2026-09-28-bug041-guard3-refinement.md"`. Subject `docs: name the port mirror in the BUG-041 spec and plan`, with the finding in the body: BUG-037 shipped the port as a mirrored pair with a parity test so the deployed copy could never drift; the plan then reasoned about "the port" as one file; the parity test did its job and the file list did not.
+- [X] [T-003-O] Commit the spec-truth and plan corrections the mirror repair obligated. This lands AFTER T-003-N rather than before the repair, because the suite is red by design across the whole crossover and the single authorized bypass is spent; the first green point is the earliest a commit can carry them. The documents were corrected on disk before the work resumed, which is what the rule protects. Both files are tracked: `git add -u "docs/superpowers/specs/2026-09-28-bug041-guard3-refinement-design.md" "docs/superpowers/plans/2026-09-28-bug041-guard3-refinement.md"`. Subject `docs: name the port mirror in the BUG-041 spec and plan`, with the finding in the body: BUG-037 shipped the port as a mirrored pair with a parity test so the deployed copy could never drift; the plan then reasoned about "the port" as one file; the parity test did its job and the file list did not.
 
 ---
 
@@ -321,7 +321,7 @@ Run every step before a character of either subject changes. Each one re-opens t
 **Interfaces:**
 - Consumes: both fixed subjects from Tasks 2 and 3.
 
-- [ ] [T-004-A] Add the port's contract assertion to `tests/hooks/guard3-port.test.js`, inside the existing `describe('Guard 3 port', ...)` block:
+- [X] [T-004-A] Add the port's contract assertion to `tests/hooks/guard3-port.test.js`, inside the existing `describe('Guard 3 port', ...)` block:
 
   ```js
   // The walk's correctness is not observable from a verdict: g3Scan scans the WHOLE
@@ -337,7 +337,7 @@ Run every step before a character of either subject changes. Each one re-opens t
 
   `readFileSync` is already imported in this file; `HOOK` is already defined at `:10`.
 
-- [ ] [T-004-B] Add the authority's contract assertion to the same file, so one test file holds the differential's two halves:
+- [X] [T-004-B] Add the authority's contract assertion to the same file, so one test file holds the differential's two halves:
 
   ```js
   it('keeps the authority on the same corrected walk', () => {
@@ -350,7 +350,7 @@ Run every step before a character of either subject changes. Each one re-opens t
 
   The count of 2 is load-bearing: P4 and P7 are separate functions and a regression that fixes one is the failure mode this item exists to prevent.
 
-- [ ] [T-004-C] Add the port's termination assertion to `tests/hooks/guard3-port.test.js`:
+- [X] [T-004-C] Add the port's termination assertion to `tests/hooks/guard3-port.test.js`:
 
   ```js
   // A walk that fails to advance hangs the hook, which a verdict assertion would never
@@ -364,9 +364,9 @@ Run every step before a character of either subject changes. Each one re-opens t
   });
   ```
 
-- [ ] [T-004-D] Add the same shape to `tests/hooks/guard3.test.js`, where the bash strip form's no-progress risk actually lives, using that file's own `runRow` and its `LC_ALL=C` environment. Assert the exit status the bash harness returns for an allow, matching the convention the file's existing `assert` helper uses; read `tests/hooks/guard3.test.js:60-95` first to copy that convention exactly rather than guessing it.
-- [ ] [T-004-E] Run the full suite: `npx vitest run --reporter=basic`. **Expected: 873 passed, 12 skipped, 0 failed.**
-- [ ] [T-004-F] Stage and commit both tracked test files: `git add -u "tests/hooks/guard3-port.test.js" "tests/hooks/guard3.test.js"`, then `git commit -F <scratchpad>/msg-t004.txt` with subject `test: pin the corrected walk contract in both subjects [BUG-041]`.
+- [X] [T-004-D] Add the same shape to `tests/hooks/guard3.test.js`, where the bash strip form's no-progress risk actually lives, using that file's own `runRow` and its `LC_ALL=C` environment. Assert the exit status the bash harness returns for an allow, matching the convention the file's existing `assert` helper uses; read `tests/hooks/guard3.test.js:60-95` first to copy that convention exactly rather than guessing it.
+- [X] [T-004-E] Run the full suite: `npx vitest run --reporter=basic`. **Expected: 873 passed, 12 skipped, 0 failed.**
+- [X] [T-004-F] Stage and commit both tracked test files: `git add -u "tests/hooks/guard3-port.test.js" "tests/hooks/guard3.test.js"`, then `git commit -F <scratchpad>/msg-t004.txt` with subject `test: pin the corrected walk contract in both subjects [BUG-041]`.
 
 ---
 
@@ -375,11 +375,11 @@ Run every step before a character of either subject changes. Each one re-opens t
 **Files:**
 - Modify: `AGENT-READABLE BACKLOG.md`
 
-- [ ] [T-005-A] Run `node <scratchpad>/id-ceiling.mjs` and confirm both legs report. Expected: `CEILING {"BUG":42,...}` and `next BUG = BUG-043`. The script exits non-zero rather than printing a ceiling if the `origin/main` leg fails; if it does, fix that before filing anything.
-- [ ] [T-005-B] File `[BUG-043]` for mechanism 2. The entry carries: the four affected checks with a verbatim specimen each (P9 commit-message prose, P9 quoted JS program, OBF escape run, P5 escaped backtick); the blanket-mask measurement and **the seven true positives it breaks** (four P6 rows, the P6 dialect row, two P12 alias rows), with the sentence that P6 and P12 inspect quoted content by design; the targeted-mask result of 36 of 43 denials with 3 of 118 corpus rows moving; the cost of a second five-state scanner in bash; and the **P7/P4 fragment quote-parity residual** recorded as the same root cause in a different check, with its `sed 's|^origin/||'` specimen.
-- [ ] [T-005-C] File `[BUG-044]` for the deny-message defect. The entry carries: 47 denials with zero allowlist entries and zero `CC_GUARD3_WARN` traces; that `.claude/memory/bash-scan-allowlist.txt` exists in no installation while `pre-tool-use.mjs:433` names it as the remedy; the three candidate shapes (seed the file with its commented header at install time, which lands in BUG-039's host-owned policy table as a `seed` row; state in the message how to create it; or both); and the discoverability question as its second concern. Decision reserved for its own spec.
-- [ ] [T-005-D] Close the `[BUG-041]` entry, naming what shipped and what was deliberately left: mechanism 1 fixed in both subjects, six corpus rows added, mechanism 2 and the heredoc class filed.
-- [ ] [T-005-E] Stage and commit. The backlog is tracked: `git add -u "AGENT-READABLE BACKLOG.md"`, then `git commit -F <scratchpad>/msg-t005.txt` with subject `docs: close BUG-041 and file BUG-043 and BUG-044`.
+- [X] [T-005-A] Run `node <scratchpad>/id-ceiling.mjs` and confirm both legs report. Expected: `CEILING {"BUG":42,...}` and `next BUG = BUG-043`. The script exits non-zero rather than printing a ceiling if the `origin/main` leg fails; if it does, fix that before filing anything.
+- [X] [T-005-B] File `[BUG-043]` for mechanism 2. The entry carries: the four affected checks with a verbatim specimen each (P9 commit-message prose, P9 quoted JS program, OBF escape run, P5 escaped backtick); the blanket-mask measurement and **the seven true positives it breaks** (four P6 rows, the P6 dialect row, two P12 alias rows), with the sentence that P6 and P12 inspect quoted content by design; the targeted-mask result of 36 of 43 denials with 3 of 118 corpus rows moving; the cost of a second five-state scanner in bash; and the **P7/P4 fragment quote-parity residual** recorded as the same root cause in a different check, with its `sed 's|^origin/||'` specimen.
+- [X] [T-005-C] File `[BUG-044]` for the deny-message defect. The entry carries: 47 denials with zero allowlist entries and zero `CC_GUARD3_WARN` traces; that `.claude/memory/bash-scan-allowlist.txt` exists in no installation while `pre-tool-use.mjs:433` names it as the remedy; the three candidate shapes (seed the file with its commented header at install time, which lands in BUG-039's host-owned policy table as a `seed` row; state in the message how to create it; or both); and the discoverability question as its second concern. Decision reserved for its own spec.
+- [X] [T-005-D] Close the `[BUG-041]` entry, naming what shipped and what was deliberately left: mechanism 1 fixed in both subjects, six corpus rows added, mechanism 2 and the heredoc class filed.
+- [X] [T-005-E] Stage and commit. The backlog is tracked: `git add -u "AGENT-READABLE BACKLOG.md"`, then `git commit -F <scratchpad>/msg-t005.txt` with subject `docs: close BUG-041 and file BUG-043 and BUG-044`.
 
 ---
 
@@ -388,13 +388,13 @@ Run every step before a character of either subject changes. Each one re-opens t
 **Files:**
 - Modify: `VERSION`, `package.json`, `package-lock.json`, `CHANGELOG.md`, `.claude/memory/project.md`
 
-- [ ] [T-006-A] Run `npm version 1.31.2 --no-git-tag-version`, which updates `package.json` and both `version` fields in `package-lock.json`.
-- [ ] [T-006-B] Write the bare version into the `VERSION` file: `printf '1.31.2\n' > VERSION`. `lib/installer/config.mjs:38` compares against the bare file, so no decoration.
-- [ ] [T-006-C] Add the `CHANGELOG.md` entry under a `## 1.31.2` heading: the walk fix in both subjects, the 20-of-41 measured flip, the six corpus rows, and the two filings.
-- [ ] [T-006-D] Verify all four agree, mechanically rather than by eye. Write `<scratchpad>/version-gate.mjs` that reads `VERSION`, `package.json`, `package-lock.json` (`version` and `packages[""].version`) and the first `## ` heading in `CHANGELOG.md`, prints all five values, and exits non-zero unless every one is `1.31.2`. This is the step whose absence shipped 1.31.0 with `VERSION` still reading 1.30.0.
-- [ ] [T-006-E] Run the full suite: `npx vitest run --reporter=basic`. **Expected: 873 passed, 12 skipped, 0 failed.**
-- [ ] [T-006-F] Append the implementation record to `.claude/memory/project.md` under `## Implementation: BUG-041 [2026-09-28]`: every boundary hit against its prediction, whether the tripwire fired, the one bypassed gate with its authorization, the AC10 substitution with its reason, and any deviation with its classification.
-- [ ] [T-006-G] Stage and commit. All five are tracked: `git add -u VERSION package.json package-lock.json CHANGELOG.md ".claude/memory/project.md"`, then `git commit -F <scratchpad>/msg-t006.txt` with subject `chore: release 1.31.2 [BUG-041]`.
+- [X] [T-006-A] Run `npm version 1.31.2 --no-git-tag-version`, which updates `package.json` and both `version` fields in `package-lock.json`.
+- [X] [T-006-B] Write the bare version into the `VERSION` file: `printf '1.31.2\n' > VERSION`. `lib/installer/config.mjs:38` compares against the bare file, so no decoration.
+- [X] [T-006-C] Add the `CHANGELOG.md` entry under a `## 1.31.2` heading: the walk fix in both subjects, the 20-of-41 measured flip, the six corpus rows, and the two filings.
+- [X] [T-006-D] Verify all four agree, mechanically rather than by eye. Write `<scratchpad>/version-gate.mjs` that reads `VERSION`, `package.json`, `package-lock.json` (`version` and `packages[""].version`) and the first `## ` heading in `CHANGELOG.md`, prints all five values, and exits non-zero unless every one is `1.31.2`. This is the step whose absence shipped 1.31.0 with `VERSION` still reading 1.30.0.
+- [X] [T-006-E] Run the full suite: `npx vitest run --reporter=basic`. **Expected: 873 passed, 12 skipped, 0 failed.**
+- [X] [T-006-F] Append the implementation record to `.claude/memory/project.md` under `## Implementation: BUG-041 [2026-09-28]`: every boundary hit against its prediction, whether the tripwire fired, the one bypassed gate with its authorization, the AC10 substitution with its reason, and any deviation with its classification.
+- [>] [T-006-G] Stage and commit. All five are tracked: `git add -u VERSION package.json package-lock.json CHANGELOG.md ".claude/memory/project.md"`, then `git commit -F <scratchpad>/msg-t006.txt` with subject `chore: release 1.31.2 [BUG-041]`.
 
 ---
 

@@ -1020,3 +1020,49 @@ Mechanism 1 is the walk. Mechanism 2 is the pattern checks reading quoted text a
 ### Standing constraint this spec inherits
 
 No acceptance criterion may be satisfied by "the operator can allowlist it." A remedy that nobody invoked across 47 denials, including the agent that wrote it, is not a remedy.
+
+## Implementation: BUG-041 [2026-09-28]
+
+Shipped as `1.31.2`. Plan: `docs/superpowers/plans/2026-09-28-bug041-guard3-refinement.md`, 6 tasks, 56 checkbox steps, seven commits on `fix/bug-041-guard3-refinement`.
+
+### Boundaries: five predicted, five hit exactly, one tripwire that fired correctly
+
+| point | predicted | actual |
+|---|---|---|
+| baseline | 857 / 0 | 857 / 0 |
+| T-002-D, authority alone | 855 / 2, authority suite only | **exact** |
+| T-003-B, three-red observation | 856 / 3, split across both suites | **exact** |
+| T-003-E, crossover, first run | 855 / 4 | **854 / 5, tripwire fired** |
+| T-003-E, crossover, reconciled | 855 / 4 | **exact** |
+| T-003-M | 869 / 0 | **exact** |
+| T-004-E and T-006-E | 873 / 0 | **exact** |
+
+### The tripwire, and why it is the release's best evidence
+
+The crossover run came back one failure above prediction, and the extra one was `tests/installer/templates.test.js > ships the front door as one byte-identical mirrored pair`. **The port is not one file.** BUG-037 shipped it as a mirrored pair with a byte-identity parity test so the deployed copy could never drift, and this plan then reasoned about "the port" as a single file. **The parity test did its job; the file list did not.**
+
+Classification, agreed at the halt: a **plan defect, incomplete file enumeration**, caught by a pre-existing guard at its designed boundary. Not a test touched, not a deviation absorbed. The response was to halt rather than patch forward, correct both documents under the two-documents-one-truth rule, repair the mirror, and re-run. The reconciled run was exact.
+
+**CONVENTION: any plan whose File Structure names a file that ships as a mirrored pair names BOTH members, and the sweep for mirrors is part of writing the table.** The parity suites are the authoritative list of what is paired: `unnest` in `tests/installer/commands-parity.test.js` for the command files, byte-identity in `tests/installer/templates.test.js` for the hooks. Three plans this fortnight touched mirrors; this is the first whose file list forgot.
+
+### The authorized bypass, fired once
+
+`.git/hooks/pre-commit` runs `npm test` and blocks on failure. The corpus is shared, so green requires both subjects to agree with every row, which leaves exactly two green states and puts AC1's isolated authority commit between them. **Isolation and greenness could not both hold, and isolation won.** One `git commit --no-verify` at `544cd4f`, with the suite run manually first and its verbatim failure list in the commit body, so git archaeology finds the declared red where it happened. The hook was never weakened, edited or disabled: **the exception belonged to the commit, not to the hook.** Green returned at the next commit.
+
+### Three premise corrections, all from measurement rather than memory
+
+- **OBF has six specimens, not zero.** The audit recorded zero because none had been captured, not because none existed.
+- **The P5 backtick specimen was never lost.** It sat in the session transcript verbatim the whole time.
+- **The `until` poller is a genuine loop correctly denied**, so it became a CONTROL row rather than a KNOWN-FP row. A specimen's class is decided by replaying it, not by remembering how it felt.
+
+### Two spec-truth commits, both under the standing rule
+
+**The plan does not get to outvote the spec silently, even when the plan is right.** AC10 asked for a test asserting the walk takes exactly two loop iterations; the plan proved that unobservable (nothing exported, `main()` at load, and no second iteration can find a glob the first `g3Scan` pass missed) and substituted four tests that pin the property where it can be seen. The spec was reworded before Task 1 rather than reinterpreted during it. The same rule produced the second commit when the mirror was found missing from System Impact.
+
+### Method worth keeping
+
+- **Measure a guard fix by copying the artifact to scratch and scoring it; never patch the repository before approval.** Both hooks were copied and run against every recovered denial and all 118 corpus rows, so the spec argued from numbers while the tree stayed clean.
+- **Source corpus commands from the transcript, never retype them.** Five of the six new rows carry nested quotes, backslashes or newlines. `JSON.stringify` did the escaping and each row was replayed through the pre-fix hook recovered from `544cd4f` before the suite was trusted.
+- **A row should pin a property, not a verdict.** The P4 row was chosen over two shorter candidates because its unquoted globs sit BEFORE the reader and none after, so it fails if anyone ever "fixes" P4 by scanning the whole command.
+- **The id ceiling counts reservations.** After the plan file was committed naming BUG-043 and BUG-044, the ceiling read 44 and reported 045 as next. That is the tool working: a reservation that raises the ceiling cannot be double-minted.
+- **The bash offset form was chosen for its failure mode.** `${rest%%"${BASH_REMATCH[0]}"*}` yields an empty after-text when the needle is absent and the existing break ends the loop, where the `#*` strip form would spin forever and need a new guard. **A guard's inner loop must not be able to hang the guard.**

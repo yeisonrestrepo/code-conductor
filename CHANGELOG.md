@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.31.2] - 2026-09-28
+
+### Fixed
+- `[BUG-041]` Guard 3's P4 and P7 walks sliced the after-text by the match LENGTH from position 0 instead of from the match index. For a match at index N that shaved N bytes of real command off the front and re-scanned, walking leftward until the truncation point landed inside a quoted region, where `g3Scan`'s fail-closed clause reported a glob that was never in the command. The walk now slices from the end of the match in the frozen authority and in both members of the port's byte-identical mirrored pair. Measured on the denials this repository's own agent collected in one session: **24 of 47 flip from deny to allow**, and of 118 corpus rows exactly two move, both of them rows the corpus had written down in advance as this fix's acceptance cases.
+- `[BUG-041]` bash reports no match index, so the original length slice was the form nearest to hand. The index is derivable, and the corrected form fails safe by terminating: when the needle is absent, `%%` returns the string unchanged, the after-text becomes empty, and the loop's existing break ends it.
+
+### Added
+- `[BUG-041]` Six corpus rows, every command quoted from the session transcript rather than retyped, and every one replayed through the pre-fix hook before the suite was trusted: one P4 row carrying unquoted globs **before** the reader and none after, so the corpus arbitrates the walk fix on both patterns it broke rather than only on P7; two CONTROL rows pinning that genuine shell loops are still denied, so a later refinement that silences them reads as a recall regression; and three mechanism-2 rows inherited by `[BUG-043]`.
+- `[BUG-041]` Four tests pinning the corrected walk where it can be seen. Iteration count has no behavioral shadow, so two textual contract assertions stand in, one per subject, with the authority's requiring the corrected form **exactly twice** because P4 and P7 are separate functions and a half-applied fix is the regression worth catching. Two termination assertions guard the loop against ever failing to advance.
+
+### Notes
+- `[BUG-041]` shipped mechanism 1 only. The pattern checks that read quoted argv text as code (P9, OBF, P5) are filed as `[BUG-043]`, with the measurement that shapes them: a blanket quote mask breaks seven genuine denials, because P6 and P12 inspect quoted content by design. The deny message that recommends `.claude/memory/bash-scan-allowlist.txt`, a file present in no installation, is filed as `[BUG-044]` with its zero-uptake measurement: 47 denials, zero allowlist entries, zero `CC_GUARD3_WARN` traces.
+
 ## [1.31.1] - 2026-09-28
 
 ### Fixed
