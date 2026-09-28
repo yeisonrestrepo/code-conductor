@@ -98,6 +98,13 @@ Each step must include:
   order, so a staging step placed above its edit commits the file's previous content while
   every checkbox still reports `[X]`, and the divergence surfaces only at whatever later task
   asserts on that file's expected state, pointing at the wrong task.
+- **Staging form within a step.** Where a staged path sits under a directory the repository
+  ignores, plain `git add <path>` exits 1 even when a tracked file staged correctly, because
+  the pathspec matched the ignored ancestor. Generate `git add -u <path>` when the file is
+  already tracked, `git add -f <path>` when it is new and under an ignored directory, and
+  plain `git add <path>` otherwise. Always generate an explicit path: bare `git add -u`
+  stages every modified tracked file in the repository. The branch is on tracked-ness, never
+  on habit, because `-u` exits 128 on an untracked path whether or not an ignore rule exists.
 
 ## Test List
 - [ ] Unit tests for [unit]
@@ -125,8 +132,8 @@ instruction in step 7.
 
 **Precondition on Task 0.** This gate runs to completion — the warning, the offer, and
 either the confirmed `git switch` or an explicit decline —
-**before any step of the approved plan's Task 0 executes**, including its `git add` /
-`git add -f` and its `git commit`. Its position in this file is not the guarantee; the
+**before any step of the approved plan's Task 0 executes**, including its `git add`,
+`git add -u` or `git add -f` and its `git commit`. Its position in this file is not the guarantee; the
 execution order is.
 Under the plan-commit ritual, Task 0 runs at approval, which is exactly when a plan commit
 lands on the wrong branch.

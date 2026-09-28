@@ -14,6 +14,8 @@ Identify and extract:
 - Add a timestamped section: `## Checkpoint [YYYY-MM-DD HH:MM]`
 - List decisions, conventions, and debt from this session
 
+**Staging that update, where the workflow commits it:** stage by tracked-ness, with an explicit path. A `project.md` that is already tracked takes `git add -u ".claude/memory/project.md"`; one that is not yet tracked takes plain `git add ".claude/memory/project.md"`, or `git add -f` where the project ignores `.claude/`. **Never an unconditional `-u` here.** This command is global and also runs in freshly scaffolded projects, which do not ignore `.claude/` and whose `project.md` is not yet tracked: there `-u` exits 128 and would halt the checkpoint before its DB tail, trading a defect those projects never had for one they would.
+
 **Update `.claude/memory/personal.md`** (local only):
 - Add any developer preferences observed this session
 
