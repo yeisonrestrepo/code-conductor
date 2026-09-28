@@ -57,7 +57,7 @@
 git add -f docs/superpowers/plans/2026-09-27-bug038-handoff-contract.md
 ```
 
-- [>] [T-000-B] Commit
+- [X] [T-000-B] Commit
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -84,7 +84,7 @@ EOF
 - Consumes: nothing from earlier tasks.
 - Produces: `scripts/snap-contract.mjs` exporting `PRE_PARSE_MAX_BYTES: number`, `V1_MAX_CHARS: number`, `POST_PARSE_MAX: Record<1|2, number>`, `MAX_VERSION: number`, `CAPS: Record<'ops.n'|'ops.f'|'mem.d'|'mem.x', [number, number]>`, `TOP_FIELDS: Record<1|2, string[]>`, `BLOCK_FIELDS: Record<'sys'|'ops'|'mem', string[]>`. Tasks 2, 3 and 5 import these names.
 
-- [ ] [T-001-A] Write the failing tests for the two-tier size check
+- [X] [T-001-A] Write the failing tests for the two-tier size check
 
 Append to `tests/unit/snap-validate.test.js`, inside the existing `describe('snap-validate.mjs', ...)` block, before its closing `})`:
 
@@ -141,7 +141,7 @@ Append to `tests/unit/snap-validate.test.js`, inside the existing `describe('sna
   })
 ```
 
-- [ ] [T-001-B] Write the failing tests for the field sets and the version ceiling
+- [X] [T-001-B] Write the failing tests for the field sets and the version ceiling
 
 Append immediately after the block from T-001-A:
 
@@ -182,12 +182,12 @@ Append immediately after the block from T-001-A:
   })
 ```
 
-- [ ] [T-001-C] Run the new tests and confirm they fail
+- [X] [T-001-C] Run the new tests and confirm they fail
 
 Run: `npx vitest run tests/unit/snap-validate.test.js`
 Expected: FAIL. The v2-over-4096 case fails with `payload too large`; the pre-parse case reports `payload too large` without the words `pre-parse ceiling`; the three module cases fail on `Cannot find module '../../scripts/snap-contract.mjs'`.
 
-- [ ] [T-001-D] Create the contract module
+- [X] [T-001-D] Create the contract module
 
 Create `scripts/snap-contract.mjs`:
 
@@ -233,7 +233,7 @@ export const TOP_FIELDS = {
 export const BLOCK_FIELDS = { sys: ['ph', 'c', 's'], ops: ['n', 'f'], mem: ['d', 'x'] };
 ```
 
-- [ ] [T-001-E] Rewrite the validator against the contract
+- [X] [T-001-E] Rewrite the validator against the contract
 
 Modify `scripts/snap-validate.mjs`. Four edits, each surgical:
 
@@ -295,24 +295,24 @@ for (const [key, [cap, elemCap]] of Object.entries(CAPS)) {
 
 The size check keeps using `raw.length`, not `trimmed.length`, so the v1 boundary stays exactly where the spec's characterization measured it: 4096 accepted, 4097 rejected.
 
-- [ ] [T-001-F] Verify the 32-line cap still holds
+- [X] [T-001-F] Verify the 32-line cap still holds
 
 Run: `npx vitest run tests/unit/snap-validate.test.js -t "32-line hard cap"`
 Expected: PASS. Net line change is zero: one line added for the pre-parse split, one for the post-parse cap, one removed for `const allow`, one removed for `const caps`, and the import packed onto line 1.
 
 If it fails, do **not** edit the cap. Pack `process.exit(0)` onto the preceding line, the style the file already uses on lines 3, 7, 19 and 31, and re-run.
 
-- [ ] [T-001-G] Run the validator suite
+- [X] [T-001-G] Run the validator suite
 
 Run: `npx vitest run tests/unit/snap-validate.test.js`
 Expected: PASS, 52 + 9 = **61 cases** in this file.
 
-- [ ] [T-001-H] Run the full suite
+- [X] [T-001-H] Run the full suite
 
 Run: `npx vitest run`
 Expected: **825 passed, 12 skipped**, 31 files.
 
-- [ ] [T-001-I] Commit
+- [X] [T-001-I] Commit
 
 ```bash
 git add scripts/snap-contract.mjs scripts/snap-validate.mjs tests/unit/snap-validate.test.js
@@ -350,7 +350,7 @@ EOF
 - Consumes: every export from Task 1's `scripts/snap-contract.mjs`.
 - Produces: no new symbols. `snap-build.mjs` keeps its stdin/stdout interface and `conductor-db.mjs` keeps its argv interface unchanged.
 
-- [ ] [T-002-A] Write the failing contract-parity tests
+- [X] [T-002-A] Write the failing contract-parity tests
 
 Create `tests/unit/snap-contract.test.js`:
 
@@ -421,12 +421,12 @@ describe('snap-contract.mjs', () => {
 })
 ```
 
-- [ ] [T-002-B] Run the new file and confirm it fails
+- [X] [T-002-B] Run the new file and confirm it fails
 
 Run: `npx vitest run tests/unit/snap-contract.test.js`
 Expected: FAIL on the literal and import assertions for `snap-build.mjs` and `conductor-db.mjs` (both still carry their own constants).
 
-- [ ] [T-002-C] Point snap-build at the contract
+- [X] [T-002-C] Point snap-build at the contract
 
 Modify `scripts/snap-build.mjs`. Replace lines 3-5:
 
@@ -451,7 +451,7 @@ const mem = { d: normArray(obj.d, CAPS['mem.d']), x: normArray(obj.x, CAPS['mem.
 
 Nothing else in the file changes: `MAX_SNAP_BYTES` and `V1_MAX_CHARS` keep their names and every use site is untouched.
 
-- [ ] [T-002-D] Point conductor-db at the contract
+- [X] [T-002-D] Point conductor-db at the contract
 
 Modify `scripts/conductor-db.mjs`. Delete line 27:
 
@@ -467,7 +467,7 @@ import { PRE_PARSE_MAX_BYTES as MAX_SNAP_BYTES } from './snap-contract.mjs';
 
 The alias keeps `cmdSnapshot`'s two use sites (`:447`, `:449`) and its `10 MiB` warning text byte-identical.
 
-- [ ] [T-002-E] Repair the two isolated-copy fixtures
+- [X] [T-002-E] Repair the two isolated-copy fixtures
 
 Modify `tests/scripts/conductor-db.test.js`. Both `Fallback B` cases copy `conductor-db.mjs` alone into a tree with no sibling, which now fails at module resolution rather than at the behavior under test. Add the sibling to each fixture, immediately after the existing `cpSync` line at `:286` and at `:306`:
 
@@ -483,17 +483,17 @@ const CONTRACT = fileURLToPath(new URL('../../scripts/snap-contract.mjs', import
 
 **Classification, recorded here so it is not re-litigated at execution time:** this is a **fixture completeness repair, not an assertion adjustment**. Neither `expect` in either case changes; the tree the fixture builds simply gains the sibling the deployed layout has always shipped (the installer copies `scripts/` wholesale at `lib/installer/deploy.mjs:190`). The single-file copy was an artifact of the script having had no siblings, and the assertion it guards, that root resolution lands the DB at `tree/.conductor/cache.db`, is untouched and exactly as strong. If the reviewer disagrees, the alternative is to leave `conductor-db.mjs` carrying its own `10 * 1024 * 1024`, which forfeits acceptance criteria 6 and 7.
 
-- [ ] [T-002-F] Run the three affected suites
+- [X] [T-002-F] Run the three affected suites
 
 Run: `npx vitest run tests/unit/snap-contract.test.js tests/scripts/snap-build.test.js tests/scripts/conductor-db.test.js`
 Expected: PASS. `snap-contract.test.js` 5 cases, `snap-build.test.js` unchanged, `conductor-db.test.js` 74 unchanged.
 
-- [ ] [T-002-G] Run the full suite
+- [X] [T-002-G] Run the full suite
 
 Run: `npx vitest run`
 Expected: **830 passed, 12 skipped**, 32 files.
 
-- [ ] [T-002-H] Commit
+- [X] [T-002-H] Commit
 
 ```bash
 git add scripts/snap-build.mjs scripts/conductor-db.mjs tests/unit/snap-contract.test.js tests/scripts/conductor-db.test.js
@@ -529,7 +529,7 @@ EOF
 - Consumes: the validator's stderr, which after Task 1 names the size case with its observed size and the cap applied.
 - Produces: `validateFile(p)` and `validateBlob(blob)` return `{ ok: boolean, reason: string }` instead of a bare boolean. Both are file-local.
 
-- [ ] [T-003-A] Write the failing tests
+- [X] [T-003-A] Write the failing tests
 
 Append to `tests/scripts/resume-read.test.js`, inside the `describe('resume-read.mjs DB branch', ...)` block for the first two and inside the core `describe` for the third:
 
@@ -578,12 +578,12 @@ and, in the core file-branch `describe`:
   });
 ```
 
-- [ ] [T-003-B] Run them and confirm they fail
+- [X] [T-003-B] Run them and confirm they fail
 
 Run: `npx vitest run tests/scripts/resume-read.test.js`
 Expected: FAIL. The trace lines read `resume: db-invalid degrade` and `resume: file-invalid halt` with no reason appended.
 
-- [ ] [T-003-C] Carry the validator's reason through
+- [X] [T-003-C] Carry the validator's reason through
 
 Modify `scripts/resume-read.mjs`.
 
@@ -658,17 +658,17 @@ Update the file-branch sites (lines 144-149):
 
 No exit code anywhere in this file changes. The degrade stays a degrade and the halt stays a halt; only the trace gains its cause.
 
-- [ ] [T-003-D] Confirm the Node-14 syntax pin still holds
+- [X] [T-003-D] Confirm the Node-14 syntax pin still holds
 
 Run: `npx vitest run tests/scripts/resume-read.test.js -t "Node-14-compatible"`
 Expected: PASS. The new code uses `||` and `String()`, never `??=`, `||=`, `.at(` or `structuredClone`.
 
-- [ ] [T-003-E] Run the suite
+- [X] [T-003-E] Run the suite
 
 Run: `npx vitest run`
 Expected: **833 passed, 12 skipped**, 32 files.
 
-- [ ] [T-003-F] Commit
+- [X] [T-003-F] Commit
 
 ```bash
 git add scripts/resume-read.mjs tests/scripts/resume-read.test.js
@@ -707,7 +707,7 @@ EOF
 - Consumes: nothing from earlier tasks. These are agent instructions, not code.
 - Produces: the marker pair `<!-- SESSION-ROW-TAIL:BEGIN -->` / `<!-- SESSION-ROW-TAIL:END -->` delimiting one canonical block in each of the three commands. Task 5's end-to-end test reads the phase literal out of `.claude/commands/cc-plan.md` through these markers.
 
-- [ ] [T-004-A] Write the failing parity tests
+- [X] [T-004-A] Write the failing parity tests
 
 Append to `tests/installer/commands-parity.test.js`:
 
@@ -772,12 +772,12 @@ describe('the fail-open session-row tail', () => {
 
 Rename the existing `MIRRORS` constant to `PLAN_MIRRORS` at its declaration (`tests/installer/commands-parity.test.js:19`) and at its four use sites inside `describe('cc-plan mirrors', ...)`. This is a mechanical rename for readability now that a second mirror pair exists; no assertion changes.
 
-- [ ] [T-004-B] Run them and confirm they fail
+- [X] [T-004-B] Run them and confirm they fail
 
 Run: `npx vitest run tests/installer/commands-parity.test.js`
 Expected: FAIL. Every `tailOf` call fails on the missing begin marker. `cc-implement mirrors` passes already, since the two files differ only in the nesting `unnest` reverses.
 
-- [ ] [T-004-C] Extract the tail in cc-compact
+- [X] [T-004-C] Extract the tail in cc-compact
 
 Modify `global/commands/cc-compact.md`. Replace lines 38-42 (steps 1 through 3 of the existing tail) with the marked canonical block, leaving step 4 (the snapshot row) and line 47's closing paragraph where they are:
 
@@ -805,7 +805,7 @@ Every redirect uses append mode (`>>`), never `>`, so a rapid or parallel second
 
 Renumber the surviving snapshot step from `4.` to `6.` and keep its text verbatim.
 
-- [ ] [T-004-D] Add the tail to cc-plan (source mirror)
+- [X] [T-004-D] Add the tail to cc-plan (source mirror)
 
 Modify `.claude/commands/cc-plan.md`. Append after line 227, as a new section:
 
@@ -824,7 +824,7 @@ followed by the block from T-004-C verbatim, with two substitutions and nothing 
 - `"$ph"` becomes `"plan"` on the `session` command line;
 - every `node .claude/scripts/` becomes `node scripts/` (the source mirror's un-nested path form).
 
-- [ ] [T-004-E] Add the tail to cc-implement (source mirror)
+- [X] [T-004-E] Add the tail to cc-implement (source mirror)
 
 Modify `.claude/commands/cc-implement.md`. Append after line 164, as a new section:
 
@@ -841,21 +841,21 @@ the completion summary has been output.
 
 followed by the same block, with `"impl"` as the phase literal and the same un-nested paths.
 
-- [ ] [T-004-F] Regenerate both template mirrors
+- [X] [T-004-F] Regenerate both template mirrors
 
 Modify `project-template/.claude/commands/cc-plan.md` and `project-template/.claude/commands/cc-implement.md`: append the identical sections with the nested path form, `node .claude/scripts/`, which is the exact inverse of the `unnest` transform the parity test applies.
 
-- [ ] [T-004-G] Run the parity suite
+- [X] [T-004-G] Run the parity suite
 
 Run: `npx vitest run tests/installer/commands-parity.test.js`
 Expected: PASS, 17 + 13 = **30 cases** in this file. The 13 break down as: 1 mirror-nesting case, 3 phase-literal cases, 3 loud-degrade cases, 1 three-way agreement case, 4 both-mirrors-carry-the-block cases, 1 cc-checkpoint-unchanged case.
 
-- [ ] [T-004-H] Run the full suite
+- [X] [T-004-H] Run the full suite
 
 Run: `npx vitest run`
 Expected: **846 passed, 12 skipped**, 32 files.
 
-- [ ] [T-004-I] Commit
+- [X] [T-004-I] Commit
 
 ```bash
 git add global/commands/cc-compact.md .claude/commands/cc-plan.md .claude/commands/cc-implement.md project-template/.claude/commands/cc-plan.md project-template/.claude/commands/cc-implement.md tests/installer/commands-parity.test.js
@@ -893,7 +893,7 @@ EOF
 - Consumes: Task 1's two-tier validator, Task 2's shared contract, Task 3's reason lines, Task 4's marker block (the phase literal is read out of the command file, not hand-copied).
 - Produces: nothing importable. This is the criterion that spans both halves.
 
-- [ ] [T-005-A] Write the cycle test
+- [X] [T-005-A] Write the cycle test
 
 Create `tests/scripts/handoff-cycle.test.js`:
 
@@ -1008,17 +1008,17 @@ describe.skipIf(!sqliteAvailable())('the checkpoint-to-resume handoff cycle', ()
 });
 ```
 
-- [ ] [T-005-B] Run the new file
+- [X] [T-005-B] Run the new file
 
 Run: `npx vitest run tests/scripts/handoff-cycle.test.js`
 Expected: PASS, 3 cases. Every dependency is already in place after Tasks 1 through 4; this file is the criterion, not a driver of new production code. If the first case fails at step 4 with exit 3, the two-tier cap did not land: re-check `POST_PARSE_MAX[2]`.
 
-- [ ] [T-005-C] Run the full suite
+- [X] [T-005-C] Run the full suite
 
 Run: `npx vitest run`
 Expected: **849 passed, 12 skipped**, 33 files.
 
-- [ ] [T-005-D] Commit
+- [X] [T-005-D] Commit
 
 ```bash
 git add tests/scripts/handoff-cycle.test.js
@@ -1047,11 +1047,11 @@ EOF
 - Modify: `package.json:3`, `CHANGELOG.md`, `README.md:317-318`
 - Modify: `.claude/memory/project.md`, `AGENT-READABLE BACKLOG.md`
 
-- [ ] [T-006-A] Bump the version
+- [X] [T-006-A] Bump the version
 
 Modify `package.json:3`: `"version": "1.30.0"` becomes `"version": "1.31.0"`.
 
-- [ ] [T-006-B] Add the CHANGELOG entry
+- [X] [T-006-B] Add the CHANGELOG entry
 
 Insert above the `## [1.30.0]` heading in `CHANGELOG.md`:
 
@@ -1068,7 +1068,7 @@ Insert above the `## [1.30.0]` heading in `CHANGELOG.md`:
 - `[BUG-038]` `tests/scripts/handoff-cycle.test.js`: the end-to-end cycle, with the phase literals read out of the command files.
 ```
 
-- [ ] [T-006-C] Add the module to the README script tree
+- [X] [T-006-C] Add the module to the README script tree
 
 Modify `README.md`. Insert above the `snap-build.mjs` line at `:317`:
 
@@ -1076,12 +1076,12 @@ Modify `README.md`. Insert above the `snap-build.mjs` line at `:317`:
 │   ├── snap-contract.mjs         SNAP limits, caps, field sets, version ceiling
 ```
 
-- [ ] [T-006-D] Run the full suite one last time
+- [X] [T-006-D] Run the full suite one last time
 
 Run: `npx vitest run`
 Expected: **849 passed, 12 skipped**, 33 files. Unchanged from T-005: this task adds no tests.
 
-- [ ] [T-006-E] Commit the release
+- [X] [T-006-E] Commit the release
 
 ```bash
 git add package.json CHANGELOG.md README.md
@@ -1094,7 +1094,7 @@ EOF
 )"
 ```
 
-- [ ] [T-006-F] Write the archetype paragraph into project memory
+- [>] [T-006-F] Write the archetype paragraph into project memory
 
 Append to `.claude/memory/project.md` a conventions paragraph titled **success semantics on failure paths**, naming its four instances: Guard 4 printing a block while exiting 1 (`[BUG-036]`), `git add` exiting 1 on a successful stage (`[BUG-040]`), the clean-miss resume that reported rc 3 for a rejected blob (`[BUG-038]`, fixed here), and `add_rc=1` under `.claude/`. Close with the standing instruction to grep for the fifth proactively rather than waiting for it to surface.
 
