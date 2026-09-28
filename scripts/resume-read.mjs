@@ -57,10 +57,17 @@ function resolveHash() {
   return SENTINEL;
 }
 
-// Validate an existing file path via snap-validate (exit-code verdict).
+// snap-validate writes one `SNAP_ERROR: ...` line per rejection; the first is the cause.
+function reasonOf(r) {
+  const first = String(r.stderr || '').trim().split('\n')[0];
+  return first || ('validator exit ' + r.status);
+}
+
+// Validate an existing file path via snap-validate. Returns the verdict AND the
+// validator's own reason, so a degrade can name what was wrong (BUG-038).
 function validateFile(p) {
   const r = spawnSync(process.execPath, [VALIDATE, p], { encoding: 'utf8', env: process.env });
-  return r.status === 0;
+  return { ok: r.status === 0, reason: reasonOf(r) };
 }
 
 // Probe how to launch node:sqlite. Returns [] (no flag), ['--experimental-sqlite','--no-warnings'], or null (unavailable).
@@ -77,10 +84,10 @@ function probeSqliteFlags() {
 function validateBlob(blob) {
   const tmp = join(COND, 'resume-validate.' + process.pid + '.tmp.json');
   try { mkdirSync(COND, { recursive: true }); writeFileSync(tmp, blob, 'utf8'); }
-  catch { return false; } // FS write error → blob unusable, degrade
+  catch { return { ok: false, reason: 'temp write failed' }; } // FS write error, blob unusable
   try {
     const r = spawnSync(process.execPath, [VALIDATE, tmp], { encoding: 'utf8', env: process.env });
-    return r.status === 0;
+    return { ok: r.status === 0, reason: reasonOf(r) };
   } finally { tryUnlink(tmp); }
 }
 
@@ -91,15 +98,17 @@ function queryDb(hash) {
     return null;
   }
   const flags = probeSqliteFlags();
-  if (flags === null) return null; // Node <22.5 or node:sqlite absent → degrade
+  if (flags === null) { trace('db-unavailable degrade: node:sqlite absent'); return null; }
   const args = flags.concat([CONDUCTOR_DB, 'get-snapshot', hash]);
   const r = spawnSync(process.execPath, args, { encoding: 'utf8', timeout: 5000, env: process.env });
-  if (r.status !== 0 || !r.stdout) return null; // timeout/kill/non-zero/empty → miss
+  if (r.status !== 0) { trace('db-query degrade: get-snapshot exit ' + r.status); return null; }
+  if (!r.stdout) return null; // no row for this hash is an ordinary miss, not a rejection
   const blob = r.stdout.trim();
   if (blob === '') return null;
-  if (!validateBlob(blob)) { trace('db-invalid degrade'); return null; }
+  const verdict = validateBlob(blob);
+  if (!verdict.ok) { trace('db-invalid degrade: ' + verdict.reason); return null; }
   const snap = parseJson(blob);
-  if (snap === undefined) { trace('db-invalid degrade'); return null; }
+  if (snap === undefined) { trace('db-invalid degrade: unparseable after validation'); return null; }
   return snap;
 }
 
@@ -141,12 +150,13 @@ function main() {
   if (!existsSync(HANDOFF)) { trace('miss'); return { code: 3, out: '' }; }
   let content;
   try { content = readFileSync(HANDOFF, 'utf8'); }
-  catch { trace('file-unreadable degrade'); return { code: 3, out: '' }; } // leave file on disk
+  catch (e) { trace('file-unreadable degrade: ' + ((e && e.code) || 'unknown')); return { code: 3, out: '' }; } // leave file on disk
   if (content.trim() === '') { trace('file-empty degrade'); tryUnlink(HANDOFF); return { code: 3, out: '' }; }
-  if (!validateFile(HANDOFF)) { trace('file-invalid halt'); return { code: 4, out: '' }; } // leave on disk
+  const fileVerdict = validateFile(HANDOFF);
+  if (!fileVerdict.ok) { trace('file-invalid halt: ' + fileVerdict.reason); return { code: 4, out: '' }; } // leave on disk
   const snap = parseJson(content);
-  if (snap === undefined) { trace('file-invalid halt'); return { code: 4, out: '' }; }
-  if (snap.sys.c !== hash) { trace('file-stale-hash degrade'); tryUnlink(HANDOFF); return { code: 3, out: '' }; }
+  if (snap === undefined) { trace('file-invalid halt: unparseable after validation'); return { code: 4, out: '' }; }
+  if (snap.sys.c !== hash) { trace('file-stale-hash degrade: ' + snap.sys.c + ' != ' + hash); tryUnlink(HANDOFF); return { code: 3, out: '' }; }
   // valid + hash matches → bind (content already captured), then unlink.
   const out = buildHit('file', snap, hash);
   trace('file-bind+unlink');

@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const SCRIPT = fileURLToPath(new URL('../../scripts/conductor-db.mjs', import.meta.url));
+const CONTRACT = fileURLToPath(new URL('../../scripts/snap-contract.mjs', import.meta.url));
 
 // The runner's Node needs the experimental flag only on 22.5.x–22.x; adding it
 // on >=22.5 is harmless (accepted no-op on 23+). `--no-warnings` suppresses the
@@ -284,6 +285,7 @@ describe.skipIf(!HAS_SQLITE)('conductor-db root resolution fallbacks', () => {
       const scriptsDir = join(tree, 'scripts');
       mkdirSync(scriptsDir, { recursive: true });
       cpSync(SCRIPT, join(scriptsDir, 'conductor-db.mjs'));
+      cpSync(CONTRACT, join(scriptsDir, 'snap-contract.mjs'));
       const r = spawnSync(process.execPath,
         [...FLAG, join(scriptsDir, 'conductor-db.mjs'), 'record', 'plan.md', 'T-001', 'X'],
         { cwd: scriptsDir, encoding: 'utf8', env: NO_GIT_ENV });
@@ -304,6 +306,7 @@ describe.skipIf(!HAS_SQLITE)('conductor-db root resolution fallbacks', () => {
       const scriptsDir = join(tree, '.claude', 'scripts');
       mkdirSync(scriptsDir, { recursive: true });
       cpSync(SCRIPT, join(scriptsDir, 'conductor-db.mjs'));
+      cpSync(CONTRACT, join(scriptsDir, 'snap-contract.mjs'));
       const r = spawnSync(process.execPath,
         [...FLAG, join(scriptsDir, 'conductor-db.mjs'), 'record', 'plan.md', 'T-001', 'X'],
         { cwd: scriptsDir, encoding: 'utf8', env: NO_GIT_ENV });

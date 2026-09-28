@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.31.0] - 2026-09-28
+
+### Fixed
+- `[BUG-038]` `scripts/snap-validate.mjs`: the payload size check ran one line before `JSON.parse`, so it could not branch on `snap.v` and capped every version at 4096 characters. Every v2 snapshot carrying checkpoint prose was written, stored and then discarded by the resume read. The check is now two tiers: a hard 10 MiB pre-parse ceiling, then the version-specific cap once the version is known. v1 keeps its 4096-character context budget under its own name.
+- `[BUG-038]` `scripts/resume-read.mjs`: every degrade and halt names its reason on `.conductor/last-write.log`, and the size case names the observed size against the cap applied. Exit codes and fail-open behavior are unchanged.
+- `[BUG-038]` `/cc-plan` and `/cc-implement`: each writes a session row at its own boundary, so `/cc-checkpoint`'s carry-forward stops reporting a phase two boundaries stale. The carry-forward itself is unchanged.
+
+### Added
+- `[BUG-038]` `scripts/snap-contract.mjs`: one module owning the pre-parse ceiling, the per-version caps, the array caps in a single key scheme, both field-set allow-lists and the version ceiling. `snap-build.mjs`, `snap-validate.mjs` and `conductor-db.mjs` all import from it, and a test asserts the three resolve the same values.
+- `[BUG-038]` `tests/scripts/handoff-cycle.test.js`: the end-to-end cycle, with the phase literals read out of the command files.
+
 ## [1.30.0] - 2026-09-27
 
 ### Fixed

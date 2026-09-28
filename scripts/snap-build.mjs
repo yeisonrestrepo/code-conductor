@@ -1,8 +1,5 @@
 import { readFileSync } from 'node:fs';
-
-const MAX_SNAP_BYTES = 10485760;          // 10 MiB (v2)
-const V1_MAX_CHARS = 4096;                // handoff-file contract (v1)
-const CAPS = { n: [3, 200], f: [20, 300], d: [10, 300], x: [5, 200] };
+import { CAPS, PRE_PARSE_MAX_BYTES as MAX_SNAP_BYTES, V1_MAX_CHARS } from './snap-contract.mjs';
 
 const die = (msg) => { process.stderr.write(`SNAP_BUILD_ERROR: ${msg}\n`); process.exit(1); };
 const byteLen = (s) => Buffer.byteLength(s, 'utf8');
@@ -48,12 +45,12 @@ for (const k of ['ph', 'c', 's']) {
 }
 
 const sys = { ph: obj.ph, c: obj.c, s: obj.s };
-const ops = { n: normArray(obj.n, CAPS.n), f: normArray(obj.f, CAPS.f) };
-const mem = { d: normArray(obj.d, CAPS.d), x: normArray(obj.x, CAPS.x) };
+const ops = { n: normArray(obj.n, CAPS['ops.n']), f: normArray(obj.f, CAPS['ops.f']) };
+const mem = { d: normArray(obj.d, CAPS['mem.d']), x: normArray(obj.x, CAPS['mem.x']) };
 const pr = typeof obj.pr === 'string' ? obj.pr : '';
 
 if (pr === '') {
-  // ---- v1: 4096-char cap, drop oldest of mem.d / ops.f ----
+  // ---- v1: V1_MAX_CHARS cap, drop oldest of mem.d / ops.f ----
   const snap = { v: 1, sys, ops, mem };
   let line = JSON.stringify(snap);
   while (line.length > V1_MAX_CHARS && (mem.d.length || ops.f.length)) {
