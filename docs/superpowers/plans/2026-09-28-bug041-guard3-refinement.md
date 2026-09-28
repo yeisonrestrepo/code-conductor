@@ -394,22 +394,22 @@ Run every step before a character of either subject changes. Each one re-opens t
 - [X] [T-006-D] Verify all four agree, mechanically rather than by eye. Write `<scratchpad>/version-gate.mjs` that reads `VERSION`, `package.json`, `package-lock.json` (`version` and `packages[""].version`) and the first `## ` heading in `CHANGELOG.md`, prints all five values, and exits non-zero unless every one is `1.31.2`. This is the step whose absence shipped 1.31.0 with `VERSION` still reading 1.30.0.
 - [X] [T-006-E] Run the full suite: `npx vitest run --reporter=basic`. **Expected: 873 passed, 12 skipped, 0 failed.**
 - [X] [T-006-F] Append the implementation record to `.claude/memory/project.md` under `## Implementation: BUG-041 [2026-09-28]`: every boundary hit against its prediction, whether the tripwire fired, the one bypassed gate with its authorization, the AC10 substitution with its reason, and any deviation with its classification.
-- [>] [T-006-G] Stage and commit. All five are tracked: `git add -u VERSION package.json package-lock.json CHANGELOG.md ".claude/memory/project.md"`, then `git commit -F <scratchpad>/msg-t006.txt` with subject `chore: release 1.31.2 [BUG-041]`.
+- [X] [T-006-G] Stage and commit. All five are tracked: `git add -u VERSION package.json package-lock.json CHANGELOG.md ".claude/memory/project.md"`, then `git commit -F <scratchpad>/msg-t006.txt` with subject `chore: release 1.31.2 [BUG-041]`.
 
 ---
 
 ## Test List
 
-- [ ] [T-100] Corpus row: P7-1 flips to allow, arbitrated in both suites (T-003-F)
-- [ ] [T-101] Corpus row: P7-2 flips to allow, arbitrated in both suites (T-003-G)
-- [ ] [T-102] Corpus row: the P4 walk row allows, with globs before the reader and none after (T-003-A)
-- [ ] [T-103] Corpus rows: both genuine loops still deny (T-003-J)
-- [ ] [T-104] Corpus rows: the three mechanism-2 specimens still deny (T-003-K)
-- [ ] [T-105] Contract: the port slices from the match end (T-004-A)
-- [ ] [T-106] Contract: the authority carries the corrected form in both walk functions (T-004-B)
-- [ ] [T-107] Termination: the port returns a verdict on a 40-pager command (T-004-C)
-- [ ] [T-108] Termination: the authority returns a verdict on the same shape (T-004-D)
-- [ ] [T-109] Unchanged: `EXCEPTIONS` still has exactly one member (existing test, must stay green throughout)
+- [X] [T-100] Corpus row: P7-1 flips to allow, arbitrated in both suites (T-003-F)
+- [X] [T-101] Corpus row: P7-2 flips to allow, arbitrated in both suites (T-003-G)
+- [X] [T-102] Corpus row: the P4 walk row allows, with globs before the reader and none after (T-003-A)
+- [X] [T-103] Corpus rows: both genuine loops still deny (T-003-J)
+- [X] [T-104] Corpus rows: the three mechanism-2 specimens still deny (T-003-K)
+- [X] [T-105] Contract: the port slices from the match end (T-004-A)
+- [X] [T-106] Contract: the authority carries the corrected form in both walk functions (T-004-B)
+- [X] [T-107] Termination: the port returns a verdict on a 40-pager command (T-004-C)
+- [X] [T-108] Termination: the authority returns a verdict on the same shape (T-004-D)
+- [X] [T-109] Unchanged: `EXCEPTIONS` still has exactly one member (existing test, must stay green throughout)
 
 ## Commit Order
 
