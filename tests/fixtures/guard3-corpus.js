@@ -159,30 +159,68 @@ export const CORPUS = [
   { label: 'exact match (no trailing slash)', command: 'cat file.ts', allowlist: ['file.ts'], verdict: 'allow' },
   { label: 'substring not matched (docs vs doc_files)', command: 'cat doc_files/*.ts', allowlist: ['docs/'], verdict: 'deny' },
 
-  // KNOWN-FP specimens, pending [BUG-041]. These three are real commands this
-  // repository's own agent ran on 2026-09-27 and Guard 3 denied. Both subjects
-  // deny all three, so they are FAITHFUL false positives, not port defects: the
-  // differential found 0 disagreements of 3. The rows assert the CURRENT verdict
-  // because the authority arbitrates until a refinement spec deliberately flips
-  // them with a predicted red state and a per-pattern rationale. Rows record what
-  // is; the spec changes what should be. [BUG-041] inherits them as its
-  // pre-written acceptance cases, so do not "fix" them here.
+  // These three are real commands this repository's own agent ran on 2026-09-27 and
+  // Guard 3 denied. They were filed as KNOWN-FP rows asserting the verdict of the
+  // day, to be flipped only by a refinement that predicted the red state first.
+  // [BUG-041] did exactly that, and the first two are now the flip it produced.
   //
-  // P7-1 and P7-2 fire with NO glob character present. g3GlobWalk slices the
-  // after-text by the match LENGTH rather than the match index (the preserved
-  // authority quirk), which shaves 7 characters off the FRONT per iteration until
-  // the after-text begins inside a quoted region; g3Scan('glob', ...) then ends in
-  // DOUBLE_QUOTED / SINGLE_QUOTED and its fail-closed clause reports a glob.
-  // P7-1 needs 8 iterations, P7-2 needs 23.
-  { label: 'KNOWN-FP P7-1: grep then sed with a quoted echo between', command: 'cd /Users/yeison/Projects/code-conductor && grep -n "seedMemoryFile" -r lib bin tests && echo "=== changelog head ===" && sed -n \'1,30p\' CHANGELOG.md', verdict: 'deny' },
-  { label: 'KNOWN-FP P7-2: multi-line cleanup piping into tail', command: 'cd /Users/yeison/Projects/code-conductor\ngit branch -d fix/bug-039-installer-host-owned-state 2>&1 | tail -3\ngit remote prune origin 2>&1 | tail -3\nprintf \'=== status ===\\n\'\ngit status --porcelain\nprintf \'=== suite on merged main ===\\n\'\nnpx vitest run 2>&1 | tail -5', verdict: 'deny' },
-  // P9-1 involves no quirk. The preprocessor joins physical lines with ';', and
-  // ';' is a command-position anchor in G3_POS, so a PROSE line inside a quoted
-  // commit message that merely begins with "for" becomes ';for ' and reads as a
-  // shell loop. The matched substring is ';for '. The scanner has quote-state
-  // machinery but the pattern checks run over the whole preprocessed string
-  // without consulting it, so quoted argv text is analyzed as if it were code.
+  // P7-1 and P7-2 fired with NO glob character present. The walk sliced the
+  // after-text by the match LENGTH rather than from the match index, shaving 7
+  // characters off the FRONT per iteration until the after-text began inside a
+  // quoted region; g3Scan('glob', ...) then ended in DOUBLE_QUOTED / SINGLE_QUOTED
+  // and its fail-closed clause reported a glob that was never in the command.
+  // P7-1 took 8 leftward iterations to get there, P7-2 took 23. The walk now slices
+  // from the end of the match in both subjects, so these two rows pin the CORRECTED
+  // contract rather than a tolerated defect. Flipping them was measured before it
+  // was written: 24 of 47 real denials moved, and of 118 corpus rows exactly these
+  // two. P9-1 below did not move, and says why.
+  { label: 'KNOWN-FP P7-1: grep then sed with a quoted echo between', command: 'cd /Users/yeison/Projects/code-conductor && grep -n "seedMemoryFile" -r lib bin tests && echo "=== changelog head ===" && sed -n \'1,30p\' CHANGELOG.md', verdict: 'allow' },
+  { label: 'KNOWN-FP P7-2: multi-line cleanup piping into tail', command: 'cd /Users/yeison/Projects/code-conductor\ngit branch -d fix/bug-039-installer-host-owned-state 2>&1 | tail -3\ngit remote prune origin 2>&1 | tail -3\nprintf \'=== status ===\\n\'\ngit status --porcelain\nprintf \'=== suite on merged main ===\\n\'\nnpx vitest run 2>&1 | tail -5', verdict: 'allow' },
+  // P9-1 involves no walk at all, which is why [BUG-041] deliberately left it
+  // denying. The preprocessor joins physical lines with ';', and ';' is a
+  // command-position anchor in G3_POS, so a PROSE line inside a quoted commit
+  // message that merely begins with "for" becomes ';for ' and reads as a shell
+  // loop. The matched substring is ';for '. The scanner has quote-state machinery
+  // but the pattern checks run over the whole preprocessed string without
+  // consulting it, so quoted argv text is analyzed as if it were code.
+  //
+  // That is MECHANISM 2, filed as [BUG-043], and it is a separate defect from the
+  // walk: it fires P9, OBF and P5, and it cannot be fixed by one preprocessing
+  // change, because a blanket quote mask breaks seven genuine denials (four P6
+  // rows, the P6 dialect row, two P12 alias rows). P6 and P12 inspect quoted
+  // content BY DESIGN. This row and the three below are that item's pre-written
+  // acceptance cases, inherited exactly as P7-1 and P7-2 were inherited by
+  // [BUG-041]. Do not "fix" them here.
   { label: 'KNOWN-FP P9-1: commit message body line beginning with for', command: 'cd /Users/yeison/Projects/code-conductor && git commit -q -m "refactor: retire seedMemoryFile and wire the deploy warn channel [BUG-039]\n\nThe table\'s seed policy is now the single write-if-absent mechanism, so\nthe standalone helper and its coverage go with it, classified as coverage\nfor deleted code with a tombstone comment naming where that coverage\nmoved. deployProject gets the CLI\'s stderr emitter, and end-to-end cases\npin the re-run behavior against the real bundled assets, which is the\nonly layer where the old copy-then-merge ordering was observable.\n\nCo-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01HLS5KAHkhpMChyqNTbqrhe"\nprintf \'commit_rc=%s\\n\' "$?"\ngit log --oneline -1', verdict: 'deny' },
+
+  // P4 carried ZERO specimens when [BUG-041] was filed and five by the time its
+  // spec was written. Both rows that the walk fix flips are P7, so without this row
+  // the corpus would arbitrate the fix on only one of the two patterns the defect
+  // broke. This command denied under P4 before the fix and allows after it, measured.
+  // The unquoted globs EARLIER in the command are load-bearing: the text after
+  // `cat VERSION` has none, so the row pins that `after` begins at the END of the
+  // match. A later "fix" that scans the whole command for globs turns this row red,
+  // which is the point.
+  { label: 'P4 walk: glob before the reader, none after it', command: 'wc -l tests/installer/*.js lib/installer/*.mjs && echo "--- VERSION ---" && cat VERSION && echo "--- node/test runner ---" && node -e \'const p=require("./package.json");console.log(JSON.stringify(p.scripts));console.log(p.version)\'', verdict: 'allow' },
+
+  // CONTROLS, not false positives. Both are genuine shell loops this repository's own
+  // agent wrote, and P9 denies them by its own rule working correctly. They are here so
+  // that a later refinement which silences either one is recognized as a RECALL
+  // regression rather than a precision win. Whether P9 should deny a loop that dumps
+  // nothing is a rule question, deliberately not answered by [BUG-041]. Both commands
+  // are quoted from the session transcript, not retyped.
+  { label: "control P9: genuine for loop over task ids", command: "cd /Users/yeison/Projects/code-conductor\nP=\"docs/superpowers/plans/2026-09-27-bug039-installer-host-owned-state.md\"\nfor id in T-100 T-101 T-102 T-103 T-104 T-105 T-106 T-107; do\n  node scripts/conductor-db.mjs record \"$P\" \"$id\" \"X\" || printf 'FAILED %s\\n' \"$id\"\ndone\nprintf 'batch_rc=%s\\n' \"$?\"", verdict: "deny" },
+  { label: "control P9: genuine until loop polling a PR", command: "until [ \"$(gh pr view 32 --json reviewDecision --jq .reviewDecision)\" = \"APPROVED\" ]; do sleep 30; done; echo \"APPROVED\"", verdict: "deny" },
+
+  // MECHANISM 2 specimens, pending [BUG-043]: quoted argv text analyzed as code.
+  // Three checks, one root cause. OBF reads a backslash run inside a single-quoted
+  // regex as an evasion attempt; P5 reads a backslash-escaped backtick inside a
+  // double-quoted pattern as a command substitution; P9 reads a JavaScript for-of
+  // inside a quoted program as a shell loop. Each denies today and is expected to
+  // keep denying until that item lands, the same footing P7-1 and P7-2 stood on.
+  { label: "KNOWN-FP OBF: escape run inside a single-quoted grep pattern, pending [BUG-043]", command: "grep -n -m 3 -E '\\[ \\] \\[T-[0-9]{3,}(-[A-Z0-9]+)*\\]' \"docs/superpowers/plans/2026-09-27-bug038-handoff-contract.md\"", verdict: "deny" },
+  { label: "KNOWN-FP P5: escaped backtick inside a double-quoted grep pattern, pending [BUG-043]", command: "grep -n \"Components Affected:\\*\\* \\`.claude/hooks/pre-tool-use.mjs\\`\" \"AGENT-READABLE BACKLOG.md\"", verdict: "deny" },
+  { label: "KNOWN-FP P9: for-of inside a quoted node program, pending [BUG-043]", command: "node -e \"\nconst t=require('fs').readFileSync('tests/fixtures/guard3-reference.sh','utf8');\nfor (const fn of ['_g3_p3_xargs_reader','_g3_p8_ls_recursive','_g3_p12_alias']) {\n  const i=t.indexOf(fn+'()');\n  const j=t.indexOf('\\n}\\n', i);\n  console.log('=== '+fn); console.log(t.slice(i, j+2));\n}\"", verdict: "deny" },
 ];
 
 // Rows that exist because the translation could have gone wrong in a specific way.
