@@ -195,11 +195,14 @@ function g3Scan(mode, input) {
 
 // Each check returns true when it FIRES (the authority's shell functions returned 1).
 //
-// A quirk worth naming, because it looks like a bug and is not: the authority walks
-// with `after="${rest:mlen}"`, slicing by the match LENGTH from position 0 rather
-// than from the match index. For `ls; cat *.ts` the match is `; cat ` and bash's
-// `after` is `at *.ts`, not `*.ts`. P4 and P7 reproduce that exactly. "Fixing" it
-// would make the port disagree with the corpus.
+// The walk's contract, corrected in both subjects under [BUG-041]: `after` is the
+// text that FOLLOWS the match, sliced from `m.index + m[0].length`. The original form
+// sliced by the match LENGTH from position 0, so for a match at index N it shaved N
+// bytes of real command off the front and re-scanned, walking leftward until the cut
+// landed inside a quoted region; g3Scan's fail-closed clause then reported a glob that
+// was never in the command. It cost 24 of the 47 denials measured in one session. The
+// authority carries the same correction, recorded as its third sanctioned exception,
+// so the corpus still arbitrates both subjects rather than one.
 
 function g3P1FindDepth(s) {
   if (!reFind.test(s)) return false;
@@ -241,7 +244,7 @@ function g3GlobWalk(s, re) {
   for (;;) {
     const m = re.exec(rest);
     if (!m) return false;
-    const after = rest.slice(m[0].length); // authority quirk: slice by length, not index
+    const after = rest.slice(m.index + m[0].length);
     if (g3Scan('glob', after).glob) return true;
     rest = after;
     if (rest === '') return false;

@@ -981,3 +981,88 @@ Shipped as **1.31.1** on `fix/bug-040-staging-convention` in six commits (`bb34a
 - **Amending any commit requires an explicit go-ahead; the default is to fold the change into the next commit.** Established after I amended an unpushed plan-state commit at `T-005-A` to absorb its own checkbox flip. It was local-only and the resulting tree was identical either way, so nothing was lost and nothing anyone had seen was rewritten. It was still the wrong call to make unasked: **a history rewrite belongs to whoever owns the history, and tidiness is not the agent's reason to reach for one.** The tell is any `--amend`, rebase or reset reached for to make a record look neater rather than to fix a stated defect.
 - **`[BUG-041]` now arrives with FOUR characterized patterns, not three.** The three filed specimens (two P7, one P9) plus a fourth captured during the `[BUG-038]` and `[BUG-040]` work: **P9 fires on `until [ ... ]; do` at command position**, a legitimate shell loop in an ordinary agent command, denied correctly by the pattern's own rule. It joins the corpus on the same evidence-first footing as the others. The uncaptured P5 backtick specimen did NOT recur across either release and stays unfiled under that entry's own rule.
 - **A poller that hardcodes its target reports the wrong thing confidently.** The PR-approval helper written for PR #32 was re-run for #34 with the number still baked in, which would have read an already-merged PR's state as the new one's. It now takes the number as an argument and returns `POLL_ERROR` on a non-zero `gh` exit instead of letting an error string fall through as a state. Same failure-path discipline the `id-ceiling` guard needed: **a tool that cannot tell "I failed" from "the answer is no" is the archetype in miniature.**
+
+## Spec: BUG-041 Guard 3 refinement [2026-09-28]
+
+**Spec file:** `docs/superpowers/specs/2026-09-28-bug041-guard3-refinement-design.md` (approved 2026-09-28 with two required additions, both applied).
+
+### The audit replaced memory with measurement
+
+The filing described three characterized specimens. Recovering every Guard 3 denial from the session transcript and re-scanning each command against the shipped hook gave **47 denial events, 43 unique commands**. The population grew from 41 to 43 mid-measurement because two of the scripts written to perform the measurement were themselves denied by the bug they were measuring.
+
+Three premises the audit held were wrong, and the transcript said so:
+- **OBF is not zero-specimen.** Six specimens, all escape runs such as `\[ \]` inside a single-quoted `grep -E` pattern.
+- **The P5 backtick specimen was never lost.** It is in the transcript verbatim: a backslash-escaped backtick inside a double-quoted grep pattern.
+- **The `until` poller is not a false positive.** It is a genuine loop correctly denied, so it is a **control** row beside `for id in ...; do`, not a KNOWN-FP row. A later refinement that silences either is a recall regression.
+
+**Convention established: measure a guard fix by copying the artifact to scratch, never by patching the repository before approval.** Both hooks were copied to scratch files with the one-line change applied and run over every recovered denial plus all 118 corpus rows. Nothing in the repository was modified to produce the numbers below, so the spec argued from measurement while the tree stayed clean.
+
+| configuration | denials flipping deny to allow | corpus rows whose verdict moves |
+|---|---|---|
+| walk fix only | 20 of 41 | 2 of 118, both pre-declared KNOWN-FP |
+| walk fix plus targeted quote mask | 36 of 43 | 3 of 118, the same two plus P9-1 |
+
+The rows that move are exactly the rows `guard3-corpus.js:162-185` wrote down in advance as this item's acceptance cases. Zero unplanned regressions in either configuration.
+
+### Gate 1, ruled (a): patch the frozen authority
+
+`guard3-reference.sh:159` becomes `rest="${rest#*"${BASH_REMATCH[0]}"}"` and `pre-tool-use.mjs:244` becomes `rest.slice(m.index + m[0].length)`. **The authority is an oracle of intent, not a snapshot of behavior**, and the walk was never intended: bash's `[[ =~ ]]` reports the matched text and no index, so `${#BASH_REMATCH[0]}` was the only slice available to whoever wrote it. Option (b) was rejected because the one existing sanctioned divergence is enumerable while this one is a function of command length and quote count, so a count assertion over an open-ended set would be a fiction. `EXCEPTIONS` stays at one member.
+
+### Gate 2, ruled split: the two mechanisms sever
+
+Mechanism 1 is the walk. Mechanism 2 is the pattern checks reading quoted text as code, which fires P9, OBF and P5. They ship separately, and the decisive argument is measured: **a blanket quote mask breaks seven genuine denials**, four P6 rows, the P6 dialect row, and two P12 alias rows. **P6 and P12 inspect quoted content by design**, since a grep pattern and an alias value are the data those checks exist to read. That makes mechanism 2 a per-check design question rather than a preprocessing patch, and it needs a second five-state scanner written in bash for the authority. It files as `BUG-043`.
+
+### The two required additions at approval
+
+- **P4 must be arbitrated by the corpus, not only by the scratch measurement.** Both flipping corpus rows are P7, so post-ship the oracle would guard the walk fix on one of its two patterns. P4 carried zero specimens when the filing was written and five by the time the spec was, three of them pure mechanism-1 flips. AC13 adds one verbatim P4 row, chosen because it carries unquoted globs **earlier** in the command while the text after `cat VERSION` has none: the row pins that the after-text begins at the end of the match, and a later "fix" that scans the whole string for globs turns it red.
+- **The deny message naming a file that does not exist gets an id, not a paragraph.** Across 47 denials the allowlist was added zero times and `CC_GUARD3_WARN` was set zero times, and `.claude/memory/bash-scan-allowlist.txt` exists in no installation while the deny message names it as the remedy. That is a product defect independent of any pattern, **documentation lying about the remedy**, and it files as `BUG-044` carrying its own candidate shapes. **Unhomed findings do not stay found**, which is why "the remedy is not a pattern change" justifies moving it rather than dropping it.
+
+### Standing constraint this spec inherits
+
+No acceptance criterion may be satisfied by "the operator can allowlist it." A remedy that nobody invoked across 47 denials, including the agent that wrote it, is not a remedy.
+
+## Implementation: BUG-041 [2026-09-28]
+
+Shipped as `1.31.2`. Plan: `docs/superpowers/plans/2026-09-28-bug041-guard3-refinement.md`, 6 tasks, 56 checkbox steps, seven commits on `fix/bug-041-guard3-refinement`.
+
+### Boundaries: five predicted, five hit exactly, one tripwire that fired correctly
+
+| point | predicted | actual |
+|---|---|---|
+| baseline | 857 / 0 | 857 / 0 |
+| T-002-D, authority alone | 855 / 2, authority suite only | **exact** |
+| T-003-B, three-red observation | 856 / 3, split across both suites | **exact** |
+| T-003-E, crossover, first run | 855 / 4 | **854 / 5, tripwire fired** |
+| T-003-E, crossover, reconciled | 855 / 4 | **exact** |
+| T-003-M | 869 / 0 | **exact** |
+| T-004-E and T-006-E | 873 / 0 | **exact** |
+
+### The tripwire, and why it is the release's best evidence
+
+The crossover run came back one failure above prediction, and the extra one was `tests/installer/templates.test.js > ships the front door as one byte-identical mirrored pair`. **The port is not one file.** BUG-037 shipped it as a mirrored pair with a byte-identity parity test so the deployed copy could never drift, and this plan then reasoned about "the port" as a single file. **The parity test did its job; the file list did not.**
+
+Classification, agreed at the halt: a **plan defect, incomplete file enumeration**, caught by a pre-existing guard at its designed boundary. Not a test touched, not a deviation absorbed. The response was to halt rather than patch forward, correct both documents under the two-documents-one-truth rule, repair the mirror, and re-run. The reconciled run was exact.
+
+**CONVENTION: any plan whose File Structure names a file that ships as a mirrored pair names BOTH members, and the sweep for mirrors is part of writing the table.** The parity suites are the authoritative list of what is paired: `unnest` in `tests/installer/commands-parity.test.js` for the command files, byte-identity in `tests/installer/templates.test.js` for the hooks. Three plans this fortnight touched mirrors; this is the first whose file list forgot.
+
+### The authorized bypass, fired once
+
+`.git/hooks/pre-commit` runs `npm test` and blocks on failure. The corpus is shared, so green requires both subjects to agree with every row, which leaves exactly two green states and puts AC1's isolated authority commit between them. **Isolation and greenness could not both hold, and isolation won.** One `git commit --no-verify` at `544cd4f`, with the suite run manually first and its verbatim failure list in the commit body, so git archaeology finds the declared red where it happened. The hook was never weakened, edited or disabled: **the exception belonged to the commit, not to the hook.** Green returned at the next commit.
+
+### Three premise corrections, all from measurement rather than memory
+
+- **OBF has six specimens, not zero.** The audit recorded zero because none had been captured, not because none existed.
+- **The P5 backtick specimen was never lost.** It sat in the session transcript verbatim the whole time.
+- **The `until` poller is a genuine loop correctly denied**, so it became a CONTROL row rather than a KNOWN-FP row. A specimen's class is decided by replaying it, not by remembering how it felt.
+
+### Two spec-truth commits, both under the standing rule
+
+**The plan does not get to outvote the spec silently, even when the plan is right.** AC10 asked for a test asserting the walk takes exactly two loop iterations; the plan proved that unobservable (nothing exported, `main()` at load, and no second iteration can find a glob the first `g3Scan` pass missed) and substituted four tests that pin the property where it can be seen. The spec was reworded before Task 1 rather than reinterpreted during it. The same rule produced the second commit when the mirror was found missing from System Impact.
+
+### Method worth keeping
+
+- **Measure a guard fix by copying the artifact to scratch and scoring it; never patch the repository before approval.** Both hooks were copied and run against every recovered denial and all 118 corpus rows, so the spec argued from numbers while the tree stayed clean.
+- **Source corpus commands from the transcript, never retype them.** Five of the six new rows carry nested quotes, backslashes or newlines. `JSON.stringify` did the escaping and each row was replayed through the pre-fix hook recovered from `544cd4f` before the suite was trusted.
+- **A row should pin a property, not a verdict.** The P4 row was chosen over two shorter candidates because its unquoted globs sit BEFORE the reader and none after, so it fails if anyone ever "fixes" P4 by scanning the whole command.
+- **The id ceiling counts reservations.** After the plan file was committed naming BUG-043 and BUG-044, the ceiling read 44 and reported 045 as next. That is the tool working: a reservation that raises the ceiling cannot be double-minted.
+- **The bash offset form was chosen for its failure mode.** `${rest%%"${BASH_REMATCH[0]}"*}` yields an empty after-text when the needle is absent and the existing break ends the loop, where the `#*` strip form would spin forever and need a new guard. **A guard's inner loop must not be able to hang the guard.**

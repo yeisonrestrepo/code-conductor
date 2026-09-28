@@ -80,7 +80,7 @@ describe.skipIf(!BASH)('guard3 - pre-tool-use.sh', () => {
   // The specimens assert the CURRENT verdict, which both subjects agree on, so
   // they belong in the shared corpus rather than in a divergence list.
   it('the corpus table carries exactly 111 rows', () => {
-    expect(CORPUS).toHaveLength(111)
+    expect(CORPUS).toHaveLength(117)
   })
 
   it.each(CORPUS.map(r => [r.label, r]))('%s', (_label, row) => {
@@ -93,5 +93,16 @@ describe.skipIf(!BASH)('guard3 - pre-tool-use.sh', () => {
     const status = runRow(row)
     if (row.verdict === 'deny') expect(status).not.toBe(0)
     else expect(status).toBe(0)
+  })
+
+  // This is where the no-progress risk actually lives. The corrected walk advances by
+  // ${#pre}+${#BASH_REMATCH[0]}; if the needle were ever missed, %% returns rest
+  // unchanged, after becomes empty and the existing break ends the loop. A form that
+  // could fail to advance would hang the hook, and the harness would report a spawn
+  // timeout rather than a verdict, so the assertion is that a verdict comes back at
+  // all. Forty pager matches, each followed by a quoted span. [BUG-041].
+  it('terminates on a command built to maximize walk iterations', () => {
+    const command = Array.from({ length: 40 }, (_, i) => `head -1 "file ${i}.txt"`).join('; ')
+    expect(runRow({ command })).toBe(0)
   })
 })

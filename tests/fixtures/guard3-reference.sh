@@ -7,7 +7,7 @@
 # the [BUG-037] port is verified against, exercised unchanged by the 108 cases in
 # tests/hooks/guard3.test.js. Do not edit to make a port pass.
 #
-# Two sanctioned exceptions exist, both recorded in
+# Three sanctioned exceptions exist. The first two are recorded in
 # docs/superpowers/specs/2026-09-25-bug037-guard3-port-and-first-ship-design.md:
 #   1. The allowlist is populated from .claude/memory/bash-scan-allowlist.txt
 #      instead of an array literal, so both subjects read one source.
@@ -16,6 +16,15 @@
 #      "cat fileXts *.md" is therefore allowed here and denied there. That
 #      inequality is asserted by design in the corpus EXCEPTIONS table; it is
 #      not a port defect.
+#   3. The P4 and P7 walks slice from the END of the match rather than by the
+#      match LENGTH from position 0. The original form shaved len(match) bytes
+#      off the FRONT and re-scanned, walking leftward until the cut landed inside
+#      a quoted region, where _g3_scan's fail-closed clause reported a glob that
+#      was never in the command. bash's [[ =~ ]] reports no index, so the length
+#      slice was the form nearest to hand; it was never intended behavior, and
+#      the index is in fact derivable, which is what the correction does.
+#      Corrected in both subjects under [BUG-041], recorded in
+#      docs/superpowers/specs/2026-09-28-bug041-guard3-refinement-design.md.
 # Nothing else in this file moves.
 
 set -euo pipefail
@@ -155,8 +164,8 @@ _g3_p4_cat_glob() {
   local cat_re="${_G3_POS}${_G3_MOD}${_G3_PATH}cat([[:space:]]|$)"
   local rest="$s"
   while [[ "$rest" =~ $cat_re ]]; do
-    local mlen=${#BASH_REMATCH[0]}
-    local after="${rest:mlen}"
+    local pre="${rest%%"${BASH_REMATCH[0]}"*}"
+    local after="${rest:${#pre}+${#BASH_REMATCH[0]}}"
     _g3_scan "glob" "$after" || return 1   # rc=1 means glob found → block
     rest="$after"
     [[ -z "$rest" ]] && break
@@ -228,8 +237,8 @@ _g3_p7_pager_glob() {
   local pager_re="${_G3_POS}${_G3_MOD}${_G3_PATH}(less|more|head|tail|sed|awk)([[:space:]]|$)"
   local rest="$s"
   while [[ "$rest" =~ $pager_re ]]; do
-    local mlen=${#BASH_REMATCH[0]}
-    local after="${rest:mlen}"
+    local pre="${rest%%"${BASH_REMATCH[0]}"*}"
+    local after="${rest:${#pre}+${#BASH_REMATCH[0]}}"
     _g3_scan "glob" "$after" || return 1   # rc=1 means glob found → block
     rest="$after"
     [[ -z "$rest" ]] && break
