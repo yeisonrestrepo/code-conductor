@@ -48,7 +48,7 @@ git add -f docs/superpowers/plans/2026-09-28-bug040-staging-convention.md
 
 **Deliberate:** this step uses `git add -f` because `docs/` is ignored and the plan file is new, which is precisely the second branch of the convention this plan implements. The convention's first use is the plan's own first commit. Noted here so a reader sees it as dogfooding rather than as an exception to the rule being written.
 
-- [>] [T-000-B] Commit
+- [X] [T-000-B] Commit
 
 Message subject: `docs: add the BUG-040 staging-convention implementation plan`
 
@@ -65,7 +65,7 @@ Message subject: `docs: add the BUG-040 staging-convention implementation plan`
 
 **These four cases pass on their first run, and that is correct.** They characterize `git`'s behavior, not this repository's code, so there is no red state to produce. Their value is as a tripwire: if a future git changes the contract, the convention's reason for existing fails loudly here instead of silently rotting in prose.
 
-- [ ] [T-001-A] Write the git-contract cases
+- [X] [T-001-A] Write the git-contract cases
 
 Create `tests/unit/staging-convention.test.js`:
 
@@ -154,17 +154,17 @@ describe('the git contract the staging convention rests on', () => {
 })
 ```
 
-- [ ] [T-001-B] Run the new file
+- [X] [T-001-B] Run the new file
 
 Run: `npx vitest run tests/unit/staging-convention.test.js`
 Expected: PASS, 4 cases. If AC6 fails, git's contract has changed and the spec is re-opened before any prose is written.
 
-- [ ] [T-001-C] Run the full suite
+- [X] [T-001-C] Run the full suite
 
 Run: `npx vitest run`
 Expected: **853 passed, 12 skipped**, 34 files.
 
-- [ ] [T-001-D] Commit
+- [X] [T-001-D] Commit
 
 Message subject: `test: pin the git add contract the staging convention rests on [BUG-040]`
 
@@ -181,7 +181,7 @@ Message subject: `test: pin the git add contract the staging convention rests on
 - Consumes: the four facts Task 1 pinned.
 - Produces: the anchor strings Task 3 asserts on.
 
-- [ ] [T-002-A] Add the rule to `CLAUDE.md`
+- [X] [T-002-A] Add the rule to `CLAUDE.md`
 
 Insert a new section immediately after `## Hard Constraints`:
 
@@ -197,7 +197,7 @@ Insert a new section immediately after `## Hard Constraints`:
 Never make `-f` the blanket form: it overrides the ignore rule, so a typo naming a genuinely ignored file stages it silently. Never omit the path from `-u`: bare `git add -u` stages every modified tracked file in the repository. `tests/unit/staging-convention.test.js` pins all four facts this rule rests on.
 ```
 
-- [ ] [T-002-B] Add the staging-form clause to `.claude/commands/cc-plan.md`
+- [X] [T-002-B] Add the staging-form clause to `.claude/commands/cc-plan.md`
 
 Insert as a sibling bullet directly after the `**Step ordering within a task.**` bullet that ends `...pointing at the wrong task.` (currently `:100`), inside the same `## Ordered Steps` list:
 
@@ -213,7 +213,7 @@ Insert as a sibling bullet directly after the `**Step ordering within a task.**`
 
 This is a sibling of the ordering rule, not a replacement: that bullet governs *where* a staging step sits, this one governs *which form* it takes. The ordering bullet already enumerates `-f` and `-u` among the forms it covers, so the two do not contradict.
 
-- [ ] [T-002-C] Correct the branch gate's form enumeration in `.claude/commands/cc-plan.md`
+- [X] [T-002-C] Correct the branch gate's form enumeration in `.claude/commands/cc-plan.md`
 
 In the Task 0 precondition paragraph (currently `:128-129`), replace:
 
@@ -231,11 +231,11 @@ with:
 
 Accuracy only: the gate enumerates the forms a Task 0 might run, and `-u` is now one of them. Leaving it would imply plans only ever use the two older forms.
 
-- [ ] [T-002-D] Mirror both edits into `project-template/.claude/commands/cc-plan.md`
+- [X] [T-002-D] Mirror both edits into `project-template/.claude/commands/cc-plan.md`
 
 Apply T-002-B and T-002-C verbatim. The mirror carries no `node .claude/scripts/` path in either inserted block, so the `unnest` transform is a no-op on them and the two files stay transform-equivalent.
 
-- [ ] [T-002-E] Add the branch-aware staging line to `global/commands/cc-checkpoint.md`
+- [X] [T-002-E] Add the branch-aware staging line to `global/commands/cc-checkpoint.md`
 
 Insert directly after the `**Update `.claude/memory/project.md`** (append only, never delete)` bullet list (currently ending `:15`), before the `**Update `.claude/memory/personal.md`**` block:
 
@@ -245,17 +245,17 @@ Insert directly after the `**Update `.claude/memory/project.md`** (append only, 
 
 `personal.md` is local-only and never committed, so the line deliberately covers `project.md` alone.
 
-- [ ] [T-002-F] Verify the cc-plan mirrors still agree
+- [X] [T-002-F] Verify the cc-plan mirrors still agree
 
 Run: `npx vitest run tests/installer/commands-parity.test.js -t "cc-plan mirrors"`
 Expected: PASS. A failure here means T-002-D diverged from T-002-B or T-002-C.
 
-- [ ] [T-002-G] Run the full suite
+- [X] [T-002-G] Run the full suite
 
 Run: `npx vitest run`
 Expected: **853 passed, 12 skipped**, 34 files. Unchanged from T-001: this task adds prose only.
 
-- [ ] [T-002-H] Commit
+- [X] [T-002-H] Commit
 
 Message subject: `docs: stage by tracked-ness, not by habit [BUG-040]`
 
@@ -272,7 +272,7 @@ Message subject: `docs: stage by tracked-ness, not by habit [BUG-040]`
 - Consumes: `read` from Task 1, and the anchor strings Task 2 wrote.
 - Produces: nothing.
 
-- [ ] [T-003-A] Append the prose-anchor cases
+- [X] [T-003-A] Append the prose-anchor cases
 
 Append to `tests/unit/staging-convention.test.js`, after the existing `describe` block:
 
@@ -311,17 +311,17 @@ describe('the convention is documented where it is needed', () => {
 })
 ```
 
-- [ ] [T-003-B] Run the file
+- [X] [T-003-B] Run the file
 
 Run: `npx vitest run tests/unit/staging-convention.test.js`
 Expected: PASS, 8 cases (4 contract plus 4 prose).
 
-- [ ] [T-003-C] Run the full suite
+- [X] [T-003-C] Run the full suite
 
 Run: `npx vitest run`
 Expected: **857 passed, 12 skipped**, 34 files.
 
-- [ ] [T-003-D] Commit
+- [X] [T-003-D] Commit
 
 Message subject: `test: pin the staging convention's prose in all four homes [BUG-040]`
 
@@ -336,16 +336,16 @@ Message subject: `test: pin the staging convention's prose in all four homes [BU
 
 **Both version files move together.** `1.31.0` shipped with `VERSION` still reading `1.30.0` because a plan step named only `package.json`. That is why this task has two separate edit steps and a step that asserts they agree.
 
-- [ ] [T-004-A] Edit `VERSION` to `1.31.1` (single line plus trailing newline)
+- [X] [T-004-A] Edit `VERSION` to `1.31.1` (single line plus trailing newline)
 
-- [ ] [T-004-B] Edit `"version"` in `package.json:3` to `1.31.1`
+- [X] [T-004-B] Edit `"version"` in `package.json:3` to `1.31.1`
 
-- [ ] [T-004-C] Verify the two agree
+- [X] [T-004-C] Verify the two agree
 
 Run: `node -e "const v=require('fs').readFileSync('VERSION','utf8').trim(); const p=require('./package.json').version; console.log(v, p, v===p)"`
 Expected: `1.31.1 1.31.1 true`. A `false` here is the 1.31.0 defect repeating and halts the task.
 
-- [ ] [T-004-D] Add the CHANGELOG entry above the `## [1.31.0]` heading
+- [X] [T-004-D] Add the CHANGELOG entry above the `## [1.31.0]` heading
 
 ```markdown
 ## [1.31.1] - 2026-09-28
@@ -357,12 +357,12 @@ Expected: `1.31.1 1.31.1 true`. A `false` here is the 1.31.0 defect repeating an
 - `[BUG-040]` `tests/unit/staging-convention.test.js`: pins the four facts about `git add` the convention rests on, including the defect itself, so the rule cannot outlive its justification.
 ```
 
-- [ ] [T-004-E] Run the full suite
+- [X] [T-004-E] Run the full suite
 
 Run: `npx vitest run`
 Expected: **857 passed, 12 skipped**, 34 files.
 
-- [ ] [T-004-F] Commit
+- [X] [T-004-F] Commit
 
 Message subject: `chore: release 1.31.1 [BUG-040]`
 
@@ -374,7 +374,7 @@ Message subject: `chore: release 1.31.1 [BUG-040]`
 
 Both steps land on `main` under the owner-scoped memory-and-backlog exception, never on the feature branch. Per the rule recorded at the `[BUG-038]` closeout, this task needs the plan's checkbox state committed before the switch, and a rebase with a content gate after the merge.
 
-- [ ] [T-005-A] Commit the plan's checkbox state on the feature branch
+- [X] [T-005-A] Commit the plan's checkbox state on the feature branch
 
 Stage with `git add -f` (the plan file is tracked in this branch but `docs/` is ignored, so `-u` also works; `-f` matches Task 0 and is what the branch gate expects). Subject: `docs: record the executed BUG-040 plan state`.
 
