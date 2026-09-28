@@ -120,6 +120,16 @@ describe('resume-read.mjs core (file branch)', () => {
     expect(src).not.toMatch(/\.at\(/);
     expect(src).not.toMatch(/structuredClone/);
   });
+
+  it('names the reason when the handoff file is rejected (exit 4 unchanged)', () => {
+    const { dir } = mkRepo();
+    writeFileSync(join(dir, HANDOFF_REL), '{"v":1,"sys":{"ph":"impl"}}\n', 'utf8');
+    const r = run(dir);
+    expect(r.status).toBe(4);                 // halt semantics unchanged
+    expect(existsSync(join(dir, HANDOFF_REL))).toBe(true);
+    const log = readFileSync(join(dir, '.conductor', 'last-write.log'), 'utf8');
+    expect(log).toMatch(/resume: file-invalid halt: SNAP_ERROR: missing block: ops/);
+  });
 });
 
 import { sqliteAvailable, dbFlags } from '../helpers/sqlite.js';
@@ -179,6 +189,35 @@ describe.runIf(sqliteAvailable())('resume-read.mjs DB branch', () => {
     dbStore(dir, head, snap(head, { sys: { ph: 'plan', c: head, s: 's' } }));
     expect(run(dir).status).toBe(0);
     expect(run(dir).status).toBe(0);
+  });
+
+  it.skipIf(!sqliteAvailable())('an oversize v1 blob degrades LOUDLY: reason, size, cap, exit 3', () => {
+    const { dir, head } = mkRepo();
+    // v1 over its 4096-character budget: valid JSON, valid schema, too large.
+    const pad = (n) => 'x'.repeat(n);
+    const big = {
+      v: 1, sys: { ph: 'plan', c: head, s: 'my-spec' },
+      ops: { n: [pad(200), pad(200), pad(200)], f: [] },
+      mem: { d: Array.from({ length: 10 }, () => pad(300)), x: Array.from({ length: 5 }, () => pad(200)) },
+    };
+    expect(JSON.stringify(big).length).toBeGreaterThan(4096);
+    dbStore(dir, head, big);
+    const r = run(dir);
+    expect(r.status).toBe(3);                 // fail-open stays fail-open
+    expect(r.stdout).toBe('');
+    const log = readFileSync(join(dir, '.conductor', 'last-write.log'), 'utf8');
+    expect(log).toMatch(/resume: db-invalid degrade: .*payload too large/);
+    expect(log).toContain('4096');            // the cap applied
+    expect(log).toMatch(/payload too large: \d+ >/);  // the observed size
+  });
+
+  it.skipIf(!sqliteAvailable())('names the reason for a schema-invalid DB blob', () => {
+    const { dir, head } = mkRepo();
+    dbStore(dir, head, { v: 1, sys: { ph: 'nope', c: head, s: 'my-spec' }, ops: { n: [], f: [] }, mem: { d: [], x: [] } });
+    const r = run(dir);
+    expect(r.status).toBe(3);
+    const log = readFileSync(join(dir, '.conductor', 'last-write.log'), 'utf8');
+    expect(log).toMatch(/resume: db-invalid degrade: .*ph must be spec\|plan\|impl\|rev/);
   });
 });
 
