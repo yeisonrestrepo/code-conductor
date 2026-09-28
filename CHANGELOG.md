@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.31.3] - 2026-09-28
+
+### Fixed
+- `[BUG-043]` Guard 3 analyzed quoted argv text as if it were code. The scanner tracked five quote states while building the preprocessed string and then discarded every one of them, so a commit message's prose, a quoted JavaScript program, a quoted regex, an escape run inside a quoted pattern, an escaped backtick and even an English sentence's period could each be read as shell syntax. `_g3_scan` and `g3Scan` now have a **mask** mode that emits a length-preserved copy with quoted content replaced and the quote characters kept, built from the stripped string and **before** the newline-to-semicolon join, so a newline inside a quoted region can never become a command anchor.
+- `[BUG-043]` **Eleven of the thirteen checks read the masked copy. P6 and P12 do not**, because a grep pattern and an alias value are the data those checks exist to inspect; a blanket mask was measured to break seven genuine denials. The allowlist also keeps the unmasked string. The boundary is asserted as a count rather than described in a comment: thirteen call sites, two unmasked, eleven masked.
+- `[BUG-043]` The **fragment quote-parity** residual named and deferred by `[BUG-041]` is resolved here at no extra cost, because it turned out to share the same seam.
+
+### Added
+- `[BUG-043]` Ten corpus rows, every transcript-sourced command pulled by script from the denial pool rather than retyped, and every one verified to deny **before** insertion so the fix flips pre-written acceptances. Two guard the P6/P12 boundary by oracle, including the first row that can detect a mistaken mask of P12. Four cover mechanism-2 shapes that had none. One arbitrates the fragment residual. Three are marked constructed and pin the exotic quote openers and the escaped-pair branch.
+- `[BUG-043]` Four contract tests for what no verdict can reach. One of them records an **absence**: length preservation has no behavioral discriminator, proven by building the defect and finding it agreed with the correct mask on all 124 rows, so the test says so instead of implying coverage it does not have.
+
+### Notes
+- `[BUG-043]` Measured against this session's own denials after the fix: **63 denial events, 56 unique commands, five still denied.** One heredoc body scanned as command text (out of scope), one genuine `find` without `-maxdepth 1`, and three genuine shell loops, two of them deliberately pinned as controls. Four of the five are the guard working.
+- `[BUG-043]` The filing priced this as needing a second five-state scanner in shell. Reading the existing one disproved that; the entry keeps its original wording under an amendment note.
+
 ## [1.31.2] - 2026-09-28
 
 ### Fixed

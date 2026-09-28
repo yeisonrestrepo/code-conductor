@@ -64,7 +64,7 @@ Any deviation in count **or suite** is a tripwire halt. The nine flipping rows a
 ### Task 0: the plan commit
 
 - [X] [T-000-A] Stage this plan file. `docs/` is ignored by `.gitignore:8` and the file is new, so this is the `-f` branch of the staging convention: `git add -f "docs/superpowers/plans/2026-09-28-bug043-quoted-argv-blindness.md"`. Confirm `add_rc=0`.
-- [>] [T-000-B] Commit with subject `docs: add the BUG-043 quoted-argv blindness implementation plan` and the two trailers, via `git commit -F <scratchpad>/msg-t000.txt`. The gate runs green; nothing has changed yet.
+- [X] [T-000-B] Commit with subject `docs: add the BUG-043 quoted-argv blindness implementation plan` and the two trailers, via `git commit -F <scratchpad>/msg-t000.txt`. The gate runs green; nothing has changed yet.
 
 ---
 
@@ -72,12 +72,12 @@ Any deviation in count **or suite** is a tripwire halt. The nine flipping rows a
 
 Every step runs before a character of either subject changes.
 
-- [ ] [T-001-A] Confirm the authority's scanner is byte-for-byte what this plan edits. Read `tests/fixtures/guard3-reference.sh` at `offset: 81, limit: 78`. It must contain `local mode="$1" input="$2"`, the five `case "$state"` arms, and eleven `[[ "$mode" == "strip" ]] && result+=` guards. Any difference halts.
-- [ ] [T-001-B] Confirm the port's scanner. Read `.claude/hooks/pre-tool-use.mjs` at `offset: 156, limit: 40`. `g3Scan(mode, input)` must carry the same five states and return `{ result, malformed }` for strip and `{ glob }` for glob.
-- [ ] [T-001-C] Confirm the dispatch shapes. Read `guard3-reference.sh` at `offset: 424, limit: 40` and `pre-tool-use.mjs` at `offset: 438, limit: 20`. The authority must show `_G3_PRE=$(_g3_scan "strip" "$_G3_JOINED")`, the `//$'\n'/;` substitution and thirteen call sites; the port must show `const pre = g3Chomp(scan.result).split('\n').join(';');` and the single dispatch loop.
-- [ ] [T-001-D] Confirm the corpus-length assertion currently reads `117` and that `guard3-port.test.js` still has no CORPUS-length assertion of its own.
-- [ ] [T-001-E] Record the baseline: `npx vitest run --reporter=basic`. Expected `873 passed | 12 skipped`. Any other number replaces the table's first row before Task 2 begins.
-- [ ] [T-001-F] Prove the bash mask mode on a **full copy** of the frozen file before the frozen file is touched, the way T-001-C did for BUG-041. Write `<scratchpad>/probe-bash-mask.mjs` that copies `guard3-reference.sh` with the Task 3 edits applied, then runs these through the copy with `LC_ALL=C LANG=C`:
+- [X] [T-001-A] Confirm the authority's scanner is byte-for-byte what this plan edits. Read `tests/fixtures/guard3-reference.sh` at `offset: 81, limit: 78`. It must contain `local mode="$1" input="$2"`, the four `case "$state"` arms (`UNQUOTED`, `SINGLE_QUOTED`, `DOUBLE_QUOTED|LOCALE_QUOTED`, `ANSI_C_QUOTED`) and **thirteen** `[[ "$mode" == "strip" ]] && result+=` emit guards, plus three further `[[ "$mode" == "strip" ]]` tests that are not emits: the `#` comment branch and the two `printf` paths. **Counts corrected here after T-001-A measured them; the plan had said five arms and eleven guards from reading rather than counting.** Any difference from the corrected numbers halts.
+- [X] [T-001-B] Confirm the port's scanner. Read `.claude/hooks/pre-tool-use.mjs` at `offset: 156, limit: 40`. `g3Scan(mode, input)` must carry the same five states and return `{ result, malformed }` for strip and `{ glob }` for glob.
+- [X] [T-001-C] Confirm the dispatch shapes. Read `guard3-reference.sh` at `offset: 424, limit: 40` and `pre-tool-use.mjs` at `offset: 438, limit: 20`. The authority must show `_G3_PRE=$(_g3_scan "strip" "$_G3_JOINED")`, the `//$'\n'/;` substitution and thirteen call sites; the port must show `const pre = g3Chomp(scan.result).split('\n').join(';');` and the single dispatch loop.
+- [X] [T-001-D] Confirm the corpus-length assertion currently reads `117` and that `guard3-port.test.js` still has no CORPUS-length assertion of its own.
+- [X] [T-001-E] Record the baseline: `npx vitest run --reporter=basic`. Expected `873 passed | 12 skipped`. Any other number replaces the table's first row before Task 2 begins.
+- [X] [T-001-F] Prove the bash mask mode on a **full copy** of the frozen file before the frozen file is touched, the way T-001-C did for BUG-041. Write `<scratchpad>/probe-bash-mask.mjs` that copies `guard3-reference.sh` with the Task 3 edits applied, then runs these through the copy with `LC_ALL=C LANG=C`:
 
   | command | expected |
   |---|---|
@@ -93,7 +93,7 @@ Every step runs before a character of either subject changes.
 
   Any disagreement halts before the frozen file is edited.
 
-- [ ] [T-001-G] Confirm the ten new rows' **pre-fix** verdicts against the current hook, so Task 2 can assert them. Write `<scratchpad>/verify-prefix-verdicts.mjs` that runs each of the ten commands through `.claude/hooks/pre-tool-use.mjs` and prints its verdict. **All ten must read `deny`.** A row that already allows pre-fix cannot be added asserting `deny`.
+- [X] [T-001-G] Confirm the ten new rows' **pre-fix** verdicts against the current hook, so Task 2 can assert them. Write `<scratchpad>/verify-prefix-verdicts.mjs` that runs each of the ten commands through `.claude/hooks/pre-tool-use.mjs` and prints its verdict. **All ten must read `deny`.** A row that already allows pre-fix cannot be added asserting `deny`.
 
 ---
 
@@ -101,7 +101,7 @@ Every step runs before a character of either subject changes.
 
 **Files:** modify `tests/fixtures/guard3-corpus.js`, `tests/hooks/guard3.test.js:83`
 
-- [ ] [T-002-A] Add the two **MASK-DESIGN** rows, which guard the by-design classification and deny both before and after the fix:
+- [X] [T-002-A] Add the two **MASK-DESIGN** rows, which guard the by-design classification and deny both before and after the fix:
 
   ```js
   // MASK-DESIGN rows, [BUG-043]. These two exist so the P6/P12 by-design boundary is
@@ -115,7 +115,7 @@ Every step runs before a character of either subject changes.
   { label: 'MASK-DESIGN P12: quoted alias value must stay readable', command: 'alias t=\'tail -50\'', verdict: 'deny' },
   ```
 
-- [ ] [T-002-B] Add the four **shape** rows for the mechanism-2 classes that lack one, each quoted verbatim from the session transcript, each `deny` now and predicted `allow` after the fix. Source them with a script that pulls the exact strings from the transcript rather than retyping, the method BUG-041 used: `node <scratchpad>/add-rows-043.mjs shapes`. The four shapes are the OBF `perl -0pi -e` host, the OBF `node -e` regex host, the P11 prose-period specimen, and the P9 quoted-regex specimen. Comment block:
+- [X] [T-002-B] Add the four **shape** rows for the mechanism-2 classes that lack one, each quoted verbatim from the session transcript, each `deny` now and predicted `allow` after the fix. Source them with a script that pulls the exact strings from the transcript rather than retyping, the method BUG-041 used: `node <scratchpad>/add-rows-043.mjs shapes`. The four shapes are the OBF `perl -0pi -e` host, the OBF `node -e` regex host, the P11 prose-period specimen, and the P9 quoted-regex specimen. Comment block:
 
   ```js
   // MECHANISM-2 shapes, pending the fix in this same item. One root cause, four
@@ -127,7 +127,7 @@ Every step runs before a character of either subject changes.
   // here rather than back-edited into it.
   ```
 
-- [ ] [T-002-C] Add the **fragment quote-parity** row, verbatim, `deny` now and predicted `allow` after:
+- [X] [T-002-C] Add the **fragment quote-parity** row, verbatim, `deny` now and predicted `allow` after:
 
   ```js
   // FRAGMENT QUOTE-PARITY, [BUG-041]'s named residual, in scope here because it shares
@@ -136,7 +136,7 @@ Every step runs before a character of either subject changes.
   // glob. Masking the input removes the content that inversion was misreading.
   ```
 
-- [ ] [T-002-D] Add the three **constructed** boundary rows, marked as constructed rather than drawn from the transcript, each `deny` before and after:
+- [X] [T-002-D] Add the three **constructed** boundary rows, marked as constructed rather than drawn from the transcript, each `deny` before and after:
 
   ```js
   // CONSTRUCTED boundary rows, not transcript specimens. They pin the scanner's exotic
@@ -147,10 +147,10 @@ Every step runs before a character of either subject changes.
   { label: 'boundary: escaped pair inside quotes then a glob (constructed)', command: 'echo "a\\\\b"; cat *.md', verdict: 'deny' },
   ```
 
-- [ ] [T-002-E] Move the corpus-length assertion in the **same step group**: `tests/hooks/guard3.test.js:83` from `toHaveLength(117)` to `toHaveLength(127)`. Skipping this is the BUG-041 lesson; it costs one failure above every prediction.
-- [ ] [T-002-F] Verify the rows parse and say what they mean: `node <scratchpad>/verify-new-rows-043.mjs`, which imports the corpus, asserts `CORPUS.length === 127`, and compares each of the ten commands byte-for-byte against its source string.
-- [ ] [T-002-G] Run the suite: `npx vitest run --reporter=basic`. **Expected: 893 passed, 12 skipped, 0 failed.** Every new row denies correctly under the unfixed hook, which is what makes them pre-written acceptances rather than wishes.
-- [ ] [T-002-H] Stage and commit. Both files are tracked: `git add -u "tests/fixtures/guard3-corpus.js" "tests/hooks/guard3.test.js"`. Subject `test: land the BUG-043 acceptance rows before the fix`, body naming the ten rows, their pre-fix verdicts and the nine predicted flips.
+- [X] [T-002-E] Move the corpus-length assertion in the **same step group**: `tests/hooks/guard3.test.js:83` from `toHaveLength(117)` to `toHaveLength(127)`. Skipping this is the BUG-041 lesson; it costs one failure above every prediction.
+- [X] [T-002-F] Verify the rows parse and say what they mean: `node <scratchpad>/verify-new-rows-043.mjs`, which imports the corpus, asserts `CORPUS.length === 127`, and compares each of the ten commands byte-for-byte against its source string.
+- [X] [T-002-G] Run the suite: `npx vitest run --reporter=basic`. **Expected: 893 passed, 12 skipped, 0 failed.** Every new row denies correctly under the unfixed hook, which is what makes them pre-written acceptances rather than wishes.
+- [X] [T-002-H] Stage and commit. Both files are tracked: `git add -u "tests/fixtures/guard3-corpus.js" "tests/hooks/guard3.test.js"`. Subject `test: land the BUG-043 acceptance rows before the fix`, body naming the ten rows, their pre-fix verdicts and the nine predicted flips.
 
 ---
 
@@ -158,7 +158,7 @@ Every step runs before a character of either subject changes.
 
 **Files:** modify `tests/fixtures/guard3-reference.sh`
 
-- [ ] [T-003-A] Add the `mask` mode to `_g3_scan`. The header comment gains a third bullet, and each accumulation guard learns the mode. Unquoted characters are emitted unchanged in both modes; quoted content becomes `x`; **quote characters and the two-character openers are always emitted as themselves**; a backslash pair inside quotes emits **two** mask characters. Replace the `SINGLE_QUOTED`, `DOUBLE_QUOTED|LOCALE_QUOTED` and `ANSI_C_QUOTED` arms with:
+- [X] [T-003-A] Add the `mask` mode to `_g3_scan`. The header comment gains a third bullet, and each accumulation guard learns the mode. Unquoted characters are emitted unchanged in both modes; quoted content becomes `x`; **quote characters and the two-character openers are always emitted as themselves**; a backslash pair inside quotes emits **two** mask characters. Replace the `SINGLE_QUOTED`, `DOUBLE_QUOTED|LOCALE_QUOTED` and `ANSI_C_QUOTED` arms with:
 
   ```sh
       SINGLE_QUOTED)
@@ -197,9 +197,9 @@ Every step runs before a character of either subject changes.
         fi ;;
   ```
 
-- [ ] [T-003-B] In the `UNQUOTED` arm, widen the five emit guards from `[[ "$mode" == "strip" ]]` to `[[ "$mode" == "strip" || "$mode" == "mask" ]]` for the `$'` opener, the `$"` opener, the unquoted backslash pair, the `'` and `"` characters, and the regular-character branch. **Leave the `#` comment branch on `strip` alone:** the mask runs over an already-stripped string, so it never meets a comment, and widening it would be a second way to shorten the output.
-- [ ] [T-003-C] At the end of the function, emit the mask the way strip emits its result: extend the two `[[ "$mode" == "strip" ]] && printf '%s' "$result"` lines to `[[ "$mode" == "strip" || "$mode" == "mask" ]]`, so the mask reaches stdout on both the malformed and clean paths.
-- [ ] [T-003-D] Build the mask in the dispatch, **before** the newline substitution, and mask the newlines the same way afterward. Replace the block at the `//$'\n'/;` line:
+- [X] [T-003-B] In the `UNQUOTED` arm, widen the **six** emit guards from `[[ "$mode" == "strip" ]]` to `[[ "$mode" == "strip" || "$mode" == "mask" ]]` for the `$'` opener, the `$"` opener, the unquoted backslash pair, the `'` and `"` characters, and the regular-character branch. **Leave the `#` comment branch on `strip` alone:** the mask runs over an already-stripped string, so it never meets a comment, and widening it would be a second way to shorten the output.
+- [X] [T-003-C] At the end of the function, emit the mask the way strip emits its result: extend the two `[[ "$mode" == "strip" ]] && printf '%s' "$result"` lines to `[[ "$mode" == "strip" || "$mode" == "mask" ]]`, so the mask reaches stdout on both the malformed and clean paths.
+- [X] [T-003-D] Build the mask in the dispatch, **before** the newline substitution, and mask the newlines the same way afterward. Replace the block at the `//$'\n'/;` line:
 
   ```sh
   # Build the masked copy BEFORE the newline substitution, so a newline inside a quoted
@@ -211,7 +211,7 @@ Every step runs before a character of either subject changes.
   _G3_MASK="${_G3_MASK//$'\n'/;}"
   ```
 
-- [ ] [T-003-E] Swap the argument at eleven of the thirteen call sites from `"$_G3_PRE"` to `"$_G3_MASK"`. **P6 and P12 keep `"$_G3_PRE"`**, and the allowlist call keeps it too. Put the boundary in one readable place directly above the block:
+- [X] [T-003-E] Swap the argument at eleven of the thirteen call sites from `"$_G3_PRE"` to `"$_G3_MASK"`. **P6 and P12 keep `"$_G3_PRE"`**, and the allowlist call keeps it too. Put the boundary in one readable place directly above the block:
 
   ```sh
   # Exactly two checks read quoted content BY DESIGN and therefore receive the UNMASKED
@@ -219,8 +219,8 @@ Every step runs before a character of either subject changes.
   # code, and receives the mask. The allowlist also reads the unmasked string. [BUG-043].
   ```
 
-- [ ] [T-003-F] Run the suite. **Expected: 884 passed, 9 failed, 12 skipped**, all nine in `tests/hooks/guard3.test.js`, being the four inherited rows, the four shape rows and the fragment row. **A tenth failure, or any failure in `tests/hooks/guard3-port.test.js`, halts the task.**
-- [ ] [T-003-G] Stage `git add -u "tests/fixtures/guard3-reference.sh"` and commit. If the gate blocks, apply the single authorized bypass under AC12's inheritance: suite run already done at T-003-F, its verbatim failure list pasted into the commit body, `git commit --no-verify -F <scratchpad>/msg-t003.txt`, subject `feat: mask quoted argv before the code-reading checks [BUG-043]`. The header's sanctioned-exception list gains a **fourth** entry describing the mask mode, in this same commit.
+- [X] [T-003-F] Run the suite. **Expected: 884 passed, 9 failed, 12 skipped**, all nine in `tests/hooks/guard3.test.js`, being the four inherited rows, the four shape rows and the fragment row. **A tenth failure, or any failure in `tests/hooks/guard3-port.test.js`, halts the task.**
+- [X] [T-003-G] Stage `git add -u "tests/fixtures/guard3-reference.sh"` and commit. If the gate blocks, apply the single authorized bypass under AC12's inheritance: suite run already done at T-003-F, its verbatim failure list pasted into the commit body, `git commit --no-verify -F <scratchpad>/msg-t003.txt`, subject `feat: mask quoted argv before the code-reading checks [BUG-043]`. The header's sanctioned-exception list gains a **fourth** entry describing the mask mode, in this same commit.
 
 ---
 
@@ -228,7 +228,7 @@ Every step runs before a character of either subject changes.
 
 **Files:** modify `.claude/hooks/pre-tool-use.mjs`, `project-template/.claude/hooks/pre-tool-use.mjs`, `tests/fixtures/guard3-corpus.js`
 
-- [ ] [T-004-A] Add the mirrored `mask` mode to `g3Scan`. Unquoted branches emit unchanged in both modes; quoted branches emit `x`; quote characters and openers are always themselves; a backslash pair inside quotes emits `xx`:
+- [X] [T-004-A] Add the mirrored `mask` mode to `g3Scan`. Unquoted branches emit unchanged in both modes; quoted branches emit `x`; quote characters and openers are always themselves; a backslash pair inside quotes emits `xx`:
 
   ```js
   function g3Scan(mode, input) {
@@ -272,7 +272,7 @@ Every step runs before a character of either subject changes.
   }
   ```
 
-- [ ] [T-004-B] Rewrite the dispatch in `guard3BashScan` so the mask is built from the stripped string, before the join, and the boundary is one readable fact:
+- [X] [T-004-B] Rewrite the dispatch in `guard3BashScan` so the mask is built from the stripped string, before the join, and the boundary is one readable fact:
 
   ```js
     // The mask is built from the STRIPPED string and BEFORE the newline join, so a
@@ -290,13 +290,13 @@ Every step runs before a character of either subject changes.
 
   Delete the old `const pre = ...` and `const ids = [];` lines the block replaces, and leave `g3AllowlistCovers(pre, ...)` untouched.
 
-- [ ] [T-004-C] Apply the identical two edits to `project-template/.claude/hooks/pre-tool-use.mjs`, then verify byte identity with a direct comparison of the two members. **This step exists because BUG-041's tripwire fired on exactly this omission.**
-- [ ] [T-004-D] Run the suite. **Expected: 875 passed, 18 failed**, nine per suite, the same nine labels in each. **Declared red state 2.** Do not commit.
-- [ ] [T-004-E] Flip the four inherited rows to `verdict: 'allow'`: `KNOWN-FP P9-1`, `KNOWN-FP OBF`, `KNOWN-FP P5`, `KNOWN-FP P9 for-of`.
-- [ ] [T-004-F] Flip the four shape rows and the fragment-parity row to `verdict: 'allow'`.
-- [ ] [T-004-G] Rewrite the two comment blocks so they describe a corrected contract rather than a tolerated defect: the mechanism-2 block states that the mask landed and names the four accidental consumers in the past tense; the fragment-parity block states that masking removed the content the inversion was misreading.
-- [ ] [T-004-H] Run the suite. **Expected: 893 passed, 12 skipped, 0 failed.**
-- [ ] [T-004-I] Stage and commit all four tracked files: `git add -u ".claude/hooks/pre-tool-use.mjs" "project-template/.claude/hooks/pre-tool-use.mjs" "tests/fixtures/guard3-corpus.js"`. Subject `fix: carry the mask into the port and flip the nine rows [BUG-043]`.
+- [X] [T-004-C] Apply the identical two edits to `project-template/.claude/hooks/pre-tool-use.mjs`, then verify byte identity with a direct comparison of the two members. **This step exists because BUG-041's tripwire fired on exactly this omission.**
+- [X] [T-004-D] Run the suite. **Expected: 875 passed, 18 failed**, nine per suite, the same nine labels in each. **Declared red state 2.** Do not commit.
+- [X] [T-004-E] Flip the four inherited rows to `verdict: 'allow'`: `KNOWN-FP P9-1`, `KNOWN-FP OBF`, `KNOWN-FP P5`, `KNOWN-FP P9 for-of`.
+- [X] [T-004-F] Flip the four shape rows and the fragment-parity row to `verdict: 'allow'`.
+- [X] [T-004-G] Rewrite the two comment blocks so they describe a corrected contract rather than a tolerated defect: the mechanism-2 block states that the mask landed and names the four accidental consumers in the past tense; the fragment-parity block states that masking removed the content the inversion was misreading.
+- [X] [T-004-H] Run the suite. **Expected: 893 passed, 12 skipped, 0 failed.**
+- [X] [T-004-I] Stage and commit all four tracked files: `git add -u ".claude/hooks/pre-tool-use.mjs" "project-template/.claude/hooks/pre-tool-use.mjs" "tests/fixtures/guard3-corpus.js"`. Subject `fix: carry the mask into the port and flip the nine rows [BUG-043]`.
 
 ---
 
@@ -306,7 +306,7 @@ Every step runs before a character of either subject changes.
 
 Four tests, all in one file so a reader sees the differential's two halves together. They pin what no behavioral test can reach, and each one states why in its comment.
 
-- [ ] [T-005-A] The port's mask contract:
+- [X] [T-005-A] The port's mask contract:
 
   ```js
   // What these assert cannot be observed from a verdict: the hook exports nothing and
@@ -319,7 +319,7 @@ Four tests, all in one file so a reader sees the differential's two halves toget
   });
   ```
 
-- [ ] [T-005-B] The port's mask shape, covering length preservation and quote survival:
+- [X] [T-005-B] The port's mask shape, covering length preservation and quote survival:
 
   ```js
   // AC8 has NO behavioral discriminator: a variant emitting one character per escaped
@@ -336,7 +336,7 @@ Four tests, all in one file so a reader sees the differential's two halves toget
   });
   ```
 
-- [ ] [T-005-C] The authority's mirror of both contracts:
+- [X] [T-005-C] The authority's mirror of both contracts:
 
   ```js
   it('keeps the authority on the same mask contract', () => {
@@ -350,7 +350,7 @@ Four tests, all in one file so a reader sees the differential's two halves toget
 
   The final assertion is the ordering pin: the mask call appears before the newline substitution in the file, which is the one place that order is visible.
 
-- [ ] [T-005-D] The dispatch boundary, both subjects, as a counted fact rather than a comment:
+- [X] [T-005-D] The dispatch boundary, both subjects, as a counted fact rather than a comment:
 
   ```js
   // AC10: the by-design boundary is one readable fact per subject. In the port it is a
@@ -368,21 +368,21 @@ Four tests, all in one file so a reader sees the differential's two halves toget
   });
   ```
 
-- [ ] [T-005-E] Run the suite. **Expected: 897 passed, 12 skipped, 0 failed.**
-- [ ] [T-005-F] Stage `git add -u "tests/hooks/guard3-port.test.js"` and commit with subject `test: pin the mask contract in both subjects [BUG-043]`.
+- [X] [T-005-E] Run the suite. **Expected: 897 passed, 12 skipped, 0 failed.**
+- [X] [T-005-F] Stage `git add -u "tests/hooks/guard3-port.test.js"` and commit with subject `test: pin the mask contract in both subjects [BUG-043]`.
 
 ---
 
 ### Task 6: the record and the release
 
-- [ ] [T-006-A] Add the **amendment note** to `[BUG-043]`'s backlog entry, leaving its original wording in place: the entry priced this as "a second five-state scanner written in bash for the authority", and reading `_g3_scan` disproved it, since the scanner exists, tracks all five states and takes a mode parameter. The fix was a third mode plus a dispatch-level argument swap.
-- [ ] [T-006-B] Close the `[BUG-043]` entry with what shipped and what was left: the mask, ten rows, nine flips, the fragment-parity residual resolved as a side effect of sharing the seam, and the heredoc family still out and still unfiled.
-- [ ] [T-006-C] Add the allowlist finding to `[BUG-044]`'s entry: `G3_BD` bounds an entry with `[ \t\n\r\f\v|;()]` or start-of-string, so a quoted path never matched an allowlist entry, before or after this change. The escape hatch nobody reached for would not have worked for a quoted path either.
-- [ ] [T-006-D] Run `npm version 1.31.3 --no-git-tag-version`, then `printf '1.31.3\n' > VERSION`, then add the `CHANGELOG.md` entry under `## [1.31.3]`.
-- [ ] [T-006-E] Run `node <scratchpad>/version-gate.mjs 1.31.3` and confirm all five locations agree.
-- [ ] [T-006-F] Append the implementation record to `.claude/memory/project.md`, including **both queued convention lines**: an AC that asserts a property of an internal value must name its observation point at spec time or be written as contract-plus-discriminator from the start; and a discriminator is confirmed by building the defect it claims to catch and scoring it against the full corpus, because a discriminator never seen to fail is an assumption wearing a test's name.
-- [ ] [T-006-G] Run the suite a final time and confirm **897 passed, 12 skipped, 0 failed**.
-- [ ] [T-006-H] Stage and commit: `git add -u "AGENT-READABLE BACKLOG.md" VERSION package.json package-lock.json CHANGELOG.md ".claude/memory/project.md"`, subject `chore: release 1.31.3 [BUG-043]`.
+- [X] [T-006-A] Add the **amendment note** to `[BUG-043]`'s backlog entry, leaving its original wording in place: the entry priced this as "a second five-state scanner written in bash for the authority", and reading `_g3_scan` disproved it, since the scanner exists, tracks all five states and takes a mode parameter. The fix was a third mode plus a dispatch-level argument swap.
+- [X] [T-006-B] Close the `[BUG-043]` entry with what shipped and what was left: the mask, ten rows, nine flips, the fragment-parity residual resolved as a side effect of sharing the seam, and the heredoc family still out and still unfiled.
+- [X] [T-006-C] Add the allowlist finding to `[BUG-044]`'s entry: `G3_BD` bounds an entry with `[ \t\n\r\f\v|;()]` or start-of-string, so a quoted path never matched an allowlist entry, before or after this change. The escape hatch nobody reached for would not have worked for a quoted path either.
+- [X] [T-006-D] Run `npm version 1.31.3 --no-git-tag-version`, then `printf '1.31.3\n' > VERSION`, then add the `CHANGELOG.md` entry under `## [1.31.3]`.
+- [X] [T-006-E] Run `node <scratchpad>/version-gate.mjs 1.31.3` and confirm all five locations agree.
+- [X] [T-006-F] Append the implementation record to `.claude/memory/project.md`, including **both queued convention lines**: an AC that asserts a property of an internal value must name its observation point at spec time or be written as contract-plus-discriminator from the start; and a discriminator is confirmed by building the defect it claims to catch and scoring it against the full corpus, because a discriminator never seen to fail is an assumption wearing a test's name.
+- [X] [T-006-G] Run the suite a final time and confirm **897 passed, 12 skipped, 0 failed**.
+- [X] [T-006-H] Stage and commit: `git add -u "AGENT-READABLE BACKLOG.md" VERSION package.json package-lock.json CHANGELOG.md ".claude/memory/project.md"`, subject `chore: release 1.31.3 [BUG-043]`.
 
 ---
 
