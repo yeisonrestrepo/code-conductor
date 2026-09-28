@@ -1066,3 +1066,21 @@ Classification, agreed at the halt: a **plan defect, incomplete file enumeration
 - **A row should pin a property, not a verdict.** The P4 row was chosen over two shorter candidates because its unquoted globs sit BEFORE the reader and none after, so it fails if anyone ever "fixes" P4 by scanning the whole command.
 - **The id ceiling counts reservations.** After the plan file was committed naming BUG-043 and BUG-044, the ceiling read 44 and reported 045 as next. That is the tool working: a reservation that raises the ceiling cannot be double-minted.
 - **The bash offset form was chosen for its failure mode.** `${rest%%"${BASH_REMATCH[0]}"*}` yields an empty after-text when the needle is absent and the existing break ends the loop, where the `#*` strip form would spin forever and need a new guard. **A guard's inner loop must not be able to hang the guard.**
+
+## Closeout: 1.31.2 and the squash-vs-rebase lesson [2026-09-28]
+
+`1.31.2` merged as `d6e6316` (PR #35, squash). Verified on the merged `main`: the spec-approval anchor appears exactly once, the implementation record once, and all five version locations read `1.31.2`. Suite on the synced `main`: 873 passed, 12 skipped, 0 failed.
+
+### The rebase precedent has a scope, and a squash is outside it
+
+**`git rebase`'s already-upstream detection matches on patch-id, so it only holds for merge commits and rebase merges. A SQUASH merge destroys the patch-ids**: nine commits become one patch that matches none of them. Any record commit made on `main` **before** branching will therefore not be dropped automatically on sync. It will be re-applied, and it conflicts as a **duplicate append**, because the block is already upstream with later sections appended after it. That is what `c016199` did here, where `61b250d` was dropped cleanly under a merge at 1.31.0.
+
+**The sanctioned answer is `git rebase --skip`, and only with upstream-superset evidence gathered first:** the anchor counted exactly once on `origin/main`, and `git diff --numstat main origin/main -- <file>` showing insertions with **zero deletions**, which proves the upstream file is a strict superset sharing the same prefix. With that evidence, `--skip` is not conflict resolution: nothing is merged, no hunk is chosen, no file is edited. It is git declining to re-apply a patch whose content is already present.
+
+**The preventive form, which is better than the cure: a release's record commits land on the branch or after the merge, never on pre-branch `main`.** 1.31.1's flow already did this correctly. This incident is what happens when the older pattern meets a squash merge.
+
+**Second squash nuance, found at cleanup:** `git branch -d` succeeded but warned that the branch was merged to its **remote-tracking ref**, not to `HEAD`. Under a squash the branch tip is never an ancestor of `main`, so the "tip reachable from main" premise does not hold literally; `-d` passes on the upstream-merged check instead. No `-f` was needed or used.
+
+### Escalation discipline, confirmed twice in one closeout
+
+The sync was brought to the owner although the content was demonstrably upstream and nothing was at risk, because **history operations on `main` are owner-scoped regardless of risk**. The reservation exists so that "nothing is at risk" never becomes the thin end of unreviewed rewrites. When the rebase then behaved differently from its precedent, the standing instruction was to stop rather than resolve, and it was followed: `--abort` first, diagnosis second, authorization third. `git reset --hard` and `git branch -f` stayed unused for a stated reason: same result, **less evidence in the reflog**, and this repository's history discipline prefers the path that shows its work.
