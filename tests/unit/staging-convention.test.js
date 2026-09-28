@@ -80,3 +80,36 @@ describe('the git contract the staging convention rests on', () => {
     expect(plain.staged).toEqual([TARGET])
   })
 })
+
+describe('the convention is documented where it is needed', () => {
+  it('AC1: CLAUDE.md carries both branches, each with its reason', () => {
+    const t = read('CLAUDE.md')
+    expect(t).toContain('git add -u <path>')
+    expect(t).toContain('git add -f <path>')
+    expect(t).toContain('never consults the ignore rule')          // the -u reason
+    expect(t).toContain('cannot stage a file git has never seen')  // the -f reason
+    expect(t).toContain('Never make `-f` the blanket form')
+    expect(t).toContain('bare `git add -u` stages every modified tracked file')
+  })
+
+  it.each([
+    '.claude/commands/cc-plan.md',
+    'project-template/.claude/commands/cc-plan.md',
+  ])('AC2/AC3: %s tells generated plans which form to emit', (rel) => {
+    const t = read(rel)
+    expect(t).toContain('**Staging form within a step.**')
+    expect(t).toContain('`git add -u <path>` when the file is')
+    expect(t).toContain('The branch is on tracked-ness')
+    // The ordering rule it sits beside must survive intact.
+    expect(t).toContain('**Step ordering within a task.**')
+  })
+
+  it('AC4: cc-checkpoint branches, and forbids the unconditional form by name', () => {
+    const t = read('global/commands/cc-checkpoint.md')
+    expect(t).toContain('git add -u ".claude/memory/project.md"')
+    expect(t).toContain('Never an unconditional `-u` here')
+    expect(t).toContain('freshly scaffolded projects')
+    // A global command must not prescribe -u for the untracked case.
+    expect(t).toContain('takes plain `git add ".claude/memory/project.md"`')
+  })
+})
