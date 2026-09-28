@@ -104,3 +104,13 @@ VERBOSITY: MIN (default)
 - Never skip the pre-tool-use hook; if it blocks a tool invocation, investigate — do not bypass.
 - Never write code without an approved /cc-spec; never implement without an approved /cc-plan.
 - Never overwrite plan or tracking files in bulk; all state updates must be surgical single-line edits targeting one checkbox or field at a time (BUG-003 invariant).
+
+## Staging Convention
+
+`.gitignore:7` excludes `.claude/` wholesale, and `git add` exits 1 whenever a pathspec matches an ignored ancestor, whether or not the file itself staged correctly. The exit code describes the warning, never the outcome. Stage by tracked-ness, always with an explicit path:
+
+- **Tracked file: `git add -u <path>`.** `-u` operates only on paths already in the index, so it never consults the ignore rule and exits 0. It fails loudly with rc 128 when the path is not tracked, which is exactly the signal the ignore rule exists to give.
+- **New file under an ignored directory: `git add -f <path>`.** `-u` cannot stage a file git has never seen, and `-f` is a deliberate assertion about one specific path.
+- **New file anywhere else: plain `git add <path>`.** Correct and sufficient; there is no ignored ancestor to trip over.
+
+Never make `-f` the blanket form: it overrides the ignore rule, so a typo naming a genuinely ignored file stages it silently. Never omit the path from `-u`: bare `git add -u` stages every modified tracked file in the repository. `tests/unit/staging-convention.test.js` pins all four facts this rule rests on.

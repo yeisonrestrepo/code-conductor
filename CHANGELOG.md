@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.31.1] - 2026-09-28
+
+### Fixed
+- `[BUG-040]` Staging convention: `git add` exits 1 whenever a pathspec matches an ignored ancestor, whether or not the file staged correctly, so a tracked file under `.claude/` broke every `&&` chain that followed it. The convention now branches on tracked-ness: `git add -u <path>` for a tracked file, `git add -f <path>` for a new one under an ignored directory, plain `git add <path>` otherwise, always with an explicit path. Recorded in `CLAUDE.md`, applied in `/cc-plan`'s generation rules and `/cc-checkpoint`. No shipped behavior changes: managed projects do not ignore `.claude/` and never had the defect.
+
+### Added
+- `[BUG-040]` `tests/unit/staging-convention.test.js`: pins the four facts about `git add` the convention rests on, including the defect itself, so the rule cannot outlive its justification.
+
 ## [1.31.0] - 2026-09-28
 
 ### Fixed
