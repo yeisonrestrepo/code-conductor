@@ -1298,3 +1298,36 @@ The two claims stay separate on the merged tree. `project-template/.claude/memor
 ### Queue
 
 `[BUG-042]` (the `.gitignore` restructure) is next, then `[BUG-046]`, unless a release needs the instruments sooner, in which case building them is that release first task. `[BUG-045]` (the quoted-path defect) remains open with its ritual priced at filing. Two dossiers stay unfiled: the heredoc family, half-characterized, and the session denial tally. **Next mintable id is `BUG-047`.**
+
+## Spec: BUG-042 gitignore restructure [2026-09-28]
+
+Spec: `docs/superpowers/specs/2026-09-28-bug042-gitignore-restructure-design.md`, 19 ACs, approved after five gate rulings that preceded the writing. Target `1.32.1`, PATCH, ratified.
+
+### What the audit measured before the spec existed
+
+- **The defect reproduces at two sites, not one.** `.gitignore:7` (`.claude/`, 12 tracked) and `:8` (`docs/`, 44 tracked) both make `git add` on a tracked file exit 1 while staging it. The `docs/` specimen is this fortnight's own BUG-044 spec file.
+- **`*.local` at `:4` does not cover `settings.local.json`.** Probed: `a.local` matches `:4`, `zz/s.local.json` matches nothing. That host-owned file is held ignored by `:7` alone, so a restructure dropping `:7` without naming it exposes a host settings file. The filing's premise did not contain this; measurement did.
+- **`:10` (`!project-template/*`) is load-bearing and exists only to patch the other two rules.** `.claude/` and `docs/` carry no leading slash, so they match at any depth. Measured both ways: with `:10` present `project-template/.claude/` and `project-template/docs/` are trackable, without it both are ignored. **The allowlist template shipped in 1.32.0 is trackable today only because of line 10.** Root-anchoring retires it, proved by measurement rather than argument.
+- **The filing's central premise was wrong, and the correction is what makes the item cheap.** It said the re-include form requires enumerating the host-owned paths and that `PROJECT_HOST_OWNED` already is that enumeration. The deny-by-default leaf form names **zero** host-owned paths and leaks zero, because `memory/*` re-excludes everything not re-included. The enumeration needed is the tracked list, which is the git index.
+
+### The corpus, two runs, one case set
+
+`.claude/` (12 tracked, 46 untracked): baseline A=rc 1 staged, B=rc 1 unstaged, D=0 visible, F=rc 1. **Leaf**: A=rc 0 staged, B=rc 1 unstaged, C=0 leaks, D=0 of 46, E=rc 0, F=rc 0. **Dir form**: B=rc 0 and STAGES, D=6 of 46 exposed.
+
+Both sites (`docs/` 44 tracked, 20 untracked): **both-leaf** A=rc 0, B=rc 1 unstaged, C=0 (project-template trackable with `:10` removed), D=0 visible. **claude-leaf + docs-dir**: B=rc 0 and STAGES, D=19 visible including 16 historical specs and plans.
+
+Case B is the item's whole point: an unlisted new file exiting 0 and staging is the dishonesty **inverted**, not removed.
+
+### The five rulings
+
+1. **Gate 1, derive or assert: (a), hand-written with exact-equality against `git ls-files`.** The index is the only enumeration that cannot drift from what is tracked, because it is what tracked means. `PROJECT_HOST_OWNED` gets a better relationship than the duplication the filing predicted: a per-row **ignored XOR tracked** invariant, holding today at 2 tracked and 7 ignored, catching the future seed row that accidentally becomes trackable, a defect class nothing currently watches. Both tests carry a deliberate-defect confirmation per the discriminator rule: a leaf removed must fail the first, a row flipped must fail the second.
+2. **Gate 2, leaf not dir**, on case B and case D. The toll (one `!` line per newly tracked asset) is accepted, documented in the block's comment header with `git add -f` as the interim, and is **self-enforcing**: AC9 fails when the line is missing, so the toll can be forgotten only by failing a test. Tax converted to checklist.
+3. **Gate 3, fold `docs/` in**, on a structural argument: `:10` patches `:8` as much as `:7`, so shipping `.claude/` alone ships a form that still needs the blanket re-include, which is half a fix that keeps the patch it exists to retire.
+4. **Gate 4, partial retirement of the BUG-040 convention, with the measurement quoted.** A rule that outlives its justification is the defect class this chain has hunted in messages, instruments and tests, and CLAUDE.md prose gets no exemption. Clause 1's justification is rewritten naming what retired it (case A, rc 1 to rc 0); clauses 2 and 3 are kept with their remaining live cases named. The anchoring note lands beside it as two sentences that do not erase each other: struck shape (d)(1) stays struck for exit-code reporting, and anchoring is load-bearing for path matching.
+5. **Gate 5, keep the `session-snapshot.json` line** with the external writer named verbatim in its comment. A line whose reason is documented is convention; a line that keeps reappearing without one is a haunting. The coupling itself routes to `[BUG-046]` as a sibling concern: an external writer to a repo file is the same "infrastructure the repo depends on but does not control" family as the release-critical instruments.
+
+### Conventions this spec ratified
+
+- **The version rule's worked example.** PATCH 1.32.1: counter named honestly (developer-facing behavior changes materially, which is why it is a release at all), the ratified test applied (observability on a fresh install; `project-template/gitignore` untouched, byte-identical output), verdict follows the test. Designated the citation for close calls.
+- **Evidence-first applies to friction.** The glob alternative `!/docs/superpowers/specs/*.md` is recorded as a named future option with its measured cost (19 visible, 16 historical, case-B semantics inverted for that subtree) and an explicit trigger: two lines per item is a **predicted** annoyance, so the option is revisited when specimens of real friction exist, not before.
+- **`.DS_Store` belongs in the developer's global gitignore**, not in any repository decision. Ruled out of scope rather than absorbed.
