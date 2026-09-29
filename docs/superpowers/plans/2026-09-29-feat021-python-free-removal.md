@@ -729,8 +729,8 @@ Before modifying any file:
   - `CHANGELOG.md` (new top entry)
   - `AGENT-READABLE BACKLOG.md:226` (heading flip) and a DONE bullet after line 232
 
-- [ ] [T-005-A] `npm version 1.34.0 --no-git-tag-version`. This moves `package.json` and both `package-lock.json` locations. Write `1.34.0` plus a newline to `VERSION`.
-- [ ] [T-005-B] `CHANGELOG.md`: insert above `## [1.33.0]`:
+- [X] [T-005-A] `npm version 1.34.0 --no-git-tag-version`. This moves `package.json` and both `package-lock.json` locations. Write `1.34.0` plus a newline to `VERSION`.
+- [X] [T-005-B] `CHANGELOG.md`: insert above `## [1.33.0]`:
 
 ```markdown
 ## [1.34.0] - <release date>
@@ -743,15 +743,15 @@ Before modifying any file:
 - **[FEAT-021]** `project-template/` changes (`CLAUDE.md`, `cc-init.md`, `pre-tool-use.mjs`), so a fresh install differs. That is why this release is minor.
 ```
 
-- [ ] [T-005-C] Backlog, surgical, one line each:
+- [X] [T-005-C] Backlog, surgical, one line each:
   - line 226, `### [ ] \`[FEAT-021]\`` → `### [X] \`[FEAT-021]\``;
   - insert after line 232: `* **DONE, shipped as \`1.34.0\` on <release date>.** Graph rung and all Python removed; an installer heal unmerges the \`graphify-ast-refresh\` hook before a content-match sweep of the two deployed files. Spec: \`docs/superpowers/specs/2026-09-29-feat021-python-free-removal-design.md\`. Plan: \`docs/superpowers/plans/2026-09-29-feat021-python-free-removal.md\` (M1: deploy merges settings, so the ordering is load-bearing; M2: no tarball ever shipped CRLF).`
-- [ ] [T-005-D] `node tools/version-gate.mjs` → five `ok` lines and `VERSION_GATE_OK 1.34.0`, rc 0.
-- [ ] [T-005-E] `node tools/record-parity.mjs` → `RECORD_PARITY_OK`, rc 0.
-- [ ] [T-005-F] `npm test` → **1009 passed / 12 skipped**.
-- [ ] [T-005-G] Confirm that `node -e "console.log(JSON.stringify(require('./package.json').dependencies ?? {}))"` prints `{}`.
-- [ ] [T-005-H] Stage: `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md"`.
-- [ ] [T-005-I] Commit: `git commit -m "chore: release 1.34.0 [FEAT-021]"`.
+- [X] [T-005-D] `node tools/version-gate.mjs` → five `ok` lines and `VERSION_GATE_OK 1.34.0`, rc 0.
+- [X] [T-005-E] `node tools/record-parity.mjs` → `RECORD_PARITY_OK`, rc 0.
+- [X] [T-005-F] `npm test` → **1009 passed / 12 skipped**.
+- [X] [T-005-G] Confirm that `node -e "console.log(JSON.stringify(require('./package.json').dependencies ?? {}))"` prints `{}`.
+- [X] [T-005-H] Stage: `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md"`.
+- [X] [T-005-I] Commit: `git commit -m "chore: release 1.34.0 [FEAT-021]"`.
 - [ ] [T-005-J] With owner confirmation, push the branch and open the release PR (closeout step 1). Closeout steps 5-10 follow the merge, per `docs/RELEASE-CLOSEOUT.md`.
 
 ## Test List
