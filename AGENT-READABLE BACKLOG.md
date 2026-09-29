@@ -110,21 +110,40 @@ This document is the single source of truth for the evolutionary engineering of 
 
 ---
 
-## PILLAR 3: MULTI-AGENT ARCHITECTURE AND ASYMMETRIC ORCHESTRATION
+## PILLAR 3: MULTI-AGENT SOFTWARE FACTORY (BAND-ORCHESTRATED)
 
-### [ ] `[FEAT-009]` Bicameral Proxy Architecture (Asymmetric LLM Chaining)
+The factory is five bands. Work enters through the Boundary band, flows Define, Build, Verify, Ship, and the loop closes when the Release agent writes back through the Ticket agent. A band never starts until the previous band's gate state is recorded in the SNAP envelope, and every agent's authority is its tool mask, not its prompt.
+
+| Band | Agents | Gate it must clear to hand off |
+|---|---|---|
+| Boundary | Ticket, Proxy, Orchestrator | Ticket enriched, intent routed |
+| Define | Analyst, Spec, Architect/Plan, UX | Spec approved, plan approved |
+| Build | Code, Test Writer | Plan tasks executed, suites written |
+| Verify | Auditor, QA, Security | Static review pass, suites green, scans clean |
+| Ship | Release, Docs | Version gate OK, record parity OK, docs synced |
+
+### [ ] `[ARCH-009]` Software Factory Band Model (Umbrella)
+* **Description:** Define the five-band execution topology as a contract: band membership, the gate condition each band records before handoff, and the closure loop (Release writes back to Ticket). The bands are Boundary (Ticket, Proxy, Orchestrator), Define (Analyst, Spec, Architect/Plan, UX), Build (Code, Test Writer), Verify (Auditor, QA, Security), Ship (Release, Docs).
+* **Impact:** Every Pillar 3 item gains a fixed address in the topology, so agent scope disputes are settled by reading the band table instead of re-arguing per feature. Emulates a software factory pipeline for teams adopting Claude Code.
+* **Components Affected:** `scripts/snap-contract.mjs` (the `gate` field's value set becomes the band gate enum), agent profile manifests (new), the Orchestrator Protocol section of both `CLAUDE.md` templates.
+* **Acceptance Criteria:** The band table above is the single normative source for agent placement; the SNAP `gate` field carries a value from the band gate enum; a handoff whose `gate` does not match the sending band's exit condition halts with a named error rather than proceeding. Flips when `FEAT-009`, `FEAT-011`, `FEAT-012` and `FEAT-031` through `FEAT-036` are all closed or superseded.
+
+### [ ] `[FEAT-009]` Proxy Agent (Bicameral Front Layer)
+* **AMENDED at Pillar 3 restructure: this item joins the Boundary band of `[ARCH-009]`. Scope unchanged; the framing moves from "a cost trick" to "the band's front door". Original heading: "Bicameral Proxy Architecture (Asymmetric LLM Chaining)". Original text preserved below.**
 * **Description:** Create a dual-layer model execution flow. A fast, low-cost model (such as Claude Haiku) acts as the interactive proxy, stripping conversational noise from user prompts before sending clean structures to the core model (Sonnet/Opus), and later wrapping dense core model text outputs into developer-friendly CLI responses.
 * **Impact:** Maximizes cost savings on premium-tier model calls while keeping the terminal UX highly communicative.
 * **Components Affected:** API communication proxy layer, message pre-processing handlers.
 * **Acceptance Criteria:** Route all interactive queries through the fast model layer, ensuring the premium heavy model is only invoked for complex code-generation or core planning tasks.
 
-### [ ] `[FEAT-011]` Multi-Agent Orchestration Core (Agent Router & Choreographer)
+### [ ] `[FEAT-011]` Orchestrator (Band Router and Phase Handoffs)
+* **AMENDED at Pillar 3 restructure: the orchestrator routes across the five `[ARCH-009]` bands, not across an open-ended role list. Its wire format is the SNAP envelope; the reserved v2 fields (`role`, `tk`, `scope`, `gate`, `p`) from the FEAT-010 extension model become live here. The amendment extends the surface without editing the text below: Components additionally cover `scripts/snap-contract.mjs`, `scripts/snap-build.mjs` and `scripts/snap-validate.mjs`, and two acceptance constraints join the original one: every handoff is a validated SNAP envelope, and a handoff that fails validation halts the receiving band; the orchestrator itself holds no write access to the repository. Original heading: "Multi-Agent Orchestration Core (Agent Router & Choreographer)". Original text preserved below.**
 * **Description:** Build the central orchestration logic in Code Conductor responsible for managing execution context, tool authorization tokens, and data handoffs between distinct specialized roles depending on the active phase of the engineering lifecycle.
 * **Impact:** Decouples agent tasks completely, laying down the groundwork for targeted, specialized system prompts.
 * **Components Affected:** Core framework orchestrator loop, execution router.
 * **Acceptance Criteria:** Coordinate role handoffs deterministically based on phase completion states without leaking prompt boundaries across different sub-agents.
 
-### [ ] `[FEAT-012]` Role-Based Sub-Agent Modeling (Spec, Plan, Auditor, QA)
+### [ ] `[FEAT-012]` Core Role Agents (Spec, Architect/Plan, Code, Auditor, QA)
+* **AMENDED at Pillar 3 restructure: these five remain the foundation roster and land first, because each maps onto an existing command (`/cc-spec`, `/cc-plan`, `/cc-implement`, `/cc-review`, `/cc-test`) and inherits its guard discipline. The roster extensions live in `[FEAT-031]` through `[FEAT-036]`. Seat naming: the Plan Agent bullet below occupies the Architect/Plan seat of the `[ARCH-009]` band table, owning design and task breakdown; the bullet's original wording stands unedited. Components additionally cover `scripts/snap-contract.mjs`. Contract consequence, named at amendment so the spec cannot dodge it: the SNAP role enum is currently `spec|plan|code|audit|qa`; adding any Pillar 3 agent beyond these five is a versioned contract change in `scripts/snap-contract.mjs` gated by `v`, never a silent enum widening, per the FEAT-010 version compatibility rule. Original heading: "Role-Based Sub-Agent Modeling (Spec, Plan, Auditor, QA)". Original text preserved below.**
 * **Description:** Model the strict profile requirements, minimal system prompts, and tool access boundaries for specialized roles:
   * **Spec Agent:** Read-only repository indexing access plus interactive developer requirement analysis.
   * **Plan Agent:** Read access to finalized specifications and target schema metadata; writes tracking records to SQLite.
@@ -134,6 +153,42 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Impact:** Shrinks system prompt footprints to the absolute minimum and ensures bulletproof task isolation.
 * **Components Affected:** Agent profile manifests, tool authorization middleware.
 * **Acceptance Criteria:** Instantiate each agent role independently with a prompt under 1000 tokens, blocking cross-role tool usage (e.g., ensuring Code Agent cannot run general shell commands and QA Agent cannot edit code files directly).
+
+### [ ] `[FEAT-031]` Ticket Agent (Boundary In and Writeback Out)
+* **Description:** The factory's entry and exit point. Inbound: read a ticket from an external tracker (Jira, Azure Boards, GitHub Issues as the zero-config default), enrich it with repository context via the memory-first chain, and hand a normalized work item to the Orchestrator. Outbound: on Ship-band completion, write the release outcome back to the originating ticket (status, version, changelog excerpt, PR link), which is the loop closure `[ARCH-009]` names.
+* **Impact:** Teams adopt the factory without changing their tracker; the writeback makes every shipped item traceable from the ticket that requested it, which is the same verifiability thesis the repo already runs on.
+* **Components Affected:** New tracker adapter layer (one interface, per-tracker implementations), Orchestrator intake, SNAP `p` payload for ticket identity, `.claude/settings.json` for tracker credentials handling.
+* **Acceptance Criteria:** GitHub Issues works end to end with zero external dependencies (via `gh` CLI when present, degrading silently when absent, per the `conductor-db.mjs` fail-open convention). Jira and Boards adapters are separate follow-ups, each behind the same interface. No credential is ever written to a tracked file. The writeback is idempotent: re-running a completed Ship band does not duplicate ticket comments.
+
+### [ ] `[FEAT-032]` Define-Band Extension: Analyst and UX Agents
+* **Description:** Two roles upstream and beside the Spec agent. **Analyst:** converts an enriched ticket into requirements and user stories before `/cc-spec` runs, so the Spec agent receives structured intent instead of raw prose. **UX Agent:** owns design system rules for frontend work; it consumes the `[FEAT-037]` skill stack (impeccable, emil-design-eng, taste-skill) and emits constraints the Code agent must honor, never code.
+* **Impact:** Closes the two Define-band seats the current roster leaves empty; frontend output stops depending on the Code agent's taste and starts depending on a role whose only job is taste.
+* **Components Affected:** Agent profile manifests, `/cc-spec` intake (accepts an Analyst handoff as pre-answered context), SNAP role enum (versioned change per the `[FEAT-012]` amendment), `project-template/CLAUDE.md` delegation table.
+* **Acceptance Criteria:** Analyst output is a fixed-shape requirements document the Spec agent consumes without re-asking answered questions. UX agent holds read-only access plus the skill stack; it cannot write source files. Both roles are skippable: a backend-only ticket never instantiates UX, and a ticket that arrives as a finished requirements doc skips Analyst.
+
+### [ ] `[FEAT-033]` Test Writer Agent (Build Band)
+* **Description:** Split test authorship out of the Code agent. The Test Writer receives the approved plan's test list and writes the suites; the Code agent writes the implementation; neither edits the other's files. Write scopes are disjoint by construction (`tests/**` vs the plan's declared source paths).
+* **Impact:** Restores the adversarial gap that makes tests worth running: the author of the code is not the author of its proof. Pairs naturally with the superpowers TDD flow already in use.
+* **Components Affected:** Agent profile manifests, `/cc-plan` output (test list becomes a first-class handoff artifact), `/cc-implement` task routing, SNAP `scope` field.
+* **Acceptance Criteria:** For a plan with a test list, suites are authored by the Test Writer under `tests/**` only; the Code agent's `scope` never includes `tests/**` and vice versa; a scope violation denies at the tool layer, not by prompt request.
+
+### [ ] `[FEAT-034]` Security Agent (Verify Band)
+* **Description:** A read-plus-execute role that runs dependency and secret scans as a Verify-band gate: `npm audit` (or the ecosystem equivalent the stack detector reports), a secrets scan over the diff, and a check that no denied-by-guard command pattern was smuggled in as a script. It reports findings; it fixes nothing.
+* **Impact:** The Verify band currently proves correctness (QA) and style (Auditor) but not safety; this closes that seat with tools the target project already has.
+* **Components Affected:** Agent profile manifests, Verify-band gate definition in `[ARCH-009]`, stack detector output (to pick the audit command per ecosystem).
+* **Acceptance Criteria:** Zero new runtime dependencies in code-conductor itself (`dependencies: {}` holds). A finding above the configured severity blocks the Ship band with a named reason; below it, the finding lands in the report and the band proceeds. The agent has no write access of any kind.
+
+### [ ] `[FEAT-035]` Release Agent (Ship Band)
+* **Description:** Wrap the release ritual the repository already performs by hand into a role: version bump across the five gated locations, `CHANGELOG.md` entry, `tools/version-gate.mjs` and `tools/record-parity.mjs` green, tag, and the CI handoff. The instruments shipped by `[BUG-046]` are this agent's tools, not new work.
+* **Impact:** The release ritual stops being prose in a plan and becomes a role with a checklist it cannot skip, which is the structural fix `[BUG-046]` already argued for.
+* **Components Affected:** Agent profile manifests, `docs/RELEASE-CLOSEOUT.md` (becomes the agent's script), `tools/` instruments (consumed, not modified).
+* **Acceptance Criteria:** A release attempted with a red instrument halts naming the instrument; the agent's write scope is exactly the release surface (`VERSION`, `package.json`, `package-lock.json`, `CHANGELOG.md`, the backlog heading flip) and nothing else; the closing act is the `[FEAT-031]` ticket writeback.
+
+### [ ] `[FEAT-036]` Docs Agent (Ship Band)
+* **Description:** After Release, reconcile user-facing documentation with what actually shipped: README sections whose content the release touched, command reference tables, the dependencies table, and guides. It proposes diffs; it does not invent claims, per the launch checklist rule that every published statement traces to the repository.
+* **Impact:** Kills the recurring drift class where the README describes the previous release (the ui-ux-pro-max dependency row and the delegation table are live specimens as of this filing).
+* **Components Affected:** Agent profile manifests, `README.md`, `project-template/CLAUDE.md` managed sections.
+* **Acceptance Criteria:** Given a shipped release, the agent produces a docs diff or an explicit "no drift found"; every changed sentence cites the commit or file that makes it true; write scope is documentation files only.
 
 ---
 
@@ -161,20 +216,23 @@ This document is the single source of truth for the evolutionary engineering of 
 
 ## PILLAR 5: INFRASTRUCTURE, ECOSYSTEM, AND QUALITY ASSURANCE
 
-### [ ] `[FEAT-019]` Dependency Abstraction via Local Consumption (Graph Dependency Shield)
+### [~] `[FEAT-019]` Dependency Abstraction via Local Consumption (Graph Dependency Shield)
+* **SUPERSEDED at Pillar 3 restructure: this item's entire premise is Graphify relationship output, and the `[FEAT-021]` resolution removes Graphify from the repository. If a structural index ever returns under an `[ARCH-009]` spec, its consumption shield is designed there, in that spec's own terms. Original text preserved below.**
 * **Description:** Implement an internal middleware utility that processes raw Graphify relationship outputs locally before exposing them to the agent prompt.
 * **Impact:** Provides the agent with necessary structural awareness without flooding the context window with raw multidimensional JSON dependency data.
 * **Components Affected:** Dependency mapper utility, tool output parser.
 * **Acceptance Criteria:** Expose structural relationships to the agent strictly via query-driven operations that return direct dependencies at a single layer of depth per request.
 
 ### [ ] `[FEAT-021]` Python-Free Structural Analysis (AST Decoupling)
+* **RESOLVED IN DIRECTION at Pillar 3 restructure, adopting the 2026-09-25 reframe's option (a): the graph rung is dropped and Python leaves the repository entirely.** The evidence is already in the reframe: `graphify` was never installed on the developer machine, the graph rung was inert for the project's entire life, every cycle shipped on memory to grep, and `skills/memory-first/SKILL.md:37` documents the skip. Keeping a hook pair (`graphify-ast-refresh.mjs` plus `.py` payload) to service a tool nobody runs is dead weight with a live cost: it is the only Python in a package whose defining constraint is zero dependencies and npm-native distribution. Scope of the removal: both hook files, the `settings.json` wiring and its installer merge (`mergeGraphifyHook`, `graphifyHookCommand`), their tests, the graph rung in the Orchestrator Protocol of both `CLAUDE.md` templates and in `skills/memory-first`, the `graphify-out/` guard references, and the README hook section. The BUG-033 wrapper work is not wasted; it is what made the removal safe to observe (silent no-op on Python-free hosts) before making it permanent. Option (b), a zero-dependency Node indexer over the repo's own `.mjs` files, is NOT filed now: it gets its own id only when a measured session shows memory to grep failing to answer a structural question, which has not happened. `[FEAT-019]` is superseded by this resolution (see its own amendment). Structural awareness for the multi-agent roster, if ever needed, is a Define-band concern and would enter through an `[ARCH-009]` spec, not through a parser swap.
 * **Description:** Re-engineer the code structural parser to drop python runtime dependencies completely, moving to modern, ultra-portable local indexing solutions.
 * **Impact:** Eradicates environment setup friction for developer workstations that lack Python runtimes or face dependency lockouts.
 * **Components Affected:** `global/hooks/graphify-ast-refresh.py` (Replacement).
 * **Acceptance Criteria:** Execute full codebase indexing natively using the TypeScript compiler API for JavaScript targets, pre-compiled Tree-sitter WebAssembly bindings, or a graceful fallback to high-speed regular expression scanners.
 * **Reframe (2026-09-25, recorded while filing BUG-033):** the first question is not which parser but **whether this repo needs a graph at all**. `graphify` is a third-party Python package this repo does not ship, and it has never been installed on the developer machine - the graph rung of the Orchestrator Protocol has been inert for the project's entire life while every cycle shipped on memory to grep, and `skills/memory-first/SKILL.md:37` already documents the skip. Candidate resolutions to evaluate when this is picked up: (a) drop the graph rung from the Orchestrator Protocol under YAGNI and keep memory to grep to targeted read; (b) a zero-dependency indexer over the repo's own `.mjs` files (`node:module` plus regex) honoring the `dependencies: {}` constraint. The TypeScript compiler API path is **out** unless code-conductor decides to index TypeScript user projects, which is a separate product decision requiring its own `/cc-spec`: `typescript` is a real runtime dependency against a package whose defining constraint is zero dependencies, and it covers TS/JS only. Replacing `graphify` is also not a parser swap - it supplies a `graphify query "<question>"` CLI over `graphify-out/graph.json`, so a replacement owns the schema, the query surface and the freshness lifecycle too.
 
-### [ ] `[FEAT-022]` UI/UX Skill Assimilation and Passive Process Removal
+### [~] `[FEAT-022]` UI/UX Skill Assimilation and Passive Process Removal
+* **SUPERSEDED by `[FEAT-037]`: rehabilitating ui-ux-pro-max's passive CSV assets is no longer worth doing, because the skill itself is replaced. Verified before superseding: the ecosystem now ships npm-native design skills (installed via the `npx skills` CLI) with active maintenance and no Python, which is a better answer to this item's Impact line than restructuring dead assets. Original text preserved below.**
 * **Description:** Deconstruct the isolated, passive structure of scripts and CSV dictionaries inside the `ui-ux-pro-max` skill directory, converting them into native configuration assets.
 * **Impact:** Restores design-system verification features and removes dead code assets that the agent currently ignores during live sessions.
 * **Components Affected:** `.claude/skills/ui-ux-pro-max/` (Restructuring).
@@ -561,6 +619,24 @@ The first report of specimen 2 guessed that possessive apostrophes in the prose 
 **ANSWERED 2026-09-28: a third specimen did force the queue, and the id was minted as `[BUG-047]` above.** The original wording is kept below because it is the condition the mint was measured against.
 
 After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two specimens plus a traced mechanism plus a severity upgrade is half the minting condition; the audit is the other half.
+
+### [ ] `[FEAT-037]` Frontend Design Skill Stack (Replace ui-ux-pro-max)
+* **Description:** Replace the GitHub-downloaded `ui-ux-pro-max` skill with a composable, npm-distributed stack installed through the `npx skills` CLI: `npx impeccable install` (Impeccable, the lead design skill), `npx skills add emilkowalski/skill` (design, animation and motion practice from the Sonner/Vaul author), and `npx skills add Leonxlnx/taste-skill` (anti-slop layout, typography, spacing defaults). The three are designed to combine; the `[FEAT-032]` UX agent is their consumer.
+* **Impact:** Removes the second Python-adjacent asset class and the last GitHub-tarball install path; frontend guidance becomes maintained third-party skills pinned and reviewable instead of a bundled static CSV set the agent ignores. Distribution stays entirely inside the node ecosystem, matching `[FEAT-023]`.
+* **Components Affected:** Installer frontend-detect branch (currently downloads ui-ux-pro-max from GitHub), sweep logic for a previously installed `ui-ux-pro-max` (remove only when content matches the known bundled version, per the 1.23.3 sweep precedent), `project-template/CLAUDE.md` delegation table (the Frontend UI/UX row), README dependencies table and file tree, `skills-lock.json` handling.
+* **Acceptance Criteria:** On a frontend-detected project the installer offers (never silently executes) the three `npx skills` installs and records the choice; the skills land where Claude Code registers them and appear in the lock file with pinned revisions, because third-party skills run with full agent permissions and an unpinned skill is an unreviewed dependency. `dependencies: {}` in `package.json` is untouched: the CLI is invoked, never depended on. A stale ui-ux-pro-max install is swept only on content match; a user-modified copy is left in place and named in the report. Both CLAUDE.md mirrors update their delegation row in the same commit.
+
+### [ ] `[FEAT-038]` Discoverability Metadata for npm and GitHub
+* **Description:** Set the search surface the launch plan depends on: GitHub repository topics (claude, claude-code, ai-agents, developer-tools, guardrails, spec-driven-development, multi-agent) and the `keywords` array in `package.json` with the terms a Claude Code user actually types. Verify the npm listing renders the README correctly after publish.
+* **Impact:** The launch sequence (Show HN, r/ClaudeAI, awesome-claude-code) drives readers to the repo and the package; readers who arrive later through search only find it if this metadata exists first, which is why it lands before any post.
+* **Components Affected:** `package.json` (`keywords`, `description`), GitHub repository settings (topics, About text, social preview), npm listing.
+* **Acceptance Criteria:** Topics and keywords are set and committed before the first post goes out (this item is a launch checklist prerequisite); `npm view` shows the keywords; the GitHub About line states what the project is in one sentence without a claim the repo cannot back.
+
+### [ ] `[FEAT-039]` Superpowers Auto-Install via the Claude Code Plugin CLI
+* **Description:** Close the last manual dependency step. The installer runs `claude plugin install superpowers@claude-plugins-official` (the official Anthropic-managed marketplace, so no marketplace registration step is needed) as part of `code-conductor` setup, replacing the README instruction that tells the user to install it by hand from `/plugin` before `/cc-spec`, `/cc-plan`, `/cc-debug`, `/cc-refactor`, `/cc-review` and `/cc-test` can work.
+* **Impact:** A fresh install goes from "npm install plus a manual plugin step you discover when a Skill() call fails" to one command. This is the dependency whose absence breaks six commands, so automating it removes the single worst first-run failure mode the project has.
+* **Components Affected:** `bin/code-conductor.mjs` (new setup step beside the hook merges), a new `lib/installer/plugins.mjs`, `tests/installer/` (stub `claude` binary on PATH, per the graphify-refresh stub-interpreter precedent), README dependencies table (the superpowers row changes from manual step to installer-handled with a manual fallback line), CHANGELOG.
+* **Acceptance Criteria:** Fail-open end to end, per the `conductor-db.mjs` convention: no `claude` binary on PATH, an older Claude Code whose CLI lacks the `plugin` subcommand, a network failure, or a marketplace schema error each degrade to one visible line printing the manual command (`/plugin install superpowers@claude-plugins-official`) and exit 0; the installer never fails because of this step. The call is bounded by a timeout (the `curl --max-time 5` precedent) and never runs detached input prompts. Idempotent: an already-installed superpowers is treated as success, and two consecutive installer runs produce the same end state. Interactive TTY runs confirm before installing (the `[FEAT-037]` consent rule: third-party code is offered, never silently executed); non-interactive runs install only under an explicit `--with-plugins` style flag and otherwise print the manual command. The exact plugin spec string `superpowers@claude-plugins-official` lives in one exported constant asserted by test, so a marketplace rename is a one-line change caught by CI rather than a silent drift.
 
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
