@@ -271,44 +271,44 @@ export const CORPUS = [
   // transcripts except where marked constructed.
 
   // Specimen 1, [BUG-041]'s session.
-  { label: 'heredoc: bracketed JS body appended to a test file', verdict: 'deny', // -> allow
+  { label: 'heredoc: bracketed JS body appended to a test file', verdict: 'allow', // [BUG-047] flipped
     command: "cat >> tests/installer/templates.test.js <<'JSEOF'\n  const rows = [\n    ['a', 1],\n  ];\nJSEOF\n" },
 
   // Specimen 2, CONSTRUCTED, not byte-faithful. The transcript records P4; this
   // rebuild carries ONE apostrophe and dies at the strip gate instead, because the
   // malformed branch fires before any pattern check. The mismatch is what exposed the
   // third denial mechanism, so the imperfect rebuild is kept and marked.
-  { label: 'heredoc: commit message body, odd apostrophe (constructed)', verdict: 'deny', // -> allow
+  { label: 'heredoc: commit message body, odd apostrophe (constructed)', verdict: 'allow', // [BUG-047] flipped
     command: "cat > msg.txt <<'EOF'\ndocs: approve the spec [BUG-044]\n\nGuard 3's audit found it.\nEOF\n" },
 
   // Specimen 2, even-apostrophe form, which is what the transcript's P4 implies.
-  { label: 'heredoc: commit message body, even apostrophes', verdict: 'deny', // -> allow
+  { label: 'heredoc: commit message body, even apostrophes', verdict: 'allow', // [BUG-047] flipped
     command: "cat > msg.txt <<'EOF'\nGuard 3's and the audit's finding [BUG-044]\nEOF\n" },
 
   // Specimen 3, [BUG-042]'s audit.
-  { label: 'heredoc: mjs script body with regex class', verdict: 'deny', // -> allow
+  { label: 'heredoc: mjs script body with regex class', verdict: 'allow', // [BUG-047] flipped
     command: "cat > probe.mjs <<'MJS'\nconst RE = /\\[(BUG)-(\\d{3,})\\]/g;\nconst n = x ?? 0;\nMJS\n" },
 
   // Specimen 4, [BUG-046]'s audit.
-  { label: 'heredoc: mjs script body with regex class and a for-of', verdict: 'deny', // -> allow
+  { label: 'heredoc: mjs script body with regex class and a for-of', verdict: 'allow', // [BUG-047] flipped
     command: "cat > ceiling.mjs <<'SCRIPT'\nconst RE = /^### \\[.\\]/;\nfor (const line of lines) {}\nSCRIPT\n" },
 
   // The delimiter pair. Neither subject distinguishes them, because neither has a
   // heredoc state at all, so both must allow after the fix.
-  { label: 'heredoc: UNQUOTED delimiter, bracket in body', verdict: 'deny', // -> allow
+  { label: 'heredoc: UNQUOTED delimiter, bracket in body', verdict: 'allow', // [BUG-047] flipped
     command: 'cat > out.txt <<EOF\ntext [x] more\nEOF\n' },
-  { label: 'heredoc: quoted delimiter, question mark in body', verdict: 'deny', // -> allow
+  { label: 'heredoc: quoted delimiter, question mark in body', verdict: 'allow', // [BUG-047] flipped
     command: "cat > out.txt <<'EOF'\ntext ?x more\nEOF\n" },
 
   // Pattern crossings: the same lexical gap produces P5 and P9 verdicts too.
-  { label: 'heredoc: command substitution in body (P5 crossing)', verdict: 'deny', // -> allow
+  { label: 'heredoc: command substitution in body (P5 crossing)', verdict: 'allow', // [BUG-047] flipped
     command: "cat > out.txt <<'EOF'\nvalue is $(date)\nEOF\n" },
-  { label: 'heredoc: for-of text in body (P9 crossing)', verdict: 'deny', // -> allow
+  { label: 'heredoc: for-of text in body (P9 crossing)', verdict: 'allow', // [BUG-047] flipped
     command: "cat > out.txt <<'EOF'\nfor (const x of y) {}\nEOF\n" },
 
   // The third mechanism: an ODD number of quote characters trips the fail-closed
   // malformed branch DURING the strip pass, before any pattern check runs.
-  { label: 'heredoc: odd apostrophe count in body (malformed gate)', verdict: 'deny', // -> allow
+  { label: 'heredoc: odd apostrophe count in body (malformed gate)', verdict: 'allow', // [BUG-047] flipped
     command: "cat > out.txt <<'EOF'\nGuard 3's audit\nEOF\n" },
   { label: 'heredoc: even apostrophe count in body', verdict: 'allow', // -> allow
     command: "cat > out.txt <<'EOF'\nGuard 3's and the audit's finding\nEOF\n" },
@@ -328,12 +328,12 @@ export const CORPUS = [
 
   // Unredirected heredoc reads zero files, so it is not a dump. Today's deny on a
   // metacharacter IS the defect. Ruled: no special case.
-  { label: 'heredoc: unredirected cat, metachar body', verdict: 'deny', // -> allow
+  { label: 'heredoc: unredirected cat, metachar body', verdict: 'allow', // [BUG-047] flipped
     command: 'cat <<EOF\n[x]\nEOF\n' },
 
   // P6 reads UNMASKED by design, so it fires on a grep shape inside a body. The flip
   // is deliberate: a grep pattern in written content is data, not a command.
-  { label: 'heredoc: grep-matchall shape inside the body only', verdict: 'deny', // -> allow
+  { label: 'heredoc: grep-matchall shape inside the body only', verdict: 'allow', // [BUG-047] flipped
     command: "cat > out.txt <<'EOF'\ngrep -r '' .\nEOF\n" },
   // THE FRONTIER: the same shape as real code must still deny.
   { label: 'heredoc frontier: grep-matchall as real code', verdict: 'deny', // -> deny
@@ -349,7 +349,7 @@ export const CORPUS = [
 
   // AC9: an unterminated heredoc is NOT malformed. Nothing after it is command, so
   // the premise that justifies fail-closed does not hold.
-  { label: 'heredoc: unterminated, metachar body', verdict: 'deny', // -> allow
+  { label: 'heredoc: unterminated, metachar body', verdict: 'allow', // [BUG-047] flipped
     command: "cat > out.txt <<'EOF'\n[x] body\n" },
 
   // THE FRONTIER for the introducer matcher: `<<<` is a here-string, NOT a heredoc.
@@ -360,9 +360,9 @@ export const CORPUS = [
     command: 'cat <<< "[x]"' },
 
   // AC8 and AC2.
-  { label: 'heredoc: two heredocs in one command', verdict: 'deny', // -> allow
+  { label: 'heredoc: two heredocs in one command', verdict: 'allow', // [BUG-047] flipped
     command: "cat > a.txt <<'A'\n[x]\nA\ncat > b.txt <<'B'\n[y]\nB\n" },
-  { label: 'heredoc: <<- with tab-indented terminator', verdict: 'deny', // -> allow
+  { label: 'heredoc: <<- with tab-indented terminator', verdict: 'allow', // [BUG-047] flipped
     command: 'cat > out.txt <<-EOF\n\t[x] body\n\tEOF\n' },
 
   // AC7: the existing states win; `<<` inside quotes is ordinary text.
@@ -370,12 +370,12 @@ export const CORPUS = [
     command: "echo 'cat <<EOF' > out.txt" },
 
   // The delimiter must match a whole line, never a substring.
-  { label: 'heredoc: delimiter word appearing inside the body', verdict: 'deny', // -> allow
+  { label: 'heredoc: delimiter word appearing inside the body', verdict: 'allow', // [BUG-047] flipped
     command: "cat > out.txt <<'EOF'\nnot EOF really [x]\nEOF\n" },
 
   // The body starts after the newline, so a redirect on the introducer's own line is
   // still command text and must not be blanked.
-  { label: 'heredoc: redirect after the introducer on the same line', verdict: 'deny', // -> allow
+  { label: 'heredoc: redirect after the introducer on the same line', verdict: 'allow', // [BUG-047] flipped
     command: "cat <<'EOF' > out.txt\n[x]\nEOF\n" },
 ];
 
