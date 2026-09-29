@@ -47,6 +47,8 @@ tests/.tmp/
 !/.claude/memory/project.md
 !/.claude/settings.json
 /docs/*
+!/docs/launch/
+/docs/launch/*
 !/docs/superpowers/
 /docs/superpowers/*
 !/docs/superpowers/plans/
@@ -54,6 +56,9 @@ tests/.tmp/
 !/docs/superpowers/specs/
 /docs/superpowers/specs/*
 !/docs/RELEASE-CLOSEOUT.md
+!/docs/launch/LAUNCH-CHECKLIST.md
+!/docs/launch/RECORDING-SCRIPT.md
+!/docs/launch/SHOW-HN-DRAFT.md
 !/docs/superpowers/plans/2026-06-10-bug002-spec-read-budget.md
 !/docs/superpowers/plans/2026-06-10-bug003-surgical-plan-state.md
 !/docs/superpowers/plans/2026-06-12-bug006-feat018-bash-scan-guard.md

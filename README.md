@@ -4,7 +4,109 @@
 [![License](https://img.shields.io/github/license/yeisonrestrepo/code-conductor.svg)](https://github.com/yeisonrestrepo/code-conductor/blob/main/LICENSE)
 [![GitHub issues](https://img.shields.io/github/issues/yeisonrestrepo/code-conductor.svg)](https://github.com/yeisonrestrepo/code-conductor/issues)
 
-A spec-first, token-efficient Claude Code configuration that turns AI-assisted coding into a disciplined, repeatable engineering workflow.
+**A governance layer for Claude Code sessions.** Hooks, guards, memory and release discipline that make an agent's work verifiable: what it may run is checked before it runs, what it decided is written where the next session will read it, and what shipped is asserted against the record by instruments that run in CI. It is a spec-first workflow, but the part worth your sixty seconds is that every claim below is checkable against a commit in this repository.
+
+---
+
+## Quickstart
+
+Three commands, from nothing to a guarded session. The output below is **real**, captured by running exactly these commands in a scratch directory.
+
+```bash
+mkdir demo && cd demo && git init -q && npm init -y >/dev/null
+npx @yeison.restrepo.r/code-conductor --project
+```
+
+```
+code-conductor: .claude/memory/project.md matches the bundled stub; it may have been overwritten by an installer re-run before 1.30.0.
+  Find a committed copy:  git log --oneline -- .claude/memory/project.md
+  Restore it:             git checkout <commit> -- .claude/memory/project.md
+```
+
+> **That warning is a known false positive on a fresh install**, and it is left in this transcript rather than edited out. `lib/installer/deploy.mjs:138` fires whenever your `project.md` equals the bundled stub, which is exactly what a *first* install produces, so it cannot tell "just seeded" from "clobbered by an old re-run". Reported, unfixed at time of writing. The install itself exits 0 and is correct.
+
+You now have `.claude/` with `commands/`, `hooks/`, `memory/`, `scripts/` and `settings.json`. The third command is any command at all, because the guard is already live:
+
+```bash
+# scene 1: a mass content dump is denied, with a message that says what to do instead
+cat *.ts
+```
+
+```
+BASH SCAN BLOCKED. The command triggered a mass content-dump pattern. Pattern ids: P4.
+Authorized alternatives: 1. Grep for targeted content search with file and pattern scope.
+2. Glob for path listing without file content. 3. Read with an explicit offset and limit.
+A permanent exception is operator policy, not a self-serve step: entries live in
+.claude/memory/bash-scan-allowlist.txt, are reviewed in git, and an agent may propose one
+but must not add it to clear its own denial.
+```
+
+```bash
+# scene 2: the decomposed form runs
+grep -n 'export' src/index.ts
+```
+
+Nothing is printed by the hook. The command runs.
+
+---
+
+## Guard 3, and what it learned
+
+Guard 3 scans every Bash command for **mass content dumps**: `cat *.ts`, `find` without a depth bound, a pager over a glob, a shell loop reading files. It denies before the command runs and names an alternative. It is not a sandbox and not a security boundary (see [What this is not](#what-this-is-not)).
+
+The interesting part is what it got wrong, because that is what the record documents.
+
+**It read quoted content as code.** A grep pattern, a commit message, an English sentence with a period: all scanned as though they were shell. Fixed in `1.31.x` by masking quoted spans before the checks, with two checks kept unmasked on purpose because a grep pattern and an alias value are the data those checks exist to read.
+
+**It read heredoc bodies as code.** Writing a file whose content contained `[`, `?`, a `$(...)`, or an odd number of apostrophes was denied by patterns written to catch *reads*. Four specimens accumulated across four consecutive working sessions before it was fixed in `1.33.0` by giving both scanners a sixth state. The argument is one sentence: **a heredoc body is content being written and is already inside the command string the scanner is holding, so it cannot flood anything.**
+
+### The honest numbers
+
+Every figure here is cited, and none of them is rounded in the project's favour.
+
+| measurement | value | source |
+|---|---|---|
+| Guard 3 denials recovered from one real working session | **47 events, 43 unique commands** | `.claude/memory/project.md:991` |
+| ...of which flipped `deny` to `allow` after the `1.31.x` fixes | **36 of 43** | same table |
+| unplanned regressions from those fixes | **0** | same table |
+| this session's own denials, replayed verbatim against today's hook | **3: one now allowed, two still denied** | reproducible, below |
+| ...of the two still denied, the guard being **right** | **1** (a genuine shell loop) | corpus control row |
+| ...the guard being **wrong** | **1** (a surviving `P7` parity inversion) | recorded in `[BUG-041]`'s entry |
+
+The population in row 1 grew from 41 to 43 *mid-measurement, because two of the scripts written to perform the measurement were themselves denied by the bug they were measuring.* That sentence is in the record, not in the marketing.
+
+**One known false positive remains**, and it is named rather than buried: a mixed `grep` with pager pipelines still denies under `P7`. It is the residual the `[BUG-041]` entry describes, where the fragment starts inside an enclosing quoted region and every subsequent quote is parity-inverted.
+
+---
+
+## Instruments: releases that verify their own record
+
+Three checks live in `tools/` as tracked repository infrastructure, and two of them run against the live repository in CI, so a divergence blocks the merge rather than waiting for someone to remember:
+
+- **`version-gate.mjs`** takes `VERSION` as the authority and checks four other locations against it. Agreement reports as agreement, which sounds trivial until you learn that its predecessor reported `FAIL` on five locations that agreed, because it compared against a literal frozen two releases earlier.
+- **`record-parity.mjs`** asserts that every item the `CHANGELOG` claims has a closed backlog entry naming the version it shipped in. It exists because `[BUG-044]` shipped, was closed out in memory, and left its backlog entry reading `[ ]` for an entire release with no instrument comparing the two documents.
+- **`id-ceiling.mjs`** reports the highest filed id over the working tree **union** `origin/main`, counting only filed headings. Its predecessor counted id-shaped tokens anywhere, so it once read a plan file's prediction of its own output back as evidence.
+
+**The example worth checking.** `[BUG-046]`'s own release ran those instruments against itself, then proved the green rather than trusting it: with the item's backlog heading deliberately flipped to `[ ]`, `record-parity` reported `FAIL [A] 1.32.2 claims BUG-046 but its heading reads [ ]` once per claim bullet and exited 1; flipped back, `RECORD_PARITY_OK`. The first release whose record cannot silently diverge is the release that made divergence detectable.
+
+`tools/README.md` carries a **registry of five retired instruments**, each with the failure mode that retired it, so the sixth one gets written by someone who has met the list.
+
+---
+
+## What this is not
+
+- **Not a sandbox and not a security boundary.** Guard 3 is advisory tooling against context exhaustion and sloppy habits. It does not contain a hostile process and was never built to.
+- **Not a model.** It is configuration, hooks and scripts around Claude Code.
+- **Not finished.** See the limits below.
+
+## Known limits
+
+- **`[BUG-045]` is the one open filed defect**: the Guard 3 allowlist cannot cover a quoted path, because the boundary sets it interpolates contain no quote character, so an entry `docs/` does not cover `cat "docs/x.md" *.md`. Filed with its ritual priced, untouched pending its own change.
+- **The `P7` false positive above**, still live.
+- **The installer's stub warning**, shown honestly in the Quickstart.
+- **Two open dossiers**, which are the evidence-collection pipeline working rather than a backlog: a session denial tally, and one for interleaved-artifact reports. A dossier holds specimens until a mechanism is characterized by probe; an id is minted only when the written condition is met. `[BUG-047]` is what that pipeline produces when it completes: an out-of-scope note, then a dossier, then four specimens across four sessions, then a mint, then a release.
+
+**The living artifact is `AGENT-READABLE BACKLOG.md`.** It is not a tidy issue list. It carries amendments above the text they amend, premises that measurement later corrected, and wrong guesses recorded beside the probe that overturned them.
 
 ---
 
