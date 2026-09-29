@@ -50,6 +50,8 @@ This is a permitted developer override for WIP commits, broken test environments
 
 **The GitHub Actions CI gate is unconditional.** A PR merged without a green CI run is a policy violation regardless of `--no-verify` usage. Never disable or skip the CI workflow to merge failing tests.
 
+Releases follow [the closeout checklist](docs/RELEASE-CLOSEOUT.md), whose version and record-parity steps are asserted by that same CI gate.
+
 ### Manual Validation Protocol
 
 Use this checklist when your environment restricts hook execution (restricted PowerShell policy, GUI git client that bypasses hooks, or bash not in PATH):
