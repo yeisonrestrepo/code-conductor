@@ -71,7 +71,7 @@ git add -f docs/superpowers/specs/2026-09-28-bug042-gitignore-restructure-design
 
 Both paths sit under `docs/`, which is still wholesale-ignored at this point, so `-f` is correct for the new plan and, because the spec is already tracked, `-u` would also work for it; `-f` is used for both here to keep one form while the ignore rule is still the broken one. **This is the last task in which `-f` is needed for a file that is already tracked**, which is the item's own epitaph and is recorded at closeout.
 
-- [>] **[T-000-C] Step 3: Commit**
+- [X] **[T-000-C] Step 3: Commit**
 
 ```bash
 git commit -m "docs: add the BUG-042 gitignore restructure implementation plan [BUG-042]" \
@@ -95,7 +95,7 @@ Expected: the pre-commit hook runs the suite and reports **902 passed / 12 skipp
 - Consumes: the index state after Task 0.
 - Produces: `expectedBlock(sites)` and `readBlock()`, exported from the test file so the discriminator cases can call them with mutated input.
 
-- [ ] **[T-001-A] Step 1: Write the parity test**
+- [X] **[T-001-A] Step 1: Write the parity test**
 
 Create `tests/unit/gitignore-block-parity.test.js`:
 
@@ -181,7 +181,7 @@ describe('.gitignore tracked-surface block', () => {
 });
 ```
 
-- [ ] **[T-001-B] Step 2: Run it and confirm the predicted red**
+- [X] **[T-001-B] Step 2: Run it and confirm the predicted red**
 
 ```bash
 npx vitest run tests/unit/gitignore-block-parity.test.js
@@ -191,7 +191,7 @@ Expected: **4 failed**, all four, because `readBlock()` throws on the missing ma
 
 Whole-suite boundary at this point, if run: **902 passed | 4 failed | 12 skipped (918)**, files **33 passed | 1 failed | 1 skipped (35)**. Any other count or any other failing suite is a tripwire: halt and report before editing `.gitignore`.
 
-- [ ] **[T-001-C] Step 3: Generate the block text**
+- [X] **[T-001-C] Step 3: Generate the block text**
 
 Write the generator to a throwaway file outside the repository and run it, so no untracked helper lands at either site while the ignore rule is mid-change:
 
@@ -220,7 +220,7 @@ node /Users/yeison/.claude/jobs/2dc6a6e3/tmp/genblock.mjs
 
 Expected shape: 19 lines for `.claude`, then `/docs/*` plus three directory pairs plus one leaf per tracked file under `docs/`. **Verify the `.claude/` half matches the spec's verbatim block character for character** before using the output; a mismatch means the generator and the spec disagree and the spec is the reviewed artifact.
 
-- [ ] **[T-001-D] Step 4: Rewrite `.gitignore`**
+- [X] **[T-001-D] Step 4: Rewrite `.gitignore`**
 
 Retire lines `:3`, `:7`, `:8`, `:10`, `:11`. Relocate `:16` (`turn-count.txt`) and `:17` (`session-snapshot.json`) below the END marker as the two external-writer lines. Keep `:1`, `:2`, `:4`, `:5`, `:6`, `:9`, `:12`, `:13`, `:14`, `:15`, `:18` where they are. The result:
 
@@ -272,7 +272,7 @@ tests/.tmp/
 
 `<GENERATED BLOCK FROM STEP 3>` is replaced by the generator's exact stdout, unmodified.
 
-- [ ] **[T-001-E] Step 5: Run the parity test and confirm green**
+- [X] **[T-001-E] Step 5: Run the parity test and confirm green**
 
 ```bash
 npx vitest run tests/unit/gitignore-block-parity.test.js
@@ -280,7 +280,7 @@ npx vitest run tests/unit/gitignore-block-parity.test.js
 
 Expected: **4 passed**.
 
-- [ ] **[T-001-F] Step 6: Verify the six acceptance behaviors by hand**
+- [X] **[T-001-F] Step 6: Verify the six acceptance behaviors by hand**
 
 ```bash
 git check-ignore -v .claude/settings.local.json
@@ -292,7 +292,7 @@ git add -u .claude/memory/project.md; echo "tracked add rc=$?"
 
 Expected: the first two name a rule inside the block, never an ancestor exclude (AC5, AC6); `rc=1` for the project-template probe, meaning not ignored, with `!project-template/*` gone (AC7); **empty output** from `ls-files --others --exclude-standard` (AC8); `rc=0` for the tracked add (AC1, AC13).
 
-- [ ] **[T-001-G] Step 7: Run the whole suite**
+- [X] **[T-001-G] Step 7: Run the whole suite**
 
 ```bash
 npx vitest run
@@ -300,7 +300,7 @@ npx vitest run
 
 Expected: **906 passed | 12 skipped (918)**, files **34 passed | 1 skipped (35)**. `tests/unit/staging-convention.test.js` must be among the passing files, unchanged (AC18).
 
-- [ ] **[T-001-H] Step 8: Stage and commit**
+- [>] **[T-001-H] Step 8: Stage and commit**
 
 ```bash
 git add -u .gitignore

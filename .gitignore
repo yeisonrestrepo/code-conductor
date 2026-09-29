@@ -1,18 +1,114 @@
 .worktrees/
 graphify-out/
-.claude/memory/personal.md
 *.local
 .DS_Store
 Thumbs.db
-.claude/
-docs/
 initial_prompt.xml
-!project-template/*
-.claude/memory/session-snapshot.md
 node_modules/
 .vitest-cache/
 coverage/
 tests/.tmp/
-.claude/memory/turn-count.txt
-.claude/memory/session-snapshot.json
 .conductor/
+
+# --- BEGIN tracked-surface block (BUG-042) ---
+# Deny by default at the two surfaces that hold tracked files. Every tracked file is
+# named here and nothing else at either site is visible to git, so the exit code is
+# honest in both directions: a tracked file stages and exits 0, an unnamed new file
+# exits 1 and stages nothing.
+#
+# THE TOLL: a newly tracked asset costs one ! line in this block. Until it is written
+# `git add <path>` exits 1 and stages nothing; `git add -f <path>` is the interim.
+# tests/unit/gitignore-block-parity.test.js computes this block from `git ls-files`
+# and fails on any drift, so the line cannot be forgotten, only paid.
+#
+# Order is load-bearing: git applies last-match-wins, so each directory re-include
+# precedes the `/*` line that re-excludes its contents, and every leaf follows it.
+#
+# The rules are root-anchored with a leading slash. Before BUG-042 they were not, so
+# `.claude/` and `docs/` matched at any depth and reached into project-template/,
+# which needed `!project-template/*` to undo. That line is retired here.
+/.claude/*
+!/.claude/commands/
+/.claude/commands/*
+!/.claude/hooks/
+/.claude/hooks/*
+!/.claude/memory/
+/.claude/memory/*
+!/.claude/commands/cc-implement.md
+!/.claude/commands/cc-init.md
+!/.claude/commands/cc-plan.md
+!/.claude/commands/cc-resume.md
+!/.claude/commands/cc-spec.md
+!/.claude/hooks/context-guard.ps1
+!/.claude/hooks/context-guard.sh
+!/.claude/hooks/post-compact.ps1
+!/.claude/hooks/post-compact.sh
+!/.claude/hooks/pre-tool-use.mjs
+!/.claude/memory/project.md
+!/.claude/settings.json
+/docs/*
+!/docs/superpowers/
+/docs/superpowers/*
+!/docs/superpowers/plans/
+/docs/superpowers/plans/*
+!/docs/superpowers/specs/
+/docs/superpowers/specs/*
+!/docs/superpowers/plans/2026-06-10-bug002-spec-read-budget.md
+!/docs/superpowers/plans/2026-06-10-bug003-surgical-plan-state.md
+!/docs/superpowers/plans/2026-06-12-bug006-feat018-bash-scan-guard.md
+!/docs/superpowers/plans/2026-06-12-bug014-verbosity-dilution-plan.md
+!/docs/superpowers/plans/2026-06-17-feat024-unit-testing-suite.md
+!/docs/superpowers/plans/2026-06-22-bug017-graphify-read-guard.md
+!/docs/superpowers/plans/2026-06-23-remove-claude-mem.md
+!/docs/superpowers/plans/2026-06-24-bug015-auto-claude-md.md
+!/docs/superpowers/plans/2026-06-24-feat007-context-guard.md
+!/docs/superpowers/plans/2026-06-30-feat010-dense-prompt-protocol.md
+!/docs/superpowers/plans/2026-07-04-arch008-a-checkpoint-compact-write-wiring.md
+!/docs/superpowers/plans/2026-07-04-arch008-s1-relational-schema-engine.md
+!/docs/superpowers/plans/2026-07-04-feat005-sqlite-task-state-engine.md
+!/docs/superpowers/plans/2026-07-05-arch008-b-phase-entry-resume-read-wiring.md
+!/docs/superpowers/plans/2026-09-24-feat016-interactive-assisted-onboarding.md
+!/docs/superpowers/plans/2026-09-24-feat025-conductor-db-retention-purge.md
+!/docs/superpowers/plans/2026-09-24-feat026-guided-branch-and-commit-drafting.md
+!/docs/superpowers/plans/2026-09-25-bug031-plan-step-ordering.md
+!/docs/superpowers/plans/2026-09-25-bug033-hook-interpreter-wiring.md
+!/docs/superpowers/plans/2026-09-25-bug036-pre-tool-use-hook-contract.md
+!/docs/superpowers/plans/2026-09-25-bug037-guard3-port-and-first-ship.md
+!/docs/superpowers/plans/2026-09-27-bug038-handoff-contract.md
+!/docs/superpowers/plans/2026-09-27-bug039-installer-host-owned-state.md
+!/docs/superpowers/plans/2026-09-28-bug040-staging-convention.md
+!/docs/superpowers/plans/2026-09-28-bug041-guard3-refinement.md
+!/docs/superpowers/plans/2026-09-28-bug042-gitignore-restructure.md
+!/docs/superpowers/plans/2026-09-28-bug043-quoted-argv-blindness.md
+!/docs/superpowers/plans/2026-09-28-bug044-deny-message-phantom-allowlist.md
+!/docs/superpowers/specs/2026-06-09-bug001-cc-compact-design.md
+!/docs/superpowers/specs/2026-06-09-bug002-spec-read-budget-design.md
+!/docs/superpowers/specs/2026-06-11-bug006-feat018-bash-scan-guard-design.md
+!/docs/superpowers/specs/2026-06-12-bug014-verbosity-dilution-design.md
+!/docs/superpowers/specs/2026-06-16-feat024-unit-testing-suite-design.md
+!/docs/superpowers/specs/2026-06-22-bug017-graphify-read-guard-design.md
+!/docs/superpowers/specs/2026-06-23-remove-claude-mem-design.md
+!/docs/superpowers/specs/2026-06-24-bug015-auto-claude-md-design.md
+!/docs/superpowers/specs/2026-06-26-feat010-dense-prompt-protocol-design.md
+!/docs/superpowers/specs/2026-07-04-arch008-a-checkpoint-compact-write-wiring-design.md
+!/docs/superpowers/specs/2026-07-04-arch008-relational-persistence-schema-design.md
+!/docs/superpowers/specs/2026-07-04-feat005-sqlite-task-state-engine-design.md
+!/docs/superpowers/specs/2026-07-05-arch008-b-phase-entry-resume-read-design.md
+!/docs/superpowers/specs/2026-09-27-bug039-installer-host-owned-state-design.md
+!/docs/superpowers/specs/2026-09-28-bug041-guard3-refinement-design.md
+!/docs/superpowers/specs/2026-09-28-bug042-gitignore-restructure-design.md
+!/docs/superpowers/specs/2026-09-28-bug043-quoted-argv-blindness-design.md
+!/docs/superpowers/specs/2026-09-28-bug044-deny-message-phantom-allowlist-design.md
+# --- END tracked-surface block (BUG-042) ---
+
+# Kept for external writers. Both lines are redundant against the block above; each is
+# kept because a process outside this file re-adds it when absent, and a line that
+# reappears without explanation is a haunting.
+#
+# kept redundant: the user-global /cc-compact appends this line when absent; removing
+# it means one re-append per compact
+.claude/memory/session-snapshot.json
+# kept redundant: lib/installer/deploy.mjs:17 merges project-template/gitignore by
+# appending absent lines, and turn-count.txt is one of its three; removing it means one
+# re-append per installer run against this repository
+.claude/memory/turn-count.txt
