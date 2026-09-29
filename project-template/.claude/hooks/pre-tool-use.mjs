@@ -53,7 +53,7 @@ function stamp(ms) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-// Guard 4: reads of node_modules/ (BUG-017; graphify-out/ left the set at FEAT-021). Runs before Guard 1 for
+// Guard 4: reads of node_modules/ (BUG-017; FEAT-021 narrowed it to this one component). Runs before Guard 1 for
 // Read: a forbidden path is forbidden whatever its size, and deciding here spares a stat
 // and a full file read on a path that is about to be denied anyway.
 function guard4BlockedRead(input) {

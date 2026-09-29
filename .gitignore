@@ -1,5 +1,4 @@
 .worktrees/
-graphify-out/
 *.local
 .DS_Store
 Thumbs.db

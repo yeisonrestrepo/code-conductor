@@ -633,7 +633,7 @@ export function healGraphifyHook(home, { shipped = SHIPPED_GRAPHIFY_HASHES, now 
   - `.gitignore:2`
   - `tests/tools/repo-invariants.test.js`
 
-- [ ] [T-004-A] Append the two failing invariants (graphify surface, exact python3 set) to `tests/tools/repo-invariants.test.js`, inside the same `describe`:
+- [X] [T-004-A] Append the two failing invariants (graphify surface, exact python3 set) to `tests/tools/repo-invariants.test.js`, inside the same `describe`:
 
 ```js
   // FEAT-021: the graph rung is gone from every surface an agent reads or an install
@@ -658,9 +658,10 @@ export function healGraphifyHook(home, { shipped = SHIPPED_GRAPHIFY_HASHES, now 
 
   Extend the `node:child_process` import to `import { execFileSync, spawnSync } from 'node:child_process';` (`git grep` exits 1 on no match, so `spawnSync` rather than `execFileSync`).
 
-- [ ] [T-004-B] Run `npx vitest run tests/tools/repo-invariants.test.js`. Expect FAIL on both: the surface test lists the CLAUDE.md files, the cc-init mirrors, memory-first and the README; the python3 test lists `README.md` as the extra member.
-- [ ] [T-004-C] `global/CLAUDE.md`: delete line 27 (`2. **Graph** — …`), then renumber the Grep / Glob, Explore sub-agent, Parallel agents and Targeted read rungs to 2, 3, 4, 5.
-- [ ] [T-004-D] `project-template/CLAUDE.md` and `CLAUDE.md` (same edits; line numbers are those of `project-template/CLAUDE.md`, minus one in the root file).
+- [X] [T-004-B] Run `npx vitest run tests/tools/repo-invariants.test.js`. Expect FAIL on both: the surface test lists the CLAUDE.md files, the cc-init mirrors, memory-first and the README; the python3 test lists `README.md` as the extra member.
+  **Executed deviations (2026-09-29, count unchanged):** (a) the surface invariant allows `bin/code-conductor.mjs` beside `heal.mjs`, because the call site names `healGraphifyHook` and prints the upgrade notice, which the plan text missed; (b) the Task 3 Guard 4 comment was reworded to name no graphify, and the python3 invariant was retitled because its own title matched the needle.
+- [X] [T-004-C] `global/CLAUDE.md`: delete line 27 (`2. **Graph** — …`), then renumber the Grep / Glob, Explore sub-agent, Parallel agents and Targeted read rungs to 2, 3, 4, 5.
+- [X] [T-004-D] `project-template/CLAUDE.md` and `CLAUDE.md` (same edits; line numbers are those of `project-template/CLAUDE.md`, minus one in the root file).
 
   **Session Initialization** (lines 37-44) becomes:
 
@@ -690,19 +691,19 @@ Before modifying any file:
 ```
 
   **The delegation table:** delete the `| Graph querying             | Explore sub-agent         |` row.
-- [ ] [T-004-E] `skills/memory-first/SKILL.md`:
+- [X] [T-004-E] `skills/memory-first/SKILL.md`:
   - line 3's description becomes `"Lookup chain enforced before any file read or search: project memory, grep/glob, targeted read — stop at the first step that answers"`;
   - step 1's "proceed to step 2" is unchanged;
   - delete the whole `### 2. Graphify Graph` section (from its heading up to the line before `### 3. Grep / Glob`);
   - renumber `### 3. Grep / Glob` → `### 2.` and `### 4. Targeted Read` → `### 3.`;
   - "Only when steps 1–3 cannot answer" becomes "Only when steps 1–2 cannot answer".
-- [ ] [T-004-F] In **both** `cc-init.md` mirrors:
+- [X] [T-004-F] In **both** `cc-init.md` mirrors:
   - delete `## Step 5 — Graph sync *(skip if IS_NEW=true)*`, its blank line, and the `/graphify .` line with its trailing blank line;
   - renumber `## Step 6 — Hook integrity check` → `## Step 5` and `## Step 7 — Confirm` → `## Step 6`;
   - delete the report line `- Graph: [built / refreshed / skipped — new project]`.
 
   Then run `npx vitest run tests/installer/commands-parity.test.js` and expect it to pass.
-- [ ] [T-004-G] `README.md`:
+- [X] [T-004-G] `README.md`:
   - **:165** becomes: `> **Note:** Do not clone this repository into a parent directory named \`node_modules\`. Guard 4 checks path components and will block agent \`Read\` calls on source files if the repository root is nested inside such a directory.`
   - **:198:** delete `refresh the project graph, `.
   - **:254-257:** the chain becomes `1. **Project memory**` / `2. **Grep / Glob**` / `3. **Targeted read**`.
@@ -712,11 +713,11 @@ Before modifying any file:
   - **:383-384:** the two rows become the single row `│   │   └── verbosity-remind.sh       Verbosity reminder on UserPromptSubmit`.
   - **:405:** "graphify-out guards" becomes "node_modules guards".
   - **:422:** "memory → graph → grep → read chain" becomes "memory → grep → read chain".
-- [ ] [T-004-H] `.gitignore`: delete line 2 (`graphify-out/`). The BUG-017 doc leaves stay.
-- [ ] [T-004-I] Run `git grep -n -i "graphify" -- global skills project-template bin lib .claude/commands .claude/hooks README.md CLAUDE.md`. Expect only `lib/installer/heal.mjs` lines.
-- [ ] [T-004-J] Run `npm test`. Expect **1009 passed / 12 skipped**.
-- [ ] [T-004-K] Stage: `git add -u global/CLAUDE.md project-template/CLAUDE.md CLAUDE.md skills/memory-first/SKILL.md .claude/commands/cc-init.md project-template/.claude/commands/cc-init.md README.md .gitignore tests/tools/repo-invariants.test.js`.
-- [ ] [T-004-L] Commit: `git commit -m "docs: remove the graph rung from every instruction surface [FEAT-021]"`.
+- [X] [T-004-H] `.gitignore`: delete line 2 (`graphify-out/`). The BUG-017 doc leaves stay.
+- [X] [T-004-I] Run `git grep -n -i "graphify" -- global skills project-template bin lib .claude/commands .claude/hooks README.md CLAUDE.md`. Expect only `lib/installer/heal.mjs` lines.
+- [X] [T-004-J] Run `npm test`. Expect **1009 passed / 12 skipped**.
+- [X] [T-004-K] Stage: `git add -u global/CLAUDE.md project-template/CLAUDE.md CLAUDE.md skills/memory-first/SKILL.md .claude/commands/cc-init.md project-template/.claude/commands/cc-init.md README.md .gitignore tests/tools/repo-invariants.test.js`.
+- [X] [T-004-L] Commit: `git commit -m "docs: remove the graph rung from every instruction surface [FEAT-021]"`.
 
 ---
 

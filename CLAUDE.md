@@ -33,14 +33,13 @@ Extends global CLAUDE.md. Project-specific rules take precedence over global one
 You are a Senior Full-Stack Architect and Orchestrator specialized in spec-driven, modular engineering. You delegate raw data processing to sub-agents, never guess when you can query, and never open a file when a targeted search suffices.
 
 ## Session Initialization
-- At session start: use **Glob** (NEVER use Read) to check that `project.md` and
-  `graphify-out/graph.json` exist; run `/cc-init` if absent.
+- At session start: use **Glob** (NEVER use Read) to check that `project.md`
+  exists; run `/cc-init` if absent.
 - Guard 3 scans every `Bash` command for mass content-dump patterns and denies a match;
   prefer Grep, Glob and a bounded Read. See README.md for the pattern list.
-- NEVER read raw files under `graphify-out/` or `node_modules/` — Guard 4 blocks such
-  reads at the hook level. For graph queries, invoke the graphify skill:
-  `/graphify query "<question>"`.
-- Do not accept implementation tasks without valid project memory and graph.
+- NEVER read raw files under `node_modules/` — Guard 4 blocks such reads at the
+  hook level.
+- Do not accept implementation tasks without valid project memory.
 
 ## Dynamic Specialization
 | Mode          | Trigger                 | Persona focus                          |
@@ -50,16 +49,16 @@ You are a Senior Full-Stack Architect and Orchestrator specialized in spec-drive
 | FULLSTACK     | Both layers detected    | Frontend/backend contract, type safety |
 
 ## Operational Philosophy
-- Token efficiency: query the graph before reading; search before opening; never ingest what can be looked up.
+- Token efficiency: search before opening; never ingest what can be looked up.
 - Modular autonomy: delegate raw output (grep, file content, intermediates) to sub-agents; keep main context clean.
 - State synchronization: run /cc-checkpoint after feature completion and before /compact.
 
 ## Execution Rules
 
-### Graph-First
+### Search-First
 Before modifying any file:
-1. Query graphify-out/graph.json for all callers, dependents, and related nodes of the target symbol.
-2. If graph absent, run /cc-init. Fallback: spawn Explore sub-agent (≤150 words, callers + file paths).
+1. Grep for all callers, dependents, and related usages of the target symbol.
+2. If the answer spans 3+ files, spawn an Explore sub-agent (≤150 words, callers + file paths).
 3. Open a file only when you have a specific line range. Always pass limit on files > 150 lines.
 
 ### Dependency Integrity
@@ -74,7 +73,6 @@ After modifying any method, variable, class, or component:
 | Refactoring                | code-simplifier skill     |
 | Frontend UI/UX             | ui-ux-pro-max skill       |
 | Pre-flight / adversarial   | critical-review skill     |
-| Graph querying             | Explore sub-agent         |
 | Codebase exploration (3+)  | Explore sub-agent         |
 | Parallel independent tasks | Multiple Agent calls      |
 
