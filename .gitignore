@@ -109,6 +109,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-09-28-bug044-deny-message-phantom-allowlist-design.md
 !/docs/superpowers/specs/2026-09-29-bug046-release-critical-instruments-design.md
 !/docs/superpowers/specs/2026-09-29-bug047-heredoc-body-scanning-design.md
+!/docs/superpowers/specs/2026-09-29-bug048-ci-measured-baseline-design.md
 !/docs/superpowers/specs/2026-09-29-feat021-python-free-removal-design.md
 # --- END tracked-surface block (BUG-042) ---
 
