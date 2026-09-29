@@ -56,7 +56,7 @@ A `PROJECT_HOST_OWNED` row becomes both tracked and ignored, or neither. The XOR
 
 ## The two blocks
 
-### `.claude/`, verbatim, 21 rule lines
+### `.claude/`, verbatim, 19 rule lines
 
 ```
 /.claude/*
@@ -92,7 +92,7 @@ A `PROJECT_HOST_OWNED` row becomes both tracked and ignored, or neither. The XOR
 /docs/superpowers/specs/*
 ```
 
-followed by one `!/docs/superpowers/plans/<file>` or `!/docs/superpowers/specs/<file>` line per tracked file, sorted, 44 in total.
+followed by one `!/docs/superpowers/plans/<file>` or `!/docs/superpowers/specs/<file>` line per tracked file, sorted. The count is whatever `git ls-files docs` reports **at generation time**, not a fixed number: it was 44 when this audit ran, 45 once this spec was committed, and 46 once the plan is. Any count written into this document would be stale before implementation starts, which is precisely why the test computes it rather than hard-coding it.
 
 **Ordering is load-bearing and is part of the contract.** Git applies last-match-wins, so a directory's `!` re-include must precede its `/*` re-exclusion, and every leaf `!` must follow the `/*` line that would otherwise exclude it. The generator in the test emits directories parent-first, then all leaves sorted, and the file must match that order exactly.
 

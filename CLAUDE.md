@@ -107,10 +107,16 @@ VERBOSITY: MIN (default)
 
 ## Staging Convention
 
-`.gitignore:7` excludes `.claude/` wholesale, and `git add` exits 1 whenever a pathspec matches an ignored ancestor, whether or not the file itself staged correctly. The exit code describes the warning, never the outcome. Stage by tracked-ness, always with an explicit path:
+`git add` exits 1 whenever a pathspec matches an ignored ancestor, whether or not the file itself staged correctly. The exit code describes the warning, never the outcome.
+
+**PARTIALLY RETIRED by BUG-042.** This rule was written because `.gitignore` excluded `.claude/` and `docs/` wholesale, so every tracked file in either sat under an ignored ancestor. Both are now root-anchored re-include blocks and that condition is gone for this repository's own tracked surfaces: measured rc 1 to rc 0 on `git add` of a tracked file, with the file staging in both states. The rule below is kept because the condition still exists wherever an ignored ancestor does, and because the branch it describes is correct independently of any one ignore rule. Stage by tracked-ness, always with an explicit path:
 
 - **Tracked file: `git add -u <path>`.** `-u` operates only on paths already in the index, so it never consults the ignore rule and exits 0. It fails loudly with rc 128 when the path is not tracked, which is exactly the signal the ignore rule exists to give.
 - **New file under an ignored directory: `git add -f <path>`.** `-u` cannot stage a file git has never seen, and `-f` is a deliberate assertion about one specific path.
 - **New file anywhere else: plain `git add <path>`.** Correct and sufficient; there is no ignored ancestor to trip over.
 
-Never make `-f` the blanket form: it overrides the ignore rule, so a typo naming a genuinely ignored file stages it silently. Never omit the path from `-u`: bare `git add -u` stages every modified tracked file in the repository. `tests/unit/staging-convention.test.js` pins all four facts this rule rests on.
+Never make `-f` the blanket form: it overrides the ignore rule, so a typo naming a genuinely ignored file stages it silently. Never omit the path from `-u`: bare `git add -u` stages every modified tracked file in the repository.
+
+Where each branch is still live after BUG-042: `-f` is required for a new file under a genuinely ignored directory, `.conductor/` being the remaining one in this repository. The ban on bare `git add -u` is independent of every ignore rule, since it is about staging the whole worktree rather than one path. `tests/unit/staging-convention.test.js` pins all four facts this rule rests on, and it builds its own fixture `.gitignore`, so it asserts git's behavior rather than this repository's file and is unaffected by BUG-042.
+
+**On anchoring.** BUG-040's audit struck anchoring as a candidate fix and that verdict stands for what it measured: `/foo/` and `foo/` report an excluded ancestor identically, so anchoring never makes an exit code honest. BUG-042 measured a different question and found anchoring load-bearing for which paths a rule matches at all: unanchored `.claude/` and `docs/` reached into `project-template/`, which is why `!project-template/*` existed, and root-anchoring is what retired it. Both sentences hold; neither erases the other.

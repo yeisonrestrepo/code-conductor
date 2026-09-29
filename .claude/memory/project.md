@@ -1331,3 +1331,51 @@ Case B is the item's whole point: an unlisted new file exiting 0 and staging is 
 - **The version rule's worked example.** PATCH 1.32.1: counter named honestly (developer-facing behavior changes materially, which is why it is a release at all), the ratified test applied (observability on a fresh install; `project-template/gitignore` untouched, byte-identical output), verdict follows the test. Designated the citation for close calls.
 - **Evidence-first applies to friction.** The glob alternative `!/docs/superpowers/specs/*.md` is recorded as a named future option with its measured cost (19 visible, 16 historical, case-B semantics inverted for that subtree) and an explicit trigger: two lines per item is a **predicted** annoyance, so the option is revisited when specimens of real friction exist, not before.
 - **`.DS_Store` belongs in the developer's global gitignore**, not in any repository decision. Ruled out of scope rather than absorbed.
+
+## Implementation: BUG-042 gitignore restructure, 1.32.1 [2026-09-28]
+
+Branch `fix/bug-042-gitignore-restructure`, six commits, 7 tasks, 31 checkbox steps. Every predicted boundary hit exactly.
+
+### Boundaries, with suites named
+
+| After | Tests | Files |
+| --- | --- | --- |
+| baseline `eaaa077` | 902 passed / 12 skipped | 33 passed / 1 skipped |
+| T-000-C plan commit | 902 / 12 | 33 / 1 |
+| **T-001-B, the single predicted red** | **902 passed, 4 failed** | **33 passed, 1 failed** |
+| T-001-G after the block | 906 / 12 | 34 / 1 |
+| T-002-D after the XOR test | 910 / 12 | 35 / 1 |
+| T-003-D, T-004-C | 910 / 12 | 35 / 1 |
+
+The red was `tests/unit/gitignore-block-parity.test.js`, all four cases, one cause: `block markers missing or inverted: begin=-1 end=-1`. Predicted by suite and by cause before it ran.
+
+### The eight acceptance behaviors, measured by hand at T-001-F
+
+- **AC1** tracked file under `.claude/`, `git add <path>`: **rc 0**, staged. `-u` likewise rc 0 (**AC13**).
+- **AC2** tracked file under `docs/`: **rc 0**, staged.
+- **AC3** unlisted new file under `.claude/`: **rc 1**, staged nothing.
+- **AC4** unlisted new file under `docs/`: **rc 1**, staged nothing.
+- **AC5/AC6** `settings.local.json` now names `.gitignore:30 /.claude/*`; `personal.md` and `bash-scan-allowlist.txt` name `.gitignore:36 /.claude/memory/*`. Every host-owned path is held by an in-block rule, never by an ancestor directory exclude.
+- **AC7** `project-template/.claude/...` and `project-template/docs/...` both probe **rc 1 from `check-ignore`**, meaning trackable, with `!project-template/*` removed.
+- **AC8** `git ls-files --others --exclude-standard .claude docs` returns **empty**. The 46 untracked `.claude/` files and the 16 historical untracked specs and plans all stayed invisible; the restructure exposed nothing.
+
+### Decisions and their reasons
+
+- **The self-reference, found by pre-flight rather than by failure.** The plan file lives under `docs/superpowers/plans/`, inside a surface the block enumerates, so the block had to be generated from an index that already contained it. Task 0 commits the plan, T-001-C generates afterwards. Plan-commit-then-generate is not one ordering among several: it is the only one that never passes through a state where the item's own artifacts violate the item's own rule. `[BUG-044]`'s collision in milder form.
+- **A number that is stale before implementation starts is not a spec value.** The spec originally wrote "44 in total" for the `docs/` leaves. It was 44 at audit, 45 once the spec was committed, 46 once the plan was. Corrected in place to "whatever `git ls-files` reports at generation time", which is also why the test computes the block rather than hard-coding it.
+- **Task 2 had no red, and said so.** The XOR invariant holds on both sides of the restructure, so all four cases passed first run. The instrument was proved anyway by flipping the comparison operator from `===` to `!==`, which turned exactly three cases red: *holds for every row*, *reports a row that is both tracked and ignored*, *reports a row that is neither*. The fourth, which names the two tracked rows, correctly stayed green because it does not call the checker. **The mature form of the predicted-red discipline is to predict green when green is true and prove the instrument anyway.**
+
+### Conventions this release produced
+
+- **A line kept for an external writer is kept with the writer's name and path in its comment.** Two specimens: the user-global `/cc-compact` for `session-snapshot.json`, and `lib/installer/deploy.mjs:17` for `turn-count.txt`. Two hauntings prevented by documentation beat two mystery re-appends investigated later. Both routed to `[BUG-046]` as the external-writers sibling concern.
+- **Scope the pin, not the file.** The block-equality test compares only the lines between its markers. That one decision is why a generated-and-asserted block can coexist permanently with an installer that appends to the same file.
+- **Evidence-first applies to friction.** The `docs/` toll is two `!` lines per item and is **self-enforcing**, since a spec committed without its line fails the parity test: a tax converted into a checklist. The glob alternative `!/docs/superpowers/specs/*.md` is recorded with its measured cost (19 files visible, 16 of them historical, case-B semantics inverted for that subtree) and an explicit trigger: it is revisited when specimens of real friction exist, not on the prediction of annoyance.
+- **The version rule's worked example.** PATCH `1.32.1`: the counter named honestly (developer-facing behavior changes materially, which is why it is a release at all), the ratified test applied (observability on a fresh install; `project-template/gitignore` untouched, byte-identical output), verdict follows the test. Cite this one when a version call is close.
+
+### The epitaph
+
+Task 0 staged the spec and the plan with `git add -f`. **That was the last time `-f` was needed in this repository for a file that was already tracked.** From `638dcc3` onward a tracked file under either surface stages with plain `git add` or `git add -u` at rc 0. The claim is bounded on purpose: `-f` is still correct and still required for a genuinely new file under a genuinely ignored directory, `.conductor/` being the remaining one, so the sentence cannot later be quoted as more than it is.
+
+### Queue after 1.32.1
+
+`[BUG-046]` (release-critical instruments as tracked scripts under `scripts/`, now also carrying the external-writers sibling concern) is next, unless a release needs the instruments sooner, in which case building them is that release first task. `[BUG-045]` (the quoted-path allowlist defect) remains open with its ritual priced at filing. **The heredoc-family dossier now meets its own minting condition** (three specimens plus a traced mechanism plus a severity upgrade) and its filing decision is owed at this closeout. The session denial tally stays unfiled. **Next mintable id is `BUG-047`.**
