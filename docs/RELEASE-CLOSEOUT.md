@@ -61,10 +61,13 @@ This document exists because the sentence "run it as a closeout step the ritual 
 
     ```bash
     git branch -d "<branch>"
-    git push origin --delete "<branch>"
+    git fetch --prune origin
+    git ls-remote --heads origin
     ```
 
     `-d` refuses unless the branch is merged, which is the check, not the ceremony. Under a squash merge it reports "merged to its upstream but not to HEAD", and that is correct rather than alarming: the branch commits are not ancestors of the squashed commit, and step 6's `0 ahead` is the independent confirmation that nothing is stranded.
+
+    **This repository deletes the remote branch automatically on merge**, so `git push origin --delete` fails with "remote ref does not exist" and is not the step. What is needed is `--prune`, because a stale remote-tracking ref survives locally and **reads exactly like a branch that was never cleaned up**. That misreading was made at the `1.32.2` closeout and reported to the owner as a leftover branch. `git ls-remote --heads origin` is the authority here; `git branch -a` is not, because it shows local tracking refs.
 
     **This step was missing until `1.33.0`**, and its absence was found the way `[BUG-046]` predicts such things are found: by an instruction citing "the checklist line" for a line that did not exist. The document `[BUG-046]` created reproduced `[BUG-046]`'s own defect one release later, which is the argument for instruments over documents restated against this file.
 
