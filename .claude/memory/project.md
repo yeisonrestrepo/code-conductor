@@ -1412,3 +1412,9 @@ Minted at a verified ceiling, both legs heading-scoped, `BUG` standing at `046` 
 ### Queue after 1.32.1 and the mint
 
 `[BUG-046]` (release-critical instruments as tracked scripts under `scripts/`, carrying the external-writers sibling concern) is next. Then `[BUG-047]` (the heredoc family) by default, unless a fourth specimen reorders it. `[BUG-045]` (the quoted-path allowlist defect) remains open with its ritual priced at filing. One dossier remains: the session denial tally, still uncharacterized and deliberately not merged into the heredoc family, since grouping is by mechanism. **Next mintable id is `BUG-048`.**
+
+### Backlog state audit [2026-09-29]
+
+A state audit of every backlog heading found **one item completed but unmarked**: `[BUG-044]` shipped as `1.32.0` (PR #37, `28142af`), was closed out in this file at `86b5435`, and the work moved on with its entry still reading `[ ]` and carrying **no shipping record at all**, so the backlog claimed a live defect that had already been fixed. The checkbox flip and the missing DONE bullet both landed, with the lateness recorded in the entry rather than quietly corrected. `[FEAT-023]` carried a lowercase `[x]` where every other closed entry carries `[X]`; normalized, since the state character is what tooling reads.
+
+**The gap this exposes:** the closeout ritual writes `project.md` and pushes record commits, but nothing verifies that the shipped item's own backlog entry was closed. The memory record said the release was done while the backlog said it was not, and no instrument compared them. Every other `[ ]` entry was verified genuinely open, three of them against the code rather than by assumption (`FEAT-030` has a per-row byte cap, not the byte-sum bound it asks for; `BUG-032`'s lookup chain in `CLAUDE.md` still names only `project.md`; `FEAT-021`'s python decoupling is unshipped). The `[~]` markers on `BUG-034` and `BUG-035` are the deliberate superseded state and were left alone.
