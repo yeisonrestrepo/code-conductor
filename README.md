@@ -17,13 +17,7 @@ mkdir demo && cd demo && git init -q && npm init -y >/dev/null
 npx @yeison.restrepo.r/code-conductor --project
 ```
 
-```
-code-conductor: .claude/memory/project.md matches the bundled stub; it may have been overwritten by an installer re-run before 1.30.0.
-  Find a committed copy:  git log --oneline -- .claude/memory/project.md
-  Restore it:             git checkout <commit> -- .claude/memory/project.md
-```
-
-> **That warning is a known false positive on a fresh install**, and it is left in this transcript rather than edited out. `lib/installer/deploy.mjs:138` fires whenever your `project.md` equals the bundled stub, which is exactly what a *first* install produces, so it cannot tell "just seeded" from "clobbered by an old re-run". Reported, unfixed at time of writing. The install itself exits 0 and is correct.
+The installer prints **nothing** and exits 0. That silence is deliberate and is asserted by a test: the stub-detection check runs *before* the seed, so a fresh scaffold cannot warn about the file it was just given (`tests/installer/deploy.test.js`, "says nothing on a fresh scaffold, whose stub it just wrote").
 
 You now have `.claude/` with `commands/`, `hooks/`, `memory/`, `scripts/` and `settings.json`. The third command is any command at all, because the guard is already live:
 
@@ -103,7 +97,7 @@ Three checks live in `tools/` as tracked repository infrastructure, and two of t
 
 - **`[BUG-045]` is the one open filed defect**: the Guard 3 allowlist cannot cover a quoted path, because the boundary sets it interpolates contain no quote character, so an entry `docs/` does not cover `cat "docs/x.md" *.md`. Filed with its ritual priced, untouched pending its own change.
 - **The `P7` false positive above**, still live.
-- **The installer's stub warning**, shown honestly in the Quickstart.
+- **A re-run against an untouched `project.md` prints a recovery hint it cannot prove is needed.** If you install, never write anything into `.claude/memory/project.md`, and install again, you get a line suggesting the file may have been overwritten by a pre-`1.30.0` re-run. It was not; it equals the stub because it was seeded and never edited. The check compares content and **cannot distinguish "seeded and untouched" from "clobbered"**, which is why the wording is hedged to "may have been" rather than "was". This residual is named and accepted in [`BUG-039`'s spec at `:129`](docs/superpowers/specs/2026-09-27-bug039-installer-host-owned-state-design.md), where the alternative (restoring from the host's own git history) was rejected as writing host files out of the host's history with new failure modes. A **fresh** install is silent, which the Quickstart shows.
 - **Two open dossiers**, which are the evidence-collection pipeline working rather than a backlog: a session denial tally, and one for interleaved-artifact reports. A dossier holds specimens until a mechanism is characterized by probe; an id is minted only when the written condition is met. `[BUG-047]` is what that pipeline produces when it completes: an out-of-scope note, then a dossier, then four specimens across four sessions, then a mint, then a release.
 
 **The living artifact is `AGENT-READABLE BACKLOG.md`.** It is not a tidy issue list. It carries amendments above the text they amend, premises that measurement later corrected, and wrong guesses recorded beside the probe that overturned them.

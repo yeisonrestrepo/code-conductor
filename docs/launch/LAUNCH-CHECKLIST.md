@@ -19,8 +19,7 @@ Corollary: **when someone finds something wrong, confirm it in the open and link
 - [ ] `node tools/record-parity.mjs` reports `RECORD_PARITY_OK`
 - [ ] Every figure in the Show HN body re-verified against the sources listed at the end of `SHOW-HN-DRAFT.md`
 - [ ] The recording made, watched once end to end, and scene 3 confirmed to allow
-- [ ] README's Quickstart output still matches a real run in a scratch directory
-- [ ] Decide the installer stub warning: fix first, or launch with it named in Known limits (it is named either way)
+- [ ] **README's Quickstart transcript re-verified against a pristine scratch install, on the day of posting.** Not a remembered run, not a run from last week: a fresh `mktemp -d`, a fresh `HOME`, one invocation. **The cheapest claim for a reader to falsify must be the best-verified one.** This line exists because the Quickstart shipped once with output a fresh install does not produce, after an agent ran the installer twice and attributed the second run's output to the first.
 
 ## Channels
 
