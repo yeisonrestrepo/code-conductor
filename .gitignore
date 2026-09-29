@@ -53,6 +53,7 @@ tests/.tmp/
 /docs/superpowers/plans/*
 !/docs/superpowers/specs/
 /docs/superpowers/specs/*
+!/docs/RELEASE-CLOSEOUT.md
 !/docs/superpowers/plans/2026-06-10-bug002-spec-read-budget.md
 !/docs/superpowers/plans/2026-06-10-bug003-surgical-plan-state.md
 !/docs/superpowers/plans/2026-06-12-bug006-feat018-bash-scan-guard.md
