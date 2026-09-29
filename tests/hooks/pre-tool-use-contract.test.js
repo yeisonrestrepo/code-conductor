@@ -105,6 +105,38 @@ describe('pre-tool-use contract harness', () => {
     expect(r.decision).toBeNull();
   });
 
+  // [BUG-044] The allowlist sentence rides only on a pattern denial. g3AllowlistCovers runs
+  // at the end of guard3BashScan; the length and malformed denials return before it, so on
+  // those two the allowlist cannot lift the block. Each absence case asserts its positive
+  // half in the same breath, so a denial that failed to fire cannot satisfy the absence
+  // vacuously.
+  it('a pattern denial names the allowlist as operator policy', () => {
+    const r = fire({ tool_name: 'Bash', tool_input: { command: 'cat *.ts' } });
+    expect(r.decision.permissionDecision).toBe('deny');
+    expect(r.decision.permissionDecisionReason).toMatch(/BASH SCAN BLOCKED/);
+    expect(r.decision.permissionDecisionReason).toMatch(/Pattern ids: P4/);
+    expect(r.decision.permissionDecisionReason).toMatch(/Authorized alternatives/);
+    expect(r.decision.permissionDecisionReason).toContain('.claude/memory/bash-scan-allowlist.txt');
+    expect(r.decision.permissionDecisionReason).toMatch(/operator policy/);
+    expect(r.decision.permissionDecisionReason).toMatch(/must not add it to clear its own denial/);
+  });
+
+  it('a length denial carries no allowlist sentence, because the allowlist is never consulted', () => {
+    const r = fire({ tool_name: 'Bash', tool_input: { command: 'echo ' + 'x'.repeat(8193) } });
+    expect(r.decision.permissionDecision).toBe('deny');
+    expect(r.decision.permissionDecisionReason).toMatch(/exceeds the maximum scan length/);
+    expect(r.decision.permissionDecisionReason).toMatch(/Authorized alternatives/);
+    expect(r.decision.permissionDecisionReason).not.toContain('bash-scan-allowlist');
+  });
+
+  it('a malformed denial carries no allowlist sentence', () => {
+    const r = fire({ tool_name: 'Bash', tool_input: { command: "echo 'unclosed" } });
+    expect(r.decision.permissionDecision).toBe('deny');
+    expect(r.decision.permissionDecisionReason).toMatch(/Malformed shell syntax/);
+    expect(r.decision.permissionDecisionReason).toMatch(/Authorized alternatives/);
+    expect(r.decision.permissionDecisionReason).not.toContain('bash-scan-allowlist');
+  });
+
   it('Case A: a valid Read payload with no file_path allows', () => {
     const r = fire({ tool_name: 'Read', tool_input: {} });
     expect(r.status).toBe(0);
