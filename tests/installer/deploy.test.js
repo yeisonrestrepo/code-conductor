@@ -344,6 +344,18 @@ describe('deployProject: host-owned state', () => {
     expect(readFileSync(p, 'utf8')).toBe('40\n');
   });
 
+  // [BUG-044] The other half of the contract: the message names a path, so a fresh deploy
+  // must make that path exist. The case below this one proves a re-run cannot overwrite it.
+  // This case is the ONLY coverage that the allowlist actually seeds: host-owned.test.js's
+  // seedHostOwned fixture never writes the template into its source tree, so the missing
+  // source is skipped there and its asserted list never mentions the allowlist.
+  it('creates the allowlist from the template when the host has none', () => {
+    const p = join(claude, 'memory', 'bash-scan-allowlist.txt');
+    writeFileSync(join(asset, 'project-template', '.claude', 'memory', 'bash-scan-allowlist.txt'), '# SEED HEADER\n');
+    deployProject(asset, home);
+    expect(readFileSync(p, 'utf8')).toBe('# SEED HEADER\n');
+  });
+
   it('leaves a host-created bash-scan-allowlist.txt byte-identical even when the template ships one', () => {
     deployProject(asset, home);
     const p = join(claude, 'memory', 'bash-scan-allowlist.txt');
