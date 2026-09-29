@@ -83,6 +83,7 @@ tests/.tmp/
 !/docs/superpowers/plans/2026-09-28-bug043-quoted-argv-blindness.md
 !/docs/superpowers/plans/2026-09-28-bug044-deny-message-phantom-allowlist.md
 !/docs/superpowers/plans/2026-09-29-bug046-release-critical-instruments.md
+!/docs/superpowers/plans/2026-09-29-bug047-heredoc-body-scanning.md
 !/docs/superpowers/specs/2026-06-09-bug001-cc-compact-design.md
 !/docs/superpowers/specs/2026-06-09-bug002-spec-read-budget-design.md
 !/docs/superpowers/specs/2026-06-11-bug006-feat018-bash-scan-guard-design.md
