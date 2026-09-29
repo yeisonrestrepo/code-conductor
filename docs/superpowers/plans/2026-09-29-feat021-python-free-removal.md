@@ -56,6 +56,8 @@ Rulings: (1) approved, with the backup-restore residual recorded in *Identified 
 
 **Spec gap the plan closed:** the spec's CLAUDE.md AC list missed Operational Philosophy's "query the graph before reading" in both CLAUDE.md files; same class as the amendment's scope, closed in Task 4.
 
+**Second spec gap the branch closed (end-of-branch review, fix commit after `d513061`):** `project-template/.claude/commands/cc-debug.md:14` told the agent to delegate a "graph query"; it now says "grep", and the surface invariant also scans `scripts/` and `.claude/settings.json`. Same class as the Operational Philosophy line.
+
 **Allowed-set measurement (2026-09-29, `git grep -l python3` over tracked non-record files):** the spec named `scripts/detect-stack.mjs` as an out-of-scope `python3` site, but it carries no `python3` literal (it detects Python from manifests: `uv.lock`, `pyproject.toml`, `Pipfile`). `tests/hooks/guard4.test.js:100` carries one in a historical comment, reworded in Task 3. The exact set pinned is therefore `tests/fixtures/guard3-corpus.js` and `tests/installer/heal.test.js`, and the Task 2 CLI fixture uses the original `python` pre-wrapper form so it adds no member.
 
 1. **M1's malformed-file divergence** from the spec's CLI matrix line, as asserted above. The alternative would move the heal ahead of `deployGlobal`. Rejected: the spec's AC places it after the deploy, and a pre-deploy heal would see settings the deploy is about to rewrite.

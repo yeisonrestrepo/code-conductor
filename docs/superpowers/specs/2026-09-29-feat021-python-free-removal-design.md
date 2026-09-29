@@ -95,7 +95,7 @@ It holds the repository's last `python3` invocation (`:235`–`:260`). No script
 ### Removal (repository)
 
 - [ ] `global/hooks/graphify-ast-refresh.py` and `global/hooks/graphify-ast-refresh.mjs` are deleted. `git ls-files '*.py'` returns nothing.
-- [ ] `git grep -n python3` over tracked non-record files (excluding `docs/superpowers/`, `CHANGELOG.md`, `AGENT-READABLE BACKLOG.md`, `.claude/memory/`) returns only these out-of-scope lines: `tests/fixtures/guard3-corpus.js:320-321` (string data) and `scripts/detect-stack.mjs` host-project detection. A test pins the tracked-`.py` half.
+- [ ] `git grep -n python3` over tracked non-record files (excluding `docs/superpowers/`, `CHANGELOG.md`, `AGENT-READABLE BACKLOG.md`, `.claude/memory/`) returns only these out-of-scope lines: `tests/fixtures/guard3-corpus.js:320-321` (string data) and `scripts/detect-stack.mjs` host-project detection. A test pins the tracked-`.py` half. **Annotated 2026-09-29 (plan owner ruling 2):** measured, `scripts/detect-stack.mjs` carries no `python3` literal (it detects Python from manifests), so it is not a member, and the corpus hit is line 321 only. The shipped invariant (`tests/tools/repo-invariants.test.js`) pins the exact file set `tests/fixtures/guard3-corpus.js` and `tests/installer/heal.test.js`.
 - [ ] `mergeGraphifyHook`, `graphifyHookCommand` and `GRAPHIFY_FINGERPRINT` are removed from `lib/installer/settings.mjs`, and the import and call site from `bin/code-conductor.mjs:7,98`.
 - [ ] `tests/hooks/graphify-refresh.test.js` is deleted. The graphify cases in `tests/installer/settings.test.js` and `tests/installer/cli.test.js` are replaced by heal cases (below), not merely deleted.
 - [ ] `tests/verbosity-hook-test.sh` is deleted (D3).

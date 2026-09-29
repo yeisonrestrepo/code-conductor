@@ -51,7 +51,7 @@ describe('this repository, at every commit', () => {
   // ships. The heal must still name the hook to remove it, and its call site names the
   // heal and prints the upgrade notice; those two files are the whole allowed set.
   it('ships no graph-rung surface: only the heal and its call site name graphify', () => {
-    const surfaces = ['global', 'skills', 'project-template', 'bin', 'lib', '.claude/commands', '.claude/hooks', 'README.md', 'CLAUDE.md'];
+    const surfaces = ['global', 'skills', 'project-template', 'bin', 'lib', 'scripts', '.claude/commands', '.claude/hooks', '.claude/settings.json', 'README.md', 'CLAUDE.md'];
     const allowed = ['lib/installer/heal.mjs', 'bin/code-conductor.mjs'];
     const files = execFileSync('git', ['ls-files', ...surfaces], { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean);
     expect(files.filter((f) => !allowed.includes(f) && /graphify/i.test(read(f)))).toEqual([]);
