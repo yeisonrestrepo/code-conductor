@@ -8,7 +8,7 @@ import { readFileSync, statSync } from 'node:fs';
 import { posix, join } from 'node:path';
 
 const LINE_LIMIT = 150;
-const BLOCKED_COMPONENTS = new Set(['graphify-out', 'node_modules']);
+const BLOCKED_COMPONENTS = new Set(['node_modules']);
 
 let emitted = false;
 
@@ -53,7 +53,7 @@ function stamp(ms) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-// Guard 4: reads of graphify-out/ and node_modules/ (BUG-017). Runs before Guard 1 for
+// Guard 4: reads of node_modules/ (BUG-017; graphify-out/ left the set at FEAT-021). Runs before Guard 1 for
 // Read: a forbidden path is forbidden whatever its size, and deciding here spares a stat
 // and a full file read on a path that is about to be denied anyway.
 function guard4BlockedRead(input) {
@@ -63,8 +63,7 @@ function guard4BlockedRead(input) {
   const parts = normalized.split('/').filter(p => p && p !== '.');
   if (!parts.some(p => BLOCKED_COMPONENTS.has(p.toLowerCase()))) return null;
   return deny(
-    'Guard 4: direct reads of graphify-out/ and node_modules/ are forbidden. ' +
-    'Use Glob for existence checks or the graphify skill: /graphify query "<question>".'
+    'Guard 4: direct reads of node_modules/ are forbidden. Use Glob for existence checks.'
   );
 }
 
@@ -81,8 +80,8 @@ function guard1LargeRead(input) {
   return deny(
     `Guard 1: LARGE FILE READ BLOCKED. File: ${path}. Lines: ${lines} ` +
     `(>${LINE_LIMIT}, no limit specified). Follow the orchestrator lookup chain: ` +
-    '1. Check .claude/memory/project.md  2. Query graphify for structural questions  ' +
-    '3. Use Grep/Glob for pattern searches  4. Read with explicit offset + limit.'
+    '1. Check .claude/memory/project.md  2. Use Grep/Glob for pattern searches  ' +
+    '3. Read with explicit offset + limit.'
   );
 }
 

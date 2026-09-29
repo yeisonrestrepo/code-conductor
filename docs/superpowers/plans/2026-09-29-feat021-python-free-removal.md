@@ -562,7 +562,7 @@ export function healGraphifyHook(home, { shipped = SHIPPED_GRAPHIFY_HASHES, now 
   - `tests/hooks/guard4.test.js`
   - `tests/hooks/pre-tool-use-contract.test.js:49-50,164-165,184,216`
 
-- [ ] [T-003-A] `tests/hooks/guard4.test.js`: change the `describe` title to `'Guard 4 — Read blocker for node_modules/'`, and rewrite the rows so the normalization coverage survives on `node_modules`:
+- [X] [T-003-A] `tests/hooks/guard4.test.js`: change the `describe` title to `'Guard 4 — Read blocker for node_modules/'`, and rewrite the rows so the normalization coverage survives on `node_modules`:
   - row1 `node_modules/pkg/package.json` blocked;
   - row2 `node_modules/.cache/ast/abc.json` blocked;
   - row4 `/abs/path/node_modules/file.json` blocked;
@@ -592,7 +592,7 @@ export function healGraphifyHook(home, { shipped = SHIPPED_GRAPHIFY_HASHES, now 
   })
 ```
 
-- [ ] [T-003-B] `tests/hooks/pre-tool-use-contract.test.js`:
+- [X] [T-003-B] `tests/hooks/pre-tool-use-contract.test.js`:
   - replace `graphify-out/graph.json` with `node_modules/pkg/index.js` at lines 50, 165, 184 and 216;
   - retitle line 49 to `'denies a node_modules read and still exits 0'` and line 164 to `'CC_HOOK_ALLOW=1 still denies a well-formed node_modules read'`;
   - add after the first test:
@@ -606,16 +606,16 @@ export function healGraphifyHook(home, { shipped = SHIPPED_GRAPHIFY_HASHES, now 
   });
 ```
 
-- [ ] [T-003-C] Run `npx vitest run tests/hooks/guard4.test.js tests/hooks/pre-tool-use-contract.test.js`. Expect FAIL on row18, row19 and the Guard 1 case.
-- [ ] [T-003-D] Edit `.claude/hooks/pre-tool-use.mjs`:
+- [X] [T-003-C] Run `npx vitest run tests/hooks/guard4.test.js tests/hooks/pre-tool-use-contract.test.js`. Expect FAIL on row18, row19 and the Guard 1 case.
+- [X] [T-003-D] Edit `.claude/hooks/pre-tool-use.mjs`:
   - line 11: `const BLOCKED_COMPONENTS = new Set(['node_modules']);`
   - line 56: the comment reads `// Guard 4: reads of node_modules/ (BUG-017; graphify-out/ left the set at FEAT-021). Runs before Guard 1 for`
   - lines 66-67: the message is `'Guard 4: direct reads of node_modules/ are forbidden. Use Glob for existence checks.'`
   - line 84: the lookup text is `'1. Check .claude/memory/project.md  2. Use Grep/Glob for pattern searches  ' +` and line 85 is `'3. Read with explicit offset + limit.'`
-- [ ] [T-003-E] Mirror: `cp .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs`, then `cmp` the two files. Expect no output, rc 0.
-- [ ] [T-003-F] Run `npm test`. Expect **1007 passed / 12 skipped**.
-- [ ] [T-003-G] Stage: `git add -u .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs tests/hooks/guard4.test.js tests/hooks/pre-tool-use-contract.test.js`.
-- [ ] [T-003-H] Commit: `git commit -m "feat: drop graphify-out from Guard 4 and the graph step from Guard 1 [FEAT-021]"`.
+- [X] [T-003-E] Mirror: `cp .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs`, then `cmp` the two files. Expect no output, rc 0.
+- [X] [T-003-F] Run `npm test`. Expect **1007 passed / 12 skipped**.
+- [X] [T-003-G] Stage: `git add -u .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs tests/hooks/guard4.test.js tests/hooks/pre-tool-use-contract.test.js`.
+- [X] [T-003-H] Commit: `git commit -m "feat: drop graphify-out from Guard 4 and the graph step from Guard 1 [FEAT-021]"`.
 
 ---
 

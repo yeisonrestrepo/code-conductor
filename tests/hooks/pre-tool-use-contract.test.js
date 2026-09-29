@@ -46,12 +46,19 @@ function writeLines(name, count) {
 }
 
 describe('pre-tool-use contract harness', () => {
-  it('denies a graphify-out read and still exits 0', () => {
-    const r = fire(readPayload('graphify-out/graph.json'));
+  it('denies a node_modules read and still exits 0', () => {
+    const r = fire(readPayload('node_modules/pkg/index.js'));
     expect(r.status).toBe(0);
     expect(r.decision.hookEventName).toBe('PreToolUse');
     expect(r.decision.permissionDecision).toBe('deny');
     expect(r.decision.permissionDecisionReason).toMatch(/Guard 4/);
+  });
+
+  it('Guard 1 names no graph step in its lookup chain', () => {
+    const r = fire(readPayload(writeLines('big.txt', 200)));
+    expect(r.decision.permissionDecision).toBe('deny');
+    expect(r.decision.permissionDecisionReason).toMatch(/Guard 1/);
+    expect(r.decision.permissionDecisionReason).not.toMatch(/graph/i);
   });
 
   it('allows an ordinary source read with no decision written', () => {
@@ -161,8 +168,8 @@ describe('pre-tool-use contract harness', () => {
   // The override's scope, asserted as an absence: it bypasses the unparseable-input
   // denial and nothing else. Without this case one refactor turns a malformed-input
   // override into a product-wide off switch and no test notices.
-  it('CC_HOOK_ALLOW=1 still denies a well-formed graphify-out read', () => {
-    const r = fire(readPayload('graphify-out/graph.json'), { CC_HOOK_ALLOW: '1' });
+  it('CC_HOOK_ALLOW=1 still denies a well-formed node_modules read', () => {
+    const r = fire(readPayload('node_modules/pkg/index.js'), { CC_HOOK_ALLOW: '1' });
     expect(r.status).toBe(0);
     expect(r.decision.permissionDecision).toBe('deny');
     expect(r.decision.permissionDecisionReason).toMatch(/Guard 4/);
@@ -181,7 +188,7 @@ describe('pre-tool-use contract harness', () => {
 
   it('never exits 2 and never emits the legacy decision shape', () => {
     const payloads = [
-      readPayload('graphify-out/graph.json'),
+      readPayload('node_modules/pkg/index.js'),
       readPayload(writeLines('big.txt', 200)),
       { tool_name: 'Write', tool_input: { file_path: writeLines('existing.txt', 4) } },
       { tool_name: 'Bash', tool_input: { command: 'ls' } },
@@ -213,7 +220,7 @@ describe('CC_GUARD3_WARN', () => {
   // value is as a regression guard from here on.
   it('changes nothing except Guard 3', () => {
     const env = { CC_GUARD3_WARN: '1' };
-    const blockedRead = fire(readPayload('graphify-out/graph.json'), env);
+    const blockedRead = fire(readPayload('node_modules/pkg/index.js'), env);
     expect(blockedRead.decision.permissionDecision).toBe('deny');
 
     const p = writeLines('existing.txt', 4);
