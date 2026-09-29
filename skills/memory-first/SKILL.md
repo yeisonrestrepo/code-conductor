@@ -1,6 +1,6 @@
 ---
 name: memory-first
-description: "Lookup chain enforced before any file read or search: project memory, code graph, grep/glob, Explore sub-agent, targeted read — stop at the first step that answers"
+description: "Lookup chain enforced before any file read or search: project memory, grep/glob, targeted read — stop at the first step that answers"
 type: skill
 ---
 
@@ -21,28 +21,11 @@ Grep pattern="<keyword>" path=".claude/memory/project.md"
 
 If Grep returns matches, use that information and stop. If no matches, proceed to step 2.
 
-### 2. Graphify Graph
-For structural or relational questions, query the code graph.
-
-**Use when asking:**
-- "What calls function X?"
-- "What does module Y depend on?"
-- "Where is interface Z implemented?"
-- "What is the path between component A and B?"
-
-```bash
-graphify query "<your question>"
-```
-
-Skip this step if `graphify` is not installed or the command returns no results. Proceed to step 3.
-
-**Do not use for:** literal string patterns, variable names, import statements.
-
-### 3. Grep / Glob
+### 2. Grep / Glob
 For pattern searches, use the `Grep` or `Glob` tools inline. Never read a full file to find a pattern.
 
-### 4. Targeted Read
-Last resort. Only when steps 1–3 cannot answer.
+### 3. Targeted Read
+Last resort. Only when steps 1–2 cannot answer.
 - Always specify `offset` and `limit`.
 - Max 150 lines per call.
 - Know approximately which lines to read before calling.

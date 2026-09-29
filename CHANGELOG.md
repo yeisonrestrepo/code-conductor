@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.34.0] - 2026-09-29
+
+### Removed
+- **[FEAT-021]** The graph rung and all Python. `global/hooks/graphify-ast-refresh.py` and its Node wrapper are gone, the installer no longer registers the hook, and the lookup chain is memory, grep/glob, Explore sub-agent, targeted read in both CLAUDE.md templates, `/cc-init` and the memory-first skill. Guard 4 now blocks `node_modules/` only; Guard 1's redirect names no graph step.
+
+### Changed
+- **[FEAT-021]** **Upgrading removes the old hook.** The installer takes the `graphify-ast-refresh` hook out of `~/.claude/settings.json`'s `UserPromptSubmit` (a timestamped backup is written beside it; any other hook sharing that entry is kept) and then deletes `~/.claude/hooks/graphify-ast-refresh.py` and `.mjs` **only if they are byte-identical to what code-conductor shipped**. A copy you edited is kept and named in the installer output; it is no longer used and can be deleted by hand. The entry is always removed before the files, so no prompt ever runs a hook whose file is gone.
+- **[FEAT-021]** `project-template/` changes (`CLAUDE.md`, `cc-init.md`, `pre-tool-use.mjs`), so a fresh install differs. That is why this release is minor.
+
 ## [1.33.0] - 2026-09-29
 
 ### Fixed

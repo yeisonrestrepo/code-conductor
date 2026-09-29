@@ -11,7 +11,7 @@ Skill({ skill: "subagent-driven-development", args: "$ARGUMENTS" })
 Skill({ skill: "critical-review" })
 ```
 
-`subagent-driven-development` delegates investigation to sub-agents (graph query + git log — no inline file reads). `critical-review` Phase 2 RESILIENCE check then runs on the proposed fix before it is applied — confirm the fix doesn't introduce a silent failure or new boundary condition. The fix must pass Phase 3 self-correction before being committed. End with `[VALIDATION]`.
+`subagent-driven-development` delegates investigation to sub-agents (grep + git log — no inline file reads). `critical-review` Phase 2 RESILIENCE check then runs on the proposed fix before it is applied — confirm the fix doesn't introduce a silent failure or new boundary condition. The fix must pass Phase 3 self-correction before being committed. End with `[VALIDATION]`.
 
 ---
 

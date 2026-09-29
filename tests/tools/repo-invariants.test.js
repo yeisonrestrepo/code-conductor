@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { scanHeadings } from '../../tools/id-ceiling.mjs';
 import { readLocations, compare } from '../../tools/version-gate.mjs';
 import { checkParity } from '../../tools/record-parity.mjs';
@@ -38,5 +39,32 @@ describe('this repository, at every commit', () => {
   // to prevent.
   it('files no id twice', () => {
     expect(scanHeadings(read('AGENT-READABLE BACKLOG.md')).duplicates).toEqual([]);
+  });
+
+  // FEAT-021: the package's defining constraints are zero dependencies and npm-native
+  // distribution, and the graph hook was the only Python in it.
+  it('tracks no Python file', () => {
+    expect(execFileSync('git', ['ls-files', '*.py'], { cwd: ROOT, encoding: 'utf8' }).trim()).toBe('');
+  });
+
+  // FEAT-021: the graph rung is gone from every surface an agent reads or an install
+  // ships. The heal must still name the hook to remove it, and its call site names the
+  // heal and prints the upgrade notice; those two files are the whole allowed set.
+  it('ships no graph-rung surface: only the heal and its call site name graphify', () => {
+    const surfaces = ['global', 'skills', 'project-template', 'bin', 'lib', 'scripts', '.claude/commands', '.claude/hooks', '.claude/settings.json', 'README.md', 'CLAUDE.md'];
+    const allowed = ['lib/installer/heal.mjs', 'bin/code-conductor.mjs'];
+    const files = execFileSync('git', ['ls-files', ...surfaces], { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean);
+    expect(files.filter((f) => !allowed.includes(f) && /graphify/i.test(read(f)))).toEqual([]);
+  });
+
+  // FEAT-021, owner ruling 2: an exact set, so a new mention anywhere else fails rather
+  // than growing an allowlist silently. Records are excluded; they describe history.
+  // The needle is assembled, and named nowhere literally, so this file cannot match itself.
+  it('names the Python interpreter command only in the two files whose subject it is', () => {
+    const needle = ['python', '3'].join('');
+    const records = [':!docs/superpowers', ':!CHANGELOG.md', ':!AGENT-READABLE BACKLOG.md', ':!.claude/memory'];
+    const r = spawnSync('git', ['grep', '-l', needle, '--', '.', ...records], { cwd: ROOT, encoding: 'utf8' });
+    const hits = r.stdout.split('\n').filter(Boolean).sort();
+    expect(hits).toEqual(['tests/fixtures/guard3-corpus.js', 'tests/installer/heal.test.js']);
   });
 });

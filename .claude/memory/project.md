@@ -1621,3 +1621,13 @@ Through the live hook, four cases: a heredoc file write with a bracket-class bod
 ### Queue
 
 **`[BUG-045]`** (the Guard 3 allowlist cannot cover a quoted path) is the only open filed defect remaining, with its ritual priced at filing. **It opens on the owner's word, not automatically.** Two dossiers stay unfiled: the session denial tally, and the interleaved-artifact dossier with its one anchored specimen and its stale-instruction sibling note. **Next mintable id is `BUG-048`.**
+
+## Spec: FEAT-021 Python-free removal of the graph rung [2026-09-29]
+
+- Spec: `docs/superpowers/specs/2026-09-29-feat021-python-free-removal-design.md`. Branch `feat/feat-021-python-free-removal`. Direction was already resolved (option (a)); the spec turns the amendment's scope into ACs. Target release `1.34.0`, complexity M.
+- **D1 upgrade path: HEAL plus content-match SWEEP.** Remove `graphify-ast-refresh` hooks from `UserPromptSubmit` in `~/.claude/settings.json` (only the matching hook; drop the entry only when it empties, settled at approval). Then delete `~/.claude/hooks/graphify-ast-refresh.{py,mjs}` only if the settings step returned `removed|absent` and the bytes match the one shipped version (`.py` @`968dc6f` sha256 `761199f1…9a800b`, `.mjs` @`5b4a1af` sha256 `c78e4e5e…282e36`). A modified file is kept and named; every path fails open; heal throws never escalate the exit code.
+- **R1:** whether the ordering is load-bearing or defense in depth depends on `deployGlobal`'s settings.json treatment (BUG-033 plan says force-copy with no `hooks` key). `/cc-plan` must measure it and record which.
+- **R2:** the hash-pin test is LOCAL-ONLY per the id-ceiling precedent (CI's shallow checkout lacks both commits); the skip reason is named in the test.
+- D2: Guard 4 drops `graphify-out` and keeps `node_modules`; Guard 1 covers any leftover graph.json. D3: `tests/verbosity-hook-test.sh` is deleted (last `python3`, superseded by FEAT-024's port, invoked by nothing).
+- Live specimen: this machine's settings carries the hand-edited `python3 …py` entry, and the deployed `.py` matches the shipped hash.
+- Out: option (b), FEAT-019 territory, the TS compiler API, host-project Python support (detect-stack, cc-docs, cc-spec manifest list), the guard3 corpus row, historical records.

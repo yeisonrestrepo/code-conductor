@@ -84,11 +84,7 @@ Run `/cc-stack`. Wait for stack profile confirmation before continuing.
 
 Run `/cc-checkpoint`. Persist current architectural state to `.claude/memory/project.md`.
 
-## Step 5 — Graph sync *(skip if IS_NEW=true)*
-
-Run `/graphify .` to build or refresh the project knowledge graph from the current working directory.
-
-## Step 6 — Hook integrity check
+## Step 5 — Hook integrity check
 
 Verify `.claude/hooks/pre-tool-use.mjs` exists. It is launched as `node <path>`, so it needs no execute bit:
 
@@ -104,13 +100,12 @@ echo "✓ Hook OK: $HOOK"
 
 If the hook file is absent, stop and report. Do not proceed silently.
 
-## Step 7 — Confirm
+## Step 6 — Confirm
 
 Report:
 - Project identity: [name / stack / language — written to CLAUDE.md]
 - Stack profile loaded: [name / skipped — new project]
 - Memory checkpoint: [saved / skipped — new project]
-- Graph: [built / refreshed / skipped — new project]
 - Hook: [OK / MISSING]
 
 `/cc-init complete.`

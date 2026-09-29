@@ -162,7 +162,7 @@ By default, the installer installs only the global core files. Use flags to exte
 
 Re-run the same install command. User-configured files are never overwritten; agent-managed files are always updated.
 
-> **Note:** Do not clone this repository into a parent directory named `graphify-out` or `node_modules`. Guard 4 checks path components and will block agent `Read` calls on source files if the repository root is nested inside such a directory. Use relative paths if this layout is unavoidable.
+> **Note:** Do not clone this repository into a parent directory named `node_modules`. Guard 4 checks path components and will block agent `Read` calls on source files if the repository root is nested inside such a directory.
 
 ---
 
@@ -195,7 +195,7 @@ All commands are tagged `(Conductor)` in the Claude Code command palette so they
 | Command | Description |
 |---------|-------------|
 | `/cc-resume` | Restore full session context in one command: reads project identity, memory, latest spec and plan, git state, and loads the stack profile. Scans the active plan for `[>]` (interrupted) and `[!]` (failed) task markers and surfaces them in the session report. Run at the start of every session after initialization. |
-| `/cc-init` | Initialize or re-sync the project environment: detect stack, checkpoint memory, refresh the project graph, and verify hook integrity. Run at the start of every session. |
+| `/cc-init` | Initialize or re-sync the project environment: detect stack, checkpoint memory, and verify hook integrity. Run at the start of every session. |
 | `/cc-spec [name]` | Search the codebase first, ask only for missing context, generate a full feature spec, and wait for your approval before any plan is made. |
 | `/cc-plan` | Require an approved spec, map the codebase, and generate an ordered implementation plan with exact file paths, a test list, a commit order, and identified risks. Every generated task line carries a unique `[T-NNN]` ID (min 3 digits, unlimited suffix depth) using plain ASCII checkboxes — enforced at generation time. |
 | `/cc-compact` | Phase-boundary command. Serializes the current phase's essential state (decisions, pending steps, files touched, constraints) into a single-line SNAP JSON snapshot at `.claude/memory/session-snapshot.json` — and, when Node `>= 22.5` is available, a git-hash-keyed row in the local `.conductor/cache.db` — then prompts you to run `/compact` to clear conversation history. Run at the end of every phase to prevent context overflow. |
@@ -252,9 +252,8 @@ Controls how much Claude writes per turn. The level is set at install time via `
 Before reading any file, Claude walks a priority lookup chain and stops at the first step that answers the question:
 
 1. **Project memory**: `.claude/memory/project.md`
-2. **Graphify graph** — structural/relational queries (`what calls X`, `what depends on Y`)
-3. **Grep / Glob** — pattern searches
-4. **Targeted read** — last resort, always with `offset` + `limit`, max 150 lines
+2. **Grep / Glob** — pattern searches
+3. **Targeted read** — last resort, always with `offset` + `limit`, max 150 lines
 
 ### agent-delegation — always active
 
@@ -266,17 +265,11 @@ Keeps the main context clean. Sub-agents handle exploration and parallel work; t
 
 Hooks run automatically at specific points in a Claude Code session. They require no manual setup.
 
-### graphify-ast-refresh *(global)*
-
-Fires on every `UserPromptSubmit`. A small Node wrapper (`graphify-ast-refresh.mjs`) checks whether `graphify-out/.graphify_ast_done` is fresh (default: 60 min, override with `GRAPHIFY_STALE_MINUTES`). If it is stale or missing, the wrapper looks for a `python3` or `python` on `PATH` (override with `GRAPHIFY_PYTHON`) and spawns the Python payload (`graphify-ast-refresh.py`) in the background to run file detection and AST extraction - no LLM calls, no tokens. The main session inherits a ready graph without paying the generation cost.
-
-Node hosts the check because Python is what is being probed: on a machine with no Python the wrapper exits 0 in silence rather than printing an interpreter error on every prompt. Set `CC_GRAPHIFY_DEBUG=1` to see the one line it would otherwise swallow. Works on Windows, Linux, and macOS, and returns immediately when the graph is current.
-
 ### pre-tool-use
 
 Fires before `Read`, `Write`, `Edit`, `create_file`, `write_file` and `Bash`. A single zero-dependency Node front door (`pre-tool-use.mjs`) reads the `PreToolUse` payload from stdin, dispatches on `tool_name`, and returns its verdict as `hookSpecificOutput.permissionDecision`. Every path exits 0: a denial is data, never an exit code.
 
-**Large-file Read guard (Guard 1)** - a `Read` of a file over 150 lines that names no `limit` is denied, and the reason redirects Claude to the orchestrator lookup chain (memory, graph, grep, targeted read). Prevents reading entire codebases when a targeted search would do.
+**Large-file Read guard (Guard 1)** - a `Read` of a file over 150 lines that names no `limit` is denied, and the reason redirects Claude to the orchestrator lookup chain (memory, grep, targeted read). Prevents reading entire codebases when a targeted search would do.
 
 **Duplicate file guard (Guard 2)** - a `Write`, `create_file` or `write_file` naming a path that already exists returns `ask`, showing the path, line count and last-modified timestamp with three options: edit in place, confirm the overwrite, or cancel. `Edit` is deliberately not gated, because editing in place is the action this guard recommends.
 
@@ -286,7 +279,7 @@ Permanent exceptions live in `.claude/memory/bash-scan-allowlist.txt`, one entry
 
 Hit a block you believe is wrong? Re-run the command with `CC_GUARD3_WARN=1` and the guard asks instead of denying, carrying the same pattern ids. That is a triage aid for reporting a false positive while you keep working, not a configuration mode: the allowlist is the sanctioned permanent exception. The variable affects Guard 3 alone.
 
-**graphify-out and node_modules guard (Guard 4)** - a `Read` whose path carries `graphify-out` or `node_modules` as an exact path component is denied, with backslashes and `..` resolved first. Use Glob for existence checks and the graphify skill for graph questions.
+**node_modules guard (Guard 4)** - a `Read` whose path carries `node_modules` as an exact path component is denied, with backslashes and `..` resolved first. Use Glob for existence checks.
 
 Input the hook cannot parse fails closed: it is denied with one stderr line naming `CC_HOOK_ALLOW=1`, which overrides that denial alone and leaves every guard fully active on every payload the hook can read. Set `CC_HOOK_DEBUG=1` to see the diagnostic lines it otherwise swallows.
 
@@ -380,8 +373,7 @@ code-conductor/
 │   │   ├── cc-stack.md           /cc-stack
 │   │   └── cc-lang.md            /cc-lang
 │   ├── hooks/
-│   │   ├── graphify-ast-refresh.mjs Node wrapper: freshness + interpreter check
-│   │   └── graphify-ast-refresh.py  Background AST refresh on UserPromptSubmit
+│   │   └── verbosity-remind.sh       Verbosity reminder on UserPromptSubmit
 │   └── memory/
 │       └── personal.md           Template (never committed)
 ├── project-template/
@@ -402,7 +394,7 @@ code-conductor/
 │       │   ├── cc-test.md        /cc-test
 │       │   └── cc-docs.md        /cc-docs
 │       ├── hooks/
-│       │   ├── pre-tool-use.mjs  Node front door: large-file, duplicate-write and graphify-out guards
+│       │   ├── pre-tool-use.mjs  Node front door: large-file, duplicate-write and node_modules guards
 │       │   ├── context-guard.sh  Turn-counter warning (.sh + .ps1)
 │       │   └── post-compact.sh   Checkpoint reminder + cache sweep after `/compact` (.sh + .ps1)
 │       └── memory/
@@ -419,7 +411,7 @@ code-conductor/
     ├── code-simplifier/SKILL.md   Always active — complexity and simplicity rules
     ├── critical-review/SKILL.md   Always active — 4-phase adversarial review protocol
     ├── verbosity/SKILL.md         Always active — MIN/INFO/VERBOSE response rules
-    ├── memory-first/SKILL.md      Always active — memory → graph → grep → read chain
+    ├── memory-first/SKILL.md      Always active — memory → grep → read chain
     └── agent-delegation/SKILL.md  Always active — sub-agent spawn rules
     # Claude Code registers personal skills only at ~/.claude/skills/<name>/SKILL.md
     # ui-ux-pro-max installed from github.com/nextlevelbuilder/ui-ux-pro-max-skill
