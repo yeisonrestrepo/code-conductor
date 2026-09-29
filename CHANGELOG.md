@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.33.0] - 2026-09-29
+
+### Fixed
+- **[BUG-047]** Guard 3 read heredoc bodies as command text, so writing a file whose content carried a glob metacharacter, a command substitution or an odd number of quote characters was denied by patterns written to catch mass **reads**. Both scanners gain a sixth state, `HEREDOC`: body characters are blanked length-preserved and do not feed quote-parity tracking, so content being written can neither trip a pattern check nor produce a malformed denial. A heredoc body is content being written and is already inside the command string the scanner holds, so it cannot flood anything, and no dump shape uses one: an unredirected `cat <<EOF` reads zero files. Four specimens across four consecutive sessions ship as corpus rows.
+- **[BUG-047]** An unterminated heredoc no longer denies as malformed. The fail-closed rule exists because an unbalanced quote leaves ambiguity about where command text resumes; an unterminated heredoc leaves none, and bash itself proceeds. Denying it would have rejected every draft of a file write whose delimiter line had not arrived yet.
+
+### Changed
+- **[BUG-047]** `project-template/.claude/hooks/pre-tool-use.mjs` changes, so a fresh install differs. That is why this release is minor rather than a patch.
+
+Scope is unchanged in both directions: a genuine mass dump before or after a heredoc still denies, `<<<` here-strings are untouched, and a `grep` pattern written as real code still denies while the same text inside a heredoc body no longer does.
+
 ## [1.32.2] - 2026-09-29
 
 ### Added

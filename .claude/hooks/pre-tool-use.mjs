@@ -150,15 +150,19 @@ function g3JoinContinuations(input) {
   return result;
 }
 
-// The five-state scanner, in two modes. "strip" removes unquoted comments and
-// reports malformed input (a state other than UNQUOTED at end of input, meaning an
-// unclosed quote). "glob" reports whether an unquoted glob character appears, and
-// treats malformed input as a glob, which is the authority's fail-closed choice.
+// The six-state scanner, in two modes. "strip" removes unquoted comments and
+// reports malformed input (a state other than UNQUOTED or HEREDOC at end of input,
+// meaning an unclosed quote). "glob" reports whether an unquoted glob character
+// appears, and treats malformed input as a glob, which is the authority's
+// fail-closed choice. HEREDOC blanks a heredoc body, added under [BUG-047].
 function g3Scan(mode, input) {
   const emit = mode === 'strip' || mode === 'mask';
   let state = 'UNQUOTED';
   let result = '';
   let i = 0;
+  let hdPending = null;   // delimiter recorded at the introducer
+  let hdDelim = null;     // delimiter in force while state === 'HEREDOC'
+  let hdDash = false;
   const len = input.length;
   while (i < len) {
     const ch = input[i];
@@ -169,12 +173,70 @@ function g3Scan(mode, input) {
       else if (ch === '\\') { if (emit) result += input.slice(i, i + 2); i += 2; }
       else if (ch === "'") { if (emit) result += ch; i += 1; state = 'SINGLE_QUOTED'; }
       else if (ch === '"') { if (emit) result += ch; i += 1; state = 'DOUBLE_QUOTED'; }
+      else if (two === '<<' && input[i + 2] !== '<') {
+        // Heredoc introducer. `<<<` is a HERE-STRING, not a heredoc, and excluding it
+        // is load-bearing: `cat <<< [x]` denies P4 today and must keep denying. The
+        // body does not begin until after this line's newline, so the delimiter is
+        // recorded and the rest of the line keeps being scanned as command text.
+        let j = i + 2;
+        hdDash = input[j] === '-';
+        if (hdDash) j += 1;
+        while (input[j] === ' ' || input[j] === '\t') j += 1;
+        const q = (input[j] === "'" || input[j] === '"') ? input[j] : '';
+        if (q) j += 1;
+        let w = '';
+        while (j < len && /[A-Za-z0-9_.-]/.test(input[j])) { w += input[j]; j += 1; }
+        if (q && input[j] === q) j += 1;
+        if (w) {
+          // Delimiter quoting is recorded and then IGNORED: this scanner performs no
+          // expansion, so <<'EOF' and <<EOF are the same to it. [BUG-047]
+          hdPending = w;
+          if (emit) result += input.slice(i, j);
+          i = j;
+        } else {
+          if (emit) result += ch;
+          i += 1;
+        }
+      }
       else if (ch === '#' && mode === 'strip') { while (i < len && input[i] !== '\n') i += 1; }
       else {
         if (mode === 'glob' && (ch === '*' || ch === '?' || ch === '{' || ch === '[')) return { glob: true };
         if (emit) result += ch;
         i += 1;
+        if (ch === '\n' && hdPending !== null) { hdDelim = hdPending; hdPending = null; state = 'HEREDOC'; }
       }
+    } else if (state === 'HEREDOC') {
+      // One line at a time. Every non-newline body character is blanked to 'x',
+      // length-preserved because the P4 and P7 walks slice by match LENGTH.
+      //
+      // Newlines stay VERBATIM here, unlike quoted regions which mask them. Quoted
+      // masking stops a newline inside a string becoming a command-position anchor;
+      // here the opposite is needed, because the newline after the terminator must
+      // survive or a command following the heredoc loses its command position and a
+      // real dump stops denying. Body newlines are harmless: everything around them
+      // is 'x'. [BUG-047]
+      let eol = input.indexOf('\n', i);
+      if (eol === -1) eol = len;
+      const line = input.slice(i, eol);
+      const cmp = hdDash ? line.replace(/^\t+/, '') : line;
+      // Only a line EQUAL to the delimiter terminates. A substring would end the state
+      // early and expose the rest of the body to the patterns.
+      //
+      // THE TERMINATOR IS EMITTED VERBATIM, and that is load-bearing. guard3BashScan
+      // runs this scanner TWICE, building the mask from strip's output, so the
+      // transformation has to be IDEMPOTENT. A blanked terminator is unfindable on the
+      // second pass: the scanner re-enters HEREDOC at the same introducer, never
+      // terminates, and blanks every command after the heredoc. The symptom is a
+      // genuine dump following a heredoc silently ceasing to deny. Body lines carry no
+      // such requirement, because nothing downstream needs to find them again.
+      if (cmp === hdDelim) {
+        if (emit) result += line;
+        state = 'UNQUOTED'; hdDelim = null; hdDash = false;
+      } else if (emit) {
+        result += 'x'.repeat(line.length);
+      }
+      i = eol;
+      if (i < len) { if (emit) result += '\n'; i += 1; }
     } else if (state === 'SINGLE_QUOTED') {
       // Backslash is literal here and ANY quote exits: there is no escape mechanism.
       if (mode === 'strip') result += ch;
@@ -191,7 +253,17 @@ function g3Scan(mode, input) {
       else { if (mode === 'strip') result += ch; else if (mode === 'mask') result += 'x'; i += 1; }
     }
   }
-  if (state !== 'UNQUOTED') return emit ? { result, malformed: true } : { glob: true };
+  // HEREDOC is deliberately exempt from the fail-closed check, and the exemption must
+  // not be "normalised" away. The rule exists because an unbalanced quote leaves
+  // AMBIGUITY about where command text resumes, and the scanner refuses to guess. An
+  // unterminated heredoc leaves no ambiguity: everything to end of input is body and
+  // there is no "after", so there is nothing unread to protect. Bash agrees, measured:
+  // on GNU bash 3.2.57, the interpreter the authority runs under, a script ending
+  // mid-heredoc delivers the body and exits 0 with NO warning; newer bash also warns
+  // and still proceeds. Fail-closed here would deny every draft of a file write whose
+  // delimiter line has not arrived yet, which is [BUG-047]'s own defect in a new
+  // state. The departure is correct BECAUSE the rule's premise does not apply.
+  if (state !== 'UNQUOTED' && state !== 'HEREDOC') return emit ? { result, malformed: true } : { glob: true };
   return emit ? { result, malformed: false } : { glob: false };
 }
 
