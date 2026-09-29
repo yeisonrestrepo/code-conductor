@@ -576,7 +576,7 @@ Append one bullet to the `[BUG-046]` entry carrying **both** specimens of extern
 
 One section: the boundary table with suites named, the block's final line count, the six hand-verified acceptance behaviors from T-001-F with their measured results, the no-red statement for Task 2, and the epitaph sentence: **Task 0 was the last time `git add -f` was needed for a file that was already tracked in this repository.**
 
-- [ ] **[T-005-D] Step 4: Stage and commit**
+- [X] **[T-005-D] Step 4: Stage and commit**
 
 ```bash
 git add -u "AGENT-READABLE BACKLOG.md"
@@ -592,13 +592,13 @@ Note the staging form change: `.claude/memory/project.md` now stages with `-u` a
 
 ### Task 6: Push and open the PR
 
-- [ ] **[T-006-A] Step 1: Push the branch**
+- [X] **[T-006-A] Step 1: Push the branch**
 
 ```bash
 git push -u origin fix/bug-042-gitignore-restructure
 ```
 
-- [ ] **[T-006-B] Step 2: Open the PR**
+- [X] **[T-006-B] Step 2: Open the PR**
 
 Body carries: the six-for-six boundary table with suites named; both corpus runs; the three audit premise corrections with their measurements; the six hand-verified acceptance behaviors; the PATCH argument; and the three conventions landing with the release (the version rule's worked example, evidence-first applied to friction, and the self-enforcing toll).
 
