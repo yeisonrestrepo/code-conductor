@@ -1510,3 +1510,46 @@ The red was real and self-inflicted. **The diagnosis was right and the response 
 **Endorsed as written, for the record:** AC5's no-target-no-default double negation; AC4's three-way failure discrimination; AC13's vacuous-pass closure and AC14's lost-versus-lying distinction; AC21's fetch-depth refusal with its reason recorded; AC30 making the `docs/` toll self-enforcing task by task; the boundary table's self-inflicted reds predicted by case membership; and the inversion-proof protocol for the one honest green, with case names reported before revert.
 
 **Ordering finding, measured at the spec commit and carried into the plan.** The approved expectation was commit document, regenerate block, verify green. **Leaf-first is strictly better and was measured:** adding the single `!` leaf in sorted position *before* staging makes plain `git add` exit **0** and stage the file, so the commit never passes through a red state at all and `-f` is never reached for. Force-staging first produces a real red (2 of 4 cases, measured twice) that then has to be cleared. Both orders end at identical content verified by the same test; leaf-first simply never lies in between. The plan uses leaf-first for single-document tasks and says why.
+
+## Closeout: 1.32.2, the first release whose record verifies itself [2026-09-29]
+
+`[BUG-046]` shipped as **`1.32.2`** (PR #39, merged `fc8dbc9`). Clean squash sync measured before acting: **`0 ahead / 1 behind`, clean**, fast-forwarded `26d5c6d..fc8dbc9`. Branch `fix/bug-046-release-critical-instruments` deleted on upstream-merged. Three instruments re-run on the merged tree rather than the branch: `VERSION_GATE_OK 1.32.2`, `RECORD_PARITY_OK`, ceiling `BUG-047` from both legs with 47 headings each and no duplicates. **Next mintable id is `BUG-048`.**
+
+### Boundaries: nine for nine
+
+| After | Predicted | Measured |
+|---|---|---|
+| baseline | 910 / 12, 35 / 1 | 910 / 12, 35 / 1 |
+| T-000 plan | no change, no red | 910 / 12, 35 / 1, block-parity 4/4 |
+| T-001 `id-ceiling` | 916 / 12, 36 / 1 | 916 / 12, 36 / 1 |
+| T-002 `version-gate` | 925 / 12, 37 / 1 (corrected) | 925 / 12, 37 / 1 |
+| T-003 `record-parity` | 934 / 12, 38 / 1 (carried) | 934 / 12, 38 / 1 |
+| T-004 `repo-invariants` | 937 / 12, 39 / 1 | 937 / 12, 39 / 1 |
+| T-005 `tools-not-shipped` | 940 / 12, 40 / 1 | 940 / 12, 40 / 1 |
+| T-006 documents only | unchanged | 940 / 12, 40 / 1 |
+| T-007 release | unchanged at `1.32.2` | 940 / 12, 40 / 1 |
+
+**No `gitignore-block-parity` red at any point.** The spec predicted three from this item's own documents; leaf-first removed all three, and the plan declared the supersession with its measurement rather than dropping the prediction.
+
+### Conventions and findings this release establishes
+
+- **A module-resolution red reports as a FILE, not as cases.** The plan predicted "all 6 cases red" for each TDD step. Vitest fails at **collection**, before any case exists, so it reports `Test Files 1 failed (1)` with zero tests run. Same cause, different accounting. **The contract for a TDD red is the cause and the named module, never a case count that cannot exist yet.** Stated at the first occurrence rather than the third.
+- **A fixture caught a defect the live repository structurally cannot.** Direction B of `record-parity` first skipped only non-terminal states, so a `[~]` superseded entry was required to name a shipped version it never had. **The live data hides it:** direction B is scoped to the ids the current version claims, and the one `[~]` entry, `[BUG-035]`, is claimed only by `1.28.0` through `1.30.0`, which direction B never reaches. The fixture exposed it in one run. **This is the argument for fixtures stated as a measurement rather than as a principle**, and it is the counterexample to "the live assertion makes the unit test redundant".
+- **Registry entry 5, added the day the registry was written.** `git diff --stat` was the plan's revert check for the three inversions, on a file that was still **untracked**, so it prints nothing whether or not an inversion survived; `git add -N` then reports the whole file. Empty output would have read as "reverted" when it meant "not measured". **A step for verifying instruments used an instrument that could not see its subject.** Generalized in `tools/README.md`: **an instrument that returns the same answer whether or not its subject is present is not measuring its subject**, which is the `numstat` defect, the max-scan defect and the vacuous-pass defect stated once.
+- **Risk 3 fired, and the diagnosis is generator semantics.** The plan said the new `docs/` leaf goes "immediately after `/docs/*`". It does not. `expectedBlock` emits, per site, the `/root/*` line, then **every directory re-include sorted**, then **every file leaf sorted by full path**. `docs/RELEASE-CLOSEOUT.md` is a file leaf and sorts before every `docs/superpowers/...` path because `R` precedes `s` in byte order. Correct position was the first file leaf, line 56, not line 50. **The case split is the diagnostic:** exact-equality-in-order red with leaf-set-completeness green means an ordering error, and both red means a missing leaf.
+- **The atomic-record exception, ruled and recorded in the commit body.** Once invariants span files, the commit that moves them moves them together. Splitting the version bump from the `CHANGELOG` leaves the version invariant red between commits; splitting the heading flip from the claim leaves direction A red. `fab33de` is the citation next time a release commit looks against the grain.
+- **The heading flip has an owner: the release commit.** It previously happened at closeout, after the merge, which is how `[BUG-044]` shipped with its heading still reading `[ ]` for an entire release. Scoping direction A to exempt the in-flight version was considered and rejected, because `[BUG-044]`'s defect lived in a shipped version and the exemption would excuse exactly the case the instrument exists to catch. **The root cause is fixed structurally rather than by a reminder**, and `docs/RELEASE-CLOSEOUT.md` documents the change.
+- **One declared deviation, named before it landed.** T-002 contributes 9 tests rather than the planned 7: the plan's Review Focus named it as an owner of the `## [Unreleased]` case and its test file carried none. A plan gap, not a discovery. Every downstream count carried the +2.
+- **Two plan steps were upgraded rather than executed as written.** T-001-F specified a control on `git show`; the CLI was run instead in a throwaway repo with no `origin`, exercising the abort end to end at rc 2 with **stdout completely empty**. T-004-E's `git diff --stat` became registry entry 5.
+
+### The instruments proved rather than asserted
+
+**The honest green, by inversion.** `repo-invariants` was predicted green because all three invariants were measured green during the audit. Each inversion turned exactly one named case red and left the other two green: `agrees with VERSION at all five version locations`, `keeps its CHANGELOG, backlog and VERSION in record parity`, `files no id twice`. No coupling.
+
+**The single-level discriminator, disproved on real data before shipping.** A bullet-start rule alone cuts 72 id occurrences to 13 claims and leaves exactly one violation, `1.32.0 claims BUG-045`, a false positive from `### Filed`. On first contact with this repository's own records the single-level form reproduced the retired max-scan's failure class. It ships as the control fixture.
+
+**AC31, the release's final line.** Both instruments ran against the release that ships them: `VERSION_GATE_OK 1.32.2` and `RECORD_PARITY_OK`, rc 0 each. Then proved rather than trusted, per the discriminator rule applied to the release's own record: with `[BUG-046]`'s heading flipped to `[ ]`, parity reports `FAIL [A] 1.32.2 claims BUG-046 but its heading reads [ ]` three times, once per claim bullet, rc 1. Restored, green. **The first release whose record cannot silently diverge is the release that made divergence detectable.**
+
+### Queue
+
+`[BUG-047]` (the heredoc family) is next, and its evidence is waiting: **four specimens** across four consecutive sessions, and the priority finding that upgrades it, that the harness's own auto-mode guidance instructs writing files with heredocs while Guard 3 denies any body carrying a bracket class, so the platform's instruction and this repository's hook are in direct conflict and the friction is systematic rather than incidental. Its spec's first audit item remains whether the frozen authority agrees with the port that `<<'EOF'` and `<<EOF` are not distinguished. Then `[BUG-045]` (the quoted-path allowlist defect), still open with its ritual priced at filing. Two dossiers stay unfiled: the session denial tally, and the interleaved-artifact dossier opened this session with one anchored specimen. **Next mintable id is `BUG-048`.**

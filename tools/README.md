@@ -16,7 +16,7 @@ Each instrument carries the test that pins its semantics, because an instrument 
 
 ## The registry of retired instruments
 
-Four release-critical checks have been retired or lost across three releases. Each was something a tripwire, a filing rule or a release gate depended on, and not one was tracked or had a test. **Meet this list before writing a fifth.**
+Five instruments have been retired or found unfit across three releases. The first four were release-critical checks that a tripwire, a filing rule or a release gate depended on, and not one was tracked or had a test. The fifth was a verification step inside this item itself, which is why the list is kept open rather than closed at four. **Meet this list before writing a sixth.**
 
 ### 1. The whole-tree `git diff --numstat` superset check
 
@@ -54,6 +54,14 @@ Five locations agreeing on one string, reported as five disagreements. **The arc
 ### 4. The commit-message files and the PR body
 
 Lost mid-release during `[BUG-044]`. Not a measurement defect: a **custody** defect, and it belongs here because it is the shape the other three share once the measurement question is set aside. Commit messages moved to `git commit -F <file>` because Guard 3 denies a `cat` heredoc inside a compound command, and the PR body then had to be staged through gitignored `.conductor/`. Cited: `.claude/memory/project.md:927`, `:1227`, `:1295`.
+
+### 5. `git diff --stat` as the revert check for an untracked file
+
+Found 2026-09-29, during `[BUG-046]`'s own implementation, and recorded here the day the registry was written because it is the registry's own class turning up inside the item that documents it.
+
+`tests/tools/repo-invariants.test.js` is predicted green, so its instrument is proved by inverting each of its three assertions and observing exactly one named case go red. The plan's verification step for confirming every inversion had been reverted was `git diff --stat -- tests/tools/repo-invariants.test.js`, expecting empty output. **The file was brand new and untracked at that point, so `git diff` has no baseline and prints nothing whether or not an inversion survived.** Adding `git add -N` to give it one then reported all 42 lines as inserted, which is equally uninformative. Empty output would have been read as "reverted" when it meant "not measured".
+
+**A step for verifying instruments used an instrument that could not see its subject.** Replaced by reading the three assertion lines directly. The general form, and the reason this entry belongs beside the other four: **an instrument that returns the same answer whether or not its subject is present is not measuring its subject.** That is the `numstat` check's defect, the max-scan's defect and the vacuous-pass defect, stated once.
 
 ---
 
