@@ -468,7 +468,21 @@ git log --oneline -1
 * **Queue position:** after `[BUG-042]`, unless a release needs the instruments sooner, in which case **building them is that release's first task** rather than a rebuild under pressure.
 
 
-### DOSSIER (unfiled, no id yet): The Heredoc Family
+### [ ] `[BUG-047]` Guard 3 Scans Heredoc Bodies as Command Text, So a Glob Metacharacter in Written Content Denies the Write
+
+* **MINTED 2026-09-28 at a verified ceiling, both legs heading-scoped** (working tree union `origin/main`, `BUG` stood at `046`, 28 headings on each leg). The dossier below is kept **verbatim as this entry's problem statement**, because it is the evidence that earned the id and back-editing it would erase the reasoning that justified the mint. Everything above the dossier heading is the filing; everything below it is the dossier as it stood when the condition was met.
+* **The minting condition, met as the dossier wrote it.** Three independently reached specimens, a traced mechanism, a severity upgrade, and the audit's first two questions pre-answered by probe. Each is named below rather than asserted.
+* **Third specimen, 2026-09-28 (`[BUG-042]`'s audit).** A `.mjs` audit script written with `cat > <path> <<'MJS'`, denied under **P4 P5 P9 at once**. Disposition: routed around with the Write tool, hook not bypassed, script content landed unchanged. **This is the first specimen showing the family crosses pattern boundaries:** the same lexical gap that produces a P4 verdict also produces P5 and P9 verdicts when the body happens to contain command substitutions and a dot operator, because the body is scanned as command text by every check at once. A remedy aimed at P4 alone would leave the other two firing on the same input.
+* **The remedy is bounded by measurement, and the binding is what the spec inherits.** The nine-case probe below shows `tee` **allows** where `cat` denies, which means the denial is reached through the reader-at-command-position path rather than through the redirection itself. That bounds the remedy: **delimiter-aware skipping of the heredoc body is sufficient for every specimen collected**, and a third lexical mode alongside strip and mask is **not obviously required**. The decision is reserved for the spec, which must argue it rather than inherit it, but the cheaper option is the one with evidence behind it.
+* **The spec's FIRST audit item is the open authority question**, unchanged from the dossier: the probe measured the **port**'s behavior and found it does not distinguish `<<'EOF'` from `<<EOF`. Whether `tests/fixtures/guard3-reference.sh` agrees is unmeasured, and the two subjects ship as a byte-identical mirrored pair driven by one corpus, so a divergence there is a finding about the pair and not only about this defect. No remedy is designed until that is measured.
+* **Components Affected:** `tests/fixtures/guard3-reference.sh` (the frozen authority, `_g3_scan`), `.claude/hooks/pre-tool-use.mjs` and its byte-identical mirror `project-template/.claude/hooks/pre-tool-use.mjs` (`g3Scan`), and the shared corpus that drives both.
+* **Acceptance Criteria:** A heredoc body containing glob metacharacters, command substitutions or a dot operator does not, by itself, produce a denial. `<<'EOF'` and `<<EOF` behave identically in both subjects, or their divergence is deliberate and asserted. The three collected specimens are corpus cases. A genuine mass-dump command that happens to precede or follow a heredoc is still denied, so the skip is scoped to the body and not to the command. Authority and port agree, asserted as a count the way `[BUG-043]` asserted its thirteen call sites.
+* **Queue position: after `[BUG-046]` by default.** The instruments are infrastructure the next release needs; this friction is real but characterized and routable-around with the Write tool. A fourth specimen, or session friction that stops being routable, reorders it.
+* **What this entry is, beyond its defect.** The evidence-first pipeline's first complete cycle, entirely self-generated: an out-of-scope note in one spec, a second spec keeping it unfiled under the same rule, a dossier opened by owner ruling, specimens collected across three sessions, a wrong mechanism guess corrected by a nine-case probe, and a mint only once the written condition was met. The dossier below is preserved so that cycle stays legible.
+
+---
+
+#### DOSSIER, verbatim as it stood at minting: The Heredoc Family
 
 **Not an item. A dossier for an uncharacterized family**, opened because `[BUG-041]`'s Out of Scope named it with the explicit condition "it needs its own characterization before it is worth an id", and `[BUG-043]`'s Out of Scope kept it unfiled under the evidence-first rule. **An id is minted when the characterization audit below runs, not before.** Recorded here rather than in either spec because both are landed history and stand as the knowledge of their day.
 
@@ -508,6 +522,8 @@ The first report of specimen 2 guessed that possessive apostrophes in the prose 
 - Whether the remedy is a **third lexical mode** (alongside strip and mask) or **delimiter-aware skipping** of the body.
 
 #### Queue
+
+**ANSWERED 2026-09-28: a third specimen did force the queue, and the id was minted as `[BUG-047]` above.** The original wording is kept below because it is the condition the mint was measured against.
 
 After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two specimens plus a traced mechanism plus a severity upgrade is half the minting condition; the audit is the other half.
 

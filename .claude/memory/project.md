@@ -1379,3 +1379,36 @@ Task 0 staged the spec and the plan with `git add -f`. **That was the last time 
 ### Queue after 1.32.1
 
 `[BUG-046]` (release-critical instruments as tracked scripts under `scripts/`, now also carrying the external-writers sibling concern) is next, unless a release needs the instruments sooner, in which case building them is that release first task. `[BUG-045]` (the quoted-path allowlist defect) remains open with its ritual priced at filing. **The heredoc-family dossier now meets its own minting condition** (three specimens plus a traced mechanism plus a severity upgrade) and its filing decision is owed at this closeout. The session denial tally stays unfiled. **Next mintable id is `BUG-047`.**
+
+## Closeout: 1.32.1 shipped, BUG-047 minted [2026-09-28]
+
+PR #38 merged as `75532b4`. Second consecutive clean squash sync.
+
+### The sync, measured rather than assumed
+
+`0 ahead / 1 behind` before the fast-forward, so nothing was stranded and the measurement is what says so. Every record commit for this item, including the closeout of `[BUG-042]` and the `[BUG-046]` sibling-concern bullet, went on the branch. `git branch -d` passed on the upstream-merged check and printed its usual squash note about the ref not being reachable from `HEAD`, which is the expected shape and not a warning about anything. The remote branch was already gone, deleted by GitHub on merge, measured with `ls-remote` rather than presumed; the prune that followed cleared a stale `origin/fix/bug-044-...` left from the previous release.
+
+### Verified on `main` after the merge
+
+- Suite **910 passed / 12 skipped**, 35 files passed / 1 skipped.
+- Five version anchors all read `1.32.1`: `VERSION`, `package.json`, `package-lock.json` twice, `CHANGELOG.md`.
+- The block-parity test passes against the merged tree, which is the first time it has run against an index it did not help create.
+
+### The epitaph, as written
+
+**Task 0 staged the spec and the plan with `git add -f`. That was the last time `-f` was needed in this repository for a file that was already tracked.** From `638dcc3` onward a tracked file under either restructured surface stages with plain `git add` or `git add -u` at rc 0, and every subsequent commit in the item was made that way. The bounded clause is part of the sentence, not a footnote to it: `-f` remains correct and still required for a genuinely new file under a genuinely ignored directory, `.conductor/` being the remaining one, so the epitaph cannot later be quoted as more than it is.
+
+### BUG-047 minted: the heredoc family
+
+Minted at a verified ceiling, both legs heading-scoped, `BUG` standing at `046` with 28 headings on each leg. The dossier is kept **verbatim as the filing's problem statement** rather than rewritten, because it is the evidence that earned the id.
+
+- **Third specimen, this item's own audit:** a `.mjs` script written with `cat > <path> <<'MJS'`, denied under **P4 P5 P9 at once**. First specimen showing the family **crosses pattern boundaries**: the body is scanned as command text by every check simultaneously, so a remedy aimed at P4 alone would leave two more firing on the same input.
+- **The remedy is bound by measurement:** `tee` allows where `cat` denies, so the denial is reached through the reader-at-command-position path. Delimiter-aware skipping is sufficient for every specimen collected; a third lexical mode is not obviously required. Decision reserved for the spec, which must argue it rather than inherit it.
+- **The spec's first audit item is the open authority question:** the probe measured the port, which does not distinguish `<<'EOF'` from `<<EOF`. Whether the frozen authority agrees is unmeasured, and since the two ship as a byte-identical mirrored pair driven by one corpus, a divergence there is a finding about the pair.
+- **Queue position: after `[BUG-046]` by default.** Instruments are infrastructure the next release needs; this friction is real but characterized and routable-around with the Write tool. A fourth specimen, or friction that stops being routable, reorders it.
+
+**What the entry is beyond its defect:** the evidence-first pipeline's first complete cycle, entirely self-generated. An out-of-scope note in one spec, a second spec keeping it unfiled under the same rule, a dossier opened by owner ruling, specimens collected across three sessions, a wrong mechanism guess corrected by a nine-case probe, and a mint only once the written condition was met. The dossier is preserved so that cycle stays legible.
+
+### Queue after 1.32.1 and the mint
+
+`[BUG-046]` (release-critical instruments as tracked scripts under `scripts/`, carrying the external-writers sibling concern) is next. Then `[BUG-047]` (the heredoc family) by default, unless a fourth specimen reorders it. `[BUG-045]` (the quoted-path allowlist defect) remains open with its ritual priced at filing. One dossier remains: the session denial tally, still uncharacterized and deliberately not merged into the heredoc family, since grouping is by mechanism. **Next mintable id is `BUG-048`.**
