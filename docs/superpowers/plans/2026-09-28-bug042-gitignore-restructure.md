@@ -409,7 +409,7 @@ npx vitest run
 
 Expected: **910 passed | 12 skipped (922)**, files **35 passed | 1 skipped (36)**.
 
-- [>] **[T-002-E] Step 5: Stage and commit**
+- [X] **[T-002-E] Step 5: Stage and commit**
 
 ```bash
 git add tests/unit/host-owned-ignore-xor.test.js
@@ -427,7 +427,7 @@ Claude-Session: https://claude.ai/code/session_01HLS5KAHkhpMChyqNTbqrhe"
 **Files:**
 - Modify: `CLAUDE.md` (the `## Staging Convention` section)
 
-- [ ] **[T-003-A] Step 1: Rewrite the section's opening premise**
+- [X] **[T-003-A] Step 1: Rewrite the section's opening premise**
 
 The section currently opens by naming `.gitignore:7` as the cause. Replace that opening with the partial-retirement form. The three bullets keep their text; what changes is the premise paragraph above them and a new paragraph below.
 
@@ -455,7 +455,7 @@ it asserts git's behavior rather than this repository's file and is unaffected b
 BUG-042.
 ```
 
-- [ ] **[T-003-B] Step 2: Add the anchoring note**
+- [X] **[T-003-B] Step 2: Add the anchoring note**
 
 Append immediately after the closing paragraph, as two sentences that do not erase each other:
 
@@ -468,7 +468,7 @@ and `docs/` reached into `project-template/`, which is why `!project-template/*`
 and root-anchoring is what retired it.
 ```
 
-- [ ] **[T-003-C] Step 3: Verify the convention test still passes**
+- [X] **[T-003-C] Step 3: Verify the convention test still passes**
 
 ```bash
 npx vitest run tests/unit/staging-convention.test.js
@@ -476,7 +476,7 @@ npx vitest run tests/unit/staging-convention.test.js
 
 Expected: **8 passed**. `AC1` asserts `CLAUDE.md` carries both branches and `AC4` asserts the `cc-checkpoint` wording; both must survive the rewrite. If either fails, the rewrite dropped a branch and must be repaired before committing, not after.
 
-- [ ] **[T-003-D] Step 4: Run the whole suite**
+- [X] **[T-003-D] Step 4: Run the whole suite**
 
 ```bash
 npx vitest run
