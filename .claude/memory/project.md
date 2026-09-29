@@ -1243,3 +1243,31 @@ The reading half is what makes it evidence rather than an impression: if any den
 
 - **An observation visible only in one party's view is attributed as such and is never load-bearing until both can see its anchor.** The owner's terminal and the agent's context are different windows. A mechanism story built across them without anchoring is how a false override nearly entered the permanent record: the annotation was real in one window, absent in the other, and the inference drawn from it was wrong. The probe-first rule caught it; this convention makes the catch cheaper next time. State which window an observation came from before reasoning from it.
 - **The two-gates reading of a tool call.** The auto-mode classifier decides whether the owner is prompted; the `PreToolUse` hook decides whether the command runs. They answer different questions and both run. A call can be classifier-approved and hook-denied, which is the ordinary case for every Guard 3 denial, so a classifier annotation is never evidence about a guard verdict.
+
+## Implementation: BUG-044 [2026-09-28]
+
+Shipped as **1.32.0** on `fix/bug-044-deny-message-phantom-allowlist` in 6 commits (`9ff16c7` plan, `8a50023` the conditional remedy, `d7f19a5` the seed and the retirement, `b8f8901` the records and the BUG-045 filing, `d1ad9e0` release, closeout last). Suite **897 to 902 passed / 12 skipped**, 33 files throughout. Plan: `docs/superpowers/plans/2026-09-28-bug044-deny-message-phantom-allowlist.md`, 6 tasks, 49 checkbox steps.
+
+**Every boundary hit its predicted count exactly, with suites named: 897, 900, 902, 902, 902, 902.** The only tripwire fired in an instrument, not in the code path.
+
+### The two defects, and which one needed no telemetry
+
+The message named a file that existed in no installation. It was also **inert on two of the three denials it printed on**: `g3AllowlistCovers` runs at `:469`, while the length denial returns at `:448` and the malformed at `:452`, both before it. The second defect is provable by reading control flow, which is why it carried the item when the first defect was contested.
+
+**The message turned out to be port-only.** `guard3-reference.sh` prints `BASH SCAN BLOCKED` plus a one-line detail and names no allowlist, so the corpus arbitrates verdicts and never message text. That discovery spared a fifth sanctioned exception and kept the frozen authority at **zero diff against `main`**, verified at closeout rather than assumed.
+
+### The collision, and why the step order was the only correct one
+
+`templates.test.js` asserted the allowlist template must not exist; another case asserted every `seed` row must have a source. They are mutually unsatisfiable the instant the policy flips. **Retire first, flip second, ship third** was chosen because the reverse orders all pass through that impossible state. Both intermediate reds were predicted by name and hit exactly: 2 failures after the retirement with the skip-coverage and seed-source cases still passing, 3 after the flip when the seed-source case joins, then all three clearing together.
+
+Classification of the test touch: **ASSERTION-RETIREMENT**, the BUG-039 shape, named in `d7f19a5` body. The retired assertion stated its own dead premise, that `deployProject` copies the template wholesale, which BUG-039 replaced with a filtered copy.
+
+### A coverage gap found by pre-flight, not by a failure
+
+`host-owned.test.js` asserts the exact seeded list and looked like collateral damage. It does not break, because its fixture never writes the template into its source tree and `seedHostOwned` skips absent sources. **The consequence is that suite gives zero coverage that the allowlist seeds**, which promoted the new `deploy.test.js` case from decorative to load-bearing. Knowing which test carries the load is half of trusting green.
+
+### Conventions
+
+- **An id ceiling counted by scanning for id-shaped tokens is retired. Count filed backlog HEADINGS instead.** The max-scan read forward references in prose as filings, including the plan file line that stated the ceiling the check expected to read after minting. **The instrument was reading its own predicted output back as evidence.** The heading-scoped form reported 43 headings before the filing and 44 after, ceiling 44 to 45, with no duplicate ids: the minting verified in both directions. This is the second retired instrument in two releases and the same failure class as the `numstat` superset check: a measurement that cannot distinguish its subject from a description of its subject.
+- **A release-critical instrument does not live in the scratchpad.** Three were lost mid-release when the directory was withdrawn: the id ceiling, the version gate and the commit-message files. Each was rebuilt inline and each rebuild is a new instrument whose agreement with the old one is unproven. The version gate is the clearest case: the old one reported FAIL on five locations that agreed, so it was comparing against a target it had not been given, and the rebuilt form takes `VERSION` as the authority. Better, but different, and the difference is recorded rather than smoothed over.
+- **State observability in the form that is true.** The seed is not observable in this repository, because no deploy runs here and `.claude/memory/` still holds no allowlist at closeout. The message change **is** observable here, and proved itself: a probe command was denied as malformed and carried no allowlist sentence. Separating the two claims is what keeps the release record trustworthy.

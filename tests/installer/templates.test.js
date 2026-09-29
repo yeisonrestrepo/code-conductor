@@ -138,10 +138,27 @@ describe('guard 3 pattern block', () => {
     expect(code).not.toMatch(/\\[sSwWdD]/);
   });
 
-  // Not shipping the filename is the whole mechanism that keeps the installer from
-  // overwriting operator policy, since deployProject copies the template wholesale.
-  it('ships no allowlist file, so the installer can never overwrite one', () => {
-    expect(existsSync(join(root, 'project-template/.claude/memory/bash-scan-allowlist.txt'))).toBe(false);
+  // [BUG-044] replaces the assertion that no allowlist file is shipped. That test's stated
+  // premise, "since deployProject copies the template wholesale", died with BUG-039:
+  // deploy.mjs filters the copy through hostOwnedFilter, which excludes every table path
+  // regardless of policy, and seedHostOwned then writes only when the target is absent. What
+  // protects operator policy now is the row, not the file's absence, and deploy.test.js
+  // proves a host file survives a re-run even when the template ships one.
+  // Classification: ASSERTION-RETIREMENT, the BUG-039 shape. The assertion changed and got
+  // stronger: it now pins the mechanism that carries the load instead of a proxy for it.
+  it('declares the allowlist a seed row and ships its template, so a re-run cannot overwrite operator policy', () => {
+    expect(PROJECT_HOST_OWNED.get('memory/bash-scan-allowlist.txt')).toBe('seed');
+    expect(existsSync(join(root, 'project-template/.claude/memory/bash-scan-allowlist.txt'))).toBe(true);
+  });
+
+  // The seed must change no verdict. Parsed by g3ReadAllowlist's own rule: trim, drop
+  // blanks, drop comments. A comment-only file is behaviorally identical to no file, which
+  // is the honest limit of this remedy: its value is that the named path resolves and its
+  // header teaches the format.
+  it('ships an allowlist template that parses to zero entries', () => {
+    const raw = readText('project-template/.claude/memory/bash-scan-allowlist.txt');
+    const entries = raw.split('\n').map((l) => l.trim()).filter((l) => l !== '' && !l.startsWith('#'));
+    expect(entries).toEqual([]);
   });
 });
 

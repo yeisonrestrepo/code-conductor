@@ -1,0 +1,29 @@
+# Guard 3 bash-scan allowlist. OPERATOR POLICY, reviewed in git.
+#
+# This file is empty on purpose. It disarms nothing until you add a line.
+#
+# Format:
+#   One entry per line. Blank lines and lines starting with # are ignored, and
+#   surrounding whitespace is trimmed.
+#
+#   An entry ending in / covers paths under that prefix, and rejects any suffix
+#   that walks up the tree with .. so an entry cannot become a traversal gift.
+#   Any other entry matches a whole command token.
+#
+#   Entries match LITERALLY. Regex metacharacters carry no special meaning, so
+#   file.ts matches file.ts and nothing else.
+#
+# Review rule:
+#   Every line here disarms Guard 3 patterns for matching commands, so give each
+#   entry a comment saying why it exists and ideally the issue it came from. An
+#   uncommented entry is a review smell.
+#
+# Example, shown commented out so this file stays inert:
+#   # docs/ is a small hand-written tree; bulk reads there are intended [BUG-000]
+#   docs/
+#
+# An agent that hits a Guard 3 denial may propose an entry here. It must not add
+# one to clear its own denial: that is the bypass the project forbids. Permanent
+# exceptions are the operator's call, which is why they are reviewed in git.
+#
+# The installer creates this file only when it is absent and never overwrites it.

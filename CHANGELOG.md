@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.32.0] - 2026-09-28
+
+### Fixed
+- **[BUG-044]** Guard 3's denial told every reader to add an entry to `.claude/memory/bash-scan-allowlist.txt`, a file that existed in no installation. Two defects, one item. The file now ships as a comment-only template that the installer creates when absent and never overwrites, so the path the message names resolves and its header teaches the entry format and the review rule. And the remedy sentence now rides only on a **pattern** denial: the length and malformed denials return before the allowlist is ever consulted, so on those two the advice was inert by construction. The sentence is reworded as operator policy, reviewed in git, which an agent may propose but must not self-serve, because the reader at the moment of friction is instructed never to bypass the hook.
+
+### Changed
+- `project-template/.claude/memory/bash-scan-allowlist.txt` is a new shipped file, and `memory/bash-scan-allowlist.txt` moves from `skip` to `seed` in the host-owned policy table. This is why the release is minor rather than a patch: it changes what ships and what the installer does on a fresh install. `README.md`'s allowlist paragraph restates to the true contract.
+- The assertion that no allowlist file is shipped is retired and replaced by one pinning the mechanism that protects operator policy today: the `seed` row plus the filtered copy introduced in `1.30.0`. Behavior is unchanged for any host that already has an allowlist, which `tests/installer/deploy.test.js` asserts byte-for-byte.
+
+### Filed
+- **[BUG-045]** The allowlist cannot cover a quoted path: `G3_BD` and `G3_AD` contain no quote character, so the entry `docs/` does not cover `cat "docs/x.md" *.md`. Measured during this item's audit and deliberately left to its own change, because widening the boundary sets touches the frozen bash authority's allow path.
+
 ## [1.31.3] - 2026-09-28
 
 ### Fixed

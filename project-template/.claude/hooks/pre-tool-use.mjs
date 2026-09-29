@@ -429,14 +429,28 @@ const g3Chomp = (s) => s.replace(/\n+$/, '');
 // keeps working instead of filing an uninstall. It is documented as triage, not as
 // configuration: the allowlist is the sanctioned permanent exception. It has no
 // relationship to CC_HOOK_ALLOW, whose scope stays the two pre-verdict conditions.
-function g3Blocked(detail) {
+// The three alternatives are the only remedy every denial shares, so they are the
+// message's constant part.
+const G3_ALTERNATIVES =
+  'Authorized alternatives: 1. Grep for targeted content search with file and pattern scope. ' +
+  '2. Glob for path listing without file content. 3. Read with an explicit offset and limit.';
+
+// The allowlist sentence rides ONLY on a pattern denial. g3AllowlistCovers runs at the end
+// of guard3BashScan; the length and malformed denials return before it, so on those two the
+// allowlist cannot lift the block and naming it would promise a remedy that provably does
+// not apply. It is worded as operator policy because the agent reading it mid-denial is
+// instructed never to bypass this hook: it may propose an entry, never self-serve one.
+// Uptake staying at zero is that instruction working, not a discoverability failure.
+// [BUG-044]
+const G3_OPERATOR_POLICY =
+  'A permanent exception is operator policy, not a self-serve step: entries live in ' +
+  '.claude/memory/bash-scan-allowlist.txt, are reviewed in git, and an agent may propose ' +
+  'one but must not add it to clear its own denial.';
+
+function g3Blocked(detail, { allowlistApplies = false } = {}) {
   const decide = process.env.CC_GUARD3_WARN ? ask : deny;
-  return decide(
-    `BASH SCAN BLOCKED. ${detail} ` +
-    'Authorized alternatives: 1. Grep for targeted content search with file and pattern scope. ' +
-    '2. Glob for path listing without file content. 3. Read with an explicit offset and limit. ' +
-    'To permit a path permanently, add a commented entry to .claude/memory/bash-scan-allowlist.txt.'
-  );
+  const policy = allowlistApplies ? ` ${G3_OPERATOR_POLICY}` : '';
+  return decide(`BASH SCAN BLOCKED. ${detail} ${G3_ALTERNATIVES}${policy}`);
 }
 
 // Guard 3: the bash command scanner, ported from tests/fixtures/guard3-reference.sh.
@@ -467,7 +481,7 @@ function guard3BashScan(input) {
   for (const { id, check } of G3_CHECKS) if (check(UNMASKED_CHECKS.has(id) ? pre : masked)) ids.push(id);
   if (ids.length === 0) return null;
   if (g3AllowlistCovers(pre, g3ReadAllowlist())) return null;
-  return g3Blocked(`The command triggered a mass content-dump pattern. Pattern ids: ${ids.join(' ')}.`);
+  return g3Blocked(`The command triggered a mass content-dump pattern. Pattern ids: ${ids.join(' ')}.`, { allowlistApplies: true });
 }
 
 const DISPATCH = {
