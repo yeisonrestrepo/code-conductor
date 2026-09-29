@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.32.1] - 2026-09-28
+
+### Fixed
+- **[BUG-042]** `.gitignore` excluded `.claude/` and `docs/` wholesale, so `git add` on a tracked file inside either exited 1 while staging the file correctly. A tracked file that staged and a new file that did not were indistinguishable, both exiting 1. Both sites are now root-anchored re-include blocks: a tracked file exits 0 and stages, an unnamed new file exits 1 and stages nothing. Measured at both sites, in both directions.
+- **[BUG-042]** `!project-template/*` is retired. `.claude/` and `docs/` carried no leading slash, so they matched at any depth and reached into `project-template/`, and that single re-include existed only to undo them. The allowlist template shipped in 1.32.0 was trackable only because of it.
+- **[BUG-042]** `.claude/settings.local.json` was held ignored by the wholesale rule alone: `*.local` matches a name ending in `.local` and does not match it. It is now named by a rule inside the block.
+
+### Added
+- `tests/unit/gitignore-block-parity.test.js` computes the block from `git ls-files` and asserts exact equality including order, with a removed-leaf discriminator. The comparison is scoped between the block's markers, so the installer's `appendMissingLinesText` merge and this test can share one file.
+- `tests/unit/host-owned-ignore-xor.test.js` asserts every `PROJECT_HOST_OWNED` row is ignored XOR tracked, with discriminators for a row flipped to both and a row flipped to neither.
+
+### Changed
+- `CLAUDE.md`'s staging convention is **partially retired**: clause 1's justification names what retired it and quotes the measurement, clauses 2 and 3 keep their remaining live cases. An anchoring note records that BUG-040's strike stands for exit-code reporting while anchoring is load-bearing for path matching.
+- Two `.gitignore` lines are kept below the block as redundant-on-purpose, each naming its external writer: the user-global `/cc-compact` for `session-snapshot.json`, and `lib/installer/deploy.mjs:17` for `turn-count.txt`.
+
+Nothing under `project-template/` or `lib/` changed, so a fresh install produces byte-identical output to 1.32.0. That is why this release is PATCH.
+
 ## [1.32.0] - 2026-09-28
 
 ### Fixed

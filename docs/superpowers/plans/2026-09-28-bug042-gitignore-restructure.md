@@ -484,7 +484,7 @@ npx vitest run
 
 Expected: **910 passed | 12 skipped (922)**, unchanged from T-002-D. A change here means the prose edit moved something a test reads.
 
-- [ ] **[T-003-E] Step 5: Stage and commit**
+- [X] **[T-003-E] Step 5: Stage and commit**
 
 ```bash
 git add -u CLAUDE.md
@@ -503,7 +503,7 @@ Claude-Session: https://claude.ai/code/session_01HLS5KAHkhpMChyqNTbqrhe"
 **Files:**
 - Modify: `VERSION`, `package.json`, `package-lock.json`, `CHANGELOG.md`
 
-- [ ] **[T-004-A] Step 1: Bump the five locations**
+- [X] **[T-004-A] Step 1: Bump the five locations**
 
 ```bash
 node -e "const f='VERSION';require('fs').writeFileSync(f,'1.32.1\n')"
@@ -517,7 +517,7 @@ node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json
 
 Expected: `1.32.1 1.32.1 1.32.1 1.32.1`. The fifth location is `CHANGELOG.md`, added in the next step.
 
-- [ ] **[T-004-B] Step 2: Add the CHANGELOG entry**
+- [X] **[T-004-B] Step 2: Add the CHANGELOG entry**
 
 Insert above the `1.32.0` section:
 
@@ -538,7 +538,7 @@ Insert above the `1.32.0` section:
 Nothing under `project-template/` or `lib/` changed, so a fresh install produces byte-identical output to 1.32.0. This is why the release is PATCH.
 ```
 
-- [ ] **[T-004-C] Step 3: Run the whole suite**
+- [X] **[T-004-C] Step 3: Run the whole suite**
 
 ```bash
 npx vitest run
