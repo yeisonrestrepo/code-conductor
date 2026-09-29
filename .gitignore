@@ -102,6 +102,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-09-28-bug043-quoted-argv-blindness-design.md
 !/docs/superpowers/specs/2026-09-28-bug044-deny-message-phantom-allowlist-design.md
 !/docs/superpowers/specs/2026-09-29-bug046-release-critical-instruments-design.md
+!/docs/superpowers/specs/2026-09-29-bug047-heredoc-body-scanning-design.md
 # --- END tracked-surface block (BUG-042) ---
 
 # Kept for external writers. Both lines are redundant against the block above; each is
