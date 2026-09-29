@@ -571,3 +571,35 @@ The same session produced **four further P4 denials that are deliberate instrume
 #### What this section is for
 
 A holding pen with an explicit emptying condition. A shape leaves here when it is either characterized by probe and filed under its mechanism, or shown to be the guard working correctly and struck. It is not a backlog of work.
+
+---
+
+### DOSSIER (unfiled, no id yet): Interleaved-Artifact Reports and the Diff-Render Mechanism
+
+**Not an item, and it adds no filed heading, so the ceiling is unaffected.** Opened 2026-09-29 to hold reports that a file on disk is two drafts interleaved and cannot parse. It opens with an **anchored** entry, meaning the artifact exists on disk and was measured rather than reconstructed from the report. That is what distinguishes this dossier from the prior occurrence and is why it is worth opening now.
+
+#### Anchored specimen 1, 2026-09-29, preserved verbatim at `a2024c9`
+
+**Path:** `/Users/yeison/.claude/jobs/2dc6a6e3/tmp/regen-block.mjs`, written 07:55:01 during the `[BUG-046]` spec drafting. The full file is in `.claude/memory/project.md` under `## Specimen: a rejected Write read as an interleaved file [2026-09-29]`.
+
+**Reported as:** two drafts interleaved and unparseable, with an `import` of `expectedBlock` beside a local definition of the same name, two contradictory header philosophies, duplicated log lines in variant wording, and `SITES`, `lsFiles`, `END` and `b` referenced with no definition in view.
+
+**Measured on disk:** 37 lines, 1792 bytes, `birth == mtime == 2026-09-29 07:55:01` so it was written exactly once and never rewritten, and `node --check` exits 0. **It parses.** It carries the `import` and **no** local definition, and every identifier reported as undefined is defined in it: `SITES` at `:10`, `lsFiles` at `:12`, `END` at `:9`, `b` at `:20`.
+
+**The mechanism, measured rather than guessed.** A **second** Write to that same path was attempted and **rejected**, and a rejected Write is rendered as the proposed replacement shown against the file it would have replaced. The two drafts differ exactly where the report says the file is inconsistent: draft 1 imports `expectedBlock` under the header "using the SAME function", draft 2 defines it locally under the header "copied VERBATIM", and both log `rules before/after`, `added` and `removed` in variant wording. Read as one buffer they interleave precisely as described, and a diff presents hunks rather than whole scopes, which accounts for identifiers appearing undefined. **Not a fresh draft over a stale one** (`birth == mtime`, one write), **not a snapshot restore, not an editor merge.** Two drafts of one session rendered together because the second was declined.
+
+**Scope note carried with the specimen:** the script itself was out of scope for `[BUG-046]`, and the reason it was reached for is recorded in `project.md` rather than here, because it is a scope finding and not a rendering one.
+
+#### Re-classification: `msg-t002`
+
+**From "unresolved" to "consistent with the same mechanism, with the inference labeled."** `msg-t002` is the commit-message file written by `[BUG-041]`'s plan step T-002-E (`docs/superpowers/plans/2026-09-28-bug041-guard3-refinement.md:202`). Its artifact was **not preserved** and is not measurable now, so this re-classification is **inference, not measurement**, and it is labeled as such on the same rule that governs mechanism claims elsewhere in these dossiers: a mechanism is claimed only after a probe, and the probe here ran on specimen 1, not on `msg-t002`. What the re-classification asserts is only that specimen 1 supplies a measured mechanism that fits `msg-t002`'s reported shape, which is strictly weaker than saying `msg-t002` was that mechanism. It leaves this dossier only if an artifact is recovered.
+
+#### The gate this dossier produces
+
+**A future interleaving report starts at the rendering layer before any corruption story.** In order: `stat` the path for `birth` against `mtime` (one write or many), `wc -l` and a parse check, then a search of the file for the identifiers reported as undefined. Only if those disagree with the report does a corruption hypothesis get opened. The cost of skipping the gate is measured here: one out-of-scope script, one interrupted item, and a corruption story that the disk refutes in three commands.
+
+**Standing asymmetry recorded plainly:** the rendering pane is not observable from the agent's side, and the disk is not observable from the reviewer's. Neither party can settle such a report alone, which is why the gate is a shared procedure rather than an instruction to either one.
+
+#### What this dossier is for, and its emptying condition
+
+A holding pen, on the same terms as the two above it. It empties when the mechanism is either confirmed by a second anchored specimen and filed under it, or shown to be something else and struck. **It is not a backlog of work, and nothing in it is queued.**
