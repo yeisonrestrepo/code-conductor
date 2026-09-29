@@ -50,6 +50,8 @@ This is a permitted developer override for WIP commits, broken test environments
 
 **The GitHub Actions CI gate is unconditional.** A PR merged without a green CI run is a policy violation regardless of `--no-verify` usage. Never disable or skip the CI workflow to merge failing tests.
 
+**Test predictions are made per environment, or not at all.** A plan predicts the local result (`npm test` on your Node) and each CI leg separately. A CI leg's prediction is stated against its key in `tools/skip-baseline.json`, which holds the skipped-test set measured on that leg. Each leg of `.github/workflows/test.yml` asserts its skipped set against that file, so a change in what CI skips, whether coverage lost or coverage gained, is red until the same PR updates the file. The failure names every test to add or remove. `npm test` asserts no skip count, because a developer machine is not a reproducible environment.
+
 Releases follow [the closeout checklist](docs/RELEASE-CLOSEOUT.md), whose version and record-parity steps are asserted by that same CI gate.
 
 ### Manual Validation Protocol

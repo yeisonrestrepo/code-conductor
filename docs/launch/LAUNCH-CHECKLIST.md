@@ -14,7 +14,7 @@ Corollary: **when someone finds something wrong, confirm it in the open and link
 
 ## Before anything is posted
 
-- [ ] `npm test` green on `main` (996 passed / 12 skipped at `1.33.0`)
+- [ ] `npm test` green on `main` locally with zero failures, and both legs of `main`'s last Test run green, each printing `SKIP_BASELINE_OK` against `tools/skip-baseline.json`, the one place a test count is recorded, because there it is measured
 - [ ] `node tools/version-gate.mjs` reports `VERSION_GATE_OK`
 - [ ] `node tools/record-parity.mjs` reports `RECORD_PARITY_OK`
 - [ ] Every figure in the Show HN body re-verified against the sources listed at the end of `SHOW-HN-DRAFT.md`
