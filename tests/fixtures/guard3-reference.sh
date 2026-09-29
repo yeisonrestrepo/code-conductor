@@ -36,6 +36,21 @@
 #      on escape runs inside quoted patterns, P5 on an escaped backtick and P11 on an
 #      English sentence's period. Added in both subjects under [BUG-043], recorded in
 #      docs/superpowers/specs/2026-09-28-bug043-quoted-argv-blindness-design.md.
+#   5. _g3_scan gained a SIXTH STATE, HEREDOC, entered on a heredoc introducer and
+#      left on the line equal to the delimiter. Body characters are emitted blanked
+#      and length-preserved and do NOT feed quote-parity tracking, so content being
+#      WRITTEN can neither trip a pattern check nor produce a malformed denial. The
+#      argument is the guard's purpose: a heredoc body is content being written and
+#      is already inside the command string this scanner holds, so it cannot flood
+#      anything, and no dump shape uses one (measured: an unredirected `cat <<EOF`
+#      reads zero files). Four specimens across four consecutive sessions are corpus
+#      rows. Two details are load-bearing and must not be "simplified": `<<<` is a
+#      HERE-STRING and is excluded by the third-character test, because `cat <<< [x]`
+#      denies P4 and must keep denying; and the terminator's newline is kept VERBATIM,
+#      unlike quoted regions which mask newlines, because a command following a
+#      heredoc would otherwise lose its command position and a real dump would stop
+#      denying. Added in both subjects under [BUG-047], recorded in
+#      docs/superpowers/specs/2026-09-29-bug047-heredoc-body-scanning-design.md.
 # Nothing else in this file moves.
 
 set -euo pipefail
@@ -91,8 +106,8 @@ _g3_join_continuations() {
 }
 
 _g3_scan() {
-  # Unified 5-state scanner (UNQUOTED / SINGLE_QUOTED / DOUBLE_QUOTED /
-  #   ANSI_C_QUOTED / LOCALE_QUOTED).  Two modes:
+  # Unified 6-state scanner (UNQUOTED / SINGLE_QUOTED / DOUBLE_QUOTED /
+  #   ANSI_C_QUOTED / LOCALE_QUOTED / HEREDOC).  Two modes:
   #   "strip" — outputs comment-stripped string to stdout; returns 0 (ok) or 2 (malformed).
   #   "glob"  — returns 1 if an unquoted glob char found, 0 if not, 1 on malformed (fail-closed).
   # Malformed = state != UNQUOTED at end of input (unclosed quote).
@@ -100,6 +115,7 @@ _g3_scan() {
   local mode="$1" input="$2"
   local state="UNQUOTED" result=""
   local i=0 len=${#input} ch="" two=""
+  local hd_pending="" hd_delim="" hd_dash=0
   while (( i < len )); do
     ch="${input:i:1}"; two="${input:i:2}"
     case "$state" in
@@ -119,6 +135,28 @@ _g3_scan() {
         elif [[ "$ch" == '"' ]]; then
           [[ "$mode" == "strip" || "$mode" == "mask" ]] && result+="$ch"
           i=$((i+1)); state="DOUBLE_QUOTED"
+        elif [[ "$two" == '<<' ]] && [[ "${input:i+2:1}" != '<' ]]; then
+          # Heredoc introducer. `<<<` is a HERE-STRING, not a heredoc, and excluding
+          # it is load-bearing: `cat <<< [x]` denies P4 today and must keep denying.
+          # The body does not begin until after this line's newline, so the delimiter
+          # is recorded and the rest of the line keeps being scanned as command text.
+          local j=$((i+2)) q="" w=""
+          hd_dash=0
+          [[ "${input:j:1}" == '-' ]] && { hd_dash=1; j=$((j+1)); }
+          while [[ "${input:j:1}" == ' ' || "${input:j:1}" == $'\t' ]]; do j=$((j+1)); done
+          [[ "${input:j:1}" == "'" || "${input:j:1}" == '"' ]] && { q="${input:j:1}"; j=$((j+1)); }
+          while [[ "${input:j:1}" =~ [A-Za-z0-9_.-] ]]; do w+="${input:j:1}"; j=$((j+1)); done
+          [[ -n "$q" && "${input:j:1}" == "$q" ]] && j=$((j+1))
+          if [[ -n "$w" ]]; then
+            # Delimiter quoting is recorded and then IGNORED: this scanner performs no
+            # expansion, so <<'EOF' and <<EOF are the same to it. [BUG-047]
+            hd_pending="$w"
+            [[ "$mode" == "strip" || "$mode" == "mask" ]] && result+="${input:i:j-i}"
+            i=$j
+          else
+            [[ "$mode" == "strip" || "$mode" == "mask" ]] && result+="$ch"
+            i=$((i+1))
+          fi
         elif [[ "$ch" == '#' ]] && [[ "$mode" == "strip" ]]; then
           # Comment: discard to end of line (preserve \n as separator)
           while (( i < len )) && [[ "${input:i:1}" != $'\n' ]]; do i=$((i+1)); done
@@ -129,7 +167,52 @@ _g3_scan() {
           fi
           [[ "$mode" == "strip" || "$mode" == "mask" ]] && result+="$ch"
           i=$((i+1))
+          if [[ "$ch" == $'\n' && -n "$hd_pending" ]]; then
+            hd_delim="$hd_pending"; hd_pending=""; state="HEREDOC"
+          fi
         fi ;;
+      HEREDOC)
+        # One line at a time. Every non-newline character is blanked to 'x',
+        # length-preserved because the P4/P7 walks slice by match LENGTH and a change
+        # in length would desynchronise them.
+        #
+        # Newlines are kept VERBATIM here, unlike quoted regions, which mask them.
+        # Quoted masking exists so a newline inside a string cannot become a
+        # command-position anchor. Here the opposite is needed: the newline AFTER the
+        # terminator must survive, or a command following the heredoc loses its command
+        # position and `cat *.ts` after a heredoc stops denying. Body newlines are
+        # harmless because everything around them is 'x'. [BUG-047]
+        local hd_line="" hd_eol=$i hd_cmp="" hd_k=0
+        while (( hd_eol < len )) && [[ "${input:hd_eol:1}" != $'\n' ]]; do hd_eol=$((hd_eol+1)); done
+        hd_line="${input:i:hd_eol-i}"
+        hd_cmp="$hd_line"
+        if [[ "$hd_dash" == 1 ]]; then
+          while [[ "$hd_cmp" == $'\t'* ]]; do hd_cmp="${hd_cmp#?}"; done
+        fi
+        # Only a line EQUAL to the delimiter terminates. A substring would end the
+        # state early and expose the rest of the body to the patterns.
+        #
+        # THE TERMINATOR IS EMITTED VERBATIM, and that is load-bearing. The dispatch
+        # runs this scanner TWICE, building the mask from strip's output, so the
+        # transformation has to be IDEMPOTENT. A blanked terminator is unfindable on
+        # the second pass: the scanner re-enters HEREDOC at the same introducer, never
+        # terminates, and blanks every command after the heredoc. The symptom is a
+        # genuine dump following a heredoc silently ceasing to deny, which is exactly
+        # what the scope control caught. Body lines carry no such requirement, because
+        # nothing downstream needs to find them again. [BUG-047]
+        if [[ "$hd_cmp" == "$hd_delim" ]]; then
+          [[ "$mode" == "strip" || "$mode" == "mask" ]] && result+="$hd_line"
+          state="UNQUOTED"; hd_delim=""; hd_dash=0
+        elif [[ "$mode" == "strip" || "$mode" == "mask" ]]; then
+          hd_k=0
+          while (( hd_k < ${#hd_line} )); do result+="x"; hd_k=$((hd_k+1)); done
+        fi
+        i=$hd_eol
+        if (( i < len )); then
+          [[ "$mode" == "strip" || "$mode" == "mask" ]] && result+=$'\n'
+          i=$((i+1))
+        fi
+        ;;
       SINGLE_QUOTED)
         # \ is literal; any ' exits (there is no escape mechanism here)
         [[ "$mode" == "strip" ]] && result+="$ch"
@@ -166,8 +249,19 @@ _g3_scan() {
         fi ;;
     esac
   done
-  # Fail-closed: unclosed quote is malformed input
-  if [[ "$state" != "UNQUOTED" ]]; then
+  # Fail-closed: unclosed quote is malformed input.
+  #
+  # HEREDOC is deliberately exempt, and the exemption must not be "normalised" away.
+  # The rule exists because an unbalanced quote leaves AMBIGUITY about where command
+  # text resumes, and the scanner refuses to guess. An unterminated heredoc leaves no
+  # ambiguity: everything to end of input is body and there is no "after", so there is
+  # nothing unread to protect. Bash agrees, measured rather than assumed: on GNU bash
+  # 3.2.57, the interpreter this file runs under, a script ending mid-heredoc delivers
+  # the body and exits 0 with NO warning; newer bash also warns and still proceeds.
+  # Fail-closed here would deny every draft of a file write whose delimiter line has
+  # not arrived yet, which is [BUG-047]'s own defect resurrected in a new state. The
+  # departure from the pattern is correct BECAUSE the pattern's premise does not apply.
+  if [[ "$state" != "UNQUOTED" && "$state" != "HEREDOC" ]]; then
     [[ "$mode" == "strip" || "$mode" == "mask" ]] && { printf '%s' "$result"; return 2; }
     return 1   # glob mode: fail-closed on malformed input
   fi
