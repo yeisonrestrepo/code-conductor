@@ -74,13 +74,13 @@ Any deviation in **count OR suite** is a tripwire: halt, do not patch forward.
 **Files:**
 - Create: `docs/superpowers/plans/2026-09-28-bug044-deny-message-phantom-allowlist.md` (this file)
 
-- [ ] [T-000-A] Stage the plan file. It is new and under the ignored `docs/`, so the `-f` form is required.
+- [X] [T-000-A] Stage the plan file. It is new and under the ignored `docs/`, so the `-f` form is required.
 
 ```bash
 git add -f "docs/superpowers/plans/2026-09-28-bug044-deny-message-phantom-allowlist.md"
 ```
 
-- [ ] [T-000-B] Commit with this exact subject.
+- [X] [T-000-B] Commit with this exact subject.
 
 ```bash
 git commit -m "docs: add the BUG-044 deny-message implementation plan"
@@ -102,7 +102,7 @@ Satisfies **AC1 through AC9**. Message-first per the Gate 1 sequencing ruling.
 - Produces: module-level constants `G3_ALTERNATIVES` and `G3_OPERATOR_POLICY`, declared immediately above `g3Blocked`.
 - Consumes: nothing from other tasks.
 
-- [ ] [T-001-A] Write the three failing tests in `tests/hooks/pre-tool-use-contract.test.js`. Insert them inside the existing top-level `describe` that holds the Guard 3 routing cases, immediately after the `it('leaves an ordinary Bash command alone', ...)` case. The `fire(payload, env?)` helper already exists in this file and returns `{ status, decision, stderr }`.
+- [X] [T-001-A] Write the three failing tests in `tests/hooks/pre-tool-use-contract.test.js`. Insert them inside the existing top-level `describe` that holds the Guard 3 routing cases, immediately after the `it('leaves an ordinary Bash command alone', ...)` case. The `fire(payload, env?)` helper already exists in this file and returns `{ status, decision, stderr }`.
 
 ```js
   // [BUG-044] The allowlist sentence rides only on a pattern denial. g3AllowlistCovers runs
@@ -138,7 +138,7 @@ Satisfies **AC1 through AC9**. Message-first per the Gate 1 sequencing ruling.
   });
 ```
 
-- [ ] [T-001-B] Run the suite and confirm the predicted red.
+- [X] [T-001-B] Run the suite and confirm the predicted red.
 
 ```bash
 npx vitest run tests/hooks/pre-tool-use-contract.test.js
@@ -146,7 +146,7 @@ npx vitest run tests/hooks/pre-tool-use-contract.test.js
 
 Expected: **19 tests, 3 failed, 16 passed.** The two absence cases fail on `not.toContain('bash-scan-allowlist')`; the presence case fails on `/operator policy/`. All three denial payloads are confirmed to deny already: pattern gives `Pattern ids: P4.`, length gives `exceeds the maximum scan length (8192 chars).`, malformed gives `Malformed shell syntax (unclosed quote), blocked as a precaution.` If any case instead fails on its **positive** half, the payload stopped denying and that is a tripwire, not a red.
 
-- [ ] [T-001-C] Edit `.claude/hooks/pre-tool-use.mjs`. Replace the body of `g3Blocked` at `:432-440` and add the two constants directly above it, keeping the existing `CC_GUARD3_WARN` comment block in place.
+- [X] [T-001-C] Edit `.claude/hooks/pre-tool-use.mjs`. Replace the body of `g3Blocked` at `:432-440` and add the two constants directly above it, keeping the existing `CC_GUARD3_WARN` comment block in place.
 
 ```js
 // The three alternatives are the only remedy every denial shares, so they are the
@@ -174,13 +174,13 @@ function g3Blocked(detail, { allowlistApplies = false } = {}) {
 }
 ```
 
-- [ ] [T-001-D] In the same file, opt the pattern denial in at `:470` (the line is the last statement of `guard3BashScan`). This is the only call site that passes the option.
+- [X] [T-001-D] In the same file, opt the pattern denial in at `:470` (the line is the last statement of `guard3BashScan`). This is the only call site that passes the option.
 
 ```js
   return g3Blocked(`The command triggered a mass content-dump pattern. Pattern ids: ${ids.join(' ')}.`, { allowlistApplies: true });
 ```
 
-- [ ] [T-001-E] Mirror both edits into `project-template/.claude/hooks/pre-tool-use.mjs`. The two files must be byte-identical. Verify before moving on:
+- [X] [T-001-E] Mirror both edits into `project-template/.claude/hooks/pre-tool-use.mjs`. The two files must be byte-identical. Verify before moving on:
 
 ```bash
 diff .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs && echo "MIRROR IDENTICAL"
@@ -188,7 +188,7 @@ diff .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.
 
 Expected: `MIRROR IDENTICAL` with no diff output. **If `diff` prints anything, stop.** A one-sided edit is the BUG-041 crossover failure repeating.
 
-- [ ] [T-001-F] Run the three affected suites and confirm green.
+- [X] [T-001-F] Run the three affected suites and confirm green.
 
 ```bash
 npx vitest run tests/hooks/pre-tool-use-contract.test.js tests/hooks/guard3-port.test.js tests/installer/templates.test.js
@@ -196,7 +196,7 @@ npx vitest run tests/hooks/pre-tool-use-contract.test.js tests/hooks/guard3-port
 
 Expected: **all green.** `pre-tool-use-contract.test.js` at **19**, `guard3-port.test.js` unchanged at **143**, `templates.test.js` unchanged at **34**. `guard3-port.test.js:46` and `pre-tool-use-contract.test.js:99` match only `/BASH SCAN BLOCKED/` and are unmodified (AC8); `pre-tool-use-contract.test.js:174`'s warn-ask identity passes because both verdicts leave through the single `g3Blocked` construction site (AC7); `templates.test.js:96-98` proves the mirror (AC1) and `:130` proves the new constants introduced no regex shorthand.
 
-- [ ] [T-001-G] Run the whole suite and confirm the predicted boundary.
+- [X] [T-001-G] Run the whole suite and confirm the predicted boundary.
 
 ```bash
 npx vitest run 2>&1 | tail -6
@@ -204,7 +204,7 @@ npx vitest run 2>&1 | tail -6
 
 Expected: **900 passed / 12 skipped, 33 files.** Deviation in count or suite is a tripwire.
 
-- [ ] [T-001-H] Confirm the authority was not touched (AC9).
+- [X] [T-001-H] Confirm the authority was not touched (AC9).
 
 ```bash
 git status --short tests/fixtures/
@@ -212,13 +212,13 @@ git status --short tests/fixtures/
 
 Expected: no output. `tests/fixtures/guard3-reference.sh` and `guard3-corpus.js` are unmodified.
 
-- [ ] [T-001-I] Stage the four files. All are tracked, so `-u` with explicit paths.
+- [X] [T-001-I] Stage the four files. All are tracked, so `-u` with explicit paths.
 
 ```bash
 git add -u .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs tests/hooks/pre-tool-use-contract.test.js
 ```
 
-- [ ] [T-001-J] Commit.
+- [X] [T-001-J] Commit.
 
 ```bash
 git commit -m "fix: print the allowlist remedy only where it can apply [BUG-044]"
@@ -240,7 +240,7 @@ Satisfies **AC10 through AC16**. The step order is load-bearing: **retire `:143`
 - Consumes: nothing from Task 1. This task is independent of the message change and could run first; it runs second only because Gate 1 ruled the sequencing message-first.
 - Produces: `PROJECT_HOST_OWNED.get('memory/bash-scan-allowlist.txt') === 'seed'`, consumed by `templates.test.js:168` and `:172` and by `seedHostOwned`.
 
-- [ ] [T-002-A] In `tests/installer/templates.test.js`, **replace** the `it('ships no allowlist file, so the installer can never overwrite one', ...)` case at `:143-145` together with its two-line comment above it. Do not delete it without a replacement. Then add the inertness case immediately after. Both go inside the same `describe` block the old case occupied.
+- [X] [T-002-A] In `tests/installer/templates.test.js`, **replace** the `it('ships no allowlist file, so the installer can never overwrite one', ...)` case at `:143-145` together with its two-line comment above it. Do not delete it without a replacement. Then add the inertness case immediately after. Both go inside the same `describe` block the old case occupied.
 
 ```js
   // [BUG-044] replaces the assertion that no allowlist file is shipped. That test's stated
@@ -267,7 +267,7 @@ Satisfies **AC10 through AC16**. The step order is load-bearing: **retire `:143`
   });
 ```
 
-- [ ] [T-002-B] Run `templates.test.js` and confirm the first predicted red.
+- [X] [T-002-B] Run `templates.test.js` and confirm the first predicted red.
 
 ```bash
 npx vitest run tests/installer/templates.test.js
@@ -275,7 +275,7 @@ npx vitest run tests/installer/templates.test.js
 
 Expected: **35 tests, 2 failed, 33 passed.** The seed-row case fails because the policy is still `skip`; the inertness case fails because `readText` cannot find the file. `:168` and `:172` both still **pass**, which is the proof that no contradictory state exists: nothing marked `skip` is shipped, and no `seed` row lacks a source.
 
-- [ ] [T-002-C] Flip the one row in `lib/installer/host-owned.mjs`. The line currently reads `['memory/bash-scan-allowlist.txt', 'skip'],` inside `PROJECT_HOST_OWNED`. Change only the policy string and extend the block comment above the table so the row's reason travels with it.
+- [X] [T-002-C] Flip the one row in `lib/installer/host-owned.mjs`. The line currently reads `['memory/bash-scan-allowlist.txt', 'skip'],` inside `PROJECT_HOST_OWNED`. Change only the policy string and extend the block comment above the table so the row's reason travels with it.
 
 ```js
   ['memory/bash-scan-allowlist.txt', 'seed'],
@@ -291,7 +291,7 @@ Then amend the comment above `PROJECT_HOST_OWNED`, which currently says every `s
 // operator policy the way it could before BUG-039 filtered the copy.
 ```
 
-- [ ] [T-002-D] Run `templates.test.js` and confirm the second predicted red.
+- [X] [T-002-D] Run `templates.test.js` and confirm the second predicted red.
 
 ```bash
 npx vitest run tests/installer/templates.test.js
@@ -299,7 +299,7 @@ npx vitest run tests/installer/templates.test.js
 
 Expected: **35 tests, 3 failed, 32 passed.** The two new cases still fail on the missing file, and `:172` ("project has a template source for every seed and merge entry") now fails because the `seed` row has no source. `:168` still passes. **This is the only state where three fail, and the next step clears all three.**
 
-- [ ] [T-002-E] Run `host-owned.test.js` and confirm it is unaffected by the flip.
+- [X] [T-002-E] Run `host-owned.test.js` and confirm it is unaffected by the flip.
 
 ```bash
 npx vitest run tests/installer/host-owned.test.js
@@ -307,7 +307,7 @@ npx vitest run tests/installer/host-owned.test.js
 
 Expected: **9 passed.** Its `seedHostOwned` fixture writes only `memory/project.md` and `memory/context-threshold.txt` into `src`, and `seedHostOwned` skips a seed entry whose source is absent, so the asserted list at `:62` is unchanged. **If this suite goes red, the missing-source skip is not behaving as read and that is a tripwire.**
 
-- [ ] [T-002-F] Create `project-template/.claude/memory/bash-scan-allowlist.txt` with exactly this content. Every line is a comment or blank, so it parses to zero entries. The header carries the BUG-037 allowlist contract verbatim (AC12).
+- [X] [T-002-F] Create `project-template/.claude/memory/bash-scan-allowlist.txt` with exactly this content. Every line is a comment or blank, so it parses to zero entries. The header carries the BUG-037 allowlist contract verbatim (AC12).
 
 ```
 # Guard 3 bash-scan allowlist. OPERATOR POLICY, reviewed in git.
@@ -341,7 +341,7 @@ Expected: **9 passed.** Its `seedHostOwned` fixture writes only `memory/project.
 # The installer creates this file only when it is absent and never overwrites it.
 ```
 
-- [ ] [T-002-G] Run `templates.test.js` and confirm green.
+- [X] [T-002-G] Run `templates.test.js` and confirm green.
 
 ```bash
 npx vitest run tests/installer/templates.test.js
@@ -349,7 +349,7 @@ npx vitest run tests/installer/templates.test.js
 
 Expected: **35 passed.** All three previously failing cases clear together: the seed-row case, the inertness case, and `:172`. `:168` never moved.
 
-- [ ] [T-002-H] Add the create-when-absent case to `tests/installer/deploy.test.js`, immediately **before** the existing `it('leaves a host-created bash-scan-allowlist.txt byte-identical even when the template ships one', ...)` at `:347`, so the pair reads create-then-preserve in file order. Use the same `asset`, `home` and `claude` fixtures the neighbouring cases use.
+- [X] [T-002-H] Add the create-when-absent case to `tests/installer/deploy.test.js`, immediately **before** the existing `it('leaves a host-created bash-scan-allowlist.txt byte-identical even when the template ships one', ...)` at `:347`, so the pair reads create-then-preserve in file order. Use the same `asset`, `home` and `claude` fixtures the neighbouring cases use.
 
 ```js
   // [BUG-044] The other half of the contract: the message names a path, so a fresh deploy
@@ -362,7 +362,7 @@ Expected: **35 passed.** All three previously failing cases clear together: the 
   });
 ```
 
-- [ ] [T-002-I] Run `deploy.test.js` and confirm green.
+- [X] [T-002-I] Run `deploy.test.js` and confirm green.
 
 ```bash
 npx vitest run tests/installer/deploy.test.js
@@ -370,7 +370,7 @@ npx vitest run tests/installer/deploy.test.js
 
 Expected: **46 passed.** The new case passes because the row is now `seed`; the existing `:347` case still passes because `hostOwnedFilter` excludes the path from the copy and `seedHostOwned` skips a present target.
 
-- [ ] [T-002-J] Run the whole suite and confirm the predicted boundary.
+- [X] [T-002-J] Run the whole suite and confirm the predicted boundary.
 
 ```bash
 npx vitest run 2>&1 | tail -6
@@ -378,14 +378,14 @@ npx vitest run 2>&1 | tail -6
 
 Expected: **902 passed / 12 skipped, 33 files.** Deviation in count or suite is a tripwire.
 
-- [ ] [T-002-K] Stage the four paths. Three are tracked; the new template is under the ignored `.claude` directory name inside `project-template/`, so it needs `-f`.
+- [X] [T-002-K] Stage the four paths. Three are tracked; the new template is under the ignored `.claude` directory name inside `project-template/`, so it needs `-f`.
 
 ```bash
 git add -u lib/installer/host-owned.mjs tests/installer/templates.test.js tests/installer/deploy.test.js
 git add -f "project-template/.claude/memory/bash-scan-allowlist.txt"
 ```
 
-- [ ] [T-002-L] Commit. The body must name the classification, per AC14.
+- [X] [T-002-L] Commit. The body must name the classification, per AC14.
 
 ```bash
 git commit -m "fix: seed the allowlist so the deny message names a real file [BUG-044]" \
@@ -420,13 +420,13 @@ Satisfies **AC17, AC19, AC20, AC21**. AC18 is already satisfied by the spec land
 **Interfaces:**
 - Consumes: `PROJECT_HOST_OWNED`'s `seed` row from Task 2, which is what makes the current README sentence false.
 
-- [ ] [T-003-A] In `README.md:189`, replace the sentence **"The installer never ships or overwrites this file."** with the true contract. Leave the rest of the paragraph, which documents the entry format, unchanged.
+- [X] [T-003-A] In `README.md:189`, replace the sentence **"The installer never ships or overwrites this file."** with the true contract. Leave the rest of the paragraph, which documents the entry format, unchanged.
 
 ```
 The installer ships this file once as a commented template and creates it only when it is absent; it never overwrites an existing one.
 ```
 
-- [ ] [T-003-B] Re-run the id ceiling with both legs before any filing (AC21). The next mintable must read `BUG-045`.
+- [X] [T-003-B] Re-run the id ceiling with both legs before any filing (AC21). The next mintable must read `BUG-045`.
 
 ```bash
 node /private/tmp/claude-501/-Users-yeison-Projects-code-conductor/f7218b10-9217-4e9b-b140-a428add61d43/scratchpad/id-ceiling.mjs
@@ -434,13 +434,13 @@ node /private/tmp/claude-501/-Users-yeison-Projects-code-conductor/f7218b10-9217
 
 Expected: `CEILING {"BUG":44,...}` and `next BUG = BUG-045` before the filing. **If it reads anything else, stop and reconcile before minting.**
 
-- [ ] [T-003-C] Add an amendment note to the `[BUG-044]` backlog entry, placed **above** its original bullet list, directly under the heading. The original wording is preserved intact (AC20).
+- [X] [T-003-C] Add an amendment note to the `[BUG-044]` backlog entry, placed **above** its original bullet list, directly under the heading. The original wording is preserved intact (AC20).
 
 ```markdown
 * **AMENDED 2026-09-28 at spec approval. Two corrections, recorded above the original text rather than edited into it.** First, **the line references below are stale**: BUG-043 shifted them, and `g3Blocked` now spans `:432-440` with the remedy sentence at `:438` and its three call sites at `:448`, `:452` and `:470`. Second, **the success measure below is a premise error**. It sets uptake moving off zero as the target. The reader at the moment of friction is the agent, and `CLAUDE.md` instructs it never to bypass the hook, so adding an entry to clear its own denial is that bypass. **Uptake remaining at zero is the design working: the agent adapts or reports, the operator legislates.** The measure is truthfulness instead, which the spec states so this cannot be re-filed as a defect without answering the argument. A third finding the entry does not carry: the remedy is **inert on two of the three denials it prints on**, because the length and malformed denials return before `g3AllowlistCovers` is ever consulted.
 ```
 
-- [ ] [T-003-D] File `[BUG-045]` at the end of Pillar 5, after the `[BUG-044]` entry and before the two dossier sections.
+- [X] [T-003-D] File `[BUG-045]` at the end of Pillar 5, after the `[BUG-044]` entry and before the two dossier sections.
 
 ```markdown
 ### [ ] `[BUG-045]` The Guard 3 Allowlist Cannot Cover a Quoted Path
@@ -454,7 +454,7 @@ Expected: `CEILING {"BUG":44,...}` and `next BUG = BUG-045` before the filing. *
 * **Acceptance Criteria:** an allowlist entry covers its path whether or not the path is quoted; no unquoted behavior changes; the `EXCEPTIONS` row still arbitrates the authority-versus-port divergence; both subjects move together; every corpus row that denies today and should still deny is asserted before the change.
 ```
 
-- [ ] [T-003-E] Re-run the id ceiling and confirm the filing moved it.
+- [X] [T-003-E] Re-run the id ceiling and confirm the filing moved it.
 
 ```bash
 node /private/tmp/claude-501/-Users-yeison-Projects-code-conductor/f7218b10-9217-4e9b-b140-a428add61d43/scratchpad/id-ceiling.mjs
@@ -462,7 +462,7 @@ node /private/tmp/claude-501/-Users-yeison-Projects-code-conductor/f7218b10-9217
 
 Expected: `CEILING {"BUG":45,...}` and `next BUG = BUG-046`.
 
-- [ ] [T-003-F] Run the whole suite. Documentation only, so nothing moves.
+- [X] [T-003-F] Run the whole suite. Documentation only, so nothing moves.
 
 ```bash
 npx vitest run 2>&1 | tail -6
@@ -470,13 +470,13 @@ npx vitest run 2>&1 | tail -6
 
 Expected: **902 passed / 12 skipped, 33 files.**
 
-- [ ] [T-003-G] Stage both tracked files.
+- [X] [T-003-G] Stage both tracked files.
 
 ```bash
 git add -u README.md "AGENT-READABLE BACKLOG.md"
 ```
 
-- [ ] [T-003-H] Commit.
+- [X] [T-003-H] Commit.
 
 ```bash
 git commit -m "docs: restate the allowlist contract, amend BUG-044, file BUG-045"
@@ -491,9 +491,9 @@ Satisfies the version ruling. **Minor, not patch**, under the rule this release 
 **Files:**
 - Modify: `VERSION`, `package.json`, `package-lock.json` (two places), `CHANGELOG.md`
 
-- [ ] [T-004-A] Set all five version locations to `1.32.0`. `VERSION` holds the bare string; `package.json` has one `version` field; `package-lock.json` has `version` at the top level and again at `packages[""].version`; `CHANGELOG.md` gains a new first heading. All five currently read `1.31.3`.
+- [X] [T-004-A] Set all five version locations to `1.32.0`. `VERSION` holds the bare string; `package.json` has one `version` field; `package-lock.json` has `version` at the top level and again at `packages[""].version`; `CHANGELOG.md` gains a new first heading. All five currently read `1.31.3`.
 
-- [ ] [T-004-B] Add the `CHANGELOG.md` entry as the new first version heading, above `1.31.3`.
+- [X] [T-004-B] Add the `CHANGELOG.md` entry as the new first version heading, above `1.31.3`.
 
 ```markdown
 ## 1.32.0
@@ -509,7 +509,7 @@ Satisfies the version ruling. **Minor, not patch**, under the rule this release 
 - **[BUG-045]** The allowlist cannot cover a quoted path: `G3_BD` and `G3_AD` contain no quote character, so the entry `docs/` does not cover `cat "docs/x.md" *.md`. Measured during this item's audit and deliberately left to its own change, because widening the boundary sets touches the frozen bash authority's allow path.
 ```
 
-- [ ] [T-004-C] Verify all five locations agree.
+- [X] [T-004-C] Verify all five locations agree.
 
 ```bash
 node /private/tmp/claude-501/-Users-yeison-Projects-code-conductor/f7218b10-9217-4e9b-b140-a428add61d43/scratchpad/version-gate.mjs
@@ -517,7 +517,7 @@ node /private/tmp/claude-501/-Users-yeison-Projects-code-conductor/f7218b10-9217
 
 Expected: all five read `1.32.0` and the gate reports agreement.
 
-- [ ] [T-004-D] Run the whole suite.
+- [X] [T-004-D] Run the whole suite.
 
 ```bash
 npx vitest run 2>&1 | tail -6
@@ -525,13 +525,13 @@ npx vitest run 2>&1 | tail -6
 
 Expected: **902 passed / 12 skipped, 33 files.**
 
-- [ ] [T-004-E] Stage the four tracked files.
+- [X] [T-004-E] Stage the four tracked files.
 
 ```bash
 git add -u VERSION package.json package-lock.json CHANGELOG.md
 ```
 
-- [ ] [T-004-F] Commit.
+- [X] [T-004-F] Commit.
 
 ```bash
 git commit -m "chore: release 1.32.0 [BUG-044]"
@@ -545,7 +545,7 @@ git commit -m "chore: release 1.32.0 [BUG-044]"
 - Modify: `docs/superpowers/plans/2026-09-28-bug044-deny-message-phantom-allowlist.md` (this file, plan state)
 - Modify: `.claude/memory/project.md`
 
-- [ ] [T-005-A] Verify the final state before recording it.
+- [X] [T-005-A] Verify the final state before recording it.
 
 ```bash
 npx vitest run 2>&1 | tail -6
@@ -555,7 +555,7 @@ git status --short tests/fixtures/
 
 Expected: **902 passed / 12 skipped**; `MIRROR IDENTICAL`; no output from the fixtures check.
 
-- [ ] [T-005-B] Confirm the live-population claim the release rests on: the allowlist now exists in this working copy only if a deploy ran, which it has not, so assert the **template** exists and the host file's absence is unchanged. This is the honest version of the claim.
+- [X] [T-005-B] Confirm the live-population claim the release rests on: the allowlist now exists in this working copy only if a deploy ran, which it has not, so assert the **template** exists and the host file's absence is unchanged. This is the honest version of the claim.
 
 ```bash
 ls -1 project-template/.claude/memory/
@@ -564,9 +564,9 @@ ls -1 .claude/memory/
 
 Expected: the template appears under `project-template/.claude/memory/`; `.claude/memory/` still holds four files and no allowlist, because this repository is not an install target and no deploy ran. **Stating it this way avoids claiming the fix is observable here when it is observable on a fresh install.**
 
-- [ ] [T-005-C] Append the implementation record to `.claude/memory/project.md` under `## Implementation: BUG-044 [2026-09-28]`, carrying: the six boundaries and whether each hit, the ASSERTION-RETIREMENT classification, the inert-remedy finding, the port-only discovery that spared a fifth authority exception, the corrected success measure, and the version rule.
+- [X] [T-005-C] Append the implementation record to `.claude/memory/project.md` under `## Implementation: BUG-044 [2026-09-28]`, carrying: the six boundaries and whether each hit, the ASSERTION-RETIREMENT classification, the inert-remedy finding, the port-only discovery that spared a fifth authority exception, the corrected success measure, and the version rule.
 
-- [ ] [T-005-D] Stage and commit the closeout.
+- [X] [T-005-D] Stage and commit the closeout.
 
 ```bash
 git add -u .claude/memory/project.md
@@ -578,13 +578,13 @@ git commit -m "docs: record the BUG-044 implementation and executed plan state"
 
 ## Test List
 
-- [ ] [T-L01] `tests/hooks/pre-tool-use-contract.test.js`: a pattern denial names the allowlist as operator policy (presence).
-- [ ] [T-L02] `tests/hooks/pre-tool-use-contract.test.js`: a length denial carries no allowlist sentence (absence plus its positive half).
-- [ ] [T-L03] `tests/hooks/pre-tool-use-contract.test.js`: a malformed denial carries no allowlist sentence (absence plus its positive half).
-- [ ] [T-L04] `tests/installer/templates.test.js`: the allowlist row is `seed` and its template ships (the ASSERTION-RETIREMENT replacement).
-- [ ] [T-L05] `tests/installer/templates.test.js`: the shipped template parses to zero entries.
-- [ ] [T-L06] `tests/installer/deploy.test.js`: a deploy creates the allowlist from the template when the host has none.
-- [ ] [T-L07] Unmodified and must stay green: `templates.test.js:96-98` mirror parity, `:130` no regex shorthands, `:168` ships nothing marked skip, `:172` template source for every seed; `deploy.test.js:347` host file survives a re-run; `host-owned.test.js:62` exact seeded list; `guard3-port.test.js:46` and `pre-tool-use-contract.test.js:99` and `:174`.
+- [X] [T-L01] `tests/hooks/pre-tool-use-contract.test.js`: a pattern denial names the allowlist as operator policy (presence).
+- [X] [T-L02] `tests/hooks/pre-tool-use-contract.test.js`: a length denial carries no allowlist sentence (absence plus its positive half).
+- [X] [T-L03] `tests/hooks/pre-tool-use-contract.test.js`: a malformed denial carries no allowlist sentence (absence plus its positive half).
+- [X] [T-L04] `tests/installer/templates.test.js`: the allowlist row is `seed` and its template ships (the ASSERTION-RETIREMENT replacement).
+- [X] [T-L05] `tests/installer/templates.test.js`: the shipped template parses to zero entries.
+- [X] [T-L06] `tests/installer/deploy.test.js`: a deploy creates the allowlist from the template when the host has none.
+- [X] [T-L07] Unmodified and must stay green: `templates.test.js:96-98` mirror parity, `:130` no regex shorthands, `:168` ships nothing marked skip, `:172` template source for every seed; `deploy.test.js:347` host file survives a re-run; `host-owned.test.js:62` exact seeded list; `guard3-port.test.js:46` and `pre-tool-use-contract.test.js:99` and `:174`.
 
 No E2E work: there is no UI. No new integration seam beyond the deploy case, which is the existing installer seam.
 
