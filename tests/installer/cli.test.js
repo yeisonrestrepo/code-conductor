@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, mkdirSync, statSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, statSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,15 +31,45 @@ describe('run', () => {
     const hits = s.hooks.UserPromptSubmit.filter(e => e.hooks.some(h => h.command.includes('verbosity-remind.sh')));
     expect(hits).toHaveLength(1);
   });
-  it('writes the graphify hook as an absolute node command with no tilde', () => {
-    run([], { HOME: home }, { cwd, log });
+  const graphifyCommands = () => {
     const s = JSON.parse(readFileSync(join(home, '.claude', 'settings.json'), 'utf8'));
-    const graphify = s.hooks.UserPromptSubmit
-      .flatMap(e => e.hooks.map(h => h.command))
-      .filter(c => c.includes('graphify-ast-refresh'));
-    expect(graphify).toHaveLength(1);
-    expect(graphify[0]).toBe(`node ${join(home, '.claude', 'hooks', 'graphify-ast-refresh.mjs').replace(/\\/g, '/')}`);
-    expect(graphify[0]).not.toContain('~');
+    return (s.hooks?.UserPromptSubmit ?? []).flatMap(e => e.hooks.map(h => h.command)).filter(c => c.includes('graphify-ast-refresh'));
+  };
+  it('installs no graphify hook and deploys no graphify file', () => {
+    expect(run([], { HOME: home }, { cwd, log })).toBe(0);
+    expect(graphifyCommands()).toEqual([]);
+    expect(readdirSync(join(home, '.claude', 'hooks')).filter(n => n.includes('graphify'))).toEqual([]);
+  });
+  it('removes a pre-wrapper graphify entry on upgrade and names a modified hook file it keeps', () => {
+    mkdirSync(join(home, '.claude', 'hooks'), { recursive: true });
+    writeFileSync(join(home, '.claude', 'settings.json'), JSON.stringify({ hooks: { UserPromptSubmit: [
+      { matcher: '', hooks: [{ type: 'command', command: 'python ~/.claude/hooks/graphify-ast-refresh.py' }] },
+    ] } }));
+    writeFileSync(join(home, '.claude', 'hooks', 'graphify-ast-refresh.py'), '# edited by hand\n');
+    expect(run([], { HOME: home }, { cwd, log })).toBe(0);
+    expect(graphifyCommands()).toEqual([]);
+    expect(existsSync(join(home, '.claude', 'hooks', 'graphify-ast-refresh.py'))).toBe(true);
+    expect(logs.some(l => l.startsWith('stdout:') && l.includes('removed the retired graphify-ast-refresh hook'))).toBe(true);
+    expect(logs.some(l => l.startsWith('stderr:') && l.includes('kept') && l.includes('graphify-ast-refresh.py'))).toBe(true);
+  });
+  // Plan M1: deployGlobal's settings merge replaces a malformed file with the template
+  // (backup beside it) BEFORE the heal runs, so the heal sees no entry and sweeps. The
+  // heal's own malformed-skipped branch is pinned in heal.test.js, not reachable here.
+  it('M1: a malformed settings.json is replaced by deploy before the heal, so the heal sweeps', () => {
+    mkdirSync(join(home, '.claude', 'hooks'), { recursive: true });
+    writeFileSync(join(home, '.claude', 'settings.json'), '{ not json');
+    writeFileSync(join(home, '.claude', 'hooks', 'graphify-ast-refresh.mjs'), '// edited by hand\n');
+    expect(run([], { HOME: home }, { cwd, log })).toBe(0);
+    expect(readdirSync(join(home, '.claude')).some(n => n.startsWith('settings.json.malformed-backup.'))).toBe(true);
+    expect(graphifyCommands()).toEqual([]);
+    expect(logs.some(l => l.includes('kept') && l.includes('graphify-ast-refresh.mjs'))).toBe(true);
+    expect(logs.some(l => l.includes('settings.json is malformed'))).toBe(false);
+  });
+  it('a second run emits nothing about graphify', () => {
+    run([], { HOME: home }, { cwd, log });
+    logs = [];
+    expect(run([], { HOME: home }, { cwd, log })).toBe(0);
+    expect(logs.filter(l => l.includes('graphify'))).toEqual([]);
   });
   it('with --project also deploys into cwd/.claude', () => {
     const rc = run(['--project'], { HOME: home }, { cwd, log });

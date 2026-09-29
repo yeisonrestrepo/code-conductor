@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
 import { scanHeadings } from '../../tools/id-ceiling.mjs';
 import { readLocations, compare } from '../../tools/version-gate.mjs';
 import { checkParity } from '../../tools/record-parity.mjs';
@@ -38,5 +39,11 @@ describe('this repository, at every commit', () => {
   // to prevent.
   it('files no id twice', () => {
     expect(scanHeadings(read('AGENT-READABLE BACKLOG.md')).duplicates).toEqual([]);
+  });
+
+  // FEAT-021: the package's defining constraints are zero dependencies and npm-native
+  // distribution, and the graph hook was the only Python in it.
+  it('tracks no Python file', () => {
+    expect(execFileSync('git', ['ls-files', '*.py'], { cwd: ROOT, encoding: 'utf8' }).trim()).toBe('');
   });
 });

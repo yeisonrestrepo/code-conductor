@@ -3,11 +3,10 @@ import { mkdtempSync, rmSync, writeFileSync, readFileSync, readdirSync, existsSy
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { verbosityHookCommand, mergeVerbosityHook, graphifyHookCommand, mergeGraphifyHook, pruneMalformedBackups, utcStamp, pruneBackups } from '../../lib/installer/settings.mjs';
+import { verbosityHookCommand, mergeVerbosityHook, pruneMalformedBackups, utcStamp, pruneBackups } from '../../lib/installer/settings.mjs';
 
 let dir, sp;
 const CMD = 'bash /h/.claude/hooks/verbosity-remind.sh';
-const GRAPHIFY_CMD = 'node /h/.claude/hooks/graphify-ast-refresh.mjs';
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'cc-set-')); sp = join(dir, 'settings.json'); });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -24,15 +23,15 @@ describe('verbosityHookCommand', () => {
 });
 
 describe('mergeVerbosityHook', () => {
-  it('adds the hook to a graphify-only settings file (fresh install)', () => {
+  it('adds the hook beside an entry it does not own (fresh install)', () => {
     writeFileSync(sp, JSON.stringify({ hooks: { UserPromptSubmit: [
-      { matcher: '', hooks: [{ type: 'command', command: 'python3 ~/.claude/hooks/graphify-ast-refresh.py' }] }
+      { matcher: '', hooks: [{ type: 'command', command: 'bash /other/hook.sh' }] }
     ] } }));
     expect(mergeVerbosityHook(sp, CMD).status).toBe('merged');
     const arr = JSON.parse(readFileSync(sp, 'utf8')).hooks.UserPromptSubmit;
     expect(arr).toHaveLength(2);
     expect(arr.some(e => e.hooks.some(h => h.command === CMD))).toBe(true);
-    expect(arr.some(e => e.hooks.some(h => h.command.includes('graphify')))).toBe(true);
+    expect(arr.some(e => e.hooks.some(h => h.command === 'bash /other/hook.sh'))).toBe(true);
   });
   it('is idempotent — second run does not duplicate', () => {
     writeFileSync(sp, '{}');
@@ -138,72 +137,5 @@ describe('shipped global/settings.json', () => {
     expect(raw).not.toContain('graphify-ast-refresh');
     const o = JSON.parse(raw);
     expect(o.hooks?.UserPromptSubmit ?? []).toEqual([]);
-  });
-});
-
-describe('graphifyHookCommand', () => {
-  it('builds the node hook command from home', () => {
-    expect(graphifyHookCommand('/h')).toBe(GRAPHIFY_CMD);
-  });
-  // A hook `command` with no `args` runs under PowerShell on a Windows host that
-  // has no Git Bash, and PowerShell does not expand a bare `~/...` passed to an
-  // external program. The installer therefore writes an absolute path, always.
-  it('uses forward slashes and no tilde for a Windows-style home', () => {
-    const cmd = graphifyHookCommand('C:\\Users\\a');
-    expect(cmd).toBe('node C:/Users/a/.claude/hooks/graphify-ast-refresh.mjs');
-    expect(cmd).not.toContain('\\');
-    expect(cmd).not.toContain('~');
-  });
-});
-
-describe('mergeGraphifyHook', () => {
-  const OTHER = { matcher: '', hooks: [{ type: 'command', command: 'bash /existing/hook.sh' }] };
-
-  it('rewrites a legacy python tilde entry to the canonical node command', () => {
-    writeFileSync(sp, JSON.stringify({ hooks: { UserPromptSubmit: [
-      { matcher: '', hooks: [{ type: 'command', command: 'python ~/.claude/hooks/graphify-ast-refresh.py' }] }
-    ] } }));
-    expect(mergeGraphifyHook(sp, GRAPHIFY_CMD).status).toBe('merged');
-    const arr = JSON.parse(readFileSync(sp, 'utf8')).hooks.UserPromptSubmit;
-    expect(arr).toHaveLength(1);
-    expect(arr[0].hooks[0].command).toBe(GRAPHIFY_CMD);
-  });
-
-  // The graphify entry is agent-owned: tuning belongs in the environment both the
-  // wrapper and the payload read, not in a command string the installer rewrites.
-  it('discards a manual env prefix on the entry it owns', () => {
-    writeFileSync(sp, JSON.stringify({ hooks: { UserPromptSubmit: [
-      { matcher: '', hooks: [{ type: 'command', command: 'GRAPHIFY_STALE_MINUTES=120 python3 ~/.claude/hooks/graphify-ast-refresh.py' }] }
-    ] } }));
-    mergeGraphifyHook(sp, GRAPHIFY_CMD);
-    const arr = JSON.parse(readFileSync(sp, 'utf8')).hooks.UserPromptSubmit;
-    expect(arr).toHaveLength(1);
-    expect(arr[0].hooks[0].command).toBe(GRAPHIFY_CMD);
-  });
-
-  it('leaves an entry it does not own byte for byte', () => {
-    writeFileSync(sp, JSON.stringify({ hooks: { UserPromptSubmit: [OTHER] } }));
-    mergeGraphifyHook(sp, GRAPHIFY_CMD);
-    const arr = JSON.parse(readFileSync(sp, 'utf8')).hooks.UserPromptSubmit;
-    expect(arr).toHaveLength(2);
-    expect(arr[0]).toEqual(OTHER);
-    expect(arr[1].hooks[0].command).toBe(GRAPHIFY_CMD);
-  });
-
-  it('is idempotent - a second run changes the file not at all', () => {
-    writeFileSync(sp, '{}');
-    mergeGraphifyHook(sp, GRAPHIFY_CMD);
-    const first = readFileSync(sp, 'utf8');
-    expect(mergeGraphifyHook(sp, GRAPHIFY_CMD).status).toBe('idempotent-skip');
-    expect(readFileSync(sp, 'utf8')).toBe(first);
-  });
-
-  it('coexists with the verbosity writer - each owns one entry', () => {
-    writeFileSync(sp, '{}');
-    mergeVerbosityHook(sp, CMD);
-    mergeGraphifyHook(sp, GRAPHIFY_CMD);
-    const arr = JSON.parse(readFileSync(sp, 'utf8')).hooks.UserPromptSubmit;
-    expect(arr.filter(e => e.hooks.some(h => h.command === CMD))).toHaveLength(1);
-    expect(arr.filter(e => e.hooks.some(h => h.command === GRAPHIFY_CMD))).toHaveLength(1);
   });
 });

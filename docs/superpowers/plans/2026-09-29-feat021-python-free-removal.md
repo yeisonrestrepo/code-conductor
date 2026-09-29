@@ -112,9 +112,9 @@ In CI (ubuntu, `actions/checkout@v4` depth 1) the hash pin skips, so CI reads 10
 - Modify: `.gitignore` (one leaf after line 91)
 - Create: `docs/superpowers/plans/2026-09-29-feat021-python-free-removal.md`
 
-- [ ] [T-000-A] Insert `!/docs/superpowers/plans/2026-09-29-feat021-python-free-removal.md` into `.gitignore` directly after the line `!/docs/superpowers/plans/2026-09-29-bug047-heredoc-body-scanning.md` (sorted position; `tests/unit/gitignore-block-parity.test.js` checks it).
-- [ ] [T-000-B] Stage: `git add -u .gitignore && git add docs/superpowers/plans/2026-09-29-feat021-python-free-removal.md` (plain `add` works once the leaf exists; expect rc 0).
-- [ ] [T-000-C] Commit: `git commit -m "docs: add the FEAT-021 python-free removal implementation plan"` with the Co-Authored-By trailer. The pre-commit hook runs the full suite; expect 996 / 12.
+- [X] [T-000-A] Insert `!/docs/superpowers/plans/2026-09-29-feat021-python-free-removal.md` into `.gitignore` directly after the line `!/docs/superpowers/plans/2026-09-29-bug047-heredoc-body-scanning.md` (sorted position; `tests/unit/gitignore-block-parity.test.js` checks it).
+- [X] [T-000-B] Stage: `git add -u .gitignore && git add docs/superpowers/plans/2026-09-29-feat021-python-free-removal.md` (plain `add` works once the leaf exists; expect rc 0).
+- [X] [T-000-C] Commit: `git commit -m "docs: add the FEAT-021 python-free removal implementation plan"` with the Co-Authored-By trailer. The pre-commit hook runs the full suite; expect 996 / 12.
 
 ---
 
@@ -135,7 +135,7 @@ In CI (ubuntu, `actions/checkout@v4` depth 1) the hash pin skips, so CI reads 10
   - `sweepGraphifyHooks(hooksDir: string, shipped?: Map): string[]`, returning one human line per file kept or failed
   - `healGraphifyHook(home: string, { shipped?, now? }?): { status: 'removed' | 'absent' | 'malformed-skipped' | 'error', lines: string[] }`, which never throws
 
-- [ ] [T-001-A] Write the failing test file `tests/installer/heal.test.js`:
+- [X] [T-001-A] Write the failing test file `tests/installer/heal.test.js`:
 
 ```js
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -341,8 +341,8 @@ describe('SHIPPED_GRAPHIFY_HASHES', () => {
 });
 ```
 
-- [ ] [T-001-B] Run `npx vitest run tests/installer/heal.test.js`. Expect FAIL: `lib/installer/heal.mjs` cannot be resolved.
-- [ ] [T-001-C] Create `lib/installer/heal.mjs`:
+- [X] [T-001-B] Run `npx vitest run tests/installer/heal.test.js`. Expect FAIL: `lib/installer/heal.mjs` cannot be resolved.
+- [X] [T-001-C] Create `lib/installer/heal.mjs`:
 
 ```js
 import { readFileSync, existsSync, unlinkSync } from 'node:fs';
@@ -445,10 +445,10 @@ export function healGraphifyHook(home, { shipped = SHIPPED_GRAPHIFY_HASHES, now 
 }
 ```
 
-- [ ] [T-001-D] Run `npx vitest run tests/installer/heal.test.js`. Expect 17 passed (the pin runs locally).
-- [ ] [T-001-E] Run `npm test`. Expect **1013 passed / 12 skipped**.
-- [ ] [T-001-F] Stage: `git add lib/installer/heal.mjs tests/installer/heal.test.js`.
-- [ ] [T-001-G] Commit: `git commit -m "feat: add the graphify heal, unmerge before a content-match sweep [FEAT-021]"`.
+- [X] [T-001-D] Run `npx vitest run tests/installer/heal.test.js`. Expect 17 passed (the pin runs locally).
+- [X] [T-001-E] Run `npm test`. Expect **1013 passed / 12 skipped**.
+- [X] [T-001-F] Stage: `git add lib/installer/heal.mjs tests/installer/heal.test.js`.
+- [X] [T-001-G] Commit: `git commit -m "feat: add the graphify heal, unmerge before a content-match sweep [FEAT-021]"`.
 
 ---
 
@@ -471,7 +471,7 @@ export function healGraphifyHook(home, { shipped = SHIPPED_GRAPHIFY_HASHES, now 
 - Consumes: `healGraphifyHook(home)` from Task 1.
 - Produces: `run()` emits one `stdout` notice on `removed`, and each heal line on `stderr` prefixed `code-conductor: `. Its exit code is unchanged.
 
-- [ ] [T-002-A] In `tests/installer/cli.test.js`, replace the test `'writes the graphify hook as an absolute node command with no tilde'` (lines 34-43) with these four tests. Add `readdirSync` to the `node:fs` import on line 2.
+- [X] [T-002-A] In `tests/installer/cli.test.js`, replace the test `'writes the graphify hook as an absolute node command with no tilde'` (lines 34-43) with these four tests. Add `readdirSync` to the `node:fs` import on line 2.
 
 ```js
   const graphifyCommands = () => {
@@ -516,12 +516,12 @@ export function healGraphifyHook(home, { shipped = SHIPPED_GRAPHIFY_HASHES, now 
   });
 ```
 
-- [ ] [T-002-B] In `tests/installer/settings.test.js`:
+- [X] [T-002-B] In `tests/installer/settings.test.js`:
   - line 6: drop `graphifyHookCommand, mergeGraphifyHook` from the import;
   - line 9: delete the `GRAPHIFY_CMD` constant;
   - lines 27-36: rename the test to `'adds the hook beside an entry it does not own (fresh install)'`, change the fixture command to `'bash /other/hook.sh'` and the last assertion to `h.command === 'bash /other/hook.sh'`;
   - delete from `describe('graphifyHookCommand'` (line 144) through end of file (line 209), plus the one blank line before it.
-- [ ] [T-002-C] Append to the `describe('this repository, at every commit'` block in `tests/tools/repo-invariants.test.js`, and add `import { execFileSync } from 'node:child_process';` to its imports:
+- [X] [T-002-C] Append to the `describe('this repository, at every commit'` block in `tests/tools/repo-invariants.test.js`, and add `import { execFileSync } from 'node:child_process';` to its imports:
 
 ```js
   // FEAT-021: the package's defining constraints are zero dependencies and npm-native
@@ -531,9 +531,9 @@ export function healGraphifyHook(home, { shipped = SHIPPED_GRAPHIFY_HASHES, now 
   });
 ```
 
-- [ ] [T-002-D] Run `npx vitest run tests/installer/cli.test.js tests/tools/repo-invariants.test.js`. Expect FAIL on `'installs no graphify hook…'`, `'removes a pre-wrapper…'` (no stdout notice), `'M1: …'` and `'tracks no Python file'`.
-- [ ] [T-002-E] `lib/installer/settings.mjs`: delete line 5 (`GRAPHIFY_FINGERPRINT`), the `graphifyHookCommand` function (lines 27-35) and `mergeGraphifyHook` (lines 110-112). Change the `mergeHook` comment "One merge serves both hooks" to "One merge serves the verbosity hook".
-- [ ] [T-002-F] `bin/code-conductor.mjs`:
+- [X] [T-002-D] Run `npx vitest run tests/installer/cli.test.js tests/tools/repo-invariants.test.js`. Expect FAIL on `'installs no graphify hook…'`, `'removes a pre-wrapper…'` (no stdout notice), `'M1: …'` and `'tracks no Python file'`.
+- [X] [T-002-E] `lib/installer/settings.mjs`: delete line 5 (`GRAPHIFY_FINGERPRINT`), the `graphifyHookCommand` function (lines 27-35) and `mergeGraphifyHook` (lines 110-112). Change the `mergeHook` comment "One merge serves both hooks" to "One merge serves the verbosity hook".
+- [X] [T-002-F] `bin/code-conductor.mjs`:
   - line 7 becomes `import { verbosityHookCommand, mergeVerbosityHook } from '../lib/installer/settings.mjs';`;
   - add `import { healGraphifyHook } from '../lib/installer/heal.mjs';` after it;
   - replace line 98 (`mergeGraphifyHook(...)`) with:
@@ -545,11 +545,11 @@ export function healGraphifyHook(home, { shipped = SHIPPED_GRAPHIFY_HASHES, now 
     for (const line of heal.lines) emit('stderr', `code-conductor: ${line}`);
 ```
 
-- [ ] [T-002-G] Delete the four files: `git rm global/hooks/graphify-ast-refresh.py global/hooks/graphify-ast-refresh.mjs tests/hooks/graphify-refresh.test.js tests/verbosity-hook-test.sh`.
-- [ ] [T-002-H] Run `git grep -n "mergeGraphifyHook\|graphifyHookCommand\|GRAPHIFY_FINGERPRINT" -- lib bin tests`. Expect only `lib/installer/heal.mjs` (`GRAPHIFY_FINGERPRINT`) lines.
-- [ ] [T-002-I] Run `npm test`. Expect **1004 passed / 12 skipped**.
-- [ ] [T-002-J] Stage: `git add -u lib/installer/settings.mjs bin/code-conductor.mjs tests/installer/settings.test.js tests/installer/cli.test.js tests/tools/repo-invariants.test.js` (the deletions are already staged by `git rm`).
-- [ ] [T-002-K] Commit: `git commit -m "feat: replace the graphify merge with the heal and delete the Python hook [FEAT-021]"`.
+- [X] [T-002-G] Delete the four files: `git rm global/hooks/graphify-ast-refresh.py global/hooks/graphify-ast-refresh.mjs tests/hooks/graphify-refresh.test.js tests/verbosity-hook-test.sh`.
+- [X] [T-002-H] Run `git grep -n "mergeGraphifyHook\|graphifyHookCommand\|GRAPHIFY_FINGERPRINT" -- lib bin tests`. Expect only `lib/installer/heal.mjs` (`GRAPHIFY_FINGERPRINT`) lines.
+- [X] [T-002-I] Run `npm test`. Expect **1004 passed / 12 skipped**.
+- [X] [T-002-J] Stage: `git add -u lib/installer/settings.mjs bin/code-conductor.mjs tests/installer/settings.test.js tests/installer/cli.test.js tests/tools/repo-invariants.test.js` (the deletions are already staged by `git rm`).
+- [X] [T-002-K] Commit: `git commit -m "feat: replace the graphify merge with the heal and delete the Python hook [FEAT-021]"`.
 
 ---
 

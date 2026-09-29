@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { resolveAssetRoot, resolveHome, nodeMajorAtLeast } from '../lib/installer/env.mjs';
 import { assertAssets, assertMergeTargets, deployGlobal, deployProject, chmodHooks } from '../lib/installer/deploy.mjs';
-import { verbosityHookCommand, mergeVerbosityHook, graphifyHookCommand, mergeGraphifyHook } from '../lib/installer/settings.mjs';
+import { verbosityHookCommand, mergeVerbosityHook } from '../lib/installer/settings.mjs';
+import { healGraphifyHook } from '../lib/installer/heal.mjs';
 import { writeVerbosity, writeVersionFile } from '../lib/installer/config.mjs';
 
 const USAGE = `Usage: code-conductor [--project] [--verbosity MIN|INFO|VERBOSE] [--version] [--help]`;
@@ -95,7 +96,10 @@ export function run(argv, env = process.env, { cwd = process.cwd(), log } = {}) 
     const v = writeVerbosity(home, assetRoot, opts.verbosity, opts.verbosityGiven);
     if (v.warn) emit('stderr', v.warn);
     mergeVerbosityHook(join(claudeDir, 'settings.json'), verbosityHookCommand(home));
-    mergeGraphifyHook(join(claudeDir, 'settings.json'), graphifyHookCommand(home));
+    // Never throws and never changes the exit code: see healGraphifyHook.
+    const heal = healGraphifyHook(home);
+    if (heal.status === 'removed') emit('stdout', 'code-conductor: removed the retired graphify-ast-refresh hook from settings.json (backup written beside it)');
+    for (const line of heal.lines) emit('stderr', `code-conductor: ${line}`);
     writeVersionFile(home, pkgVersion(assetRoot));
     if (opts.project) deployProject(assetRoot, cwd, { warn: (m) => emit('stderr', m) });
     return 0;
