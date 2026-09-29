@@ -1631,3 +1631,33 @@ Through the live hook, four cases: a heredoc file write with a bracket-class bod
 - D2: Guard 4 drops `graphify-out` and keeps `node_modules`; Guard 1 covers any leftover graph.json. D3: `tests/verbosity-hook-test.sh` is deleted (last `python3`, superseded by FEAT-024's port, invoked by nothing).
 - Live specimen: this machine's settings carries the hand-edited `python3 …py` entry, and the deployed `.py` matches the shipped hash.
 - Out: option (b), FEAT-019 territory, the TS compiler API, host-project Python support (detect-stack, cc-docs, cc-spec manifest list), the guard3 corpus row, historical records.
+
+## Closeout: 1.34.0, the graph rung and all Python leave the package [2026-09-29]
+
+`[FEAT-021]` shipped as **`1.34.0`** (PR #44, merged `6fd92de`). Squash sync measured before acting: **`0 ahead / 1 behind`, clean**, fast-forward `b915c31..6fd92de`. On the merged tree: **`VERSION_GATE_OK 1.34.0`**; **`RECORD_PARITY_OK`**, with `[FEAT-021]` at `[X]` and its DONE bullet naming `1.34.0`; ceiling before this record's filing **`BUG-047` from both legs** (57 headings each, no duplicates). Local suite **1009 passed / 12 skipped**.
+
+### Boundaries: six for six locally, and the CI prediction wrong in premise
+
+| After | Predicted (local) | Measured (local) |
+|---|---|---|
+| T-000 plan | 996 / 12 | 996 / 12 |
+| T-001 heal module | 1013 / 12 | 1013 / 12 |
+| T-002 swap + delete Python | 1004 / 12 | 1004 / 12 |
+| T-003 guards | 1007 / 12 | 1007 / 12 |
+| T-004 instruction surfaces | 1009 / 12 | 1009 / 12 |
+| T-005 release, plus fix `34cfde4` | 1009 / 12 | 1009 / 12 |
+
+### Record
+
+- **M1, the corrected premise.** `deployGlobal` merges `settings.json` (the `GLOBAL_HOST_OWNED` filter keeps it out of the copy; `mergeSettingsFile` with an empty fingerprint list and a template with no `hooks` key never touches the host's `hooks`). The BUG-033 plan's "force-copy" claim has been stale since BUG-039. D1's heal ordering (unmerge first, sweep only on `removed|absent`) is therefore **LOAD-BEARING**, and the heal is the only thing that ever removes the stale entry. Deploy also replaces a *malformed* settings file before the heal runs, so at CLI level the heal sweeps (test named `M1`); the heal's own `malformed-skipped` contract is pinned at unit level.
+- **M2.** All 14 published tarballs (1.23.0 to 1.33.0) carry **zero CR bytes** in both hook files, one hash per file across all of them. The Windows-clone `autocrlf` residual fails safe: kept and named.
+- **Per-environment baselines.** Local **1009 / 12**. CI **925 / 96** on Node 20 (v20.20.2): 95 environmental, of which **83 are `node:sqlite` self-skips below 22.5** (`conductor-db` 74, `handoff-cycle` 3, `resume-read` 6) and **12 are uninstalled-skills skips** (`code-conductor-plugin`, which skip locally too), plus **1 hash pin** on the shallow clone. Main's baseline run `36636754979` at `b915c31` read **913 / 95**; this branch's CI delta (+12 passed, +1 skipped) equals the local delta minus the pin exactly. **The rule: future plans state test predictions PER ENVIRONMENT or not at all.** The CI half is filed as `[BUG-048]`.
+- **Two spec gaps the branch closed:** the Operational Philosophy graph clause in both CLAUDE.md files, and `project-template/.claude/commands/cc-debug.md:14`'s "graph query" instruction (fixed in `34cfde4`, found by the end-of-branch review).
+- **Coverage gap, named and not fixed:** no test runs the heal against a symlinked `settings.json`. The code resolves the real path; a dangling symlink yields status `error` and the sweep is skipped, which is the safe side. It joins the heal matrix in any later change touching `heal.test.js`, without its own release.
+- **Native execution was a one-time exception.** This plan ran natively as an explicit per-plan exception; the subagent-driven preference in `personal.md` stays unchanged.
+- **`[ARCH-009]` field evidence (handoff observations).** These were reported in-session, not in PR #44's body, so they are recorded here verbatim as the durable copy. T0: none lacked; folding the rulings needed one new measurement (detect-stack carries no `python3`; `guard4.test.js:100` did). T1: none; plan code verbatim, 17/17 first run. T2: none; the `settings.test.js` block end (142-208) was re-derived by line count. T3: none; the Guard 4 row rewrites were given as intent, not strings, so an exact-once replace script was written. T4: **plan defect, out of lane**: the surface invariant missed the heal's call site in `bin/`, the Task 3 hook comment named `graphify-out/`, and the python3 invariant's own title matched its needle; all fixed in lane, recorded under T-004-B. T5: none.
+- **Verify-band observation from the review cycle.** The no-graphify check passed green over `cc-debug.md` because its pattern (`graphify`) was more specific than the concept it protected ("graph query"). **A Verify-band gate must declare what it is able to see, not only what it found.** Same class as the hash pin skipping in CI: a green that covers less than its name.
+
+### Queue
+
+`[BUG-048]` filed by this closeout (CI's green was never a measured baseline, and its runtime is deprecated). `[BUG-045]` remains open on the owner's word. **Next mintable id after this filing is `BUG-049`.**

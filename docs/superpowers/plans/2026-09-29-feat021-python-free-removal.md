@@ -754,7 +754,7 @@ Before modifying any file:
 - [X] [T-005-G] Confirm that `node -e "console.log(JSON.stringify(require('./package.json').dependencies ?? {}))"` prints `{}`.
 - [X] [T-005-H] Stage: `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md"`.
 - [X] [T-005-I] Commit: `git commit -m "chore: release 1.34.0 [FEAT-021]"`.
-- [ ] [T-005-J] With owner confirmation, push the branch and open the release PR (closeout step 1). Closeout steps 5-10 follow the merge, per `docs/RELEASE-CLOSEOUT.md`.
+- [X] [T-005-J] With owner confirmation, push the branch and open the release PR (closeout step 1). Closeout steps 5-10 follow the merge, per `docs/RELEASE-CLOSEOUT.md`.
 
 ## Test List
 
