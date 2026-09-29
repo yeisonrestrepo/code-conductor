@@ -471,3 +471,29 @@ The first report of specimen 2 guessed that possessive apostrophes in the prose 
 #### Queue
 
 After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two specimens plus a traced mechanism plus a severity upgrade is half the minting condition; the audit is the other half.
+
+### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
+
+**Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
+
+#### Incidental tolls, 2026-09-28 session (BUG-044 spec phase)
+
+Three, all on the work auditing the deny message they printed.
+
+1. **P1**, the audit's first command: a recursive `grep` with `-l` chained to a `find` without `-maxdepth 1`. Denied. This is the specimen quoted in the BUG-044 spec's problem statement as the mechanism tolling on the work auditing it.
+2. **P4**, the commit-message heredoc. Characterized by probe; see the heredoc dossier above.
+3. **P5**, a chained commit-push-verify command. **Uncharacterized.** Verbatim:
+
+   ```
+   git add -u "AGENT-READABLE BACKLOG.md" && git commit -F <scratchpad>/msg-dossier.txt 2>&1 | tail -6 && git push origin main 2>&1 | tail -3 && echo "ahead: $(git rev-list --count origin/main..main)  behind: $(git rev-list --count main..origin/main)  clean: $([ -z "$(git status --short)" ] && echo yes || echo no)"
+   ```
+
+   Reported as P5. **Note a double-count corrected:** this command and the "`-z "$(git status --short)"` shape" mentioned separately in the same exchange are **the same specimen**, not two. One specimen, four command substitutions, no probe yet. Disposition: the command was **decomposed into three simpler calls**, not retried; the first landed as `d92b625`.
+
+#### The tally's note, so the frequency signal stays clean
+
+The same session produced **four further P4 denials that are deliberate instrumentation, not tolls**: the layer-interaction probe recorded in `project.md` under the 2026-09-28 custody note. Instrumented denials are excluded from every toll count. **A tally that mixes them overstates the false-positive rate by the exact amount of measurement performed**, which would punish measuring.
+
+#### What this section is for
+
+A holding pen with an explicit emptying condition. A shape leaves here when it is either characterized by probe and filed under its mechanism, or shown to be the guard working correctly and struck. It is not a backlog of work.

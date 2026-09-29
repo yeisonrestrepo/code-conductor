@@ -1221,3 +1221,25 @@ The seed's honest limit is stated rather than glossed: a comment-only file parse
 - **PATCH repairs, MINOR changes what ships, and the test is observability on a fresh install.** A release that adds a file to the shipped inventory or changes a documented installer contract is observable new behavior on every install and takes a minor bump; one that repairs behavior without changing what ships is a patch. `1.31.1`, `1.31.2` and `1.31.3` were patches by this rule; BUG-044 is `1.32.0` because it ships a template file and restates `README.md:189`. Cite this line instead of re-arguing the version.
 - **A measure that can only move by doing the thing the project forbids is not a measure.** Zero allowlist uptake was filed as a discoverability defect; the party in the friction loop is instructed never to bypass the hook, so moving the number would mean agents began self-serving exceptions. When a metric's improvement is prohibited behavior, correct the metric, not the number.
 - **A premise correction to a landed filing is noted in the new spec, never edited into the entry.** BUG-044's line references (`:433`, `:427-435`) went stale when BUG-043 shifted them to `:432-440` and `:438`. The entry receives an amendment note above its original text; the original wording stays intact.
+
+## Custody note: the layer probe and the override that did not happen [2026-09-28]
+
+**2026-09-28.** A chained commit-push-verify command was denied under P5 for its command substitutions. It was **not** retried: it was decomposed into three simpler calls, the first of which (`git add -u` plus `git commit -F`) matched no pattern and landed as `d92b625`. A four-case probe the same day confirmed Guard 3 denials are terminal under this session's auto mode, on byte-identical retry and on trivial variation, with no execution in any case. **No override occurred, and the guard's terminality is measured rather than assumed.** An owner-side terminal annotation ("Allowed by auto mode classifier") prompted the probe; it is not present in the agent's tool results and per the two-gates reading it annotated a hook-allowed call.
+
+### The probe, for reuse
+
+Four runs against a harmless P4 target in scratch: a reader plus an unquoted glob, redirecting into a file whose existence is the observable for whether the command ran.
+
+| case | verdict | ids | target after |
+|---|---|---|---|
+| a, first run | deny | P4 | absent |
+| b, byte-identical retry | deny | P4 | absent |
+| b2, third identical run | deny | P4 | absent |
+| c, trivially changed target | deny | P4 | absent |
+
+The reading half is what makes it evidence rather than an impression: if any denied run had executed, its redirect target would exist. None did. **"Hook skipped on retry" and "hook denied and overridden" are different defects with different owners, and the probe excludes both.**
+
+### Conventions
+
+- **An observation visible only in one party's view is attributed as such and is never load-bearing until both can see its anchor.** The owner's terminal and the agent's context are different windows. A mechanism story built across them without anchoring is how a false override nearly entered the permanent record: the annotation was real in one window, absent in the other, and the inference drawn from it was wrong. The probe-first rule caught it; this convention makes the catch cheaper next time. State which window an observation came from before reasoning from it.
+- **The two-gates reading of a tool call.** The auto-mode classifier decides whether the owner is prompted; the `PreToolUse` hook decides whether the command runs. They answer different questions and both run. A call can be classifier-approved and hook-denied, which is the ordinary case for every Guard 3 denial, so a classifier annotation is never evidence about a guard verdict.
