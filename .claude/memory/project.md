@@ -1271,3 +1271,30 @@ Classification of the test touch: **ASSERTION-RETIREMENT**, the BUG-039 shape, n
 - **An id ceiling counted by scanning for id-shaped tokens is retired. Count filed backlog HEADINGS instead.** The max-scan read forward references in prose as filings, including the plan file line that stated the ceiling the check expected to read after minting. **The instrument was reading its own predicted output back as evidence.** The heading-scoped form reported 43 headings before the filing and 44 after, ceiling 44 to 45, with no duplicate ids: the minting verified in both directions. This is the second retired instrument in two releases and the same failure class as the `numstat` superset check: a measurement that cannot distinguish its subject from a description of its subject.
 - **A release-critical instrument does not live in the scratchpad.** Three were lost mid-release when the directory was withdrawn: the id ceiling, the version gate and the commit-message files. Each was rebuilt inline and each rebuild is a new instrument whose agreement with the old one is unproven. The version gate is the clearest case: the old one reported FAIL on five locations that agreed, so it was comparing against a target it had not been given, and the rebuilt form takes `VERSION` as the authority. Better, but different, and the difference is recorded rather than smoothed over.
 - **State observability in the form that is true.** The seed is not observable in this repository, because no deploy runs here and `.claude/memory/` still holds no allowlist at closeout. The message change **is** observable here, and proved itself: a probe command was denied as malformed and carried no allowlist sentence. Separating the two claims is what keeps the release record trustworthy.
+
+## Closeout: 1.32.0 and the first clean squash sync [2026-09-28]
+
+`1.32.0` merged as `28142af` (PR #37, squash). Verified on the merged `main`: all five version locations read `1.32.0`, **eight record anchors each appear exactly once**, the suite is green at **902 passed / 12 skipped**, the hook mirrors are byte-identical, and the shipped template is present.
+
+### The stranding rule worked, and this is the evidence
+
+The rule from `1.31.3` said the hazard is not WHERE a record commit lands but that it sits **unpushed when the squash arrives**, so owner-scoped record commits on `main` are pushed in the same action that creates them, and everything else goes on the branch.
+
+**This release put every record commit on the branch, including both filings, and the sync measured 0 ahead / 1 behind.** A pure fast-forward. No rebase, no `--skip`, no enumerated commit list, no superset evidence required, because nothing stranded. That is the first clean squash sync since the rule was written, and it is the rule being confirmed rather than merely followed.
+
+The one deliberate reorder was filing `[BUG-046]` on the branch before pushing rather than on `main` after the PR opened. Filing it on `main` while an unmerged PR was open is the exact anatomy that stranded `c016199` and the three `1.31.3` strays.
+
+**`git branch -d` again warned that the branch was merged to its remote-tracking ref rather than to `HEAD`, and passed on that check.** Under a squash the branch tip is never an ancestor of `main`. Third confirmation, no force needed any of the three times.
+
+### Observability, restated after the merge
+
+The two claims stay separate on the merged tree. `project-template/.claude/memory/bash-scan-allowlist.txt` is **present**; this repository own copy at `.claude/memory/bash-scan-allowlist.txt` is **absent**, because no deploy runs here. `deploy.test.js` proves the seed in both directions. The message change is observable here and demonstrated itself twice during the closeout: the T-005 probe that rendered the message table, and the first attempt at this very append, were both denied as malformed, and both denials carried the alternatives with no allowlist sentence. The second was a genuinely malformed command, an apostrophe closing a single-quoted shell string, so it is the guard working rather than a false positive.
+
+### Conventions
+
+- **The scratchpad is not a release dependency, and this release proved it four times.** Three instruments (`id-ceiling.mjs`, `version-gate.mjs`, the commit-message files) were lost mid-release when the directory was withdrawn, and the PR body then had to be staged through gitignored `.conductor/`. Each rebuild is a new instrument whose agreement with its predecessor is unproven. Filed as `[BUG-046]` with the demarcation line: **an instrument a tripwire or gate depends on is infrastructure; single-use probes and session evidence stay in the scratchpad.**
+- **A clean sync is a measurement, not an absence.** Reporting `0 ahead / 1 behind` before fast-forwarding is what distinguishes "nothing stranded" from "nothing checked". The rebase-and-skip ritual is for when that measurement says otherwise, and skipping the measurement because the last release needed the ritual would be as wrong as skipping the ritual because this one did not.
+
+### Queue
+
+`[BUG-042]` (the `.gitignore` restructure) is next, then `[BUG-046]`, unless a release needs the instruments sooner, in which case building them is that release first task. `[BUG-045]` (the quoted-path defect) remains open with its ritual priced at filing. Two dossiers stay unfiled: the heredoc family, half-characterized, and the session denial tally. **Next mintable id is `BUG-047`.**
