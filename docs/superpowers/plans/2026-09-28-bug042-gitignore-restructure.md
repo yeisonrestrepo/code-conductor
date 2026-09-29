@@ -546,7 +546,7 @@ npx vitest run
 
 Expected: **910 passed | 12 skipped (922)**. `tests/installer/cli.test.js` and `tests/installer/manifest.test.js` read the version; if either fails, a location disagrees and the fix is the location, not the test.
 
-- [ ] **[T-004-D] Step 4: Stage and commit**
+- [X] **[T-004-D] Step 4: Stage and commit**
 
 ```bash
 git add -u VERSION package.json package-lock.json CHANGELOG.md
@@ -564,15 +564,15 @@ Claude-Session: https://claude.ai/code/session_01HLS5KAHkhpMChyqNTbqrhe"
 - Modify: `AGENT-READABLE BACKLOG.md`
 - Modify: `.claude/memory/project.md`
 
-- [ ] **[T-005-A] Step 1: Close `[BUG-042]`**
+- [X] **[T-005-A] Step 1: Close `[BUG-042]`**
 
 Flip the heading checkbox from `[ ]` to `[X]` as a surgical single-line edit, then add a `DONE` bullet directly under the heading recording: shipped as 1.32.1; the two sites with their measured case rows; the three premise corrections the audit made (the `*.local` gap, `:10`'s load-bearing role, and the enumeration being the git index rather than `PROJECT_HOST_OWNED`); and the supersession bookkeeping note that the second site was found by audit, same archetype, folded by ruling.
 
-- [ ] **[T-005-B] Step 2: Add the sibling concern to `[BUG-046]`**
+- [X] **[T-005-B] Step 2: Add the sibling concern to `[BUG-046]`**
 
 Append one bullet to the `[BUG-046]` entry carrying **both** specimens of external writers to repo files: the user-global `/cc-compact`, which appends `.claude/memory/session-snapshot.json` when absent, and `lib/installer/deploy.mjs:17`, which appends `turn-count.txt` through the `project-template/gitignore` merge. Both belong to the same "infrastructure the repo depends on but does not control" family as the release-critical instruments. Name the two kept lines and their comments as the current mitigation, and state the policy the pair produced: a line kept for an external writer is kept with the writer's name and path in its comment.
 
-- [ ] **[T-005-C] Step 3: Append the implementation record to `.claude/memory/project.md`**
+- [X] **[T-005-C] Step 3: Append the implementation record to `.claude/memory/project.md`**
 
 One section: the boundary table with suites named, the block's final line count, the six hand-verified acceptance behaviors from T-001-F with their measured results, the no-red statement for Task 2, and the epitaph sentence: **Task 0 was the last time `git add -f` was needed for a file that was already tracked in this repository.**
 
