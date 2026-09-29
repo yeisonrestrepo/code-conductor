@@ -1579,3 +1579,45 @@ The red was real and self-inflicted. **The diagnosis was right and the response 
 **Convention established by the audit: a probe harness runs its controls before printing any matrix, and refuses to print on control failure.** This audit's first harness reported `allow` on all fifteen rows including `cat *.ts`, because `CLAUDE_TOOL_INPUT` carries the `tool_input` object alone rather than the whole payload and `CLAUDE_TOOL_NAME` is a separate variable that was omitted, so dispatch never reached the Bash guard. **An all-allow matrix from a broken harness is indistinguishable from a real finding**, which is `tools/README.md`'s registry class applied to a measuring instrument.
 
 **The reader-at-command-position boundary is pinned from two directions**, `tee` and `python3` both allowing on byte-identical bodies, and both ship as corpus rows.
+
+## Closeout: 1.33.0, the release that dissolved a standing contradiction [2026-09-29]
+
+`[BUG-047]` shipped as **`1.33.0`** (PR #40, merged `eff4236`). Clean squash sync measured before acting: **`0 ahead / 1 behind`, clean**, fast-forward `16b2520..eff4236`. All three instruments signed the acta on the merged tree: **`VERSION_GATE_OK 1.33.0`**, **`RECORD_PARITY_OK`** with `[BUG-047]`'s heading at `[X]` and its DONE bullet naming `1.33.0`, and a ceiling of **`BUG-047` from both legs**, 47 headings each, no duplicates. Suite **996 passed / 12 skipped, 40 files / 1 skipped**. **Next mintable id is `BUG-048`.**
+
+### Boundaries: five for five
+
+| After | Predicted | Measured |
+|---|---|---|
+| T-000 plan | no change, no red | 996 / 12, 40 / 1, block-parity 4/4 |
+| T-001 corpus rows | 996 / 12 (corrected from 994) | 996 / 12, both subjects green |
+| T-002 authority alone | **RED, exactly 17 named cases**, port green | 17 red, exactly the list, port green |
+| T-003 port, mirror, flips | 996 / 12 | 996 / 12 |
+| T-004 release | 996 / 12 at `1.33.0` | 996 / 12 |
+
+### The rule this release produced
+
+**A TWO-PASS PIPELINE REQUIRES AN IDEMPOTENT TRANSFORMATION.** `guard3BashScan` and the authority's dispatch both run the scanner twice, building the mask from strip's output. A first draft blanked the heredoc terminator line along with the body, so the second pass could not find it: the scanner re-entered `HEREDOC` at the same introducer, never terminated, and blanked every command after the heredoc. **The symptom was silent and severe, a genuine mass dump following a heredoc write ceasing to deny.** The terminator is now emitted verbatim while body lines are not, because nothing downstream needs to find a body line again. **The scope control caught it**, which is why that row exists in both positions, and it is the strongest evidence yet for writing controls that assert what must *keep* being true rather than only what must change.
+
+### A self-corrected diagnosis, recorded because it nearly shipped
+
+The first explanation for that failure was `set -euo pipefail` aborting on a bare arithmetic command evaluating to zero. **That was wrong.** Bash exempts every command in an `&&` list except the one following the final `&&`, which is precisely why the existing scanner uses `[[ ... ]] && result+=...` throughout. A comment asserting the false mechanism had already been written into the frozen authority and was removed rather than shipped. **The lesson is the ordering:** the wrong diagnosis was plausible, matched the symptom, and would have left a false explanation embedded in the most load-bearing file in the repository. What caught it was extracting the scanner and printing the mask, rather than reasoning further from the symptom.
+
+### The plan carried the defect, and following it literally would have shipped it
+
+The plan's T-003 listing contained the first draft's port code, terminator blanking included. Since the port has the same two-pass shape, executing that step verbatim would have reintroduced into the port the bug the authority commit had just fixed. **The corrected form was applied and the deviation named in the commit.** A plan is a document of intent and inherits whatever was wrong at writing time; the instrument that caught this was a corpus row, not a re-reading of the plan.
+
+### The success measure, demonstrated rather than narrated
+
+Through the live hook, four cases: a heredoc file write with a bracket-class body **allows**; a genuine mass dump **denies**; a dump following a heredoc write **denies**; a here-string glob **denies**. Then through the **real Bash tool** in the implementing session, a `cat > file <<'SCRIPT'` carrying a character class, a `??`, a `for...of` and an apostrophe **executed and ran**. That is the exact shape denied under **P4 P5 P9** in four consecutive sessions. **The contradiction between the platform's auto-mode guidance and this repository's own hook is gone**, which was the item's stated value: not the friction of one denial, but the removal of two binding instruction sets that disagreed.
+
+### Other findings
+
+- **The sixth sanctioned exception held its ritual.** One file, header amended in the same commit, one `--no-verify` scoped to that commit with `git status --short` checked to show exactly one path, the hook itself untouched, and the port deliberately one commit behind with `guard3-port.test.js` green as the proof the red belonged to the authority alone.
+- **Two frontier rows justified themselves.** `<<<` is a here-string and `cat <<< [x]` must keep denying, so the introducer matcher tests the third character; and the P6 grep shape as real code must keep denying while the same text inside a body is allowed to flip.
+- **A green test had been announcing a false number.** `guard3.test.js`'s count assertion read `carries exactly 111 rows` in its label while asserting `127`. The label was not updated when the corpus last grew. Both now read 155. **A label is part of the assertion's output, and an unchecked one drifts exactly like a comment.**
+- **One declared deviation:** 28 corpus rows rather than the planned 27, so the suite total is 996 and not 994. Named before it landed, and every downstream count carried it.
+- **`docs/RELEASE-CLOSEOUT.md` was missing its branch-deletion step**, found when an instruction cited "the checklist line" for a line that did not exist. **The document `[BUG-046]` created reproduced `[BUG-046]`'s own defect one release later.** Step 10 now exists, including why a squash merge makes `git branch -d` report "merged to its upstream but not to HEAD" and why that is correct rather than alarming.
+
+### Queue
+
+**`[BUG-045]`** (the Guard 3 allowlist cannot cover a quoted path) is the only open filed defect remaining, with its ritual priced at filing. **It opens on the owner's word, not automatically.** Two dossiers stay unfiled: the session denial tally, and the interleaved-artifact dossier with its one anchored specimen and its stale-instruction sibling note. **Next mintable id is `BUG-048`.**

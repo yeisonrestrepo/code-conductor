@@ -57,6 +57,17 @@ This document exists because the sentence "run it as a closeout step the ritual 
 
 9. **Push the record commit in the same action that creates it.** An owner-scoped record commit on `main` is never left local.
 
+10. **Delete the item's branch, local and remote.**
+
+    ```bash
+    git branch -d "<branch>"
+    git push origin --delete "<branch>"
+    ```
+
+    `-d` refuses unless the branch is merged, which is the check, not the ceremony. Under a squash merge it reports "merged to its upstream but not to HEAD", and that is correct rather than alarming: the branch commits are not ancestors of the squashed commit, and step 6's `0 ahead` is the independent confirmation that nothing is stranded.
+
+    **This step was missing until `1.33.0`**, and its absence was found the way `[BUG-046]` predicts such things are found: by an instruction citing "the checklist line" for a line that did not exist. The document `[BUG-046]` created reproduced `[BUG-046]`'s own defect one release later, which is the argument for instruments over documents restated against this file.
+
 ---
 
 ## Why the heading flip lives in the release commit
