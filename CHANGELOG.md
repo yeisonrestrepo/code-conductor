@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.32.2] - 2026-09-29
+
+### Added
+- **[BUG-046]** Three release-critical instruments are now tracked repository infrastructure under `tools/`, each with the test that pins its semantics: a heading-scoped id ceiling over the working tree union `origin/main`, a version gate taking `VERSION` as its authority, and a record-parity check comparing `CHANGELOG.md`, the backlog and `VERSION`. `tests/tools/repo-invariants.test.js` asserts the version and record invariants against the live repository, so CI enforces them at the merge gate rather than a checklist enforcing nothing.
+- **[BUG-046]** `tools/README.md` records the four retired instruments with their failure modes, so a maintainer meets the registry before writing a fifth. It corrects the third entry: that gate failed on a hardcoded literal frozen two releases back, not on a missing target, and the defect still reproduces on demand. It also corrects the custody premise: the scratchpad was never withdrawn, and what survived were the retired forms while the shipped semantics were never written to any file.
+- `docs/RELEASE-CLOSEOUT.md` is the closeout checklist the record-parity amendment assumed and this repository did not have. It names which steps are CI-backed and which are not, and states that halt semantics come from the merge gate rather than from any line in it.
+
+### Changed
+- **[BUG-046]** The backlog heading flip moves into the release commit. It previously happened at closeout, after the merge, and therefore had no owner, which is how `[BUG-044]` shipped as `1.32.0` with its heading still reading `[ ]` for an entire release. With record parity asserted live, a release claiming an item whose heading is still open is red on its own pull request.
+
+Nothing under `project-template/` or `lib/` changed, and `tools/` is absent from `package.json` `files` and untouched by the installer, so a fresh install produces byte-identical output to 1.32.1. That is why this release is PATCH.
+
 ## [1.32.1] - 2026-09-28
 
 ### Fixed
