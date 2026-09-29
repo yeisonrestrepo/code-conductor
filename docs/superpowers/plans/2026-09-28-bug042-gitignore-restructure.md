@@ -300,7 +300,7 @@ npx vitest run
 
 Expected: **906 passed | 12 skipped (918)**, files **34 passed | 1 skipped (35)**. `tests/unit/staging-convention.test.js` must be among the passing files, unchanged (AC18).
 
-- [>] **[T-001-H] Step 8: Stage and commit**
+- [X] **[T-001-H] Step 8: Stage and commit**
 
 ```bash
 git add -u .gitignore
@@ -328,7 +328,7 @@ Claude-Session: https://claude.ai/code/session_01HLS5KAHkhpMChyqNTbqrhe"
 
 **This task has no red state, and that is stated rather than discovered.** The invariant holds today and holds after Task 1, so all four cases pass on their first run. Its value is regression plus the two discriminators, which prove it can fail.
 
-- [ ] **[T-002-A] Step 1: Write the test**
+- [X] **[T-002-A] Step 1: Write the test**
 
 Create `tests/unit/host-owned-ignore-xor.test.js`:
 
@@ -389,7 +389,7 @@ describe('PROJECT_HOST_OWNED rows are ignored XOR tracked', () => {
 });
 ```
 
-- [ ] **[T-002-B] Step 2: Run it**
+- [X] **[T-002-B] Step 2: Run it**
 
 ```bash
 npx vitest run tests/unit/host-owned-ignore-xor.test.js
@@ -397,11 +397,11 @@ npx vitest run tests/unit/host-owned-ignore-xor.test.js
 
 Expected: **4 passed**, first run, no red.
 
-- [ ] **[T-002-C] Step 3: Confirm the discriminators are load-bearing**
+- [X] **[T-002-C] Step 3: Confirm the discriminators are load-bearing**
 
 Temporarily change `xorViolations`'s filter from `===` to `!==`, re-run, confirm cases 1, 3 and 4 fail, then revert. This is a manual confirmation, not a committed change; report the three failing case names in the task report.
 
-- [ ] **[T-002-D] Step 4: Run the whole suite**
+- [X] **[T-002-D] Step 4: Run the whole suite**
 
 ```bash
 npx vitest run
@@ -409,7 +409,7 @@ npx vitest run
 
 Expected: **910 passed | 12 skipped (922)**, files **35 passed | 1 skipped (36)**.
 
-- [ ] **[T-002-E] Step 5: Stage and commit**
+- [>] **[T-002-E] Step 5: Stage and commit**
 
 ```bash
 git add tests/unit/host-owned-ignore-xor.test.js
