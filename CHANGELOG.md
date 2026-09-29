@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.34.1] - 2026-09-29
+
+### Fixed
+- **[BUG-048]** CI was green on a skipped-test set nobody had measured: 96 skipped on Node 20 against 12 locally, for the same tests, and nothing asserted it. Each CI leg now asserts its exact skipped set against `tools/skip-baseline.json`, measured from this change's own CI run, and a difference fails the leg naming every test that moved, so coverage lost and coverage gained are both recorded in the PR that causes them.
+- **[BUG-048]** The workflows' actions ran on GitHub's deprecated Node 20 action runtime. `actions/checkout`, `actions/setup-node` and `actions/cache` move to `v7`, `v7` and `v6`, whose `action.yml` declares `node24`.
+
+### Changed
+- **[BUG-048]** CI tests on Node 20 and Node 24. Node 20 keeps `engines`' floor and the `node:sqlite`-absent paths exercised; Node 24 executes the 83 persistence tests Node 20 skips, which CI had never run. The publish job's pre-publish suite runs on Node 24.
+
+The package contents are unchanged: every file this release touches is outside `package.json` `files`.
+
 ## [1.34.0] - 2026-09-29
 
 ### Removed
