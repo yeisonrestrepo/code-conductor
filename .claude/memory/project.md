@@ -1420,3 +1420,69 @@ A state audit of every backlog heading found **one item completed but unmarked**
 **The gap this exposes:** the closeout ritual writes `project.md` and pushes record commits, but nothing verifies that the shipped item's own backlog entry was closed. The memory record said the release was done while the backlog said it was not, and no instrument compared them. Every other `[ ]` entry was verified genuinely open, three of them against the code rather than by assumption (`FEAT-030` has a per-row byte cap, not the byte-sum bound it asks for; `BUG-032`'s lookup chain in `CLAUDE.md` still names only `project.md`; `FEAT-021`'s python decoupling is unshipped). The `[~]` markers on `BUG-034` and `BUG-035` are the deliberate superseded state and were left alone.
 
 The backlog-state gap was **folded into `[BUG-046]` by ruling, not minted**: it is the third instrument of the same item, since that entry's thesis is release-critical checks with no tracked instrument behind them. The amendment prices a **record-parity check** under `scripts/` asserting, for an item id at closeout, that the heading reads `[X]`, that a DONE bullet naming the shipped version exists, and that the version agrees with `VERSION` and `CHANGELOG.md`, run as a closeout step the ritual cannot skip. Root cause in one line: **the heading flip had no owner**, because plan tasks touch the backlog only when named and the closeout writes memory without reading the backlog. The `[BUG-044]` state becomes the deliberate-defect fixture. **The amendment adds no heading, so the ceiling stays `BUG-047` and the next mintable id stays `BUG-048`.**
+
+## Specimen: a rejected Write read as an interleaved file [2026-09-29]
+
+**Preserved at owner instruction, verbatim, with its path, because it is the first artifact of this shape that exists on disk and is therefore anchorable rather than inferred.** Reported by the owner as "two drafts interleaved and cannot parse," in the `msg-t002` shape.
+
+**Path:** `/Users/yeison/.claude/jobs/2dc6a6e3/tmp/regen-block.mjs`
+**Written:** 2026-09-29 07:55:01, during the `[BUG-046]` spec drafting.
+**On-disk facts, measured:** 37 lines, 1792 bytes, `birth == mtime` (written exactly once, never rewritten), and `node --check` exits 0. **It parses.**
+
+```js
+// Regenerate .gitignore's tracked-surface block from git ls-files, using the SAME
+// function the parity test asserts with, so the file and the test cannot drift.
+import { execFileSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { expectedBlock } from '/Users/yeison/Projects/code-conductor/tests/unit/gitignore-block-parity.test.js';
+
+const ROOT = '/Users/yeison/Projects/code-conductor';
+const BEGIN = '# --- BEGIN tracked-surface block (BUG-042) ---';
+const END = '# --- END tracked-surface block (BUG-042) ---';
+const SITES = ['.claude', 'docs'];
+
+const lsFiles = (site) =>
+  execFileSync('git', ['ls-files', site], { cwd: ROOT, encoding: 'utf8' })
+    .split('\n')
+    .filter(Boolean);
+
+const want = expectedBlock(SITES.map((s) => [s, lsFiles(s)]));
+
+const raw = readFileSync(ROOT + '/.gitignore', 'utf8').split('\n');
+const b = raw.indexOf(BEGIN);
+const e = raw.indexOf(END);
+if (b < 0 || e <= b) throw new Error('markers missing or inverted: begin=' + b + ' end=' + e);
+
+// Keep every comment and blank line inside the markers; replace only the rule lines.
+const inside = raw.slice(b + 1, e);
+const comments = inside.filter((l) => l.trim() === '' || l.trim().startsWith('#'));
+const oldRules = inside.filter((l) => l.trim() !== '' && !l.trim().startsWith('#'));
+
+console.log('rules before=' + oldRules.length + ' after=' + want.length);
+const added = want.filter((l) => !oldRules.includes(l));
+const removed = oldRules.filter((l) => !want.includes(l));
+console.log('added=' + JSON.stringify(added));
+console.log('removed=' + JSON.stringify(removed));
+
+const out = raw.slice(0, b + 1).concat(comments, want, raw.slice(e));
+writeFileSync(ROOT + '/.gitignore', out.join('\n'), 'utf8');
+console.log('block rewritten, lines=' + out.length);
+```
+
+**What produced the reported artifact, answered from evidence rather than inference.** The file above contains an `import` of `expectedBlock` and **no local definition of it**, and every identifier reported as undefined is defined in it: `SITES` at line 10, `lsFiles` at 12, `END` at 9, `b` at 20. So the unparseable interleaving is not on disk and never was. A **second** Write to the same path was attempted and **rejected**; a rejected Write is rendered as the proposed replacement shown against the file it would have replaced. Draft 1 (the import form, header "using the SAME function") and draft 2 (a local verbatim copy, header "copied VERBATIM") both bring `expectedBlock` into scope, each carries a header stating a different philosophy, and both log `rules before/after`, `added` and `removed` in variant wording. Read as one buffer they interleave exactly as reported, and a diff shows hunks rather than whole scopes, which accounts for the identifiers appearing to have no definition in view. **Not a fresh draft over a stale one** (`birth == mtime`, one write), **not a snapshot restore, not an editor merge:** two of one session's drafts rendered together because the second was declined. The rendering pane itself was not observable from this side; the disk facts are, and they are decisive.
+
+**The job.** `/Users/yeison/.claude/jobs/2dc6a6e3/` is this session's own background-job workspace. The harness directs temporary files there rather than `/tmp`, because parallel jobs share `/tmp` and clobber each other. Job `2dc6a6e3` is this conversation, spanning the `[BUG-042]` release and the `[BUG-046]` audit: writes run 2026-09-28 20:02 through 21:21 (`audit042`, `backlog042`, `changelog042`, `closeout042`, `mint047`, `amend046`, `mark-done`, `compact-1321`, `blob.json`) and resume 2026-09-29 07:50 through 07:55 (`ceiling-046`, `record-parity-probe`, `discriminator-probe`, `two-level-probe`, then `regen-block`). **It is deleted with the job**, which is why a specimen kept only there is not preserved, and why this one is copied here.
+
+### Why the block regeneration was reached for, and why it was out of scope anyway
+
+**Not context bleed from the `[BUG-042]` snapshot.** A condition created and measured in this session, three calls earlier:
+
+1. `git add <new spec file>` exited **1** and staged nothing. `docs/` is a deny-by-default surface after `[BUG-042]`, and the file is new and unnamed by the block. This is the shipped behavior working exactly as specified.
+2. `git add -f` staged it, rc 0.
+3. `git ls-files docs` then included it, so `gitignore-block-parity` went **red, 2 of 4**, and precisely the two predicted cases: *equals the block computed from git ls-files, in order* and *names every tracked file at both sites and nothing else*. The directory-ordering and removed-leaf cases stayed green.
+
+The red was real and self-inflicted. **The diagnosis was right and the response was wrong:** the correct response was not to build regeneration machinery, it was to not stage an unapproved spec at all. Unstaged, `gitignore-block-parity` is green again, measured. The owner's scope ruling holds independently: no gate asks for it, the block shipped with its parity test as the authority, and when the leaf is genuinely needed at spec approval it is **one line in sorted position**, not a regeneration pass. `[BUG-042]` also already left `genblock.mjs` in the same workspace, so the script was redundant on top of being out of scope.
+
+### A documentation defect this exposed, reported not fixed
+
+`CLAUDE.md`'s Staging Convention closes with: "`-f` is required for a new file under a genuinely ignored directory, `.conductor/` being the remaining one in this repository." **That sentence is incomplete, measured today.** After `[BUG-042]`, any new file under `docs/` or `.claude/` is genuinely ignored until its leaf exists in the block, so `-f` is required there too. The epitaph's bounded clause survives intact and is the reason: `-f` was last needed for a file that was **already tracked**, and this file is new. Same family as the registry this item documents: a rule whose stated scope no longer matches its measured scope.
