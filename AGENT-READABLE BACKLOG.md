@@ -609,3 +609,13 @@ A holding pen with an explicit emptying condition. A shape leaves here when it i
 #### What this dossier is for, and its emptying condition
 
 A holding pen, on the same terms as the two above it. It empties when the mechanism is either confirmed by a second anchored specimen and filed under it, or shown to be something else and struck. **It is not a backlog of work, and nothing in it is queued.**
+
+#### Sibling note, 2026-09-29: stale instructions, and why they are not a specimen of the above
+
+**Not a specimen of the diff-render mechanism, and deliberately filed beside it rather than inside it.** That mechanism is artifact-level and lives on the agent's side of the window; this is message-level and its origin is on the owner's side. Grouping by mechanism forbids merging them, on the same rule that kept the quoted-path defect out of the heredoc family.
+
+**The incident.** A complete, well-formed instruction set arrived naming `gh pr merge` denials, PR #27, `[BUG-032]` filing, a `[FEAT-009]` spec phase, and snapshots at `4691f98` and `fa80470`. It was the `[BUG-031]` closeout instruction of 2026-09-25, resurfaced four days and four releases out of order. Every reference in it was real, which is precisely what made it plausible.
+
+**The rule it produces: STALE INSTRUCTIONS ARE DETECTED BY MEASURING THEIR PREMISES.** Not by tone, not by plausibility, and not by whether the identifiers resolve. Here `gh pr view 27` reported `MERGED 2026-09-25`, `git cat-file -t` confirmed both commits, and the backlog showed `[BUG-031]` already `[X]` while `[BUG-032]` was already filed rather than awaiting filing. **Every identifier resolved and every premise was false**, which is the same shape as an instrument whose subject and whose description of its subject cannot be told apart.
+
+**The two-window attribution rule applies to instruction provenance too.** Neither party can see the other's window, so an instruction whose premises do not match the tree is reported with its premise-by-premise measurement and not acted on, exactly as an artifact report is answered from disk before any corruption story is opened.
