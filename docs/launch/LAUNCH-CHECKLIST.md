@@ -20,6 +20,9 @@ Corollary: **when someone finds something wrong, confirm it in the open and link
 - [ ] Every figure in the Show HN body re-verified against the sources listed at the end of `SHOW-HN-DRAFT.md`
 - [ ] The recording made, watched once end to end, and scene 3 confirmed to allow
 - [ ] **README's Quickstart transcript re-verified against a pristine scratch install, on the day of posting.** Not a remembered run, not a run from last week: a fresh `mktemp -d`, a fresh `HOME`, one invocation. **The cheapest claim for a reader to falsify must be the best-verified one.** This line exists because the Quickstart shipped once with output a fresh install does not produce, after an agent ran the installer twice and attributed the second run's output to the first.
+- [ ] `[FEAT-038]` shipped: GitHub topics set, `package.json` keywords published, About line written
+- [ ] The deny, adapt, allow GIF exported from the recording and embedded at the top of the README
+- [ ] `[BUG-045]` published as a GitHub issue, verbatim from its backlog entry including the priced ritual, labeled `help wanted`: it is the exemplar of how this project files a defect, and an open, honest, well-specified issue is an invitation to contribute
 
 ## Channels
 
@@ -39,3 +42,11 @@ Show HN first, on its own, and let it run. The other two are follow-ups, not a s
 - **Do not defend the known defects.** They are in the README because they are real. "Yes, that one is still open, here is the entry" is a complete answer.
 - **Do not describe it as a security tool.** It is advisory tooling against context exhaustion and sloppy habits. Someone will ask, and the honest answer is in the README under *What this is not*.
 - **Do not let an agent post.** Including replies.
+
+## After the posts: sustain, do not campaign
+
+The launch is not the marketing. The record is. Three standing practices, all owner acts:
+
+- **Answer where the conversation already happens.** Threads about guardrail friction in Claude Code get a reply that links the denial record and the fix commit, not a pitch. If the answer is not in the repo, say you will check and come back.
+- **One technical post per notable release**, written from the release's own spec and plan, published only when the release is out and the claims are bisectable. No cadence quota: a release with nothing to teach gets no post.
+- **When a reader finds a defect, confirm it in the open, thank them, and link the fix when it lands.** The known-limits section of the README is the template for the tone.
