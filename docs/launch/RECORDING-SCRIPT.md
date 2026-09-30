@@ -102,7 +102,7 @@ Re-run the arc against the scaffolded project and confirm the three verdicts, so
 
 ```bash
 node tools/id-ceiling.mjs        # sanity: the repo you recorded from is the repo you ship
-npm test                          # 996 passed / 12 skipped at 1.33.0
+npm test                          # green, zero failures; counts live only in tools/skip-baseline.json, measured by CI
 ```
 
 If scene 3 ever denies again, **do not re-record around it.** That is a regression and the corpus row `heredoc: mjs script body with regex class` will have gone red first.
