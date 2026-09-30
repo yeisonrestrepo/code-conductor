@@ -71,6 +71,8 @@ This branch adds **23** tests (Task 1) and changes no other test's skip conditio
 | `ci-node20` | 948 | 96 | 1044 | `conductor-db` 74, `handoff-cycle` 3, `resume-read` 6, plugin 12, heal pin 1 | FEAT-021 gate run measured 925/96, plus 23 |
 | `ci-node24` | 1031 | 13 | 1044 | plugin 12, heal pin 1 | derived: the 96 minus the 83 `node:sqlite` skips (M3) |
 
+**REVISED before Run 1 (Task 5; the owner accepted the empty-`--env` fix, which adds 1 passing test).** The table above is kept as the original prediction. The binding predictions are now: local **1033 / 12 (1045)**, `ci-node20` **949 / 96 (1045)**, `ci-node24` **1032 / 13 (1045)**. The skipped sets and their composition are unchanged.
+
 The heal pin (`tests/installer/heal.test.js`, "pins each shipped hash…") skips in CI because the clone is shallow, and runs locally, where history is present. That is why `ci-node24` is 13 and local is 12 on the same Node major.
 
 ## Bootstrap: exactly two CI runs, three executions
@@ -89,12 +91,12 @@ This is the owner's expected shape, and the plan follows it, with two stated dif
 
 ## Bootstrap record (filled during execution, one single-line edit per field)
 
-- Run 1 id and head SHA: —
-- Run 1 attempt 1, `ci-node20` (conclusion, totals, skipped by file): —
-- Run 1 attempt 1, `ci-node24` (conclusion, totals, skipped by file): —
-- Run 1 annotations (deprecation warnings per leg): —
-- Identity stability, attempt 1 vs attempt 2: —
-- Arming commit SHA: —
+- Run 1 id and head SHA: `36648751722` on `d3b8b8bf8c99e095b65df536f0f713aeb32f637c` (`pull_request`, PR #45)
+- Run 1 attempt 1, `ci-node20` (conclusion, totals, skipped by file): `success`, Node v20.20.2, `Tests  949 passed | 96 skipped (1045)`; `conductor-db` 74, `handoff-cycle` 3, `resume-read` 6, plugin 12, heal 1. Matches the revised prediction exactly.
+- Run 1 attempt 1, `ci-node24` (conclusion, totals, skipped by file): `success`, Node v24.21.0, `Tests  1032 passed | 13 skipped (1045)`; plugin 12, heal 1. Matches the revised prediction exactly, so the 83 `node:sqlite` tests ran and passed on Node 24.
+- Run 1 annotations (deprecation warnings per leg): 0 on each leg. Each leg carries exactly one annotation, the notice "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026…" (out of scope).
+- Identity stability, attempt 1 vs attempt 2: `IDENTITY_STABLE ci-node24: 13 identities byte-identical across both attempts` / `IDENTITY_STABLE ci-node20: 96 identities byte-identical across both attempts` (rc 0; attempt 2 totals and composition identical to attempt 1)
+- Arming commit SHA: (this commit; see git log)
 
 ## Review Focus
 
@@ -115,9 +117,9 @@ This is the owner's expected shape, and the plan follows it, with two stated dif
 - Modify: `.gitignore`, adding the leaf line after `!/docs/superpowers/plans/2026-09-29-bug047-heredoc-body-scanning.md`.
 - Create: `docs/superpowers/plans/2026-09-29-bug048-ci-measured-baseline.md` (this file).
 
-- [ ] [T-000-A] Insert `!/docs/superpowers/plans/2026-09-29-bug048-ci-measured-baseline.md` into `.gitignore` on the line after `!/docs/superpowers/plans/2026-09-29-bug047-heredoc-body-scanning.md`. This is its sorted position, and `tests/unit/gitignore-block-parity.test.js` enforces it.
-- [ ] [T-000-B] Stage: `git add -u .gitignore`, then `git add docs/superpowers/plans/2026-09-29-bug048-ci-measured-baseline.md`. The leaf line makes the new file visible, so plain `add` stages it.
-- [ ] [T-000-C] Commit: `git commit -m "docs: add the BUG-048 CI measured-baseline implementation plan [BUG-048]"`. The pre-commit suite is expected at **1009 passed / 12 skipped** (1021 total).
+- [X] [T-000-A] Insert `!/docs/superpowers/plans/2026-09-29-bug048-ci-measured-baseline.md` into `.gitignore` on the line after `!/docs/superpowers/plans/2026-09-29-bug047-heredoc-body-scanning.md`. This is its sorted position, and `tests/unit/gitignore-block-parity.test.js` enforces it.
+- [X] [T-000-B] Stage: `git add -u .gitignore`, then `git add docs/superpowers/plans/2026-09-29-bug048-ci-measured-baseline.md`. The leaf line makes the new file visible, so plain `add` stages it.
+- [X] [T-000-C] Commit: `git commit -m "docs: add the BUG-048 CI measured-baseline implementation plan [BUG-048]"`. The pre-commit suite is expected at **1009 passed / 12 skipped** (1021 total).
 
 ### Task 1: The instrument and its tests
 
@@ -135,7 +137,7 @@ This is the owner's expected shape, and the plan follows it, with two stated dif
   - `evaluate({ env, reportPath, reportText, baselineText, root })`: returns `{ code: 0|1, lines: string[] }`.
   - CLI: `node tools/skip-baseline.mjs [--env <name>] --report <path>`.
 
-- [ ] [T-001-A] Write the failing test file `tests/tools/skip-baseline.test.js`:
+- [X] [T-001-A] Write the failing test file `tests/tools/skip-baseline.test.js`:
 
 ```js
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -357,8 +359,8 @@ describe('the CLI', () => {
 });
 ```
 
-- [ ] [T-001-B] Run `npx vitest run tests/tools/skip-baseline.test.js`. Expected: the file fails to load with "Failed to resolve import ../../tools/skip-baseline.mjs" (or "Cannot find module"), and **0 of 23** tests run.
-- [ ] [T-001-C] Write `tools/skip-baseline.mjs`:
+- [X] [T-001-B] Run `npx vitest run tests/tools/skip-baseline.test.js`. Expected: the file fails to load with "Failed to resolve import ../../tools/skip-baseline.mjs" (or "Cannot find module"), and **0 of 23** tests run.
+- [X] [T-001-C] Write `tools/skip-baseline.mjs`:
 
 ```js
 #!/usr/bin/env node
@@ -512,9 +514,9 @@ function main() {
 if (process.argv[1] === fileURLToPath(import.meta.url)) main();
 ```
 
-- [ ] [T-001-D] Run `npx vitest run tests/tools/skip-baseline.test.js`. Expected: **23 passed**. Then run `npx vitest run tests/tools/tools-not-shipped.test.js` and expect it to pass unchanged. It checks only `package.json` `files` and `deployProject`, and neither changes (full read, deferred from the spec).
-- [ ] [T-001-E] Stage `git add tools/skip-baseline.mjs tests/tools/skip-baseline.test.js`. Both files are new and `tools/` and `tests/` are not ignored, so plain `add` is correct.
-- [ ] [T-001-F] Commit: `git commit -m "fix: add the skip-baseline instrument and pin its semantics [BUG-048]"`. **Boundary:** the pre-commit suite must read **1032 passed / 12 skipped (1044)**. Halt on any other number.
+- [X] [T-001-D] Run `npx vitest run tests/tools/skip-baseline.test.js`. Expected: **23 passed**. Then run `npx vitest run tests/tools/tools-not-shipped.test.js` and expect it to pass unchanged. It checks only `package.json` `files` and `deployProject`, and neither changes (full read, deferred from the spec).
+- [X] [T-001-E] Stage `git add tools/skip-baseline.mjs tests/tools/skip-baseline.test.js`. Both files are new and `tools/` and `tests/` are not ignored, so plain `add` is correct.
+- [X] [T-001-F] Commit: `git commit -m "fix: add the skip-baseline instrument and pin its semantics [BUG-048]"`. **Boundary:** the pre-commit suite must read **1032 passed / 12 skipped (1044)**. Halt on any other number.
 
 ### Task 2: Record the rule (docs, R1)
 
@@ -525,18 +527,18 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) main();
 - Modify: `docs/launch/LAUNCH-CHECKLIST.md:17` (R1)
 - Modify: `.gitignore` (the report path)
 
-- [ ] [T-002-A] In `tools/README.md`, insert a row after the `record-parity.mjs` row:
+- [X] [T-002-A] In `tools/README.md`, insert a row after the `record-parity.mjs` row:
   `| \`skip-baseline.mjs\` | invariant | \`.github/workflows/test.yml\` on every matrix leg, after the suite; report-only by hand |`
-- [ ] [T-002-B] In `tools/README.md`, insert this paragraph after the paragraph beginning `**Read \`docs/RELEASE-CLOSEOUT.md\` before a release.**`:
+- [X] [T-002-B] In `tools/README.md`, insert this paragraph after the paragraph beginning `**Read \`docs/RELEASE-CLOSEOUT.md\` before a release.**`:
   `**\`skip-baseline.json\` is measured, never typed.** Each key is one CI leg's exact skipped set, copied from that leg's own run. A red leg names every identity to add (\`+\`) or remove (\`−\`); the fix is to copy those lines into that key in the same PR, and the diff is the reviewer's evidence of the coverage change. A new matrix leg stays red until its key is committed. Run by hand without \`--env\`, the instrument only reports, because a developer machine is not a reproducible environment: its skipped set depends on the local Node and on \`~/.claude/skills\`.`
-- [ ] [T-002-C] In `CONTRIBUTING.md`, insert this paragraph between the paragraph beginning `**The GitHub Actions CI gate is unconditional.**` and the one beginning `Releases follow`:
+- [X] [T-002-C] In `CONTRIBUTING.md`, insert this paragraph between the paragraph beginning `**The GitHub Actions CI gate is unconditional.**` and the one beginning `Releases follow`:
   `**Test predictions are made per environment, or not at all.** A plan predicts the local result (\`npm test\` on your Node) and each CI leg separately. A CI leg's prediction is stated against its key in \`tools/skip-baseline.json\`, which holds the skipped-test set measured on that leg. Each leg of \`.github/workflows/test.yml\` asserts its skipped set against that file, so a change in what CI skips, whether coverage lost or coverage gained, is red until the same PR updates the file. The failure names every test to add or remove. \`npm test\` asserts no skip count, because a developer machine is not a reproducible environment.`
-- [ ] [T-002-D] In `docs/RELEASE-CLOSEOUT.md:3`, replace `asserts the version and record invariants against the live repository on every push and pull request.` with `asserts the version and record invariants against the live repository on every push and pull request. Each CI leg also asserts its exact skipped-test set against \`tools/skip-baseline.json\` (\`tools/skip-baseline.mjs\`, \`[BUG-048]\`), so a change in what CI skips is red at the same gate.`
-- [ ] [T-002-E] In `docs/RELEASE-CLOSEOUT.md` step 5, replace `5. **Merge on green.**` with `5. **Merge on green**: both legs of the Test workflow green, each printing \`SKIP_BASELINE_OK\`.`
-- [ ] [T-002-F] Apply R1 in `docs/launch/LAUNCH-CHECKLIST.md:17`. Replace `` - [ ] `npm test` green on `main` (996 passed / 12 skipped at `1.33.0`) `` with `` - [ ] `npm test` green on `main` locally with zero failures, and both legs of `main`'s last Test run green, each printing `SKIP_BASELINE_OK` against `tools/skip-baseline.json`, the one place a test count is recorded, because there it is measured ``. The next two lines already assert `VERSION_GATE_OK` and `RECORD_PARITY_OK`, which completes R1's command-and-instrument set without duplicating them.
-- [ ] [T-002-G] In `.gitignore`, insert `/vitest-report.json` on the line after `.vitest-cache/`. This is outside the BUG-042 block, so the parity test is unaffected.
-- [ ] [T-002-H] Stage `git add -u tools/README.md CONTRIBUTING.md docs/RELEASE-CLOSEOUT.md docs/launch/LAUNCH-CHECKLIST.md .gitignore`.
-- [ ] [T-002-I] Commit: `git commit -m "docs: state per-environment test predictions and the skip-baseline gate [BUG-048]"`. **Boundary:** 1032 / 12 (1044), unchanged.
+- [X] [T-002-D] In `docs/RELEASE-CLOSEOUT.md:3`, replace `asserts the version and record invariants against the live repository on every push and pull request.` with `asserts the version and record invariants against the live repository on every push and pull request. Each CI leg also asserts its exact skipped-test set against \`tools/skip-baseline.json\` (\`tools/skip-baseline.mjs\`, \`[BUG-048]\`), so a change in what CI skips is red at the same gate.`
+- [X] [T-002-E] In `docs/RELEASE-CLOSEOUT.md` step 5, replace `5. **Merge on green.**` with `5. **Merge on green**: both legs of the Test workflow green, each printing \`SKIP_BASELINE_OK\`.`
+- [X] [T-002-F] Apply R1 in `docs/launch/LAUNCH-CHECKLIST.md:17`. Replace `` - [ ] `npm test` green on `main` (996 passed / 12 skipped at `1.33.0`) `` with `` - [ ] `npm test` green on `main` locally with zero failures, and both legs of `main`'s last Test run green, each printing `SKIP_BASELINE_OK` against `tools/skip-baseline.json`, the one place a test count is recorded, because there it is measured ``. The next two lines already assert `VERSION_GATE_OK` and `RECORD_PARITY_OK`, which completes R1's command-and-instrument set without duplicating them.
+- [X] [T-002-G] In `.gitignore`, insert `/vitest-report.json` on the line after `.vitest-cache/`. This is outside the BUG-042 block, so the parity test is unaffected.
+- [X] [T-002-H] Stage `git add -u tools/README.md CONTRIBUTING.md docs/RELEASE-CLOSEOUT.md docs/launch/LAUNCH-CHECKLIST.md .gitignore`.
+- [X] [T-002-I] Commit: `git commit -m "docs: state per-environment test predictions and the skip-baseline gate [BUG-048]"`. **Boundary:** 1032 / 12 (1044), unchanged.
 
 ### Task 3: Workflows (D1, D2, R2); gate unarmed
 
@@ -545,7 +547,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) main();
 - Modify: `.github/workflows/publish.yml:15-28`
 - Modify: the three comments that name `actions/checkout@v4`: `docs/RELEASE-CLOSEOUT.md:5`, `tests/installer/heal.test.js:188` and `tests/tools/repo-invariants.test.js:36`.
 
-- [ ] [T-003-A] Replace `.github/workflows/test.yml` with:
+- [X] [T-003-A] Replace `.github/workflows/test.yml` with:
 
 ```yaml
 name: Test
@@ -596,7 +598,7 @@ jobs:
         run: node tools/skip-baseline.mjs --report vitest-report.json
 ```
 
-- [ ] [T-003-B] In `.github/workflows/publish.yml`, replace lines 15–28, from `      - uses: actions/checkout@v4` through `      - run: npx vitest run`, with:
+- [X] [T-003-B] In `.github/workflows/publish.yml`, replace lines 15–28, from `      - uses: actions/checkout@v4` through `      - run: npx vitest run`, with:
 
 ```yaml
       - uses: actions/checkout@v7
@@ -619,19 +621,19 @@ jobs:
       - run: npx vitest run
 ```
 
-- [ ] [T-003-C] Replace `actions/checkout@v4` with `actions/checkout@v7` in the three comments. Measured in M1, v7's `fetch-depth` still defaults to 1, so each sentence stays true:
+- [X] [T-003-C] Replace `actions/checkout@v4` with `actions/checkout@v7` in the three comments. Measured in M1, v7's `fetch-depth` still defaults to 1, so each sentence stays true:
   - `docs/RELEASE-CLOSEOUT.md:5`;
   - `tests/installer/heal.test.js:188`;
   - `tests/tools/repo-invariants.test.js:36`.
 
   Then run `git grep -n "actions/[a-z-]*@v4" -- . ':!docs/superpowers' ':!CHANGELOG.md' ':!AGENT-READABLE BACKLOG.md' ':!.claude/memory'`. Expected: no output. The excluded files are records of history and keep `@v4` on purpose.
-- [ ] [T-003-D] Verify the reporter wiring locally, exactly as CI invokes it: `npm test -- --reporter=default --reporter=json --outputFile.json=vitest-report.json`, then `node tools/skip-baseline.mjs --report vitest-report.json`.
+- [X] [T-003-D] Verify the reporter wiring locally, exactly as CI invokes it: `npm test -- --reporter=default --reporter=json --outputFile.json=vitest-report.json`, then `node tools/skip-baseline.mjs --report vitest-report.json`.
   - Expected: the first line is `SKIP_BASELINE_OBSERVED node v24.18.0: 12 skipped identities (report: vitest-report.json)`.
   - Then 12 `SKIPPED "tests/plugin/code-conductor-plugin.test.js > …"` lines.
   - Then `SKIP_BASELINE_REPORT_ONLY: no --env given, nothing asserted`, at rc 0.
-- [ ] [T-003-E] Run `git status --porcelain --ignored vitest-report.json`. Expected: `!! vitest-report.json`, meaning the report is ignored. Then delete it with `rm vitest-report.json`.
-- [ ] [T-003-F] Stage `git add -u .github/workflows/test.yml .github/workflows/publish.yml docs/RELEASE-CLOSEOUT.md tests/installer/heal.test.js tests/tools/repo-invariants.test.js`.
-- [ ] [T-003-G] Commit: `git commit -m "ci: bump actions to their node24 majors and test on a Node 20 and 24 matrix [BUG-048]"`. **Boundary:** 1032 / 12 (1044), unchanged.
+- [X] [T-003-E] Run `git status --porcelain --ignored vitest-report.json`. Expected: `!! vitest-report.json`, meaning the report is ignored. Then delete it with `rm vitest-report.json`.
+- [X] [T-003-F] Stage `git add -u .github/workflows/test.yml .github/workflows/publish.yml docs/RELEASE-CLOSEOUT.md tests/installer/heal.test.js tests/tools/repo-invariants.test.js`.
+- [X] [T-003-G] Commit: `git commit -m "ci: bump actions to their node24 majors and test on a Node 20 and 24 matrix [BUG-048]"`. **Boundary:** 1032 / 12 (1044), unchanged.
 
 ### Task 4: Release 1.34.1 (D4)
 
@@ -642,8 +644,8 @@ jobs:
 - `CHANGELOG.md`
 - `AGENT-READABLE BACKLOG.md:642`
 
-- [ ] [T-004-A] Write `1.34.1` into `VERSION` (with a trailing newline), then run `npm version 1.34.1 --no-git-tag-version`, which moves `package.json` and both `package-lock.json` locations.
-- [ ] [T-004-B] In `CHANGELOG.md`, insert this after `# Changelog` and its blank line, before `## [1.34.0] - 2026-09-29`:
+- [X] [T-004-A] Write `1.34.1` into `VERSION` (with a trailing newline), then run `npm version 1.34.1 --no-git-tag-version`, which moves `package.json` and both `package-lock.json` locations.
+- [X] [T-004-B] In `CHANGELOG.md`, insert this after `# Changelog` and its blank line, before `## [1.34.0] - 2026-09-29`:
 
 ```markdown
 ## [1.34.1] - 2026-09-29
@@ -659,19 +661,19 @@ The package contents are unchanged: every file this release touches is outside `
 
 ```
 
-- [ ] [T-004-C] Flip the heading in `AGENT-READABLE BACKLOG.md:642`: `### [ ] \`[BUG-048]\`` becomes `### [X] \`[BUG-048]\``. This is a single-line edit.
-- [ ] [T-004-D] Insert this as the first bullet under that heading, as a single-line insert:
+- [X] [T-004-C] Flip the heading in `AGENT-READABLE BACKLOG.md:642`: `### [ ] \`[BUG-048]\`` becomes `### [X] \`[BUG-048]\``. This is a single-line edit.
+- [X] [T-004-D] Insert this as the first bullet under that heading, as a single-line insert:
   `* **DONE, shipped as \`1.34.1\` on 2026-09-29.** Actions moved to their node24 majors in both workflows (checkout \`v7\`, setup-node \`v7\`, cache \`v6\`); \`test.yml\` runs a \`{20, 24}\` matrix with a per-version cache key; each leg asserts its exact skipped set with \`tools/skip-baseline.mjs\` against \`tools/skip-baseline.json\`, measured from the PR's own CI run and armed by the branch's last commit; \`publish.yml\` tests on Node 24 and states why it runs no skip-baseline step. Spec: \`docs/superpowers/specs/2026-09-29-bug048-ci-measured-baseline-design.md\`. Plan: \`docs/superpowers/plans/2026-09-29-bug048-ci-measured-baseline.md\`.`
-- [ ] [T-004-E] Run `node tools/version-gate.mjs`. Expected: five `ok` lines and `VERSION_GATE_OK 1.34.1` at rc 0. Then run `node tools/record-parity.mjs`. Expected: `RECORD_PARITY_OK` at rc 0.
-- [ ] [T-004-F] Stage `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md"`.
-- [ ] [T-004-G] Commit: `git commit -m "chore: release 1.34.1 [BUG-048]"`. **Boundary:** 1032 / 12 (1044), unchanged, because `repo-invariants` reads the live records and stays green.
+- [X] [T-004-E] Run `node tools/version-gate.mjs`. Expected: five `ok` lines and `VERSION_GATE_OK 1.34.1` at rc 0. Then run `node tools/record-parity.mjs`. Expected: `RECORD_PARITY_OK` at rc 0.
+- [X] [T-004-F] Stage `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md"`.
+- [X] [T-004-G] Commit: `git commit -m "chore: release 1.34.1 [BUG-048]"`. **Boundary:** 1032 / 12 (1044), unchanged, because `repo-invariants` reads the live records and stays green.
 
 ### Task 5: Pre-push review of Tasks 1–4
 
 Run 1 is spent only on a reviewed branch, so that review fixes do not cost extra CI runs.
 
-- [ ] [T-005-A] Dispatch one fresh reviewer, on the most capable model, over `git diff main...HEAD`, with the spec and this plan. Its scope is the instrument's contract against D3, the workflow YAML, R1 and R2, and the release records.
-- [ ] [T-005-B] Apply any fix the owner accepts before Task 6, one commit per finding, re-measuring the boundary after each. A fix that changes the test count gets a new prediction in its report **before** it is committed.
+- [X] [T-005-A] Dispatch one fresh reviewer, on the most capable model, over `git diff main...HEAD`, with the spec and this plan. Its scope is the instrument's contract against D3, the workflow YAML, R1 and R2, and the release records.
+- [X] [T-005-B] Apply any fix the owner accepts before Task 6, one commit per finding, re-measuring the boundary after each. A fix that changes the test count gets a new prediction in its report **before** it is committed.
 
 ### Task 6: Run 1, attempt 1 (measure, gate unarmed)
 
@@ -680,7 +682,7 @@ Run 1 is spent only on a reviewed branch, so that review fixes do not cost extra
   - `.conductor/bug048/ci-measure.mjs`
   - `.conductor/bug048/pr-body.md`
 
-- [ ] [T-006-A] Write `.conductor/bug048/ci-measure.mjs`:
+- [X] [T-006-A] Write `.conductor/bug048/ci-measure.mjs`:
 
 ```js
 // Reads one attempt of a Test workflow run. For each matrix leg it records the Vitest
@@ -696,7 +698,9 @@ const gh = (...a) => execFileSync('gh', a, { encoding: 'utf8', maxBuffer: 1 << 2
 const clean = (raw) => raw.replace(/\r$/, '').replace(/^\S+Z /, '').replace(/\x1b\[[0-9;]*m/g, '');
 
 function readLeg(job) {
-  const lines = gh('api', `repos/${REPO}/actions/jobs/${job.id}/logs`).split('\n').map(clean);
+  // gh 2.100 refuses a response carrying terminal escapes, and Vitest colors its CI
+  // output; clean() strips them after the fetch (measured at Task 5's review).
+  const lines = gh('api', '--allow-escape-sequences', `repos/${REPO}/actions/jobs/${job.id}/logs`).split('\n').map(clean);
   const identities = lines.map((l) => l.match(/^SKIPPED (".*")$/)).filter(Boolean).map((m) => JSON.parse(m[1])).sort();
   const gate = lines.filter((l) => l.startsWith('SKIP_BASELINE_'));
   const observed = gate.find((l) => l.startsWith('SKIP_BASELINE_OBSERVED'));
@@ -707,8 +711,10 @@ function readLeg(job) {
   }
   const totals = lines.find((l) => /^\s*Tests\s+\d/.test(l))?.trim() ?? null;
   const notes = JSON.parse(gh('api', `repos/${REPO}/check-runs/${job.id}/annotations`));
-  const deprecated = notes.map((n) => n.message ?? '').filter((m) => /Node\.js 20 is deprecated/.test(m));
-  return { conclusion: job.conclusion, totals, gate, identities, annotations: notes.length, deprecated };
+  // Every annotation is kept verbatim: the regex alone would pass a reworded warning.
+  const annotations = notes.map((n) => `${n.annotation_level}: ${n.message ?? ''}`);
+  const deprecated = annotations.filter((m) => /Node\.js 20 is deprecated/.test(m));
+  return { conclusion: job.conclusion, totals, gate, identities, annotations, deprecated };
 }
 
 const { jobs } = JSON.parse(gh('api', `repos/${REPO}/actions/runs/${run}/attempts/${attempt}/jobs`));
@@ -722,34 +728,35 @@ writeFileSync(out, JSON.stringify(result, null, 2) + '\n');
 for (const [env, r] of Object.entries(result)) {
   const byFile = {};
   for (const id of r.identities) { const f = id.slice(0, id.indexOf(' > ')); byFile[f] = (byFile[f] ?? 0) + 1; }
-  console.log(`${env} conclusion=${r.conclusion} totals="${r.totals}" skipped=${r.identities.length} annotations=${r.annotations} deprecated=${r.deprecated.length}`);
+  console.log(`${env} conclusion=${r.conclusion} totals="${r.totals}" skipped=${r.identities.length} annotations=${r.annotations.length} deprecated=${r.deprecated.length}`);
+  for (const a of r.annotations) console.log(`  annotation ${a}`);
   for (const l of r.gate) console.log(`  ${l}`);
   console.log(`  by file: ${JSON.stringify(byFile)}`);
 }
 ```
 
-- [ ] [T-006-B] Push: `git push -u origin fix/bug-048-ci-measured-baseline`.
-- [ ] [T-006-C] Write `.conductor/bug048/pr-body.md`. It should give:
+- [X] [T-006-B] Push: `git push -u origin fix/bug-048-ci-measured-baseline`.
+- [X] [T-006-C] Write `.conductor/bug048/pr-body.md`. It should give:
   - a summary of the three mechanisms;
   - the per-leg predictions table from this plan;
   - the line "**Bootstrap in progress: the skip-baseline gate is unarmed until the arming commit (Run 2).**";
   - the attribution footer.
 
   Then open the PR as a draft: `gh pr create --draft --base main --title "1.34.1 - BUG-048: measure and assert CI's skipped set per Node leg" --body-file .conductor/bug048/pr-body.md`. `test.yml` triggers on `pull_request`, so **the PR is what starts Run 1**. A branch push alone runs nothing.
-- [ ] [T-006-D] Find Run 1 with `gh run list --branch fix/bug-048-ci-measured-baseline --workflow Test --limit 1 --json databaseId,headSha,event`. Confirm that `headSha` equals `git rev-parse HEAD` and that `event` is `pull_request`. Then wait with `gh run watch <id> --exit-status`.
-- [ ] [T-006-E] Measure with `node .conductor/bug048/ci-measure.mjs <id> 1 .conductor/bug048/run1-a1.json`, then compare against the Predictions table, leg by leg:
-  - **`ci-node20`:** conclusion `success`. Totals `Tests  948 passed | 96 skipped (1044)`. Skipped by file: `conductor-db` 74, `handoff-cycle` 3, `resume-read` 6, plugin 12, `heal` 1.
-  - **`ci-node24`:** conclusion `success`. Totals `Tests  1031 passed | 13 skipped (1044)`. Skipped by file: plugin 12, `heal` 1.
+- [X] [T-006-D] Find Run 1 with `gh run list --branch fix/bug-048-ci-measured-baseline --workflow Test --limit 1 --json databaseId,headSha,event`. The run may not be registered yet right after `gh pr create`, so repeat that one command (single invocations about 15 s apart, never a shell loop) until the listed `headSha` equals `git rev-parse HEAD` and `event` is `pull_request`. Then wait with `gh run watch <id> --exit-status`.
+- [X] [T-006-E] Measure with `node .conductor/bug048/ci-measure.mjs <id> 1 .conductor/bug048/run1-a1.json`, then compare against the Predictions table, leg by leg:
+  - **`ci-node20`:** conclusion `success`. Totals `Tests  949 passed | 96 skipped (1045)` (revised at Task 5, originally 948 / 1044). Skipped by file: `conductor-db` 74, `handoff-cycle` 3, `resume-read` 6, plugin 12, `heal` 1.
+  - **`ci-node24`:** conclusion `success`. Totals `Tests  1032 passed | 13 skipped (1045)` (revised at Task 5, originally 1031 / 1044). Skipped by file: plugin 12, `heal` 1.
   - **Both legs:** `deprecated=0` (Mechanism 1), and each leg's last instrument line is `SKIP_BASELINE_REPORT_ONLY: no --env given, nothing asserted`.
   - **Any difference halts the plan here.** Report the measured and predicted values side by side, and write no baseline.
-- [ ] [T-006-F] Fill in these Bootstrap record fields, one single-line edit each: Run 1 id and head SHA; attempt 1 `ci-node20`; attempt 1 `ci-node24`; and annotations.
+- [X] [T-006-F] Fill in these Bootstrap record fields, one single-line edit each: Run 1 id and head SHA; attempt 1 `ci-node20`; attempt 1 `ci-node24`; and annotations.
 
 ### Task 7: Run 1, attempt 2 (identity stability)
 
 **Files:**
 - Create: `.conductor/bug048/stability.mjs`
 
-- [ ] [T-007-A] Write `.conductor/bug048/stability.mjs`:
+- [X] [T-007-A] Write `.conductor/bug048/stability.mjs`:
 
 ```js
 // Compares two attempts' measured sets byte-for-byte per leg. An identity that embeds a
@@ -775,9 +782,9 @@ for (const env of Object.keys(a)) {
 process.exitCode = stable ? 0 : 1;
 ```
 
-- [ ] [T-007-B] Re-run Run 1 with `gh run rerun <id>`, then `gh run watch <id> --exit-status`. The rerun uses the same commit, and nothing is committed between attempts.
-- [ ] [T-007-C] Measure attempt 2 with `node .conductor/bug048/ci-measure.mjs <id> 2 .conductor/bug048/run1-a2.json`, then compare with `node .conductor/bug048/stability.mjs .conductor/bug048/run1-a1.json .conductor/bug048/run1-a2.json`. Expected: `IDENTITY_STABLE ci-node20: 96 …` and `IDENTITY_STABLE ci-node24: 13 …`, at rc 0. **`IDENTITY_UNSTABLE` halts the plan.** Report each differing identity. The fix is to the identity or the test title, decided with the owner, never an edit to the baseline.
-- [ ] [T-007-D] Fill in the Bootstrap record field "Identity stability", as a single-line edit, with both `IDENTITY_STABLE` lines verbatim.
+- [X] [T-007-B] Re-run Run 1 with `gh run rerun <id>`, then `gh run watch <id> --exit-status`. The rerun uses the same commit, and nothing is committed between attempts.
+- [X] [T-007-C] Measure attempt 2 with `node .conductor/bug048/ci-measure.mjs <id> 2 .conductor/bug048/run1-a2.json`, then compare with `node .conductor/bug048/stability.mjs .conductor/bug048/run1-a1.json .conductor/bug048/run1-a2.json`. Expected: `IDENTITY_STABLE ci-node20: 96 …` and `IDENTITY_STABLE ci-node24: 13 …`, at rc 0. **`IDENTITY_UNSTABLE` halts the plan.** Report each differing identity. The fix is to the identity or the test title, decided with the owner, never an edit to the baseline.
+- [X] [T-007-D] Fill in the Bootstrap record field "Identity stability", as a single-line edit, with both `IDENTITY_STABLE` lines verbatim.
 
 ### Task 8: The arming commit, and Run 2 (the proof)
 
@@ -787,7 +794,7 @@ process.exitCode = stable ? 0 : 1;
 - Modify: `.github/workflows/test.yml` (the last step's name and command)
 - Modify: this plan's Bootstrap record
 
-- [ ] [T-008-A] Write `.conductor/bug048/write-baseline.mjs`:
+- [X] [T-008-A] Write `.conductor/bug048/write-baseline.mjs`:
 
 ```js
 // Writes tools/skip-baseline.json from one measured attempt, then reads the file back
@@ -810,19 +817,19 @@ for (const env of Object.keys(measured)) {
 }
 ```
 
-- [ ] [T-008-B] Run `node .conductor/bug048/write-baseline.mjs .conductor/bug048/run1-a1.json tools/skip-baseline.json`. Expected: `BASELINE_WRITTEN ci-node20: 96 …` and `BASELINE_WRITTEN ci-node24: 13 …`, at rc 0.
-- [ ] [T-008-C] Show that assert mode reads the committed file, and that a laptop is not a CI environment:
+- [X] [T-008-B] Run `node .conductor/bug048/write-baseline.mjs .conductor/bug048/run1-a1.json tools/skip-baseline.json`. Expected: `BASELINE_WRITTEN ci-node20: 96 …` and `BASELINE_WRITTEN ci-node24: 13 …`, at rc 0.
+- [X] [T-008-C] Show that assert mode reads the committed file, and that a laptop is not a CI environment:
   - Run `npm test -- --reporter=default --reporter=json --outputFile.json=vitest-report.json`, then `node tools/skip-baseline.mjs --env ci-node24 --report vitest-report.json`.
   - Expected: `SKIP_BASELINE_DRIFT ci-node24: +0 −1 (report: vitest-report.json, baseline: tools/skip-baseline.json)`, followed by one `−` line naming the heal-pin identity from `tests/installer/heal.test.js`, at rc 1. Locally the history is present, so the pin runs.
   - Then delete the report with `rm vitest-report.json`.
-- [ ] [T-008-D] Arm the gate in `.github/workflows/test.yml`. Replace the last step:
+- [X] [T-008-D] Arm the gate in `.github/workflows/test.yml`. Replace the last step:
   - its name `Report the skipped set (unarmed until this branch's CI measures the baseline)` becomes `Assert the skipped set against the measured baseline`;
   - its command `node tools/skip-baseline.mjs --report vitest-report.json` becomes `node tools/skip-baseline.mjs --env ci-node${{ matrix.node }} --report vitest-report.json`.
-- [ ] [T-008-E] Fill in the Bootstrap record field "Arming commit SHA" with `(this commit; see git log)` as a single-line edit. A commit cannot contain its own SHA, so the real SHA is written at closeout.
-- [ ] [T-008-F] Stage:
+- [X] [T-008-E] Fill in the Bootstrap record field "Arming commit SHA" with `(this commit; see git log)` as a single-line edit. A commit cannot contain its own SHA, so the real SHA is written at closeout.
+- [X] [T-008-F] Stage:
   - `git add tools/skip-baseline.json` (a new file in a directory that is not ignored);
   - `git add -u .github/workflows/test.yml docs/superpowers/plans/2026-09-29-bug048-ci-measured-baseline.md`.
-- [ ] [T-008-G] Commit: `git commit -m "ci: arm the skip-baseline gate with the sets CI measured [BUG-048]"`. **Boundary:** 1032 / 12 (1044), unchanged. The arming commit adds no test, so Run 2's totals must equal Run 1's.
+- [X] [T-008-G] Commit: `git commit -m "ci: arm the skip-baseline gate with the sets CI measured [BUG-048]"`. **Boundary:** 1033 / 12 (1045), unchanged since Task 5 (revised prediction). The arming commit adds no test, so Run 2's totals must equal Run 1's.
 - [ ] [T-008-H] Push with `git push`. Find Run 2 as in T-006-D and confirm `headSha` equals the arming commit. Wait with `gh run watch <id> --exit-status`, then run `node .conductor/bug048/ci-measure.mjs <id> 1 .conductor/bug048/run2.json`. Expected on each leg:
   - conclusion `success`, with the same totals as Run 1;
   - `deprecated=0`;

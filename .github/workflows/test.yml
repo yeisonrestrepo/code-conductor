@@ -42,5 +42,5 @@ jobs:
       - name: Run tests
         run: npm test -- --reporter=default --reporter=json --outputFile.json=vitest-report.json
 
-      - name: Report the skipped set (unarmed until this branch's CI measures the baseline)
-        run: node tools/skip-baseline.mjs --report vitest-report.json
+      - name: Assert the skipped set against the measured baseline
+        run: node tools/skip-baseline.mjs --env ci-node${{ matrix.node }} --report vitest-report.json
