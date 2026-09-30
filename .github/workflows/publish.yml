@@ -25,10 +25,11 @@ jobs:
       - run: npm install -g npm@^11.5.1
       - run: npm ci
       # Node 24 is the most-covered runtime: it executes the node:sqlite suites that
-      # Node 20 skips. The Node 20 floor is asserted on every PR by test.yml's matrix, on
-      # this same commit. No skip-baseline step here [BUG-048]: the baseline is a merge
-      # gate, every publishable commit already passed both asserted legs on its PR, and
-      # this suite's own red remains the publish gate.
+      # Node 20 skips. The Node 20 floor is asserted by test.yml's matrix on the PR, and
+      # again by its push-to-main run, which tests the exact commit a release tags. No
+      # skip-baseline step here [BUG-048]: the baseline is a merge gate, every publishable
+      # commit already passed both asserted legs, and this suite's own red remains the
+      # publish gate.
       - run: npx vitest run
       - name: Verify package version matches the release tag
         run: |
