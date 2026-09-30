@@ -75,11 +75,12 @@ The population in row 1 grew from 41 to 43 *mid-measurement, because two of the 
 
 ## Instruments: releases that verify their own record
 
-Three checks live in `tools/` as tracked repository infrastructure, and two of them run against the live repository in CI, so a divergence blocks the merge rather than waiting for someone to remember:
+Four checks live in `tools/` as tracked repository infrastructure. Three of them run on every pull request, so a divergence blocks the merge rather than waiting for someone to remember, and the fourth is a query run by hand:
 
-- **`version-gate.mjs`** takes `VERSION` as the authority and checks four other locations against it. Agreement reports as agreement, which sounds trivial until you learn that its predecessor reported `FAIL` on five locations that agreed, because it compared against a literal frozen two releases earlier.
-- **`record-parity.mjs`** asserts that every item the `CHANGELOG` claims has a closed backlog entry naming the version it shipped in. It exists because `[BUG-044]` shipped, was closed out in memory, and left its backlog entry reading `[ ]` for an entire release with no instrument comparing the two documents.
-- **`id-ceiling.mjs`** reports the highest filed id over the working tree **union** `origin/main`, counting only filed headings. Its predecessor counted id-shaped tokens anywhere, so it once read a plan file's prediction of its own output back as evidence.
+- **`version-gate.mjs`** takes `VERSION` as the authority and checks four other locations against it. Agreement reports as agreement, which sounds trivial until you learn that its predecessor reported `FAIL` on five locations that agreed, because it compared against a literal frozen two releases earlier. It runs at the merge gate through `tests/tools/repo-invariants.test.js`, and by hand at closeout.
+- **`record-parity.mjs`** asserts that every item the `CHANGELOG` claims has a closed backlog entry naming the version it shipped in. It exists because `[BUG-044]` shipped, was closed out in memory, and left its backlog entry reading `[ ]` for an entire release with no instrument comparing the two documents. It runs at the merge gate through `tests/tools/repo-invariants.test.js`, and by hand at closeout.
+- **`skip-baseline.mjs`** asserts each CI leg's exact skipped-test set against `tools/skip-baseline.json`, where every set is copied from that leg's own run rather than typed. It runs directly in `.github/workflows/test.yml` on the Node 20 and Node 24 legs, after the suite. It exists because CI was green with 96 tests skipped on Node 20 against 12 locally, and nothing asserted either number.
+- **`id-ceiling.mjs`** reports the highest filed id over the working tree **union** `origin/main`, counting only filed headings. Its predecessor counted id-shaped tokens anywhere, so it once read a plan file's prediction of its own output back as evidence. It is local-only by ruling: a person or agent runs it, over both legs, before minting an id. Its remote leg needs history the CI checkout does not fetch, so CI asserts only its duplicate-free half.
 
 **The example worth checking.** `[BUG-046]`'s own release ran those instruments against itself, then proved the green rather than trusting it: with the item's backlog heading deliberately flipped to `[ ]`, `record-parity` reported `FAIL [A] 1.32.2 claims BUG-046 but its heading reads [ ]` once per claim bullet and exited 1; flipped back, `RECORD_PARITY_OK`. The first release whose record cannot silently diverge is the release that made divergence detectable.
 
@@ -95,10 +96,11 @@ Three checks live in `tools/` as tracked repository infrastructure, and two of t
 
 ## Known limits
 
-- **`[BUG-045]` is the one open filed defect**: the Guard 3 allowlist cannot cover a quoted path, because the boundary sets it interpolates contain no quote character, so an entry `docs/` does not cover `cat "docs/x.md" *.md`. Filed with its ritual priced, untouched pending its own change.
+- **`[BUG-045]`, open:** the Guard 3 allowlist cannot cover a quoted path, because the boundary sets it interpolates contain no quote character, so an entry `docs/` does not cover `cat "docs/x.md" *.md`. Filed with its ritual priced, untouched pending its own change.
+- **`[BUG-032]`, open:** global memory preferences sit outside the documented lookup chain. Nothing in the chain points at `~/.claude/memory/personal.md`, and the installer never deploys `global/memory/`, so a preference filed there is never read by the agent it was written for.
 - **The `P7` false positive above**, still live.
 - **A re-run against an untouched `project.md` prints a recovery hint it cannot prove is needed.** If you install, never write anything into `.claude/memory/project.md`, and install again, you get a line suggesting the file may have been overwritten by a pre-`1.30.0` re-run. It was not; it equals the stub because it was seeded and never edited. The check compares content and **cannot distinguish "seeded and untouched" from "clobbered"**, which is why the wording is hedged to "may have been" rather than "was". This residual is named and accepted in [`BUG-039`'s spec at `:129`](docs/superpowers/specs/2026-09-27-bug039-installer-host-owned-state-design.md), where the alternative (restoring from the host's own git history) was rejected as writing host files out of the host's history with new failure modes. A **fresh** install is silent, which the Quickstart shows.
-- **Two open dossiers**, which are the evidence-collection pipeline working rather than a backlog: a session denial tally, and one for interleaved-artifact reports. A dossier holds specimens until a mechanism is characterized by probe; an id is minted only when the written condition is met. `[BUG-047]` is what that pipeline produces when it completes: an out-of-scope note, then a dossier, then four specimens across four sessions, then a mint, then a release.
+- **Three open dossiers**, which are the evidence-collection pipeline working rather than a backlog: a session denial tally, one for interleaved-artifact reports, and an intermittent commit-hook hang in the `snap-build` suite. A dossier holds specimens until a mechanism is characterized by probe; an id is minted only when the written condition is met. `[BUG-047]` is what that pipeline produces when it completes: an out-of-scope note, then a dossier, then four specimens across four sessions, then a mint, then a release.
 
 **The living artifact is `AGENT-READABLE BACKLOG.md`.** It is not a tidy issue list. It carries amendments above the text they amend, premises that measurement later corrected, and wrong guesses recorded beside the probe that overturned them.
 
@@ -113,7 +115,7 @@ code-conductor assumes these are already in place — the installer does not set
 | Node.js `>= 20` | Running the `code-conductor` CLI itself | Any current Node LTS |
 | Claude Code | The environment every command/skill/hook in this repo runs inside | — |
 | **superpowers plugin** | `/cc-spec` (`brainstorming`), `/cc-plan` (`writing-plans`), and `/cc-debug`, `/cc-refactor`, `/cc-review`, `/cc-test` (all four via `subagent-driven-development`) | Install from Claude Code's `/plugin` marketplace, then run `/reload-plugins`, **before** using these commands — without it, their `Skill(...)` calls fail |
-| ui-ux-pro-max skill | UI/UX guidance on frontend projects | No manual step — the installer downloads it from GitHub automatically when `/cc-stack` detects a frontend stack |
+| ui-ux-pro-max skill | Nothing: retired guidance | No shipped code downloads, installs or activates it. Its replacement is filed as `[FEAT-037]` |
 
 ---
 
@@ -126,7 +128,6 @@ AI coding assistants are only as good as the structure you put around them. With
 | Free-form prompt → agent guesses, overwrites, drifts | `/cc-spec` → approved spec → `/cc-plan` → confirmed steps → implement |
 | Full files read on every turn | grep/find before read — targeted tool calls only |
 | Conventions reset every session | Stack profile + memory loaded at session start |
-| Frontend code with no UX consideration | UI/UX skill activated automatically for frontend stacks |
 | Manual CLAUDE.md with `<command>` placeholders | **Stack auto-detection** — `code-conductor --project` reads your `package.json`, `go.mod`, `Cargo.toml`, etc. and auto-fills CLAUDE.md Development Commands so the agent never guesses your build/test/lint commands |
 | Verbose markdown handoffs eat context | **SNAP v1**: minified single-line JSON handoff format, schema-validated by `scripts/snap-validate.mjs`, ≥15% smaller than the markdown snapshot it replaces |
 
@@ -224,9 +225,9 @@ Applied to every piece of code written or reviewed in every session. Enforces:
 - Descriptive names — no `Base`, `Abstract`, `Manager`, `Handler`
 - Comments explain why, never what
 
-### ui-ux-pro-max — frontend projects
+### ui-ux-pro-max — retired guidance, pending [FEAT-037]
 
-Activated automatically when `/cc-stack` detects a frontend stack (React, Angular, Next.js, and similar). Installed from [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) — the installer downloads it directly from GitHub. Enforces visual hierarchy, spacing grids, semantic color tokens, component states, WCAG AA accessibility, and framework-specific UI conventions.
+Earlier releases described this skill as installed from GitHub and activated when `/cc-stack` detects a frontend stack. No shipped code does either. The `CLAUDE.md` templates still name it; `[FEAT-037]` replaces it with a frontend design skill stack, and this section changes when that ships.
 
 ### critical-review — always active during implementation
 
@@ -414,7 +415,6 @@ code-conductor/
     ├── memory-first/SKILL.md      Always active — memory → grep → read chain
     └── agent-delegation/SKILL.md  Always active — sub-agent spawn rules
     # Claude Code registers personal skills only at ~/.claude/skills/<name>/SKILL.md
-    # ui-ux-pro-max installed from github.com/nextlevelbuilder/ui-ux-pro-max-skill
 ```
 
 ---
