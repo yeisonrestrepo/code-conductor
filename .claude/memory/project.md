@@ -1848,3 +1848,62 @@ Neither asserts `description` or `keywords`.
 ### Queue
 
 Nothing minted. The FEAT-038 owner half is verified (step 6 above), and `LAUNCH-CHECKLIST.md`'s `[FEAT-038]` prerequisite is now true; ticking it is the owner's act. `[BUG-045]` remains open on the owner's word. **The next mintable id is `BUG-049`.**
+
+## Closeout: 1.34.3, the README's defect, dossier and instrument claims derived from the tree [2026-09-29]
+
+Patch **`1.34.3`** shipped (PR #47, squash `6922af0`). It carries no backlog item: it is documentation accuracy from the 2026-09-29 pre-launch audit's Class A rulings, and its CHANGELOG bullets carry no id marker, so record parity reads zero `1.34.3` claims by design. The owner waived a spec: the edits were ruled line by line, and a lean plan plus the release ritual was judged enough (`docs/superpowers/plans/2026-09-29-docs-accuracy-1-34-3.md`). **This release discharges the company-internal sharing prerequisite:** from `1.34.3` the repo is shareable inside the owner's company, and the README on npm matches the tree.
+
+**Sync.** Measured before acting: **`0 ahead / 1 behind`**, which is clean. `main` was fast-forwarded to `6922af0`.
+
+**Instrument output on the merged tree:**
+- **`VERSION_GATE_OK 1.34.3`**.
+- **`RECORD_PARITY_OK`**.
+- The ceiling from both legs is **`{"BUG":48,"FEAT":39,"ARCH":9}`**, with 58 headings each and no duplicates. The next mintable id is **`BUG-049`**; nothing was minted.
+- `main`'s push run `36658863428` succeeded, printing `SKIP_BASELINE_OK ci-node20: 96 skipped` and `SKIP_BASELINE_OK ci-node24: 13 skipped`.
+- **Publish:** run **`36658977844`** (release `v1.34.3`) **succeeded**, printing `+ @yeison.restrepo.r/code-conductor@1.34.3` at 02:15:51Z. This is the third consecutive success under the BUG-048 workflow.
+- **npm:** the first read after the sync still showed `1.34.2`, the same lag as at `1.34.2`. The re-query read `version 1.34.3` and `gitHead 6922af0`, equal to the tag's commit.
+
+**Eight predictions, eight matches:**
+
+| Boundary | Predicted | Measured |
+|---|---|---|
+| Task 0, plan (`b7a8b7d`) | 1035 / 12 | 1035 / 12 (1047) |
+| Task 1, `repo-invariants` red | 4 failed / 8 passed | 4 failed / 8 passed |
+| Task 1, `repo-invariants` green | 12 passed | 12 / 12 |
+| Task 1 commit (`142044e`) | 1039 / 12 | 1039 / 12 (1051) |
+| Task 2 commit (`2186e0d`) | 1039 / 12 | 1039 / 12 |
+| Task 3, release (`d13a2a3`) | 1039 / 12 | 1039 / 12 |
+| PR run `36658702670`, `ci-node20` | 955 / 96 | 955 / 96 (1051), `SKIP_BASELINE_OK` |
+| PR run `36658702670`, `ci-node24` | 1038 / 13 | 1038 / 13 (1051), `SKIP_BASELINE_OK` |
+
+`tools/skip-baseline.json` is unchanged. The owner's original prediction was "docs-only, so 1035 / 12". The plan corrected it to +4 passed, because the red-green pins add tests while the skipped sets, the only thing the baseline asserts, do not move. The owner confirmed the correction.
+
+### Content
+
+- **README claims are now derived, not counted.** Four `tests/tools/repo-invariants.test.js` tests pin them, and each was watched red first:
+  - **Known limits lists exactly the backlog's open BUG headings.** It now shows `[BUG-045]` and `[BUG-032]`, one bullet each; before, it named `[BUG-045]` as "the one open filed defect". Sweep items 4 and 7.
+  - **The dossier count follows the backlog's `### DOSSIER` headings.** It now reads three, including the `snap-build` hang dossier opened in `7fc283d`. Sweep item 8.
+  - **Every tracked `tools/*.mjs` is named, and the count leads the section.** There are four, and each states how it runs: `skip-baseline.mjs` directly at `test.yml:46`, `version-gate.mjs` and `record-parity.mjs` at the merge gate through `repo-invariants`, and `id-ceiling.mjs` local-only by ruling. Sweep item 9.
+  - **No automatic-install claim for ui-ux-pro-max.** No shipped code installs it; the README now calls it retired guidance pending `[FEAT-037]`, and the Problem-table row claiming automatic activation was deleted by ruling. The residual is left to `[FEAT-037]`: `global/CLAUDE.md:86` and `project-template/CLAUDE.md:49,75` still name it, and the README says so. Sweep item 10.
+- **`RECORDING-SCRIPT.md:19`:** the off-camera install output is now "empty", as measured against `1.34.2` from a scratch `HOME`. Sweep item 11.
+- **Show HN freeze line.** `SHOW-HN-DRAFT.md` carries one line recording the Class B ruling. Sweep items 1–6 are deferred to a single regeneration on posting eve, each figure recomputed by its own stated method, and nobody patches them piecemeal in between.
+- **Two uncharacterized specimens in the session denial tally dossier, from one day of ordinary work:**
+  - **P7**, the audit's chained read (`2186e0d`). The entry also corrects the audit report, which had called it the `[BUG-041]` residual without a probe.
+  - **P5**, the PR #47 CI read, chained with a `$(...)` substitution. It also opens with `cat <file> | tail`, so the trigger is not assumed. Recorded in this closeout's commit.
+
+  Both were decomposed into scratchpad scripts: no inline retry, no allowlist entry, no probe. They are evidence for sizing a future Guard 3 refinement spec, with no cause claimed.
+
+### Pre-launch audit, for the record
+
+The read-only audit at `06fd2ca` produced these results:
+- **Instruments:** all green.
+- **Quickstart:** the transcript reproduced from a fresh `mktemp -d` with a fresh `HOME`: `1.34.2`, rc 0, 0 bytes on stdout and stderr.
+- **Recording scenes:** all four verdicts matched through the scaffolded hook: `P4` deny, allow, heredoc allow, `P4` deny.
+- **Listings:** the npm and GitHub listings equal V1 and V2.
+- **Social preview and issues:** `usesCustomOpenGraphImage: false`, and 0 open issues.
+
+**What is left before posting is owner acts:** the GIF, the social preview decision, the `[BUG-045]` issue, the Show HN regeneration on posting eve, and the Quickstart re-run on the day of posting.
+
+### Queue
+
+Nothing minted. **The next mintable id is `BUG-049`.** Next: `/cc-spec ARCH-009`, scoped to the vertical slice by the owner's addendum. The deliverable is the band contract with its gate enum and the SNAP v2 fields going live, sized so FEAT-011 and FEAT-012 can ship one real Code-to-QA handoff. FEAT-031 through FEAT-036 are post-launch. The slice is timeboxed by the owner, and the public launch does not wait for it.

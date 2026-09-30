@@ -666,9 +666,9 @@ Three, all on the work auditing the deny message they printed.
 
    Reported as P5. **Note a double-count corrected:** this command and the "`-z "$(git status --short)"` shape" mentioned separately in the same exchange are **the same specimen**, not two. One specimen, four command substitutions, no probe yet. Disposition: the command was **decomposed into three simpler calls**, not retried; the first landed as `d92b625`.
 
-#### Incidental toll, 2026-09-29 session (pre-launch audit)
+#### Incidental tolls, 2026-09-29 session (pre-launch audit and the 1.34.3 release)
 
-One, on a read-only audit command.
+Two, both on read-only commands, both uncharacterized.
 
 1. **P7**, a chained read: README lines, the `tools/` listing, the workflows' `run:` lines, a backlog slice and the dossier headings. Denied. **Uncharacterized.** This entry also corrects the audit report that produced it: the report called it the `[BUG-041]` P7 residual firing live, which is a mechanism claim made without a probe. The command carries an unquoted `*.yml` glob as a `grep` file operand, so whether this is the residual or the guard reading a real glob is exactly what is not known. Verbatim, with the repository path replaced by `<repo>`:
 
@@ -677,6 +677,14 @@ One, on a read-only audit command.
    ```
 
    Disposition: the same reads were moved into a scratchpad script run with `bash`, which Guard 3 allowed. Not retried inline, no allowlist entry.
+
+2. **P5**, reading PR #47's CI result after `1.34.3`'s checks went green: chained with `;` and `&&`, with pipes and one `$(...)` substitution capturing a run id. Denied. **Uncharacterized, and no probe was run.** For whoever probes it later, the command also opens with `cat <file> | tail -4`, which is a second candidate for what P5 read, so the substitution is not assumed to be the trigger. Verbatim, with the repository path replaced by `<repo>` and the scratch directory by `<tmp>`:
+
+   ```
+   cd <repo> && cat <tmp>/pr47-checks.txt | tail -4; id=$(gh run list --branch docs/readme-accuracy-1-34-3 --workflow test.yml --limit 1 --json databaseId --jq '.[0].databaseId'); echo "run=$id"; gh run view "$id" --log > <tmp>/pr47-log.txt 2>&1; grep -E 'SKIP_BASELINE|Tests  ' <tmp>/pr47-log.txt | cut -c1-230; git diff --quiet main -- tools/skip-baseline.json && echo "baseline_diff=empty"
+   ```
+
+   Disposition: decomposed into a scratchpad script run with `bash`, which Guard 3 allowed. Not retried inline, no allowlist entry.
 
 #### The tally's note, so the frequency signal stays clean
 
