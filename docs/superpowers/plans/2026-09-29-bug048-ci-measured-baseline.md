@@ -96,7 +96,8 @@ This is the owner's expected shape, and the plan follows it, with two stated dif
 - Run 1 attempt 1, `ci-node24` (conclusion, totals, skipped by file): `success`, Node v24.21.0, `Tests  1032 passed | 13 skipped (1045)`; plugin 12, heal 1. Matches the revised prediction exactly, so the 83 `node:sqlite` tests ran and passed on Node 24.
 - Run 1 annotations (deprecation warnings per leg): 0 on each leg. Each leg carries exactly one annotation, the notice "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026…" (out of scope).
 - Identity stability, attempt 1 vs attempt 2: `IDENTITY_STABLE ci-node24: 13 identities byte-identical across both attempts` / `IDENTITY_STABLE ci-node20: 96 identities byte-identical across both attempts` (rc 0; attempt 2 totals and composition identical to attempt 1)
-- Arming commit SHA: (this commit; see git log)
+- Arming commit SHA: `bfe68fc22454968f2ae41cbbf2d9b97e9e589690` (squash-merged to `main` as `a3c82b1`, tree-identical)
+- Run 2 (recorded at closeout on `main`, per Difference 2): `36648998924` on `bfe68fc`; `SKIP_BASELINE_OK ci-node20: 96 skipped identities match tools/skip-baseline.json (report: vitest-report.json)` and `SKIP_BASELINE_OK ci-node24: 13 skipped identities match tools/skip-baseline.json (report: vitest-report.json)`; totals 949 / 96 and 1032 / 13 (1045), equal to Run 1; 0 deprecation annotations on each leg. `main`'s push run `36649619172` on `a3c82b1` repeated both OK lines.
 
 ## Review Focus
 
@@ -830,13 +831,13 @@ for (const env of Object.keys(measured)) {
   - `git add tools/skip-baseline.json` (a new file in a directory that is not ignored);
   - `git add -u .github/workflows/test.yml docs/superpowers/plans/2026-09-29-bug048-ci-measured-baseline.md`.
 - [X] [T-008-G] Commit: `git commit -m "ci: arm the skip-baseline gate with the sets CI measured [BUG-048]"`. **Boundary:** 1033 / 12 (1045), unchanged since Task 5 (revised prediction). The arming commit adds no test, so Run 2's totals must equal Run 1's.
-- [ ] [T-008-H] Push with `git push`. Find Run 2 as in T-006-D and confirm `headSha` equals the arming commit. Wait with `gh run watch <id> --exit-status`, then run `node .conductor/bug048/ci-measure.mjs <id> 1 .conductor/bug048/run2.json`. Expected on each leg:
+- [X] [T-008-H] Push with `git push`. Find Run 2 as in T-006-D and confirm `headSha` equals the arming commit. Wait with `gh run watch <id> --exit-status`, then run `node .conductor/bug048/ci-measure.mjs <id> 1 .conductor/bug048/run2.json`. Expected on each leg:
   - conclusion `success`, with the same totals as Run 1;
   - `deprecated=0`;
   - exactly one instrument line: `SKIP_BASELINE_OK ci-node20: 96 skipped identities match tools/skip-baseline.json (report: vitest-report.json)` on `ci-node20`, and the `ci-node24` counterpart with 13.
 
   Any other outcome halts the plan.
-- [ ] [T-008-I] Post Run 2's result as a PR comment: the run id, both `SKIP_BASELINE_OK` lines verbatim, both totals, and the annotation counts. Then run `gh pr ready`. The plan's Bootstrap record gets Run 2 and the arming SHA at closeout on `main`, as Difference 2 explains.
+- [X] [T-008-I] Post Run 2's result as a PR comment: the run id, both `SKIP_BASELINE_OK` lines verbatim, both totals, and the annotation counts. Then run `gh pr ready`. The plan's Bootstrap record gets Run 2 and the arming SHA at closeout on `main`, as Difference 2 explains.
 
 ## Test List
 

@@ -1671,3 +1671,52 @@ Spec `docs/superpowers/specs/2026-09-29-bug048-ci-measured-baseline-design.md`, 
 - **R2:** `publish.yml` does NOT run the instrument: the baseline is a merge gate, every publishable commit passed both asserted legs on its PR, and the publish suite's Vitest red remains the publish gate.
 - **Out:** raising `engines` (Node 20 EOL 2026-04-30; the 20 leg leaves later as a deliberate act with a baseline diff), running the plugin suite in CI, `fetch-depth: 0`, the Ubuntu 26 runner notice, Windows/macOS legs, asserting passed counts, a local baseline.
 - **Carried to /cc-plan (owner):** bootstrap sequencing is Review Focus item 1 (baseline measured from the branch's own CI before arming); an identity-stability check across two runs is a plan task with its result recorded in the plan text; each leg's skipped count is predicted per environment before the arming run.
+
+## Closeout: 1.34.1, CI's skipped set becomes a measured, asserted baseline [2026-09-29]
+
+`[BUG-048]` shipped as **`1.34.1`** (PR #45, squash `a3c82b1`, tree-identical to the arming commit `bfe68fc`).
+
+**Sync.** Measured before acting: **`0 ahead / 1 behind`**, which is clean. Local `main` was fast-forwarded in place with `git fetch origin main:main`, because `git switch` refused over the plan file's uncommitted ticks, and the ticks were not stashed.
+
+**Instrument output on the merged tree:**
+- **`VERSION_GATE_OK 1.34.1`** (five `ok`).
+- **`RECORD_PARITY_OK`**.
+- The ceiling from both legs is **`{"BUG":48,"FEAT":39,"ARCH":9}`**, with 58 headings each and no duplicates. The next mintable id is **`BUG-049`**; nothing was minted.
+- The local suite reads **1033 passed / 12 skipped (1045)**.
+- `main`'s push run `36649619172` printed both `SKIP_BASELINE_OK` lines.
+
+### Bootstrap: two runs, three executions, every prediction matched
+
+| Execution | Commit | `ci-node20` | `ci-node24` |
+|---|---|---|---|
+| Run 1, attempt 1 (report-only), `36648751722` | `d3b8b8b` | success, v20.20.2, 949 / 96 (1045): `conductor-db` 74, `handoff-cycle` 3, `resume-read` 6, plugin 12, heal pin 1 | success, v24.21.0, 1032 / 13 (1045): plugin 12, heal pin 1 |
+| Run 1, attempt 2 (rerun, same commit) | `d3b8b8b` | `IDENTITY_STABLE ci-node20: 96` byte-identical | `IDENTITY_STABLE ci-node24: 13` byte-identical |
+| Run 2 (armed), `36648998924` | `bfe68fc` | `SKIP_BASELINE_OK ci-node20: 96 …` | `SKIP_BASELINE_OK ci-node24: 13 …` |
+
+- **Deprecation annotations:** 0 on every leg of every execution. The only annotation is the Ubuntu 26 notice, which is out of scope.
+- **Local test counts per task:** 1032 / 12 (1044) at Tasks 1–4. The owner-accepted empty-`--env` fix added one test, and the predictions were revised **before** Run 1 to 1033 / 12, 949 / 96 and 1032 / 13 (1045). Every later commit read 1033 / 12.
+- **The node24 leg ran the persistence suites in CI for the first time.** The 83 `node:sqlite` tests ran and passed there.
+- **Local demonstration.** `--env ci-node24` against a local report gave `SKIP_BASELINE_DRIFT ci-node24: +0 −1`, naming the heal pin (history is present locally), at rc 1. This shows the gate reads the committed file and that a laptop is not a CI environment.
+
+### Record
+
+- **D2 reverses `project.md:521`.** That line reads "The runner stays on `node-version: '20'` … Raising the runner to 22/24 and adding a Node matrix to Test are both out of scope". It is kept as history. `publish.yml` now tests on Node 24, and `test.yml` runs the `{20, 24}` matrix. The Node 20 floor is asserted by the matrix on the PR and again by the push-to-main run.
+- **Two spec gaps closed beyond the spec's text**, both found by the pre-push review and accepted by the owner:
+  - `docs/launch/RECORDING-SCRIPT.md:105`'s frozen "996 passed / 12 skipped at 1.33.0", which R1's surface did not name (`ec62580`);
+  - `publish.yml`'s comment crediting the same-commit guarantee to the PR run, which tests the merge ref, when the push-to-main run is the one that tests the tagged commit (`d3b8b8b`).
+- **The review's principal catch.** `--env ""` read as no `--env` and passed as report-only at rc 0. That was **a fail-open inside the one gate whose thesis is failing closed**. It is fixed in `e724b45`: the new test went red with the fix stashed (1 failed, 23 passed) and green with it (24/24). CI could not reach it (the armed form is `ci-node${{ matrix.node }}`), which is exactly why only a review could find it.
+- **`[ARCH-009]` observation.** The plan's `ci-measure.mjs` fetched job logs with `gh api …/jobs/{id}/logs`. gh 2.100.0 refuses a response containing terminal escapes unless given `--allow-escape-sequences`, and Vitest colours its CI output, so every leg would have thrown. **A plan cannot know a tool's live behaviour; only an execution against the installed binary reveals it, and that is what a verify-band reviewer is for.** The Task 5 reviewer measured it on a real job log, and it was fixed in the plan text before Run 1 was spent.
+- **Hybrid execution split: held.** Tasks 1–4 were subagent-driven with a reviewer between tasks (all approved, zero fix rounds, every handoff observation "nothing missing"). Tasks 5–8 ran natively in-session, against live CI state in strict run order. This was a band boundary chosen in the field: isolated build tasks went to fresh contexts, and verify/ship orchestration stayed continuous.
+- **The seven reviewer-agreed residuals, left as-is (owner-ratified):**
+  1. A **duplicate test name** in a report aborts every run while the pair exists. This is fail-closed, as the plan chose. No file that can skip in CI has one (measured over 124 tests).
+  2. A **repeated `--report`** silently overrides the earlier value. The workflow passes it once.
+  3. A null `assertionResults` entry throws a TypeError rather than printing an ABORT line. It still exits nonzero, and Vitest never emits one.
+  4. `LAUNCH-CHECKLIST.md:17` is a run-on line (brief-verbatim).
+  5. `RELEASE-CLOSEOUT.md:3` "each CI leg also asserts" was false until the arming commit. It became true before the merge.
+  6. `publish.yml`'s same-commit premise. It was later reworded by the owner-accepted `d3b8b8b`.
+  7. `tools/skip-baseline.json` is named by the CHANGELOG and the backlog before it existed. It landed at arming, by design.
+- **Working ledger** `.superpowers/sdd/2026-09-29-bug048-ci-measured-baseline/` was deleted in this record commit's action. Git history is the record.
+
+### Queue
+
+Nothing minted. `[BUG-045]` remains open on the owner's word. **The next mintable id is `BUG-049`.**
