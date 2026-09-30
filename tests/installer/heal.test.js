@@ -185,7 +185,7 @@ describe('healGraphifyHook', () => {
   });
 });
 
-// A local instrument, not a merge gate. actions/checkout@v4 fetches depth 1, so CI has
+// A local instrument, not a merge gate. actions/checkout@v7 fetches depth 1, so CI has
 // neither commit, and the npm tarball ships no tests. fetch-depth: 0 was declined for
 // the id ceiling on the same grounds (docs/RELEASE-CLOSEOUT.md, step 8). A skip here
 // means the history is absent, never that the hashes were verified.

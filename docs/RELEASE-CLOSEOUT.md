@@ -1,8 +1,8 @@
 # Release closeout checklist
 
-**Halt semantics come from the merge gate, not from this document.** `CONTRIBUTING.md` states the GitHub Actions CI gate is unconditional, and `tests/tools/repo-invariants.test.js` asserts the version and record invariants against the live repository on every push and pull request. So steps 3 and 4 below are **CI-backed**: skipping them does not let a divergence through, it only delays finding it.
+**Halt semantics come from the merge gate, not from this document.** `CONTRIBUTING.md` states the GitHub Actions CI gate is unconditional, and `tests/tools/repo-invariants.test.js` asserts the version and record invariants against the live repository on every push and pull request. Each CI leg also asserts its exact skipped-test set against `tools/skip-baseline.json` (`tools/skip-baseline.mjs`, `[BUG-048]`), so a change in what CI skips is red at the same gate. So steps 3 and 4 below are **CI-backed**: skipping them does not let a divergence through, it only delays finding it.
 
-Step 8 is **not** CI-backed, and the reason is named rather than left implicit: the ceiling's `origin/main` leg needs a ref `actions/checkout@v4` does not fetch at its default depth. `fetch-depth: 0` was declined, because the filing ritual's both-legs rule already protects it and a slower clone on every CI run buys nothing that rule does not give.
+Step 8 is **not** CI-backed, and the reason is named rather than left implicit: the ceiling's `origin/main` leg needs a ref `actions/checkout@v7` does not fetch at its default depth. `fetch-depth: 0` was declined, because the filing ritual's both-legs rule already protects it and a slower clone on every CI run buys nothing that rule does not give.
 
 This document exists because the sentence "run it as a closeout step the ritual cannot skip" was written against a checklist that did not exist. A sentence binding an artifact into a document that is not there is unenforceable, and an unenforceable sentence claiming enforcement is the same class of defect `[BUG-044]` shipped to fix.
 
@@ -30,7 +30,7 @@ This document exists because the sentence "run it as a closeout step the ritual 
 
    Expect `RECORD_PARITY_OK` at rc 0. **CI-backed.**
 
-5. **Merge on green.**
+5. **Merge on green**: both legs of the Test workflow green, each printing `SKIP_BASELINE_OK`.
 
 6. **Sync `main`, reporting the measurement before acting on it.**
 

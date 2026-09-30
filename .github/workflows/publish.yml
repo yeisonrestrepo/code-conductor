@@ -12,19 +12,24 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
-      # Two bounds, both load-bearing: OIDC trusted publishing needs npm >= 11.5.1,
-      # and npm 12 dropped Node 20 entirely (engines ^22.22.2 || ^24.15.0 || >=26),
-      # so an unpinned @latest fails this job with EBADENGINE. npm 11 accepts
-      # ^20.17.0 || >=22.9.0. The runner stays on Node 20 to match engines.node's
-      # floor, so the tarball is validated on the oldest Node the package supports.
+      # OIDC trusted publishing needs npm >= 11.5.1. npm stays pinned to 11 rather than
+      # floating to @latest so this job's npm moves only by a deliberate edit: npm 12's
+      # engines (^22.22.2 || ^24.15.0 || >=26) would tie the job to whichever 24.x
+      # setup-node resolves, and npm 11 accepts ^20.17.0 || >=22.9.0.
       - run: npm install -g npm@^11.5.1
       - run: npm ci
+      # Node 24 is the most-covered runtime: it executes the node:sqlite suites that
+      # Node 20 skips. The Node 20 floor is asserted by test.yml's matrix on the PR, and
+      # again by its push-to-main run, which tests the exact commit a release tags. No
+      # skip-baseline step here [BUG-048]: the baseline is a merge gate, every publishable
+      # commit already passed both asserted legs, and this suite's own red remains the
+      # publish gate.
       - run: npx vitest run
       - name: Verify package version matches the release tag
         run: |

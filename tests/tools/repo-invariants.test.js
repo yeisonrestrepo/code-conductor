@@ -33,7 +33,7 @@ describe('this repository, at every commit', () => {
   });
 
   // The ceiling itself is a query and is not asserted here: its remote leg needs a ref
-  // actions/checkout@v4 does not fetch at its default depth, and fetch-depth: 0 was
+  // actions/checkout@v7 does not fetch at its default depth, and fetch-depth: 0 was
   // declined because the both-legs filing rule already protects it. Duplicate-id
   // freedom is the assertable half, single leg, and it is the harm the ceiling exists
   // to prevent.

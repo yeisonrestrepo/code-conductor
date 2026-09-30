@@ -9,8 +9,11 @@ Each instrument carries the test that pins its semantics, because an instrument 
 | `id-ceiling.mjs` | query | a person or agent, before minting an id |
 | `version-gate.mjs` | invariant | `tests/tools/repo-invariants.test.js` in CI, and by hand at closeout |
 | `record-parity.mjs` | invariant | `tests/tools/repo-invariants.test.js` in CI, and by hand at closeout |
+| `skip-baseline.mjs` | invariant | `.github/workflows/test.yml` on every matrix leg, after the suite; report-only by hand |
 
 **Read `docs/RELEASE-CLOSEOUT.md` before a release.** Halt semantics come from the merge gate, not from any checklist line: `CONTRIBUTING.md` states the CI gate is unconditional, so a red invariant blocks the merge whether or not anybody remembered to run anything.
+
+**`skip-baseline.json` is measured, never typed.** Each key is one CI leg's exact skipped set, copied from that leg's own run. A red leg names every identity to add (`+`) or remove (`−`); the fix is to copy those lines into that key in the same PR, and the diff is the reviewer's evidence of the coverage change. A new matrix leg stays red until its key is committed. Run by hand without `--env`, the instrument only reports, because a developer machine is not a reproducible environment: its skipped set depends on the local Node and on `~/.claude/skills`.
 
 ---
 

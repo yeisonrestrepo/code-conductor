@@ -1661,3 +1661,13 @@ Through the live hook, four cases: a heredoc file write with a bracket-class bod
 ### Queue
 
 `[BUG-048]` filed by this closeout (CI's green was never a measured baseline, and its runtime is deprecated). `[BUG-045]` remains open on the owner's word. **Next mintable id after this filing is `BUG-049`.**
+
+## Spec: BUG-048, CI's green was never a measured baseline [2026-09-29]
+
+Spec `docs/superpowers/specs/2026-09-29-bug048-ci-measured-baseline-design.md`, APPROVED 2026-09-29 with R1 and R2. Target `1.34.1` (repo-only, per the `[BUG-046]` precedent), complexity M.
+- **Three mechanisms, never conflated.** (1) Action runtime: bump checkout/setup-node/cache in `test.yml` and `publish.yml` to majors whose `action.yml` declares `runs.using: node24`, measured via `gh api`; evidence is the check-runs **annotations API**, not log text. (2) Test runtime: matrix `{20, 24}`, `fail-fast: false`; 20 is the `engines` floor and the `node:sqlite`-absent paths, 24 executes the 83 persistence tests; cache key gains the Node version; `publish.yml` tests on 24. (3) Assertion: `tools/skip-baseline.mjs` plus `tools/skip-baseline.json`, the exact skipped SET per named CI environment (identity `<file> > <fullName>`), unknown `--env` fails, report-only without `--env`, fail-closed aborts, duplicate detection.
+- **Rejected:** an in-suite reporter or `globalTeardown` assertion, because a developer machine is not a reproducible environment (plugin skips depend on `~/.claude/skills`, sqlite on the local Node).
+- **R1:** `docs/launch/LAUNCH-CHECKLIST.md`'s frozen "996 passed / 12 skipped at 1.33.0" becomes command and instrument assertions; numbers live only in the measured baseline file.
+- **R2:** `publish.yml` does NOT run the instrument: the baseline is a merge gate, every publishable commit passed both asserted legs on its PR, and the publish suite's Vitest red remains the publish gate.
+- **Out:** raising `engines` (Node 20 EOL 2026-04-30; the 20 leg leaves later as a deliberate act with a baseline diff), running the plugin suite in CI, `fetch-depth: 0`, the Ubuntu 26 runner notice, Windows/macOS legs, asserting passed counts, a local baseline.
+- **Carried to /cc-plan (owner):** bootstrap sequencing is Review Focus item 1 (baseline measured from the branch's own CI before arming); an identity-stability check across two runs is a plan task with its result recorded in the plan text; each leg's skipped count is predicted per environment before the arming run.

@@ -10,26 +10,37 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Each leg is a coverage decision, not a version preference [BUG-048]. Node 20 is
+    # engines.node's floor and the only leg on which the node:sqlite-absent degradation
+    # paths run for real; Node 24 executes the persistence suites that Node 20 skips.
+    # fail-fast is off so one leg's red never hides the other's result.
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20', '24']
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: ${{ matrix.node }}
           cache: 'npm'
           cache-dependency-path: 'package-lock.json'
 
       - name: Cache Vitest transform cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .vitest-cache
-          key: vitest-${{ runner.os }}-${{ hashFiles('vitest.config.js', 'package-lock.json') }}
+          key: vitest-${{ runner.os }}-node${{ matrix.node }}-${{ hashFiles('vitest.config.js', 'package-lock.json') }}
           restore-keys: |
-            vitest-${{ runner.os }}-
+            vitest-${{ runner.os }}-node${{ matrix.node }}-
 
       - name: Install dependencies
         run: npm ci
 
       - name: Run tests
-        run: npm test
+        run: npm test -- --reporter=default --reporter=json --outputFile.json=vitest-report.json
+
+      - name: Assert the skipped set against the measured baseline
+        run: node tools/skip-baseline.mjs --env ci-node${{ matrix.node }} --report vitest-report.json
