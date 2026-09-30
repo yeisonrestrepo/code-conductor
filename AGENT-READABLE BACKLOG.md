@@ -648,6 +648,41 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 * **Components Affected:** `.github/workflows/test.yml`, possibly `tests/` for a baseline assertion, `docs/RELEASE-CLOSEOUT.md` if predictions become per-environment.
 * **Acceptance Criteria:** No deprecation warning in a green run; the chosen test runtime(s) named in the workflow with the coverage consequence stated; a measured, asserted skip baseline per environment; the FEAT-021 gate scenario (an 83-skip silent divergence with matching totals) reproduced as the red case the assertion now catches.
 
+### [ ] `[BUG-049]` The Installer Replaced an Existing Project CLAUDE.md on a `--project` Install
+* **Field report, 2026-09-30, verbatim from the owner's terminal.** The owner was dogfooding `1.34.3` in a work repository (WSL, `~/projects/nymbl`):
+  ```
+  npx @yeison.restrepo.r/code-conductor@1.34.3 --project
+  -> "code-conductor: removed the retired graphify-ast-refresh hook from
+     settings.json (backup written beside it)"          [FEAT-021 heal: OK]
+  -> the BUG-039 stub-match recovery hint printed        [known residual]
+  -> the project's EXISTING CLAUDE.md (a company repo's own configuration,
+     including their migration skills setup) was REPLACED by the shipped
+     template: no merge, no skip, no backup.
+  ```
+  **No data was actually lost.** The host's `CLAUDE.md` was committed, so the clobber landed as an uncommitted change in its working tree, and the owner rolled it back with `git restore`. The specimen is the git-visible diff: the shipped template replacing the host's content wholesale.
+* **Severity: P0-class, host-data destruction.** It is recoverable only where the host happens to version the file, and the installer must never assume that. It gates the company-internal sharing channel, so it holds the queue's head until released.
+* **Defect class: `[BUG-039]`'s class on a different file.** That class is host-owned data overwritten by deploy.
+* **Contradicts the contract on record, which is why it must be measured before any cause is claimed:**
+  - `[BUG-027]` (closed) established the rule that `CLAUDE.md` is merged, never overwritten. Conductor-owned content lives between `cc:managed` sentinels, content outside them is preserved byte for byte, and every change is backed up and written atomically.
+  - `README.md`'s "How the installer treats your CLAUDE.md" section promises the same. It names one path that discards host content: the one-time pre-sentinel migration, which removes host sections the managed block also defines and keeps the pre-migration file as `CLAUDE.md.installer-backup.<UTC timestamp>`.
+  - **Measured while filing, and it bears on "no backup" without settling it:** the shipped `project-template/gitignore:2` ignores `*.installer-backup.*`, and the installer merges that line into the host's `.gitignore`. A backup written beside the file would therefore be invisible to `git status` and `git diff`.
+  - Whether a backup exists in the host, and whether this was the migration path, a regression, or a path the merge never covered, is for the spec to measure. **No mechanism is claimed here.**
+* **The same field run, recorded for the evidence pipeline:**
+  - **`[FEAT-021]` heal, first confirmed field firing:** it removed the retired `graphify-ast-refresh` hook from a real host's `settings.json` and wrote the backup beside it. It worked as designed.
+  - **`[BUG-039]` stub hint, firing on a legitimate fresh stub:** it is the known residual named in README Known limits, and it is accepted.
+  - Neither is a defect, so neither opens a dossier.
+* **Components Affected:** `bin/code-conductor.mjs`, `lib/installer/deploy.mjs`, `lib/installer/file-merge.mjs`, `project-template/CLAUDE.md`, and every other host file deployed the same way (siblings are measured, not assumed).
+* **Acceptance Criteria:**
+  - **Never destroyed without a backup.** An existing project `CLAUDE.md` is never destroyed without a backup beside it.
+  - **Fresh install still usable.** A fresh `--project` install, with no `CLAUDE.md`, still ends with a usable `CLAUDE.md`.
+  - **Field scenario is the red case.** The field scenario is replayed as the red case.
+  - **Minimum test matrix:**
+    - a fresh install;
+    - a host `CLAUDE.md` with arbitrary content;
+    - a host `CLAUDE.md` byte-equal to a shipped template version;
+    - a re-run over each end state, for idempotence.
+  - **Ships as `1.34.4`.**
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.

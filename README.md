@@ -96,6 +96,7 @@ Four checks live in `tools/` as tracked repository infrastructure. Three of them
 
 ## Known limits
 
+- **`[BUG-049]`, open, and the most severe:** on `1.34.3`, a `--project` install in the field replaced an existing project `CLAUDE.md` with the shipped template, against the merge-and-backup contract described under [How the installer treats your CLAUDE.md](#how-the-installer-treats-your-claudemd). It is being measured, and the fix targets `1.34.4`. Until then, commit your `CLAUDE.md` before installing.
 - **`[BUG-045]`, open:** the Guard 3 allowlist cannot cover a quoted path, because the boundary sets it interpolates contain no quote character, so an entry `docs/` does not cover `cat "docs/x.md" *.md`. Filed with its ritual priced, untouched pending its own change.
 - **`[BUG-032]`, open:** global memory preferences sit outside the documented lookup chain. Nothing in the chain points at `~/.claude/memory/personal.md`, and the installer never deploys `global/memory/`, so a preference filed there is never read by the agent it was written for.
 - **The `P7` false positive above**, still live.

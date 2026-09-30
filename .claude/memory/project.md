@@ -1907,3 +1907,30 @@ The read-only audit at `06fd2ca` produced these results:
 ### Queue
 
 Nothing minted. **The next mintable id is `BUG-049`.** Next: `/cc-spec ARCH-009`, scoped to the vertical slice by the owner's addendum. The deliverable is the band contract with its gate enum and the SNAP v2 fields going live, sized so FEAT-011 and FEAT-012 can ship one real Code-to-QA handoff. FEAT-031 through FEAT-036 are post-launch. The slice is timeboxed by the owner, and the public launch does not wait for it.
+
+## Checkpoint 2026-09-30 00:30
+
+`main` is at **`3020163`**: `1.34.3` has shipped and its closeout is recorded. `[ARCH-009]` has not started; its `/cc-spec` was entered and paused at Question 1 (the band fields go live as v3, recommended, or by widening v2). A P0-class field defect takes the queue's head: an existing project `CLAUDE.md` replaced on a `--project` install. It is to be filed as `BUG-049` and ship as `1.34.4`.
+
+### Decisions
+
+- **The pre-launch audit is read-only, and every claim cites its source.** Class A findings (false today) shipped as `1.34.3`. Class B, the Show HN figures, is frozen until one regeneration on posting eve.
+- **README claims that can be derived from the tree are pinned by `repo-invariants` tests:** the open BUG headings, the dossier count, the `tools/*.mjs` instruments, and the absence of a ui-ux-pro-max install claim. A new drift fails the merge gate.
+- **A docs-only patch may skip `/cc-spec` when the owner has ruled each edit line by line.** A lean plan plus the release ritual is then enough.
+- **Release commits use `chore: release X.Y.Z`.** A release that claims no item puts no id marker on any CHANGELOG bullet, so record parity reads zero claims.
+- **`[ARCH-009]` slice direction.** The contract layer is the band table, the gate enum and the live SNAP fields, sized for one Code→QA handoff. FEAT-031 through FEAT-036 come after launch.
+
+### Conventions
+
+- **A denial dossier specimen makes no cause claim without a probe.** `2186e0d` corrected the audit's own unprobed P7 attribution.
+- **Count predictions are restated for red-green pins.** Four new passing tests move the passed counts by four and the skipped sets by zero.
+
+### Technical debt
+
+- **The `CLAUDE.md` templates still name ui-ux-pro-max as active** (`global/CLAUDE.md:86`, `project-template/CLAUDE.md:49,75`). Left to `[FEAT-037]`.
+- **Two uncharacterized denials sit in the session denial tally:** P7 from the audit, P5 from the PR #47 CI read. No probe has run on either.
+
+### Workarounds
+
+- **npm registry lag after a publish.** The first `npm view` still shows the previous version. Re-query a few minutes later rather than reading the lag as a failure.
+- **Guard 3 denials on chained, piped or substituted read commands.** Put the reads in a scratchpad script and run it with `bash`. Never add an allowlist entry for this.
