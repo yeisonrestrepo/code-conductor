@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.34.3] - 2026-09-29
+
+### Changed
+- Documentation accuracy, from the 2026-09-29 pre-launch audit. `README.md`'s Known limits named `[BUG-045]` as the one open filed defect while `[BUG-032]` was also open, and counted two dossiers where the backlog holds three (sweep items 4, 7, 8). Both lists are now derived from the backlog by a test.
+- Documentation accuracy: the Instruments section said three checks live in `tools/`. There are four, and each now says how it runs: `skip-baseline.mjs` directly in CI, `version-gate.mjs` and `record-parity.mjs` through the merge-gate suite, `id-ceiling.mjs` by hand (sweep item 9).
+- Documentation accuracy: the README said the installer downloads the ui-ux-pro-max skill from GitHub. No shipped code does, and it is now described as retired guidance pending `[FEAT-037]` (sweep item 10).
+
+Nothing about how the tool runs changes: the package's code is identical to `1.34.2`. Inside the package, only `README.md` differs.
+
 ## [1.34.2] - 2026-09-29
 
 ### Changed

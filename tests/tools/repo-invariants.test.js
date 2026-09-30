@@ -14,6 +14,14 @@ import { checkParity } from '../../tools/record-parity.mjs';
 // from; no checklist line enforces anything.
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
+// The text between one "## " heading and the next, so a claim is checked where it is made.
+const section = (text, heading) => {
+  const start = text.indexOf(`\n## ${heading}\n`);
+  if (start === -1) throw new Error(`no "## ${heading}" section`);
+  const end = text.indexOf('\n## ', start + 1);
+  return text.slice(start, end === -1 ? undefined : end);
+};
+const COUNT_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
 
 describe('this repository, at every commit', () => {
   it('agrees with VERSION at all five version locations', () => {
@@ -90,5 +98,37 @@ describe('this repository, at every commit', () => {
   // utf8 read above keeps a BOM as U+FEFF and a text match would have to know to look.
   it('starts README.md with its heading byte, not a byte-order mark', () => {
     expect(readFileSync(join(ROOT, 'README.md'))[0]).toBe(0x23);
+  });
+
+  // 1.34.3, pre-launch audit sweep items 4 and 7: Known limits named one open filed
+  // defect while the backlog had two. Derived, not counted by hand: a defect is listed
+  // when its bullet's first token is its id, so passing mentions do not count.
+  it('lists every open filed defect in Known limits, and only those', () => {
+    const open = [...read('AGENT-READABLE BACKLOG.md').matchAll(/^### \[ \] `\[(BUG-\d+)\]`/gm)].map((m) => m[1]).sort();
+    const listed = [...section(read('README.md'), 'Known limits').matchAll(/^- \*\*`\[(BUG-\d+)\]`/gm)].map((m) => m[1]).sort();
+    expect(listed).toEqual(open);
+  });
+
+  // 1.34.3, sweep item 8: a dossier opened in a closeout commit left the README's count
+  // behind. A minted dossier loses its heading, so this follows the pipeline's own rule.
+  it('counts the open dossiers in Known limits as the backlog holds them', () => {
+    const n = read('AGENT-READABLE BACKLOG.md').match(/^### DOSSIER /gm).length;
+    expect(section(read('README.md'), 'Known limits')).toContain(`**${COUNT_WORDS[n]} open dossier`);
+  });
+
+  // 1.34.3, sweep item 9: skip-baseline.mjs shipped in 1.34.1 and the section still said
+  // three. Every tracked instrument is named, and the count leads the section.
+  it('names every tools/ instrument in the Instruments section, with their count', () => {
+    const tools = execFileSync('git', ['ls-files', 'tools/*.mjs'], { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean);
+    const text = section(read('README.md'), 'Instruments: releases that verify their own record');
+    expect(tools.filter((t) => !text.includes(`**\`${t.slice('tools/'.length)}\`**`))).toEqual([]);
+    expect(text).toContain(`${COUNT_WORDS[tools.length]} checks live in \`tools/\``);
+  });
+
+  // 1.34.3, sweep item 10: the README said the installer downloads ui-ux-pro-max from
+  // GitHub. No shipped code has done so since the curl download was replaced and later
+  // dropped; FEAT-037 owns its replacement. The claim, not the name, is what is barred.
+  it('claims no automatic install of ui-ux-pro-max, which no shipped code performs', () => {
+    expect(read('README.md')).not.toMatch(/nextlevelbuilder|downloads it (directly )?from GitHub|activated automatically for frontend/i);
   });
 });
