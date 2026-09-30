@@ -16,7 +16,7 @@ Set the terminal to **90 columns** before recording. The deny message wraps badl
 
 ## Setup, off camera
 
-Do this **before** you hit record. It is not part of the arc and its output is the known-false-positive warning, which needs a footnote rather than a frame.
+Do this **before** you hit record. It is not part of the arc, and its output is empty: a fresh install prints nothing and exits 0, measured 2026-09-29 against `1.34.2` from a scratch `HOME`.
 
 ```bash
 mkdir /tmp/cc-demo && cd /tmp/cc-demo

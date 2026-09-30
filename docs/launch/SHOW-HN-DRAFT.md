@@ -2,6 +2,8 @@
 
 **Nothing here publishes from an agent session.** Posting is the owner's act. This file is for review.
 
+**Frozen by ruling, 2026-09-29 pre-launch audit.** The figures below are known stale (sweep items 1–6) and are not patched piecemeal. The draft is regenerated once, on posting eve, with each figure recomputed by its own stated method from that day's tree.
+
 ## Title candidates
 
 Strongest first.
