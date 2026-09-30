@@ -1753,7 +1753,7 @@ Spec `docs/superpowers/specs/2026-09-29-feat038-discoverability-metadata-design.
 
 ## Closeout: 1.34.2, npm and GitHub given one description and one keyword list [2026-09-29]
 
-`[FEAT-038]` shipped as **`1.34.2`** (PR #46, squash `241838a`). This is the repo half. The owner half is **not yet verified**; see the step 6 result below.
+`[FEAT-038]` shipped as **`1.34.2`** (PR #46, squash `241838a`). Both halves are verified: the repo half at publish, and the owner half at the fourth step 6 read (see below).
 
 **Sync.** Measured before acting: **`0 ahead / 1 behind`**, which is clean. `main` was fast-forwarded to `241838a`.
 
@@ -1807,7 +1807,11 @@ Neither asserts `description` or `keywords`.
   - `usesCustomOpenGraphImage: false`, unchanged as expected.
   - The repo's `updated_at` is 01:10:17Z, around the release publish, and no later.
   - The owner reported the checklist done, but no settings save reached the repository. The owner was told, and continued the closeout with step 6 left open.
-  - **Open:** re-run the owner checklist (web UI or `gh repo edit`, with R2's per-term fallback), then re-run step 6. `LAUNCH-CHECKLIST.md`'s `[FEAT-038]` prerequisite stays unticked until step 6 passes.
+  - **Resolved: PASS on the fourth read.**
+    - The owner ran the spec's comma-form `gh repo edit` inside the session with the `!` prefix. It exited silently: `gh` accepted the comma form, so R2's per-term fallback was not needed.
+    - The repo's `updated_at` moved to 01:36:02Z.
+    - Checks: About === V1 byte for byte is `true`. The topic set equals V2 (`+ none − none`), and none of the four removals is present. `usesCustomOpenGraphImage` is still `false`.
+    - **Lesson:** the owner act was reported done twice before any edit had reached the repository, and the read-only verify step was the only thing that caught it. Running the command where its output lands in the session turned an unverifiable claim into an observed exit.
 - **Step 7, npm H1 render: PASS**, confirmed by the owner in a browser.
 
 ### Record
@@ -1843,4 +1847,4 @@ Neither asserts `description` or `keywords`.
 
 ### Queue
 
-Nothing minted. The FEAT-038 owner half remains open (step 6 above). `[BUG-045]` remains open on the owner's word. **The next mintable id is `BUG-049`.**
+Nothing minted. The FEAT-038 owner half is verified (step 6 above), and `LAUNCH-CHECKLIST.md`'s `[FEAT-038]` prerequisite is now true; ticking it is the owner's act. `[BUG-045]` remains open on the owner's word. **The next mintable id is `BUG-049`.**
