@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.34.2] - 2026-09-29
+
+### Changed
+- **[FEAT-038]** npm and GitHub describe the project in the same sentence: "A governance layer for Claude Code sessions: hooks that check an agent's commands before they run, a spec-first workflow, and project memory the next session reads." `package.json` gains `keywords`, eleven terms that double as the GitHub topics, each one backed in the spec by something the repository ships. `claude-code-plugin` is not among them, because this is an installer CLI, not a plugin. A test pins the sentence and the list, so the `package.json` half cannot drift alone.
+- **[FEAT-038]** `README.md` no longer starts with a UTF-8 byte-order mark. npm renders this file on the package page, and the heading is now its first byte. The text is unchanged.
+
+Nothing about how the tool runs changes: the package's code is identical to `1.34.1`. Only `package.json` metadata and `README.md`'s first three bytes differ.
+
 ## [1.34.1] - 2026-09-29
 
 ### Fixed

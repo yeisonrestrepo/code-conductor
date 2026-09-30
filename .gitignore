@@ -91,6 +91,7 @@ tests/.tmp/
 !/docs/superpowers/plans/2026-09-29-bug047-heredoc-body-scanning.md
 !/docs/superpowers/plans/2026-09-29-bug048-ci-measured-baseline.md
 !/docs/superpowers/plans/2026-09-29-feat021-python-free-removal.md
+!/docs/superpowers/plans/2026-09-29-feat038-discoverability-metadata.md
 !/docs/superpowers/specs/2026-06-09-bug001-cc-compact-design.md
 !/docs/superpowers/specs/2026-06-09-bug002-spec-read-budget-design.md
 !/docs/superpowers/specs/2026-06-11-bug006-feat018-bash-scan-guard-design.md
@@ -113,6 +114,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-09-29-bug047-heredoc-body-scanning-design.md
 !/docs/superpowers/specs/2026-09-29-bug048-ci-measured-baseline-design.md
 !/docs/superpowers/specs/2026-09-29-feat021-python-free-removal-design.md
+!/docs/superpowers/specs/2026-09-29-feat038-discoverability-metadata-design.md
 # --- END tracked-surface block (BUG-042) ---
 
 # Kept for external writers. Both lines are redundant against the block above; each is

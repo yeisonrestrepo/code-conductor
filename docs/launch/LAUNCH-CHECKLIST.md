@@ -22,6 +22,7 @@ Corollary: **when someone finds something wrong, confirm it in the open and link
 - [ ] **README's Quickstart transcript re-verified against a pristine scratch install, on the day of posting.** Not a remembered run, not a run from last week: a fresh `mktemp -d`, a fresh `HOME`, one invocation. **The cheapest claim for a reader to falsify must be the best-verified one.** This line exists because the Quickstart shipped once with output a fresh install does not produce, after an agent ran the installer twice and attributed the second run's output to the first.
 - [ ] `[FEAT-038]` shipped: GitHub topics set, `package.json` keywords published, About line written
 - [ ] The deny, adapt, allow GIF exported from the recording and embedded at the top of the README
+- [ ] Social preview set, or GitHub's default card deliberately kept, decided when the GIF exists, with the card previewed once against the final About line
 - [ ] `[BUG-045]` published as a GitHub issue, verbatim from its backlog entry including the priced ritual, labeled `help wanted`: it is the exemplar of how this project files a defect, and an open, honest, well-specified issue is an invitation to contribute
 
 ## Channels

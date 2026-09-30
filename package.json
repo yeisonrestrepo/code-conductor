@@ -1,7 +1,20 @@
 {
   "name": "@yeison.restrepo.r/code-conductor",
-  "version": "1.34.1",
-  "description": "A spec-first, token-efficient Claude Code configuration and installer CLI.",
+  "version": "1.34.2",
+  "description": "A governance layer for Claude Code sessions: hooks that check an agent's commands before they run, a spec-first workflow, and project memory the next session reads.",
+  "keywords": [
+    "agentic-development",
+    "ai-agents",
+    "claude",
+    "claude-code",
+    "claude-code-hooks",
+    "claudecode",
+    "cli",
+    "developer-tools",
+    "guardrails",
+    "skills",
+    "spec-driven-development"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/yeisonrestrepo/code-conductor.git"

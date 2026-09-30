@@ -67,4 +67,28 @@ describe('this repository, at every commit', () => {
     const hits = r.stdout.split('\n').filter(Boolean).sort();
     expect(hits).toEqual(['tests/fixtures/guard3-corpus.js', 'tests/installer/heal.test.js']);
   });
+
+  // FEAT-038: npm's description and GitHub's About line are the same sentence, and the
+  // owner pastes the About from the spec, so this is the half an edit could drift alone.
+  // ASCII only, because a curly apostrophe or an em dash arrives through a paste unseen.
+  // The keyword list doubles as the GitHub topic list; its order is the one npm stores.
+  it('describes itself with the one sentence and keyword list both listings carry', () => {
+    const pkg = JSON.parse(read('package.json'));
+    expect(pkg.description).toBe(
+      "A governance layer for Claude Code sessions: hooks that check an agent's commands before they run, a spec-first workflow, and project memory the next session reads."
+    );
+    expect(pkg.description).toMatch(/^[\x20-\x7e]+$/);
+    expect(pkg.description.match(/[.!?](\s|$)/g)).toEqual(['.']);
+    expect(pkg.keywords).toEqual([
+      'agentic-development', 'ai-agents', 'claude', 'claude-code', 'claude-code-hooks', 'claudecode',
+      'cli', 'developer-tools', 'guardrails', 'skills', 'spec-driven-development',
+    ]);
+  });
+
+  // FEAT-038: npm renders this file on the package page, and a leading byte-order mark
+  // sits ahead of the "#" its renderer needs to see first. Read as bytes, because the
+  // utf8 read above keeps a BOM as U+FEFF and a text match would have to know to look.
+  it('starts README.md with its heading byte, not a byte-order mark', () => {
+    expect(readFileSync(join(ROOT, 'README.md'))[0]).toBe(0x23);
+  });
 });

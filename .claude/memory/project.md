@@ -1720,3 +1720,33 @@ Spec `docs/superpowers/specs/2026-09-29-bug048-ci-measured-baseline-design.md`, 
 ### Queue
 
 Nothing minted. `[BUG-045]` remains open on the owner's word. **The next mintable id is `BUG-049`.**
+
+## Spec: FEAT-038, discoverability metadata for npm and GitHub [2026-09-29]
+
+Spec `docs/superpowers/specs/2026-09-29-feat038-discoverability-metadata-design.md`, APPROVED 2026-09-29 with R1 and R2. Target `1.34.2`, a patch, because nothing about how the tool runs changes. Complexity S.
+- **Two halves, kept separate.**
+  - **Repo half (plan):**
+    - `package.json` `description` = V1 and `keywords` = V2;
+    - strip `README.md`'s 3-byte UTF-8 BOM, showing the bytes before and after;
+    - two pinning tests in `tests/tools/repo-invariants.test.js`;
+    - one `LAUNCH-CHECKLIST.md` line;
+    - the release ritual.
+  - **Owner half (after merge, the owner runs it):** GitHub About and topics, pasted from the spec's exact values. The agent verifies it read-only with `gh repo view`.
+- **V1**, the npm description and GitHub About, identical: "A governance layer for Claude Code sessions: hooks that check an agent's commands before they run, a spec-first workflow, and project memory the next session reads." It is 164 characters and ASCII, and every clause is backed.
+- **V2**, the keywords and topics, one list: `agentic-development, ai-agents, claude, claude-code, claude-code-hooks, claudecode, cli, developer-tools, guardrails, skills, spec-driven-development`.
+- **Topics removed:**
+  - `claude-code-plugin`: an unbacked claim, because `project.md:395` says it is an installer CLI, not a plugin. Load-bearing.
+  - `claude-ai`: names a product the project does not target.
+  - `agent`: redundant.
+  - `tokens`: claims nothing.
+- **Old About stale:** "automatic stack profiles" describes what `[FEAT-013]` retired.
+- **Held back:** `multi-agent` is added to both lists when Pillar 3 (`[ARCH-009]`) ships its first agent. Today it is a backlog pillar, not shipped behavior.
+- **Predictions**, two new tests, neither skipping: local 1035/12, ci-node20 951/96, ci-node24 1034/13 (1047 each). `tools/skip-baseline.json` is unchanged.
+- **R1:** before any edit, the plan greps every test file that reads `package.json` (FEAT-023's `repository.url` guard among them), proving that the additive fields break nothing.
+- **R2:** the owner checklist carries a one-flag-per-term fallback in case `gh` rejects the comma-separated topic form.
+- **Out:**
+  - the social preview, moved to launch acts beside the GIF by owner ruling, with a checklist line holding its place;
+  - post content, the GIF, and the `[BUG-045]` issue;
+  - the Website field, `homepage` and `bugs`;
+  - any agent-run `gh repo edit`.
+- **npm rendering:** checked by the owner in a browser, because npmjs.com answers `curl` with 403.
