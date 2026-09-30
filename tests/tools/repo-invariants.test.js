@@ -84,4 +84,11 @@ describe('this repository, at every commit', () => {
       'cli', 'developer-tools', 'guardrails', 'skills', 'spec-driven-development',
     ]);
   });
+
+  // FEAT-038: npm renders this file on the package page, and a leading byte-order mark
+  // sits ahead of the "#" its renderer needs to see first. Read as bytes, because the
+  // utf8 read above keeps a BOM as U+FEFF and a text match would have to know to look.
+  it('starts README.md with its heading byte, not a byte-order mark', () => {
+    expect(readFileSync(join(ROOT, 'README.md'))[0]).toBe(0x23);
+  });
 });
