@@ -1750,3 +1750,97 @@ Spec `docs/superpowers/specs/2026-09-29-feat038-discoverability-metadata-design.
   - the Website field, `homepage` and `bugs`;
   - any agent-run `gh repo edit`.
 - **npm rendering:** checked by the owner in a browser, because npmjs.com answers `curl` with 403.
+
+## Closeout: 1.34.2, npm and GitHub given one description and one keyword list [2026-09-29]
+
+`[FEAT-038]` shipped as **`1.34.2`** (PR #46, squash `241838a`). This is the repo half. The owner half is **not yet verified**; see the step 6 result below.
+
+**Sync.** Measured before acting: **`0 ahead / 1 behind`**, which is clean. `main` was fast-forwarded to `241838a`.
+
+**Instrument output on the merged tree:**
+- **`VERSION_GATE_OK 1.34.2`**.
+- **`RECORD_PARITY_OK`**.
+- The ceiling from both legs is **`{"BUG":48,"FEAT":39,"ARCH":9}`**, with 58 headings each and no duplicates. The next mintable id is **`BUG-049`**; nothing was minted.
+- `main`'s push run `36653823369` succeeded, printing `SKIP_BASELINE_OK ci-node20: 96 skipped` and `SKIP_BASELINE_OK ci-node24: 13 skipped`.
+
+**Every count boundary matched its prediction:**
+
+| Boundary | Result |
+|---|---|
+| Task 0, plan (`510b72e`) | 1033 / 12 |
+| Task 1 (`4f9f6c5`) | 1034 / 12 |
+| Task 2 (`c536438`) | 1035 / 12 |
+| Task 3, release (`4afb4e6`) | 1035 / 12 |
+| PR run `36653547014` | `ci-node20` 951 / 96 (1047) and `ci-node24` 1034 / 13 (1047), both `SKIP_BASELINE_OK` |
+
+`tools/skip-baseline.json` is unchanged. Both new tests were watched red first:
+- the description test received the old string;
+- the BOM test expected `35` and received `239`.
+
+**BOM, byte level.** `README.md`'s first 16 bytes:
+- before: `efbb bf23 2063 6f64 652d 636f 6e64 7563  ...# code-conduc` (35260 bytes);
+- after: `2320 636f 6465 2d63 6f6e 6475 6374 6f72  # code-conductor` (35257 bytes).
+
+`git diff --numstat` read `1 1 README.md`. The release diff moved only the version lines of `package.json` (1/1) and `package-lock.json` (2/2), and the lock carries no `keywords`.
+
+**R1, recorded in the plan.** Only two tests read this repo's `package.json`:
+- `tests/installer/manifest.test.js` (name, bin, files, `repository.url`, type, engines, publishConfig);
+- `tests/tools/tools-not-shipped.test.js` (`files`).
+
+Neither asserts `description` or `keywords`.
+
+### Verification (spec main path)
+
+- **Step 4, npm: PASS, on the one re-query the spec allows.**
+  - Publish run `36653978686` (release `v1.34.2`) succeeded, printing `+ @yeison.restrepo.r/code-conductor@1.34.2` at 01:12:49Z.
+  - The query at 01:13:43Z still returned `1.34.1`: `@1.34.2` gave E404 and `dist-tags` read `latest: 1.34.1`. npm itself said "may take a few minutes to become available".
+  - The re-query four minutes later read:
+    - `description` === V1: `true`;
+    - `keywords` === V2, in order: `true`;
+    - `version`: `1.34.2`;
+    - `gitHead`: `241838a`, equal to the `v1.34.2` tag's commit.
+- **Step 6, GitHub: FAIL, three reads over about ten minutes.** This is the spec's error case. It was reported to the owner, and the agent did not edit anything.
+  - `gh repo view` and `gh api repos/...` both show the pre-FEAT-038 About, "Spec-first workflow engine for Claude Code: /cc-spec → /cc-plan → /cc-implement, with automatic stack profiles, …". About === V1 is `false`.
+  - The topics are the original nine.
+    - The four removals are all still present: `agent`, `claude-ai`, `claude-code-plugin`, `tokens`.
+    - The six additions are all still missing: `ai-agents`, `claude-code`, `claude-code-hooks`, `cli`, `developer-tools`, `guardrails`.
+  - `usesCustomOpenGraphImage: false`, unchanged as expected.
+  - The repo's `updated_at` is 01:10:17Z, around the release publish, and no later.
+  - The owner reported the checklist done, but no settings save reached the repository. The owner was told, and continued the closeout with step 6 left open.
+  - **Open:** re-run the owner checklist (web UI or `gh repo edit`, with R2's per-term fallback), then re-run step 6. `LAUNCH-CHECKLIST.md`'s `[FEAT-038]` prerequisite stays unticked until step 6 passes.
+- **Step 7, npm H1 render: PASS**, confirmed by the owner in a browser.
+
+### Record
+
+- **The values, as shipped.**
+  - V1: "A governance layer for Claude Code sessions: hooks that check an agent's commands before they run, a spec-first workflow, and project memory the next session reads."
+  - V2: `agentic-development, ai-agents, claude, claude-code, claude-code-hooks, claudecode, cli, developer-tools, guardrails, skills, spec-driven-development`.
+  - Topics removed, with reasons:
+    - `claude-code-plugin`: unbacked (an installer CLI, not a plugin; `project.md:395`), and load-bearing;
+    - `claude-ai`: names a product the project does not target;
+    - `agent`: redundant with `ai-agents`;
+    - `tokens`: claims nothing searchable.
+  - **`multi-agent` is held** until Pillar 3 (`[ARCH-009]`) ships its first agent. That release's spec adds it to both lists.
+- **`[BUG-048]`'s named risk, discharged.** Its plan named `publish.yml` as unexercised by any PR run, so its first execution would be the next publish. That first run under the BUG-048 changes (actions at their node24 majors, suite on Node 24) was the `1.34.1` release, run **`36650007346`, conclusion success**, at `fbcf259`. The second, `36653978686` for `1.34.2`, also succeeded (publish job 36s, run 40s). The owner's screenshot shows the run page: its only annotation is the Ubuntu 26 `ubuntu-latest` migration notice (out of scope, as at `1.34.1`), and there is no Node 20 action-runtime deprecation.
+- **SPECIMEN, not minted: an intermittent commit-hook hang in `tests/scripts/snap-build.test.js`.** Filed in the backlog's new dossier with its minting condition, which is **recurrence**.
+- **Review minors, left as-is:**
+  - the ASCII and one-sentence checks in `repo-invariants.test.js:79-80` cannot fail before the exact-match `toBe` at :76 does, so they are defence in depth;
+  - an "e.g. " in a future description would false-red the sentence count, and the exact match forces a spec edit first anyway.
+
+  The whole-branch reviewer (most capable model, run in parallel with CI) found no Critical or Important issues.
+- **`[ARCH-009]` observation: the execution criterion has stabilized across three field executions.**
+  - FEAT-021 ran native: sequential, exact code, mostly deletion.
+  - BUG-048 ran hybrid: independent build tasks were subagent-driven, and live-CI orchestration stayed in-session.
+  - FEAT-038 ran native: an S, with four tasks appending to one test file.
+
+  **The criterion:**
+  - subagent-driven when tasks are independent enough that fresh-context isolation buys review value;
+  - native when tasks are small, strictly sequential and share files;
+  - hybrid when a plan holds both.
+
+  It is a routing rule for the Build band, recorded in `personal.md` Workflow Preferences as the refinement of the standing subagent-driven preference.
+- **Working ledger** `.superpowers/sdd/2026-09-29-feat038-discoverability-metadata/`: deleted, on owner confirmation.
+
+### Queue
+
+Nothing minted. The FEAT-038 owner half remains open (step 6 above). `[BUG-045]` remains open on the owner's word. **The next mintable id is `BUG-049`.**

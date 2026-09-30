@@ -732,3 +732,23 @@ A holding pen, on the same terms as the two above it. It empties when the mechan
 **The reviewer's half, recorded because a one-sided record is the defect this dossier exists to catch.** The reviewer ordered the mint **and** pre-argued the version bump on the report's strength, without requiring the truth table first. **Audit-first is what caught it, which is precisely why audit-first precedes filing even when the filing has already been ordered.** An order to file is not evidence that there is something to file.
 
 **The cost, and it landed in the worst possible place.** Before the audit ran, the false claim was written into `README.md`'s launch-facing Quickstart, inside a section opening "The output below is real", and merged to `main` in PR #41. The repair is a docs-only change: the Quickstart now shows the true silent output, and the genuine residual moved to Known limits cited to `BUG-039`'s spec. `docs/launch/LAUNCH-CHECKLIST.md` gained a line requiring the Quickstart transcript to be re-verified against a pristine scratch install **on the day of posting**, because the cheapest claim for a reader to falsify must be the best-verified one.
+
+### DOSSIER (unfiled, no id yet): Intermittent Commit-Hook Hang in the snap-build Suite
+
+**Not an item, and it adds no filed heading, so the ceiling is unaffected.** Opened 2026-09-29 during the FEAT-038 execution. It holds one specimen of a full-suite run that stopped making progress. **No mechanism claim is made.** The symptom points at a child that never saw end-of-input, but nothing traced that far.
+
+#### Specimen 1, 2026-09-29, Task 2's commit of `c536438` (FEAT-038)
+
+- **Test:** `tests/scripts/snap-build.test.js` › `snap-build.mjs > truncates an over-cap v2 pr to <= 10 MiB, still valid JSON`. This is the file's largest-input case. It pipes a payload above 10 MiB to `scripts/snap-build.mjs` via `spawnSync(..., { input, maxBuffer: MAX + 65536 })`.
+- **Symptom:** the pre-commit hook's `vitest` ran past 10 minutes. The two commits before it had each run the whole suite well inside that.
+  - Both the `vitest` worker (pid 2953) and its `snap-build.mjs` child (pid 3585, cwd a `sb-*` sandbox under the system temp dir) were **idle at 0.0% CPU** for the whole elapsed time.
+  - The child's fd 0 was an open unix socket.
+  - Every other file in the suite had already reported.
+- **Action:** the child alone was killed (`kill 3585`). `spawnSync` returned, and the test failed at 634175 ms. The hook reported 1 failed / 1034 passed / 12 skipped (1047), so the commit aborted with the index intact.
+- **Solo:** `npx vitest run tests/scripts/snap-build.test.js` gave **10 passed (10)**, promptly.
+- **Retry:** the same commit, re-run unchanged, went green at **1035 / 12 (1047)**. The next commit (`4afb4e6`) ran under a hang watch and also went green. CI on both legs never showed it.
+- **Why it is not attributed to FEAT-038:** the diff touches only `package.json` metadata, `README.md`'s first 3 bytes, two `repo-invariants` tests, and records. None is read by `snap-build.mjs` or its test.
+
+#### Minting condition
+
+**Recurrence.** A second specimen of this test, or of any `spawnSync`-with-`input` test, stalling with both processes idle mints a BUG. Until then this is one observation, and a single hang gets no speculative fix (no timeout added, no test skipped). On recurrence, capture the child's fd table and the parent's stack before killing it (`lsof -p <child>`, `sample <parent>` on macOS). Record the payload size and machine load, because a pipe deadlock under load and a lost end-of-input are different mechanisms with different fixes.
