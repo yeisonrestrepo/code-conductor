@@ -116,6 +116,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-09-29-bug048-ci-measured-baseline-design.md
 !/docs/superpowers/specs/2026-09-29-feat021-python-free-removal-design.md
 !/docs/superpowers/specs/2026-09-29-feat038-discoverability-metadata-design.md
+!/docs/superpowers/specs/2026-09-30-bug049-claude-md-clobber-design.md
 # --- END tracked-surface block (BUG-042) ---
 
 # Kept for external writers. Both lines are redundant against the block above; each is

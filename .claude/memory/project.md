@@ -1934,3 +1934,22 @@ Nothing minted. **The next mintable id is `BUG-049`.** Next: `/cc-spec ARCH-009`
 
 - **npm registry lag after a publish.** The first `npm view` still shows the previous version. Re-query a few minutes later rather than reading the lag as a failure.
 - **Guard 3 denials on chained, piped or substituted read commands.** Put the reads in a scratchpad script and run it with `bash`. Never add an allowlist entry for this.
+
+## Spec: BUG-049, CLAUDE.md ownership by sentinels only, append-only, backup reported [2026-09-30]
+
+The spec is `docs/superpowers/specs/2026-09-30-bug049-claude-md-clobber-design.md`, APPROVED 2026-09-30 with its six rulings. It targets `1.34.4`, patch, complexity M, and holds the queue's head because it gates company-internal sharing.
+
+- **Measured mechanism:** `merge-md.mjs` `mergeClaudeMdText` (`:81`) decides ownership by heading name.
+  - A 15-heading host-edited project file loses 8 of 15 host lines, silently.
+  - `--global` loses 12 of 12.
+  - The pre-image backup is written but unreported, and `*.installer-backup.*` hides it from git.
+  - `.gitignore` loses nothing.
+- **Fix:** conductor owns only its sentinel block.
+  - A sentinel-less file gets the block appended, with nothing else changed: no heading dedupe, no scaffold append, no repair of damaged input (AC9b, with a field-verbatim head).
+  - A balanced block has its interior refreshed.
+  - Every write is backed up first (ordering proved by fault injection) and its path is reported on stdout, with backups still git-ignored.
+  - `.gitignore` gets one labelled block holding the measured three entries: exact-line entries are gathered into it, modified variants are left alone, and nothing moves if the file has any `!` line.
+- **Two-run shape (sealed by the field fingerprint):** an old pre-sentinel generation overwrote the company file with no backup, then 1.34.3 backed up the damaged file. The field damage (two label characters eaten, a `* ` prefix) has no historical code match and its mechanism is unknown.
+- **README:** `1.34.4` is stated as the minimum safe version, pinned so it can never exceed `VERSION`.
+- **Out of scope:** `[FEAT-040]`, filed by this spec (ceiling `{"BUG":49,"FEAT":39,"ARCH":9}` on both legs), which is `/cc-stack`'s semantic adoption with approval-gated writes and queues behind `[ARCH-009]`.
+- **Plan:** it opens with full reads of `merge-md.mjs`, `deploy.mjs` and `file-merge.mjs`. Its Review Focus names re-deriving the tests that asserted the old destructive semantics, `merge-md.test.js:84` first.
