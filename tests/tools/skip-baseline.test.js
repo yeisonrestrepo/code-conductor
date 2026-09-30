@@ -118,6 +118,12 @@ describe('parseArgs', () => {
     expect(parseArgs(['--report', 'r.json', '--env']).error).toBe('--env needs a value');
     expect(parseArgs(['--env', 'ci-node20', '--report', 'r.json'])).toEqual({ env: 'ci-node20', report: 'r.json' });
   });
+
+  // Found at the pre-push review: an empty --env read as no --env, so an assert run
+  // silently became report-only at rc 0.
+  it('rejects an empty --env rather than failing open to report-only', () => {
+    expect(parseArgs(['--env', '', '--report', 'r.json']).error).toBe('--env needs a value');
+  });
 });
 
 describe('evaluate, assert mode', () => {

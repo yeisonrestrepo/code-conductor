@@ -71,7 +71,9 @@ export function parseArgs(argv) {
     const flag = argv[i];
     if (flag !== '--env' && flag !== '--report') return { error: `unknown argument ${JSON.stringify(flag)}` };
     const value = argv[i + 1];
-    if (value === undefined || value.startsWith('--')) return { error: `${flag} needs a value` };
+    // An empty value is rejected too: `--env ""` would otherwise read as no --env and
+    // pass as report-only, a fail-open in a gate whose rule is fail-closed.
+    if (!value || value.startsWith('--')) return { error: `${flag} needs a value` };
     out[flag.slice(2)] = value;
   }
   if (!out.report) return { error: '--report <path> is required' };
