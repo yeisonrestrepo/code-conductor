@@ -1,27 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync, readFileSync, readdirSync, lstatSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { assertAssets, deployGlobal, deployProject, chmodHooks, assertMergeTargets } from '../../lib/installer/deploy.mjs';
 import { SENTINEL_START, SENTINEL_END } from '../../lib/installer/merge-md.mjs';
 
-const TPL_GLOBAL = [
-  '# Global Claude Configuration', '',
-  SENTINEL_START,
-  '## Workflow', '', 'Spec, then plan, then implement.', '',
-  '## Safety', '', 'Confirm before writes.',
-  SENTINEL_END, '',
-].join('\n');
-
-const TPL_PROJECT = [
-  '# Project Claude Configuration', '',
-  '## Project Identity', '', '- Name: TBD', '',
-  '## Conventions', '', '- TBD', '',
-  SENTINEL_START,
-  '## Agent Identity', '', 'You are an orchestrator.', '',
-  '## Hard Constraints', '', '- Never hardcode secrets.',
-  SENTINEL_END, '',
-].join('\n');
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const GLOBAL_BLOCK = [SENTINEL_START, '## Workflow', '', 'Spec, then plan, then implement.', '', '## Safety', '', 'Confirm before writes.', SENTINEL_END, ''].join('\n');
+const TPL_GLOBAL = ['# Global Claude Configuration', '', GLOBAL_BLOCK].join('\n');
+const PROJECT_BLOCK = [SENTINEL_START, '## Agent Identity', '', 'You are an orchestrator.', '', '## Hard Constraints', '', '- Never hardcode secrets.', SENTINEL_END, ''].join('\n');
+const TPL_PROJECT = ['# Project Claude Configuration', '', '## Project Identity', '', '- Name: TBD', '', '## Conventions', '', '- TBD', '', PROJECT_BLOCK].join('\n');
 
 const TPL_GITIGNORE = '.claude/memory/turn-count.txt\n*.installer-backup.*\n';
 const SKILL_MD = '---\nname: critical-review\ndescription: "adversarial review"\ntype: skill\n---\n\n# Critical Review\n';
@@ -137,6 +126,21 @@ describe('deployGlobal — CLAUDE.md merge', () => {
     expect(readFileSync(join(dir, 'CLAUDE.md'), 'utf8')).toBe(first);
     expect(readdirSync(dir).filter(n => n.includes('.installer-backup.'))).toHaveLength(1);
   });
+  it('[AC2] keeps all 12 host lines of a sentinel-less ~/.claude/CLAUDE.md and appends the block alone', () => {
+    const tpl = readFileSync(join(ROOT, 'global', 'CLAUDE.md'), 'utf8').replace(/\r\n/g, '\n');
+    writeFileSync(join(asset, 'global', 'CLAUDE.md'), tpl);
+    const host = tpl.split('\n')
+      .filter((l) => l !== SENTINEL_START && l !== SENTINEL_END)
+      .flatMap((l) => (l.startsWith('## ') ? [l, `host line under ${l.slice(3)}`] : [l]))
+      .join('\n');
+    expect(host.match(/^host line under /gm)).toHaveLength(12);
+    const dir = join(home, '.claude');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'CLAUDE.md'), host);
+    deployGlobal(asset, home);
+    const block = tpl.slice(tpl.indexOf(SENTINEL_START), tpl.indexOf(SENTINEL_END) + SENTINEL_END.length) + '\n';
+    expect(readFileSync(join(dir, 'CLAUDE.md'), 'utf8')).toBe(host + '\n' + block);
+  });
 });
 
 describe('deployGlobal — skills', () => {
@@ -179,14 +183,11 @@ describe('deployGlobal — skills', () => {
 });
 
 describe('deployProject — merges instead of clobbering', () => {
-  it('preserves a host CLAUDE.md and appends the missing sections', () => {
-    writeFileSync(join(home, 'CLAUDE.md'), '# Acme\n\n## Project Identity\n\n- Name: acme\n');
+  it('[AC3] preserves a host CLAUDE.md byte for byte and appends the block alone', () => {
+    const host = '# Acme\n\n## Project Identity\n\n- Name: acme\n';
+    writeFileSync(join(home, 'CLAUDE.md'), host);
     deployProject(asset, home);
-    const after = readFileSync(join(home, 'CLAUDE.md'), 'utf8');
-    expect(after).toContain('- Name: acme');
-    expect(after).not.toContain('- Name: TBD');
-    expect(after).toContain('## Conventions');
-    expect(after).toContain('## Agent Identity');
+    expect(readFileSync(join(home, 'CLAUDE.md'), 'utf8')).toBe(host + '\n' + PROJECT_BLOCK);
   });
   it('appends only absent .gitignore lines and keeps host lines', () => {
     writeFileSync(join(home, '.gitignore'), 'dist\n');

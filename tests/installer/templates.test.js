@@ -25,9 +25,9 @@ describe('bundled CLAUDE.md templates', () => {
     expect(stack.index).toBeLessThan(scan.start);
     expect(text).toContain('<!-- cc-stack:managed:');
   });
-  // The engine skips template headings positioned after the managed block
-  // (`h.index > tpl.start`), so a section placed below the block would silently
-  // never be appended to any host. Lock the invariant the engine depends on.
+  // A fresh install writes the template whole and a merge appends the block at EOF,
+  // so a template with content after the block would give fresh and merged hosts two
+  // different shapes. Lock the block-last invariant both paths share.
   it.each(['global/CLAUDE.md', 'project-template/CLAUDE.md'])('%s keeps the managed block last', (rel) => {
     const scan = scanLines(readFileSync(join(root, rel), 'utf8').replace(/\r\n/g, '\n'));
     expect(scan.headings.every(h => h.index < scan.end)).toBe(true);

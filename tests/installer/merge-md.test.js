@@ -1,33 +1,31 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   SENTINEL_START, SENTINEL_END, detectEol, normalizeHeading,
   mergeClaudeMdText, appendMissingLinesText,
 } from '../../lib/installer/merge-md.mjs';
 
-const TPL = [
-  '# Project Claude Configuration',
-  '',
-  '## Project Identity',
-  '',
-  '- Name: TBD',
-  '',
-  '## Conventions',
-  '',
-  '- TBD',
-  '',
-  SENTINEL_START,
-  '## Agent Identity',
-  '',
-  'You are an orchestrator.',
-  '',
-  '## Hard Constraints',
-  '',
-  '- Never hardcode secrets.',
-  SENTINEL_END,
-  '',
-].join('\n');
+const HERE = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(HERE, '..', '..');
+
+// The contract, written out rather than computed by the code under test: the block is
+// the sentinel lines and everything between them, plus one terminating newline.
+const INTERIOR = ['## Agent Identity', '', 'You are an orchestrator.', '', '## Hard Constraints', '', '- Never hardcode secrets.'];
+const BLOCK = [SENTINEL_START, ...INTERIOR, SENTINEL_END, ''].join('\n');
+const TPL = ['# Project Claude Configuration', '', '## Project Identity', '', '- Name: TBD', '', '## Conventions', '', '- TBD', '', BLOCK].join('\n');
 
 const crlf = (s) => s.replace(/\n/g, '\r\n');
+const lf = (s) => s.replace(/\r\n/g, '\n');
+const realTemplate = (rel) => lf(readFileSync(join(ROOT, rel), 'utf8'));
+const blockOf = (tpl) => tpl.slice(tpl.indexOf(SENTINEL_START), tpl.indexOf(SENTINEL_END) + SENTINEL_END.length) + '\n';
+// A conductor-shaped host with no sentinels: the template's own lines, one host line
+// under every `## ` heading, so a lost section is a lost line.
+const withHostLines = (tpl) => tpl.split('\n')
+  .filter((l) => l !== SENTINEL_START && l !== SENTINEL_END)
+  .flatMap((l) => (l.startsWith('## ') ? [l, `host line under ${l.slice(3)}`] : [l]))
+  .join('\n');
 
 describe('detectEol', () => {
   it('returns CRLF for a CRLF host and LF for an LF host', () => {
@@ -46,21 +44,15 @@ describe('normalizeHeading', () => {
 });
 
 describe('mergeClaudeMdText — host preservation', () => {
-  it('keeps every host-owned line byte-identical and appends only missing sections', () => {
+  it('[AC3, LF] keeps every host byte and appends the managed block alone', () => {
     const host = ['# My Project', '', '## Project Identity', '', '- Name: acme', ''].join('\n');
     const { text, changed } = mergeClaudeMdText(TPL, host);
     expect(changed).toBe(true);
-    expect(text).toContain('- Name: acme');
-    expect(text).not.toContain('- Name: TBD');
-    expect(text).toContain('## Conventions');
-    expect(text).toContain(SENTINEL_START);
-    expect(text.indexOf('## Conventions')).toBeLessThan(text.indexOf(SENTINEL_START));
+    expect(text).toBe(host + '\n' + BLOCK);
   });
-  it('never removes, rewrites or reorders a host section the template lacks', () => {
+  it('[AC3] never removes, rewrites, reorders or adds to a host section, known or not', () => {
     const host = ['# My Project', '', '## Deployment', '', 'kubectl apply', ''].join('\n');
-    const { text } = mergeClaudeMdText(TPL, host);
-    expect(text).toContain('## Deployment\n\nkubectl apply');
-    expect(text.indexOf('## Deployment')).toBeLessThan(text.indexOf('## Project Identity'));
+    expect(mergeClaudeMdText(TPL, host).text).toBe(host + '\n' + BLOCK);
   });
   it('is idempotent — a second merge appends nothing and changes nothing', () => {
     const host = ['# My Project', '', '## Project Identity', '', '- Name: acme', ''].join('\n');
@@ -81,16 +73,19 @@ describe('mergeClaudeMdText — managed block', () => {
     expect(text).not.toContain('You are an orchestrator.');
     expect(text).toContain('- Name: acme');
   });
-  it('migrates a sentinel-less host without producing duplicate headings', () => {
+  it('[AC4] refreshes only the interior: every byte outside the sentinels is identical, in LF and CRLF', () => {
+    const before = '# Mine  \n\n\n## X\ttab\n';
+    const after = 'trailing  \n\n';
+    const host = `${before}${SENTINEL_START}\nold interior\n${SENTINEL_END}\n${after}`;
+    expect(mergeClaudeMdText(TPL, host).text).toBe(`${before}${BLOCK}${after}`);
+    expect(mergeClaudeMdText(TPL, crlf(host)).text).toBe(crlf(`${before}${BLOCK}${after}`));
+  });
+  it('[AC11, AC1] keeps a sentinel-less host\'s managed-name sections and appends the block beside them', () => {
     const host = [
       '# My Project', '', '## Project Identity', '', '- Name: acme', '',
       '## Agent Identity', '', 'stale conductor text', '',
     ].join('\n');
-    const { text } = mergeClaudeMdText(TPL, host);
-    const count = text.split('\n').filter(l => normalizeHeading(l) === 'agent identity' && l.startsWith('## ')).length;
-    expect(count).toBe(1);
-    expect(text).not.toContain('stale conductor text');
-    expect(text).toContain('- Name: acme');
+    expect(mergeClaudeMdText(TPL, host).text).toBe(host + '\n' + BLOCK);
   });
   it('leaves the file entirely untouched on every malformed sentinel count', () => {
     for (const bad of [
@@ -109,45 +104,46 @@ describe('mergeClaudeMdText — managed block', () => {
 });
 
 describe('mergeClaudeMdText — parsing', () => {
-  it('does not treat ## inside a fence as a heading, on either side', () => {
-    const host = ['# H', '', '```md', '## Conventions', '```', ''].join('\n');
-    const { text } = mergeClaudeMdText(TPL, host);
-    expect(text.split('## Conventions').length - 1).toBe(2); // the fenced one + the appended real one
+  it('[AC3] does not treat sentinels inside a ``` fence as sentinels, so the host is sentinel-less', () => {
+    const host = ['# H', '', '```md', SENTINEL_START, '## Agent Identity', SENTINEL_END, '```', ''].join('\n');
+    expect(mergeClaudeMdText(TPL, host).text).toBe(host + '\n' + BLOCK);
   });
-  it('handles ~~~ fences, info strings and an unclosed fence at EOF', () => {
-    const host = ['# H', '', '~~~text title', '## Conventions', '~~~', '', '```js', '## Project Identity'].join('\n');
-    const { text } = mergeClaudeMdText(TPL, host);
-    expect(text).toContain('## Conventions\n\n- TBD');
-    expect(text).toContain('## Project Identity\n\n- Name: TBD');
+  it('[AC3] handles ~~~ fences with an info string the same way', () => {
+    const host = ['# H', '', '~~~text title', SENTINEL_START, '~~~', ''].join('\n');
+    expect(mergeClaudeMdText(TPL, host).text).toBe(host + '\n' + BLOCK);
   });
-  it('treats ### and indented ## as body text', () => {
-    const host = ['# H', '', '### Conventions', '', '  ## Project Identity', ''].join('\n');
-    const { text } = mergeClaudeMdText(TPL, host);
-    expect(text).toContain('## Conventions\n\n- TBD');
-    expect(text).toContain('## Project Identity\n\n- Name: TBD');
+  it('[AC6, Review Focus 2] writes nothing to a sentinel-less host that ends inside an unclosed fence', () => {
+    const host = ['# H', '', '```js', '## Project Identity'].join('\n');
+    const r = mergeClaudeMdText(TPL, host);
+    expect(r.changed).toBe(false);
+    expect(r.text).toBe(host);
+    expect(r.warning).toBe('CLAUDE_MD_UNCLOSED_FENCE');
   });
 });
 
 describe('mergeClaudeMdText — EOL', () => {
-  it('adds the missing trailing newline before appending', () => {
+  it('[AC3] adds the missing trailing newline, then one blank line, before the block', () => {
     const host = '# H\n\n## Project Identity\n\n- Name: acme';
-    const { text } = mergeClaudeMdText(TPL, host);
-    expect(text).not.toContain('- Name: acme## ');
-    expect(text).toContain('- Name: acme\n');
+    expect(mergeClaudeMdText(TPL, host).text).toBe(host + '\n\n' + BLOCK);
   });
-  it('writes CRLF for a CRLF host and never introduces CRLF into an LF host', () => {
-    const host = crlf('# H\n\n## Project Identity\n\n- Name: acme\n');
-    const { text } = mergeClaudeMdText(TPL, host);
-    expect(text).toContain('\r\n');
-    expect(text.replace(/\r\n/g, '')).not.toContain('\n');
-    const lf = mergeClaudeMdText(TPL, '# H\n\n## Project Identity\n\n- Name: acme\n').text;
-    expect(lf).not.toContain('\r');
+  it('[AC3, CRLF] writes the block in CRLF for a CRLF host and in LF for an LF host', () => {
+    const host = '# H\n\n## Project Identity\n\n- Name: acme\n';
+    expect(mergeClaudeMdText(TPL, crlf(host)).text).toBe(crlf(host) + '\r\n' + crlf(BLOCK));
+    expect(mergeClaudeMdText(TPL, host).text).toBe(host + '\n' + BLOCK);
   });
   it('converges on a CRLF host — the second merge is a no-op', () => {
     const once = mergeClaudeMdText(TPL, crlf('# H\n\n## Project Identity\n\n- Name: acme\n')).text;
     const twice = mergeClaudeMdText(TPL, once);
     expect(twice.changed).toBe(false);
     expect(twice.text).toBe(once);
+  });
+  it('[AC3, BOM] keeps the byte-order mark as the first bytes', () => {
+    const host = '﻿# H\n\nprose\n';
+    expect(mergeClaudeMdText(TPL, host).text).toBe(host + '\n' + BLOCK);
+  });
+  it('[AC3, Review Focus 3] leaves a mixed-EOL host\'s bytes alone and appends in the detected EOL', () => {
+    const host = '# H\r\nlf line\ncrlf line\r\n';
+    expect(mergeClaudeMdText(TPL, host).text).toBe(host + '\r\n' + crlf(BLOCK));
   });
 });
 
@@ -159,12 +155,32 @@ describe('mergeClaudeMdText — whole copy', () => {
       expect(text).toBe(TPL);
     }
   });
-  it('appends every template section to a host with no ## headings', () => {
-    const { text } = mergeClaudeMdText(TPL, '# H\n\nJust prose.\n');
-    expect(text).toContain('Just prose.');
-    expect(text).toContain('## Project Identity');
-    expect(text).toContain('## Conventions');
-    expect(text).toContain(SENTINEL_END);
+  it('[AC3] appends the block alone to a host with no ## headings', () => {
+    const host = '# H\n\nJust prose.\n';
+    expect(mergeClaudeMdText(TPL, host).text).toBe(host + '\n' + BLOCK);
+  });
+});
+
+describe('mergeClaudeMdText — BUG-049 red cases, on the shipped templates', () => {
+  it('[AC1, AC6] keeps all 15 host lines of a sentinel-less conductor-shaped file and appends the block alone', () => {
+    const tpl = realTemplate('project-template/CLAUDE.md');
+    const host = withHostLines(tpl) + '## Migration Skills\nhost line under Migration Skills\n';
+    expect(host.match(/^host line under /gm)).toHaveLength(15);
+    const once = mergeClaudeMdText(tpl, host);
+    expect(once.text).toBe(host + '\n' + blockOf(tpl));
+    expect(mergeClaudeMdText(tpl, once.text).changed).toBe(false);
+  });
+  it('[AC9b, AC6] preserves field-damaged input byte for byte: no repair, no relabelling', () => {
+    // Field-verbatim: the head of the nymbl backup, supplied by the owner 2026-09-30.
+    const fieldHead = readFileSync(join(HERE, 'fixtures', 'bug049-field-head.md'), 'utf8');
+    // Reconstruction: lines 16 onward of project-template/CLAUDE.md at 2a3a811, the
+    // template byte-identical to the 1.23.0-1.23.3 tarballs (sha1 3d0ee6dfc962).
+    const reconstruction = readFileSync(join(HERE, 'fixtures', 'bug049-2a3a811-tail.md'), 'utf8');
+    const host = fieldHead + reconstruction;
+    const tpl = realTemplate('project-template/CLAUDE.md');
+    const once = mergeClaudeMdText(tpl, host);
+    expect(once.text).toBe(host + '\n' + blockOf(tpl));
+    expect(mergeClaudeMdText(tpl, once.text).changed).toBe(false);
   });
 });
 
