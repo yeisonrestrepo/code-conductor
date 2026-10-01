@@ -35,6 +35,14 @@ describe('packed tarball', () => {
     expect(existsSync(join(pkgDir, 'docs'))).toBe(false);
     expect(existsSync(join(pkgDir, 'install.sh'))).toBe(false);
   });
+  // R1: AC7's fault injector lives only in tests/installer/merge-ordering.test.js, as a
+  // vitest module mock. Nothing that ships may import or mock through vitest.
+  it('ships no test seam: no packed script imports vitest or calls its mock API', () => {
+    const scripts = readdirSync(pkgDir, { recursive: true }).filter(p => /\.(mjs|js)$/.test(p));
+    expect(scripts.length).toBeGreaterThan(0);
+    const seam = /\bvi\.(mock|hoisted|spyOn)\(|from ['"]vitest['"]/;
+    expect(scripts.filter(p => seam.test(readFileSync(join(pkgDir, p), 'utf8')))).toEqual([]);
+  });
   it('ships the template ignore rules under the undotted name', () => {
     expect(existsSync(join(pkgDir, 'project-template', 'gitignore'))).toBe(true);
     expect(existsSync(join(pkgDir, 'project-template', '.gitignore'))).toBe(false);

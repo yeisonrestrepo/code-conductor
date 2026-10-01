@@ -108,6 +108,21 @@ describe('mergeFileInto', () => {
     expect(readdirSync(dir).filter(n => n.includes('.installer-backup.'))).toEqual([]);
     expect(warnings.join('\n')).toMatch(/SENTINEL_UNBALANCED/);
   });
+  it('[AC8] reports the backup path through onBackup once, and never when nothing changes', () => {
+    writeFileSync(target, '# Mine\n');
+    const reported = [];
+    mergeFileInto(tplPath, target, mergeClaudeMdText, { warn, onBackup: (p) => reported.push(p) });
+    const backup = readdirSync(dir).find(n => n.includes('.installer-backup.'));
+    expect(reported).toEqual([join(dir, backup)]);
+    mergeFileInto(tplPath, target, mergeClaudeMdText, { warn, onBackup: (p) => reported.push(p) });
+    expect(reported).toHaveLength(1);
+  });
+  it('[AC10e] emits a merge notice once the write has succeeded', () => {
+    writeFileSync(target, 'old\n');
+    const noticing = () => ({ text: 'new\n', changed: true, warning: null, notice: 'a notice' });
+    expect(mergeFileInto(tplPath, target, noticing, { warn })).toBe('merged');
+    expect(warnings).toEqual(['code-conductor: a notice']);
+  });
 });
 
 describe('mergeFileInto — absent template', () => {

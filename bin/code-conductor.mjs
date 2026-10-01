@@ -91,7 +91,7 @@ export function run(argv, env = process.env, { cwd = process.cwd(), log } = {}) 
     assertAssets(assetRoot, ['global', 'skills', 'scripts', 'project-template']); // pre-flight
     assertMergeTargets(home, cwd, opts.project);                                  // pre-flight
     writing = true;                                                    // copy phase begins
-    const claudeDir = deployGlobal(assetRoot, home);
+    const claudeDir = deployGlobal(assetRoot, home, { warn: (m) => emit('stderr', m), report: (m) => emit('stdout', m) });
     chmodHooks(claudeDir);
     const v = writeVerbosity(home, assetRoot, opts.verbosity, opts.verbosityGiven);
     if (v.warn) emit('stderr', v.warn);
@@ -101,7 +101,7 @@ export function run(argv, env = process.env, { cwd = process.cwd(), log } = {}) 
     if (heal.status === 'removed') emit('stdout', 'code-conductor: removed the retired graphify-ast-refresh hook from settings.json (backup written beside it)');
     for (const line of heal.lines) emit('stderr', `code-conductor: ${line}`);
     writeVersionFile(home, pkgVersion(assetRoot));
-    if (opts.project) deployProject(assetRoot, cwd, { warn: (m) => emit('stderr', m) });
+    if (opts.project) deployProject(assetRoot, cwd, { warn: (m) => emit('stderr', m), report: (m) => emit('stdout', m) });
     return 0;
   } catch (err) {
     // Pre-flight failures (nothing written yet) → exit 1.

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync, readFileSync, readdirSync, lstatSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync, readFileSync, readdirSync, lstatSync, symlinkSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -38,6 +38,11 @@ afterEach(() => {
   rmSync(asset, { recursive: true, force: true });
   rmSync(home, { recursive: true, force: true });
 });
+const capture = () => {
+  const out = { warned: [], said: [] };
+  out.opts = { warn: (m) => out.warned.push(m), report: (m) => out.said.push(m) };
+  return out;
+};
 
 describe('assertAssets', () => {
   it('throws MISSING_ASSET for an absent dir', () => {
@@ -437,7 +442,7 @@ describe('deployProject: overwritten project.md detection', () => {
   });
 
   it('says nothing on a fresh scaffold, whose stub it just wrote', () => {
-    deployProject(asset, home, { warn });
+    deployProject(asset, home, { warn, report: (m) => warned.push(m) });
     expect(warned).toEqual([]);
     expect(readFileSync(join(home, '.claude', 'memory', 'project.md'), 'utf8')).toBe(STUB);
   });
@@ -466,5 +471,66 @@ describe('deployProject: overwritten project.md detection', () => {
     warned.length = 0;
     deployProject(asset, home, { warn });
     expect(warned).toEqual([]);
+  });
+});
+
+describe('backup report (BUG-049)', () => {
+  it('[AC5] leaves files equal to the shipped templates untouched, with no backup and no report', () => {
+    writeFileSync(join(home, 'CLAUDE.md'), TPL_PROJECT);
+    writeFileSync(join(home, '.gitignore'), TPL_GITIGNORE);
+    const c = capture();
+    deployProject(asset, home, c.opts);
+    expect(readFileSync(join(home, 'CLAUDE.md'), 'utf8')).toBe(TPL_PROJECT);
+    expect(readFileSync(join(home, '.gitignore'), 'utf8')).toBe(TPL_GITIGNORE);
+    expect(readdirSync(home).filter(n => n.includes('.installer-backup.'))).toEqual([]);
+    expect(c.said).toEqual([]);
+  });
+  it('[AC8] reports each project backup with the exact line, and nothing on a re-run', () => {
+    writeFileSync(join(home, 'CLAUDE.md'), '# Acme\n');
+    writeFileSync(join(home, '.gitignore'), 'dist\n');
+    const c = capture();
+    deployProject(asset, home, c.opts);
+    const claude = readdirSync(home).find(n => n.startsWith('CLAUDE.md.installer-backup.'));
+    const ignore = readdirSync(home).find(n => n.startsWith('.gitignore.installer-backup.'));
+    expect(c.said).toEqual([
+      `code-conductor: backed up CLAUDE.md to ${claude} before merging (git-ignored by design)`,
+      `code-conductor: backed up .gitignore to ${ignore} before merging (git-ignored by design)`,
+    ]);
+    c.said.length = 0;
+    deployProject(asset, home, c.opts);
+    expect(c.said).toEqual([]);
+  });
+  it('[AC8, R2] reports a global backup by its ~/.claude path, without the project ignore claim', () => {
+    const dir = join(home, '.claude');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'CLAUDE.md'), '# Mine\n');
+    const c = capture();
+    deployGlobal(asset, home, c.opts);
+    const backup = readdirSync(dir).find(n => n.includes('.installer-backup.'));
+    expect(c.said).toEqual([`code-conductor: backed up ~/.claude/CLAUDE.md to ~/.claude/${backup} before merging`]);
+  });
+  it('[Review Focus 4, R2] reports a symlinked target\'s backup by its absolute path, without the ignore claim', () => {
+    const real = join(asset, 'dotfiles-CLAUDE.md');
+    writeFileSync(real, '# Acme\n');
+    symlinkSync(real, join(home, 'CLAUDE.md'));
+    const c = capture();
+    deployProject(asset, home, c.opts);
+    const backup = readdirSync(asset).find(n => n.startsWith('dotfiles-CLAUDE.md.installer-backup.'));
+    expect(c.said).toEqual([`code-conductor: backed up CLAUDE.md to ${join(realpathSync(asset), backup)} before merging`]);
+  });
+  it('[AC9] keeps a backup byte-equal to the original across consecutive runs', () => {
+    const original = '# Acme\n\n## Hard Constraints\n\n- our own rule\n';
+    writeFileSync(join(home, 'CLAUDE.md'), original);
+    for (let i = 0; i < 3; i++) deployProject(asset, home, capture().opts);
+    const backups = readdirSync(home).filter(n => n.startsWith('CLAUDE.md.installer-backup.'));
+    expect(backups.map(n => readFileSync(join(home, n), 'utf8'))).toContain(original);
+    expect(readFileSync(join(home, 'CLAUDE.md'), 'utf8')).toBe(original + '\n' + PROJECT_BLOCK);
+  });
+  it('[AC10e] says once, on the warning channel, that existing entries stayed in place', () => {
+    writeFileSync(join(home, '.gitignore'), '.claude/memory/turn-count.txt\n!keep.log\n');
+    const c = capture();
+    deployProject(asset, home, c.opts);
+    deployProject(asset, home, c.opts);
+    expect(c.warned.filter(m => m.includes('left the existing Code Conductor entries'))).toHaveLength(1);
   });
 });

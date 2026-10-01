@@ -103,6 +103,12 @@ describe('run', () => {
     expect(rc).toBe(2);
     expect(logs.some(l => l.startsWith('stderr:') && /PARTIAL_WRITE/.test(l))).toBe(true);
   });
+  it('[AC8] prints the backup report on stdout when --project merges an existing CLAUDE.md', () => {
+    writeFileSync(join(cwd, 'CLAUDE.md'), '# Acme\n');
+    expect(run(['--project'], { HOME: home }, { cwd, log })).toBe(0);
+    const backup = readdirSync(cwd).find(n => n.startsWith('CLAUDE.md.installer-backup.'));
+    expect(logs).toContain(`stdout:code-conductor: backed up CLAUDE.md to ${backup} before merging (git-ignored by design)`);
+  });
   it('is silent on stdout at MIN (no informational output)', () => {
     run([], { HOME: home }, { cwd, log });
     expect(logs.filter(l => l.startsWith('stdout:'))).toHaveLength(0);
