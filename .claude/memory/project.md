@@ -1953,3 +1953,6 @@ The spec is `docs/superpowers/specs/2026-09-30-bug049-claude-md-clobber-design.m
 - **README:** `1.34.4` is stated as the minimum safe version, pinned so it can never exceed `VERSION`.
 - **Out of scope:** `[FEAT-040]`, filed by this spec (ceiling `{"BUG":49,"FEAT":39,"ARCH":9}` on both legs), which is `/cc-stack`'s semantic adoption with approval-gated writes and queues behind `[ARCH-009]`.
 - **Plan:** it opens with full reads of `merge-md.mjs`, `deploy.mjs` and `file-merge.mjs`. Its Review Focus names re-deriving the tests that asserted the old destructive semantics, `merge-md.test.js:84` first.
+- **Owner precisions for the plan (2026-09-30):**
+  1. **Re-derived tests** (`merge-md.test.js:84` inverted; `:49` and `:162` revisited) are written from the spec's contract, `host + separator + block` byte-exact. They are never written by negating the old assertion text, because a negated destructive assertion can pass for the wrong reason. Each re-derived test states the AC it pins.
+  2. **AC7's fault injection** needs a seam that makes `backupFile` and `writeAtomic` throw on command. The plan says where that seam lives and why it cannot fire in production: an installer shipping an unguarded fault injector is not acceptable in this fix.
