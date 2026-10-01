@@ -6,6 +6,7 @@ import { resolveRealTarget, backupFile, writeAtomic, mergeFileInto } from '../..
 import { mergeClaudeMdText, SENTINEL_START, SENTINEL_END } from '../../lib/installer/merge-md.mjs';
 
 const TPL = ['# T', '', '## Project Identity', '', '- Name: TBD', '', SENTINEL_START, '## Hard Constraints', '', '- No secrets.', SENTINEL_END, ''].join('\n');
+const FM_BLOCK = [SENTINEL_START, '## Hard Constraints', '', '- No secrets.', SENTINEL_END, ''].join('\n');
 
 let dir, tplPath, target, warnings;
 const warn = (m) => warnings.push(m);
@@ -68,21 +69,21 @@ describe('mergeFileInto', () => {
     expect(mergeFileInto(tplPath, target, mergeClaudeMdText, { warn })).toBe('unchanged');
     expect(readdirSync(dir).filter(n => n.includes('.installer-backup.'))).toHaveLength(1);
   });
-  it('makes the pre-migration content recoverable from the backup', () => {
+  it('[AC9, AC1] keeps the pre-merge file in the backup and every host byte in the target', () => {
     const before = '# Mine\n\n## Hard Constraints\n\n- my own rule\n';
     writeFileSync(target, before);
     mergeFileInto(tplPath, target, mergeClaudeMdText, { warn });
     const backup = readdirSync(dir).find(n => n.includes('.installer-backup.'));
     expect(readFileSync(join(dir, backup), 'utf8')).toBe(before);
-    expect(readFileSync(target, 'utf8')).not.toContain('- my own rule');
+    expect(readFileSync(target, 'utf8')).toBe(before + '\n' + FM_BLOCK);
   });
-  it('merges through a symlink and leaves the link intact', () => {
+  it('[AC3] merges through a symlink and leaves the link intact', () => {
     const real = join(dir, 'real-CLAUDE.md');
     writeFileSync(real, '# Mine\n\n## Deployment\n\nkubectl\n');
     symlinkSync(real, target);
     expect(mergeFileInto(tplPath, target, mergeClaudeMdText, { warn })).toBe('merged');
     expect(lstatSync(target).isSymbolicLink()).toBe(true);
-    expect(readFileSync(real, 'utf8')).toContain('## Project Identity');
+    expect(readFileSync(real, 'utf8')).toBe('# Mine\n\n## Deployment\n\nkubectl\n' + '\n' + FM_BLOCK);
     // the backup lands beside the RESOLVED path, not beside the link
     expect(readdirSync(dir).filter(n => n.startsWith('real-CLAUDE.md.installer-backup.'))).toHaveLength(1);
     expect(readdirSync(dir).filter(n => n.startsWith('CLAUDE.md.installer-backup.'))).toEqual([]);
@@ -106,6 +107,21 @@ describe('mergeFileInto', () => {
     expect(readFileSync(target, 'utf8')).toBe(bad);
     expect(readdirSync(dir).filter(n => n.includes('.installer-backup.'))).toEqual([]);
     expect(warnings.join('\n')).toMatch(/SENTINEL_UNBALANCED/);
+  });
+  it('[AC8] reports the backup path through onBackup once, and never when nothing changes', () => {
+    writeFileSync(target, '# Mine\n');
+    const reported = [];
+    mergeFileInto(tplPath, target, mergeClaudeMdText, { warn, onBackup: (p) => reported.push(p) });
+    const backup = readdirSync(dir).find(n => n.includes('.installer-backup.'));
+    expect(reported).toEqual([join(dir, backup)]);
+    mergeFileInto(tplPath, target, mergeClaudeMdText, { warn, onBackup: (p) => reported.push(p) });
+    expect(reported).toHaveLength(1);
+  });
+  it('[AC10e] emits a merge notice once the write has succeeded', () => {
+    writeFileSync(target, 'old\n');
+    const noticing = () => ({ text: 'new\n', changed: true, warning: null, notice: 'a notice' });
+    expect(mergeFileInto(tplPath, target, noticing, { warn })).toBe('merged');
+    expect(warnings).toEqual(['code-conductor: a notice']);
   });
 });
 

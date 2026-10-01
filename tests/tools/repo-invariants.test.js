@@ -131,4 +131,18 @@ describe('this repository, at every commit', () => {
   it('claims no automatic install of ui-ux-pro-max, which no shipped code performs', () => {
     expect(read('README.md')).not.toMatch(/nextlevelbuilder|downloads it (directly )?from GitHub|activated automatically for frontend/i);
   });
+
+  // 1.34.4, BUG-049 AC13: the README names the oldest release that neither overwrites nor
+  // silently strips a host CLAUDE.md, where installs are described. The floor can only
+  // name a release that exists, so it may never run ahead of VERSION.
+  it('states one minimum safe version where installs are described, never above VERSION', () => {
+    const FLOOR = /\*\*Minimum safe version: `(\d+\.\d+\.\d+)`\.\*\*/;
+    const floors = ['Quickstart', 'Install'].map((h) => section(read('README.md'), h).match(FLOOR)?.[1]);
+    expect(floors[0]).toBeDefined();
+    expect(floors[1]).toBe(floors[0]);
+    const [f, v] = [floors[0], read('VERSION').trim()].map((s) => s.split('.').map(Number));
+    const firstDiff = f.findIndex((n, i) => n !== v[i]);
+    expect(firstDiff === -1 || f[firstDiff] < v[firstDiff]).toBe(true);
+    for (const h of ['Quickstart', 'Install']) expect(section(read('README.md'), h)).toContain('code-conductor@latest');
+  });
 });

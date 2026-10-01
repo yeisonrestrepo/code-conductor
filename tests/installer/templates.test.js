@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { scanLines, SENTINEL_START } from '../../lib/installer/merge-md.mjs';
+import { scanLines, SENTINEL_START, GITIGNORE_HEADER } from '../../lib/installer/merge-md.mjs';
 import {
   GLOBAL_HOST_OWNED, PROJECT_HOST_OWNED,
   GLOBAL_SETTINGS_FINGERPRINTS, PROJECT_SETTINGS_FINGERPRINTS,
@@ -25,9 +25,9 @@ describe('bundled CLAUDE.md templates', () => {
     expect(stack.index).toBeLessThan(scan.start);
     expect(text).toContain('<!-- cc-stack:managed:');
   });
-  // The engine skips template headings positioned after the managed block
-  // (`h.index > tpl.start`), so a section placed below the block would silently
-  // never be appended to any host. Lock the invariant the engine depends on.
+  // A fresh install writes the template whole and a merge appends the block at EOF,
+  // so a template with content after the block would give fresh and merged hosts two
+  // different shapes. Lock the block-last invariant both paths share.
   it.each(['global/CLAUDE.md', 'project-template/CLAUDE.md'])('%s keeps the managed block last', (rel) => {
     const scan = scanLines(readFileSync(join(root, rel), 'utf8').replace(/\r\n/g, '\n'));
     expect(scan.headings.every(h => h.index < scan.end)).toBe(true);
@@ -67,6 +67,10 @@ describe('project-template/gitignore', () => {
     const lines = readFileSync(join(root, 'project-template/gitignore'), 'utf8').split('\n').map(l => l.trim());
     expect(lines).toContain('*.installer-backup.*');
     expect(lines).toContain('*.installer-tmp.*');
+  });
+  it('opens with the header the .gitignore merge finds its block by', () => {
+    const text = readFileSync(join(root, 'project-template/gitignore'), 'utf8');
+    expect(text.split('\n')[0]).toBe(GITIGNORE_HEADER);
   });
 });
 

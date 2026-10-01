@@ -212,6 +212,29 @@ The factory is five bands. Work enters through the Boundary band, flows Define, 
 * **Components Affected:** `scripts/init-wizard.mjs`, `scripts/claude-md-fields.mjs`, `/cc-init` Step 2 (both mirrors). *No model API binding: the agent running the session does the asking.*
 * **Acceptance Criteria:** Gracefully fall back to an interactive console questionnaire if automated file discovery yields no metadata, resulting in a structured, clean `CLAUDE.md` output.
 
+### [ ] `[FEAT-040]` Semantic Adoption of a Pre-Existing Host CLAUDE.md by /cc-stack
+* **Filed 2026-09-30 from the `[BUG-049]` spec, as the intelligent half of the responsibility split the owner ruled there.**
+  - **The installer's half:** `[BUG-049]`'s deterministic, non-destructive structural merge. Conductor owns only its sentinel block, a sentinel-less host file gets the block appended and nothing else, and the installer never reclassifies host prose. Guesses about a team's shared file are the defect class `[BUG-049]` fixes.
+  - **This item's half:** semantic judgment. It belongs here because a model and a human are both in the loop.
+* **Precedent:** `[FEAT-013]`, which established that `CLAUDE.md` generation belongs to the command, not to static templates.
+* **Description:** When `/cc-stack` detects a pre-existing `CLAUDE.md` that conductor did not author, it offers to adopt it.
+  1. The model reads the file's actual content.
+  2. It proposes a mapping of that content into conductor's structure, shown to the owner as the full resulting file.
+  3. It preserves whatever does not map, verbatim.
+  4. It writes **only** on the owner's explicit approval of the shown result.
+
+  Declining leaves the file exactly as the installer left it.
+* **Impact:** A team with its own `CLAUDE.md` gets one coherent file instead of its content beside a managed block. That covers the duplicate headings `[BUG-049]` accepts on sentinel-less hosts, which are reconciled here, by a human decision.
+* **Components Affected:** `global/commands/cc-stack.md` (both mirrors), the `CLAUDE.md` managed-block contract in `README.md`, and possibly `scripts/claude-md-fields.mjs`.
+* **Acceptance Criteria:**
+  - No write without an explicit approval of the exact shown result.
+  - Content that does not map is preserved byte for byte, outside the managed block.
+  - The managed block's content is never rewritten by the adoption, which only moves host content.
+  - A backup is taken before the approved write, and its path is reported, per `[BUG-049]`'s backup rule.
+  - Declining is a no-op.
+  - The flow never triggers on a file whose only non-block content is conductor's own scaffold.
+* **Queue:** behind `[ARCH-009]`, unless the owner reorders.
+
 ---
 
 ## PILLAR 5: INFRASTRUCTURE, ECOSYSTEM, AND QUALITY ASSURANCE
@@ -648,7 +671,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 * **Components Affected:** `.github/workflows/test.yml`, possibly `tests/` for a baseline assertion, `docs/RELEASE-CLOSEOUT.md` if predictions become per-environment.
 * **Acceptance Criteria:** No deprecation warning in a green run; the chosen test runtime(s) named in the workflow with the coverage consequence stated; a measured, asserted skip baseline per environment; the FEAT-021 gate scenario (an 83-skip silent divergence with matching totals) reproduced as the red case the assertion now catches.
 
-### [ ] `[BUG-049]` The Installer Replaced an Existing Project CLAUDE.md on a `--project` Install
+### [X] `[BUG-049]` The Installer Replaced an Existing Project CLAUDE.md on a `--project` Install
+* **DONE, shipped as `1.34.4` on 2026-09-30.** `CLAUDE.md` ownership is decided by the `cc:managed` sentinels alone: a sentinel-less host keeps every byte and gets the block appended, a balanced host has only its interior refreshed, and a host ending inside an unclosed fence is left untouched with a warning. Every backup is reported on stdout. A failed backup skips the file, proven by injected faults whose injector exists only as a vitest module mock, and the packed tarball is asserted to contain none. `.gitignore` entries live in one labelled block with exact-line gathering and a negation guard. The README names `1.34.4` as the minimum safe version. Out of scope, as specified: field restoration, the mangling mechanism (unknown), and reconciling duplicate headings (`[FEAT-040]`).
 * **Field report, 2026-09-30, verbatim from the owner's terminal.** The owner was dogfooding `1.34.3` in a work repository (WSL, `~/projects/nymbl`):
   ```
   npx @yeison.restrepo.r/code-conductor@1.34.3 --project
@@ -667,6 +691,11 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   - `README.md`'s "How the installer treats your CLAUDE.md" section promises the same. It names one path that discards host content: the one-time pre-sentinel migration, which removes host sections the managed block also defines and keeps the pre-migration file as `CLAUDE.md.installer-backup.<UTC timestamp>`.
   - **Measured while filing, and it bears on "no backup" without settling it:** the shipped `project-template/gitignore:2` ignores `*.installer-backup.*`, and the installer merges that line into the host's `.gitignore`. A backup written beside the file would therefore be invisible to `git status` and `git diff`.
   - Whether a backup exists in the host, and whether this was the migration path, a regression, or a path the merge never covered, is for the spec to measure. **No mechanism is claimed here.**
+* **AMENDMENT, 2026-09-30, the backup's fingerprint (spec `docs/superpowers/specs/2026-09-30-bug049-claude-md-clobber-design.md`):**
+  - **A backup existed.** It is git-ignored, and 1.34.3 wrote it without reporting it.
+  - **Its content is a pre-sentinel conductor template, not the company's original.** It belongs to the `f75f5e0`–`2a3a811` family; `2a3a811` is byte-equal to the 1.23.x tarballs.
+  - **The two-run shape is therefore:** an old generation overwrote the company file with no backup, then 1.34.3 backed up that damaged file and removed its managed-name sections.
+  - **Field observation, mechanism unknown:** that template is corrupted with a systematic pattern. Each identity and command label loses two characters (`- me:`, `Bld`, …), and lines carry a spurious `* ` prefix. The script-era fill logic (`_fill_claude_md`, `Set-ClaudeMdFields`) cannot produce it, and no census template contains it. No cause is claimed.
 * **The same field run, recorded for the evidence pipeline:**
   - **`[FEAT-021]` heal, first confirmed field firing:** it removed the retired `graphify-ast-refresh` hook from a real host's `settings.json` and wrote the backup beside it. It worked as designed.
   - **`[BUG-039]` stub hint, firing on a legitimate fresh stub:** it is the known residual named in README Known limits, and it is accepted.

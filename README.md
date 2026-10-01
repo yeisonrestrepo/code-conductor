@@ -12,9 +12,11 @@
 
 Three commands, from nothing to a guarded session. The output below is **real**, captured by running exactly these commands in a scratch directory.
 
+**Minimum safe version: `1.34.4`.** Older versions can strip or damage an existing `CLAUDE.md`: every release before `1.24` overwrote it with no backup, `1.24` through `1.34.3` silently removed your sections whose headings matched the managed block's, and an older pre-sentinel version left at least one field file with damaged lines. Install with `@latest`, as below.
+
 ```bash
 mkdir demo && cd demo && git init -q && npm init -y >/dev/null
-npx @yeison.restrepo.r/code-conductor --project
+npx @yeison.restrepo.r/code-conductor@latest --project
 ```
 
 The installer prints **nothing** and exits 0. That silence is deliberate and is asserted by a test: the stub-detection check runs *before* the seed, so a fresh scaffold cannot warn about the file it was just given (`tests/installer/deploy.test.js`, "says nothing on a fresh scaffold, whose stub it just wrote").
@@ -96,7 +98,6 @@ Four checks live in `tools/` as tracked repository infrastructure. Three of them
 
 ## Known limits
 
-- **`[BUG-049]`, open, and the most severe:** on `1.34.3`, a `--project` install in the field replaced an existing project `CLAUDE.md` with the shipped template, against the merge-and-backup contract described under [How the installer treats your CLAUDE.md](#how-the-installer-treats-your-claudemd). It is being measured, and the fix targets `1.34.4`. Until then, commit your `CLAUDE.md` before installing.
 - **`[BUG-045]`, open:** the Guard 3 allowlist cannot cover a quoted path, because the boundary sets it interpolates contain no quote character, so an entry `docs/` does not cover `cat "docs/x.md" *.md`. Filed with its ritual priced, untouched pending its own change.
 - **`[BUG-032]`, open:** global memory preferences sit outside the documented lookup chain. Nothing in the chain points at `~/.claude/memory/personal.md`, and the installer never deploys `global/memory/`, so a preference filed there is never read by the agent it was written for.
 - **The `P7` false positive above**, still live.
@@ -136,8 +137,10 @@ AI coding assistants are only as good as the structure you put around them. With
 
 ## Install
 
+**Minimum safe version: `1.34.4`.** Older versions can strip or damage an existing `CLAUDE.md`: every release before `1.24` overwrote it with no backup, `1.24` through `1.34.3` silently removed your sections whose headings matched the managed block's, and an older pre-sentinel version left at least one field file with damaged lines. Install with `@latest`, as below.
+
 ```bash
-npx @yeison.restrepo.r/code-conductor            # one-shot global setup
+npx @yeison.restrepo.r/code-conductor@latest            # one-shot global setup
 # or
 npm install -g @yeison.restrepo.r/code-conductor && code-conductor
 ```
@@ -422,14 +425,23 @@ code-conductor/
 
 ## .gitignore Note
 
-When installed with `--project`, the installer appends these rules to your project's
-`.gitignore`, and only the ones you are missing — your own entries are never touched:
+When installed with `--project`, the installer keeps its rules in one labelled block in
+your project's `.gitignore`:
 
 ```
+# Code Conductor (added by the installer; safe to keep)
 .claude/memory/turn-count.txt
 *.installer-backup.*
 *.installer-tmp.*
 ```
+
+The block ends at the first blank line. Your own lines are never edited. A line that is
+exactly one of these three rules (earlier versions appended them one at a time) is moved
+into the block, so each rule appears once; a line you changed, such as
+`/.claude/memory/turn-count.txt`, is not an exact match and stays where it is. If your
+`.gitignore` has any `!` line, nothing is moved, because moving a rule past a `!` can
+change what is ignored: the block then holds only the rules you lack, and the installer
+says so. A change to `.gitignore` is backed up and reported exactly as for `CLAUDE.md`.
 
 The last two keep the installer's own backups and crash-stranded temp files out of
 `git status`. The rules ship inside the package as `project-template/gitignore`
@@ -443,28 +455,34 @@ published tarball; the installer restores the dot when it writes to your project
 `CLAUDE.md` and `.gitignore` are **merged**, never overwritten. Everything else the
 installer ships (`settings.json`, hooks, commands, `scripts/`) is replaced on every run.
 
-- **Managed sections** live between `<!-- cc:managed:start -->` and `<!-- cc:managed:end -->`.
-  Code Conductor owns that block and replaces its contents wholesale on every upgrade, so
-  released improvements reach existing installs. Edits inside the block are lost.
-- **Everything outside the block is yours.** Existing sections are preserved byte-for-byte;
-  sections the template has and your file lacks are appended once, immediately above the
-  managed block. Sections you wrote that the template has never heard of are never touched.
+- **Code Conductor owns one block and nothing else.** Its content lives between
+  `<!-- cc:managed:start -->` and `<!-- cc:managed:end -->`, and those two markers alone
+  decide ownership; a heading's name never does. Every upgrade replaces the block's
+  contents wholesale, so released improvements reach existing installs. Edits inside the
+  block are lost, and recoverable from the backup.
+- **Everything outside the block is yours, byte for byte.** Nothing outside it is
+  removed, rewritten, reordered or added.
+- **A file without the markers gets the block appended at the end**, after one blank
+  line and in your file's line endings, and nothing else changes. If your file already
+  has sections named like the block's (`## Agent Identity`, `## Hard Constraints`, …),
+  you will see both: yours above, Code Conductor's inside the block. That is deliberate.
+  The installer never decides which of your sections are really its own; reconciling
+  them is planned for `/cc-stack` as `[FEAT-040]`.
 - **Before any change, the installer copies your file to
-  `CLAUDE.md.installer-backup.<UTC timestamp>`** and keeps the five most recent.
+  `CLAUDE.md.installer-backup.<UTC timestamp>`**, keeps the five most recent, and prints
+  where it put it:
 
-> **One-time migration on your first 1.24 install.** If your `CLAUDE.md` predates the
-> sentinel markers and already contains sections that the managed block also defines
-> (`## Agent Identity`, `## Hard Constraints`, …), **those sections are removed** and
-> replaced by the managed block, so you do not end up with two copies of each. This is the
-> only path that discards content you wrote. **Your pre-migration file is preserved in the
-> `.installer-backup.` copy beside it** — diff it after upgrading and move anything you
-> want to keep into a section outside the managed block.
+  ```
+  code-conductor: backed up CLAUDE.md to CLAUDE.md.installer-backup.20260930T120000Z before merging (git-ignored by design)
+  ```
 
-> **A cosmetic wart of that same migration, in `~/.claude/CLAUDE.md` only.** The managed
-> block carries the file's intro sentence ("Applies to every project on this machine…"),
-> and your pre-sentinel copy keeps its own above the block, so you will see that one
-> sentence twice after the first upgrade. Delete the copy above the block — it is outside
-> the managed region, so your deletion sticks.
+  Backups are git-ignored so nobody commits one by accident and they stay out of every
+  teammate's `git status`; the printed line is how you find yours. A fresh install, and a
+  re-run that changes nothing, print nothing.
+
+The same rules apply to `~/.claude/CLAUDE.md`, whose backup line names the `~/.claude/`
+path. If your file ends inside a code fence that is never closed, the installer leaves it
+untouched with a warning, because a block appended there would be hidden inside the fence.
 
 If the markers in your file are damaged — a `start` with no `end`, two blocks, an `end`
 before its `start` — the installer prints a warning, leaves the file completely untouched,
