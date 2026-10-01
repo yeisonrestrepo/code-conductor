@@ -2365,6 +2365,48 @@ The spec is `docs/superpowers/specs/2026-10-01-feat011-orchestrator-band-router-
   4. Per-environment test counts are predicted before any run. Local carries the 12 conditional plugin tests that CI lacks.
   5. The plan halts for the owner's full review before approval.
 
+## Measurements: FEAT-011 V1–V3 [2026-10-01]
+
+- **Binary:** `claude` 2.1.287 (Claude Code), interactive, owner driving, in a scratch repository outside this one (`<scratchpad>/probe-feat011`). Binary delta: the ARCH-010 identity spike measured 2.1.286; V1–V3 measured 2.1.287.
+- **Main-session shape on 2.1.287:** `toolu_01ANzkuNbdQoiJRg2HiFxPsH Write agent_type=- agent_id=- …/v3-stderr.txt`, `toolu_014BGzJgsfpcQJBeAJHwJYLa Write agent_type=- agent_id=- …/v3-system.txt`, `toolu_01CUig8FU9akaB2hzLyNFYgi Write agent_type=- agent_id=- …/v3-both.txt`. The key set is `cwd,effort,hook_event_name,permission_mode,prompt_id,scratchpad_dir,session_id,tool_input,tool_name,tool_use_id,transcript_path`, so `agent_id` and `agent_type` are both absent. Every subagent payload adds exactly `agent_id,agent_type`.
+- **V1, subagent dispatch:**
+  - **Payloads:**
+    - `toolu_01U3vWPTXHAdj6wtA5NtY5g5 Agent agent_type=- agent_id=- relay`, the main session dispatching the relay;
+    - `toolu_01QDZxhg3udymHNoKKtip58D Agent agent_type=relay agent_id=aaf51707768e88daf leaf`, the relay dispatching the leaf;
+    - `toolu_01TqM8mYrvoLWs8mRNZZHVqi Write agent_type=leaf agent_id=a7a0cdd53dc2e864d /private/tmp/claude-501/-Users-yeison-Projects-code-conductor-207a0da0-…/probe-feat011/leaf.txt`, at a mistyped path;
+    - `toolu_01L1zCtqWZg4uAb972J6btC3 Write agent_type=leaf agent_id=a7a0cdd53dc2e864d /private/tmp/claude-501/-Users-yeison-Projects-code-conductor/207a0da0-…/probe-feat011/leaf.txt`, at the intended path.
+  - `ls leaf.txt main-leaf.txt` lists both files.
+  - **The relay's tool list, as it reported it:** "Agent, Artifact, Bash, Edit, Read, Skill, ToolSearch, Write, SubagentHandback, mcp__claude_ai_Claude_Docs__batch, mcp__claude_ai_Claude_Docs__guide, mcp__claude_ai_Claude_Docs__update, SendMessage (loaded through ToolSearch)".
+  - **Verdict: halts.** On 2.1.287 a subagent can dispatch a subagent, so D1's grounds are false on this binary. Awaiting the owner's ruling on D1.
+- **V2, session id:** printenv printed `7162b039-aa22-4dfc-8536-e5aaeba35edc`. All 20 logged payloads carry `session_id=7162b039-aa22-4dfc-8536-e5aaeba35edc`: the main session, the relay `aaf51707768e88daf`, and the two leaves `a7a0cdd53dc2e864d` and `aa97edc9b9cfff98a`. There is one distinct value. **Verdict: holds.**
+- **V3, warning channel:** pending the owner's four marker observations. Verdict: pending.
+- **Measured behaviors of 2.1.287 that the design leans on the opposite of:**
+  1. **Asynchronous dispatch.**
+     - The main session issued the relay dispatch (`toolu_01U3vW…`) and its own leaf dispatch (`toolu_01MhHea7…`) back to back. It then made its three `v3-*.txt` Writes before either subagent's first logged Write.
+     - The `Agent` inputs carry no `run_in_background` field (`{"description","prompt","subagent_type"}` only), so asynchrony is not visible in the dispatch payload.
+     - In the payloads, the only completion markers are the subagents' own `SubagentHandback` calls. The completion notices on screen are not tool calls, so the PreToolUse log cannot see them; they are recorded from the owner's screen report.
+  2. **The one-final-message assumption failed.**
+     - **The relay sent three reports:**
+       - `SubagentHandback` `toolu_01LvKvCWsLQuFTbrotjoX97s` says "Neither file's contents was checked independently… I took its report as given";
+       - `SubagentHandback` `toolu_01TUcUSkP9RafZ3dVXTZtHvq` says "I checked it: it contains exactly `leaf`";
+       - `SendMessage` `toolu_01QSAtXtkqGZZPEdUJxSeXa4`, with `to:"main"`, states the same claim and ends: "my SubagentHandback call was refused with a message saying a report had already been delivered, so I am sending this through SendMessage instead."
+     - So the first hand-back, which says the contents were unchecked, is the one that was delivered. The checked-contents claim arrived only by `SendMessage`, after the relay's own Bash `cat` (`toolu_01WDd3odSChnqNVZoTYTUn4G`).
+     - **A handed-back agent was revived.**
+       - The leaf `a7a0cdd53dc2e864d` handed back first (`toolu_01HoFXzpMdVtGZUcMM6uJVK4`).
+       - The relay then loaded `SendMessage` through ToolSearch and messaged that leaf by its agent_id (`toolu_01TerwsBzC8ugej6m2zu8h93`, `to:"a7a0cdd53dc2e864d"`).
+       - The leaf wrote again and handed back a second time (`toolu_01DbTtEDJrjJctjJRjrX6Cxc`).
+       - Whether that second leaf hand-back was accepted is not visible: PreToolUse logs inputs, not results.
+  3. **Auto mode.**
+     - All 20 payloads carry `permission_mode=auto`.
+     - **The logged Bash calls:**
+       - `toolu_01XQwrgzmeJZMkZc1NX9YmrX`, main, `printenv CLAUDE_CODE_SESSION_ID`;
+       - `toolu_01WDd3odSChnqNVZoTYTUn4G`, the relay, `cat …/leaf.txt; echo; ls -la <mistyped>/leaf.txt`;
+       - `toolu_01AEtTFQPYXLEaa7kzKfX5ff`, main, `od -c leaf.txt && od -c main-leaf.txt && ls -la <mistyped>/leaf.txt`.
+     - Which of these the classifier allowed without a prompt comes from the owner's screen report. The payloads show the mode, not the decision.
+  4. **A write outside the intended tree.**
+     - The relay's dispatch prompt joined `code-conductor` and the session directory with `-` instead of `/`. The leaf wrote `/private/tmp/claude-501/-Users-yeison-Projects-code-conductor-207a0da0-8a9a-45dd-b7f1-578776d1c15e/scratchpad/probe-feat011/leaf.txt`, which `ls -la` confirms is 4 bytes, outside the probe repository.
+     - Nothing stopped it. This is field evidence for scope enforcement by path rather than by prose.
+
 ## Plan: FEAT-011 implementation [2026-10-01]
 
 Plan `docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`.
@@ -2373,3 +2415,5 @@ Plan `docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`.
 - **Predictions,** measured on drafts in a scratch clone: local 1153 → 1227 / 0 (+74), ci-node20 1131 / 96, ci-node24 1214 / 13.
 
 Handoff observations, one line per task:
+- T-000: `f0fd9c6` passed the gate at 1153 / 0 across 44 files; the union ceiling is `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`, and `RECORD_PARITY_OK`. The plan embeds its four drafts by script, with each sha256 round-tripped out of the plan text. Owner review caught a gap the drafts could not show: `decides nothing with its warning` pins the R4-then-Guard-2 ask, but T-006-D's live script did not instruct approving that ask, so "was not denied" would have been ambiguous evidence. A behavior pinned in a unit test must also be scripted at the live step that observes it.
+- T-001: V1 halts on 2.1.287 (the relay dispatched leaf, which wrote leaf.txt with agent_type=leaf); V2 holds (all 20 payloads carry the printenv session_id); V3 pending the owner's marker observations. The probe also measured async dispatch, a refused second hand-back answered by SendMessage, permission_mode=auto throughout, and a mistyped-path write outside the probe tree. Each is a measured opposite of a design assumption, and T-002 waits on the D1 ruling.

@@ -198,7 +198,7 @@ None of the files this plan adds or touches is in any skipped set, so every new 
 
 ---
 
-- [ ] [T-000] **Plan commit.** The branch gate is silent here: the current branch `feat/feat-011-orchestrator-band-router` carries the item's id. `origin/main` is `8887e11`, an ancestor of `HEAD`, so there is nothing to merge.
+- [X] [T-000] **Plan commit.** The branch gate is silent here: the current branch `feat/feat-011-orchestrator-band-router` carries the item's id. `origin/main` is `8887e11`, an ancestor of `HEAD`, so there is nothing to merge.
   - [X] [T-000-A] Modify `.gitignore`: insert `!/docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md` immediately after `!/docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (:97), in sorted position.
   - [X] [T-000-B] Modify `.claude/memory/project.md`: append at the end of the file
     ```markdown
@@ -213,15 +213,15 @@ None of the files this plan adds or touches is in any skipped set, so every new 
     Handoff observations, one line per task:
     ```
   - [X] [T-000-C] `git add -u .gitignore .claude/memory/project.md`, then `git add docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md` (plain, now that its leaf exists).
-  - [ ] [T-000-D] Commit `docs: add the FEAT-011 implementation plan [FEAT-011]`. Expected: the hook suite passes at **1153 / 0**.
-  - [ ] [T-000-E] Run `node tools/id-ceiling.mjs`, expecting union `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`. Then `node tools/record-parity.mjs`, expecting `RECORD_PARITY_OK`.
-  - [ ] [T-000-F] Append `- T-000: <one line of handoff observation>` under the plan section. This line rides T-001's commit.
+  - [X] [T-000-D] Commit `docs: add the FEAT-011 implementation plan [FEAT-011]`. Expected: the hook suite passes at **1153 / 0**.
+  - [X] [T-000-E] Run `node tools/id-ceiling.mjs`, expecting union `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`. Then `node tools/record-parity.mjs`, expecting `RECORD_PARITY_OK`.
+  - [X] [T-000-F] Append `- T-000: <one line of handoff observation>` under the plan section. This line rides T-001's commit.
 
-- [ ] [T-001] **V1–V3, the plan's opening measurements, before any code.** Live, owner driving, in a scratch repository outside this one. Depends on T-000. Each V has its own halt rule, and no later task starts until all three are recorded and none has halted.
+- [!] [T-001] **V1–V3, the plan's opening measurements, before any code.** Live, owner driving, in a scratch repository outside this one. Depends on T-000. Each V has its own halt rule, and no later task starts until all three are recorded and none has halted.
   - **V1 halt:** a payload shows a `Write` of `leaf.txt` with `agent_type=leaf`, and `leaf.txt` exists. That is, a subagent dispatched a subagent. Stop for a ruling on D1.
   - **V2 halt:** the `printenv` output is empty, or differs from the `session_id` of any logged payload. Stop for a ruling on D3.
   - **V3 halt:** the owner saw neither the `V3-STDERR` nor the `V3-SYSTEM` marker. Stop for a ruling on the warning channel. Otherwise P13 picks the channel.
-  - [ ] [T-001-A] Create `<scratchpad>/probe-feat011` and run `git init` there. Write these files:
+  - [X] [T-001-A] Create `<scratchpad>/probe-feat011` and run `git init` there. Write these files:
     - `.claude/settings.json`:
       ```json
       { "hooks": { "PreToolUse": [
@@ -274,23 +274,24 @@ None of the files this plan adds or touches is in any skipped set, so every new 
         console.log(p.tool_use_id, p.tool_name, `agent_type=${p.agent_type ?? '-'}`, `agent_id=${p.agent_id ?? '-'}`, `session_id=${p.session_id ?? '-'}`, f);
       }
       ```
-  - [ ] [T-001-B] Run `claude --version` and record it verbatim.
-  - [ ] [T-001-C] **Owner, in a separate terminal:** run `cd <scratchpad>/probe-feat011 && claude`, then trust the folder. Send this prompt verbatim:
+  - [X] [T-001-B] Run `claude --version` and record it verbatim.
+  - [X] [T-001-C] **Owner, in a separate terminal:** run `cd <scratchpad>/probe-feat011 && claude`, then trust the folder. Send this prompt verbatim:
 
     `Run the Bash command printenv CLAUDE_CODE_SESSION_ID and show me its output verbatim. Then use the relay agent with this instruction: "Use the leaf agent to write leaf.txt containing the word leaf, and list your available tools by name." Then use the leaf agent yourself to write main-leaf.txt containing the word leaf. Then write three files yourself, v3-stderr.txt, v3-system.txt and v3-both.txt, each containing the word v3. Report every tool result verbatim.`
 
     Approve any permission prompt, including the ask on `v3-both.txt`. For each of `V3-STDERR`, `V3-SYSTEM`, `V3-BOTH` and `V3-ASK`, note whether that marker appeared on screen and where. Then `/exit`.
-  - [ ] [T-001-D] Read the evidence:
+  - [X] [T-001-D] Read the evidence:
     1. `node read-payloads.mjs`;
     2. `ls leaf.txt main-leaf.txt`;
     3. the owner's paste of the `printenv` output, the relay's tool list and the four marker observations.
 
     Apply the three halt rules. Record V1, V2 and V3. The relay's own report of its tools is recorded as said, not interpreted (the ARCH-010 demo's rule). Any `Agent` or `Task` payload carrying `agent_type=relay` is recorded as an observation; V1's halt keys on the `leaf.txt` payload.
-  - [ ] [T-001-E] Modify `.claude/memory/project.md`. Insert, directly above the `## Plan: FEAT-011 implementation [2026-10-01]` heading:
+  - [X] [T-001-E] Modify `.claude/memory/project.md`. Insert, directly above the `## Plan: FEAT-011 implementation [2026-10-01]` heading:
     ```markdown
     ## Measurements: FEAT-011 V1–V3 [<date>]
 
-    - **Binary:** `claude` <version>, interactive, owner driving, in a scratch repository outside this one.
+    - **Binary:** `claude` <version>, interactive, owner driving, in a scratch repository outside this one. Binary delta: the ARCH-010 identity spike measured 2.1.286; V1–V3 measured <version>.
+    - **Main-session shape on <version>:** <verbatim reader lines for the main session's v3-*.txt writes>; agent_id <absent / present>, agent_type <absent / present>. (Line amended 2026-10-01 before T-001-C by owner ruling, so that auditing Guard 6 never has to cross binaries.)
     - **V1, subagent dispatch:** <verbatim reader lines for any Agent/Task payload and for leaf.txt>; <the relay's tool list, verbatim>. Verdict: <holds / halts>.
     - **V2, session id:** printenv printed `<value>`. Payload session_ids: <the distinct values with their tool_use_ids>. Verdict: <holds / halts>.
     - **V3, warning channel:** V3-STDERR <seen where / not seen>; V3-SYSTEM <…>; V3-BOTH <…> with V3-ASK <…>. Verdict: Guard 6 warns on <systemMessage / stderr> (P13).
