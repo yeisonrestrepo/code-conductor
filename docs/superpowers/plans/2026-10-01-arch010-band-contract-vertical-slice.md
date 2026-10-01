@@ -51,12 +51,12 @@ Every new test runs in all three environments. None of the touched test files is
 | T-002 contract v3, version first | **1086 / 0** (+5) | n/a | n/a |
 | T-003 v3 rules and `--to` | **1120 / 0** (+34) | n/a | n/a |
 | T-004 `snap-build` v3 | **1128 / 0** (+8) | n/a | n/a |
-| T-005 Guard 5 | **1151 / 0** (+23) | n/a | n/a |
-| T-006 `.gitignore` and host ownership | **1152 / 0** (+1) | n/a | n/a |
-| T-007 demo handoff | 1152 / 0 | n/a | n/a |
-| T-008 README and release | **1152 / 0** | **1056 / 96**, `SKIP_BASELINE_OK` | **1139 / 13**, `SKIP_BASELINE_OK` |
+| T-005 Guard 5 | **1152 / 0** (+24) | n/a | n/a |
+| T-006 `.gitignore` and host ownership | **1153 / 0** (+1) | n/a | n/a |
+| T-007 demo handoff | 1153 / 0 | n/a | n/a |
+| T-008 README and release | **1153 / 0** | **1057 / 96**, `SKIP_BASELINE_OK` | **1140 / 13**, `SKIP_BASELINE_OK` |
 
-- **Totals:** 1152 on every leg.
+- **Totals:** 1153 on every leg. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
 - **Test files:** local goes from 43 to **44 passed**. The new file is `tests/hooks/guard5.test.js`.
 - **Halt rule:** any count that differs from its row halts the task before its commit. A prediction is amended before it is measured, never absorbed after.
 
@@ -519,7 +519,7 @@ Every new test runs in all three environments. None of the touched test files is
   - [X] [T-003-D] Run `npx vitest run tests/unit/snap-validate.test.js tests/unit/snap-contract.test.js`, all passing, including the 38-line cap at exactly 38. Then run `npm test`: **1120 / 0**.
   - [X] [T-003-E] Append `- T-003: <one line>` to the plan section. Then `git add -u scripts/snap-validate.mjs tests/unit/snap-validate.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit). Commit `feat: v3 band-field validation and the --to handoff check [ARCH-010]`. Expected: **1120 / 0**.
 
-- [ ] [T-004] **`snap-build` emits v3** (AC6). Native. Depends on T-002.
+- [X] [T-004] **`snap-build` emits v3** (AC6). Native. Depends on T-002.
 
   **Interfaces:**
   - *Consumes:* `V3_CAPS`.
@@ -596,7 +596,7 @@ Every new test runs in all three environments. None of the touched test files is
 
     A scratch build of these exact edits during planning produced output byte-identical to the current builder for three v1/v2 inputs: a plain v1, a v2 with prose, and a v1 at the size cap.
   - [X] [T-004-D] Run `npx vitest run tests/scripts/snap-build.test.js tests/unit/snap-contract.test.js`, all passing. The pre-existing snap-build tests are unmodified, and they are AC6's byte-identity proof. Then run `npm test`: **1128 / 0**.
-  - [ ] [T-004-E] Append `- T-004: <one line>` to the plan section. Then `git add -u scripts/snap-build.mjs tests/scripts/snap-build.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit). Commit `feat: snap-build emits SNAP v3 when given band fields [ARCH-010]`. Expected: **1128 / 0**.
+  - [X] [T-004-E] Append `- T-004: <one line>` to the plan section. Then `git add -u scripts/snap-build.mjs tests/scripts/snap-build.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit). Commit `feat: snap-build emits SNAP v3 when given band fields [ARCH-010]`. Expected: **1128 / 0**.
 
 - [ ] [T-005] **Guard 5** (AC8, AC9, AC10, Review Focus 1–3 and 5). **Subagent, then a reviewer.** It runs in the main checkout with no worktree, and the subagent does not commit. Depends on T-002 and on T-001's verdict.
 
@@ -622,7 +622,7 @@ Every new test runs in all three environments. None of the touched test files is
   **The subagent's prompt carries this line verbatim:** "Apply T-005-C's edits in the order C1, C2, C4, C3. The order is load-bearing: registering Guard 5 (C3) before `main` passes `payload` (C4) makes the live hook deny every write, including the edit that would fix it."
 
   **A trap measured during planning.** Patching this file with `String.prototype.replace` and a string replacement silently expands the `'\\$&'` in `globToRegExp`, and the draft grew to 789 lines instead of 680. Use the Edit tool, or a replacer function.
-  - [ ] [T-005-A] Create `tests/hooks/guard5.test.js`:
+  - [X] [T-005-A] Create `tests/hooks/guard5.test.js`:
     ```js
     import { describe, it, expect, beforeEach, afterEach } from 'vitest';
     import { spawnSync } from 'node:child_process';
@@ -806,7 +806,7 @@ Every new test runs in all three environments. None of the touched test files is
       });
     });
     ```
-  - [ ] [T-005-B] Run `npx vitest run tests/hooks/guard5.test.js`. Expected: **15 failed, 8 passed**.
+  - [X] [T-005-B] Run `npx vitest run tests/hooks/guard5.test.js`. Expected: **15 failed, 8 passed**.
     - **Failed:**
       - C ×4;
       - D;
@@ -820,7 +820,7 @@ Every new test runs in all three environments. None of the touched test files is
       - A ×2 and B;
       - G ×4, since today nothing gates them;
       - `..`-name.
-  - [ ] [T-005-C] Modify `.claude/hooks/pre-tool-use.mjs` in the order C1, C2, C4, C3, as listed below. The order is load-bearing:
+  - [X] [T-005-C] Modify `.claude/hooks/pre-tool-use.mjs` in the order C1, C2, C4, C3, as listed below. The order is load-bearing:
     - **C1, :7–8:**
       ```js
       import { existsSync, readFileSync, statSync } from 'node:fs';
@@ -905,15 +905,15 @@ Every new test runs in all three environments. None of the touched test files is
       // Guard 5 runs first on every write-family tool: a scope deny outranks Guard 2's ask.
       for (const tool of BAND_WRITE_TOOLS) DISPATCH[tool].unshift(guard5BandScope);
       ```
-  - [ ] [T-005-D] Run `cp .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs`, the mirror (AC10). Expected `wc -l`: **680** for both.
-  - [ ] [T-005-E] Run `npx vitest run tests/hooks tests/installer/templates.test.js`. Expected: all pass.
-    - `guard5.test.js` at 23 of 23;
+  - [X] [T-005-D] Run `cp .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs`, the mirror (AC10). Expected `wc -l`: **680** for both.
+  - [X] [T-005-E] Run `npx vitest run tests/hooks tests/installer/templates.test.js`. Expected: all pass.
+    - `guard5.test.js` at 24 of 24;
     - every pre-existing hook test unmodified (AC9);
     - the mirror test byte-identical;
     - the Guard 3 explicit-character-class test, which scans only the Guard 3 block, unaffected.
 
-    Then run `npm test`: **1151 / 0**, with test files **44**.
-  - [ ] [T-005-F] **Subagent stops here and reports.** A fresh reviewer then reads only:
+    Then run `npm test`: **1152 / 0**, with test files **44**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
+  - [X] [T-005-F] **Subagent stops here and reports.** A fresh reviewer then reads only:
     - the diff of the two hook files and the new test;
     - the spec's Guard 5 table;
     - Review Focus 1–3 and 5.
@@ -921,7 +921,7 @@ Every new test runs in all three environments. None of the touched test files is
     **The reviewer also confirms that the `DISPATCH` write-tool entries are distinct array instances before the `unshift` loop.** A shared instance would register Guard 5 more than once: invisible in behaviour, wrong in structure. The check: no two of `DISPATCH.Write`, `DISPATCH.Edit`, `DISPATCH.create_file` and `DISPATCH.write_file` are the same array literal or reference. Added at approval, 2026-10-01, by owner review.
 
     It returns findings. The orchestrator fixes or rules on each, and re-runs T-005-E.
-  - [ ] [T-005-G] Append `- T-005: <one line>` to the plan section. Then `git add -u .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit), then `git add tests/hooks/guard5.test.js`. Commit `feat: Guard 5 denies a role agent's write outside its band scope [ARCH-010]`. Expected: **1151 / 0**.
+  - [ ] [T-005-G] Append `- T-005: <one line>` to the plan section. Then `git add -u .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit), then `git add tests/hooks/guard5.test.js`. Commit `feat: Guard 5 denies a role agent's write outside its band scope [ARCH-010]`. Expected: **1152 / 0**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
 
 - [ ] [T-006] **`.gitignore` and host ownership** (AC13). Native. Depends on T-000.
   - [ ] [T-006-A] Modify `tests/installer/templates.test.js`. Append inside `describe('project-template/gitignore', …)` (:65):
@@ -937,8 +937,8 @@ Every new test runs in all three environments. None of the touched test files is
   - [ ] [T-006-C] Modify `project-template/gitignore`: append `.claude/memory/band-envelope.json` as line 5, keeping the trailing newline.
   - [ ] [T-006-D] Modify `lib/installer/host-owned.mjs`: insert `  ['memory/band-envelope.json', 'skip'],` after `  ['memory/turn-count.txt', 'skip'],` (:42), so the `memory/` skips stay together.
   - [ ] [T-006-E] Modify `tests/installer/deploy.test.js:15`, where the fixture mirrors the template. Append `.claude/memory/band-envelope.json\n` to `TPL_GITIGNORE`, after `*.installer-tmp.*\n`. **Halt rule:** if any `deploy.test.js` assertion fails other than through this fixture, stop. A fixture change is not allowed to rewrite an expectation silently.
-  - [ ] [T-006-F] Run `git check-ignore -q .claude/memory/band-envelope.json` and `git ls-files --error-unmatch .claude/memory/band-envelope.json`. Expected: 0 and 1, so the path is ignored and untracked. This was measured as ignored by `/.claude/memory/*` (`.gitignore:36`) on 2026-10-01. Then run `npx vitest run tests/installer tests/unit/host-owned-ignore-xor.test.js`, all passing. The xor test covers the new row with no new test (D3). Then run `npm test`: **1152 / 0**.
-  - [ ] [T-006-G] Append `- T-006: <one line>` to the plan section. Then `git add -u project-template/gitignore lib/installer/host-owned.mjs tests/installer/templates.test.js tests/installer/deploy.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit). Commit `feat: ignore and host-own the band envelope [ARCH-010]`. Expected: **1152 / 0**.
+  - [ ] [T-006-F] Run `git check-ignore -q .claude/memory/band-envelope.json` and `git ls-files --error-unmatch .claude/memory/band-envelope.json`. Expected: 0 and 1, so the path is ignored and untracked. This was measured as ignored by `/.claude/memory/*` (`.gitignore:36`) on 2026-10-01. Then run `npx vitest run tests/installer tests/unit/host-owned-ignore-xor.test.js`, all passing. The xor test covers the new row with no new test (D3). Then run `npm test`: **1153 / 0**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
+  - [ ] [T-006-G] Append `- T-006: <one line>` to the plan section. Then `git add -u project-template/gitignore lib/installer/host-owned.mjs tests/installer/templates.test.js tests/installer/deploy.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit). Commit `feat: ignore and host-own the band envelope [ARCH-010]`. Expected: **1153 / 0**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
 
 - [ ] [T-007] **AC12: the demo Code→QA handoff, interactive, in a scratch project.** In-session, live. Depends on T-003, T-004, T-005 and T-006. **Halt rule:** an in-scope write that is denied, or an out-of-scope write that lands, stops the task for a ruling before release.
   - [ ] [T-007-A] Create `<scratchpad>/demo-ac12` and run `git init` there. Then:
@@ -1005,7 +1005,7 @@ Every new test runs in all three environments. None of the touched test files is
     - the four facts with their verbatim evidence;
     - both `--to` outputs from T-007-B and T-007-D.
 
-    Then append `- T-007: <one line>` under the plan section. Then `git add -u .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit). Commit `docs: record the ARCH-010 Code->QA demo handoff (AC12) [ARCH-010]`. Expected: **1152 / 0**.
+    Then append `- T-007: <one line>` under the plan section. Then `git add -u .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit). Commit `docs: record the ARCH-010 Code->QA demo handoff (AC12) [ARCH-010]`. Expected: **1153 / 0**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
 
 - [ ] [T-008] **README and release 1.35.0** (AC14, AC15; `docs/RELEASE-CLOSEOUT.md` steps 1–5). Native. Depends on T-007.
   - [ ] [T-008-A] Modify `README.md`: insert after the Guard 4 paragraph (:288), separated by a blank line:
@@ -1039,11 +1039,11 @@ Every new test runs in all three environments. None of the touched test files is
     - `node tools/record-parity.mjs`, expecting `RECORD_PARITY_OK`.
 
     **Discriminator (AC14):** flip the heading back to `### [ ]` and expect a red run naming `1.35.0` and `ARCH-010`. Restore `[X]` and re-run green.
-  - [ ] [T-008-E] Run `npm test`: **1152 / 0**. Then run `node tools/id-ceiling.mjs`: union `{"BUG":53,"FEAT":40,"ARCH":10}`, next `BUG-054`.
-  - [ ] [T-008-F] Append `- T-008: <one line>` to the plan section. Then `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit). Commit `chore: release 1.35.0 [ARCH-010]`. Expected: **1152 / 0**.
+  - [ ] [T-008-E] Run `npm test`: **1153 / 0**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72) Then run `node tools/id-ceiling.mjs`: union `{"BUG":53,"FEAT":40,"ARCH":10}`, next `BUG-054`.
+  - [ ] [T-008-F] Append `- T-008: <one line>` to the plan section. Then `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit). Commit `chore: release 1.35.0 [ARCH-010]`. Expected: **1153 / 0**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
   - [ ] [T-008-G] **Confirm with the owner, then** push the branch with `git push -u origin feat/arch-010-band-contract-vertical-slice` and open the PR against `main`. Expected CI:
-    - ci-node20 **1056 / 96**;
-    - ci-node24 **1139 / 13**;
+    - ci-node20 **1057 / 96**; (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
+    - ci-node24 **1140 / 13**; (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
     - both legs printing `SKIP_BASELINE_OK`;
     - `git diff origin/main -- tools/skip-baseline.json` empty (AC15).
   - [ ] [T-008-H] **Stop at the green PR.** Report both `SKIP_BASELINE_OK` lines, both run ids and the PR URL. The owner merges and publishes the GitHub Release `v1.35.0`.
@@ -1086,10 +1086,10 @@ Every new test runs in all three environments. None of the touched test files is
 3. T-002: `feat: SNAP v3 contract with the version decided first [ARCH-010]`, at 1086 / 0.
 4. T-003: `feat: v3 band-field validation and the --to handoff check [ARCH-010]`, at 1120 / 0.
 5. T-004: `feat: snap-build emits SNAP v3 when given band fields [ARCH-010]`, at 1128 / 0.
-6. T-005: `feat: Guard 5 denies a role agent's write outside its band scope [ARCH-010]`, at 1151 / 0.
-7. T-006: `feat: ignore and host-own the band envelope [ARCH-010]`, at 1152 / 0.
-8. T-007: `docs: record the ARCH-010 Code->QA demo handoff (AC12) [ARCH-010]`, at 1152 / 0.
-9. T-008: `chore: release 1.35.0 [ARCH-010]`, at 1152 / 0. CI: 1056 / 96 and 1139 / 13.
+6. T-005: `feat: Guard 5 denies a role agent's write outside its band scope [ARCH-010]`, at 1152 / 0. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
+7. T-006: `feat: ignore and host-own the band envelope [ARCH-010]`, at 1153 / 0. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
+8. T-007: `docs: record the ARCH-010 Code->QA demo handoff (AC12) [ARCH-010]`, at 1153 / 0. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
+9. T-008: `chore: release 1.35.0 [ARCH-010]`, at 1153 / 0. CI: 1057 / 96 and 1140 / 13. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
 
 ## Identified Risks
 
