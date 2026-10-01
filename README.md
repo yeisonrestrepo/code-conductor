@@ -12,9 +12,11 @@
 
 Three commands, from nothing to a guarded session. The output below is **real**, captured by running exactly these commands in a scratch directory.
 
+**Minimum safe version: `1.34.4`.** Older versions can strip or damage an existing `CLAUDE.md`: every release before `1.24` overwrote it with no backup, `1.24` through `1.34.3` silently removed your sections whose headings matched the managed block's, and an older pre-sentinel version left at least one field file with damaged lines. Install with `@latest`, as below.
+
 ```bash
 mkdir demo && cd demo && git init -q && npm init -y >/dev/null
-npx @yeison.restrepo.r/code-conductor --project
+npx @yeison.restrepo.r/code-conductor@latest --project
 ```
 
 The installer prints **nothing** and exits 0. That silence is deliberate and is asserted by a test: the stub-detection check runs *before* the seed, so a fresh scaffold cannot warn about the file it was just given (`tests/installer/deploy.test.js`, "says nothing on a fresh scaffold, whose stub it just wrote").
@@ -96,7 +98,6 @@ Four checks live in `tools/` as tracked repository infrastructure. Three of them
 
 ## Known limits
 
-- **`[BUG-049]`, open, and the most severe:** on `1.34.3`, a `--project` install in the field replaced an existing project `CLAUDE.md` with the shipped template, against the merge-and-backup contract described under [How the installer treats your CLAUDE.md](#how-the-installer-treats-your-claudemd). It is being measured, and the fix targets `1.34.4`. Until then, commit your `CLAUDE.md` before installing.
 - **`[BUG-045]`, open:** the Guard 3 allowlist cannot cover a quoted path, because the boundary sets it interpolates contain no quote character, so an entry `docs/` does not cover `cat "docs/x.md" *.md`. Filed with its ritual priced, untouched pending its own change.
 - **`[BUG-032]`, open:** global memory preferences sit outside the documented lookup chain. Nothing in the chain points at `~/.claude/memory/personal.md`, and the installer never deploys `global/memory/`, so a preference filed there is never read by the agent it was written for.
 - **The `P7` false positive above**, still live.
@@ -136,8 +137,10 @@ AI coding assistants are only as good as the structure you put around them. With
 
 ## Install
 
+**Minimum safe version: `1.34.4`.** Older versions can strip or damage an existing `CLAUDE.md`: every release before `1.24` overwrote it with no backup, `1.24` through `1.34.3` silently removed your sections whose headings matched the managed block's, and an older pre-sentinel version left at least one field file with damaged lines. Install with `@latest`, as below.
+
 ```bash
-npx @yeison.restrepo.r/code-conductor            # one-shot global setup
+npx @yeison.restrepo.r/code-conductor@latest            # one-shot global setup
 # or
 npm install -g @yeison.restrepo.r/code-conductor && code-conductor
 ```

@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.34.4] - 2026-09-30
+
+### Fixed
+- **[BUG-049]** The installer silently removed your own sections from an existing `CLAUDE.md` when their headings matched the managed block's (`## Agent Identity`, `## Hard Constraints` and six more), on every version from `1.24` to `1.34.3`; under `--global`, that was every section of `~/.claude/CLAUDE.md`. Ownership is now decided by the `cc:managed` markers alone. A file without them gets the block appended at the end and nothing else changes, and a file with them has only the block's interior refreshed. Damaged input is preserved as it is, never repaired.
+- **[BUG-049]** Every backup the installer writes is reported on stdout with its path. Backups stay git-ignored by design, and the line is how you find them. A failed backup now skips that file with a warning instead of aborting the install, and nothing is written without one.
+
+### Changed
+- **[BUG-049]** The installer's `.gitignore` rules live in one labelled block, `# Code Conductor (added by the installer; safe to keep)`. Rules an earlier version appended one at a time are gathered into it by exact match. A file with any `!` line keeps every line where it is.
+- **[BUG-049]** The README names `1.34.4` as the minimum safe version and installs with `@latest`.
+
+`project-template/gitignore` gains its header line, so a fresh install's `.gitignore` differs by that one line.
+
 ## [1.34.3] - 2026-09-29
 
 ### Changed

@@ -671,7 +671,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 * **Components Affected:** `.github/workflows/test.yml`, possibly `tests/` for a baseline assertion, `docs/RELEASE-CLOSEOUT.md` if predictions become per-environment.
 * **Acceptance Criteria:** No deprecation warning in a green run; the chosen test runtime(s) named in the workflow with the coverage consequence stated; a measured, asserted skip baseline per environment; the FEAT-021 gate scenario (an 83-skip silent divergence with matching totals) reproduced as the red case the assertion now catches.
 
-### [ ] `[BUG-049]` The Installer Replaced an Existing Project CLAUDE.md on a `--project` Install
+### [X] `[BUG-049]` The Installer Replaced an Existing Project CLAUDE.md on a `--project` Install
+* **DONE, shipped as `1.34.4` on 2026-09-30.** `CLAUDE.md` ownership is decided by the `cc:managed` sentinels alone: a sentinel-less host keeps every byte and gets the block appended, a balanced host has only its interior refreshed, and a host ending inside an unclosed fence is left untouched with a warning. Every backup is reported on stdout. A failed backup skips the file, proven by injected faults whose injector exists only as a vitest module mock, and the packed tarball is asserted to contain none. `.gitignore` entries live in one labelled block with exact-line gathering and a negation guard. The README names `1.34.4` as the minimum safe version. Out of scope, as specified: field restoration, the mangling mechanism (unknown), and reconciling duplicate headings (`[FEAT-040]`).
 * **Field report, 2026-09-30, verbatim from the owner's terminal.** The owner was dogfooding `1.34.3` in a work repository (WSL, `~/projects/nymbl`):
   ```
   npx @yeison.restrepo.r/code-conductor@1.34.3 --project
