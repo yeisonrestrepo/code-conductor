@@ -770,6 +770,30 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   - The 1.23.2 legacy root `scripts/` is still swept in a host project.
   - Red-green proof against a fixture of each case.
 
+### [ ] `[BUG-053]` The Pre-Commit Test Gate Writes Into the Real Repository When Run From a Linked Worktree
+* **Filed 2026-10-01 from the second incident of that day** (`.claude/memory/project.md`, "Incident 2026-10-01 (second)"). Minted after `node tools/id-ceiling.mjs` read working tree `{"BUG":52,"FEAT":40,"ARCH":9}` and `origin/main` `{"BUG":50,"FEAT":40,"ARCH":9}`, union next `BUG-053`.
+* **The defect.** The `code-conductor:test-gate` pre-commit hook runs `npm test` with the environment git hands to hooks. The suite's fixtures run `git` in their own temp directories, and they inherit that environment. From a linked worktree, that environment points every fixture `git` at the real repository.
+* **Cause, measured 2026-10-01 in a scratch repo outside this repository.** A hook printing `env | grep ^GIT_` showed the relative/absolute asymmetry:
+  - **Primary checkout:** no `GIT_DIR` at all, and `GIT_INDEX_FILE=.git/index`, which is **relative**. After a fixture changes into its temp directory, it resolves to that directory's own `.git/index`, which is harmless. This is why the gate ran for hundreds of primary-checkout commits without damage.
+  - **Linked worktree:** `GIT_DIR=<primary>/.git/worktrees/<name>` and `GIT_INDEX_FILE=<primary>/.git/worktrees/<name>/index`, both **absolute**. Fixture child processes inherit both, so their `init`, `config` and `commit` land in the real repository.
+* **Field evidence, 2026-10-01 09:34:10 local.** One gated commit from a linked `main` worktree (armed by a `node_modules` symlink) did all of the following:
+  - read 30 failed / 1051 passed;
+  - put five fixture `init` commits on local `main`;
+  - set `core.bare=true` and added `user.name=T` and `user.email=t@t.t` in the shared `.git/config`;
+  - overwrote the worktree's index.
+
+  Hooks were not touched. The damage was repaired, and nothing was pushed.
+* **Where the gate comes from.** The retired `install.sh` (FEAT-024) appended it, and the shell installers were removed in `4d987fa` (FEAT-023). The hook survives in `.git/hooks/pre-commit` of any clone that ran `install.sh`, and nothing tracked in this repository pins it.
+* **Interim mitigation:** the test gate is not run from linked worktrees until this item closes.
+* **The repair choice belongs to this item's own spec.** Candidates named so far, without a ruling:
+  - the gate unsets `GIT_DIR` and `GIT_INDEX_FILE`, plus the other repository-locating variables, before `npm test`;
+  - the suite's git-spawning fixtures scrub the inherited `GIT_*` environment themselves, so that no caller can aim them at a real repository;
+  - both.
+* **Components Affected:** the `code-conductor:test-gate` hook block (local `.git/hooks/pre-commit`), and the test helpers that spawn `git` against fixture repositories.
+* **Acceptance Criteria:**
+  - A full `npm test` run with the environment git hands to a linked-worktree hook leaves the real repository's refs, config and index byte-identical.
+  - A red-green proof reproduces the leak with a fixture `GIT_DIR` and shows it closed.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
