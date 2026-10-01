@@ -120,6 +120,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-09-29-feat038-discoverability-metadata-design.md
 !/docs/superpowers/specs/2026-09-30-arch010-band-contract-vertical-slice-design.md
 !/docs/superpowers/specs/2026-09-30-bug049-claude-md-clobber-design.md
+!/docs/superpowers/specs/2026-10-01-feat011-orchestrator-band-router-design.md
 # --- END tracked-surface block (BUG-042) ---
 
 # Kept for external writers. Both lines are redundant against the block above; each is

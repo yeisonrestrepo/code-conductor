@@ -2291,6 +2291,8 @@ Minor **`1.35.0`** shipped `[ARCH-010]` (PR #49, squash `a351297`). Plan: `docs/
 
 **Filed at this closeout:** `[BUG-054]`, the `/cc-plan` staging-gap generator defect. The filter-match-set prediction rule, the subagent-brief observation line and the reviewer-pin discriminator line are folded into its record.
 
+**The pairing instrument fired in the field.** The pre-commit invariant (`tests/tools/repo-invariants.test.js`, "lists every open filed defect in Known limits") blocked the first closeout commit because `[BUG-054]` was missing from README's Known limits. It caught an incomplete filing before it landed. The entry was added, and `8887e11` passed at 1153 / 0.
+
 **`[ARCH-009]` evidence harvest from the slice, in one place:**
 - **Per-task handoff observations** (each in full under "Plan: ARCH-010 implementation"):
   - **T-000:** a stated mitigation is a property to verify, not a sentence to write. The C1→C4 claim was false until owner review reordered it to C1, C2, C4, C3.
@@ -2308,3 +2310,57 @@ Minor **`1.35.0`** shipped `[ARCH-010]` (PR #49, squash `a351297`). Plan: `docs/
 **`[ARCH-009]` flip condition:** satisfied on `ARCH-010`. It still waits on `FEAT-009`, `FEAT-011`, `FEAT-012` and `FEAT-031` through `FEAT-036`.
 
 **Next:** the next session starts `[FEAT-011]` against the live band contract. The Show HN launch is unblocked per the owner's timebox decision.
+
+## Checkpoint 2026-10-01 12:36
+
+Session span: `[ARCH-010]` T-000 → T-008, released as **1.35.0** (PR #49, squash `a351297`), closeout `8887e11` on `main`, `[BUG-054]` filed. Ceiling `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`. Local 1153 / 0 across 44 files.
+
+### Decisions
+- Guard 5 keys on `agent_type` only; an `agent_id`-only payload is Case A (unguarded), pinned by a test that discriminates against an `agent_id` mutant.
+- The tool mask is hard authority; Bash abstention is prompt-level only, and Bash writes are a stated Guard 5 non-goal (AC11/AC12, claude 2.1.286).
+- `[ARCH-009]` flip condition satisfied on ARCH-010; it still waits on FEAT-009, FEAT-011, FEAT-012 and FEAT-031–036.
+- Next session: `/cc-resume`, instruments first, then `/cc-spec FEAT-011` against the live band contract.
+
+### Conventions
+- An instrument firing correctly is recorded as evidence in the closeout, never as an embarrassment.
+- Notes outside git (`~/.claude` memory) are reminders only; `project.md` and the backlog are the record and win any disagreement.
+- Count predictions are amended before measurement, never after, and each amendment is named in the closeout.
+
+### Debt and workarounds
+- `[BUG-054]`: `/cc-plan` omits the plan file from its own staging steps; plans are amended by hand until fixed.
+- Interim constraints stand until their fixes close: no installer runs in this repo (BUG-052), no test gate from a linked worktree and no worktree isolation for agents (BUG-053), conductor scripts run from source `scripts/` (BUG-051).
+
+## Spec: FEAT-011, the orchestrator band router and phase handoffs [2026-10-01]
+
+The spec is `docs/superpowers/specs/2026-10-01-feat011-orchestrator-band-router-design.md`. It was APPROVED 2026-10-01 after two review rounds, and targets `1.36.0`, a minor release, at complexity L. Branch `feat/feat-011-orchestrator-band-router`. No new id was minted, and there is no SNAP contract change: the item consumes the ARCH-010 primitives as given.
+
+- **Shape:**
+  - `/cc-orchestrate <ITEM> [--auto]` runs in the main session.
+  - It is backed by `scripts/orchestrate.mjs`, whose verbs are `start`, `install`, `handback`, `approve` and `end`.
+  - It routes spec, then plan, then code (one dispatch per plan task), then audit, then qa, serially, and ends at `verify_pass`. Release stays human.
+- **Guard 6** (round one, A1, as amended):
+  - It enforces only when the payload's `session_id` equals the one in `.claude/memory/orchestrator-run.json`.
+  - A stale or invalid run fails open with a warning (`ORCH_RUN_STALE`, `ORCH_RUN_INVALID`) and never blocks a session.
+  - The order is Guard 5, then Guard 6, then Guard 2. When `agent_type` is a band role, Guard 6 does not apply.
+  - A write outside the surface is denied with `ORCH_WRITE_DENIED`.
+  - The write surface is the run file, the band envelope, `session-snapshot.json` and `.conductor/**`: gitignored state only.
+  - Bash, and R5's breadth (any non-role agent can write the surface), are stated limits.
+- **Gates:**
+  - The orchestrator authors only `boundary_routed` and `define_approved`. The latter is written once, after the plan approval: two human approvals, one gate write.
+  - D6 forwards a hand-back's gate only across a band boundary, and re-issues the band's entry gate inside one.
+  - Hand-backs travel as one `SNAP_HANDBACK <json>` line in the agent's final message.
+- **Defaults and halts:**
+  - Step mode is the default, and `--auto` is opt-in (A4).
+  - An empty plan scope halts with `ORCH_EMPTY_SCOPE`, and Code is never dispatched with `tk:R`.
+  - In v1 a halt is terminal (D12): recovery is `end` followed by `start`.
+  - The script directory is found by presence. That is safe here only through the BUG-052 → BUG-051 chain (D11).
+- **Folded by ruling:** `project-template/gitignore` lacks `.conductor/`, contrary to `README.md:325`. AC10 closes it, with a red-to-green discriminator.
+- **Carried to `/cc-plan` (owner, 2026-10-01):**
+  1. V1–V3 are the opening steps, before any guard code, each with its halt condition:
+     - V1: a subagent cannot dispatch a subagent;
+     - V2: `CLAUDE_CODE_SESSION_ID` equals the payload `session_id`;
+     - V3: which warning channel reaches the user.
+  2. The T-006-A exact-list test on `project-template/gitignore` goes red on AC10's two lines. The plan predicts it per environment, under the BUG-054 match-set rule.
+  3. Each task gets one handoff-observation line.
+  4. Per-environment test counts are predicted before any run. Local carries the 12 conditional plugin tests that CI lacks.
+  5. The plan halts for the owner's full review before approval.
