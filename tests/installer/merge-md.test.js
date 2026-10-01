@@ -112,6 +112,16 @@ describe('mergeClaudeMdText — parsing', () => {
     const host = ['# H', '', '~~~text title', SENTINEL_START, '~~~', ''].join('\n');
     expect(mergeClaudeMdText(TPL, host).text).toBe(host + '\n' + BLOCK);
   });
+  it('[AC3, review fix] closes a fence only on a run of the same character at least as long as its opener', () => {
+    const host = ['# Mine', '', '````markdown', '```bash', 'npm test', '```', '````', '', 'More prose.', ''].join('\n');
+    expect(mergeClaudeMdText(TPL, host).text).toBe(host + '\n' + BLOCK);
+  });
+  it('[AC3, review fix] recognizes fences indented up to three spaces, so sentinels inside stay hidden', () => {
+    const indented = ['text', '   ```', SENTINEL_START, '   ```', ''].join('\n');
+    expect(mergeClaudeMdText(TPL, indented).text).toBe(indented + '\n' + BLOCK);
+    const mixed = ['text', '  ~~~', SENTINEL_START, '~~~', ''].join('\n');
+    expect(mergeClaudeMdText(TPL, mixed).text).toBe(mixed + '\n' + BLOCK);
+  });
   it('[AC6, Review Focus 2] writes nothing to a sentinel-less host that ends inside an unclosed fence', () => {
     const host = ['# H', '', '```js', '## Project Identity'].join('\n');
     const r = mergeClaudeMdText(TPL, host);
@@ -211,6 +221,10 @@ describe('mergeGitignoreText', () => {
   });
   it('[AC10c] gathers scattered exact entries into the block, once each', () => {
     expect(mergeGitignoreText(IGNORE_TPL, HOSTS.c).text).toBe('dist\nbuild/\n' + '\n' + IGNORE_TPL);
+  });
+  it('[AC10c, review fix] keeps a leading byte-order mark when gathering an entry from line 1', () => {
+    const host = '﻿*.installer-tmp.*\nnode_modules\n';
+    expect(mergeGitignoreText(IGNORE_TPL, host).text).toBe('﻿node_modules\n' + '\n' + IGNORE_TPL);
   });
   it('[AC10d] never touches a host-modified variant; the block carries all three', () => {
     expect(mergeGitignoreText(IGNORE_TPL, HOSTS.d).text).toBe(HOSTS.d + '\n' + IGNORE_TPL);

@@ -55,6 +55,19 @@ Every new or changed test runs in all three environments, because none of the to
 
 **Halt rule:** any count that differs from its row halts the task before the commit.
 
+**Amended 2026-09-30, after the whole-branch review and before measurement** (FEAT-021 rule: amended before measured, never absorbed).
+- **The fix-pass commit:** `fix: close code fences by CommonMark length and indentation rules [BUG-049]` adds 4 passing tests:
+  - 2 for the fence fix (Important #1);
+  - 1 for Low 1 (the `.gitignore` BOM pin);
+  - 1 for Low 5 (the prune-failure report, through a third injection switch).
+- **The merge gate moves to:**
+  - local **1069 / 12 (1081)**;
+  - ci-node20 **985 / 96**;
+  - ci-node24 **1068 / 13**.
+
+  Totals are 1081 on both legs, both print `SKIP_BASELINE_OK`, and the `tools/skip-baseline.json` diff is empty.
+- **Low 2, ruled by the owner: output accompanies writes.** A run that writes nothing prints nothing, on the first run or the fifteenth. AC10e's notice fires only on the run that writes the block while leaving host entries in place.
+
 ## Review Focus
 
 1. **Re-derived tests can pass for the wrong reason (the owner's precision).**
@@ -1050,7 +1063,7 @@ Every new or changed test runs in all three environments, because none of the to
   - [ ] [T-005-H] Run `npx vitest run tests/tools/repo-invariants.test.js`. Expected: **13 passed**. Run the full suite: **1065 / 12 (1077)**.
   - [ ] [T-005-I] Stage with `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md tests/tools/repo-invariants.test.js`. Commit `chore: release 1.34.4 [BUG-049]`. Expected: the hook suite passes at **1065 / 12**.
   - [ ] [T-005-J] Push the branch and open the PR against `main`. Expected CI:
-    - ci-node20 **981 / 96** and ci-node24 **1064 / 13**, both printing `SKIP_BASELINE_OK`;
+    - ci-node20 **985 / 96** and ci-node24 **1068 / 13** (amended from 981 / 1064; see the amendment under Predictions), both printing `SKIP_BASELINE_OK`;
     - `git diff main -- tools/skip-baseline.json` empty.
   - [ ] [T-005-K] **Stop at the green PR.** Report both `SKIP_BASELINE_OK` lines and the PR URL. The owner merges and publishes the GitHub Release `v1.34.4`.
 

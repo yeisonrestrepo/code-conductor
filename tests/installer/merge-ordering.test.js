@@ -10,14 +10,19 @@ import { mergeClaudeMdText, SENTINEL_START, SENTINEL_END } from '../../lib/insta
 // exists only inside vitest's module graph, tests/ is outside package.json `files`,
 // and smoke.test.js requires that no packed file names vitest. Each switch is off by
 // default, and every call it does not fail goes to the real function.
-const faults = vi.hoisted(() => ({ copyFileSync: false, renameSync: false }));
+const faults = vi.hoisted(() => ({ copyFileSync: false, renameSync: false, readdirSync: false }));
 vi.mock('node:fs', async (importOriginal) => {
   const fs = await importOriginal();
   const injectable = (name) => (...args) => {
     if (faults[name]) throw Object.assign(new Error(`injected ${name} fault`), { code: 'EIO' });
     return fs[name](...args);
   };
-  const mocked = { ...fs, copyFileSync: injectable('copyFileSync'), renameSync: injectable('renameSync') };
+  const mocked = {
+    ...fs,
+    copyFileSync: injectable('copyFileSync'),
+    renameSync: injectable('renameSync'),
+    readdirSync: injectable('readdirSync'),
+  };
   return { ...mocked, default: mocked };
 });
 
@@ -36,6 +41,7 @@ beforeEach(() => {
   reported = [];
   faults.copyFileSync = false;
   faults.renameSync = false;
+  faults.readdirSync = false;
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -59,5 +65,15 @@ describe('mergeFileInto — backup ordering under injected faults (AC7)', () => 
     expect(named('.installer-tmp.')).toEqual([]);
     expect(reported).toEqual([]);
     expect(warnings.join('\n')).toMatch(/could not back it up/);
+  });
+  it('[AC8, review fix] reports a backup that exists even when pruning old backups fails', () => {
+    faults.readdirSync = true;
+    const status = mergeFileInto(tplPath, target, mergeClaudeMdText, opts());
+    faults.readdirSync = false;
+    expect(status).toBe('merged');
+    const [backup] = named('.installer-backup.');
+    expect(readFileSync(join(dir, backup), 'utf8')).toBe(HOST);
+    expect(reported).toEqual([join(dir, backup)]);
+    expect(warnings.join('\n')).not.toMatch(/could not back it up/);
   });
 });
