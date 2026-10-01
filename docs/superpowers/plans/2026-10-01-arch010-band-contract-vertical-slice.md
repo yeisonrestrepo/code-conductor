@@ -940,7 +940,7 @@ Every new test runs in all three environments. None of the touched test files is
   - [X] [T-006-F] Run `git check-ignore -q .claude/memory/band-envelope.json` and `git ls-files --error-unmatch .claude/memory/band-envelope.json`. Expected: 0 and 1, so the path is ignored and untracked. This was measured as ignored by `/.claude/memory/*` (`.gitignore:36`) on 2026-10-01. Then run `npx vitest run tests/installer tests/unit/host-owned-ignore-xor.test.js`, all passing. The xor test covers the new row with no new test (D3). Then run `npm test`: **1153 / 0**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
   - [X] [T-006-G] Append `- T-006: <one line>` to the plan section. Then `git add -u project-template/gitignore lib/installer/host-owned.mjs tests/installer/templates.test.js tests/installer/deploy.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit). Commit `feat: ignore and host-own the band envelope [ARCH-010]`. Expected: **1153 / 0**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
 
-- [ ] [T-007] **AC12: the demo Code→QA handoff, interactive, in a scratch project.** In-session, live. Depends on T-003, T-004, T-005 and T-006. **Halt rule:** an in-scope write that is denied, or an out-of-scope write that lands, stops the task for a ruling before release.
+- [X] [T-007] **AC12: the demo Code→QA handoff, interactive, in a scratch project.** In-session, live. Depends on T-003, T-004, T-005 and T-006. **Halt rule:** an in-scope write that is denied, or an out-of-scope write that lands, stops the task for a ruling before release.
   - [X] [T-007-A] Create `<scratchpad>/demo-ac12` and run `git init` there. Then:
     - copy this repository's `.claude/hooks/pre-tool-use.mjs` to `.claude/hooks/pre-tool-use.mjs`;
     - copy T-001's `log.mjs` and `read-payloads.mjs`;
@@ -1000,7 +1000,7 @@ Every new test runs in all three environments. None of the touched test files is
     2. the out-of-scope write was denied with `BAND_SCOPE_VIOLATION`, verbatim, and `notes/out.txt` is absent;
     3. QA has no write tool: no write-family payload with `agent_type=qa`, and `qa.txt` is absent;
     4. `--to qa` passed on `build_executed`.
-  - [ ] [T-007-G] Modify `.claude/memory/project.md`: append a `## Demo: ARCH-010 Code→QA handoff (AC12) [<date>]` section holding:
+  - [X] [T-007-G] Modify `.claude/memory/project.md`: append a `## Demo: ARCH-010 Code→QA handoff (AC12) [<date>]` section holding:
     - the `claude` version;
     - the four facts with their verbatim evidence;
     - both `--to` outputs from T-007-B and T-007-D.
@@ -1008,12 +1008,12 @@ Every new test runs in all three environments. None of the touched test files is
     Then append `- T-007: <one line>` under the plan section. Then `git add -u .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit). Commit `docs: record the ARCH-010 Code->QA demo handoff (AC12) [ARCH-010]`. Expected: **1153 / 0**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
 
 - [ ] [T-008] **README and release 1.35.0** (AC14, AC15; `docs/RELEASE-CLOSEOUT.md` steps 1–5). Native. Depends on T-007.
-  - [ ] [T-008-A] Modify `README.md`: insert after the Guard 4 paragraph (:288), separated by a blank line:
+  - [X] [T-008-A] Modify `README.md`: insert after the Guard 4 paragraph (:288), separated by a blank line:
     ```markdown
     **Band scope guard (Guard 5)** - a `Write`, `Edit`, `create_file` or `write_file` from a subagent whose `agent_type` names a band role (`spec`, `plan`, `code`, `audit`, `qa`) is checked against the nearest `.claude/memory/band-envelope.json` above its working directory, a SNAP v3 envelope. A malformed envelope, an agent that is not the envelope's role, a role not holding `RW`, or a path outside the envelope's `scope` globs (anchored at the band root, the directory whose `.claude/` holds the envelope) is denied with a named reason. The main session, any other agent, and any project without an envelope are untouched. It assumes cooperative agents: `agent_type` is a name taken on trust, and `Bash`, `NotebookEdit`, MCP write tools and symlinked paths are not covered.
     ```
-  - [ ] [T-008-B] Run `npm version 1.35.0 --no-git-tag-version`, then write `1.35.0` into `VERSION`.
-  - [ ] [T-008-C] Modify the records.
+  - [X] [T-008-B] Run `npm version 1.35.0 --no-git-tag-version`, then write `1.35.0` into `VERSION`.
+  - [X] [T-008-C] Modify the records.
     - **`AGENT-READABLE BACKLOG.md`.** At the line `grep -n '^### \[ \] `\[ARCH-010\]`'` reports, change `### [ ]` to `### [X]`. Insert as its first bullet:
       ```markdown
       * **DONE, shipped as `1.35.0` on <date>.** SNAP v3 carries the band: `role`, `tk`, `scope`, `gate` and `p`, with per-version block sets, so v1 and v2 are byte-identical. The gate enum is the band table's five exit conditions, and the role enum is the five foundation roles. `snap-validate --to <role>` halts a handoff whose gate is not the previous band's exit with `SNAP_GATE_MISMATCH`. Guard 5 denies a role agent's write outside its envelope's declared scope, with `.claude/memory/band-envelope.json` ignored and host-owned. Folded, with no separate id: the validator's field-versus-version check order, the second sighting of `[BUG-038]`'s check-order class, fixed by deciding `v` first. The interactive identity probe (AC11) and the Code→QA demo (AC12) are recorded in `project.md`. Out of scope, as specified: `[FEAT-011]`, `[FEAT-012]`, `[FEAT-031]`–`[FEAT-036]`, `[BUG-050]`, hostile agent definitions, and writes through `Bash`, `NotebookEdit`, MCP tools or symlinks.
@@ -1034,13 +1034,13 @@ Every new test runs in all three environments. None of the touched test files is
       - **[ARCH-010]** `snap-validate` decides the version before the field sets. An envelope from a newer version now reports `SNAP_UNKNOWN_VERSION` instead of an unexpected-key error, and a payload missing `v` reports only `missing: v`.
       ```
     If the release commit lands on another date, use that date in both places.
-  - [ ] [T-008-D] Run the release checks:
+  - [X] [T-008-D] Run the release checks:
     - `node tools/version-gate.mjs`, expecting `VERSION_GATE_OK 1.35.0`;
     - `node tools/record-parity.mjs`, expecting `RECORD_PARITY_OK`.
 
     **Discriminator (AC14):** flip the heading back to `### [ ]` and expect a red run naming `1.35.0` and `ARCH-010`. Restore `[X]` and re-run green.
-  - [ ] [T-008-E] Run `npm test`: **1153 / 0**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72) Then run `node tools/id-ceiling.mjs`: union `{"BUG":53,"FEAT":40,"ARCH":10}`, next `BUG-054`.
-  - [ ] [T-008-F] Append `- T-008: <one line>` to the plan section. Then `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit). Commit `chore: release 1.35.0 [ARCH-010]`. Expected: **1153 / 0**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
+  - [X] [T-008-E] Run `npm test`: **1153 / 0**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72) Then run `node tools/id-ceiling.mjs`: union `{"BUG":53,"FEAT":40,"ARCH":10}`, next `BUG-054`.
+  - [X] [T-008-F] Append `- T-008: <one line>` to the plan section. Then `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit). Commit `chore: release 1.35.0 [ARCH-010]`. Expected: **1153 / 0**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
   - [ ] [T-008-G] **Confirm with the owner, then** push the branch with `git push -u origin feat/arch-010-band-contract-vertical-slice` and open the PR against `main`. Expected CI:
     - ci-node20 **1057 / 96**; (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
     - ci-node24 **1140 / 13**; (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)

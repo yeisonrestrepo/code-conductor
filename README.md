@@ -290,6 +290,8 @@ Hit a block you believe is wrong? Re-run the command with `CC_GUARD3_WARN=1` and
 
 **node_modules guard (Guard 4)** - a `Read` whose path carries `node_modules` as an exact path component is denied, with backslashes and `..` resolved first. Use Glob for existence checks.
 
+**Band scope guard (Guard 5)** - a `Write`, `Edit`, `create_file` or `write_file` from a subagent whose `agent_type` names a band role (`spec`, `plan`, `code`, `audit`, `qa`) is checked against the nearest `.claude/memory/band-envelope.json` above its working directory, a SNAP v3 envelope. A malformed envelope, an agent that is not the envelope's role, a role not holding `RW`, or a path outside the envelope's `scope` globs (anchored at the band root, the directory whose `.claude/` holds the envelope) is denied with a named reason. The main session, any other agent, and any project without an envelope are untouched. It assumes cooperative agents: `agent_type` is a name taken on trust, and `Bash`, `NotebookEdit`, MCP write tools and symlinked paths are not covered.
+
 Input the hook cannot parse fails closed: it is denied with one stderr line naming `CC_HOOK_ALLOW=1`, which overrides that denial alone and leaves every guard fully active on every payload the hook can read. Set `CC_HOOK_DEBUG=1` to see the diagnostic lines it otherwise swallows.
 
 ### context-guard *(global + project)* — v1.15.0

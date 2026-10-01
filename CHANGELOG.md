@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.35.0] - 2026-10-01
+
+### Added
+- **[ARCH-010]** SNAP v3, the band envelope. `sys` gains `role` and `tk`, `ops` gains `scope` and `gate`, `mem` gains `p`. `snap-build` emits v3 whenever it is given a band field, and v1/v2 output is unchanged.
+- **[ARCH-010]** `snap-validate <file> --to <role>` checks a handoff: the envelope's `gate` must be the exit of the band before the receiving role's, or it exits 1 with `SNAP_GATE_MISMATCH`.
+- **[ARCH-010]** Guard 5 in the PreToolUse front door denies a band-role subagent's `Write`, `Edit`, `create_file` or `write_file` outside the `scope` declared in `.claude/memory/band-envelope.json`. Sessions without an envelope, and the main session always, are unaffected.
+
+### Changed
+- **[ARCH-010]** `.claude/memory/band-envelope.json` joins the installer's managed `.gitignore` block and is host-owned: never shipped, never overwritten.
+
+### Fixed
+- **[ARCH-010]** `snap-validate` decides the version before the field sets. An envelope from a newer version now reports `SNAP_UNKNOWN_VERSION` instead of an unexpected-key error, and a payload missing `v` reports only `missing: v`.
+
 ## [1.34.4] - 2026-09-30
 
 ### Fixed
