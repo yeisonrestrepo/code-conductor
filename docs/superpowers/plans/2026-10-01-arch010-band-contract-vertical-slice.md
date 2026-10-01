@@ -349,7 +349,7 @@ Every new test runs in all three environments. None of the touched test files is
   - [X] [T-002-F] Run `npx vitest run tests/unit/snap-contract.test.js tests/unit/snap-validate.test.js`, expecting all to pass. Then run `npm test`: **1086 / 0**. Also run `npx vitest run tests/scripts/snap-build.test.js tests/scripts/conductor-db.test.js tests/scripts/resume-read.test.js`, all passing. Those are the contract's other consumers, and they are unmodified.
   - [X] [T-002-G] Append `- T-002: <one line>` to the plan section of `project.md`. Then `git add -u scripts/snap-contract.mjs scripts/snap-validate.mjs tests/unit/snap-contract.test.js tests/unit/snap-validate.test.js .claude/memory/project.md` and `git add -u docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (amended at execution 2026-10-01 under the T-001-F ruling: tracking state travels with the task that produced it). Commit `feat: SNAP v3 contract with the version decided first [ARCH-010]`, with a body naming the four AC4 rewrites as contract-correct. Expected: **1086 / 0**.
 
-- [ ] [T-003] **v3 field rules and the `--to` handoff check** (AC5, AC7, Review Focus 4). Native. Depends on T-002.
+- [X] [T-003] **v3 field rules and the `--to` handoff check** (AC5, AC7, Review Focus 4). Native. Depends on T-002.
 
   **Interfaces:**
   - *Consumes:* `ROLES`, `TOOL_KINDS`, `GATES`, `V3_CAPS`, `expectedGate`.
@@ -517,14 +517,14 @@ Every new test runs in all three environments. None of the touched test files is
     ```
     The name `arrayCaps` is deliberate. `snap-contract.test.js:37` forbids `caps = {` in the validator, and that is a case-sensitive match, so `arrayCaps = {` does not trip it.
   - [X] [T-003-D] Run `npx vitest run tests/unit/snap-validate.test.js tests/unit/snap-contract.test.js`, all passing, including the 38-line cap at exactly 38. Then run `npm test`: **1120 / 0**.
-  - [ ] [T-003-E] Append `- T-003: <one line>` to the plan section. Then `git add -u scripts/snap-validate.mjs tests/unit/snap-validate.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit). Commit `feat: v3 band-field validation and the --to handoff check [ARCH-010]`. Expected: **1120 / 0**.
+  - [X] [T-003-E] Append `- T-003: <one line>` to the plan section. Then `git add -u scripts/snap-validate.mjs tests/unit/snap-validate.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit). Commit `feat: v3 band-field validation and the --to handoff check [ARCH-010]`. Expected: **1120 / 0**.
 
 - [ ] [T-004] **`snap-build` emits v3** (AC6). Native. Depends on T-002.
 
   **Interfaces:**
   - *Consumes:* `V3_CAPS`.
   - *Produces:* `snap-build` input keys `role`, `tk`, `scope`, `gate` and `p`, any one of which selects v3. T-007 uses this to build the demo envelopes.
-  - [ ] [T-004-A] Modify `tests/scripts/snap-build.test.js`. Append inside the top-level `describe`:
+  - [X] [T-004-A] Modify `tests/scripts/snap-build.test.js`. Append inside the top-level `describe`:
     ```js
       // ---- ARCH-010: any band field selects v3, the band envelope ----
       const band = { role: 'code', tk: 'RW', scope: ['src/**'], gate: 'define_approved' };
@@ -561,8 +561,8 @@ Every new test runs in all three environments. None of the touched test files is
         expect(r.stderr).toBe('SNAP_BUILD_ERROR: p must be a plain object\n');
       });
     ```
-  - [ ] [T-004-B] Run `npx vitest run tests/scripts/snap-build.test.js -t "AC6"`. Expected: **8 failed**, because the current builder ignores every band key and emits v1.
-  - [ ] [T-004-C] Modify `scripts/snap-build.mjs`:
+  - [X] [T-004-B] Run `npx vitest run tests/scripts/snap-build.test.js -t "AC6"`. Expected: **8 failed**, because the current builder ignores every band key and emits v1.
+  - [X] [T-004-C] Modify `scripts/snap-build.mjs`:
     - **:2** becomes:
       ```js
       import { CAPS, PRE_PARSE_MAX_BYTES as MAX_SNAP_BYTES, V1_MAX_CHARS, V3_CAPS } from './snap-contract.mjs';
@@ -595,7 +595,7 @@ Every new test runs in all three environments. None of the touched test files is
     - **`const snap = { v: 2, sys, ops, mem, pr: pr.slice(0, keep) };`** becomes `const snap = { v, sys, ops, mem, pr: pr.slice(0, keep) };`.
 
     A scratch build of these exact edits during planning produced output byte-identical to the current builder for three v1/v2 inputs: a plain v1, a v2 with prose, and a v1 at the size cap.
-  - [ ] [T-004-D] Run `npx vitest run tests/scripts/snap-build.test.js tests/unit/snap-contract.test.js`, all passing. The pre-existing snap-build tests are unmodified, and they are AC6's byte-identity proof. Then run `npm test`: **1128 / 0**.
+  - [X] [T-004-D] Run `npx vitest run tests/scripts/snap-build.test.js tests/unit/snap-contract.test.js`, all passing. The pre-existing snap-build tests are unmodified, and they are AC6's byte-identity proof. Then run `npm test`: **1128 / 0**.
   - [ ] [T-004-E] Append `- T-004: <one line>` to the plan section. Then `git add -u scripts/snap-build.mjs tests/scripts/snap-build.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit). Commit `feat: snap-build emits SNAP v3 when given band fields [ARCH-010]`. Expected: **1128 / 0**.
 
 - [ ] [T-005] **Guard 5** (AC8, AC9, AC10, Review Focus 1–3 and 5). **Subagent, then a reviewer.** It runs in the main checkout with no worktree, and the subagent does not commit. Depends on T-002 and on T-001's verdict.
