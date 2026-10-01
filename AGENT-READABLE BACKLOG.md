@@ -712,6 +712,27 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
     - a re-run over each end state, for idempotence.
   - **Ships as `1.34.4`.**
 
+### [ ] `[BUG-050]` The Release Instruments Are Silent on Sub-Shaped Ids
+* **Filed 2026-09-30 from the `[ARCH-009]` spec, Q2.** Minted after `node tools/id-ceiling.mjs` on both legs read `{"BUG":49,"FEAT":40,"ARCH":9}`, next `BUG-050`.
+* **The defect is the silence, not any one regex.** `tools/record-parity.mjs` and `tools/id-ceiling.mjs` neither read nor reject an id with a suffix after its number, such as `[ARCH-008-S1]` or `[ARCH-009-S1]`:
+  - A backlog heading of that shape is skipped.
+  - A `CHANGELOG` claim of that shape, `- **[ARCH-009-S1]** …`, is skipped.
+  - Nothing reports that anything was skipped.
+* **Consequence:** a release claiming a sub-shaped id passes record parity having read nothing. That is a green covering less than its name, the class the Verify-band lesson names (`project.md:1659`): a gate must declare what it is able to see.
+* **Measured 2026-09-30, without a mechanism claim beyond the measurement.** The three patterns were run against the shapes in question, and each did not match:
+  - parity's heading pattern (`record-parity.mjs:20`) against `### [X] \`[ARCH-008-S1]\``;
+  - the ceiling's heading pattern (`id-ceiling.mjs:21`) against the same heading;
+  - parity's claim pattern (`record-parity.mjs:24`) against `- **[ARCH-009-S1]** text`.
+* **No historical violation to grandfather.** The `[ARCH-008-S1]`, `[ARCH-008-A]` and `[ARCH-008-B]` releases predate both instruments, and their `CHANGELOG` bullets do not use the claim form.
+* **Two repairs are legitimate, and this filing does not choose between them.** The choice belongs to this item's own spec:
+  - **(a) Widen both instruments to see sub-shaped ids.** If (a) is chosen, the widened instrument runs against the full live records before it is trusted, because the historical `[ARCH-008]` sub-items enter its field of view at once.
+  - **(b) Pin the convention that releases claim only top-level ids**, and make parity fail loudly on a sub-shaped claim instead of skipping it.
+* **Not blocking:** the `[ARCH-009]` band-contract slice ships under a new top-level id, which both instruments read unchanged (owner ruling, `[ARCH-009]` spec Q2).
+* **Components Affected:** `tools/record-parity.mjs`, `tools/id-ceiling.mjs`, their tests, and `tools/README.md`.
+* **Acceptance Criteria:**
+  - A sub-shaped id in a backlog heading or a `CHANGELOG` claim is never silently skipped by either instrument. It is either read or rejected with a named failure, per the repair the spec chooses.
+  - Red-green proof against a fixture holding each shape.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
