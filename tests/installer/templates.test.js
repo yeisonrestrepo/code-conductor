@@ -72,6 +72,12 @@ describe('project-template/gitignore', () => {
     const text = readFileSync(join(root, 'project-template/gitignore'), 'utf8');
     expect(text.split('\n')[0]).toBe(GITIGNORE_HEADER);
   });
+  it('[AC13] ignores the band envelope as the fourth managed entry', () => {
+    const lines = readFileSync(join(root, 'project-template/gitignore'), 'utf8').split('\n').map(l => l.trim());
+    expect(lines.filter(l => l && !l.startsWith('#'))).toEqual([
+      '.claude/memory/turn-count.txt', '*.installer-backup.*', '*.installer-tmp.*', '.claude/memory/band-envelope.json',
+    ]);
+  });
 });
 
 // npm strips these names from every published tarball regardless of package.json

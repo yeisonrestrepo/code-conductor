@@ -101,4 +101,39 @@ describe('snap-build.mjs', () => {
     expect(r.status).not.toBe(0);
     expect(r.stdout).toBe('');
   });
+
+  // ---- ARCH-010: any band field selects v3, the band envelope ----
+  const band = { role: 'code', tk: 'RW', scope: ['src/**'], gate: 'define_approved' };
+
+  it('[AC6] emits v3 when band fields are present, in BLOCK_FIELDS[3] order, and it validates', () => {
+    const r = build(JSON.stringify({ ...base, ...band, p: { tests: 'green' } }));
+    expect(r.status).toBe(0);
+    expect(r.stdout.trim()).toBe('{"v":3,"sys":{"ph":"impl","c":"abc1234","s":"feat010","role":"code","tk":"RW"},"ops":{"n":[],"f":[],"scope":["src/**"],"gate":"define_approved"},"mem":{"d":[],"x":[],"p":{"tests":"green"}},"pr":""}');
+    expect(validate(r.stdout.trim()).status).toBe(0);
+  });
+
+  it.each(['role', 'tk', 'gate'])('[AC6] dies when a band input lacks %s', (key) => {
+    const { [key]: _, ...rest } = band;
+    const r = build(JSON.stringify({ ...base, ...rest }));
+    expect(r.status).toBe(1);
+    expect(r.stderr).toBe(`SNAP_BUILD_ERROR: missing or empty scalar: ${key}\n`);
+  });
+
+  it.each([['scope', ['src/**']], ['p', {}]])('[AC6] %s alone selects v3, so the band scalars become required', (key, value) => {
+    const r = build(JSON.stringify({ ...base, [key]: value }));
+    expect(r.status).toBe(1);
+    expect(r.stderr).toBe('SNAP_BUILD_ERROR: missing or empty scalar: role\n');
+  });
+
+  it('[AC6] dies on a non-array scope', () => {
+    const r = build(JSON.stringify({ ...base, ...band, scope: 'src/**' }));
+    expect(r.status).toBe(1);
+    expect(r.stderr).toBe('SNAP_BUILD_ERROR: scope must be an array\n');
+  });
+
+  it('[AC6] dies on a non-object p', () => {
+    const r = build(JSON.stringify({ ...base, ...band, p: ['x'] }));
+    expect(r.status).toBe(1);
+    expect(r.stderr).toBe('SNAP_BUILD_ERROR: p must be a plain object\n');
+  });
 });

@@ -4,6 +4,7 @@ import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { GATES, ROLES, V3_CAPS, expectedGate } from '../../scripts/snap-contract.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = resolve(__dirname, '../..')
@@ -94,8 +95,9 @@ describe('snap-validate.mjs', () => {
     expect(r.stderr).toBe('SNAP_ERROR: ph must be spec|plan|impl|rev\n')
   })
 
-  it('rejects unknown version (v > 2)', () => {
-    const payload = { ...VALID, v: 3 }
+  it('rejects unknown version (v > MAX_VERSION)', async () => {
+    const { MAX_VERSION } = await import('../../scripts/snap-contract.mjs')
+    const payload = { ...VALID, v: MAX_VERSION + 1 }
     const r = run(fixture(j(payload)))
     expect(r.status).toBe(1)
     expect(r.stderr).toBe('SNAP_ERROR: SNAP_UNKNOWN_VERSION\n')
@@ -244,10 +246,10 @@ describe('snap-validate.mjs', () => {
     expect(src).not.toMatch(/console\./)
   })
 
-  it('scripts/snap-validate.mjs stays within the 32-line hard cap', () => {
+  it('scripts/snap-validate.mjs stays within the 38-line hard cap', () => {
     const src = readFileSync(VALIDATOR, 'utf8').split(/\r?\n/)
     const counted = src.filter(l => l.trim() !== '' && !l.trim().startsWith('//'))
-    expect(counted.length).toBeLessThanOrEqual(32)
+    expect(counted.length).toBeLessThanOrEqual(38)
   })
 
   it('SNAP v1 serialization is at most 85% of the equivalent markdown snapshot length', () => {
@@ -307,8 +309,9 @@ describe('snap-validate.mjs', () => {
     expect(r.stderr).toBe('SNAP_ERROR: pr must be a string\n')
   })
 
-  it('rejects v > 2 with SNAP_UNKNOWN_VERSION', () => {
-    const bad = { ...VALID, v: 3 }
+  it('rejects v > MAX_VERSION with SNAP_UNKNOWN_VERSION', async () => {
+    const { MAX_VERSION } = await import('../../scripts/snap-contract.mjs')
+    const bad = { ...VALID, v: MAX_VERSION + 1 }
     const r = run(fixture(j(bad)))
     expect(r.status).toBe(1)
     expect(r.stderr).toBe('SNAP_ERROR: SNAP_UNKNOWN_VERSION\n')
@@ -406,7 +409,8 @@ describe('snap-validate.mjs', () => {
     const { BLOCK_FIELDS } = await import('../../scripts/snap-contract.mjs')
     const src = readFileSync(VALIDATOR, 'utf8')
     expect(src).toContain('BLOCK_FIELDS')
-    expect(BLOCK_FIELDS).toEqual({ sys: ['ph', 'c', 's'], ops: ['n', 'f'], mem: ['d', 'x'] })
+    const V1 = { sys: ['ph', 'c', 's'], ops: ['n', 'f'], mem: ['d', 'x'] }
+    expect(BLOCK_FIELDS).toEqual({ 1: V1, 2: V1, 3: { sys: ['ph', 'c', 's', 'role', 'tk'], ops: ['n', 'f', 'scope', 'gate'], mem: ['d', 'x', 'p'] } })
     const r = run(fixture(j({ ...VALID, sys: { ...VALID.sys, extra: 1 } })))
     expect(r.status).toBe(1)
     expect(r.stderr).toBe('SNAP_ERROR: unexpected key: sys.extra\n')
@@ -420,5 +424,116 @@ describe('snap-validate.mjs', () => {
     const over = run(fixture(j({ ...VALID, v: MAX_VERSION + 1 })))
     expect(over.status).toBe(1)
     expect(over.stderr).toBe('SNAP_ERROR: SNAP_UNKNOWN_VERSION\n')
+  })
+
+  it('[AC3] decides the version first: an unknown version carrying unknown keys is SNAP_UNKNOWN_VERSION', async () => {
+    const { MAX_VERSION } = await import('../../scripts/snap-contract.mjs')
+    const bad = { ...VALID, v: MAX_VERSION + 1, sys: { ...VALID.sys, role: 'code', zz: 1 }, ops: { ...VALID.ops, gate: 'x' } }
+    const r = run(fixture(j(bad)))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: SNAP_UNKNOWN_VERSION\n')
+  })
+
+  it('reports only missing: v when v is absent, not the whole missing list [ARCH-010 D2]', () => {
+    const { v, ...noV } = VALID
+    const r = run(fixture(j({ ...noV, sys: { c: 'abc1234', s: 'feat010' } })))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: missing: v\n')
+  })
+})
+
+// ---- ARCH-010: v3 band fields and the handoff check ----
+const VALID3 = { v: 3, sys: { ph: 'impl', c: 'abc1234', s: 'arch010', role: 'code', tk: 'RW' }, ops: { n: [], f: [], scope: ['src/**'], gate: 'define_approved' }, mem: { d: [], x: [] } }
+const with3 = (blk, patch) => ({ ...VALID3, [blk]: { ...VALID3[blk], ...patch } })
+function runTo(path, ...args) {
+  const r = spawnSync('node', [VALIDATOR, path, ...args], { stdio: 'pipe', timeout: 10000 })
+  return { status: r.status ?? -1, stderr: (r.stderr ?? '').toString() }
+}
+
+describe('snap-validate.mjs v3 [ARCH-010]', () => {
+  it.each(ROLES)('[AC5] accepts a valid v3 envelope for role %s', (role) => {
+    const env = { ...VALID3, sys: { ...VALID3.sys, role, tk: 'X' }, ops: { n: [], f: [], gate: expectedGate(role) } }
+    expect(run(fixture(j(env)))).toEqual({ status: 0, stderr: '', stdout: '' })
+  })
+
+  it.each(['sys.role', 'sys.tk', 'ops.gate'])('[AC5] names a missing %s', (key) => {
+    const [blk, field] = key.split('.')
+    const { [field]: _, ...rest } = VALID3[blk]
+    const r = run(fixture(j({ ...VALID3, [blk]: rest })))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe(`SNAP_ERROR: missing: ${key}\n`)
+  })
+
+  it.each([
+    ['sys', 'role', 'boss', 'role must be spec|plan|code|audit|qa'],
+    ['sys', 'tk', 'W', 'tk must be R|RW|X'],
+    ['ops', 'gate', 'green', 'gate must be boundary_routed|define_approved|build_executed|verify_pass|ship_released'],
+  ])('[AC5] rejects %s.%s outside its enum', (blk, field, value, message) => {
+    const r = run(fixture(j(with3(blk, { [field]: value }))))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe(`SNAP_ERROR: ${message}\n`)
+  })
+
+  it('[AC5] requires scope when tk is RW', () => {
+    const { scope, ...ops } = VALID3.ops
+    const r = run(fixture(j({ ...VALID3, ops })))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: missing: ops.scope (required when tk is RW)\n')
+  })
+
+  it.each([[[]], ['text'], [null]])('[AC5] rejects a non-object p (%j)', (p) => {
+    const r = run(fixture(j(with3('mem', { p }))))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: p must be a plain object\n')
+  })
+
+  it.each([[1, 'sys', 'role'], [2, 'sys', 'tk'], [1, 'ops', 'scope'], [2, 'ops', 'gate'], [1, 'mem', 'p']])(
+    '[AC5] rejects a v3-only key on v%i: %s.%s', (v, blk, field) => {
+      const base = v === 2 ? { ...VALID, v: 2, pr: '' } : VALID
+      const r = run(fixture(j({ ...base, [blk]: { ...base[blk], [field]: 'code' } })))
+      expect(r.status).toBe(1)
+      expect(r.stderr).toBe(`SNAP_ERROR: unexpected key: ${blk}.${field}\n`)
+    })
+
+  it('caps ops.scope by count, from the contract', () => {
+    const scope = Array.from({ length: V3_CAPS['ops.scope'][0] + 1 }, (_, i) => `d${i}/**`)
+    const r = run(fixture(j(with3('ops', { scope }))))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: ops.scope exceeds cap\n')
+  })
+
+  it('requires ops.scope to be an array', () => {
+    const r = run(fixture(j(with3('ops', { scope: 'src/**' }))))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: ops.scope must be an array\n')
+  })
+
+  it('[AC7] --to qa passes on build_executed', () => {
+    expect(runTo(fixture(j(with3('ops', { gate: 'build_executed' }))), '--to', 'qa')).toEqual({ status: 0, stderr: '' })
+  })
+
+  it.each(GATES.filter(g => g !== 'build_executed'))('[AC7] --to qa halts on %s', (gate) => {
+    const r = runTo(fixture(j(with3('ops', { gate }))), '--to', 'qa')
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe(`SNAP_ERROR: SNAP_GATE_MISMATCH: qa expects build_executed, got ${gate}\n`)
+  })
+
+  it.each([
+    ['spec', 'boundary_routed'], ['plan', 'boundary_routed'], ['code', 'define_approved'],
+    ['audit', 'build_executed'], ['qa', 'build_executed'],
+  ])('[AC7] --to %s expects %s', (role, gate) => {
+    expect(runTo(fixture(j(with3('ops', { gate }))), '--to', role)).toEqual({ status: 0, stderr: '' })
+  })
+
+  it('--to on a v1 envelope is a named error, not a silent pass', () => {
+    const r = runTo(fixture(j(VALID)), '--to', 'qa')
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: --to requires a v3 envelope\n')
+  })
+
+  it('rejects an unknown --to role with the usage line', () => {
+    const r = runTo(fixture(j(VALID3)), '--to', 'boss')
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: usage: snap-validate.mjs <file> [--to spec|plan|code|audit|qa]\n')
   })
 })

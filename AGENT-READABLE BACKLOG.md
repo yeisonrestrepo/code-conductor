@@ -126,7 +126,28 @@ The factory is five bands. Work enters through the Boundary band, flows Define, 
 * **Description:** Define the five-band execution topology as a contract: band membership, the gate condition each band records before handoff, and the closure loop (Release writes back to Ticket). The bands are Boundary (Ticket, Proxy, Orchestrator), Define (Analyst, Spec, Architect/Plan, UX), Build (Code, Test Writer), Verify (Auditor, QA, Security), Ship (Release, Docs).
 * **Impact:** Every Pillar 3 item gains a fixed address in the topology, so agent scope disputes are settled by reading the band table instead of re-arguing per feature. Emulates a software factory pipeline for teams adopting Claude Code.
 * **Components Affected:** `scripts/snap-contract.mjs` (the `gate` field's value set becomes the band gate enum), agent profile manifests (new), the Orchestrator Protocol section of both `CLAUDE.md` templates.
-* **Acceptance Criteria:** The band table above is the single normative source for agent placement; the SNAP `gate` field carries a value from the band gate enum; a handoff whose `gate` does not match the sending band's exit condition halts with a named error rather than proceeding. Flips when `FEAT-009`, `FEAT-011`, `FEAT-012` and `FEAT-031` through `FEAT-036` are all closed or superseded.
+* **Acceptance Criteria:** The band table above is the single normative source for agent placement; the SNAP `gate` field carries a value from the band gate enum; a handoff whose `gate` does not match the sending band's exit condition halts with a named error rather than proceeding. Flips when `ARCH-010`, `FEAT-009`, `FEAT-011`, `FEAT-012` and `FEAT-031` through `FEAT-036` are all closed or superseded.
+
+### [X] `[ARCH-010]` Band Contract Vertical Slice (SNAP v3, Gate Enum, One Code->QA Handoff)
+* **DONE, shipped as `1.35.0` on 2026-10-01.** SNAP v3 carries the band: `role`, `tk`, `scope`, `gate` and `p`, with per-version block sets, so v1 and v2 are byte-identical. The gate enum is the band table's five exit conditions, and the role enum is the five foundation roles. `snap-validate --to <role>` halts a handoff whose gate is not the previous band's exit with `SNAP_GATE_MISMATCH`. Guard 5 denies a role agent's write outside its envelope's declared scope, with `.claude/memory/band-envelope.json` ignored and host-owned. Folded, with no separate id: the validator's field-versus-version check order, the second sighting of `[BUG-038]`'s check-order class, fixed by deciding `v` first. The interactive identity probe (AC11) and the Code→QA demo (AC12) are recorded in `project.md`. Out of scope, as specified: `[FEAT-011]`, `[FEAT-012]`, `[FEAT-031]`–`[FEAT-036]`, `[BUG-050]`, hostile agent definitions, and writes through `Bash`, `NotebookEdit`, MCP tools or symlinks.
+* **Minted 2026-09-30 from the `[ARCH-009]` spec, owner Q2**, after `node tools/id-ceiling.mjs` read `{"BUG":50,"FEAT":40,"ARCH":9}` on both legs. It is a top-level id so that both release instruments read it unchanged. See `[BUG-050]` for why a sub-shaped id would be invisible to them.
+* **Spec:** `docs/superpowers/specs/2026-09-30-arch010-band-contract-vertical-slice-design.md`, APPROVED 2026-09-30.
+* **Description:** The band contract becomes executable:
+  - **SNAP v3**, with per-version block membership:
+    - `sys` gains `role` and `tk`;
+    - `ops` gains `scope` and `gate`;
+    - `mem` gains `p`.
+  - **The gate enum:** `boundary_routed`, `define_approved`, `build_executed`, `verify_pass`, `ship_released`.
+  - **The five foundation roles:** `spec|plan|code|audit|qa`.
+  - **The handoff check:** `snap-validate --to <role>`, failing with `SNAP_GATE_MISMATCH`.
+  - **Guard 5** in `pre-tool-use.mjs`, denying a role agent's out-of-scope write. It is armed by the band envelope plus the payload's `agent_type`, which was measured on `claude` 2.1.286.
+* **Folded defect, by owner ruling:** `snap-validate.mjs` checked field sets before the version, so an installed 1.34.x reader names a newer envelope's failure as `unexpected key` instead of `SNAP_UNKNOWN_VERSION`. This is the second sighting of `[BUG-038]`'s check-order class in one validator. The version check moves first.
+* **Components Affected:**
+  - `scripts/snap-contract.mjs`, `scripts/snap-validate.mjs`, `scripts/snap-build.mjs`;
+  - `.claude/hooks/pre-tool-use.mjs` and its `project-template/` mirror;
+  - `project-template/gitignore`;
+  - `lib/installer/host-owned.mjs`.
+* **Acceptance Criteria:** the spec's AC1–AC15. It ships as `1.35.0`.
 
 ### [ ] `[FEAT-009]` Proxy Agent (Bicameral Front Layer)
 * **AMENDED at Pillar 3 restructure: this item joins the Boundary band of `[ARCH-009]`. Scope unchanged; the framing moves from "a cost trick" to "the band's front door". Original heading: "Bicameral Proxy Architecture (Asymmetric LLM Chaining)". Original text preserved below.**

@@ -2,3 +2,4 @@
 .claude/memory/turn-count.txt
 *.installer-backup.*
 *.installer-tmp.*
+.claude/memory/band-envelope.json

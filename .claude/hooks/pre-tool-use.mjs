@@ -4,8 +4,8 @@
 // hookSpecificOutput.permissionDecision and EVERY path exits 0. Nothing here exits 2:
 // a deliberate denial must never be indistinguishable from a crashed script.
 // Zero dependencies by design; node: builtins only.
-import { readFileSync, statSync } from 'node:fs';
-import { posix, join } from 'node:path';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { posix, join, resolve, dirname, relative, isAbsolute, sep } from 'node:path';
 
 const LINE_LIMIT = 150;
 const BLOCKED_COMPONENTS = new Set(['node_modules']);
@@ -106,6 +106,76 @@ function guard2DuplicateWrite(input) {
     '   2. Confirm you want to overwrite (re-issue the command)\n' +
     '   3. Cancel'
   );
+}
+
+// ── Guard 5 constants ─────────────────────────────────────────────────────────
+// Copies of scripts/snap-contract.mjs values (ARCH-010 D7). This file is mirrored to two
+// locations and the contract sits at a different relative path from each, so no import is
+// correct in both; tests/hooks/guard5.test.js pins every copy to the contract instead.
+const BAND_ROLES = ['spec', 'plan', 'code', 'audit', 'qa'];
+const BAND_TOOL_KINDS = ['R', 'RW', 'X'];
+const BAND_WRITE_TOOLS = ['Write', 'Edit', 'create_file', 'write_file'];
+const BAND_ENVELOPE_MAX_BYTES = 10485760;
+const BAND_ENVELOPE_REL = ['.claude', 'memory', 'band-envelope.json'];
+
+const isPlainObject = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
+
+// The band root is the nearest ancestor of cwd holding the envelope; the scope globs
+// anchor there too, so discovery and anchoring are one rule (owner ruling, Case F).
+function findBandRoot(start) {
+  let dir = resolve(start);
+  while (!existsSync(join(dir, ...BAND_ENVELOPE_REL))) {
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+  return dir;
+}
+
+// Only what Guard 5 itself reads is checked. Anything less is Case C, not a guess.
+function readEnvelope(path) {
+  let env;
+  try {
+    if (statSync(path).size > BAND_ENVELOPE_MAX_BYTES) return null;
+    env = JSON.parse(readFileSync(path, 'utf8'));
+  } catch { return null; }
+  if (!isPlainObject(env) || env.v !== 3 || !isPlainObject(env.sys) || !isPlainObject(env.ops)) return null;
+  if (!BAND_ROLES.includes(env.sys.role) || !BAND_TOOL_KINDS.includes(env.sys.tk)) return null;
+  const scope = env.ops.scope;
+  if (env.sys.tk === 'RW' && !(Array.isArray(scope) && scope.every((g) => typeof g === 'string'))) return null;
+  return env;
+}
+
+// `**/` spans zero or more directories, a trailing `**` any depth, `*` one segment.
+function globToRegExp(glob) {
+  const body = glob.split(/(\*\*\/|\*\*|\*)/).map((part) => {
+    if (part === '**/') return '(?:.*/)?';
+    if (part === '**') return '.*';
+    if (part === '*') return '[^/]*';
+    return part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }).join('');
+  return new RegExp(`^${body}$`);
+}
+
+// Guard 5: a role agent writing outside its band envelope's declared scope (ARCH-010).
+// The main session carries no agent_type and is never subject to it (Case A); with no
+// envelope there is nothing to verify (Case B). Cases C-G are the spec's table.
+function guard5BandScope(input, payload) {
+  const role = payload.agent_type;
+  if (!BAND_ROLES.includes(role)) return null;
+  const cwd = typeof payload.cwd === 'string' && payload.cwd ? payload.cwd : process.cwd();
+  const root = findBandRoot(cwd);
+  if (!root) return null;
+  const file = join(root, ...BAND_ENVELOPE_REL);
+  const env = readEnvelope(file);
+  if (!env) return deny(`Guard 5: BAND_ENVELOPE_INVALID: ${file} is unreadable or not a valid v3 band envelope.`);
+  if (env.sys.role !== role) return deny(`Guard 5: BAND_ROLE_MISMATCH: agent ${role} is not the envelope's role ${env.sys.role}.`);
+  if (env.sys.tk !== 'RW') return deny(`Guard 5: BAND_READ_ONLY: role ${role} holds tk ${env.sys.tk}, not RW.`);
+  const target = targetPath(input);
+  const rel = relative(root, resolve(cwd, target)).split(sep).join('/');
+  const inside = target !== '' && rel !== '' && rel !== '..' && !rel.startsWith('../') && !isAbsolute(rel);
+  if (inside && env.ops.scope.some((g) => globToRegExp(g).test(rel))) return null;
+  return deny(`Guard 5: BAND_SCOPE_VIOLATION: ${target || '<no path>'} is outside the declared scope [${env.ops.scope.join(', ')}]`);
 }
 
 // ── Guard 3 constants ─────────────────────────────────────────────────────────
@@ -563,6 +633,8 @@ const DISPATCH = {
   Edit: [],
   Bash: [guard3BashScan],
 };
+// Guard 5 runs first on every write-family tool: a scope deny outranks Guard 2's ask.
+for (const tool of BAND_WRITE_TOOLS) DISPATCH[tool].unshift(guard5BandScope);
 
 // Case B. Unparseable input is not "nothing to verify", it is "the verifier could not
 // run", which is the condition that fails closed. CC_HOOK_ALLOW bypasses THIS denial only;
@@ -600,7 +672,7 @@ function main() {
   const guards = DISPATCH[name];
   if (!guards) { debug(`no guard registered for tool_name "${name}"; allowing`); return; }
   for (const guard of guards) {
-    const decision = guard(input);
+    const decision = guard(input, payload);
     if (decision) { emit(decision); return; }
   }
 }

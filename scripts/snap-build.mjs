@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { CAPS, PRE_PARSE_MAX_BYTES as MAX_SNAP_BYTES, V1_MAX_CHARS } from './snap-contract.mjs';
+import { CAPS, PRE_PARSE_MAX_BYTES as MAX_SNAP_BYTES, V1_MAX_CHARS, V3_CAPS } from './snap-contract.mjs';
 
 const die = (msg) => { process.stderr.write(`SNAP_BUILD_ERROR: ${msg}\n`); process.exit(1); };
 const byteLen = (s) => Buffer.byteLength(s, 'utf8');
@@ -49,7 +49,22 @@ const ops = { n: normArray(obj.n, CAPS['ops.n']), f: normArray(obj.f, CAPS['ops.
 const mem = { d: normArray(obj.d, CAPS['mem.d']), x: normArray(obj.x, CAPS['mem.x']) };
 const pr = typeof obj.pr === 'string' ? obj.pr : '';
 
-if (pr === '') {
+// ---- v3: any band field selects the band envelope (ARCH-010); without one, v1/v2 are untouched ----
+const band = ['role', 'tk', 'scope', 'gate', 'p'].some((k) => obj[k] !== undefined);
+if (band) {
+  for (const k of ['role', 'tk', 'gate']) {
+    if (typeof obj[k] !== 'string' || obj[k] === '') die(`missing or empty scalar: ${k}`);
+  }
+  if (obj.scope !== undefined && !Array.isArray(obj.scope)) die('scope must be an array');
+  if (obj.p !== undefined && (typeof obj.p !== 'object' || obj.p === null || Array.isArray(obj.p))) die('p must be a plain object');
+  // Assignment order is serialization order: BLOCK_FIELDS[3] lists scope before gate.
+  Object.assign(sys, { role: obj.role, tk: obj.tk });
+  if (obj.scope !== undefined) ops.scope = normArray(obj.scope, V3_CAPS['ops.scope']);
+  ops.gate = obj.gate;
+  if (obj.p !== undefined) mem.p = obj.p;
+}
+
+if (pr === '' && !band) {
   // ---- v1: V1_MAX_CHARS cap, drop oldest of mem.d / ops.f ----
   const snap = { v: 1, sys, ops, mem };
   let line = JSON.stringify(snap);
@@ -60,8 +75,9 @@ if (pr === '') {
   }
   writeOut(line);
 } else {
-  // ---- v2: 10 MiB cap, truncate raw pr before serialize ----
-  const skeletonBytes = byteLen(JSON.stringify({ v: 2, sys, ops, mem, pr: '' }));
+  // ---- v2 and v3: 10 MiB cap, truncate raw pr before serialize ----
+  const v = band ? 3 : 2;
+  const skeletonBytes = byteLen(JSON.stringify({ v, sys, ops, mem, pr: '' }));
   if (skeletonBytes > MAX_SNAP_BYTES) die('skeleton exceeds cap even without prose');
 
   // total serialized bytes for a candidate pr value (skeleton already counts the two empty-value quotes)
@@ -82,6 +98,6 @@ if (pr === '') {
     }
   }
 
-  const snap = { v: 2, sys, ops, mem, pr: pr.slice(0, keep) };
+  const snap = { v, sys, ops, mem, pr: pr.slice(0, keep) };
   writeOut(JSON.stringify(snap));
 }
