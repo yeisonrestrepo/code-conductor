@@ -94,8 +94,9 @@ describe('snap-validate.mjs', () => {
     expect(r.stderr).toBe('SNAP_ERROR: ph must be spec|plan|impl|rev\n')
   })
 
-  it('rejects unknown version (v > 2)', () => {
-    const payload = { ...VALID, v: 3 }
+  it('rejects unknown version (v > MAX_VERSION)', async () => {
+    const { MAX_VERSION } = await import('../../scripts/snap-contract.mjs')
+    const payload = { ...VALID, v: MAX_VERSION + 1 }
     const r = run(fixture(j(payload)))
     expect(r.status).toBe(1)
     expect(r.stderr).toBe('SNAP_ERROR: SNAP_UNKNOWN_VERSION\n')
@@ -244,10 +245,10 @@ describe('snap-validate.mjs', () => {
     expect(src).not.toMatch(/console\./)
   })
 
-  it('scripts/snap-validate.mjs stays within the 32-line hard cap', () => {
+  it('scripts/snap-validate.mjs stays within the 38-line hard cap', () => {
     const src = readFileSync(VALIDATOR, 'utf8').split(/\r?\n/)
     const counted = src.filter(l => l.trim() !== '' && !l.trim().startsWith('//'))
-    expect(counted.length).toBeLessThanOrEqual(32)
+    expect(counted.length).toBeLessThanOrEqual(38)
   })
 
   it('SNAP v1 serialization is at most 85% of the equivalent markdown snapshot length', () => {
@@ -307,8 +308,9 @@ describe('snap-validate.mjs', () => {
     expect(r.stderr).toBe('SNAP_ERROR: pr must be a string\n')
   })
 
-  it('rejects v > 2 with SNAP_UNKNOWN_VERSION', () => {
-    const bad = { ...VALID, v: 3 }
+  it('rejects v > MAX_VERSION with SNAP_UNKNOWN_VERSION', async () => {
+    const { MAX_VERSION } = await import('../../scripts/snap-contract.mjs')
+    const bad = { ...VALID, v: MAX_VERSION + 1 }
     const r = run(fixture(j(bad)))
     expect(r.status).toBe(1)
     expect(r.stderr).toBe('SNAP_ERROR: SNAP_UNKNOWN_VERSION\n')
@@ -406,7 +408,8 @@ describe('snap-validate.mjs', () => {
     const { BLOCK_FIELDS } = await import('../../scripts/snap-contract.mjs')
     const src = readFileSync(VALIDATOR, 'utf8')
     expect(src).toContain('BLOCK_FIELDS')
-    expect(BLOCK_FIELDS).toEqual({ sys: ['ph', 'c', 's'], ops: ['n', 'f'], mem: ['d', 'x'] })
+    const V1 = { sys: ['ph', 'c', 's'], ops: ['n', 'f'], mem: ['d', 'x'] }
+    expect(BLOCK_FIELDS).toEqual({ 1: V1, 2: V1, 3: { sys: ['ph', 'c', 's', 'role', 'tk'], ops: ['n', 'f', 'scope', 'gate'], mem: ['d', 'x', 'p'] } })
     const r = run(fixture(j({ ...VALID, sys: { ...VALID.sys, extra: 1 } })))
     expect(r.status).toBe(1)
     expect(r.stderr).toBe('SNAP_ERROR: unexpected key: sys.extra\n')
@@ -420,5 +423,20 @@ describe('snap-validate.mjs', () => {
     const over = run(fixture(j({ ...VALID, v: MAX_VERSION + 1 })))
     expect(over.status).toBe(1)
     expect(over.stderr).toBe('SNAP_ERROR: SNAP_UNKNOWN_VERSION\n')
+  })
+
+  it('[AC3] decides the version first: an unknown version carrying unknown keys is SNAP_UNKNOWN_VERSION', async () => {
+    const { MAX_VERSION } = await import('../../scripts/snap-contract.mjs')
+    const bad = { ...VALID, v: MAX_VERSION + 1, sys: { ...VALID.sys, role: 'code', zz: 1 }, ops: { ...VALID.ops, gate: 'x' } }
+    const r = run(fixture(j(bad)))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: SNAP_UNKNOWN_VERSION\n')
+  })
+
+  it('reports only missing: v when v is absent, not the whole missing list [ARCH-010 D2]', () => {
+    const { v, ...noV } = VALID
+    const r = run(fixture(j({ ...noV, sys: { c: 'abc1234', s: 'feat010' } })))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: missing: v\n')
   })
 })

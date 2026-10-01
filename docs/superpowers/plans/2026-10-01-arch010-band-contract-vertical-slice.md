@@ -132,7 +132,7 @@ Every new test runs in all three environments. None of the touched test files is
   - [X] [T-000-G] Run `npm test`, expecting **1081 / 0**. Then `node tools/id-ceiling.mjs`: the working tree now reads `{"BUG":53,"FEAT":40,"ARCH":10}`, origin/main `{"BUG":53,"FEAT":40,"ARCH":9}`, union next `BUG-054`. Then `node tools/record-parity.mjs`, expecting `RECORD_PARITY_OK`.
   - [X] [T-000-H] Append to `project.md` under the plan section: `- T-000: <one line of handoff observation>`. This line rides T-001's commit.
 
-- [ ] [T-001] **AC11: the interactive identity probe, the plan's first verification step, before any guard code.** Depends on T-000. **Halt rule:** if a subagent's `Write` does not carry `agent_id` and `agent_type`, or if the main session's payload carries either key, stop for a ruling. Guard 5 code is not written until it is given. Other key-set differences are recorded, not halted on.
+- [X] [T-001] **AC11: the interactive identity probe, the plan's first verification step, before any guard code.** Depends on T-000. **Halt rule:** if a subagent's `Write` does not carry `agent_id` and `agent_type`, or if the main session's payload carries either key, stop for a ruling. Guard 5 code is not written until it is given. Other key-set differences are recorded, not halted on.
   - [X] [T-001-A] Create the scratch probe repository at `<scratchpad>/probe-ac11`, outside this repository, and run `git init` there. Write these files:
     - `.claude/settings.json`:
       ```json
@@ -177,7 +177,7 @@ Every new test runs in all three environments. None of the touched test files is
     - **AC11 interactive re-run (2026-10-01, `claude` <version>, interactive mode):** <the verbatim reader output>. (a) <answer>. (b) <answer>. (c) <answer>. <Key-set differences from the -p spike, or "none">.
     ```
     Then append `- T-001: <one line of handoff observation>` under the plan section.
-  - [ ] [T-001-F] `git add -u .claude/memory/project.md` and `git add -u docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (amended at execution 2026-10-01 by owner ruling: the plan's ticked boxes ride this commit, per T-000's precedent). Commit `docs: record the ARCH-010 interactive identity probe (AC11) [ARCH-010]`. Expected: **1081 / 0**.
+  - [X] [T-001-F] `git add -u .claude/memory/project.md` and `git add -u docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (amended at execution 2026-10-01 by owner ruling: the plan's ticked boxes ride this commit, per T-000's precedent). Commit `docs: record the ARCH-010 interactive identity probe (AC11) [ARCH-010]`. Expected: **1081 / 0**.
 
 - [ ] [T-002] **Contract v3, with the version decided first** (AC1, AC2, AC3, AC4 and D2). Native. Depends on T-001's verdict.
 
@@ -191,7 +191,7 @@ Every new test runs in all three environments. None of the touched test files is
     - `ROLES`, `TOOL_KINDS`, `BANDS`, `GATES` and `ROLE_BAND`;
     - `WRITE_TOOLS`;
     - `expectedGate(role) → string`.
-  - [ ] [T-002-A] Modify `tests/unit/snap-contract.test.js`.
+  - [X] [T-002-A] Modify `tests/unit/snap-contract.test.js`.
     - **Add an import below line 6.** The new names are reached through the namespace, so each new test goes red on its own instead of failing the file's module link:
       ```js
       import * as contract from '../../scripts/snap-contract.mjs'
@@ -238,7 +238,7 @@ Every new test runs in all three environments. None of the touched test files is
           })
         })
       ```
-  - [ ] [T-002-B] Modify `tests/unit/snap-validate.test.js`. All four rewrites are named as contract-correct (AC4). Each is located by its title, and the line numbers are from 2026-10-01:
+  - [X] [T-002-B] Modify `tests/unit/snap-validate.test.js`. All four rewrites are named as contract-correct (AC4). Each is located by its title, and the line numbers are from 2026-10-01:
     - **`'rejects unknown version (v > 2)'` (:97)**, where `v: 3` becomes a valid version:
       ```js
         it('rejects unknown version (v > MAX_VERSION)', async () => {
@@ -273,12 +273,12 @@ Every new test runs in all three environments. None of the touched test files is
           expect(r.stderr).toBe('SNAP_ERROR: missing: v\n')
         })
       ```
-  - [ ] [T-002-C] **Red first (AC1, AC2, AC3):** run `npx vitest run tests/unit/snap-contract.test.js tests/unit/snap-validate.test.js`. Expected: **7 failed**:
+  - [X] [T-002-C] **Red first (AC1, AC2, AC3):** run `npx vitest run tests/unit/snap-contract.test.js tests/unit/snap-validate.test.js`. Expected: **7 failed**:
     - 4 in the contract file: the rewritten pins, `[AC1]`, `[AC2]` and the enums test;
     - 3 in the validator file: `[AC3]` (current output `unexpected key: sys.role`), the missing-`v` test (current output also names `sys.ph`), and the per-version shape.
 
     A new test that passes here is a finding about the test, and halts.
-  - [ ] [T-002-D] Modify `scripts/snap-contract.mjs`. Replace everything from the `// Post-parse, version-specific caps` comment (:17) to the end of the file with:
+  - [X] [T-002-D] Modify `scripts/snap-contract.mjs`. Replace everything from the `// Post-parse, version-specific caps` comment (:17) to the end of the file with:
     ```js
     // Post-parse, version-specific caps, applied once snap.v is known. v2 and v3 share the
     // pre-parse ceiling: neither is a context-budget file.
@@ -330,7 +330,7 @@ Every new test runs in all three environments. None of the touched test files is
     export const expectedGate = (role) => GATES[BANDS.indexOf(ROLE_BAND[role]) - 1];
     ```
     The old :34 comment, "block members are version-invariant", is false from v3 on. It goes with the replaced block.
-  - [ ] [T-002-E] Modify `scripts/snap-validate.mjs`. This is the D2 reorder plus per-version lookups; the v3 rules come in T-003:
+  - [X] [T-002-E] Modify `scripts/snap-validate.mjs`. This is the D2 reorder plus per-version lookups; the v3 rules come in T-003:
     - Insert after :10 (the root-object check):
       ```js
       // D2: v is decided before every check whose meaning depends on it (BUG-038's check-order class, second sighting).
@@ -346,8 +346,8 @@ Every new test runs in all three environments. None of the touched test files is
     - Delete the old :19, the version line that now sits above.
 
     Counted lines: 32.
-  - [ ] [T-002-F] Run `npx vitest run tests/unit/snap-contract.test.js tests/unit/snap-validate.test.js`, expecting all to pass. Then run `npm test`: **1086 / 0**. Also run `npx vitest run tests/scripts/snap-build.test.js tests/scripts/conductor-db.test.js tests/scripts/resume-read.test.js`, all passing. Those are the contract's other consumers, and they are unmodified.
-  - [ ] [T-002-G] Append `- T-002: <one line>` to the plan section of `project.md`. Then `git add -u scripts/snap-contract.mjs scripts/snap-validate.mjs tests/unit/snap-contract.test.js tests/unit/snap-validate.test.js .claude/memory/project.md`. Commit `feat: SNAP v3 contract with the version decided first [ARCH-010]`, with a body naming the four AC4 rewrites as contract-correct. Expected: **1086 / 0**.
+  - [X] [T-002-F] Run `npx vitest run tests/unit/snap-contract.test.js tests/unit/snap-validate.test.js`, expecting all to pass. Then run `npm test`: **1086 / 0**. Also run `npx vitest run tests/scripts/snap-build.test.js tests/scripts/conductor-db.test.js tests/scripts/resume-read.test.js`, all passing. Those are the contract's other consumers, and they are unmodified.
+  - [ ] [T-002-G] Append `- T-002: <one line>` to the plan section of `project.md`. Then `git add -u scripts/snap-contract.mjs scripts/snap-validate.mjs tests/unit/snap-contract.test.js tests/unit/snap-validate.test.js .claude/memory/project.md` and `git add -u docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (amended at execution 2026-10-01 under the T-001-F ruling: tracking state travels with the task that produced it). Commit `feat: SNAP v3 contract with the version decided first [ARCH-010]`, with a body naming the four AC4 rewrites as contract-correct. Expected: **1086 / 0**.
 
 - [ ] [T-003] **v3 field rules and the `--to` handoff check** (AC5, AC7, Review Focus 4). Native. Depends on T-002.
 

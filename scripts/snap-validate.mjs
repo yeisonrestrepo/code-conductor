@@ -8,15 +8,16 @@ if (trimmed === '') err('empty file');
 if (raw.length > PRE_PARSE_MAX_BYTES) err(`payload too large: ${raw.length} > ${PRE_PARSE_MAX_BYTES} (pre-parse ceiling)`);
 let snap; try { snap = JSON.parse(trimmed); } catch { err('malformed JSON'); }
 if (typeof snap !== 'object' || snap === null || Array.isArray(snap)) err('root must be a plain object');
+// D2: v is decided before every check whose meaning depends on it (BUG-038's check-order class, second sighting).
+if (snap.v === undefined) err('missing: v'); if (typeof snap.v !== 'number' || !Number.isInteger(snap.v) || snap.v < 1) err('v must be a positive integer');
+if (snap.v > MAX_VERSION) err('SNAP_UNKNOWN_VERSION');
 for (const b of ['sys', 'ops', 'mem']) if (typeof snap[b] !== 'object' || snap[b] === null || Array.isArray(snap[b])) err(`missing block: ${b}`);
-const req = { v: snap.v, 'sys.ph': snap.sys.ph, 'sys.c': snap.sys.c, 'sys.s': snap.sys.s, 'ops.n': snap.ops.n, 'ops.f': snap.ops.f, 'mem.d': snap.mem.d, 'mem.x': snap.mem.x };
+const req = { 'sys.ph': snap.sys.ph, 'sys.c': snap.sys.c, 'sys.s': snap.sys.s, 'ops.n': snap.ops.n, 'ops.f': snap.ops.f, 'mem.d': snap.mem.d, 'mem.x': snap.mem.x };
 const missing = Object.entries(req).filter(([, v]) => v === undefined).map(([k]) => k);
 if (missing.length) { for (const k of missing) process.stderr.write(`SNAP_ERROR: missing: ${k}\n`); process.exit(1); }
-const topAllowed = TOP_FIELDS[snap.v] || TOP_FIELDS[1];
-const topExtra = Object.keys(snap).find(k => !topAllowed.includes(k)); if (topExtra) err(`unexpected key: ${topExtra}`);
+const topExtra = Object.keys(snap).find(k => !TOP_FIELDS[snap.v].includes(k)); if (topExtra) err(`unexpected key: ${topExtra}`);
 if (snap.pr !== undefined && typeof snap.pr !== 'string') err('pr must be a string');
-for (const b of ['sys', 'ops', 'mem']) { const extra = Object.keys(snap[b]).find(k => !BLOCK_FIELDS[b].includes(k)); if (extra) err(`unexpected key: ${b}.${extra}`); }
-if (typeof snap.v !== 'number' || !Number.isInteger(snap.v) || snap.v < 1) err('v must be a positive integer'); if (snap.v > MAX_VERSION) err('SNAP_UNKNOWN_VERSION');
+for (const b of ['sys', 'ops', 'mem']) { const extra = Object.keys(snap[b]).find(k => !BLOCK_FIELDS[snap.v][b].includes(k)); if (extra) err(`unexpected key: ${b}.${extra}`); }
 if (raw.length > POST_PARSE_MAX[snap.v]) err(`payload too large: ${raw.length} > ${POST_PARSE_MAX[snap.v]} (v${snap.v} cap)`);
 if (!['spec', 'plan', 'impl', 'rev'].includes(snap.sys.ph)) err('ph must be spec|plan|impl|rev');
 for (const [key, [cap, elemCap]] of Object.entries(CAPS)) {
