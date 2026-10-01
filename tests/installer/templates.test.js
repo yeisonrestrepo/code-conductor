@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { scanLines, SENTINEL_START } from '../../lib/installer/merge-md.mjs';
+import { scanLines, SENTINEL_START, GITIGNORE_HEADER } from '../../lib/installer/merge-md.mjs';
 import {
   GLOBAL_HOST_OWNED, PROJECT_HOST_OWNED,
   GLOBAL_SETTINGS_FINGERPRINTS, PROJECT_SETTINGS_FINGERPRINTS,
@@ -67,6 +67,10 @@ describe('project-template/gitignore', () => {
     const lines = readFileSync(join(root, 'project-template/gitignore'), 'utf8').split('\n').map(l => l.trim());
     expect(lines).toContain('*.installer-backup.*');
     expect(lines).toContain('*.installer-tmp.*');
+  });
+  it('opens with the header the .gitignore merge finds its block by', () => {
+    const text = readFileSync(join(root, 'project-template/gitignore'), 'utf8');
+    expect(text.split('\n')[0]).toBe(GITIGNORE_HEADER);
   });
 });
 

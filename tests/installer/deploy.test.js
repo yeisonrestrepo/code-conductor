@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertAssets, deployGlobal, deployProject, chmodHooks, assertMergeTargets } from '../../lib/installer/deploy.mjs';
-import { SENTINEL_START, SENTINEL_END } from '../../lib/installer/merge-md.mjs';
+import { SENTINEL_START, SENTINEL_END, GITIGNORE_HEADER } from '../../lib/installer/merge-md.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const GLOBAL_BLOCK = [SENTINEL_START, '## Workflow', '', 'Spec, then plan, then implement.', '', '## Safety', '', 'Confirm before writes.', SENTINEL_END, ''].join('\n');
@@ -12,7 +12,7 @@ const TPL_GLOBAL = ['# Global Claude Configuration', '', GLOBAL_BLOCK].join('\n'
 const PROJECT_BLOCK = [SENTINEL_START, '## Agent Identity', '', 'You are an orchestrator.', '', '## Hard Constraints', '', '- Never hardcode secrets.', SENTINEL_END, ''].join('\n');
 const TPL_PROJECT = ['# Project Claude Configuration', '', '## Project Identity', '', '- Name: TBD', '', '## Conventions', '', '- TBD', '', PROJECT_BLOCK].join('\n');
 
-const TPL_GITIGNORE = '.claude/memory/turn-count.txt\n*.installer-backup.*\n';
+const TPL_GITIGNORE = `${GITIGNORE_HEADER}\n.claude/memory/turn-count.txt\n*.installer-backup.*\n*.installer-tmp.*\n`;
 const SKILL_MD = '---\nname: critical-review\ndescription: "adversarial review"\ntype: skill\n---\n\n# Critical Review\n';
 
 let asset, home;
@@ -189,11 +189,10 @@ describe('deployProject — merges instead of clobbering', () => {
     deployProject(asset, home);
     expect(readFileSync(join(home, 'CLAUDE.md'), 'utf8')).toBe(host + '\n' + PROJECT_BLOCK);
   });
-  it('appends only absent .gitignore lines and keeps host lines', () => {
+  it('[AC10b] keeps host .gitignore lines and appends the labelled block after a blank line', () => {
     writeFileSync(join(home, '.gitignore'), 'dist\n');
     deployProject(asset, home);
-    const after = readFileSync(join(home, '.gitignore'), 'utf8');
-    expect(after).toBe('dist\n.claude/memory/turn-count.txt\n*.installer-backup.*\n');
+    expect(readFileSync(join(home, '.gitignore'), 'utf8')).toBe('dist\n\n' + TPL_GITIGNORE);
   });
   it('writes both files whole when the host has neither', () => {
     deployProject(asset, home);
@@ -218,7 +217,7 @@ describe('deployProject — merges instead of clobbering', () => {
     symlinkSync(real, join(home, '.gitignore'));
     deployProject(asset, home);
     expect(lstatSync(join(home, '.gitignore')).isSymbolicLink()).toBe(true);
-    expect(readFileSync(real, 'utf8')).toBe('dist\n.claude/memory/turn-count.txt\n*.installer-backup.*\n');
+    expect(readFileSync(real, 'utf8')).toBe('dist\n\n' + TPL_GITIGNORE);
   });
 });
 

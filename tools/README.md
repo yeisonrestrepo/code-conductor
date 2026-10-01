@@ -105,4 +105,4 @@ Neither is under this repository's control, and both would otherwise produce a l
 
 **The convention this pair produced: a line kept for an external writer is kept with the writer's name and path in its own comment.** Both lines sit below the `[BUG-042]` tracked-surface block, each carrying its writer's name. Two hauntings prevented by documentation beat two mystery re-appends investigated later.
 
-**The tolerance mechanism already ships**, and no instrument here needs to add one: `tests/unit/gitignore-block-parity.test.js` compares only the lines **between its markers**, which is exactly why it and the installer's `appendMissingLinesText` merge can share one file permanently. Cite that precedent before building anything new to tolerate a writer.
+**The tolerance mechanism already ships**, and no instrument here needs to add one: `tests/unit/gitignore-block-parity.test.js` compares only the lines **between its markers**, which is exactly why it and the installer's `mergeGitignoreText` merge, whose negation guard moves nothing in a file with `!` lines, can share one file permanently. Cite that precedent before building anything new to tolerate a writer.

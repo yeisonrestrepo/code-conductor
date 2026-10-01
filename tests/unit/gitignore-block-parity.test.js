@@ -39,8 +39,8 @@ export function expectedBlock(sites) {
 // Only the rules are compared. Comments and blank lines inside the markers are free,
 // so the block can carry its own explanation, and everything OUTSIDE the markers is
 // free too. That scope is what lets this test and the installer's
-// appendMissingLinesText merge share one file forever: an appended line lands below
-// the END marker and cannot break the equality.
+// mergeGitignoreText merge share one file forever: this file's ! lines trip its
+// negation guard, so its block is appended below the END marker and nothing moves.
 export function readBlock() {
   const raw = readFileSync(`${ROOT}/.gitignore`, 'utf8').split('\n').map((l) => l.trimEnd());
   const b = raw.indexOf(BEGIN);

@@ -4,7 +4,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   SENTINEL_START, SENTINEL_END, detectEol, normalizeHeading,
-  mergeClaudeMdText, appendMissingLinesText,
+  mergeClaudeMdText, mergeGitignoreText, GITIGNORE_HEADER,
 } from '../../lib/installer/merge-md.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -184,24 +184,60 @@ describe('mergeClaudeMdText — BUG-049 red cases, on the shipped templates', ()
   });
 });
 
-describe('appendMissingLinesText', () => {
-  it('retains host lines and appends only absent non-blank, non-comment template lines', () => {
-    const tpl = '# comment\n\nnode_modules\n.claude/memory/turn-count.txt\n';
-    const host = 'dist\nnode_modules\n';
-    const { text, changed } = appendMissingLinesText(tpl, host);
-    expect(changed).toBe(true);
-    expect(text).toBe('dist\nnode_modules\n.claude/memory/turn-count.txt\n');
-    expect(text).not.toContain('# comment');
+describe('mergeGitignoreText', () => {
+  // The shipped template is exactly the block: header, then the three managed entries.
+  const IGNORE_TPL = [GITIGNORE_HEADER, '.claude/memory/turn-count.txt', '*.installer-backup.*', '*.installer-tmp.*', ''].join('\n');
+  const HOSTS = {
+    b: 'dist\nnode_modules\n',
+    c: 'dist\n.claude/memory/turn-count.txt\nbuild/\n*.installer-backup.*\n',
+    d: 'dist\n/.claude/memory/turn-count.txt\n.installer-backup.\n',
+    e: '.claude/memory/turn-count.txt\n!keep.log\n',
+    g: 'dist\r\n.claude/memory/turn-count.txt\r\n',
+    h: `dist\n\n${GITIGNORE_HEADER}\n.claude/memory/turn-count.txt\n*.installer-backup.*\n`,
+    rf5: `dist\n\n${IGNORE_TPL}my-own.log\n`,
+  };
+
+  it('[AC10a] writes the template whole for an empty or whitespace-only host', () => {
+    for (const host of ['', '  \n']) {
+      const r = mergeGitignoreText(IGNORE_TPL, host);
+      expect(r.changed).toBe(true);
+      expect(r.text).toBe(IGNORE_TPL);
+    }
   });
-  it('is idempotent and reports no change when every line is present', () => {
-    const tpl = 'node_modules\n';
-    const r = appendMissingLinesText(tpl, 'node_modules\n');
+  it('[AC10b] leaves host lines untouched and appends the block after one blank line', () => {
+    const r = mergeGitignoreText(IGNORE_TPL, HOSTS.b);
+    expect(r.text).toBe(HOSTS.b + '\n' + IGNORE_TPL);
+    expect(r.notice).toBe(null);
+  });
+  it('[AC10c] gathers scattered exact entries into the block, once each', () => {
+    expect(mergeGitignoreText(IGNORE_TPL, HOSTS.c).text).toBe('dist\nbuild/\n' + '\n' + IGNORE_TPL);
+  });
+  it('[AC10d] never touches a host-modified variant; the block carries all three', () => {
+    expect(mergeGitignoreText(IGNORE_TPL, HOSTS.d).text).toBe(HOSTS.d + '\n' + IGNORE_TPL);
+  });
+  it('[AC10e] moves nothing when any ! line exists, adds only the absent entries, and says so', () => {
+    const r = mergeGitignoreText(IGNORE_TPL, HOSTS.e);
+    expect(r.text).toBe(HOSTS.e + '\n' + [GITIGNORE_HEADER, '*.installer-backup.*', '*.installer-tmp.*', ''].join('\n'));
+    expect(r.notice).toMatch(/left the existing Code Conductor entries in \.gitignore where they are/);
+  });
+  it('[AC10f, AC6] is byte-identical, silent and unchanged on a second run of every case', () => {
+    for (const host of Object.values(HOSTS)) {
+      const once = mergeGitignoreText(IGNORE_TPL, host).text;
+      const twice = mergeGitignoreText(IGNORE_TPL, once);
+      expect(twice).toEqual({ text: once, changed: false, warning: null, notice: null });
+    }
+  });
+  it('[AC10b, CRLF] removes and appends in the host EOL', () => {
+    expect(mergeGitignoreText(IGNORE_TPL, HOSTS.g).text).toBe('dist\r\n' + '\r\n' + crlf(IGNORE_TPL));
+  });
+  it('[Review Focus 6] adds a missing entry at the end of an existing block, with no second header', () => {
+    expect(mergeGitignoreText(IGNORE_TPL, HOSTS.h).text).toBe(`dist\n\n${IGNORE_TPL}`);
+    const noFinalNewline = `${GITIGNORE_HEADER}\n.claude/memory/turn-count.txt`;
+    expect(mergeGitignoreText(IGNORE_TPL, noFinalNewline).text).toBe(IGNORE_TPL);
+  });
+  it('[Review Focus 5] never moves or removes a host line written under the block', () => {
+    const r = mergeGitignoreText(IGNORE_TPL, HOSTS.rf5);
     expect(r.changed).toBe(false);
-    expect(r.text).toBe('node_modules\n');
-  });
-  it('matches on trimmed, CR-stripped lines and appends in host EOL', () => {
-    const r = appendMissingLinesText('node_modules\ndist\n', 'node_modules  \r\n');
-    expect(r.changed).toBe(true);
-    expect(r.text).toBe('node_modules  \r\ndist\r\n');
+    expect(r.text).toBe(HOSTS.rf5);
   });
 });

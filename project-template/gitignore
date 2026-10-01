@@ -1,3 +1,4 @@
+# Code Conductor (added by the installer; safe to keep)
 .claude/memory/turn-count.txt
 *.installer-backup.*
 *.installer-tmp.*
