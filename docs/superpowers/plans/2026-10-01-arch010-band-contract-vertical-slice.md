@@ -923,7 +923,7 @@ Every new test runs in all three environments. None of the touched test files is
     It returns findings. The orchestrator fixes or rules on each, and re-runs T-005-E.
   - [X] [T-005-G] Append `- T-005: <one line>` to the plan section. Then `git add -u .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit), then `git add tests/hooks/guard5.test.js`. Commit `feat: Guard 5 denies a role agent's write outside its band scope [ARCH-010]`. Expected: **1152 / 0**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
 
-- [ ] [T-006] **`.gitignore` and host ownership** (AC13). Native. Depends on T-000.
+- [X] [T-006] **`.gitignore` and host ownership** (AC13). Native. Depends on T-000.
   - [X] [T-006-A] Modify `tests/installer/templates.test.js`. Append inside `describe('project-template/gitignore', …)` (:65):
     ```js
       it('[AC13] ignores the band envelope as the fourth managed entry', () => {
@@ -938,10 +938,10 @@ Every new test runs in all three environments. None of the touched test files is
   - [X] [T-006-D] Modify `lib/installer/host-owned.mjs`: insert `  ['memory/band-envelope.json', 'skip'],` after `  ['memory/turn-count.txt', 'skip'],` (:42), so the `memory/` skips stay together.
   - [X] [T-006-E] Modify `tests/installer/deploy.test.js:15`, where the fixture mirrors the template. Append `.claude/memory/band-envelope.json\n` to `TPL_GITIGNORE`, after `*.installer-tmp.*\n`. **Halt rule:** if any `deploy.test.js` assertion fails other than through this fixture, stop. A fixture change is not allowed to rewrite an expectation silently.
   - [X] [T-006-F] Run `git check-ignore -q .claude/memory/band-envelope.json` and `git ls-files --error-unmatch .claude/memory/band-envelope.json`. Expected: 0 and 1, so the path is ignored and untracked. This was measured as ignored by `/.claude/memory/*` (`.gitignore:36`) on 2026-10-01. Then run `npx vitest run tests/installer tests/unit/host-owned-ignore-xor.test.js`, all passing. The xor test covers the new row with no new test (D3). Then run `npm test`: **1153 / 0**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
-  - [ ] [T-006-G] Append `- T-006: <one line>` to the plan section. Then `git add -u project-template/gitignore lib/installer/host-owned.mjs tests/installer/templates.test.js tests/installer/deploy.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit). Commit `feat: ignore and host-own the band envelope [ARCH-010]`. Expected: **1153 / 0**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
+  - [X] [T-006-G] Append `- T-006: <one line>` to the plan section. Then `git add -u project-template/gitignore lib/installer/host-owned.mjs tests/installer/templates.test.js tests/installer/deploy.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit). Commit `feat: ignore and host-own the band envelope [ARCH-010]`. Expected: **1153 / 0**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
 
 - [ ] [T-007] **AC12: the demo Code→QA handoff, interactive, in a scratch project.** In-session, live. Depends on T-003, T-004, T-005 and T-006. **Halt rule:** an in-scope write that is denied, or an out-of-scope write that lands, stops the task for a ruling before release.
-  - [ ] [T-007-A] Create `<scratchpad>/demo-ac12` and run `git init` there. Then:
+  - [X] [T-007-A] Create `<scratchpad>/demo-ac12` and run `git init` there. Then:
     - copy this repository's `.claude/hooks/pre-tool-use.mjs` to `.claude/hooks/pre-tool-use.mjs`;
     - copy T-001's `log.mjs` and `read-payloads.mjs`;
     - write the files below.
@@ -972,7 +972,7 @@ Every new test runs in all three environments. None of the touched test files is
       ---
       Run what you are asked to run and report the output verbatim. If asked to write a file, say whether you have a tool for it.
       ```
-  - [ ] [T-007-B] Build the Code envelope from source, then validate it.
+  - [X] [T-007-B] Build the Code envelope from source, then validate it.
     - Write `code-fields.json`:
       `{"ph":"impl","c":"0000000","s":"arch010-demo","n":[],"f":[],"d":[],"x":[],"role":"code","tk":"RW","scope":["src/**"],"gate":"define_approved"}`
     - Build: `node <repo>/scripts/snap-build.mjs < code-fields.json > .claude/memory/band-envelope.json`.
@@ -981,21 +981,21 @@ Every new test runs in all three environments. None of the touched test files is
       - the same with `--to qa`, expecting exit 1 and `SNAP_ERROR: SNAP_GATE_MISMATCH: qa expects build_executed, got define_approved`.
 
     Record both verbatim.
-  - [ ] [T-007-C] **Owner, in a separate terminal:** `cd <scratchpad>/demo-ac12 && claude`, then trust the folder. Send this prompt verbatim:
+  - [X] [T-007-C] **Owner, in a separate terminal:** `cd <scratchpad>/demo-ac12 && claude`, then trust the folder. Send this prompt verbatim:
 
     `Use the code agent to write src/app.txt containing "in scope", then use the code agent to write notes/out.txt containing "out of scope". Do not write any file yourself. Tell me exactly what each write returned.`
 
     Approve the permission prompt for the in-scope write. Leave the session open.
-  - [ ] [T-007-D] Build the QA envelope.
+  - [X] [T-007-D] Build the QA envelope.
     - Write `qa-fields.json` with `role: "qa"`, `tk: "X"`, `gate: "build_executed"` and no `scope`.
     - Build it the same way, overwriting the envelope.
     - Run `--to qa`, expecting exit 0, and record it.
-  - [ ] [T-007-E] **Owner, same session**, sends verbatim:
+  - [X] [T-007-E] **Owner, same session**, sends verbatim:
 
     `Use the qa agent to run git status --short, then ask the qa agent to create qa.txt containing "qa". Do not write any file yourself. Report what it says.`
 
     Then `/exit`.
-  - [ ] [T-007-F] Read the evidence: `node read-payloads.mjs`, `ls src notes qa.txt`, and the owner's paste of the session's reports. Record the four AC12 facts:
+  - [X] [T-007-F] Read the evidence: `node read-payloads.mjs`, `ls src notes qa.txt`, and the owner's paste of the session's reports. Record the four AC12 facts:
     1. the in-scope write was allowed: `src/app.txt` exists, and the payload has `agent_type=code`;
     2. the out-of-scope write was denied with `BAND_SCOPE_VIOLATION`, verbatim, and `notes/out.txt` is absent;
     3. QA has no write tool: no write-family payload with `agent_type=qa`, and `qa.txt` is absent;
