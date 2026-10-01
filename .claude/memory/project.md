@@ -2025,3 +2025,42 @@ The original gate was 1065, 981 and 1064. The owner moved it to 1069, 985 and 10
 
 ### Queue
 Nothing minted. **The next mintable id is `BUG-050`.** Next: resume `/cc-spec ARCH-009` from its checkpoint, at Q1: band fields as v3 (recommended), or widen v2. `[FEAT-040]` queues behind it. The plan's execution workspace (`.superpowers/sdd/…`, untracked) was deleted with this record.
+
+## Spike: does PreToolUse identify subagent tool calls? (ARCH-009 spec, Q3) [2026-09-30]
+
+- **Binary:** `claude` 2.1.286 (Claude Code), run with `claude -p` (non-interactive) in a scratch git repo outside this repository. One project PreToolUse hook (`matcher: "*"`) appended each raw payload to a log and allowed every call. One subagent definition, `.claude/agents/probe-writer.md` (`tools: Write`). Three payloads were logged.
+- **Control (main session):** two payloads.
+  - The `Write` of `main.txt` carried keys `session_id, transcript_path, cwd, prompt_id, permission_mode, effort, hook_event_name, tool_name, tool_input, tool_use_id`.
+  - The `Agent` delegation carried the same keys, with `tool_input.subagent_type: "probe-writer"`.
+- **Specimen (subagent):** the `Write` of `sub.txt` carried the same keys **plus `agent_id` (`"afb1811e0bd10da56"`) and `agent_type` (`"probe-writer"`)**. `session_id` was identical to the main session's.
+- **(a) Does PreToolUse fire for subagent tool calls?** Yes.
+- **(b) Which identity fields arrive, as raw payload keys?** `agent_id` and `agent_type`. `agent_type` equals the agent definition's `name`.
+- **(c) Can the hook distinguish the main session from a subagent?** Yes. The main-session payloads carry neither key, and `session_id` cannot distinguish them, because the subagent shares it.
+- **Limits of the measurement:** one run, one version, `-p` mode only, and the interactive mode was not measured. The finding is version-pinned to 2.1.286, as the gh escape-sequence finding was pinned to gh 2.100.0. `agent_type` is a name the hook takes on trust: any agent definition can be named `code`.
+- **Handoff observation:** the spike's protocol (control run, three verbatim questions, version beside the output) was supplied in full by the owner's amendments. Nothing was missing, and the scratch directory was deleted after this record.
+
+## Spec: ARCH-010, the band contract vertical slice (SNAP v3, gate enum, one Code→QA handoff) [2026-09-30]
+
+The spec is `docs/superpowers/specs/2026-09-30-arch010-band-contract-vertical-slice-design.md`, APPROVED 2026-09-30 with six amendments. It targets `1.35.0`, a minor release, at complexity L. Branch `feat/arch-010-band-contract-vertical-slice`. `[ARCH-010]` was minted after the ceiling run on both legs (`{"BUG":50,"FEAT":40,"ARCH":9}`), and `[ARCH-009]`'s flip condition now includes it.
+
+- **Q1, v3 rather than a widened v2, with ground 1 restated as measured:**
+  - Installed 1.34.x readers fail generically on any newer envelope that carries new keys.
+  - Readers from ARCH-010 onward give `SNAP_UNKNOWN_VERSION` for every later version.
+  - `MAX_VERSION` goes to 3, with `TOP_FIELDS[3]` and `POST_PARSE_MAX[3]`. Block membership becomes per-version, with v1 and v2 byte-identical (AC2).
+- **Q2, the id.** The slice ships under top-level `ARCH-010`. `[BUG-050]` (filed in `02cddea`) records that both instruments are silent on sub-shaped ids. Its repair, widening the instruments or failing loudly on a sub-shaped claim, is left to its own spec.
+- **Q3, enforcement.** Guard 5 lives in the front door. The spike measured `agent_id` and `agent_type` on subagent payloads only, on `claude` 2.1.286 in `-p` mode. Guard 5 arms on the envelope plus an `agent_type` naming a role. QA's command-only side is its tools list; Guard 5 covers Code's path scope. The threat model is cooperative agents, not a hostile agent definition.
+- **Q4, the enums.** All five gate values: `boundary_routed`, `define_approved`, `build_executed`, `verify_pass`, `ship_released`. Five roles. The asymmetry is deliberate: a gate value is topology, a role value is an implementation.
+- **Folded defect.** The validator's version check moves first. This is the **second sighting of `[BUG-038]`'s check-order class in `snap-validate.mjs`**: the size check at `:7` first, then the field-versus-version pair.
+- **Owner amendments:**
+  1. `PROJECT_HOST_OWNED` gains its sixth `skip` row, `memory/band-envelope.json`.
+  2. AC4 names the validator line-cap rewrite (`snap-validate.test.js:250`, cap 32), with the new count stated at plan time.
+  3. The band root is the directory where the walk-up from `cwd` finds `.claude/memory/band-envelope.json`, and the `scope` globs anchor there.
+  4. The baseline stays unchanged (AC15).
+  5. `ship_released` is defined here; the Release-to-Ticket closure is `[FEAT-031]`'s.
+  6. The AC1 and AC2 contract tests run red first.
+- **Carried to `/cc-plan`:**
+  - the interactive re-run of the logging probe as the first verification step (AC11);
+  - the demo handoff with fixture agents (AC12);
+  - per-environment predictions;
+  - the restated line cap;
+  - a one-line handoff observation per task.
