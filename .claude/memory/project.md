@@ -2064,3 +2064,152 @@ The spec is `docs/superpowers/specs/2026-09-30-arch010-band-contract-vertical-sl
   - per-environment predictions;
   - the restated line cap;
   - a one-line handoff observation per task.
+- **Owner carry-forward for `/cc-plan` (2026-09-30), restated so that compaction cannot drop it:**
+  1. **Predictions.** Per-environment predictions come before any run. The starting baselines are local 1081 / 0 (measured 2026-10-01; cause: the install deployed the personal skills globally, so the 12 conditional plugin tests now run), ci-node20 985 / 96 and ci-node24 1068 / 13 unchanged, because the CI runners carry no `~/.claude/skills` and their environments did not move. AC15 holds as written: the slice adds passing tests only: `tools/skip-baseline.json` does not change.
+  2. **The interactive probe (AC11)** is the plan's first verification step, before any guard code. If the identity keys differ from the spike's, the plan halts for a ruling.
+  3. **The Build-band routing criterion applies to this plan's own tasks:**
+     - the contract and validator edits are small, sequential and share files, so they run native;
+     - the hook guard and its test suite are isolated enough to consider a subagent;
+     - the probe and the demo handoff are live, and stay in-session.
+
+     The plan states the chosen split, per the three-origin criterion.
+  4. **The line cap.** The validator line cap's new expected count is stated in the plan text before anything runs (AC4 as amended).
+  5. **Handoff observations.** One line of handoff observations per task, as further `[ARCH-009]` evidence.
+- **Reporting note:** The 02cddea BUG-050 filing commit was first reported in the turn after the ARCH-010 spec commit; the earlier claim that it was reported at the start of the Q3 turn could not be substantiated from any transcript.
+
+## Checkpoint 2026-09-30 21:33
+
+Session span: 1.34.4 closeout (`d9f56b3`), `[BUG-050]` filed (`02cddea`), the ARCH-009 questions resolved into the `[ARCH-010]` spec (`85df4cb`), `/cc-compact` at `85df4cb`. Branch `feat/arch-010-band-contract-vertical-slice`. The id ceiling now stands at `{"BUG":50,"FEAT":40,"ARCH":10}`.
+
+### Decisions
+- ARCH-010 spec APPROVED with six amendments; target 1.35.0, L. SNAP v3 with per-version BLOCK_FIELDS; v1/v2 byte-identical (AC2).
+- The validator decides `v` before field sets (folded defect, second sighting of the BUG-038 check-order class).
+- Guard 5 arms only on `.claude/memory/band-envelope.json` plus a payload `agent_type` naming a role; the main session is never subject. The threat model is cooperative agents.
+- The ARCH-009 flip condition now includes ARCH-010.
+
+### Conventions
+- Five carry-forward points for `/cc-plan` sit uncommitted in this file and are committed with the plan's Task 0 (BUG-049 precedent).
+- Every commit a turn makes is named in that turn's closing report, not only in mid-turn narration.
+
+### Debt and workarounds
+- `[BUG-050]`: the parity and ceiling instruments silently skip sub-shaped ids; repair left to its own spec.
+- The plan helper scripts `task-start` and `task-done` cannot parse `[T-00N]` plans; progress is tracked by hand (an ARCH-009 observation).
+- Guard 3 denies `for` loops, `$()` chains and piped multi-greps; route them through scratchpad scripts rather than allowlist entries.
+
+## Incident 2026-10-01: the installer swept this repository's own `scripts/`
+
+- **Trigger.** The installer ran inside this repository, at 2026-10-01 12:46:19Z (07:46:19 local), as `npx code-conductor --project` per the owner. The stamp is shared by the backups it wrote: `CLAUDE.md.installer-backup.20261001T124619Z`, `.gitignore.installer-backup.20261001T124619Z`, and `~/.claude/CLAUDE.md.installer-backup.20261001T124619Z`.
+- **Mechanism, established by code reading.** `sweepStaleRootScripts` (`lib/installer/deploy.mjs:142-149`, called from `deployProject` at `:211`) removes `<cwd>/scripts` with `rmSync` whenever its file list equals the bundled `scripts/` list exactly (`:147-148`). The heuristic exists for the 1.23.2 legacy deployment. In the development repo it is satisfied by identity, because the bundle is built from this very directory. `:212` then deployed the normal copy to `.claude/scripts/`.
+- **Corrected diagnosis.** The first `/cc-resume` report called the scripts "moved". They were swept. `.claude/scripts/` is the ordinary deployment copy, and in this repository the `/cc-stack` command path was not the defect.
+- **Inventory, `git status --porcelain` verbatim, before anything was touched:**
+  ```
+   M .claude/commands/cc-implement.md
+   M .claude/commands/cc-init.md
+   M .claude/commands/cc-plan.md
+   M .claude/commands/cc-spec.md
+   M .claude/hooks/context-guard.sh
+   M .claude/memory/project.md
+   M .claude/settings.json
+   M .gitignore
+   M CLAUDE.md
+   D scripts/claude-md-fields.mjs
+   D scripts/conductor-db.mjs
+   D scripts/detect-stack.mjs
+   D scripts/init-wizard.mjs
+   D scripts/resume-read.mjs
+   D scripts/session-id.mjs
+   D scripts/snap-build.mjs
+   D scripts/snap-contract.mjs
+   D scripts/snap-validate.mjs
+  ```
+  Ignored: `.claude/scripts/`, `.gitignore.installer-backup.20261001T124619Z`, `CLAUDE.md.installer-backup.20261001T124619Z`.
+- **Count: 17 installer-touched paths**, plus `.claude/memory/project.md`, which was session-modified and excluded. The installer never writes `.claude/memory/` (the `BUG-039` skip rows held), and its +31 lines were this session's own deliberate writes: the carry-forward block, the reporting note and the 2026-09-30 21:33 checkpoint.
+- **Restore.** I ran `git restore` on the 17 explicit paths, with no blanket form: the 9 `scripts/*`, the 4 `.claude/commands/*`, `.claude/settings.json` (an added PowerShell hook), `.claude/hooks/context-guard.sh` (content and the 100755 mode), `CLAUDE.md` (duplicated sections) and `.gitignore` (an appended `*.installer-backup.*` rule). After proof, I removed `.claude/scripts/` and both repo-root backups.
+- **Proof:**
+  - `git status --porcelain` shows only ` M .claude/memory/project.md`.
+  - The `context-guard.sh` diff is empty, mode included.
+  - `npm test` reads 1081 passed / 0 skipped across 43 files.
+  - `id-ceiling` reads working tree `{"BUG":50,"FEAT":40,"ARCH":10}` and `origin/main` `{"BUG":50,"FEAT":40,"ARCH":9}`; the ARCH gap is only `85df4cb`, unpushed. The union is `{"BUG":50,"FEAT":40,"ARCH":10}`, next `BUG-051`.
+  - `record-parity` reads `RECORD_PARITY_OK`.
+- **Test divergence, accepted as proof.** The prediction 1069 / 12 was made against the pre-install environment.
+  - **Mechanism:** the conditional gate at `tests/plugin/code-conductor-plugin.test.js:8` runs 12 tests only when the personal skills exist under `~/.claude/skills`.
+  - **Arithmetic:** 12 skips became 12 passes, and the total is unchanged at 1081.
+  - **Trigger:** the same install wrote those `SKILL.md` files at 2026-10-01 07:46:19 local.
+  - **Baseline:** the local baseline moves forward to 1081 / 0. The environment was not edited to fit the old record.
+- **The two halves of the install.** The project half was damage, and it is restored. The global half (`~/.claude` commands, hooks, skills, and the `CLAUDE.md` managed-block merge with its backup) stands as a legitimate if unintended upgrade of this machine's global environment. Its one measured consequence is the local skip-set change above. There is no `~/.claude` rollback.
+- **Field observation.** `pre-tool-use.mjs` never appeared in the inventory, because the deployed mirror is byte-identical under the parity contract. That is the mirror-parity test confirmed in the field by an accident.
+- **`[ARCH-009]` field evidence.** An installer run is a baseline-changing event: a gate's green moved without one line of the repo changing.
+- **Filings:** `[BUG-051]` (the `cc-stack.md` detector path) and `[BUG-052]` (no self-install guard; the sweep heuristic cannot tell the legacy deployment from the source tree).
+- **`[BUG-051]` reverse-direction sighting, 2026-10-01, evidence for its spec.** The upgraded global `/cc-compact` called `.claude/scripts/*`, but the development repo carries `scripts/`; the filing's class ran the other way. Together the two directions constrain the repair: global commands run in both worlds, so path resolution must go by presence, trying one layout and falling back to the other. Interim workaround for this repo: run the scripts from source, as `scripts/*.mjs`.
+
+## Incident 2026-10-01 (second): the pre-commit test gate wrote into this repository from a linked worktree
+
+Linked to the installer incident above: this happened while I was filing its `[BUG-051]` amendment.
+
+- **Trigger.** I created a linked worktree of `main` at the session scratchpad (`…/scratchpad/main-wt`) and symlinked `node_modules` into it so that `tests/tools/repo-invariants.test.js` could run there (13 / 13 passed). The symlink armed the `code-conductor:test-gate` pre-commit hook, which skips without `node_modules`. It had skipped for `6cb84e7` and `a091c7d`. At 09:34:10 local, `git commit` of the amendment ran the full suite, which read 30 failed / 1051 passed. The amendment commit never landed.
+- **Fixture commits on local `main`**, pinned verbatim before any ref moved (`sha | author | timestamp | subject`):
+  ```
+  231679062ec68ea4feccd785092786d0ed88e927 | Yeison Restrepo <yeison.restrepo.r@gmail.com> | 2026-10-01T09:34:10-05:00 | init
+  c840a01c113c69ed28216b639f2a0e6e05733a9f | Yeison Restrepo <yeison.restrepo.r@gmail.com> | 2026-10-01T09:34:10-05:00 | init
+  7d78e3f60e705767e88171eab595ff82db45d829 | Yeison Restrepo <yeison.restrepo.r@gmail.com> | 2026-10-01T09:34:10-05:00 | init
+  8d62cc96d4400c950ed2363605db74250ccaaccc | Yeison Restrepo <yeison.restrepo.r@gmail.com> | 2026-10-01T09:34:10-05:00 | init
+  24ce8ca61565a62dac80b9c4e02f2f8919685234 | Yeison Restrepo <yeison.restrepo.r@gmail.com> | 2026-10-01T09:34:10-05:00 | init
+  ```
+  Their parent is `a091c7d`, and `24ce8ca` deletes the repository's files.
+- **`git config --local --list`, after the damage:**
+  ```
+  core.repositoryformatversion=0
+  core.filemode=true
+  core.bare=true
+  core.logallrefupdates=true
+  core.ignorecase=true
+  core.precomposeunicode=true
+  remote.origin.url=git@github.com:yeisonrestrepo/code-conductor.git
+  remote.origin.fetch=+refs/heads/*:refs/remotes/origin/*
+  branch.main.remote=origin
+  branch.main.merge=refs/heads/main
+  branch.main.vscode-merge-base=origin/main
+  branch.docs/launch-prep.remote=origin
+  branch.docs/launch-prep.merge=refs/heads/docs/launch-prep
+  branch.docs/quickstart-repair.remote=origin
+  branch.docs/quickstart-repair.merge=refs/heads/docs/quickstart-repair
+  branch.feat/arch-010-band-contract-vertical-slice.vscode-merge-base=origin/main
+  user.email=t@t.t
+  user.name=T
+  ```
+  Diffed against the expected entries, three are fixture writes: `core.bare=true` (it was false, since the primary checkout worked until 09:34) and the added `user.email=t@t.t` and `user.name=T`. The global identity is unaffected. `.git/config` mtime is 09:34:16.
+- **Hook integrity:**
+  - `git config --get-all core.hooksPath` returns rc 1, so no entry exists.
+  - Newest mtime in `.git/hooks/` is 2026-06-30. `pre-commit` (359 bytes, 14:01:02) is the unmodified `code-conductor:test-gate`, and everything else is a `.sample`.
+  - No hook was planted.
+- **Other `.git` state:**
+  - `HEAD`, `ORIG_HEAD`, `packed-refs` and `logs` are untouched.
+  - `refs/heads/main` was written at 09:34:11.
+  - The `.git` directory's own mtime is 09:34:31, but its entry list is the standard set. I read that as a transient lock, unexplained beyond that.
+- **Not damaged:**
+  - `feat/arch-010-band-contract-vertical-slice` is still at `85df4cb`.
+  - The primary working tree shows only `M .claude/memory/project.md`.
+  - All other branches and tags are unchanged, and `origin/main` is `02cddea`, never pushed.
+- **Interim mitigation:** the test gate is not run from linked worktrees until `[BUG-053]` closes.
+- **`[ARCH-009]` field evidence, extending piece 2 and piece 4 together.** A Verify-band gate must declare not only what it can see but where it is allowed to *write*. Isolation is part of the gate's contract, and a gate run from an unmeasured environment turned destructive.
+- **Repair, authorized by the owner:**
+  1. `git config --local core.bare false`, then `--unset user.name` and `--unset user.email`.
+  2. I verified the primary checkout was `feat/arch-010-band-contract-vertical-slice` with only `M .claude/memory/project.md`, then ran the guarded `git update-ref refs/heads/main a091c7d 231679062ec6…`.
+  3. `git worktree remove --force` on the damaged worktree. `node_modules` in the primary survived, because the symlink was removed, not followed.
+- **Proof:**
+  - `git fsck --no-dangling` rc 0;
+  - `git worktree list` shows the primary only;
+  - local config is `core.bare=false`, with no `user.*` and no `hooksPath`;
+  - `git status` shows only `M .claude/memory/project.md`;
+  - the branch ceiling reads `{"BUG":50,"FEAT":40,"ARCH":10}` before the push, and parity reads `RECORD_PARITY_OK`.
+- **Cause, measured in a scratch repo outside this repository** (a hook printing `env | grep ^GIT_`):
+  - the primary checkout hands hooks no `GIT_DIR` and a relative `GIT_INDEX_FILE=.git/index`;
+  - a linked worktree hands them an absolute `GIT_DIR=<primary>/.git/worktrees/<name>` and an absolute `GIT_INDEX_FILE`.
+
+  The owner's relative/absolute refinement is confirmed, and filed as `[BUG-053]` (`50e673a`). The gate's origin is the retired `install.sh` (FEAT-024, removed in `4d987fa`).
+- **Re-run.** The `[BUG-051]` amendment landed as `3bcfdcf` from a fresh `main` worktree with no `node_modules`, so the gate skipped, docs only.
+- **Push.** `main` went `02cddea..3bcfdcf` (`6cb84e7`, `a091c7d`, `50e673a`, `3bcfdcf`). CI run `36880869487` matched every prediction: ci-node20 read 985 / 96 and ci-node24 1068 / 13, with `SKIP_BASELINE_OK` on both legs and `repo-invariants` 13 / 13 on both legs. The post-push ceiling is `origin/main` `{"BUG":53,"FEAT":40,"ARCH":9}` and branch working tree `ARCH:10`; the union is `{"BUG":53,"FEAT":40,"ARCH":10}`, next `BUG-054`.
+
+## Plan: ARCH-010 implementation [2026-10-01]
+
+Plan `docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md`, APPROVED 2026-10-01 with R1–R11 as written, one required amendment and one reviewer addition. The amendment: T-005-C's edit order is C1, C2, C4, C3, because registering Guard 5 before `main` passes `payload` would make the live hook deny every write, including the fix. The addition: T-005-F's reviewer confirms the `DISPATCH` write-tool arrays are distinct instances. Routing: T-002–T-004 native (shared contract files), T-005 subagent then reviewer (main checkout, no worktree, no commit: BUG-053), T-001 and T-007 live with the owner driving the terminal (R11), the rest native. Validator line cap 32 → 38, stated before running. Handoff observations, one line per task:
