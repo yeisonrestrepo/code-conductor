@@ -733,6 +733,20 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   - A sub-shaped id in a backlog heading or a `CHANGELOG` claim is never silently skipped by either instrument. It is either read or rejected with a named failure, per the repair the spec chooses.
   - Red-green proof against a fixture holding each shape.
 
+### [ ] `[BUG-051]` `/cc-stack` Runs the Detector From a Path Installed Projects Do Not Have
+* **Filed 2026-10-01 from the installer self-install incident.** Minted after `node tools/id-ceiling.mjs` on both legs read `{"BUG":50,"FEAT":40,"ARCH":9}`, next `BUG-051`. ARCH reads 9 because `[ARCH-010]` lives only in the unpushed feature-branch commit `85df4cb`.
+* **The defect.** The global command `global/commands/cc-stack.md` hardcodes `scripts/detect-stack.mjs` in two places:
+  - its run line (`:17`);
+  - its step-1 not-a-git-repo fallback (`:9`).
+
+  `deployProject` deploys the detector to `.claude/scripts/` (`lib/installer/deploy.mjs:212`). An installed project has no root `scripts/detect-stack.mjs` unless it happens to own one.
+* **Consequence.** In every current install, `/cc-stack` exits non-zero with `MODULE_NOT_FOUND` and announces "no stack detected", whatever the project's stack. It breaks independently of the incident that surfaced it.
+* **Field evidence.** On 2026-10-01, `/cc-stack` in this repository read `Cannot find module '…/scripts/detect-stack.mjs'`, rc 1, at a moment when the root `scripts/` had been swept (`[BUG-052]`) and only `.claude/scripts/` existed. That is exactly an installed project's layout. The installed `~/.claude/commands/cc-stack.md` carries the same two lines.
+* **Components Affected:** `global/commands/cc-stack.md`, and any test pinning its run line.
+* **Acceptance Criteria:**
+  - In an installed project, `/cc-stack` runs the detector from the deployed location, and the step-1 fallback names that same location.
+  - A test pins the command's detector path to the path `deployProject` actually deploys.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
