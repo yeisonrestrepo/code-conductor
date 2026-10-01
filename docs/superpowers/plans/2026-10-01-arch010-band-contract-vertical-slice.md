@@ -116,24 +116,24 @@ Every new test runs in all three environments. None of the touched test files is
 
 ---
 
-- [ ] [T-000] **Plan commit and main merge.** The branch gate is silent here because the current branch equals the derived `feat/arch-010-band-contract-vertical-slice`.
-  - [ ] [T-000-A] Modify `.gitignore`: add `!/docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` immediately after `!/docs/superpowers/plans/2026-09-30-bug049-claude-md-clobber.md` (:96), in sorted position.
-  - [ ] [T-000-B] Modify `.claude/memory/project.md`: append at the end of the file
+- [X] [T-000] **Plan commit and main merge.** The branch gate is silent here because the current branch equals the derived `feat/arch-010-band-contract-vertical-slice`.
+  - [X] [T-000-A] Modify `.gitignore`: add `!/docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` immediately after `!/docs/superpowers/plans/2026-09-30-bug049-claude-md-clobber.md` (:96), in sorted position.
+  - [X] [T-000-B] Modify `.claude/memory/project.md`: append at the end of the file
     ```markdown
 
     ## Plan: ARCH-010 implementation [2026-10-01]
 
     Plan `docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md`. Routing: T-002–T-004 native (shared contract files), T-005 subagent then reviewer (main checkout, no worktree, no commit: BUG-053), T-001 and T-007 live in-session, the rest native. Validator line cap 32 → 38, stated before running. Handoff observations, one line per task:
     ```
-  - [ ] [T-000-C] `git add -u .gitignore .claude/memory/project.md`, then `git add docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md`. `project.md` carries the five carry-forward points, the reporting note and both 2026-10-01 incident records, all uncommitted since the spec.
-  - [ ] [T-000-D] Commit `docs: add the ARCH-010 implementation plan [ARCH-010]`. Expected: the hook suite passes at **1081 / 0**.
-  - [ ] [T-000-E] Run `git fetch origin`, then `git rev-parse origin/main`. Expected: `3bcfdcf…`. **Halt if `origin/main` moved**, and re-measure the merge before going on.
-  - [ ] [T-000-F] Run `git merge --no-ff -m "chore: merge main's BUG-051, BUG-052 and BUG-053 filings into the ARCH-010 branch [ARCH-010]" origin/main`. Expected: no conflicts (R1).
-  - [ ] [T-000-G] Run `npm test`, expecting **1081 / 0**. Then `node tools/id-ceiling.mjs`: the working tree now reads `{"BUG":53,"FEAT":40,"ARCH":10}`, origin/main `{"BUG":53,"FEAT":40,"ARCH":9}`, union next `BUG-054`. Then `node tools/record-parity.mjs`, expecting `RECORD_PARITY_OK`.
-  - [ ] [T-000-H] Append to `project.md` under the plan section: `- T-000: <one line of handoff observation>`. This line rides T-001's commit.
+  - [X] [T-000-C] `git add -u .gitignore .claude/memory/project.md`, then `git add docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md`. `project.md` carries the five carry-forward points, the reporting note and both 2026-10-01 incident records, all uncommitted since the spec.
+  - [X] [T-000-D] Commit `docs: add the ARCH-010 implementation plan [ARCH-010]`. Expected: the hook suite passes at **1081 / 0**.
+  - [X] [T-000-E] Run `git fetch origin`, then `git rev-parse origin/main`. Expected: `3bcfdcf…`. **Halt if `origin/main` moved**, and re-measure the merge before going on.
+  - [X] [T-000-F] Run `git merge --no-ff -m "chore: merge main's BUG-051, BUG-052 and BUG-053 filings into the ARCH-010 branch [ARCH-010]" origin/main`. Expected: no conflicts (R1).
+  - [X] [T-000-G] Run `npm test`, expecting **1081 / 0**. Then `node tools/id-ceiling.mjs`: the working tree now reads `{"BUG":53,"FEAT":40,"ARCH":10}`, origin/main `{"BUG":53,"FEAT":40,"ARCH":9}`, union next `BUG-054`. Then `node tools/record-parity.mjs`, expecting `RECORD_PARITY_OK`.
+  - [X] [T-000-H] Append to `project.md` under the plan section: `- T-000: <one line of handoff observation>`. This line rides T-001's commit.
 
 - [ ] [T-001] **AC11: the interactive identity probe, the plan's first verification step, before any guard code.** Depends on T-000. **Halt rule:** if a subagent's `Write` does not carry `agent_id` and `agent_type`, or if the main session's payload carries either key, stop for a ruling. Guard 5 code is not written until it is given. Other key-set differences are recorded, not halted on.
-  - [ ] [T-001-A] Create the scratch probe repository at `<scratchpad>/probe-ac11`, outside this repository, and run `git init` there. Write these files:
+  - [X] [T-001-A] Create the scratch probe repository at `<scratchpad>/probe-ac11`, outside this repository, and run `git init` there. Write these files:
     - `.claude/settings.json`:
       ```json
       { "hooks": { "PreToolUse": [ { "matcher": "*", "hooks": [ { "type": "command", "command": "node .claude/hooks/log.mjs" } ] } ] } }
@@ -160,24 +160,24 @@ Every new test runs in all three environments. None of the touched test files is
         console.log(p.tool_name, JSON.stringify(Object.keys(p)), `agent_id=${p.agent_id ?? '-'}`, `agent_type=${p.agent_type ?? '-'}`);
       }
       ```
-  - [ ] [T-001-B] Run `claude --version` and record it verbatim.
-  - [ ] [T-001-C] **Owner, in a separate terminal:** `cd <scratchpad>/probe-ac11 && claude`, then trust the folder. Send this prompt verbatim:
+  - [X] [T-001-B] Run `claude --version` and record it verbatim.
+  - [X] [T-001-C] **Owner, in a separate terminal:** `cd <scratchpad>/probe-ac11 && claude`, then trust the folder. Send this prompt verbatim:
 
     `Write a file main.txt containing the word main. Then use the probe-writer agent to write sub.txt containing the word sub. Do not write any other file.`
 
     Approve both writes, then `/exit`.
-  - [ ] [T-001-D] Run `node read-payloads.mjs` in the probe directory. Compare it with the spike (`project.md`, "## Spike: does PreToolUse identify subagent tool calls?"):
+  - [X] [T-001-D] Run `node read-payloads.mjs` in the probe directory. Compare it with the spike (`project.md`, "## Spike: does PreToolUse identify subagent tool calls?"):
     - the control key set;
     - the specimen set, which should be the control set plus `agent_id` and `agent_type`, with `agent_type === "probe-writer"`;
     - whether `session_id` is shared.
 
     Apply the halt rule.
-  - [ ] [T-001-E] Modify `.claude/memory/project.md`: insert directly after the spike section's handoff-observation bullet (:2040) a sub-block:
+  - [X] [T-001-E] Modify `.claude/memory/project.md`: insert directly after the spike section's handoff-observation bullet (:2040) a sub-block:
     ```markdown
     - **AC11 interactive re-run (2026-10-01, `claude` <version>, interactive mode):** <the verbatim reader output>. (a) <answer>. (b) <answer>. (c) <answer>. <Key-set differences from the -p spike, or "none">.
     ```
     Then append `- T-001: <one line of handoff observation>` under the plan section.
-  - [ ] [T-001-F] `git add -u .claude/memory/project.md`. Commit `docs: record the ARCH-010 interactive identity probe (AC11) [ARCH-010]`. Expected: **1081 / 0**.
+  - [ ] [T-001-F] `git add -u .claude/memory/project.md` and `git add -u docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (amended at execution 2026-10-01 by owner ruling: the plan's ticked boxes ride this commit, per T-000's precedent). Commit `docs: record the ARCH-010 interactive identity probe (AC11) [ARCH-010]`. Expected: **1081 / 0**.
 
 - [ ] [T-002] **Contract v3, with the version decided first** (AC1, AC2, AC3, AC4 and D2). Native. Depends on T-001's verdict.
 
