@@ -747,6 +747,29 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   - In an installed project, `/cc-stack` runs the detector from the deployed location, and the step-1 fallback names that same location.
   - A test pins the command's detector path to the path `deployProject` actually deploys.
 
+### [ ] `[BUG-052]` The Installer Cannot Tell Its Own Source Tree From the Legacy Deployment It Sweeps
+* **Filed 2026-10-01 from the installer self-install incident.** Minted after `node tools/id-ceiling.mjs` on both legs read working tree `{"BUG":51,"FEAT":40,"ARCH":9}` and `origin/main` `{"BUG":50,"FEAT":40,"ARCH":9}`, union next `BUG-052`. The working-tree leg is ahead of `origin/main` only by `[BUG-051]`, which is committed and not yet pushed.
+* **The defect is the missing distinction.** The installer has no self-install guard, and the `sweepStaleRootScripts` heuristic (`lib/installer/deploy.mjs:142-149`, called from `deployProject` at `:211`) cannot tell the 1.23.2 legacy deployment from the installer's own source tree.
+  - The heuristic removes `<cwd>/scripts` with `rmSync` whenever its file list equals the bundled `scripts/` list exactly (`:147-148`).
+  - In the development repository that condition holds by identity, because the bundle is built from that very directory.
+  - Running `npx code-conductor --project` inside the development repository therefore deletes tracked source.
+* **The rest of the project half lands on the source too.** `project-template/.claude/` is copied over the repository's own `.claude/`, and the root merges rewrite its `CLAUDE.md` and `.gitignore`.
+* **Field evidence, 2026-10-01 12:46:19Z** (the full record is in `.claude/memory/project.md`, "Incident 2026-10-01"):
+  - one run deleted all 9 tracked `scripts/*.mjs`;
+  - it rewrote 4 `.claude/commands/*`, `.claude/settings.json`, `.claude/hooks/context-guard.sh` (content and its 100755 mode), `CLAUDE.md` and `.gitignore`;
+  - it deployed an untracked `.claude/scripts/`.
+
+  That is 17 installer-touched paths in total, restored by explicit-path `git restore`.
+* **The repair choice belongs to this item's own spec.** Candidates named so far, without a ruling:
+  - a package-name self-guard;
+  - a different discriminator for the legacy deployment;
+  - refusing the sweep when `scripts/` is git-tracked.
+* **Components Affected:** `lib/installer/deploy.mjs` (`sweepStaleRootScripts`, `deployProject`), possibly `bin/code-conductor.mjs`, and the installer tests.
+* **Acceptance Criteria:**
+  - Running the installer with `--project` inside the development repository never deletes or overwrites tracked source.
+  - The 1.23.2 legacy root `scripts/` is still swept in a host project.
+  - Red-green proof against a fixture of each case.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
