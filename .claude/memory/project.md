@@ -2259,3 +2259,52 @@ Plan `docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md`
   - The session ran the two code writes as parallel background agents (`a2b6514d1dcdc1cbb` for `notes/out.txt`, `a75eeccce3adf20f1` for `src/app.txt`). The log interleaves, so it was read by `tool_use_id`.
 - **Identity, a second sighting:** a `ScheduleWakeup` payload (`toolu_01A67s9Sr97UypsVzGUihJk2`) carried `agent_id` with no `agent_type`, the shape T-001 first measured. It is Case A by construction. All ten payloads shared one `session_id`.
 - **`[ARCH-009]` evidence:** the demo showed exactly where mask authority ends and cooperative-prompt behavior begins. A missing tool is hard, a declined redirection is soft. That is the seam FEAT-012's shipped profiles and the post-launch band items exist to harden.
+
+## Closeout: 1.35.0, the band contract vertical slice (ARCH-010) [2026-10-01]
+
+Minor **`1.35.0`** shipped `[ARCH-010]` (PR #49, squash `a351297`). Plan: `docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md`. Spec: `docs/superpowers/specs/2026-09-30-arch010-band-contract-vertical-slice-design.md`.
+
+**Sync.** Measured before acting: **`ahead: 0` / `behind: 1`**, which is clean. `main` was fast-forwarded from `3bcfdcf` to `a351297`, and the merged tree equals the branch tree at `c7d1a23` (`git diff --stat` empty).
+
+**Instrument output on the merged tree:**
+- **`VERSION_GATE_OK 1.35.0`**.
+- **`RECORD_PARITY_OK`**. On the branch, the AC14 discriminator went red with `RECORD_PARITY_FAILED (5 violations)`, each line reading `1.35.0 claims ARCH-010 but its heading reads [ ]`, then green on restore.
+- **Ceiling before the mint:** working tree and `origin/main` both `headings=65 max={"BUG":53,"FEAT":40,"ARCH":10} dupes=none`, union next **`BUG-054`**.
+- **Ceiling after minting `[BUG-054]`:** working tree `headings=66 max={"BUG":54,"FEAT":40,"ARCH":10}`, `origin/main` `headings=65 max={"BUG":53,"FEAT":40,"ARCH":10}`, `UNION ceiling {"BUG":54,"FEAT":40,"ARCH":10}`, next **`BUG-055`**.
+- **PR run `36897689925`:** ci-node20 `1057 passed | 96 skipped (1153)` and ci-node24 `1140 passed | 13 skipped (1153)`, printing `SKIP_BASELINE_OK ci-node20: 96 skipped identities match tools/skip-baseline.json` and `SKIP_BASELINE_OK ci-node24: 13 skipped identities match tools/skip-baseline.json`. `git diff origin/main -- tools/skip-baseline.json` was empty (AC15).
+- **Push run on `main`, `36898030632`:** the same counts and both `SKIP_BASELINE_OK` lines.
+- **Local suite on `main`:** 1153 / 0, with 44 test files passed.
+- **Publish:** run **`36898233234`** (release `v1.35.0`) succeeded, printing `+ @yeison.restrepo.r/code-conductor@1.35.0`. `npm view` reads `version = '1.35.0'` and `gitHead = 'a35129752dc5fd99644406ea2d94afc862defa3c'`, equal to `v1.35.0`'s commit.
+
+**Every count boundary matched its prediction**, after one amendment made before measurement (T-005-F, owner ruling: one added `[A]` test, slice delta 71 → 72):
+
+| Boundary | Measured |
+|---|---|
+| T-000 / T-001 | 1081 / 0 |
+| T-002 | 1086 / 0 (red 7) |
+| T-003 | 1120 / 0 (red 18 of the 34 new tests, 16 passed; the filter also caught one green T-002 test) |
+| T-004 | 1128 / 0 (red 8) |
+| T-005 | 1152 / 0, 44 files (red 15 / 8) |
+| T-006 | 1153 / 0 (red 1) |
+| T-007 / T-008 | 1153 / 0 |
+| CI | 1057 / 96 and 1140 / 13 (1153 each) |
+
+**Filed at this closeout:** `[BUG-054]`, the `/cc-plan` staging-gap generator defect. The filter-match-set prediction rule, the subagent-brief observation line and the reviewer-pin discriminator line are folded into its record.
+
+**`[ARCH-009]` evidence harvest from the slice, in one place:**
+- **Per-task handoff observations** (each in full under "Plan: ARCH-010 implementation"):
+  - **T-000:** a stated mitigation is a property to verify, not a sentence to write. The C1→C4 claim was false until owner review reordered it to C1, C2, C4, C3.
+  - **T-001:** identity held in interactive mode on the same binary. It found the `agent_id`-without-`agent_type` shape, which keying the guard on `agent_type` makes harmless by construction.
+  - **T-002 and T-003:** the version-first reorder, and red splits exact to the test. The filter artifact was reconciled at the test level.
+  - **T-004:** v1/v2 byte identity was re-proven by the untouched pre-existing suite.
+  - **T-005:** subagent then reviewer. The four DISPATCH arrays were proven distinct by probe, and the review-added pin was proven to discriminate against a mutant keyed on `agent_id`.
+  - **T-006:** the `deploy.test.js` fixture is not asserted line for line against the template.
+  - **T-007:** see the next bullet.
+  - **T-008:** the README anchor had drifted through the main merge and was placed by content.
+- **The demo's seam:** the demo showed exactly where mask authority ends and cooperative-prompt behavior begins. A missing tool is hard, a declined redirection is soft. That is the seam FEAT-012's shipped profiles and the post-launch band items exist to harden.
+- **From the installer incident:** an installer run is a baseline-changing event: a gate's green moved without one line of the repo changing.
+- **From the worktree incident:** a Verify-band gate must declare not only what it can see but where it is allowed to *write*. Isolation is part of the gate's contract, and a gate run from an unmeasured environment turned destructive.
+
+**`[ARCH-009]` flip condition:** satisfied on `ARCH-010`. It still waits on `FEAT-009`, `FEAT-011`, `FEAT-012` and `FEAT-031` through `FEAT-036`.
+
+**Next:** the next session starts `[FEAT-011]` against the live band contract. The Show HN launch is unblocked per the owner's timebox decision.

@@ -815,6 +815,22 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   - A full `npm test` run with the environment git hands to a linked-worktree hook leaves the real repository's refs, config and index byte-identical.
   - A red-green proof reproduces the leak with a fixture `GIT_DIR` and shows it closed.
 
+### [ ] `[BUG-054]` Generated Plans Omit the Plan File From Their Own Staging Steps
+* **Filed 2026-10-01 at the `1.35.0` closeout**, from the ARCH-010 slice's plan-format notes (`.claude/memory/project.md`, "Plan: ARCH-010 implementation"). Minted on `main` after `node tools/id-ceiling.mjs` read working tree and `origin/main` both `{"BUG":53,"FEAT":40,"ARCH":10}`, union next `BUG-054`.
+* **The defect.** `/cc-plan` generates per-task staging steps that list the files the task edits but leave out the plan file itself. Under `cc-implement`, the plan file carries that task's ticked boxes, so the tick has no commit to ride. Its home is the generator, not any one plan. It belongs to `[BUG-031]`'s class: that item fixed the order of a staging step relative to its edit, and this one is a staging step that is missing a file.
+* **Sightings, all in `docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md`:**
+  - **Found twice during execution:** T-001-F staged only `project.md`, and so did T-002-G. Each was amended at execution by owner ruling, citing T-000's precedent that tracking state travels with the task that produced it.
+  - **Prevented four more times:** after T-002 the owner ruled the gap a measured pattern. The remaining staging steps (T-003-E, T-004-E, T-005-G, T-006-G, T-007-G and T-008-F) were amended in one pass. Four of them were still ahead of execution, and each carries the same one-line note.
+* **Folded into this record, as plan-format evidence with no separate id (owner rulings during the slice):**
+  - **A red-step prediction made through a runner filter should list everything the filter matches, not only the new tests.** T-003-B predicted 18 failed / 16 passed for `-t "ARCH-010"`, but the filter also matched T-002's already-green `[ARCH-010 D2]` test, so the runner read 18 / 17. It was reconciled at the test level before proceeding. T-004 and T-006 then checked their filters' match sets before running.
+  - **A subagent brief should ask for the task's handoff observation line**, so the task's own executor writes it. The T-005 brief did not, and the orchestrator wrote it.
+  - **A pin added at review should state its discriminator**, the wrong implementation it turns red on. T-005's `agent_id`-only `[A]` test now states it by measurement: a scratch copy of the hook keyed on `agent_id` denies the payload the test expects to be allowed.
+* **Components Affected:** `.claude/commands/cc-plan.md` and its `project-template/` mirror (the `## Ordered Steps` staging rules), `tests/installer/commands-parity.test.js`.
+* **Acceptance Criteria:**
+  - The plan-generation rules require every task's commit group that ticks plan checkboxes to stage the plan file with `git add -u <plan path>`. Ticks from a task's final commit ride the next task's commit, and the last task's ride the closeout commit.
+  - The rules require a filtered red-step prediction to list the filter's full match set.
+  - Both rules ship in both `cc-plan.md` mirrors and are pinned by presence anchors in the existing parity suite.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.

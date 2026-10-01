@@ -1007,7 +1007,7 @@ Every new test runs in all three environments. None of the touched test files is
 
     Then append `- T-007: <one line>` under the plan section. Then `git add -u .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit). Commit `docs: record the ARCH-010 Code->QA demo handoff (AC12) [ARCH-010]`. Expected: **1153 / 0**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
 
-- [ ] [T-008] **README and release 1.35.0** (AC14, AC15; `docs/RELEASE-CLOSEOUT.md` steps 1–5). Native. Depends on T-007.
+- [X] [T-008] **README and release 1.35.0** (AC14, AC15; `docs/RELEASE-CLOSEOUT.md` steps 1–5). Native. Depends on T-007.
   - [X] [T-008-A] Modify `README.md`: insert after the Guard 4 paragraph (:288), separated by a blank line:
     ```markdown
     **Band scope guard (Guard 5)** - a `Write`, `Edit`, `create_file` or `write_file` from a subagent whose `agent_type` names a band role (`spec`, `plan`, `code`, `audit`, `qa`) is checked against the nearest `.claude/memory/band-envelope.json` above its working directory, a SNAP v3 envelope. A malformed envelope, an agent that is not the envelope's role, a role not holding `RW`, or a path outside the envelope's `scope` globs (anchored at the band root, the directory whose `.claude/` holds the envelope) is denied with a named reason. The main session, any other agent, and any project without an envelope are untouched. It assumes cooperative agents: `agent_type` is a name taken on trust, and `Bash`, `NotebookEdit`, MCP write tools and symlinked paths are not covered.
@@ -1041,12 +1041,12 @@ Every new test runs in all three environments. None of the touched test files is
     **Discriminator (AC14):** flip the heading back to `### [ ]` and expect a red run naming `1.35.0` and `ARCH-010`. Restore `[X]` and re-run green.
   - [X] [T-008-E] Run `npm test`: **1153 / 0**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72) Then run `node tools/id-ceiling.mjs`: union `{"BUG":53,"FEAT":40,"ARCH":10}`, next `BUG-054`.
   - [X] [T-008-F] Append `- T-008: <one line>` to the plan section. Then `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit). Commit `chore: release 1.35.0 [ARCH-010]`. Expected: **1153 / 0**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
-  - [ ] [T-008-G] **Confirm with the owner, then** push the branch with `git push -u origin feat/arch-010-band-contract-vertical-slice` and open the PR against `main`. Expected CI:
+  - [X] [T-008-G] **Confirm with the owner, then** push the branch with `git push -u origin feat/arch-010-band-contract-vertical-slice` and open the PR against `main`. Expected CI:
     - ci-node20 **1057 / 96**; (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
     - ci-node24 **1140 / 13**; (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
     - both legs printing `SKIP_BASELINE_OK`;
     - `git diff origin/main -- tools/skip-baseline.json` empty (AC15).
-  - [ ] [T-008-H] **Stop at the green PR.** Report both `SKIP_BASELINE_OK` lines, both run ids and the PR URL. The owner merges and publishes the GitHub Release `v1.35.0`.
+  - [X] [T-008-H] **Stop at the green PR.** Report both `SKIP_BASELINE_OK` lines, both run ids and the PR URL. The owner merges and publishes the GitHub Release `v1.35.0`.
 
 ## Test List
 
