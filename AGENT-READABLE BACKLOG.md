@@ -753,6 +753,67 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   - A sub-shaped id in a backlog heading or a `CHANGELOG` claim is never silently skipped by either instrument. It is either read or rejected with a named failure, per the repair the spec chooses.
   - Red-green proof against a fixture holding each shape.
 
+### [ ] `[BUG-051]` Shipped Commands Run the Detector From a Path Installed Projects Do Not Have
+* **Filed 2026-10-01 from the installer self-install incident.** Minted after `node tools/id-ceiling.mjs` on both legs read `{"BUG":50,"FEAT":40,"ARCH":9}`, next `BUG-051`. ARCH reads 9 because `[ARCH-010]` lives only in the unpushed feature-branch commit `85df4cb`.
+* **Scope amended 2026-10-01 to the class (owner ruling, `[BUG-042]` fold criterion).** Commands shipped to installs reference the detector at `scripts/detect-stack.mjs`, but `deployProject` deploys it to `.claude/scripts/` (`lib/installer/deploy.mjs:212`). An installed project has no root `scripts/detect-stack.mjs` unless it happens to own one. Repairing one instance while the other stays broken would ship a form that still needs its other half. There are two instances:
+  - **`global/commands/cc-stack.md`**, in its run line (`:17`) and its step-1 not-a-git-repo fallback (`:9`).
+  - **`project-template/.claude/commands/cc-resume.md`**, in the BUG-015 auto-fill run line (`:24`) and its existence check (`:27`).
+* **The two instances fail asymmetrically.** `/cc-stack` fails loud: it exits non-zero with `MODULE_NOT_FOUND` and announces "no stack detected", whatever the project's stack. `/cc-resume` degrades silently, because its existence check skips the step without a word. The blank-command auto-fill has therefore been a silent no-op in every modern install. That is the defect-is-the-silence theme of `[BUG-050]`. Both breaks are independent of the incident that surfaced them.
+* **The enabling gap.** The mirror-parity test (`tests/installer/commands-parity.test.js:24`, `:78`) covers only the `cc-plan` and `cc-init` pairs, so `cc-resume`'s mirror could drift unseen. This is the fourth sighting of pattern-versus-concept: the parity gate covers less than its name. Whether parity widens to every command pair is this item's spec question, not this filing's.
+* **Field evidence.** On 2026-10-01, `/cc-stack` in this repository read `Cannot find module '…/scripts/detect-stack.mjs'`, rc 1, at a moment when the root `scripts/` had been swept (`[BUG-052]`) and only `.claude/scripts/` existed. That is exactly an installed project's layout. The installed `~/.claude/commands/cc-stack.md` carries the same two lines.
+* **Components Affected:** `global/commands/cc-stack.md`, `project-template/.claude/commands/cc-resume.md` and its `.claude/commands/` mirror, and `tests/installer/commands-parity.test.js` or a sibling pinning the detector path.
+* **Acceptance Criteria:**
+  - In an installed project, `/cc-stack` runs the detector from the deployed location, and its step-1 fallback names that same location.
+  - In an installed project, `/cc-resume`'s auto-fill runs the detector from the deployed location instead of silently skipping.
+  - A test pins every shipped command's detector path to the path `deployProject` actually deploys.
+
+### [ ] `[BUG-052]` The Installer Cannot Tell Its Own Source Tree From the Legacy Deployment It Sweeps
+* **Filed 2026-10-01 from the installer self-install incident.** Minted after `node tools/id-ceiling.mjs` on both legs read working tree `{"BUG":51,"FEAT":40,"ARCH":9}` and `origin/main` `{"BUG":50,"FEAT":40,"ARCH":9}`, union next `BUG-052`. The working-tree leg is ahead of `origin/main` only by `[BUG-051]`, which is committed and not yet pushed.
+* **The defect is the missing distinction.** The installer has no self-install guard, and the `sweepStaleRootScripts` heuristic (`lib/installer/deploy.mjs:142-149`, called from `deployProject` at `:211`) cannot tell the 1.23.2 legacy deployment from the installer's own source tree.
+  - The heuristic removes `<cwd>/scripts` with `rmSync` whenever its file list equals the bundled `scripts/` list exactly (`:147-148`).
+  - In the development repository that condition holds by identity, because the bundle is built from that very directory.
+  - Running `npx code-conductor --project` inside the development repository therefore deletes tracked source.
+* **The rest of the project half lands on the source too.** `project-template/.claude/` is copied over the repository's own `.claude/`, and the root merges rewrite its `CLAUDE.md` and `.gitignore`.
+* **Field evidence, 2026-10-01 12:46:19Z** (the full record is in `.claude/memory/project.md`, "Incident 2026-10-01"):
+  - one run deleted all 9 tracked `scripts/*.mjs`;
+  - it rewrote 4 `.claude/commands/*`, `.claude/settings.json`, `.claude/hooks/context-guard.sh` (content and its 100755 mode), `CLAUDE.md` and `.gitignore`;
+  - it deployed an untracked `.claude/scripts/`.
+
+  That is 17 installer-touched paths in total, restored by explicit-path `git restore`.
+* **The repair choice belongs to this item's own spec.** Candidates named so far, without a ruling:
+  - a package-name self-guard;
+  - a different discriminator for the legacy deployment;
+  - refusing the sweep when `scripts/` is git-tracked.
+* **Components Affected:** `lib/installer/deploy.mjs` (`sweepStaleRootScripts`, `deployProject`), possibly `bin/code-conductor.mjs`, and the installer tests.
+* **Acceptance Criteria:**
+  - Running the installer with `--project` inside the development repository never deletes or overwrites tracked source.
+  - The 1.23.2 legacy root `scripts/` is still swept in a host project.
+  - Red-green proof against a fixture of each case.
+
+### [ ] `[BUG-053]` The Pre-Commit Test Gate Writes Into the Real Repository When Run From a Linked Worktree
+* **Filed 2026-10-01 from the second incident of that day** (`.claude/memory/project.md`, "Incident 2026-10-01 (second)"). Minted after `node tools/id-ceiling.mjs` read working tree `{"BUG":52,"FEAT":40,"ARCH":9}` and `origin/main` `{"BUG":50,"FEAT":40,"ARCH":9}`, union next `BUG-053`.
+* **The defect.** The `code-conductor:test-gate` pre-commit hook runs `npm test` with the environment git hands to hooks. The suite's fixtures run `git` in their own temp directories, and they inherit that environment. From a linked worktree, that environment points every fixture `git` at the real repository.
+* **Cause, measured 2026-10-01 in a scratch repo outside this repository.** A hook printing `env | grep ^GIT_` showed the relative/absolute asymmetry:
+  - **Primary checkout:** no `GIT_DIR` at all, and `GIT_INDEX_FILE=.git/index`, which is **relative**. After a fixture changes into its temp directory, it resolves to that directory's own `.git/index`, which is harmless. This is why the gate ran for hundreds of primary-checkout commits without damage.
+  - **Linked worktree:** `GIT_DIR=<primary>/.git/worktrees/<name>` and `GIT_INDEX_FILE=<primary>/.git/worktrees/<name>/index`, both **absolute**. Fixture child processes inherit both, so their `init`, `config` and `commit` land in the real repository.
+* **Field evidence, 2026-10-01 09:34:10 local.** One gated commit from a linked `main` worktree (armed by a `node_modules` symlink) did all of the following:
+  - read 30 failed / 1051 passed;
+  - put five fixture `init` commits on local `main`;
+  - set `core.bare=true` and added `user.name=T` and `user.email=t@t.t` in the shared `.git/config`;
+  - overwrote the worktree's index.
+
+  Hooks were not touched. The damage was repaired, and nothing was pushed.
+* **Where the gate comes from.** The retired `install.sh` (FEAT-024) appended it, and the shell installers were removed in `4d987fa` (FEAT-023). The hook survives in `.git/hooks/pre-commit` of any clone that ran `install.sh`, and nothing tracked in this repository pins it.
+* **Interim mitigation:** the test gate is not run from linked worktrees until this item closes.
+* **The repair choice belongs to this item's own spec.** Candidates named so far, without a ruling:
+  - the gate unsets `GIT_DIR` and `GIT_INDEX_FILE`, plus the other repository-locating variables, before `npm test`;
+  - the suite's git-spawning fixtures scrub the inherited `GIT_*` environment themselves, so that no caller can aim them at a real repository;
+  - both.
+* **Components Affected:** the `code-conductor:test-gate` hook block (local `.git/hooks/pre-commit`), and the test helpers that spawn `git` against fixture repositories.
+* **Acceptance Criteria:**
+  - A full `npm test` run with the environment git hands to a linked-worktree hook leaves the real repository's refs, config and index byte-identical.
+  - A red-green proof reproduces the leak with a fixture `GIT_DIR` and shows it closed.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
