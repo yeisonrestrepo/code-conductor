@@ -733,19 +733,19 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   - A sub-shaped id in a backlog heading or a `CHANGELOG` claim is never silently skipped by either instrument. It is either read or rejected with a named failure, per the repair the spec chooses.
   - Red-green proof against a fixture holding each shape.
 
-### [ ] `[BUG-051]` `/cc-stack` Runs the Detector From a Path Installed Projects Do Not Have
+### [ ] `[BUG-051]` Shipped Commands Run the Detector From a Path Installed Projects Do Not Have
 * **Filed 2026-10-01 from the installer self-install incident.** Minted after `node tools/id-ceiling.mjs` on both legs read `{"BUG":50,"FEAT":40,"ARCH":9}`, next `BUG-051`. ARCH reads 9 because `[ARCH-010]` lives only in the unpushed feature-branch commit `85df4cb`.
-* **The defect.** The global command `global/commands/cc-stack.md` hardcodes `scripts/detect-stack.mjs` in two places:
-  - its run line (`:17`);
-  - its step-1 not-a-git-repo fallback (`:9`).
-
-  `deployProject` deploys the detector to `.claude/scripts/` (`lib/installer/deploy.mjs:212`). An installed project has no root `scripts/detect-stack.mjs` unless it happens to own one.
-* **Consequence.** In every current install, `/cc-stack` exits non-zero with `MODULE_NOT_FOUND` and announces "no stack detected", whatever the project's stack. It breaks independently of the incident that surfaced it.
+* **Scope amended 2026-10-01 to the class (owner ruling, `[BUG-042]` fold criterion).** Commands shipped to installs reference the detector at `scripts/detect-stack.mjs`, but `deployProject` deploys it to `.claude/scripts/` (`lib/installer/deploy.mjs:212`). An installed project has no root `scripts/detect-stack.mjs` unless it happens to own one. Repairing one instance while the other stays broken would ship a form that still needs its other half. There are two instances:
+  - **`global/commands/cc-stack.md`**, in its run line (`:17`) and its step-1 not-a-git-repo fallback (`:9`).
+  - **`project-template/.claude/commands/cc-resume.md`**, in the BUG-015 auto-fill run line (`:24`) and its existence check (`:27`).
+* **The two instances fail asymmetrically.** `/cc-stack` fails loud: it exits non-zero with `MODULE_NOT_FOUND` and announces "no stack detected", whatever the project's stack. `/cc-resume` degrades silently, because its existence check skips the step without a word. The blank-command auto-fill has therefore been a silent no-op in every modern install. That is the defect-is-the-silence theme of `[BUG-050]`. Both breaks are independent of the incident that surfaced them.
+* **The enabling gap.** The mirror-parity test (`tests/installer/commands-parity.test.js:24`, `:78`) covers only the `cc-plan` and `cc-init` pairs, so `cc-resume`'s mirror could drift unseen. This is the fourth sighting of pattern-versus-concept: the parity gate covers less than its name. Whether parity widens to every command pair is this item's spec question, not this filing's.
 * **Field evidence.** On 2026-10-01, `/cc-stack` in this repository read `Cannot find module '…/scripts/detect-stack.mjs'`, rc 1, at a moment when the root `scripts/` had been swept (`[BUG-052]`) and only `.claude/scripts/` existed. That is exactly an installed project's layout. The installed `~/.claude/commands/cc-stack.md` carries the same two lines.
-* **Components Affected:** `global/commands/cc-stack.md`, and any test pinning its run line.
+* **Components Affected:** `global/commands/cc-stack.md`, `project-template/.claude/commands/cc-resume.md` and its `.claude/commands/` mirror, and `tests/installer/commands-parity.test.js` or a sibling pinning the detector path.
 * **Acceptance Criteria:**
-  - In an installed project, `/cc-stack` runs the detector from the deployed location, and the step-1 fallback names that same location.
-  - A test pins the command's detector path to the path `deployProject` actually deploys.
+  - In an installed project, `/cc-stack` runs the detector from the deployed location, and its step-1 fallback names that same location.
+  - In an installed project, `/cc-resume`'s auto-fill runs the detector from the deployed location instead of silently skipping.
+  - A test pins every shipped command's detector path to the path `deployProject` actually deploys.
 
 ### [ ] `[BUG-052]` The Installer Cannot Tell Its Own Source Tree From the Legacy Deployment It Sweeps
 * **Filed 2026-10-01 from the installer self-install incident.** Minted after `node tools/id-ceiling.mjs` on both legs read working tree `{"BUG":51,"FEAT":40,"ARCH":9}` and `origin/main` `{"BUG":50,"FEAT":40,"ARCH":9}`, union next `BUG-052`. The working-tree leg is ahead of `origin/main` only by `[BUG-051]`, which is committed and not yet pushed.
