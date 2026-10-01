@@ -1956,3 +1956,72 @@ The spec is `docs/superpowers/specs/2026-09-30-bug049-claude-md-clobber-design.m
 - **Owner precisions for the plan (2026-09-30):**
   1. **Re-derived tests** (`merge-md.test.js:84` inverted; `:49` and `:162` revisited) are written from the spec's contract, `host + separator + block` byte-exact. They are never written by negating the old assertion text, because a negated destructive assertion can pass for the wrong reason. Each re-derived test states the AC it pins.
   2. **AC7's fault injection** needs a seam that makes `backupFile` and `writeAtomic` throw on command. The plan says where that seam lives and why it cannot fire in production: an installer shipping an unguarded fault injector is not acceptable in this fix.
+
+## Closeout: 1.34.4, CLAUDE.md ownership by sentinels alone, backups reported [2026-09-30]
+
+Patch **`1.34.4`** shipped `[BUG-049]` (PR #48, squash `7fbe120`). Plan: `docs/superpowers/plans/2026-09-30-bug049-claude-md-clobber.md`. Spec: `docs/superpowers/specs/2026-09-30-bug049-claude-md-clobber-design.md`.
+
+**Sync.** Measured before acting: **`0 ahead / 1 behind`**, which is clean. `main` was fast-forwarded to `7fbe120`.
+
+**Instrument output on the merged tree:**
+- **`VERSION_GATE_OK 1.34.4`**.
+- **`RECORD_PARITY_OK`**. On the branch, the discriminator flip of `[BUG-049]` back to `[ ]` went red with 4 violations naming `1.34.4`, then green on restore.
+- The ceiling from both legs is **`{"BUG":49,"FEAT":40,"ARCH":9}`**, with 60 headings each and no duplicates. The next mintable id is **`BUG-050`**; nothing was minted.
+- **Push run on `main`:** `36797537104` succeeded at 985 / 96 and 1068 / 13 (1081 each), printing `SKIP_BASELINE_OK ci-node20: 96 skipped` and `SKIP_BASELINE_OK ci-node24: 13 skipped`.
+- **PR run:** `36797375017` measured the same numbers. `tools/skip-baseline.json` is unchanged.
+- **Local suite on `main`:** 1069 / 12 (1081), with 42 test files passed and 1 skipped (43).
+- **Publish:** run **`36797652237`** (release `v1.34.4`) **succeeded**, printing `+ @yeison.restrepo.r/code-conductor@1.34.4`, with a provenance statement in the transparency log.
+- **npm:** the first read at 00:45:51Z still showed `1.34.3`, the usual lag. The registry poll read `1.34.4` at 00:46:21Z, and `npm view` reads `version 1.34.4` and `gitHead 7fbe1207df37…`, equal to `v1.34.4`'s commit.
+
+**Every count boundary matched its prediction, after one amendment made before measurement:**
+
+| Boundary | Measured |
+|---|---|
+| T-000 | 1039 / 12 |
+| T-001 | 1045 / 12 |
+| T-002 | 1052 / 12 |
+| T-003 | 1064 / 12 |
+| T-004 | 1064 / 12 |
+| T-005 | 1065 / 12 |
+| Review fix pass | 1069 / 12 |
+| CI | 985 / 96 and 1068 / 13 |
+
+The original gate was 1065, 981 and 1064. The owner moved it to 1069, 985 and 1068 for the review fix pass's 4 tests, written into the plan text before anything was run (the FEAT-021 rule).
+
+**Red runs, each verified against the unchanged engine with every failure named:**
+- T-001-E: 18 failed. All were `toBe` mismatches showing host content lost or the scaffold appended.
+- T-002-D: 12 failed.
+- T-003-F: 9 failed. The AC7 failures were thrown by the injected faults themselves, which proves the injector reaches `file-merge.mjs`.
+- T-005: the floor test went red twice: first with the floor missing, then with the floor above `VERSION`.
+- Review fix pass: 4 failed.
+
+### Content
+- **The incident arc.**
+  1. The field clobber was reported on nymbl (`1.34.3`).
+  2. The mechanism was measured: heading-name ownership in `mergeClaudeMdText`, plus the pre-sentinel migration scoped to more than the README claimed. It silently removed host sections under the eight managed headings, and all 12 under `--global`.
+  3. The two-run shape was sealed by the heal-line fingerprint: an old pre-sentinel generation overwrote the file with no backup, and `1.34.3` then backed up the damaged file and stripped it.
+  4. The fix shipped as sentinel-only ownership with an append-only merge. Ordering is backup, report, write, proven by injected faults; reports go to stdout; and `.gitignore` gets one labelled block with a negation guard.
+- **Third pattern-versus-concept sighting.** The review's fence finding was a scanner implementing a rule narrower than the standard it claims: it closed on any `` ``` `` run, where CommonMark requires the same character at least as long, up to 3 spaces indented. It joins the no-graphify check and the skip-count green.
+- **Tally dossier.** The P5 from this session's red-log read joins the 2026-09-29 P7 and the `1.34.3` P5, as the owner earmarked. Recorded in the same subsection, so the count is not understated:
+  - this session also produced a P7 (plan-mapping greps) and a P9 (an inline `for` poll loop), both uncharacterized;
+  - and a P4 on `cat vitest.config.*`, held as a candidate for striking as the guard working correctly.
+
+  The dossier now holds six uncharacterized specimens, including the 2026-09-28 P5, plus the one P4 candidate.
+- **`[ARCH-009]` field observation: plan-parsing tooling is band infrastructure.** The superpowers `task-start`/`task-done` scripts could not read this plan's `[T-00N]` checkbox format ("no heading matching 'Task 1'"), so progress was tracked by hand. A format that the executor's tools cannot read is a handoff defect between the plan author and the plan executor.
+- **Known reporting edge (Low 4).** The CLAUDE.md report prints "(git-ignored by design)" before the `.gitignore` merge resolves. If that merge is then skipped or its write fails, the claim is false for that one run. This is the candidate for a cheap later fix if the report line ever changes anyway.
+- **Lows recorded without a change:**
+  - Low 3: a doubled blank line or an orphan header can remain after gathering. Cosmetic and idempotent.
+  - Low 6: a whitespace-only host is replaced with no backup, which spec main path 1 mandates.
+- **Owner ruling, Low 2: output accompanies writes.** A run that writes nothing prints nothing; AC10e's notice fires only on the writing run.
+- **The reviewer's declined-to-judge items**, none fixed here:
+  - AC9 across 5+ upgrades: `MAX_BACKUPS = 5` eventually prunes the pre-first-run backup of a host whose block interior was edited (existing retention policy).
+  - The `-10` collision suffix sorts before `-2` in the prune order (existing, `settings.mjs`).
+  - In a negation host, the block appended at EOF after `!` lines could override a host re-include of the same pattern. The spec mandates appending the absent entries.
+  - A `.gitignore` entry with leading whitespace is gathered, although git treats leading spaces as significant. Unrealistic input.
+  - CommonMark edges beyond fence length and indentation (HTML blocks, indented code blocks hiding sentinels): the spec is silent, and nothing is destructive under append-only.
+  - README prose beyond the floor invariant was outside the review's focus.
+  - A symlinked cwd combined with a symlinked CLAUDE.md prints an absolute path and no ignore claim, which errs toward honesty.
+- **Company channel unblocked.** `1.34.4` is the minimum safe version, stated in the README's Quickstart and Install sections per AC13 and pinned at or below `VERSION` by `repo-invariants`. Company-internal sharing is now open, which supersedes the `1.34.3` closeout's discharge line, voided by `[BUG-049]`.
+
+### Queue
+Nothing minted. **The next mintable id is `BUG-050`.** Next: resume `/cc-spec ARCH-009` from its checkpoint, at Q1: band fields as v3 (recommended), or widen v2. `[FEAT-040]` queues behind it. The plan's execution workspace (`.superpowers/sdd/…`, untracked) was deleted with this record.
