@@ -2364,3 +2364,12 @@ The spec is `docs/superpowers/specs/2026-10-01-feat011-orchestrator-band-router-
   3. Each task gets one handoff-observation line.
   4. Per-environment test counts are predicted before any run. Local carries the 12 conditional plugin tests that CI lacks.
   5. The plan halts for the owner's full review before approval.
+
+## Plan: FEAT-011 implementation [2026-10-01]
+
+Plan `docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`.
+- **Approval:** APPROVED 2026-10-01 after full review. P1–P18 stand as written, with P13's systemMessage tie-break pre-ruled. The 49th test (`ORCH_RUN_INVALID` through the router), the routing and the never-start-a-run-here constraint are approved. One amendment: T-006-D approves Guard 2's ask, and fact 4 records the sequence warn, then ask, then the completed write.
+- **Routing:** T-003 runs as a subagent then a reviewer (main checkout, no worktree, no commit: BUG-053); T-001 and T-006 run live with the owner driving; the rest are native.
+- **Predictions,** measured on drafts in a scratch clone: local 1153 → 1227 / 0 (+74), ci-node20 1131 / 96, ci-node24 1214 / 13.
+
+Handoff observations, one line per task:
