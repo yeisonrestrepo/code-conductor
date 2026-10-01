@@ -12,7 +12,7 @@ const TPL_GLOBAL = ['# Global Claude Configuration', '', GLOBAL_BLOCK].join('\n'
 const PROJECT_BLOCK = [SENTINEL_START, '## Agent Identity', '', 'You are an orchestrator.', '', '## Hard Constraints', '', '- Never hardcode secrets.', SENTINEL_END, ''].join('\n');
 const TPL_PROJECT = ['# Project Claude Configuration', '', '## Project Identity', '', '- Name: TBD', '', '## Conventions', '', '- TBD', '', PROJECT_BLOCK].join('\n');
 
-const TPL_GITIGNORE = `${GITIGNORE_HEADER}\n.claude/memory/turn-count.txt\n*.installer-backup.*\n*.installer-tmp.*\n`;
+const TPL_GITIGNORE = `${GITIGNORE_HEADER}\n.claude/memory/turn-count.txt\n*.installer-backup.*\n*.installer-tmp.*\n.claude/memory/band-envelope.json\n`;
 const SKILL_MD = '---\nname: critical-review\ndescription: "adversarial review"\ntype: skill\n---\n\n# Critical Review\n';
 
 let asset, home;

@@ -598,7 +598,7 @@ Every new test runs in all three environments. None of the touched test files is
   - [X] [T-004-D] Run `npx vitest run tests/scripts/snap-build.test.js tests/unit/snap-contract.test.js`, all passing. The pre-existing snap-build tests are unmodified, and they are AC6's byte-identity proof. Then run `npm test`: **1128 / 0**.
   - [X] [T-004-E] Append `- T-004: <one line>` to the plan section. Then `git add -u scripts/snap-build.mjs tests/scripts/snap-build.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit). Commit `feat: snap-build emits SNAP v3 when given band fields [ARCH-010]`. Expected: **1128 / 0**.
 
-- [ ] [T-005] **Guard 5** (AC8, AC9, AC10, Review Focus 1–3 and 5). **Subagent, then a reviewer.** It runs in the main checkout with no worktree, and the subagent does not commit. Depends on T-002 and on T-001's verdict.
+- [X] [T-005] **Guard 5** (AC8, AC9, AC10, Review Focus 1–3 and 5). **Subagent, then a reviewer.** It runs in the main checkout with no worktree, and the subagent does not commit. Depends on T-002 and on T-001's verdict.
 
   **Interfaces:**
   - *Consumes:* `ROLES`, `TOOL_KINDS`, `WRITE_TOOLS` and `PRE_PARSE_MAX_BYTES` from `scripts/snap-contract.mjs`. The tests import them; the hook carries copies.
@@ -921,10 +921,10 @@ Every new test runs in all three environments. None of the touched test files is
     **The reviewer also confirms that the `DISPATCH` write-tool entries are distinct array instances before the `unshift` loop.** A shared instance would register Guard 5 more than once: invisible in behaviour, wrong in structure. The check: no two of `DISPATCH.Write`, `DISPATCH.Edit`, `DISPATCH.create_file` and `DISPATCH.write_file` are the same array literal or reference. Added at approval, 2026-10-01, by owner review.
 
     It returns findings. The orchestrator fixes or rules on each, and re-runs T-005-E.
-  - [ ] [T-005-G] Append `- T-005: <one line>` to the plan section. Then `git add -u .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit), then `git add tests/hooks/guard5.test.js`. Commit `feat: Guard 5 denies a role agent's write outside its band scope [ARCH-010]`. Expected: **1152 / 0**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
+  - [X] [T-005-G] Append `- T-005: <one line>` to the plan section. Then `git add -u .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit), then `git add tests/hooks/guard5.test.js`. Commit `feat: Guard 5 denies a role agent's write outside its band scope [ARCH-010]`. Expected: **1152 / 0**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
 
 - [ ] [T-006] **`.gitignore` and host ownership** (AC13). Native. Depends on T-000.
-  - [ ] [T-006-A] Modify `tests/installer/templates.test.js`. Append inside `describe('project-template/gitignore', …)` (:65):
+  - [X] [T-006-A] Modify `tests/installer/templates.test.js`. Append inside `describe('project-template/gitignore', …)` (:65):
     ```js
       it('[AC13] ignores the band envelope as the fourth managed entry', () => {
         const lines = readFileSync(join(root, 'project-template/gitignore'), 'utf8').split('\n').map(l => l.trim());
@@ -933,11 +933,11 @@ Every new test runs in all three environments. None of the touched test files is
         ]);
       });
     ```
-  - [ ] [T-006-B] Run `npx vitest run tests/installer/templates.test.js -t "AC13"`. Expected: **1 failed**, three entries instead of four.
-  - [ ] [T-006-C] Modify `project-template/gitignore`: append `.claude/memory/band-envelope.json` as line 5, keeping the trailing newline.
-  - [ ] [T-006-D] Modify `lib/installer/host-owned.mjs`: insert `  ['memory/band-envelope.json', 'skip'],` after `  ['memory/turn-count.txt', 'skip'],` (:42), so the `memory/` skips stay together.
-  - [ ] [T-006-E] Modify `tests/installer/deploy.test.js:15`, where the fixture mirrors the template. Append `.claude/memory/band-envelope.json\n` to `TPL_GITIGNORE`, after `*.installer-tmp.*\n`. **Halt rule:** if any `deploy.test.js` assertion fails other than through this fixture, stop. A fixture change is not allowed to rewrite an expectation silently.
-  - [ ] [T-006-F] Run `git check-ignore -q .claude/memory/band-envelope.json` and `git ls-files --error-unmatch .claude/memory/band-envelope.json`. Expected: 0 and 1, so the path is ignored and untracked. This was measured as ignored by `/.claude/memory/*` (`.gitignore:36`) on 2026-10-01. Then run `npx vitest run tests/installer tests/unit/host-owned-ignore-xor.test.js`, all passing. The xor test covers the new row with no new test (D3). Then run `npm test`: **1153 / 0**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
+  - [X] [T-006-B] Run `npx vitest run tests/installer/templates.test.js -t "AC13"`. Expected: **1 failed**, three entries instead of four.
+  - [X] [T-006-C] Modify `project-template/gitignore`: append `.claude/memory/band-envelope.json` as line 5, keeping the trailing newline.
+  - [X] [T-006-D] Modify `lib/installer/host-owned.mjs`: insert `  ['memory/band-envelope.json', 'skip'],` after `  ['memory/turn-count.txt', 'skip'],` (:42), so the `memory/` skips stay together.
+  - [X] [T-006-E] Modify `tests/installer/deploy.test.js:15`, where the fixture mirrors the template. Append `.claude/memory/band-envelope.json\n` to `TPL_GITIGNORE`, after `*.installer-tmp.*\n`. **Halt rule:** if any `deploy.test.js` assertion fails other than through this fixture, stop. A fixture change is not allowed to rewrite an expectation silently.
+  - [X] [T-006-F] Run `git check-ignore -q .claude/memory/band-envelope.json` and `git ls-files --error-unmatch .claude/memory/band-envelope.json`. Expected: 0 and 1, so the path is ignored and untracked. This was measured as ignored by `/.claude/memory/*` (`.gitignore:36`) on 2026-10-01. Then run `npx vitest run tests/installer tests/unit/host-owned-ignore-xor.test.js`, all passing. The xor test covers the new row with no new test (D3). Then run `npm test`: **1153 / 0**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
   - [ ] [T-006-G] Append `- T-006: <one line>` to the plan section. Then `git add -u project-template/gitignore lib/installer/host-owned.mjs tests/installer/templates.test.js tests/installer/deploy.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md` (plan file amended 2026-10-01 by owner ruling after T-002: the plan's ticks ride this commit). Commit `feat: ignore and host-own the band envelope [ARCH-010]`. Expected: **1153 / 0**. (amended 2026-10-01 at T-005-F by owner ruling: one added [A] test, slice delta 71 → 72)
 
 - [ ] [T-007] **AC12: the demo Code→QA handoff, interactive, in a scratch project.** In-session, live. Depends on T-003, T-004, T-005 and T-006. **Halt rule:** an in-scope write that is denied, or an out-of-scope write that lands, stops the task for a ruling before release.
