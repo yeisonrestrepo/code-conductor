@@ -112,6 +112,30 @@ Construct `old_string` using the `old_string` construction rule. Use `Edit` to r
 
 Carry out the task described on that line.
 
+### Step 4.5: OWASP Security Scan (post-implement guardrail)
+
+**Applies only when Step 4 wrote or edited code files** (`.js`, `.ts`, `.mjs`, `.cjs`, `.py`, `.java`, `.go`, `.rb`, `.php`, `.jsx`, `.tsx`, `.vue`, `.svelte`). Skip this step for markdown, config, documentation, or non-code changes.
+
+After executing the task, review every code change you made in Step 4 against the OWASP Top 10. Scan the **diff only** (lines you added or modified), not the entire file:
+
+| ID | Category | What to flag |
+|----|----------|-------------|
+| A01 | Broken Access Control | Missing auth/authz checks on new endpoints, CORS set to `*`, exposed admin routes without middleware |
+| A02 | Cryptographic Failures | Hardcoded secrets/tokens/passwords/API keys, `MD5`/`SHA1` for password hashing, `http://` for sensitive data, encryption keys in source |
+| A03 | Injection | String concatenation in SQL/NoSQL queries, unsanitized `eval()`, `exec()`, `Function()`, template literals in shell commands, raw user input in queries |
+| A04 | Insecure Design | Missing input validation at system boundaries (user input, API params), no length/type checks on untrusted data |
+| A05 | Security Misconfiguration | `debug: true` or `DEBUG=*` in production config, default credentials, stack traces exposed to client, verbose error messages with internal paths |
+| A06 | Vulnerable Components | _(deferred — not scannable from diff)_ |
+| A07 | Auth Failures | Session tokens in URLs or query strings, missing brute-force protection on login, weak password validation |
+| A08 | Data Integrity | `dangerouslySetInnerHTML` without sanitization, `innerHTML` assignment from user input, `JSON.parse()` / deserialization of untrusted data without validation |
+| A09 | Logging Failures | Secrets, tokens, or passwords in log statements, PII logged in plaintext |
+| A10 | SSRF | User-controlled URLs passed directly to `fetch`/`axios`/`http.get` without allowlist validation |
+
+**Behavior:**
+
+- **Finding detected:** emit `[SECURITY] file:line — A0X: one-sentence description` for each finding. Fix all findings immediately before proceeding to Step 5. If a finding cannot be fixed without changing the task's scope, flag it for human review: `[SECURITY-REVIEW] file:line — A0X: description (requires human decision)` and proceed.
+- **Clean:** silent — no output, proceed directly to Step 5.
+
 ### Step 5: Post-flip
 
 Construct `old_string` from the pre-flip line with `[ ]` replaced by `[>]` (the state after Step 3). Apply the `old_string` construction rule. Use `Edit` to replace:
