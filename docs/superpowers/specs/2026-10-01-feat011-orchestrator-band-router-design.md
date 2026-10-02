@@ -15,6 +15,16 @@
 
 The empty-scope halt is a rule, and the plan's first verification step is endorsed.
 
+**AMENDED 2026-10-01 by owner ruling on D1, after V1 halted on `claude` 2.1.287.** The changes:
+- D1 is re-grounded on measured facts;
+- R7 is added (`ORCH_NESTED_DISPATCH`);
+- D8 is serial by construction;
+- the hand-back is defined as the delivered `SubagentHandback` report, with `ORCH_HANDBACK_CONFLICT` added;
+- the R5 limit, the Bash limit and Out of Scope are reworded;
+- the auto-mode contingency for AC12 is pre-ruled and fired.
+
+The measurements are in `project.md` under "Measurements: FEAT-011 V1–V3".
+
 **Item.** `[FEAT-011]`, already minted, so no new id is needed. It consumes the `[ARCH-010]` contract shipped in `1.35.0` as given: `expectedGate(role)`, `snap-validate --to <role>`, Guard 5, and the host-owned band envelope. **No SNAP contract change:** `MAX_VERSION` stays 3, and `ROLES`, `GATES`, `BANDS` and `ROLE_BAND` are untouched.
 
 **Target.** `1.36.0`, a minor release: a new command, a new script and a new guard. Branch `feat/feat-011-orchestrator-band-router`.
@@ -36,6 +46,16 @@ All of this is in `.claude/memory/project.md`:
   - `session_id` is one value across the main session and its subagents.
   - In interactive mode the main session produced an `agent_id`-only shape twice (T-001's `Bash`, then the demo's `ScheduleWakeup`).
   - All of it is measured on `claude` 2.1.286.
+- **V1–V3 on `claude` 2.1.287** ("Measurements: FEAT-011 V1–V3"):
+  - **F1, dispatch:** a subagent can dispatch a subagent. A nested agent's payloads carry its own `agent_type`, not its parent's.
+  - **F2, session:** nesting does not change `session_id`.
+  - **F3, asynchrony:** dispatch returns before the agent finishes.
+  - **F4, the post-hand-back tail:** an agent keeps acting after its `SubagentHandback` is delivered. A second hand-back is refused, and the agent then reported through `SendMessage` to main, contradicting the delivered report.
+  - **F5, revival:** a subagent can revive an agent that has already handed back, using `SendMessage` and its `agent_id`.
+  - **F6, auto mode:** every payload carried `permission_mode=auto`, and hook denies still block under auto mode. A hook `ask` did not prompt; the classifier resolved it and the write proceeded (V3 re-run). No Bash call prompted, and the main session's `od -c` showed "Allowed by auto mode classifier".
+  - **V3, the warning channel:** stderr at exit 0 is invisible in interactive mode on 2.1.287. `systemMessage` renders inline with the tool result, behind the prefix `PreToolUse:Write says: `.
+  - **Completion notice, from the owner's screen:** each completion notice appeared only after all of that agent's activity, including the relay's late `SendMessage` report.
+  - **Main-session shape:** re-confirmed on 2.1.287. It carries no `agent_id` and no `agent_type`.
 - **The demo's seam (AC12, Fact 3):** "A missing tool is hard, a declined redirection is soft." The mask closes the write-family path. The Bash-redirection path is closed only by cooperation at the prompt level, and Guard 5 does not cover Bash writes.
 - **Installer incident:** "an installer run is a baseline-changing event: a gate's green moved without one line of the repo changing."
 - **Worktree incident:** "a Verify-band gate must declare not only what it can see but where it is allowed to *write*. Isolation is part of the gate's contract." This spec therefore declares the orchestrator's write surface by enumeration, not only its prohibitions.
@@ -46,7 +66,7 @@ All of this is in `.claude/memory/project.md`:
 - **Contract facts, from code:**
   - `expectedGate` returns the previous band's exit gate, so spec and plan both expect `boundary_routed`, and audit and qa both expect `build_executed` (`scripts/snap-contract.mjs:64`).
   - Guard 5 reads one envelope and denies with `BAND_ROLE_MISMATCH` when the agent is not the envelope's role (`pre-tool-use.mjs:172`).
-  - Hand-back envelopes cannot be written to the envelope file by a role agent, because that is outside every role's scope.
+  - Hand-back envelopes cannot be written to the envelope file by a role agent, because that is outside every role's scope. F1 opened a two-hop path around this: a role dispatches a non-role helper, and the helper writes the envelope under R5. R7 closes that path.
   - `scripts/session-id.mjs:36` prefers `CLAUDE_CODE_SESSION_ID`, and falls back to a cache or a random UUID.
 
 ## Solution
@@ -57,15 +77,17 @@ It never edits a tracked file. Its state lives in a host-owned, gitignored run f
 
 **Two guards bound the authority:**
 - **Guard 5** (unchanged) bounds the role agents.
-- **Guard 6** (new) bounds everything else while a run is live in this session. A write-family call from anything other than a band role is denied outside the orchestrator's enumerated write surface. So during a run, repository writes go only through Guard 5.
+- **Guard 6** (new) bounds everything else while a run is live in this session. A write-family call from anything other than a band role is denied outside the orchestrator's enumerated write surface. So during a run, repository writes go only through Guard 5. During the run, only the main session may dispatch or message agents (R7).
 
 **Guard 6 is bound to the run's `session_id`.** In any other session the run file is stale: Guard 6 warns and allows, and never blocks. Bash stays outside enforcement, the same measured boundary as ARCH-010.
 
 ### Decisions, each with its grounds
 
 - **D1. The orchestrator is the main session, not a masked subagent.**
-  - **Grounds:** dispatch is the `Agent` tool. Subagents are understood not to dispatch subagents, but that is unmeasured on this binary.
-  - **Verification:** V1 below measures it first and halts the plan if it is false.
+  - **Grounds (amended on V1, ruled 2026-10-01):** the original ground, that subagents cannot dispatch, is false on 2.1.287 (F1). D1 stands on two measured grounds instead:
+    1. **The orchestrator must converse with the owner.** Step mode pauses before every dispatch, and the two define approvals pause in both modes (D7). Only the main session converses; an orchestrator subagent would hand back once and could only be revived by `SendMessage`, which F4 and F5 show is unreliable.
+    2. **The main session must be bounded either way.** An orchestrator subagent carrying identity would leave the main session, which carries none, unbounded. So run-state keying (D3) is required regardless, and F2 shows it holds at any nesting depth.
+  - **Nested dispatch** is closed for every agent during a live run by R7. It stays open only for the main session, which is the orchestrator.
   - **Consequence:** identity cannot mark the orchestrator (spike, part (c)), so enforcement keys on run state (D3).
 - **D2. The orchestrator is not a SNAP role.** It produces and checks envelopes and never appears in one. Boundary and Ship have no role in `ROLES`, and adding one is a version-gated contract change owned by the roster items: `[FEAT-031]` Ticket, `[FEAT-035]` Release and `[FEAT-036]` Docs.
 - **D3. Guard 6 is session-bound run-state enforcement.**
@@ -87,7 +109,18 @@ It never edits a tracked file. Its state lives in a host-owned, gitignored run f
   - Step mode pauses before every dispatch.
   - `--auto` advances on validated envelopes without pausing.
   - The two define approvals pause in both modes.
-- **D8. Dispatch is serial across roles.** There is one envelope file, and Guard 5's `BAND_ROLE_MISMATCH` makes concurrent roles impossible by construction. FEAT-011 dispatches one agent at a time, including one Code dispatch per plan task.
+- **D8. Dispatch is serial by construction, not by assumption (amended 2026-10-01).** On 2.1.287 dispatch is asynchronous (F3), and concurrency is the binary's default. v1 serializes by waiting, and three things make that hold:
+  1. **The orchestrator waits.** After each dispatch it waits for that agent's completion notice before it runs `handback`. The notice arrives only after all of the agent's activity (the owner's screen observation), so it bounds F4's tail.
+  2. **`install` needs a recorded hand-back.** It advances only from a recorded hand-back (`nextStep` reads `handbacks`), so no envelope for the next position exists while the current position is unreported.
+  3. **R7 denies nested `Agent` and `SendMessage`** from every agent during a live run, so no agent can widen the set of agents running.
+
+  There is one envelope file. Guard 5's `BAND_ROLE_MISMATCH` denies a different role's writes. FEAT-011 dispatches one agent at a time, including one Code dispatch per plan task.
+
+  **Stated limit, the lingering writer:** an agent that keeps writing after its hand-back is bounded only by the envelope in force:
+  - a different-role install revokes its scope;
+  - a same-role install, Code task N to N+1, does not, so a lingering task-N writer lands inside task N+1's scope.
+
+  Waiting for the completion notice is the mitigation. `TaskStop` is not relied on, because its effect on a handed-back agent is unmeasured.
 - **D9. An empty plan scope is a plan defect and halts the run with `ORCH_EMPTY_SCOPE`.** Code is never dispatched with `tk:R` as a fallback, because a read-only Code dispatch would hide the defect.
 - **D10. No agent definitions ship in FEAT-011 (A2).** A role whose definition is not found halts with `ORCH_AGENT_MISSING`. The demo uses fixture agents. The real profiles are `[FEAT-012]`'s.
 - **D11. Script paths resolve by presence.** The command tries `.claude/scripts/` then `scripts/`, so it runs both in deployed projects and in this repository. This follows the constraint the `[BUG-051]` reverse-direction sighting recorded: "path resolution must go by presence". It does not repair BUG-051's other commands.
@@ -175,27 +208,34 @@ Nothing else, and nothing tracked. Containment is by path text, the same rule an
 4. **Dispatch:** the `Agent` tool with `subagent_type: <role>`.
    - The brief carries the item, the artifact paths, and the hand-back instruction.
    - It also asks for the one-line handoff observation (the ARCH-010 brief lesson).
-5. **Hand-back:** the role agent's final message carries exactly one line `SNAP_HANDBACK <single-line v3 JSON>`. The orchestrator pipes that line to `orchestrate.mjs handback <role>`, which:
+   - It tells the agent that its first `SubagentHandback` is final, so it must verify before delivering (F4).
+   - The orchestrator then waits for the agent's completion notice (D8), and runs nothing for that position until it arrives.
+5. **Hand-back:** the hand-back is the **delivered `SubagentHandback` report**. The binary delivers one per agent and refuses a second (F4). That report carries exactly one line `SNAP_HANDBACK <single-line v3 JSON>`. A later `SendMessage` from the agent is not the hand-back; R7 denies it during a run. The orchestrator pipes the delivered report to `orchestrate.mjs handback <role>`, which:
    1. validates the envelope;
    2. checks `sys.role` equals the dispatched role;
    3. checks the gate against the table's "may hand back" column;
    4. records the result.
+
+   If a second `SNAP_HANDBACK` for the same position still reaches the orchestrator, it is fed to `handback` too, which halts with `ORCH_HANDBACK_CONFLICT`. This is defense in depth behind R7.
 6. **Define pauses:** after spec, the owner approves the spec, which is a halt only. After plan, the owner approves the plan, and `orchestrate.mjs approve plan` writes `define_approved`, recording `approvals.plan`.
-7. **Build:** Code is dispatched once per plan task, serially. Each dispatch gets a fresh envelope scoped to that task. If a task halts, `tasks.done` stays as recorded, nothing is forwarded, and nothing further is dispatched (D12).
+7. **Build:** Code is dispatched once per plan task, serially. Each dispatch waits for the previous task's completion notice and its recorded hand-back (D8). Each dispatch gets a fresh envelope scoped to that task. If a task halts, `tasks.done` stays as recorded, nothing is forwarded, and nothing further is dispatched (D12).
 8. **Verify:** audit, then qa. When qa hands back `verify_pass`:
    - `orchestrate.mjs end` removes the run file and the envelope;
    - the report names every hand-back, every approval and every handoff observation, and states that release is human (`docs/RELEASE-CLOSEOUT.md`).
 
-### Guard 6 (write-family tools: `Write`, `Edit`, `create_file`, `write_file`)
+### Guard 6 (write-family tools: `Write`, `Edit`, `create_file`, `write_file`; dispatch tools: `Agent`, `SendMessage`)
 
 **Front-door evaluation order:**
 - The write-family `DISPATCH` arrays become `[guard5BandScope, guard6OrchestratorRun, …existing]`.
 - So Guard 5 runs first, then Guard 6, then Guard 2. A Guard 6 deny outranks Guard 2's ask, for the same reason Guard 5's does.
+- `DISPATCH` gains two entries, `Agent: [guard6OrchestratorRun]` and `SendMessage: [guard6OrchestratorRun]`, each a distinct array instance.
+- The hook's `PreToolUse` matcher, `Read|Write|Edit|create_file|write_file|Bash`, gains `|Agent|SendMessage`. It changes in both `.claude/settings.json` and `project-template/.claude/settings.json`, so the hook is invoked for those tools at all.
 
 **Guard 6's cases, evaluated in order:**
 
 | Case | Condition | Result |
 |---|---|---|
+| R7 | tool is `Agent` or `SendMessage`, the payload carries `agent_type` (any value, role or not), a valid run file exists, and the payload's `session_id` equals the run's | **deny** `ORCH_NESTED_DISPATCH`. For any other `Agent` or `SendMessage` payload Guard 6 returns nothing, with no warning: the main session, no run, an invalid run, or a stale run. R1–R6 apply to write-family tools only. |
 | R1 | `agent_type` names a band role | not applicable: Guard 6 returns nothing and Guard 5 governs |
 | R2 | no run file found by the walk-up | allow (nothing to enforce) |
 | R3 | run file unreadable or invalid (bad JSON, missing `session_id`) | **fail open:** allow, warn `ORCH_RUN_INVALID` naming the file and the command `node <scripts>/orchestrate.mjs end` |
@@ -205,13 +245,25 @@ Nothing else, and nothing tracked. Containment is by path text, the same rule an
 
 The R6 deny message reads: `Guard 6: ORCH_WRITE_DENIED: <path> is outside the orchestrator's write surface while run <item> is live; repository writes during a run go through a band role (Guard 5).`
 
+The R7 deny message reads: `Guard 6: ORCH_NESTED_DISPATCH: <tool> from agent <agent_type> is denied while run <item> is live; only the orchestrator dispatches or messages agents during a run.`
+
+**Why R7 comes before R1.** A role agent's dispatch is exactly the path R7 closes. With R1 first, Guard 6 would return nothing for a role and Guard 5 would never see `Agent`, because that is not a write-family tool.
+
 **Warnings never decide the call.** A warning is emitted without a decision, so the remaining guards still run.
 
-**The warning channel is chosen by measurement (V3).** Either stderr at exit 0, or the hook output's `systemMessage` field, whichever the binary surfaces to the user.
+**The warning channel is chosen by measurement (V3).** Either stderr at exit 0, or the hook output's `systemMessage` field, whichever the binary surfaces to the user. *Measured 2026-10-01 on 2.1.287: `systemMessage`. stderr is invisible, so this is not a tie-break.* The binary renders the warning behind `PreToolUse:Write says: `, so the warning text must read well behind that prefix.
 
 **Bash is not covered.** A main-session or agent `Bash` write during a run is outside Guard 6, as it is outside Guard 5. The spec, the README and the deny text's documentation all say so plainly. It is the measured boundary of the shipped contract, not a gap this item claims to close.
+- **The `claude -p` seam is part of the Bash limit.** A role agent can spawn `claude -p` through Bash. That creates a child session with a different `session_id`, which lands in R4 (warn, allow). It is the declared Bash seam, not a new hole, and it stays a prompt-level boundary.
+- **Auto mode removes the human backstop.** Under `permission_mode=auto` (F6), a Bash write may run without any human prompt, so the Bash limit has no prompt behind it. A hook `ask` does not prompt either, because the classifier resolves it, so no human stands behind Guard 2's ask. Hook denies still block.
 
-**R5 is broad; this is a stated limit.** Inside the live session, any non-role agent can write the write surface itself, including `band-envelope.json`. So under the cooperative model, an envelope can be forged through write tools. This is the same trust class as taking `agent_type` on trust: Guard 6 bounds where the orchestrator writes, not who writes inside that surface. The README states it beside the Bash limit.
+**R5 is broad; this is a stated limit (amended 2026-10-01).** Inside the live session, a non-role agent can write the write surface itself, including `band-envelope.json`. So under the cooperative model, an envelope can be forged through write tools. Only the main session can create such an agent:
+- **The nested path is closed.** A role or any other subagent dispatching a helper is denied by R7 (F1's two-hop widening).
+- **The main-session path remains the cooperative seam.** The orchestrator, or the owner, dispatches the non-role agents.
+
+This is the same trust class as taking `agent_type` on trust: Guard 6 bounds where the orchestrator writes, not who writes inside that surface. The README states it beside the Bash limit.
+
+**R7 protects live runs only.** Outside a run there is no Guard 6, so on 2.1.287 any agent can dispatch agents, and the ARCH-010 manual-envelope pattern keeps its shipped cooperative limits unchanged. F1 is new information about that shipped posture, not a FEAT-011 regression.
 
 ### Alternative paths
 
@@ -228,6 +280,8 @@ Every orchestrator halt:
 - records `halt` in the run file;
 - dispatches nothing further.
 
+An agent already in flight when a halt is recorded is not stopped (F3, F4). The orchestrator still waits for its completion notice before reporting the halt, and its writes stay bounded by the envelope in force.
+
 A halted run in its live session keeps Guard 6 enforcing until `orchestrate.mjs end`, the same session's explicit exit.
 
 | Code | When |
@@ -236,7 +290,8 @@ A halted run in its live session keeps Guard 6 enforcing until `orchestrate.mjs 
 | `ORCH_RUN_ACTIVE` | start while this session's run exists |
 | `ORCH_RUN_INVALID` | a step finds the run file unreadable (halt, while Guard 6 itself fails open) |
 | `ORCH_AGENT_MISSING` | no agent definition whose `name` equals the role, in `.claude/agents/` or `~/.claude/agents/` (plugin-provided agents are not searched; that limit is stated) |
-| `ORCH_HANDBACK_MISSING` | the final message has no `SNAP_HANDBACK` line, or more than one |
+| `ORCH_HANDBACK_MISSING` | the delivered `SubagentHandback` report has no `SNAP_HANDBACK` line, or more than one |
+| `ORCH_HANDBACK_CONFLICT` | `handback <role>` arrives when no role is dispatched and the run's last recorded hand-back is that role's: a second report for one position. Detection is per position by role, so it cannot tell a late task-N report from task N+1's on adjacent same-role positions. That window is D8's lingering-writer limit, mitigated by the completion-notice wait and R7, not by this code. |
 | `ORCH_HANDBACK_INVALID` | the hand-back fails `snap-validate`; the `SNAP_ERROR` is quoted verbatim |
 | `ORCH_HANDBACK_ROLE_MISMATCH` | the hand-back's `sys.role` is not the dispatched role |
 | `ORCH_GATE_UNEARNED` | the hand-back's gate is not in that role's "may hand back" column (for example spec or plan claiming `define_approved`) |
@@ -248,9 +303,9 @@ A halted run in its live session keeps Guard 6 enforcing until `orchestrate.mjs 
 ## Verification first (the plan's opening steps, before any guard code; AC11-style, owner driving, scratch repo outside this repository)
 
 On the installed `claude` binary, version recorded beside the output:
-- **V1:** a subagent's tool set offers no working `Agent` dispatch. Equivalently, a subagent asked to dispatch a fixture agent cannot. **If it can, the plan halts for a ruling on D1.**
+- **V1:** a subagent's tool set offers no working `Agent` dispatch. Equivalently, a subagent asked to dispatch a fixture agent cannot. **If it can, the plan halts for a ruling on D1.** *Measured 2026-10-01 on 2.1.287: it can (F1). The plan halted, and the ruling amended D1, D8 and Guard 6 (R7).*
 - **V2:** `CLAUDE_CODE_SESSION_ID`, read by a main-session `Bash`, equals the `session_id` in that session's PreToolUse payloads, both main-session and subagent. **If it differs or is absent, the plan halts for a ruling on D3.**
-- **V3:** for an allowed PreToolUse call, which channel reaches the user: stderr at exit 0, or a `systemMessage` field. Guard 6's warning uses the measured one.
+- **V3:** for an allowed PreToolUse call, which channel reaches the user: stderr at exit 0, or a `systemMessage` field. Guard 6's warning uses the measured one. *Measured 2026-10-01 on 2.1.287: `systemMessage`; stderr is not seen.*
 
 ## Acceptance Criteria
 
@@ -260,6 +315,7 @@ On the installed `claude` binary, version recorded beside the output:
   - Unit tests feed one invalid envelope through each path and assert nothing is written.
 - [ ] **AC2. A failed validation halts the receiving band.** For each of the following, a test asserts the halt code, that `halt` is recorded, and that the envelope file is unchanged:
   - `ORCH_HANDBACK_MISSING`
+  - `ORCH_HANDBACK_CONFLICT`. The envelope file is unchanged, and the first hand-back stays recorded as it was.
   - `ORCH_HANDBACK_INVALID`
   - `ORCH_HANDBACK_ROLE_MISMATCH`
   - `ORCH_GATE_UNEARNED`
@@ -271,8 +327,22 @@ On the installed `claude` binary, version recorded beside the output:
   - R4: warn and allow, with a mismatched `session_id` and a missing one;
   - R5: allow, for each of the four surface entries;
   - R6: deny for the main-session shape, the `agent_id`-only shape and a `general-purpose` agent, each writing a tracked path.
+  - R7, deny `ORCH_NESTED_DISPATCH`:
+    - for a band role and for a `general-purpose` agent, each calling `Agent`;
+    - for a band role calling `SendMessage`.
+  - R7, no decision:
+    - for the main-session shape and the `agent_id`-only shape calling `Agent`;
+    - for a role's `Agent` call with no run file;
+    - for a role's `Agent` call with a stale run.
 
-  A review pin states its discriminator. A mutant that drops the `session_id` comparison turns R4 red, and a mutant keyed on `agent_id` turns the `agent_id`-only R6 red.
+  A review pin states its discriminator:
+  - a mutant that drops the `session_id` comparison turns R4 red;
+  - a mutant keyed on `agent_id` turns the `agent_id`-only R6 red, and the `agent_id`-only R7 no-decision case red;
+  - a mutant that orders R1 before R7 turns the band-role R7 denies red.
+- [ ] **AC3a. The hook sees the dispatch tools.**
+  - Both settings files' `PreToolUse` matchers name `Agent` and `SendMessage`, and the two files stay identical in that entry.
+  - `DISPATCH.Agent` and `DISPATCH.SendMessage` each hold `guard6OrchestratorRun`, as distinct instances.
+  - The installer's settings merge carries the new matcher into an existing host file. The fingerprint `pre-tool-use.mjs` is unchanged.
 - [ ] **AC4. The write surface is declared, not only implied.**
   - The four entries appear in one exported constant in `orchestrate.mjs`, and Guard 6's copy is pinned to it by test, in the same pattern as `BAND_ROLES`.
   - The README names all four.
@@ -301,6 +371,8 @@ On the installed `claude` binary, version recorded beside the output:
   4. a second session started while the run file remains writes a tracked file and is **not** blocked, and sees `ORCH_RUN_STALE`.
 
   It is recorded the way the ARCH-010 demo was, read by `tool_use_id`.
+
+  **Every AC12 record states the session's `permission_mode`.** Pre-ruled contingency (owner, 2026-10-01): if a hook `ask` does not prompt under auto mode, T-006-D runs in default permission mode, so the Guard 2 ask can be observed and approved. *Fired: V3 measured that the ask does not prompt under auto mode.*
 - [ ] **AC13. Baseline.** `tools/skip-baseline.json` is unchanged, because this item adds passing tests only. Per-environment count predictions are stated in the plan before any run.
 
 ## Out of Scope
@@ -312,7 +384,8 @@ On the installed `claude` binary, version recorded beside the output:
 - Any SNAP contract change.
 - Bash, `NotebookEdit`, MCP-tool and symlink writes, in Guard 6 as in Guard 5.
 - Hostile agent definitions, since `agent_type` is taken on trust.
-- Parallel role dispatch.
+- Parallel role dispatch. Concurrency is the binary's default (F3); v1 serializes by waiting for each completion notice (D8), and parallelism stays out of scope.
+- Stopping a lingering agent after its hand-back (`TaskStop` is unmeasured). This is stated as D8's limit.
 - A resume or retry verb for a halted run (D12).
 - Repairing `[BUG-051]` in other commands, and `[BUG-052]` or `[BUG-053]`.
 - The `Orchestrator Protocol` section of the `CLAUDE.md` templates. That is the lookup chain, a different thing with the same word, and it is left as is.
@@ -332,16 +405,20 @@ The closeout cites this section.
 
 - **New `scripts/orchestrate.mjs`:** the router, run file, install, hand-back, approve, end, and the write-surface constant.
 - **New `/cc-orchestrate` command** in `project-template/.claude/commands/` and the `.claude/commands/` mirror.
-- **`.claude/hooks/pre-tool-use.mjs` and its template mirror:** Guard 6, its registration, and the pinned surface constant.
+- **`.claude/hooks/pre-tool-use.mjs` and its template mirror:** Guard 6, its registration, and the pinned surface constant. This includes R7's two `DISPATCH` entries, `Agent` and `SendMessage`.
+- **`.claude/settings.json` and `project-template/.claude/settings.json`:** the `PreToolUse` matcher gains `|Agent|SendMessage` (AC3a).
 - **`lib/installer/host-owned.mjs`:** one `skip` row.
 - **`project-template/gitignore`:** two lines.
 - **Tests:**
   - new `tests/hooks/guard6.test.js` and `tests/scripts/orchestrate.test.js` (directory per existing layout, settled at plan);
   - updates to the templates and deploy suites.
-- **README:** a Guard 6 paragraph beside Guard 5, the orchestrator section, the write surface, the Bash limit, the R5 limit (non-role agents can write the surface, envelope included), and Known limits. The CHANGELOG entry lands at release.
+- **README:** a Guard 6 paragraph beside Guard 5, the orchestrator section, the write surface, the Bash limit with its `claude -p` seam and the auto-mode line (no human behind a Bash write or a hook ask), the R5 limit (non-role agents can write the surface, envelope included; R7 closes the nested path), R7, D8's lingering-writer limit, and Known limits, including that R7 protects live runs only. Outside a run, any agent can dispatch agents on 2.1.287, and the ARCH-010 manual-envelope pattern keeps its shipped cooperative limits; F1 is not a FEAT-011 regression. The CHANGELOG entry lands at release.
 - **This repository's `.gitignore`:**
   - the spec's own leaf `!/docs/superpowers/specs/2026-10-01-feat011-orchestrator-band-router-design.md`, in sorted position after line 122, lands in the spec commit;
   - the run file and `.conductor/` are already ignored here (`/.claude/memory/*` at `:36`, `.conductor/` at `:11`);
+  - the never-start-a-run-here constraint is load-bearing twice:
+    - it protects this session's own writes;
+    - it makes the new `Agent|SendMessage` matcher harmless in this repository's live settings, because T-003's subagents land in R7's no-run, no-decision path;
   - any new tracked command or plan file pays its leaf in its own commit.
 
 ### Files Requiring Full Read (deferred to /cc-plan)
