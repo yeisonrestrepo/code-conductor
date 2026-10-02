@@ -24,6 +24,9 @@ const SECTION = /^### (.+?)\s*$/;
 const CLAIM = /^\s*[-*]\s+\*\*\[([A-Z]+-\d{3,})\]\*\*/;
 const SHIPPED_AS = /shipped as `?(\d+\.\d+\.\d+)`?/;
 const TERMINAL = new Set(['X', '~']);
+// [BUG-050] Sub-shaped ids (e.g. ARCH-008-S1) — reject, never silently skip.
+const SUB_HEADING = /^### \[(.)\] `\[([A-Z]+-\d{3,}(?:-[A-Za-z0-9]+)+)\]`/;
+const SUB_CLAIM = /^\s*[-*]\s+\*\*\[([A-Z]+-\d{3,}(?:-[A-Za-z0-9]+)+)\]\*\*/;
 
 const lines = (text) => String(text).replace(/\r\n/g, '\n').split('\n');
 
@@ -77,6 +80,21 @@ export function checkParity({ backlogText, changelogText, versionFile }) {
   }
   for (const version of duplicates) {
     violations.push({ direction: 'PARSE', id: null, version, detail: `CHANGELOG names version ${version} more than once` });
+  }
+
+  // [BUG-050] Sub-shaped id rejection: never silently skip.
+  for (const line of lines(backlogText)) {
+    const m = line.match(SUB_HEADING);
+    if (m) violations.push({ direction: 'SUB', id: m[2], version: null, detail: `backlog heading "${m[2]}" is sub-shaped; only top-level ids are tracked` });
+  }
+  {
+    let ver = null;
+    for (const line of lines(changelogText)) {
+      const v = line.match(VERSION_HEADING);
+      if (v) { ver = v[1]; continue; }
+      const c = line.match(SUB_CLAIM);
+      if (c) violations.push({ direction: 'SUB', id: c[1], version: ver, detail: `${ver || 'unknown'} claims "${c[1]}" which is sub-shaped; only top-level ids are tracked` });
+    }
   }
 
   const backlog = parseBacklog(backlogText);
