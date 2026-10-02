@@ -1670,7 +1670,7 @@ This matters because the new matcher invokes the hook on every dispatch in every
   - [X] [T-005-G] Append `- T-005: <one line>` under the plan section. Then `git add -u .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`. Commit `feat: add the /cc-orchestrate command [FEAT-011]`. Expected: **1237 / 0**.
   - [X] [T-005-H] **Amended on T-006's demo, which caught a defect in the shipped template.** Run A's spec hand-back carried `tk` `RW` and no `ops.scope`, and `handback spec` halted `ORCH_HANDBACK_INVALID: SNAP_ERROR: missing: ops.scope (required when tk is RW)`. `snap-validate.mjs:25` requires `ops.scope` only when `tk` is `RW`, and `:27` caps it whenever it is present. `envelopeFields` gives spec, plan and code (`RW`) a scope and gives audit (`R`) and qa (`X`) none. The brief therefore tells the agent to copy `ops.scope` verbatim from its envelope and to leave the key out when the envelope has none, which is correct for every `tk` and invents nothing. The draft above now carries that line and the template's `"scope"` field, at sha `97176ee7…`. Overwrite both mirrors from it with Write, then confirm with `cmp`. No test asserts on the brief text, so the counts are predicted unchanged: `npx vitest run tests/installer/commands-parity.test.js tests/unit/gitignore-block-parity.test.js` at **36 / 36**, and `npm test` at **1237 / 0**, 46 files. Then `git add -u .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md` (BUG-054). Commit `fix: the handback template omits ops.scope, which the validator requires for RW [FEAT-011]`.
 
-- [ ] [T-006] **AC12: the live demo, in a scratch project.** Owner driving, step mode. Depends on T-002 through T-005. **Halt rule:** any of the four facts landing otherwise than below stops the task for a ruling before release. **Every T-006 record states its session's `permission_mode`,** read from that session's payloads (AC12, amended on the D1 ruling).
+- [X] [T-006] **AC12: the live demo, in a scratch project.** Owner driving, step mode. Depends on T-002 through T-005. **Halt rule:** any of the four facts landing otherwise than below stops the task for a ruling before release. **Every T-006 record states its session's `permission_mode`,** read from that session's payloads (AC12, amended on the D1 ruling).
   - [X] [T-006-A] Create `<scratchpad>/demo-feat011`. Run `git init`, write `README.md` containing `demo`, and commit it, so the run has a tracked path to be denied. Then copy in, from this branch:
     - `scripts/orchestrate.mjs`, `scripts/snap-contract.mjs`, `scripts/snap-build.mjs` and `scripts/snap-validate.mjs`, into `scripts/`. There is no `.claude/scripts/`, so D11 falls through to source;
     - `.claude/hooks/pre-tool-use.mjs`;
@@ -1724,7 +1724,7 @@ This matters because the new matcher invokes the hook on every dispatch in every
     Append `- T-006: <one line>` under the plan section. Then `git add -u .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`. Commit `docs: record the FEAT-011 orchestrated demo run (AC12) [FEAT-011]`. Expected: **1237 / 0**.
 
 - [ ] [T-007] **README and release 1.36.0** (AC4's README half, AC13; `docs/RELEASE-CLOSEOUT.md` steps 1–5). Native. Depends on T-006.
-  - [ ] [T-007-A] Modify `README.md`, placing each change by content, not line number (ARCH-010 T-008's drift note).
+  - [X] [T-007-A] Modify `README.md`, placing each change by content, not line number (ARCH-010 T-008's drift note).
     - **The Guard 6 paragraph.** Insert after the Guard 5 paragraph (`**Band scope guard (Guard 5)**`, :294), separated by a blank line:
       ```markdown
       **Orchestrator write guard (Guard 6)** - while a `/cc-orchestrate` run is live, its run file `.claude/memory/orchestrator-run.json` binds it to one session by `session_id`. In that session, a `Write`, `Edit`, `create_file` or `write_file` from anything but a band role (the main session, a payload carrying only `agent_id`, any other agent) is denied with `ORCH_WRITE_DENIED` unless its target lies inside the orchestrator's write surface, anchored at the run root: `.claude/memory/orchestrator-run.json`, `.claude/memory/band-envelope.json`, `.claude/memory/session-snapshot.json` and `.conductor/**`. Band roles stay under Guard 5. A run file from another session is stale and an unreadable one is invalid: both warn (`ORCH_RUN_STALE`, `ORCH_RUN_INVALID`) with the cleanup command and never block. While the run is live, a subagent's `Agent` or `SendMessage` call is denied with `ORCH_NESTED_DISPATCH`, so only the orchestrator dispatches or messages agents (R7; the hook's matcher names both tools). Outside a live run there is no Guard 6: any agent can dispatch agents, as before. Limits are stated, not closed:
@@ -1740,7 +1740,7 @@ This matters because the new matcher invokes the hook on every dispatch in every
     - **The tree.**
       - After `│       │   ├── cc-implement.md   /cc-implement`, insert `│       │   ├── cc-orchestrate.md /cc-orchestrate`.
       - After `│   ├── session-id.mjs            Stable session-id resolver`, insert `│   ├── orchestrate.mjs           Band router: run file, envelopes, hand-backs (FEAT-011)`.
-    - **Known limits.** Insert before `- **The \`P7\` false positive above**, still live.`:
+    - **Known limits.** Insert before `- **The \`P7\` false positive above**, still live.` (The warn+ask matrix was amended in 2026-10-02 by owner ruling, from T-006's finding 5. The Known-limits invariant counts only `[BUG-NNN]` bullets, so the suite is predicted unchanged at 1237 / 0.):
       ```markdown
       - **The orchestrator (`1.36.0`) assumes cooperative agents.**
         - Guard 6 does not cover `Bash` writes, `claude -p` children included.
@@ -1748,13 +1748,21 @@ This matters because the new matcher invokes the hook on every dispatch in every
         - R7 protects live runs only.
         - An agent writing after its hand-back is bounded only by the envelope in force, so a same-role next task inherits it.
         - Under auto permission mode no human stands behind a Bash write or a hook `ask`.
+        - A Guard 6 warning reaches you, never the model's tool result, and not in every case. Measured on `claude` 2.1.287:
+
+          | Channel | Permission mode | A prompting decision rides along | You see the warning |
+          |---|---|---|---|
+          | stderr | `auto` | no | no |
+          | `systemMessage` (Guard 6's channel) | `auto` | no; a hook `ask` does not prompt under `auto` | yes, behind `PreToolUse:Write says: ` |
+          | `systemMessage` | `default` | no | yes, in full |
+          | `systemMessage` | `default` | yes, for example Guard 2's overwrite prompt | no: the warning is lost |
         - Agent definitions provided by plugins are not searched.
         - A halted run cannot be resumed, only ended and restarted.
 
         No role agent definitions ship until `[FEAT-012]`.
       ```
-  - [ ] [T-007-B] Run `npm version 1.36.0 --no-git-tag-version`, then write `1.36.0` into `VERSION`.
-  - [ ] [T-007-C] Modify the records.
+  - [X] [T-007-B] Run `npm version 1.36.0 --no-git-tag-version`, then write `1.36.0` into `VERSION`.
+  - [X] [T-007-C] Modify the records.
     - **`AGENT-READABLE BACKLOG.md`:**
       - At the line `` grep -n '^### \[ \] `\[FEAT-011\]`' `` reports (:159), change `### [ ]` to `### [X]`.
       - Insert as its first bullet:
@@ -1775,13 +1783,13 @@ This matters because the new matcher invokes the hook on every dispatch in every
       ```
 
     If the release commit lands on another date, use that date in both places.
-  - [ ] [T-007-D] Run the release checks:
+  - [X] [T-007-D] Run the release checks:
     - `node tools/version-gate.mjs`, expecting `VERSION_GATE_OK 1.36.0`;
     - `node tools/record-parity.mjs`, expecting `RECORD_PARITY_OK`.
 
     **Discriminator:** flip the FEAT-011 heading back to `### [ ]` and expect a red run naming `1.36.0` and `FEAT-011`. Restore `[X]` and re-run green.
-  - [ ] [T-007-E] Run `npm test`, expecting **1237 / 0**. Then `node tools/id-ceiling.mjs`, expecting union `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`.
-  - [ ] [T-007-F] Append `- T-007: <one line>` under the plan section. Then `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`. Commit `chore: release 1.36.0 [FEAT-011]`. Expected: **1237 / 0**.
+  - [X] [T-007-E] Run `npm test`, expecting **1237 / 0**. Then `node tools/id-ceiling.mjs`, expecting union `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`.
+  - [X] [T-007-F] Append `- T-007: <one line>` under the plan section. Then `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`. Commit `chore: release 1.36.0 [FEAT-011]`. Expected: **1237 / 0**.
   - [ ] [T-007-G] **Confirm with the owner, then** push with `git push -u origin feat/feat-011-orchestrator-band-router` and open the PR against `main`. Expected CI:
     - ci-node20 **1141 / 96**;
     - ci-node24 **1224 / 13**;

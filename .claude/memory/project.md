@@ -2521,6 +2521,27 @@ Fact 4's session reads `default`, as the halt rule requires.
 - the qa fixture was amended before attempt 4;
 - the spec fixture was swapped before run B (T-006-C). Its prior body was "Write `docs/superpowers/specs/demo-design.md` containing the single line `# Demo spec`. End as your brief instructs."
 
+**Amendment, 2026-10-02, owner rulings on `7bf717f`'s four open points.** The text above stands as committed; this note supersedes it where they differ.
+
+1. **Fact 4 is ruled satisfied in substance.** It is satisfied with the observed sequence: no visible warn, then the ask, then the completed write. Finding 5 explains the divergence. The warn *was* emitted, since the probe proves the channel alive in `default`, and it is lost in rendering only when it rides a prompting ask. The fact's substance held entirely: R4 allowed, Guard 2 asked in `default` mode, the write completed, and nothing was denied. The plan's expected sequence is noted as pre-measurement: it was written before the warn+ask composition was measurable, because under auto no ask ever prompted. T-006 is ticked.
+2. **The warn+ask matrix is approved as T-007's README input.**
+3. **Observation lines restored from the owner's terminal captures.**
+   - **Attempt 4,** from the final report, verbatim:
+     - spec: "The envelope scope matched the task path exactly, so the spec write went through Guard 5 without being denied."
+     - plan: "The plan content was given in full and the envelope scope matched the target path, so this handoff needed only one write inside scope and no spec lookup."
+     - code Task 1: "The plan and envelope were enough on their own. The task was two in-scope edits with no denials."
+     - code Task 2: "A one-file plan task needs only Write and Edit inside the scope, but the required gate value 'build_executed' does not match what happened when there is no build to run."
+     - audit: "The plan and src/ match exactly, but the spec is empty and the template gate says build_executed although this read-only audit ran no build."
+     - qa: "The qa check here is just a directory listing, and the envelope has no ops.scope key, so the scope key was left out as the brief says."
+   - **Attempt 2,** from the `end` print's deletes on the owner's screen:
+     - spec: "Reading the envelope before writing made it easy to check the scope and copy it verbatim; the write went through with no guard friction."
+     - plan: "Guard 5 checks writes against the real repo root, so a typo in an absolute path shows up as a scope violation. Check the path against the cwd before treating a denial as a real out-of-scope write."
+     - code Task 1: "This envelope covered both the task file and the plan, so I could do the task and tick the plan box in a single pass without any scope denials."
+   - **Lesson:** `end` clears the hand-back directory, so the command's final report is the only observation carrier. A run that dies before its report loses its lines unless someone captured the screen.
+4. **Finding 1 widens on observable evidence.**
+   - **Attempt 2:** the spec and plan hand-backs both validated at exit 0 on the owner's screen, each carrying `ops.scope`. Code Task 1's hand-back was never submitted; the P12 refusal intercepted it.
+   - **The after-the-fix claim is therefore 8 validated hand-backs:** 2 in attempt 2 and 6 in attempt 4.
+
 ## Plan: FEAT-011 implementation [2026-10-01]
 
 Plan `docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`.
@@ -2569,3 +2590,10 @@ Handoff observations, one line per task:
   - **Fact 2** landed in run B by owner ruling.
   - **Fact 4** completed without a deny, but the planned warn did not render, so it is held for the owner's ruling at T-007.
   - **Five findings** are recorded, nothing minted: the template defect, the stale seam, qa's reinterpretation, Guard 6 enforcing on a halted run, and the warn+ask render loss.
+- T-007: every row read as predicted:
+  - **README:** the drafted blocks are verbatim, checked by `check-readme.mjs`, with the warn+ask matrix amended into the plan first. The suite then read 1237 / 0.
+  - **Version:** the bump to `1.36.0`.
+  - **Records:** the backlog and CHANGELOG are verbatim with their date set, checked by `check-records.mjs`.
+  - **Gates:** `VERSION_GATE_OK 1.36.0` and `RECORD_PARITY_OK`.
+  - **Discriminator:** red, `FAIL [A] 1.36.0 claims FEAT-011 but its heading reads [ ]` ×4, `RECORD_PARITY_FAILED (4 violations)`, rc 1; one violation per CHANGELOG `[FEAT-011]` bullet. Then green.
+  - **Suite and ceiling:** 1237 / 0 across 46 files, union ceiling `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`.
