@@ -1723,7 +1723,7 @@ This matters because the new matcher invokes the hook on every dispatch in every
 
     Append `- T-006: <one line>` under the plan section. Then `git add -u .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`. Commit `docs: record the FEAT-011 orchestrated demo run (AC12) [FEAT-011]`. Expected: **1237 / 0**.
 
-- [ ] [T-007] **README and release 1.36.0** (AC4's README half, AC13; `docs/RELEASE-CLOSEOUT.md` steps 1–5). Native. Depends on T-006.
+- [X] [T-007] **README and release 1.36.0** (AC4's README half, AC13; `docs/RELEASE-CLOSEOUT.md` steps 1–5). Native. Depends on T-006.
   - [X] [T-007-A] Modify `README.md`, placing each change by content, not line number (ARCH-010 T-008's drift note).
     - **The Guard 6 paragraph.** Insert after the Guard 5 paragraph (`**Band scope guard (Guard 5)**`, :294), separated by a blank line:
       ```markdown
@@ -1790,12 +1790,12 @@ This matters because the new matcher invokes the hook on every dispatch in every
     **Discriminator:** flip the FEAT-011 heading back to `### [ ]` and expect a red run naming `1.36.0` and `FEAT-011`. Restore `[X]` and re-run green.
   - [X] [T-007-E] Run `npm test`, expecting **1237 / 0**. Then `node tools/id-ceiling.mjs`, expecting union `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`.
   - [X] [T-007-F] Append `- T-007: <one line>` under the plan section. Then `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`. Commit `chore: release 1.36.0 [FEAT-011]`. Expected: **1237 / 0**.
-  - [ ] [T-007-G] **Confirm with the owner, then** push with `git push -u origin feat/feat-011-orchestrator-band-router` and open the PR against `main`. Expected CI:
+  - [X] [T-007-G] **Confirm with the owner, then** push with `git push -u origin feat/feat-011-orchestrator-band-router` and open the PR against `main`. Expected CI:
     - ci-node20 **1141 / 96**;
     - ci-node24 **1224 / 13**;
     - both legs printing `SKIP_BASELINE_OK`;
     - `git diff origin/main -- tools/skip-baseline.json` empty (AC13).
-  - [ ] [T-007-H] **Stop at the green PR.** Report both `SKIP_BASELINE_OK` lines, both run ids and the PR URL. The owner merges and publishes the GitHub Release `v1.36.0`.
+  - [X] [T-007-H] **Stop at the green PR.** Report both `SKIP_BASELINE_OK` lines, both run ids and the PR URL. The owner merges and publishes the GitHub Release `v1.36.0`.
 
 ## Test List
 

@@ -2597,3 +2597,104 @@ Handoff observations, one line per task:
   - **Gates:** `VERSION_GATE_OK 1.36.0` and `RECORD_PARITY_OK`.
   - **Discriminator:** red, `FAIL [A] 1.36.0 claims FEAT-011 but its heading reads [ ]` ×4, `RECORD_PARITY_FAILED (4 violations)`, rc 1; one violation per CHANGELOG `[FEAT-011]` bullet. Then green.
   - **Suite and ceiling:** 1237 / 0 across 46 files, union ceiling `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`.
+
+## Closeout: 1.36.0, the orchestrator band router and Guard 6 (FEAT-011) [2026-10-02]
+
+**What shipped.** Minor **`1.36.0`** shipped `[FEAT-011]` (PR #60, squash `78e7f40`).
+- Plan: `docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`.
+- Spec: `docs/superpowers/specs/2026-10-01-feat011-orchestrator-band-router-design.md`.
+
+**Sync.** `main` was fast-forwarded from `8887e11` to `78e7f40`, a single-parent squash. The merged tree equals the branch tree at `1252fc9`: `git diff --stat 1252fc9 78e7f40` is empty.
+
+**Instrument output on the merged tree:**
+- **`VERSION_GATE_OK 1.36.0`:** all five fields read `1.36.0`.
+- **`RECORD_PARITY_OK`.** On the branch, the discriminator went red with `RECORD_PARITY_FAILED (4 violations)`, each line reading `1.36.0 claims FEAT-011 but its heading reads [ ]`, then green on restore.
+- **Ceiling:** the working tree and `origin/main` both read `headings=66 max={"BUG":54,"FEAT":40,"ARCH":10} dupes=none`, with `UNION ceiling {"BUG":54,"FEAT":40,"ARCH":10}` and next **`BUG-055`**. Nothing was minted in FEAT-011.
+- **PR run `37031455159`:**
+  - ci-node20 (job `110919039541`) `1141 passed | 96 skipped (1237)`;
+  - ci-node24 (job `110919039160`) `1224 passed | 13 skipped (1237)`;
+  - it printed `SKIP_BASELINE_OK ci-node20: 96 skipped identities match tools/skip-baseline.json` and `SKIP_BASELINE_OK ci-node24: 13 skipped identities match tools/skip-baseline.json`;
+  - `git diff origin/main -- tools/skip-baseline.json` was empty (AC13).
+- **Push run on `main`, `37032274298`:** the same counts and both `SKIP_BASELINE_OK` lines. `tools/skip-baseline.json` is unchanged from `8887e11` to `78e7f40`.
+- **Local suite on `main`:** 1237 / 0, with 46 test files passed.
+- **Closing readings:** total 1237 on all three legs.
+
+  | Leg | Reading |
+  |---|---|
+  | local | 1237 / 0 |
+  | ci-node20 | 1141 / 96 |
+  | ci-node24 | 1224 / 13 |
+- **Publish:** run **`37033073816`** (release `1.36.0`) succeeded, printing `+ @yeison.restrepo.r/code-conductor@1.36.0`. `npm view` reads version `1.36.0` and gitHead `78e7f40e5ddfec076a2c77d96a9475b8b84276c9`, which equals the release tag's commit and the squash commit.
+- **Tag naming, observed and not acted on:**
+  - **What happened:** the release and its tag are named `1.36.0`, not `v1.36.0`, departing from `v1.35.0`, `v1.34.4` and `v1.34.3`.
+  - **Why the publish was unaffected:** `publish.yml:38` strips an optional leading `v` (`TAG="${TAG#v}"`), so the version check passed either way.
+  - **No retag:** the tag is the owner's outward artifact.
+
+**Every count boundary matched its prediction.** Amendments were made before measurement, never absorbed after: the D1 ruling's re-derivation, and T-005-H's no-test-change fix.
+
+| Boundary | Measured |
+|---|---|
+| T-000 / T-001 | 1153 / 0, 44 files |
+| T-002 | 1203 / 0, 45 files |
+| T-003 | 1233 / 0; eight mutants red as predicted (4, 1, 2, 1, 1, 2, 2, 1) |
+| T-004 | 1235 / 0. One halt, resolved by owner ruling: the clone read 306 against the derived 304 because it already carried T-005's two parity tests, and 304 when re-measured at the true state |
+| T-005 | 1237 / 0, 46 files |
+| T-005-H (the template fix, `56abb97`) | parity 36 / 36, 1237 / 0 |
+| T-006 (`7bf717f`) | 1237 / 0 |
+| T-007 (`1252fc9`) | 1237 / 0 |
+| CI | 1141 / 96 and 1224 / 13 (1237 each) |
+
+**`[FEAT-011]` harvest, in one place.** Each item is evidenced in the sections above: Measurements V1–V3, Demo (AC12) and its amendment, and Plan.
+
+- **V1 inverted D1 on `claude` 2.1.287.**
+  - **The measurement:** subagents can dispatch (F1). A nested agent carries its own `agent_type`, the `session_id` is shared across depth (F2), and dispatch is asynchronous (F3).
+  - **The ruling:** the orchestrator stays in the main session. **R7** was added: Guard 6 denies a subagent's `Agent` and `SendMessage` while a run is live, with `ORCH_NESTED_DISPATCH`.
+  - **From F4 and F5:** the binary refuses a second `SubagentHandback`, but an agent can still report or be revived by `SendMessage`. The hand-back became the delivered report, and a second report for one position halts with **`ORCH_HANDBACK_CONFLICT`**.
+- **D8's cold-wait pattern: the wait fails cold and holds after one in-context correction.**
+  - 2 slips across about 13 dispatched hand-backs, then 0.
+  - Both slips were the first hand-back of a fresh conversation (attempt 1's spec and run B's spec), and both were self-reported.
+  - Attempts 2 through 4 held the wait on 11 consecutive dispatches.
+  - Prompt-level waiting is cooperation, not enforcement. This is a `[FEAT-012]` brief-design input.
+- **The wake requirement, measured.** The orchestrator's turn dies before each completion notice arrives, so every dispatch needed one manual owner wake. This is an ergonomics fact for `[FEAT-012]` and for any `--auto` mode, which cannot be unattended while it holds.
+- **The warn+ask render-loss matrix.**
+  - **Channels:** stderr is invisible, while the `systemMessage` channel is alive in both `auto` and `default`, rendered behind `PreToolUse:Write says: `.
+  - **The loss:** a warning is lost only when it rides a Guard 2 `ask` that actually prompts.
+  - **Who sees it:** the `systemMessage` reaches the user, never the model's tool result, confirmed in both modes.
+  - **Placement:** the matrix shipped in README's Known limits.
+- **The stale seam, measured live.**
+  - The `session_id` changed mid-session (`9b472b1a` → `eb0814fd`) on an environment reset, with no crash.
+  - The router refused the old run (P12, exit 2), recording nothing.
+  - `end` succeeded across sessions, three times.
+- **The Bash seam, and the brief fix that held.**
+  - **The sighting:** at T-003 a reviewer whose Write the owner declined rewrote the instrument through a Bash heredoc (`toolu_01WgFdKWsSCDhfc61DSr8isR`, then `toolu_01MDH5idd8SN4KxRCCeFhJpd`).
+  - **The cause:** the brief, which said "If a hook denies a command, use a simpler alternative".
+  - **The fix:** briefs now say an owner's deny is an instruction to stop, not an obstacle. No agent routed around a deny through Bash anywhere in T-006, including qa under Guard 3's P1/P8 blocks.
+- **The gate-semantics limit is a measured property of v1 gates.**
+  - It came from two roles, in three sightings: audit in attempt 3, code Task 2 in attempt 4, and audit again in attempt 4.
+  - A gate value copied from a template can claim work that never ran.
+  - **Gates certify protocol position, not work truth.**
+- **Two defects caught by the demo, which paid for itself.**
+  - **The `ops.scope` hand-back template defect** halted `ORCH_HANDBACK_INVALID` on attempt 1 and was fixed in `56abb97` before release. After the fix, 8 hand-backs validated: 2 in attempt 2 and 6 in attempt 4.
+  - **The qa fixture reinterpretation:** qa substituted a stricter criterion nobody gave it and refused its gate, the mutant-runner incident's sibling toward refusal.
+    - The no-forged-gate path (`ORCH_HANDBACK_MISSING`) operated end to end.
+    - The fixture was amended by owner ruling.
+- **Two standing rules, carried forward:**
+  - instruments and records are edited only through Write or Edit, where the owner sees the diff, and an agent that needs an instrument changed reports the need instead of patching it;
+  - never start an `orchestrate.mjs` run or invoke `/cc-orchestrate` in this repository.
+
+**Collaborator situation: claimed territory, no action taken.**
+- **PRs #50 to #56** cover `[BUG-050]` through `[BUG-054]`, `[BUG-045]` and `[BUG-032]`. They are the owner's to review.
+- **Interim rules stay in force until those PRs merge:**
+  - `[BUG-051]`: `/cc-init` records the stack.
+  - `[BUG-052]`: never run the installer against this repository.
+  - `[BUG-053]`: never run the gate from a linked worktree.
+- **Baselines move:** any third-party merge to `main` moves the baselines, so any active plan re-derives its predictions after one.
+- **PR #59** is a feature with no minted id. It enters through intake, not merge.
+
+**Owner-pending notes, nothing minted:**
+- **Reviewer-in-loop candidate.** This would codify the owner-reviewer pattern this item ran on: the owner reviews, rules and halts at each boundary. The use case is Jira tickets. It hooks into `[FEAT-012]` and `[FEAT-031]`, and is constrained by the measured F4 (a second hand-back is refused, yet an agent can keep reporting), F5 (a handed-back agent can be revived by `SendMessage`) and R7 (no nested dispatch during a live run).
+- **Triage rule for external issues and PRs.** This is a pending `CONTRIBUTING.md` item, with PR #59 as its first case.
+
+**`[ARCH-009]`:** `FEAT-011` is done. Of the items the 1.35.0 closeout named, it still waits on `FEAT-009`, `FEAT-012` and `FEAT-031` through `FEAT-036`.
+
+**Next:** `[FEAT-012]` opens with `/cc-spec` in a fresh session, after a `/cc-compact` here.
