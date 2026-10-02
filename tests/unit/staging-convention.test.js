@@ -6,6 +6,7 @@ import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join, resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { cleanGitEnv } from '../helpers/git-env.js'
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const read = (rel) => readFileSync(join(REPO_ROOT, rel), 'utf8').replace(/\r\n/g, '\n')
@@ -19,7 +20,7 @@ afterEach(() => { while (trees.length) { try { rmSync(trees.pop(), { recursive: 
 function mkRepo(ignoreBody, { track }) {
   const dir = mkdtempSync(join(tmpdir(), 'staging-'))
   trees.push(dir)
-  const g = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+  const g = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', env: cleanGitEnv(), stdio: ['ignore', 'pipe', 'ignore'] })
   g(['init', '-q'])
   g(['config', 'user.email', 't@t.t'])
   g(['config', 'user.name', 'T'])
@@ -35,8 +36,8 @@ function mkRepo(ignoreBody, { track }) {
 }
 
 function add(dir, args) {
-  const r = spawnSync('git', ['add', ...args], { cwd: dir, encoding: 'utf8' })
-  const s = spawnSync('git', ['diff', '--cached', '--name-only'], { cwd: dir, encoding: 'utf8' })
+  const r = spawnSync('git', ['add', ...args], { cwd: dir, encoding: 'utf8', env: cleanGitEnv() })
+  const s = spawnSync('git', ['diff', '--cached', '--name-only'], { cwd: dir, encoding: 'utf8', env: cleanGitEnv() })
   return {
     status: r.status,
     stderr: r.stderr || '',
