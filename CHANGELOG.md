@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.36.0] - 2026-10-02
+
+### Added
+- **[FEAT-011]** `/cc-orchestrate <ITEM> [--auto]` and `scripts/orchestrate.mjs`, the band router. One run moves one backlog item through Define, Build and Verify by SNAP v3 envelopes that are built, validated with `snap-validate --to <role>` and installed one role at a time, and every role's hand-back is validated before the next dispatch. A failed validation halts the run. Step mode pauses before every dispatch; `--auto` skips those pauses but never the spec and plan approvals.
+- **[FEAT-011]** Guard 6 in the PreToolUse front door. While a run is live in a session, a write-family call from anything but a band role is denied outside `.claude/memory/orchestrator-run.json`, `.claude/memory/band-envelope.json`, `.claude/memory/session-snapshot.json` and `.conductor/**`, and a subagent's `Agent` or `SendMessage` call is denied (`ORCH_NESTED_DISPATCH`). A run file from another session, or an unreadable one, only warns.
+
+### Changed
+- **[FEAT-011]** `.claude/memory/orchestrator-run.json` joins the installer's managed `.gitignore` block and is host-owned. `.conductor/` joins the block too, so a project's local cache is ignored as the README always said.
+- **[FEAT-011]** The PreToolUse matcher in both settings files gains `Agent|SendMessage`, so the front door runs on every dispatch. The installer's settings merge carries it into existing projects.
+
 ## [1.35.0] - 2026-10-01
 
 ### Added

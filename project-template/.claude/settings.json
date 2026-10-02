@@ -2,7 +2,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Read|Write|Edit|create_file|write_file|Bash",
+        "matcher": "Read|Write|Edit|create_file|write_file|Bash|Agent|SendMessage",
         "hooks": [
           {
             "type": "command",

@@ -105,6 +105,24 @@ Four checks live in `tools/` as tracked repository infrastructure. Three of them
 - **`[BUG-052]`, open:** the installer has no self-install guard. Its sweep of the 1.23.2 legacy root `scripts/` matches by exact file list, which the development repository satisfies by identity, so running `--project` inside this repository deletes tracked source. Do not run the installer against a clone of code-conductor itself.
 - **`[BUG-053]`, open:** the pre-commit test gate that the retired `install.sh` appended runs `npm test` with git's hook environment. From a linked worktree, git hands hooks an absolute `GIT_DIR` and `GIT_INDEX_FILE`, so the suite's fixture `git` commands write into the real repository's refs, config and index. Do not run the gate from a linked worktree.
 - **`[BUG-054]`, open:** `/cc-plan` generates staging steps that leave out the plan file itself, so a task's ticked checkboxes have no commit to ride. Until it is fixed, add the plan path to each task's `git add -u` list when you review a generated plan.
+- **The orchestrator (`1.36.0`) assumes cooperative agents.**
+  - Guard 6 does not cover `Bash` writes, `claude -p` children included.
+  - Inside a live run, a non-role agent the main session dispatched may write the orchestrator's write surface, the band envelope included.
+  - R7 protects live runs only.
+  - An agent writing after its hand-back is bounded only by the envelope in force, so a same-role next task inherits it.
+  - Under auto permission mode no human stands behind a Bash write or a hook `ask`.
+  - A Guard 6 warning reaches you, never the model's tool result, and not in every case. Measured on `claude` 2.1.287:
+
+    | Channel | Permission mode | A prompting decision rides along | You see the warning |
+    |---|---|---|---|
+    | stderr | `auto` | no | no |
+    | `systemMessage` (Guard 6's channel) | `auto` | no; a hook `ask` does not prompt under `auto` | yes, behind `PreToolUse:Write says: ` |
+    | `systemMessage` | `default` | no | yes, in full |
+    | `systemMessage` | `default` | yes, for example Guard 2's overwrite prompt | no: the warning is lost |
+  - Agent definitions provided by plugins are not searched.
+  - A halted run cannot be resumed, only ended and restarted.
+
+  No role agent definitions ship until `[FEAT-012]`.
 - **The `P7` false positive above**, still live.
 - **A re-run against an untouched `project.md` prints a recovery hint it cannot prove is needed.** If you install, never write anything into `.claude/memory/project.md`, and install again, you get a line suggesting the file may have been overwritten by a pre-`1.30.0` re-run. It was not; it equals the stub because it was seeded and never edited. The check compares content and **cannot distinguish "seeded and untouched" from "clobbered"**, which is why the wording is hedged to "may have been" rather than "was". This residual is named and accepted in [`BUG-039`'s spec at `:129`](docs/superpowers/specs/2026-09-27-bug039-installer-host-owned-state-design.md), where the alternative (restoring from the host's own git history) was rejected as writing host files out of the host's history with new failure modes. A **fresh** install is silent, which the Quickstart shows.
 - **Three open dossiers**, which are the evidence-collection pipeline working rather than a backlog: a session denial tally, one for interleaved-artifact reports, and an intermittent commit-hook hang in the `snap-build` suite. A dossier holds specimens until a mechanism is characterized by probe; an id is minted only when the written condition is met. `[BUG-047]` is what that pipeline produces when it completes: an out-of-scope note, then a dossier, then four specimens across four sessions, then a mint, then a release.
@@ -210,6 +228,7 @@ All commands are tagged `(Conductor)` in the Claude Code command palette so they
 | `/cc-plan` | Require an approved spec, map the codebase, and generate an ordered implementation plan with exact file paths, a test list, a commit order, and identified risks. Every generated task line carries a unique `[T-NNN]` ID (min 3 digits, unlimited suffix depth) using plain ASCII checkboxes — enforced at generation time. |
 | `/cc-compact` | Phase-boundary command. Serializes the current phase's essential state (decisions, pending steps, files touched, constraints) into a single-line SNAP JSON snapshot at `.claude/memory/session-snapshot.json` — and, when Node `>= 22.5` is available, a git-hash-keyed row in the local `.conductor/cache.db` — then prompts you to run `/compact` to clear conversation history. Run at the end of every phase to prevent context overflow. |
 | `/cc-implement` | Execute implementation tasks from an approved plan using a surgical 5-step ritual: Grep-locate pending tasks → single-line Read verify → pre-flip `[ ]` to `[>]` → execute → post-flip to `[X]` or `[!]`. Never reads or rewrites the full plan file. Includes dependency evaluation, drift detection, and a Step 6 hook that records each task's final state to a local SQLite cache (see below). |
+| `/cc-orchestrate <ITEM> [--auto]` | Route one backlog item through Define, Build and Verify. For each role it builds, validates (`snap-validate --to`) and installs a SNAP v3 band envelope, dispatches the agent named after the role, waits for its completion notice, and checks the one `SNAP_HANDBACK` line of its delivered hand-back before the next. It pauses before every dispatch unless `--auto`; the spec and plan approvals always pause. A failed validation halts the run, terminally in this version (recover with `end`, then `start`). It needs agent definitions named `spec`, `plan`, `code`, `audit` and `qa` in `.claude/agents/` or `~/.claude/agents/`, none of which ship yet, and plans in the writing-plans format (`### Task N` with a `**Files:**` block). Release stays human. |
 
 Each of `/cc-spec`, `/cc-plan`, and `/cc-implement` opens its phase with a **resume read** (`scripts/resume-read.mjs`): it restores any context stored for the current git commit, so work survives branch switches and rollbacks (see [Local State Cache & Session Persistence](#local-state-cache--session-persistence--v1220)).
 | `/cc-review [file\|dir]` | Review code in three layers - Critical / Important / Suggestion - then deliver a verdict and offer to auto-fix. |
@@ -292,6 +311,12 @@ Hit a block you believe is wrong? Re-run the command with `CC_GUARD3_WARN=1` and
 **node_modules guard (Guard 4)** - a `Read` whose path carries `node_modules` as an exact path component is denied, with backslashes and `..` resolved first. Use Glob for existence checks.
 
 **Band scope guard (Guard 5)** - a `Write`, `Edit`, `create_file` or `write_file` from a subagent whose `agent_type` names a band role (`spec`, `plan`, `code`, `audit`, `qa`) is checked against the nearest `.claude/memory/band-envelope.json` above its working directory, a SNAP v3 envelope. A malformed envelope, an agent that is not the envelope's role, a role not holding `RW`, or a path outside the envelope's `scope` globs (anchored at the band root, the directory whose `.claude/` holds the envelope) is denied with a named reason. The main session, any other agent, and any project without an envelope are untouched. It assumes cooperative agents: `agent_type` is a name taken on trust, and `Bash`, `NotebookEdit`, MCP write tools and symlinked paths are not covered.
+
+**Orchestrator write guard (Guard 6)** - while a `/cc-orchestrate` run is live, its run file `.claude/memory/orchestrator-run.json` binds it to one session by `session_id`. In that session, a `Write`, `Edit`, `create_file` or `write_file` from anything but a band role (the main session, a payload carrying only `agent_id`, any other agent) is denied with `ORCH_WRITE_DENIED` unless its target lies inside the orchestrator's write surface, anchored at the run root: `.claude/memory/orchestrator-run.json`, `.claude/memory/band-envelope.json`, `.claude/memory/session-snapshot.json` and `.conductor/**`. Band roles stay under Guard 5. A run file from another session is stale and an unreadable one is invalid: both warn (`ORCH_RUN_STALE`, `ORCH_RUN_INVALID`) with the cleanup command and never block. While the run is live, a subagent's `Agent` or `SendMessage` call is denied with `ORCH_NESTED_DISPATCH`, so only the orchestrator dispatches or messages agents (R7; the hook's matcher names both tools). Outside a live run there is no Guard 6: any agent can dispatch agents, as before. Limits are stated, not closed:
+- `Bash` writes are not covered, as under Guard 5. That includes a role spawning `claude -p`, whose child session carries another `session_id` and is warned, not blocked.
+- Under auto permission mode no human stands behind a Bash write or a hook `ask`.
+- Inside the live session, only a main-session-dispatched non-role agent can write the surface itself, the band envelope included. So Guard 6 bounds where the orchestrator writes, not who writes inside that surface.
+- An agent that keeps writing after its hand-back is bounded only by the envelope in force.
 
 Input the hook cannot parse fails closed: it is denied with one stderr line naming `CC_HOOK_ALLOW=1`, which overrides that denial alone and leaves every guard fully active on every payload the hook can read. Set `CC_HOOK_DEBUG=1` to see the diagnostic lines it otherwise swallows.
 
@@ -399,6 +424,7 @@ code-conductor/
 │       │   ├── cc-spec.md        /cc-spec
 │       │   ├── cc-plan.md        /cc-plan
 │       │   ├── cc-implement.md   /cc-implement
+│       │   ├── cc-orchestrate.md /cc-orchestrate
 │       │   ├── cc-review.md      /cc-review
 │       │   ├── cc-compact.md     /cc-compact — phase boundary compaction
 │       │   ├── cc-debug.md       /cc-debug
@@ -418,6 +444,7 @@ code-conductor/
 │   ├── snap-build.mjs            SNAP v1/v2 handoff serializer
 │   ├── snap-validate.mjs         SNAP schema validator
 │   ├── session-id.mjs            Stable session-id resolver
+│   ├── orchestrate.mjs           Band router: run file, envelopes, hand-backs (FEAT-011)
 │   └── detect-stack.mjs          Stack auto-detection scanner
 └── skills/
     ├── code-simplifier/SKILL.md   Always active — complexity and simplicity rules

@@ -3,3 +3,5 @@
 *.installer-backup.*
 *.installer-tmp.*
 .claude/memory/band-envelope.json
+.claude/memory/orchestrator-run.json
+.conductor/

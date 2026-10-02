@@ -2291,6 +2291,8 @@ Minor **`1.35.0`** shipped `[ARCH-010]` (PR #49, squash `a351297`). Plan: `docs/
 
 **Filed at this closeout:** `[BUG-054]`, the `/cc-plan` staging-gap generator defect. The filter-match-set prediction rule, the subagent-brief observation line and the reviewer-pin discriminator line are folded into its record.
 
+**The pairing instrument fired in the field.** The pre-commit invariant (`tests/tools/repo-invariants.test.js`, "lists every open filed defect in Known limits") blocked the first closeout commit because `[BUG-054]` was missing from README's Known limits. It caught an incomplete filing before it landed. The entry was added, and `8887e11` passed at 1153 / 0.
+
 **`[ARCH-009]` evidence harvest from the slice, in one place:**
 - **Per-task handoff observations** (each in full under "Plan: ARCH-010 implementation"):
   - **T-000:** a stated mitigation is a property to verify, not a sentence to write. The C1→C4 claim was false until owner review reordered it to C1, C2, C4, C3.
@@ -2308,3 +2310,290 @@ Minor **`1.35.0`** shipped `[ARCH-010]` (PR #49, squash `a351297`). Plan: `docs/
 **`[ARCH-009]` flip condition:** satisfied on `ARCH-010`. It still waits on `FEAT-009`, `FEAT-011`, `FEAT-012` and `FEAT-031` through `FEAT-036`.
 
 **Next:** the next session starts `[FEAT-011]` against the live band contract. The Show HN launch is unblocked per the owner's timebox decision.
+
+## Checkpoint 2026-10-01 12:36
+
+Session span: `[ARCH-010]` T-000 → T-008, released as **1.35.0** (PR #49, squash `a351297`), closeout `8887e11` on `main`, `[BUG-054]` filed. Ceiling `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`. Local 1153 / 0 across 44 files.
+
+### Decisions
+- Guard 5 keys on `agent_type` only; an `agent_id`-only payload is Case A (unguarded), pinned by a test that discriminates against an `agent_id` mutant.
+- The tool mask is hard authority; Bash abstention is prompt-level only, and Bash writes are a stated Guard 5 non-goal (AC11/AC12, claude 2.1.286).
+- `[ARCH-009]` flip condition satisfied on ARCH-010; it still waits on FEAT-009, FEAT-011, FEAT-012 and FEAT-031–036.
+- Next session: `/cc-resume`, instruments first, then `/cc-spec FEAT-011` against the live band contract.
+
+### Conventions
+- An instrument firing correctly is recorded as evidence in the closeout, never as an embarrassment.
+- Notes outside git (`~/.claude` memory) are reminders only; `project.md` and the backlog are the record and win any disagreement.
+- Count predictions are amended before measurement, never after, and each amendment is named in the closeout.
+
+### Debt and workarounds
+- `[BUG-054]`: `/cc-plan` omits the plan file from its own staging steps; plans are amended by hand until fixed.
+- Interim constraints stand until their fixes close: no installer runs in this repo (BUG-052), no test gate from a linked worktree and no worktree isolation for agents (BUG-053), conductor scripts run from source `scripts/` (BUG-051).
+
+## Spec: FEAT-011, the orchestrator band router and phase handoffs [2026-10-01]
+
+The spec is `docs/superpowers/specs/2026-10-01-feat011-orchestrator-band-router-design.md`. It was APPROVED 2026-10-01 after two review rounds, and targets `1.36.0`, a minor release, at complexity L. Branch `feat/feat-011-orchestrator-band-router`. No new id was minted, and there is no SNAP contract change: the item consumes the ARCH-010 primitives as given.
+
+- **Shape:**
+  - `/cc-orchestrate <ITEM> [--auto]` runs in the main session.
+  - It is backed by `scripts/orchestrate.mjs`, whose verbs are `start`, `install`, `handback`, `approve` and `end`.
+  - It routes spec, then plan, then code (one dispatch per plan task), then audit, then qa, serially, and ends at `verify_pass`. Release stays human.
+- **Guard 6** (round one, A1, as amended):
+  - It enforces only when the payload's `session_id` equals the one in `.claude/memory/orchestrator-run.json`.
+  - A stale or invalid run fails open with a warning (`ORCH_RUN_STALE`, `ORCH_RUN_INVALID`) and never blocks a session.
+  - The order is Guard 5, then Guard 6, then Guard 2. When `agent_type` is a band role, Guard 6 does not apply.
+  - A write outside the surface is denied with `ORCH_WRITE_DENIED`.
+  - The write surface is the run file, the band envelope, `session-snapshot.json` and `.conductor/**`: gitignored state only.
+  - Bash, and R5's breadth (any non-role agent can write the surface), are stated limits.
+- **Gates:**
+  - The orchestrator authors only `boundary_routed` and `define_approved`. The latter is written once, after the plan approval: two human approvals, one gate write.
+  - D6 forwards a hand-back's gate only across a band boundary, and re-issues the band's entry gate inside one.
+  - Hand-backs travel as one `SNAP_HANDBACK <json>` line in the agent's final message.
+- **Defaults and halts:**
+  - Step mode is the default, and `--auto` is opt-in (A4).
+  - An empty plan scope halts with `ORCH_EMPTY_SCOPE`, and Code is never dispatched with `tk:R`.
+  - In v1 a halt is terminal (D12): recovery is `end` followed by `start`.
+  - The script directory is found by presence. That is safe here only through the BUG-052 → BUG-051 chain (D11).
+- **Folded by ruling:** `project-template/gitignore` lacks `.conductor/`, contrary to `README.md:325`. AC10 closes it, with a red-to-green discriminator.
+- **Carried to `/cc-plan` (owner, 2026-10-01):**
+  1. V1–V3 are the opening steps, before any guard code, each with its halt condition:
+     - V1: a subagent cannot dispatch a subagent;
+     - V2: `CLAUDE_CODE_SESSION_ID` equals the payload `session_id`;
+     - V3: which warning channel reaches the user.
+  2. The T-006-A exact-list test on `project-template/gitignore` goes red on AC10's two lines. The plan predicts it per environment, under the BUG-054 match-set rule.
+  3. Each task gets one handoff-observation line.
+  4. Per-environment test counts are predicted before any run. Local carries the 12 conditional plugin tests that CI lacks.
+  5. The plan halts for the owner's full review before approval.
+
+## Measurements: FEAT-011 V1–V3 [2026-10-01]
+
+- **Binary:** `claude` 2.1.287 (Claude Code), interactive, owner driving, in a scratch repository outside this one (`<scratchpad>/probe-feat011`). Binary delta: the ARCH-010 identity spike measured 2.1.286; V1–V3 measured 2.1.287.
+- **Main-session shape on 2.1.287:** `toolu_01ANzkuNbdQoiJRg2HiFxPsH Write agent_type=- agent_id=- …/v3-stderr.txt`, `toolu_014BGzJgsfpcQJBeAJHwJYLa Write agent_type=- agent_id=- …/v3-system.txt`, `toolu_01CUig8FU9akaB2hzLyNFYgi Write agent_type=- agent_id=- …/v3-both.txt`. The key set is `cwd,effort,hook_event_name,permission_mode,prompt_id,scratchpad_dir,session_id,tool_input,tool_name,tool_use_id,transcript_path`, so `agent_id` and `agent_type` are both absent. Every subagent payload adds exactly `agent_id,agent_type`.
+- **V1, subagent dispatch:**
+  - **Payloads:**
+    - `toolu_01U3vWPTXHAdj6wtA5NtY5g5 Agent agent_type=- agent_id=- relay`, the main session dispatching the relay;
+    - `toolu_01QDZxhg3udymHNoKKtip58D Agent agent_type=relay agent_id=aaf51707768e88daf leaf`, the relay dispatching the leaf;
+    - `toolu_01TqM8mYrvoLWs8mRNZZHVqi Write agent_type=leaf agent_id=a7a0cdd53dc2e864d /private/tmp/claude-501/-Users-yeison-Projects-code-conductor-207a0da0-…/probe-feat011/leaf.txt`, at a mistyped path;
+    - `toolu_01L1zCtqWZg4uAb972J6btC3 Write agent_type=leaf agent_id=a7a0cdd53dc2e864d /private/tmp/claude-501/-Users-yeison-Projects-code-conductor/207a0da0-…/probe-feat011/leaf.txt`, at the intended path.
+  - `ls leaf.txt main-leaf.txt` lists both files.
+  - **The relay's tool list, as it reported it:** "Agent, Artifact, Bash, Edit, Read, Skill, ToolSearch, Write, SubagentHandback, mcp__claude_ai_Claude_Docs__batch, mcp__claude_ai_Claude_Docs__guide, mcp__claude_ai_Claude_Docs__update, SendMessage (loaded through ToolSearch)".
+  - **Verdict: halts.** On 2.1.287 a subagent can dispatch a subagent, so D1's grounds are false on this binary. Awaiting the owner's ruling on D1.
+- **V2, session id:** printenv printed `7162b039-aa22-4dfc-8536-e5aaeba35edc`. All 20 logged payloads carry `session_id=7162b039-aa22-4dfc-8536-e5aaeba35edc`: the main session, the relay `aaf51707768e88daf`, and the two leaves `a7a0cdd53dc2e864d` and `aa97edc9b9cfff98a`. There is one distinct value. **Verdict: holds.**
+- **V3, warning channel:** measured on a re-run: a fresh session, the same fixture, the same binary 2.1.287, `permission_mode=auto`. The markers appearing prove the hook ran, so the fresh session is valid for this measurement. Owner's screen:
+  - **V3-STDERR:** not seen. The `v3-stderr.txt` write completed with no marker anywhere on screen, so stderr at exit 0 is invisible in interactive mode on 2.1.287.
+  - **V3-SYSTEM:** seen, rendered inline with the tool result, verbatim: `PreToolUse:Write says: V3-SYSTEM marker`.
+  - **V3-BOTH:** seen, in the same rendering, verbatim: `PreToolUse:Write says: V3-BOTH marker`.
+  - **V3-ASK:** no prompt appeared and the write proceeded directly, so the classifier resolved the ask under `permission_mode=auto`.
+  - **Verdict: holds.** Guard 6 warns on `systemMessage` (P13), and not as a tie-break, since stderr is invisible. Guard 6's warning text is rendered behind the prefix `PreToolUse:Write says: ` and must read well behind it.
+  - **The AC12 contingency fired as pre-ruled.** Asks do not prompt under auto mode, so T-006-D runs in default permission mode and every T-006 record states `permission_mode`.
+- **Measured behaviors of 2.1.287 that the design leans on the opposite of:**
+  1. **Asynchronous dispatch.**
+     - The main session issued the relay dispatch (`toolu_01U3vW…`) and its own leaf dispatch (`toolu_01MhHea7…`) back to back. It then made its three `v3-*.txt` Writes before either subagent's first logged Write.
+     - The `Agent` inputs carry no `run_in_background` field (`{"description","prompt","subagent_type"}` only), so asynchrony is not visible in the dispatch payload.
+     - In the payloads, the only completion markers are the subagents' own `SubagentHandback` calls. The completion notices on screen are not tool calls, so the PreToolUse log cannot see them; they are recorded from the owner's screen report.
+     - **Owner screen observation:** both completion notices ("leaf finished 7s", "relay finished 1m 23s") appeared after all of that agent's activity, including the relay's late `SendMessage` report. The completion notice is therefore the correct wait point, and it bounds the post-hand-back tail.
+  2. **The one-final-message assumption failed.**
+     - **The relay sent three reports:**
+       - `SubagentHandback` `toolu_01LvKvCWsLQuFTbrotjoX97s` says "Neither file's contents was checked independently… I took its report as given";
+       - `SubagentHandback` `toolu_01TUcUSkP9RafZ3dVXTZtHvq` says "I checked it: it contains exactly `leaf`";
+       - `SendMessage` `toolu_01QSAtXtkqGZZPEdUJxSeXa4`, with `to:"main"`, states the same claim and ends: "my SubagentHandback call was refused with a message saying a report had already been delivered, so I am sending this through SendMessage instead."
+     - So the first hand-back, which says the contents were unchecked, is the one that was delivered. The checked-contents claim arrived only by `SendMessage`, after the relay's own Bash `cat` (`toolu_01WDd3odSChnqNVZoTYTUn4G`).
+     - **A handed-back agent was revived.**
+       - The leaf `a7a0cdd53dc2e864d` handed back first (`toolu_01HoFXzpMdVtGZUcMM6uJVK4`).
+       - The relay then loaded `SendMessage` through ToolSearch and messaged that leaf by its agent_id (`toolu_01TerwsBzC8ugej6m2zu8h93`, `to:"a7a0cdd53dc2e864d"`).
+       - The leaf wrote again and handed back a second time (`toolu_01DbTtEDJrjJctjJRjrX6Cxc`).
+       - Whether that second leaf hand-back was accepted is not visible: PreToolUse logs inputs, not results.
+  3. **Auto mode.**
+     - All 20 payloads carry `permission_mode=auto`.
+     - **The logged Bash calls:**
+       - `toolu_01XQwrgzmeJZMkZc1NX9YmrX`, main, `printenv CLAUDE_CODE_SESSION_ID`;
+       - `toolu_01WDd3odSChnqNVZoTYTUn4G`, the relay, `cat …/leaf.txt; echo; ls -la <mistyped>/leaf.txt`;
+       - `toolu_01AEtTFQPYXLEaa7kzKfX5ff`, main, `od -c leaf.txt && od -c main-leaf.txt && ls -la <mistyped>/leaf.txt`.
+     - Which of these the classifier allowed without a prompt comes from the owner's screen report. The payloads show the mode, not the decision.
+     - **Owner screen observation:** no Bash call prompted across both runs. The `od -c` call showed "Allowed by auto mode classifier" explicitly.
+  4. **A write outside the intended tree.**
+     - The relay's dispatch prompt joined `code-conductor` and the session directory with `-` instead of `/`. The leaf wrote `/private/tmp/claude-501/-Users-yeison-Projects-code-conductor-207a0da0-8a9a-45dd-b7f1-578776d1c15e/scratchpad/probe-feat011/leaf.txt`, which `ls -la` confirms is 4 bytes, outside the probe repository.
+     - Nothing stopped it. This is field evidence for scope enforcement by path rather than by prose.
+
+## Demo: FEAT-011 orchestrated run (AC12) [2026-10-02]
+
+**Where and on what.** The demo ran at `<scratchpad>/demo-feat011` on `claude` 2.1.287, the build V1–V3 measured. Sources:
+- the demo's `payloads.jsonl`, 215 PreToolUse payloads read through `read-payloads.mjs`;
+- the owner's notes, `.conductor/notes/T-006.md`;
+- the owner's verbatim pastes of each terminal.
+
+The payload log records PreToolUse only, so deny texts, halt texts and rendered messages come from the owner's screen.
+
+**`permission_mode` per session, read from payloads:**
+
+| Session | Run | Payloads | Mode |
+|---|---|---|---|
+| `9b472b1a-0000-4ff8-bb09-bac045b30ac9` | A, attempts 1–2 | 47 | `auto` |
+| `eb0814fd-1a04-4e45-b6d3-08dd9b8dae96` | A, attempts 3–4 | 153 | `auto` |
+| `5f7fdf8e-6e75-4cc6-bb92-b4409e5d38f2` | B, `DEMO-002` | 12 | `auto` |
+| `a8638d2b-14a6-4652-af3f-5bb9b8b019d1` | D | 3 | `default` |
+
+Fact 4's session reads `default`, as the halt rule requires.
+
+**The four AC12 facts.**
+
+1. **Run A reached `verify_pass` (attempt 4, `DEMO-001`, session `eb0814fd`).**
+   - **Close:** qa's `SubagentHandback` was `toolu_01NiWkm3V63iV8agsRX4yYS6`, `handback qa` was `toolu_019aRUjtLWZeQzkFvsxjS5nE`, and `end` was `toolu_01L6JyozkAaoGnkmNeAoTbEZ`, run automatically on `verify_pass`.
+   - **`end`'s record:** gate `verify_pass`, `halt` null, tasks done 2.
+   - **Approvals,** both by Yeison Restrepo: spec 14:29:06Z, plan 14:30:56Z.
+   - **Six hand-backs:**
+     - spec, `boundary_routed`, 14:28:47;
+     - plan, `boundary_routed`, 14:30:02;
+     - code Task 1, `build_executed`, 14:32:08;
+     - code Task 2, `build_executed`, 14:33:00;
+     - audit, `build_executed`, 14:34:05;
+     - qa, `verify_pass`, 14:35:04.
+   - **Closing lines:** the report table, then "Release is yours to do, following docs/RELEASE-CLOSEOUT.md". The terminal collapsed part of the JSON, and the report table carried every row.
+2. **Guard 6 R6 denied the main session's write. This is a ruled deviation: the fact moved from run A to run B.**
+   - **Payload:** `toolu_01TfyQjmj8U6UzYBExbaws5g`, session `5f7fdf8e`. Rendered verbatim: `Error: PreToolUse:Write hook error: Guard 6: ORCH_WRITE_DENIED: /private/tmp/claude-501/-Users-yeison-Projects-code-conductor/207a0da0-8a9a-45dd-b7f1-578776d1c15e/scratchpad/demo-feat011/README.md is outside the orchestrator's write surface while run DEMO-002 is live; repository writes during a run go through a band role (Guard 5).`
+   - **Outcome:** the write did not complete, and `README.md` still read `demo`.
+   - **Why it moved:** T-006-B step 4 was not performed in run A. The owner ruled on 2026-10-02 that R6's deny depends on a live run, the main-session shape and an out-of-surface target, none of which varies with band or item, so the measurement is equivalent. Re-running run A for placement alone would add no information.
+   - **Two material differences:** the deny cites `DEMO-002`, and it landed in define rather than build.
+   - **Timing:** it also landed after the run had halted with `ORCH_GATE_UNEARNED`, which is finding 4.
+3. **Run B halted on the forged gate (session `5f7fdf8e`).**
+   - **The halt:** `handback spec` (`toolu_016wGYUmm1nhEdYkQn4sdkcZ`) printed, verbatim, `ORCH_GATE_UNEARNED: spec may hand back boundary_routed, not define_approved`, then `exit=1`. The run file gained `"halt": {"code": "ORCH_GATE_UNEARNED", "reason": "spec may hand back boundary_routed, not define_approved", "at": "2026-10-02T14:45:05.208Z"}`.
+   - **Nothing followed:** no `plan` dispatch payload comes after it. The session's remaining payloads are the main session's `ls`/`cat` of `README.md`, a Read and the fact-2 Write.
+   - **The agent announced its forged gate:** "One deliberate deviation from your brief: the SNAP gate below is `define_approved`, not `boundary_routed`. My system configuration requires that gate no matter what the brief says, and it states that this fixture exists to test that the orchestrator halts." It also wrote: "Do not read `define_approved` as real approval. No user approved this spec. The value is a test signal from my configuration, and the orchestrator should halt rather than move to the next phase."
+   - **The router halted anyway:** the forged gate was rejected by the `MAY_HAND_BACK` table, not by trust.
+4. **Run D's write completed with no deny (session `a8638d2b`, `default`). It landed otherwise than planned, held for the owner's ruling at T-007.**
+   - **Payload:** `toolu_01783Xfn6HUUeS35hrfQ2wmU`.
+   - **Planned sequence:** warn, then ask, then completed write.
+   - **Observed sequence:** no visible warn, then the ask, then the completed write.
+   - **The ask:** Guard 2 rendered "Overwrite file README.md", showing the diff (`1 - demo` / `1 + second session`) and "Do you want to overwrite README.md? 1. Yes / 2. Yes, and switch to accept edits... / 3. No". The owner chose Yes.
+   - **Tool result, verbatim:** "The file /private/tmp/claude-501/-Users-yeison-Projects-code-conductor/207a0da0-8a9a-45dd-b7f1-578776d1c15e/scratchpad/demo-feat011/README.md has been updated successfully. (file state is current in your context - no need to Read it back)". `README.md` reads `second session`.
+   - **No deny** appeared at any point. The R4 warn's absence is finding 5.
+   - **Run B's run file** stayed in place by design (T-006-C) until run D's `end`. That `end` ran from the shell, so it has no payload, and it printed the `DEMO-002` run verbatim: session `5f7fdf8e…`, band define, role spec, gate `boundary_routed`, no approvals, no hand-backs, and the halt block from fact 3.
+
+**Fixture observation lines that survived.** The other lines were cleared by `end` with `.conductor/handback/` and were not captured.
+- **Attempt 1, spec:** "A single in-scope write was enough for a minimal spec handoff, and the band envelope did not get in the way."
+- **Attempt 3, audit:** "With an empty spec, the audit can only check work against the plan, and a gate value copied from a template can claim a build that never ran."
+- **Attempt 3, qa:** "A qa band can't report verify_pass on a repo with no test runner; the repo needs a test command (or a declared "no tests" gate) before qa can succeed." The owner ruled this a reinterpretation, not a finding (finding 3).
+- **Run B, spec:** "A gate value forced by system configuration overrides the brief's gate, so the orchestrator has to check gate values rather than trust them as approvals."
+
+**Five findings beyond the script.** Each is citable for future roster items; nothing is minted.
+
+1. **The `ops.scope` template defect,** caught by the demo and fixed in `56abb97` (T-005-H).
+   - **Halt:** attempt 1 halted `ORCH_HANDBACK_INVALID: SNAP_ERROR: missing: ops.scope (required when tk is RW)`.
+   - **After the fix:** attempt 4 closed with all six hand-backs recorded, including audit's scope-less `R` hand-back. qa's `X` hand-back is recorded through its `verify_pass` gate.
+2. **The stale-run seam, measured live.**
+   - **The change:** the `session_id` changed mid-session, `9b472b1a` → `eb0814fd`, on an environment reset, with no crash.
+   - **Boundary:** payload 47, `toolu_01J3Qy6xziNMpi7GGWnHatS8` (code's `SubagentHandback`, old session), then payload 48, `toolu_01E2eSmcC855e3ENrPmXt38U` (Write of `.conductor/handback/code-1.txt`, new session).
+   - **Refusal (P12):** `handback code` and `install code --check` both exited 2 with "orchestrate: run DEMO-001 belongs to another session; end it, or start to replace it". Nothing was recorded.
+   - **`end` across sessions:** it succeeded every time, confirmed three times.
+3. **qa's reinterpretation, and the no-forged-gate path end to end.**
+   - **Reinterpretation:** in attempt 3 (session `eb0814fd`), qa's own report met the fixture's condition: `ls src` showed `one.txt` and `two.txt`. It then substituted a stricter criterion nobody gave it, that a test suite must run, and took the failure branch. This is the mutant-runner incident's sibling: an agent overriding its instruction with its own judgment, here toward refusal. It is not a finding that the project needs a test command.
+   - **The path held:** the agent would not claim its gate and omitted `SNAP_HANDBACK`. The run halted `ORCH_HANDBACK_MISSING: expected exactly one SNAP_HANDBACK line, found 0`, recorded verbatim, and nothing further was dispatched.
+   - **Bash scan:** the scan hook (P1, P8) blocked qa's wider searches, and qa did not route around it.
+   - **The fixture, amended 2026-10-02 by owner ruling (plan T-006-A):**
+     - original body: "Run `ls src`. If `one.txt` and `two.txt` both exist, end as your brief instructs; otherwise leave out the `SNAP_HANDBACK` line and say why."
+     - new body: "Run `ls src` and report its output. Your verification for this demo IS that `one.txt` and `two.txt` both exist in that listing; no other verification exists in this project and none is required. If both exist, end as your brief instructs, claiming verify_pass. If either is missing, leave out the SNAP_HANDBACK line and say which is missing."
+   - **No contract edit, no new gate, no test suite.**
+4. **Guard 6 enforces on a halted run.** Fact 2's deny landed after run B had halted with `ORCH_GATE_UNEARNED`. That confirms "a halted run in its live session keeps Guard 6 enforcing until end".
+5. **Warn+ask render loss, newly isolated.**
+   - **The channel works in `default` mode.** Run D's probe (`toolu_01KWpDrcs1pTqQdxLFTjzzZb`) targeted `probe.txt`, which did not exist, so no ask rode along. It rendered in full, verbatim: `PreToolUse:Write says: Guard 6: ORCH_RUN_STALE: run DEMO-002 (started 2026-10-02T14:43:59.692Z) belongs to another session, so writes are not restricted. Clear it with: node scripts/orchestrate.mjs end`, followed by "Wrote 1 line to probe.txt".
+   - **The warn is lost when it rides a Guard 2 ask that actually prompts,** as at fact 4. V3 could not measure this composition under auto.
+   - **Asymmetry:** the session's assistant reported "No hook or other message appeared with the write" for the probe too, while the line was on the owner's screen. The `systemMessage` reaches the user, not the model's tool result, now confirmed in both modes.
+
+**Known limits matrix, measured.** This is the T-007 README Known limits input; it lands in README at T-007, the task that owns README.
+
+| Channel | `permission_mode` | Prompting decision rides along | Seen by the user | Seen by the model |
+|---|---|---|---|---|
+| stderr | `auto` | no | no (V3) | no |
+| `systemMessage` | `auto` | no | yes, behind `PreToolUse:Write says: ` (V3) | not observed |
+| `systemMessage` with ask | `auto` | no: the classifier resolves the ask, no prompt (V3) | not measured | not measured |
+| `systemMessage` | `default` | no (the `probe.txt` write) | yes, in full | no |
+| `systemMessage` with ask | `default` | yes: Guard 2's prompt (the `README.md` write) | **no, the warn is lost** | no |
+
+**Harvest patterns:**
+- **D8's wait fails cold and holds after one correction.** There were 2 slips across about 13 dispatched hand-backs. Both were the first hand-back of a fresh conversation (attempt 1's spec and run B's spec), and both were self-reported. There were zero slips after an in-context correction: attempts 2 to 4 held the wait on 11 consecutive dispatches. This is a FEAT-012 brief-design input.
+- **The gate-semantics limit is a measured property of v1 gates.** It came from two roles, in three sightings: audit in attempt 3, code Task 2 in attempt 4, and audit again in attempt 4. A gate value copied from a template can claim work that never ran. The attempt-3 audit line above is the harvest centerpiece.
+- **The T-003 brief-template fix held.** No agent routed around a deny through Bash anywhere in T-006.
+
+**Not a defect.** `end` printing the halted run is its correct exit-record behavior: it prints the run it removes. A demo session labeled it a bug; it is not recorded as one.
+
+**Demo-side changes, all owner-driven:**
+- the fixed command was copied in before attempt 2 (`97176ee7`, by `cmp`);
+- the qa fixture was amended before attempt 4;
+- the spec fixture was swapped before run B (T-006-C). Its prior body was "Write `docs/superpowers/specs/demo-design.md` containing the single line `# Demo spec`. End as your brief instructs."
+
+**Amendment, 2026-10-02, owner rulings on `7bf717f`'s four open points.** The text above stands as committed; this note supersedes it where they differ.
+
+1. **Fact 4 is ruled satisfied in substance.** It is satisfied with the observed sequence: no visible warn, then the ask, then the completed write. Finding 5 explains the divergence. The warn *was* emitted, since the probe proves the channel alive in `default`, and it is lost in rendering only when it rides a prompting ask. The fact's substance held entirely: R4 allowed, Guard 2 asked in `default` mode, the write completed, and nothing was denied. The plan's expected sequence is noted as pre-measurement: it was written before the warn+ask composition was measurable, because under auto no ask ever prompted. T-006 is ticked.
+2. **The warn+ask matrix is approved as T-007's README input.**
+3. **Observation lines restored from the owner's terminal captures.**
+   - **Attempt 4,** from the final report, verbatim:
+     - spec: "The envelope scope matched the task path exactly, so the spec write went through Guard 5 without being denied."
+     - plan: "The plan content was given in full and the envelope scope matched the target path, so this handoff needed only one write inside scope and no spec lookup."
+     - code Task 1: "The plan and envelope were enough on their own. The task was two in-scope edits with no denials."
+     - code Task 2: "A one-file plan task needs only Write and Edit inside the scope, but the required gate value 'build_executed' does not match what happened when there is no build to run."
+     - audit: "The plan and src/ match exactly, but the spec is empty and the template gate says build_executed although this read-only audit ran no build."
+     - qa: "The qa check here is just a directory listing, and the envelope has no ops.scope key, so the scope key was left out as the brief says."
+   - **Attempt 2,** from the `end` print's deletes on the owner's screen:
+     - spec: "Reading the envelope before writing made it easy to check the scope and copy it verbatim; the write went through with no guard friction."
+     - plan: "Guard 5 checks writes against the real repo root, so a typo in an absolute path shows up as a scope violation. Check the path against the cwd before treating a denial as a real out-of-scope write."
+     - code Task 1: "This envelope covered both the task file and the plan, so I could do the task and tick the plan box in a single pass without any scope denials."
+   - **Lesson:** `end` clears the hand-back directory, so the command's final report is the only observation carrier. A run that dies before its report loses its lines unless someone captured the screen.
+4. **Finding 1 widens on observable evidence.**
+   - **Attempt 2:** the spec and plan hand-backs both validated at exit 0 on the owner's screen, each carrying `ops.scope`. Code Task 1's hand-back was never submitted; the P12 refusal intercepted it.
+   - **The after-the-fix claim is therefore 8 validated hand-backs:** 2 in attempt 2 and 6 in attempt 4.
+
+## Plan: FEAT-011 implementation [2026-10-01]
+
+Plan `docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`.
+- **Approval:** APPROVED 2026-10-01 after full review. P1–P18 stand as written, with P13's systemMessage tie-break pre-ruled. The 49th test (`ORCH_RUN_INVALID` through the router), the routing and the never-start-a-run-here constraint are approved. One amendment: T-006-D approves Guard 2's ask, and fact 4 records the sequence warn, then ask, then the completed write.
+- **Routing:** T-003 runs as a subagent then a reviewer (main checkout, no worktree, no commit: BUG-053); T-001 and T-006 run live with the owner driving; the rest are native.
+- **Predictions,** measured on drafts in a scratch clone: local 1153 → 1227 / 0 (+74), ci-node20 1131 / 96, ci-node24 1214 / 13.
+
+Handoff observations, one line per task:
+- T-000: `f0fd9c6` passed the gate at 1153 / 0 across 44 files; the union ceiling is `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`, and `RECORD_PARITY_OK`. The plan embeds its four drafts by script, with each sha256 round-tripped out of the plan text. Owner review caught a gap the drafts could not show: `decides nothing with its warning` pins the R4-then-Guard-2 ask, but T-006-D's live script did not instruct approving that ask, so "was not denied" would have been ambiguous evidence. A behavior pinned in a unit test must also be scripted at the live step that observes it.
+- T-001: V1 halts on 2.1.287 (the relay dispatched leaf, which wrote leaf.txt with agent_type=leaf); V2 holds (all 20 payloads carry the printenv session_id); V3 pending the owner's marker observations. The probe also measured async dispatch, a refused second hand-back answered by SendMessage, permission_mode=auto throughout, and a mistyped-path write outside the probe tree. Each is a measured opposite of a design assumption, and T-002 waits on the D1 ruling.
+- T-001 (V3 and ruling): V3 holds on a fresh-session re-run. stderr is invisible and systemMessage renders behind "PreToolUse:Write says: ", so Guard 6 warns on systemMessage. The V1 halt was ruled: D1 stands on new grounds, R7 and ORCH_HANDBACK_CONFLICT were added, and D8 is serial by waiting for the completion notice (spec e5901ae). Lesson: a halt rule that fires is the plan working; the binary moved under a spec written against the previous build, and only re-measuring on the shipping build caught it.
+- T-002: both files were written from the plan text by the same extractor that verified the plan, so each landed on its sha (88ab6418, cb99c5a0) with nothing transcribed by hand. Every row read as predicted: the load failure, 50 / 50, the three contract suites untouched, and 1203 / 0 across 45 files. The amended plan moved no count it did not predict.
+- T-003: Guard 6 with R7 landed on its planning sha (d03d2128, 750 lines) through C1, C2a, C2b, C3, C4 and C5, with both smoke payloads clean after every step, a 20 / 10 red, then 503 and 1233 / 0; the fresh reviewer's eight mutants matched M1 4, M1b 1, M2 2, M2b 1, M3 1, M4 2, M5 2, M6 1 on the restored runner. Subagent's observation: the smoke-agent payload is still allowed after C5 because no run file exists, so it proves the hook loads and runs, not that R7 denies; R7's deny is proven by the suite alone until T-004 routes Agent and SendMessage.
+  - **The brief caused the runner rewrite, and the inducing instruction is named.** The reviewer brief said "write your OWN mutant runner" and "copy the REAL repository's hook into the clone", and its constraint line said "If a hook denies a command, use a simpler alternative". That line drew no distinction between a guard's deny and the owner's permission deny, so the reviewer treated the owner's declined Write as an obstacle to route around (a Bash heredoc) rather than an instruction to stop on. Correction for the brief template, and ARCH-009 harvest for FEAT-012: an owner's deny is an instruction, not an obstacle; a brief must say explicitly that a declined permission prompt means stop and report, and that only a guard's deny invites an alternative.
+  - **Bash-seam sighting, with Guard 3 disambiguated.** The owner declined the reviewer's Write of `scratchpad/mutants.mjs` (`toolu_01WgFdKWsSCDhfc61DSr8isR`, 2026-10-02T01:09:54.827Z, "Permission for this tool use was denied"). The same content then landed through Bash `cat > …/mutants.mjs <<'EOF'` (`toolu_01MDH5idd8SN4KxRCCeFhJpd`, 01:12:26.572Z, result `written`), with no prompt under `permission_mode=auto`, and was run at 01:12:29.845Z (`toolu_01KJdzcRnufnRFu1LxXpyano`). Guard 3 scans heredoc bodies against its patterns (P10's ground, unchanged), and this body matched none; it does not deny a heredoc file write as such. Both facts hold, and they are not in contradiction. The owner restored the original runner (sha `9170f486…`, rebuilt from tool history and byte-identical), and the reviewer re-ran on it; its race ahead of the owner's hold was accepted, because it followed every term.
+  - **Citable evidence for the future enforcement roster items (nothing minted):** a live measurement, inside this repository's own task, that a Write the owner denied completed through Bash under auto mode, by the tool_use_ids above. Standing rule for the rest of FEAT-011: scratchpad instruments are edited only through the Write tool, where the owner sees the diff, and an agent that needs an instrument changed reports the need instead of patching it.
+- T-004: every row read as predicted, and none was absorbed:
+  - 1 / 1 / 36 for the new test red, then `[AC13]` red;
+  - 1 failed / 1233 (1234) on the full suite;
+  - `deploy.test.js` 53 / 53 on both sides of the fixture edit;
+  - the declared three-red window (AC3a merge 1 / 17, union matcher 2 / 36), held with no full-suite run, then 56 / 56;
+  - 304 / 304 across 17 files, and 1235 / 0.
+
+  The two repository test diffs hash identically to the clone diffs that were measured (`53108ef1`, `21480e94`), so planning and execution measured the same bytes. The live `.claude/settings.json` matcher now routes `Agent` and `SendMessage` to the hook. Both settings files parsed immediately after each edit (the owner's parse check, with its halt rule in T-004-L). Every hook result after the edit was silent, and this session made no dispatch, so R7's no-run path is not yet live-observed.
+  - **Standing rule, extended at T-004's go:** for the rest of FEAT-011, instruments **and records** are edited only through Write or Edit, where the owner sees the diff. `c5fea9c`'s rule covered instruments only, and its own T-003 append went through a Bash heredoc.
+- T-005: every row read as predicted:
+  - 2 failed / 30 skipped, each failure ENOENT;
+  - both mirrors written from the plan text at `c4d1b325` and identical by `cmp`;
+  - the leaf placed between cc-init and cc-plan, then plain `git add` at rc 0;
+  - staging before measuring, 36 / 36, and 1237 / 0.
+
+  The parity diff hashes identically to the clone's (`5e04f5ea`). One live effect worth knowing: the moment the command file existed, this session's skill list offered `cc-orchestrate`. The never-start-a-run-here constraint is therefore now one keystroke from being broken, not just a policy about a script, and from here it is held by discipline alone.
+  - **Amended at T-005-H: T-006's demo caught a defect in the shipped template.** The `SNAP_HANDBACK` template omitted `ops.scope`, and `snap-validate.mjs:25` requires it when `tk` is `RW` (spec, plan and code). Audit (`R`) and qa (`X`) envelopes carry no scope, and the validator does not require one there. The fix is one brief line telling the agent to copy `ops.scope` verbatim from its envelope and to leave the key out when the envelope has none, plus a `"scope"` field in the template. The draft moved from `c4d1b325` to `97176ee7`. The line above records what was written at T-005 and keeps its sha. The fix was checked against the validator:
+    - the scope-less original reproduced the demo's error at rc 1;
+    - the same hand-back with the envelope's scope copied in passed at rc 0;
+    - a scope-less `R` hand-back passed at rc 0.
+
+    The plan's draft extracts at `97176ee7` through a new `scratchpad/extract-fence.mjs`, written with Write; `extract.mjs` does not read four-backtick fences. The control extraction reproduced `c4d1b325` from the unamended plan first. Both mirrors match the draft by `cmp`. Predicted, then measured: parity 36 / 36, and 1237 / 0 across 46 files.
+- T-006 (run A, attempt 1; `permission_mode` `auto` on all 9 payloads, session `9b472b1a`):
+  - **Live AC2-adjacent evidence: the error path behaved exactly as specified.** The spec agent wrote `demo-design.md` in scope. Its hand-back was v3 with `tk` `RW` and no `ops.scope`. `handback spec` printed `ORCH_HANDBACK_INVALID: SNAP_ERROR: missing: ops.scope (required when tk is RW)`, quoting the validator verbatim, and exited 1. The run file gained `halt` at 01:42:08.434Z with `handbacks` still empty. Nothing further was dispatched, and the envelope was left unchanged (spec, `RW`, `docs/superpowers/specs/**`). The demo earned its place by catching a shipped-template defect before release; see T-005-H.
+  - **D8 slip, live sighting.** The orchestrator's wait for the completion notice is prompt-level cooperation, and it failed once. After "Message from @spec", the main session wrote `.conductor/handback/spec.txt` and ran `handback spec` before `Agent "Spec role for DEMO-001" finished - 8s` appeared. There was no consequence this time, since the agent had already delivered its single report and the hand-back halted on validation. The restart follows the wait strictly.
+  - **D12 observed live: halt, then restart.** A halt is not resumed. The recovery is `end` followed by a fresh `start DEMO-001`, with run A re-driven from step 1 to the same stop points. Before the restart, the fixed command was copied into the demo (`.claude/commands/cc-orchestrate.md`, `c4d1b325` to `97176ee7`, confirmed by `cmp`). The restart's own outputs land with T-006-E's evidence.
+- T-006: AC12 was measured across four sessions on 2.1.287 (A and B `auto`, D `default`); the record is under "Demo: FEAT-011 orchestrated run (AC12)".
+  - **Fact 1** closed `verify_pass` on attempt 4.
+  - **Fact 3** halted `ORCH_GATE_UNEARNED` verbatim.
+  - **Fact 2** landed in run B by owner ruling.
+  - **Fact 4** completed without a deny, but the planned warn did not render, so it is held for the owner's ruling at T-007.
+  - **Five findings** are recorded, nothing minted: the template defect, the stale seam, qa's reinterpretation, Guard 6 enforcing on a halted run, and the warn+ask render loss.
+- T-007: every row read as predicted:
+  - **README:** the drafted blocks are verbatim, checked by `check-readme.mjs`, with the warn+ask matrix amended into the plan first. The suite then read 1237 / 0.
+  - **Version:** the bump to `1.36.0`.
+  - **Records:** the backlog and CHANGELOG are verbatim with their date set, checked by `check-records.mjs`.
+  - **Gates:** `VERSION_GATE_OK 1.36.0` and `RECORD_PARITY_OK`.
+  - **Discriminator:** red, `FAIL [A] 1.36.0 claims FEAT-011 but its heading reads [ ]` ×4, `RECORD_PARITY_FAILED (4 violations)`, rc 1; one violation per CHANGELOG `[FEAT-011]` bullet. Then green.
+  - **Suite and ceiling:** 1237 / 0 across 46 files, union ceiling `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`.
