@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { cleanGitEnv } from '../helpers/git-env.js';
 
 const SCRIPT = fileURLToPath(new URL('../../scripts/conductor-db.mjs', import.meta.url));
 const CONTRACT = fileURLToPath(new URL('../../scripts/snap-contract.mjs', import.meta.url));
@@ -21,10 +22,11 @@ const FLAG = NEEDS_FLAG ? ['--experimental-sqlite', '--no-warnings'] : [];
 let HAS_SQLITE = false;
 try { execFileSync(process.execPath, [...FLAG, '-e', "require('node:sqlite')"], { stdio: 'ignore' }); HAS_SQLITE = true; } catch { /* skip below */ }
 
+const CLEAN_ENV = cleanGitEnv();
 function runDb(args, { cwd, env, input } = {}) {
   return spawnSync(process.execPath, [...FLAG, SCRIPT, ...args], {
     cwd, encoding: 'utf8',
-    env: env ?? process.env,
+    env: env ?? CLEAN_ENV,
     input,
   });
 }
@@ -42,7 +44,7 @@ async function readRows(dbPath) {
 let repo;
 beforeEach(() => {
   repo = mkdtempSync(join(tmpdir(), `cc-db-${randomUUID()}-`));
-  execFileSync('git', ['init', '-q'], { cwd: repo });   // primary root path
+  execFileSync('git', ['init', '-q'], { cwd: repo, env: cleanGitEnv() });
 });
 afterEach(() => {
   // On Windows the db + `-wal`/`-shm` sidecars can stay briefly locked after the
