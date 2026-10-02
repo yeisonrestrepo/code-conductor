@@ -100,4 +100,41 @@ describe('checkParity', () => {
     const backlog = '### [X] `[BUG-046]` Item\r\n* **DONE, shipped as `1.32.2`**.\r\n';
     expect(run(backlog, CLAIMED.replace(/\n/g, '\r\n')).ok).toBe(true);
   });
+
+  // [BUG-050] Sub-shaped ids are rejected, never silently skipped.
+  it('rejects a sub-shaped backlog heading', () => {
+    const backlog = [
+      '### [X] `[BUG-046]` Normal item',
+      '* **DONE, shipped as `1.32.2`**.',
+      '### [X] `[ARCH-008-S1]` Sub-shaped item',
+    ].join('\n');
+    const r = run(backlog, CLAIMED);
+    expect(r.ok).toBe(false);
+    expect(r.violations.some((v) => v.direction === 'SUB' && v.id === 'ARCH-008-S1')).toBe(true);
+  });
+
+  it('rejects a sub-shaped CHANGELOG claim', () => {
+    const changelog = [
+      '# Changelog', '',
+      '## [1.32.2] - 2026-09-29', '',
+      '### Fixed',
+      '- **[BUG-046]** Normal claim.',
+      '- **[ARCH-009-S1]** Sub-shaped claim.', '',
+    ].join('\n');
+    const backlog = [
+      '### [X] `[BUG-046]` Normal',
+      '* **DONE, shipped as `1.32.2`**.',
+    ].join('\n');
+    const r = run(backlog, changelog);
+    expect(r.ok).toBe(false);
+    expect(r.violations.some((v) => v.direction === 'SUB' && v.id === 'ARCH-009-S1' && v.version === '1.32.2')).toBe(true);
+  });
+
+  it('does not reject a top-level id as sub-shaped', () => {
+    const backlog = [
+      '### [X] `[BUG-046]` Normal item',
+      '* **DONE, shipped as `1.32.2`**.',
+    ].join('\n');
+    expect(run(backlog, CLAIMED).violations.filter((v) => v.direction === 'SUB')).toEqual([]);
+  });
 });

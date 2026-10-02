@@ -53,4 +53,29 @@ describe('scanHeadings', () => {
   it('reads a heading with trailing whitespace after the closing backtick', () => {
     expect(scanHeadings('### [ ] `[BUG-010]` Item   ').headings).toBe(1);
   });
+
+  // [BUG-050] Sub-shaped ids are rejected, never silently skipped.
+  it('rejects a sub-shaped id like ARCH-008-S1 and reports it', () => {
+    const text = '### [X] `[ARCH-008-S1]` Sub-shaped item';
+    const r = scanHeadings(text);
+    expect(r.headings).toBe(0);
+    expect(r.subShaped).toEqual(['ARCH-008-S1']);
+  });
+
+  it('rejects multiple sub-shaped ids alongside normal ones', () => {
+    const text = [
+      '### [X] `[BUG-010]` Normal item',
+      '### [ ] `[ARCH-008-S1]` Sub one',
+      '### [ ] `[ARCH-009-A]` Sub two',
+      '### [X] `[FEAT-020]` Another normal',
+    ].join('\n');
+    const r = scanHeadings(text);
+    expect(r.headings).toBe(2);
+    expect(r.max).toEqual({ BUG: 10, FEAT: 20 });
+    expect(r.subShaped).toEqual(['ARCH-008-S1', 'ARCH-009-A']);
+  });
+
+  it('does not reject a top-level id as sub-shaped', () => {
+    expect(scanHeadings('### [ ] `[BUG-050]` Normal').subShaped).toEqual([]);
+  });
 });
