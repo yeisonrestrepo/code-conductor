@@ -30,14 +30,17 @@ describe('this repository, at every commit', () => {
     expect(r.ok).toBe(true);
   });
 
+  // [BUG-050] The 3 ARCH-008 sub-items predate both instruments and are grandfathered.
+  const GRANDFATHERED_SUB = new Set(['ARCH-008-S1', 'ARCH-008-A', 'ARCH-008-B']);
+
   it('keeps its CHANGELOG, backlog and VERSION in record parity', () => {
     const r = checkParity({
       backlogText: read('AGENT-READABLE BACKLOG.md'),
       changelogText: read('CHANGELOG.md'),
       versionFile: read('VERSION').trim(),
     });
-    expect(r.violations.map((v) => v.detail)).toEqual([]);
-    expect(r.ok).toBe(true);
+    const active = r.violations.filter((v) => !(v.direction === 'SUB' && GRANDFATHERED_SUB.has(v.id)));
+    expect(active.map((v) => v.detail)).toEqual([]);
   });
 
   // The ceiling itself is a query and is not asserted here: its remote leg needs a ref
@@ -47,6 +50,11 @@ describe('this repository, at every commit', () => {
   // to prevent.
   it('files no id twice', () => {
     expect(scanHeadings(read('AGENT-READABLE BACKLOG.md')).duplicates).toEqual([]);
+  });
+
+  it('[BUG-050] reports the grandfathered sub-shaped ids', () => {
+    const r = scanHeadings(read('AGENT-READABLE BACKLOG.md'));
+    for (const id of GRANDFATHERED_SUB) expect(r.subShaped).toContain(id);
   });
 
   // FEAT-021: the package's defining constraints are zero dependencies and npm-native
