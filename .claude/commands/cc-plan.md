@@ -105,6 +105,10 @@ Each step must include:
   plain `git add <path>` otherwise. Always generate an explicit path: bare `git add -u`
   stages every modified tracked file in the repository. The branch is on tracked-ness, never
   on habit, because `-u` exits 128 on an untracked path whether or not an ignore rule exists.
+- **Plan file in staging steps.** Every commit group that ticks checkboxes in the plan file must
+  include a `git add -u <plan-file-path>` step after the checkbox edits so the ticked state
+  rides the commit. The last task's ticks ride the closeout commit. Without this step,
+  `cc-implement` marks checkboxes `[X]` but the committed file still shows the previous state.
 
 ## Test List
 - [ ] Unit tests for [unit]
