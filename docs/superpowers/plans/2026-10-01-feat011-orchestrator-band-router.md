@@ -361,7 +361,7 @@ This matters because the new matcher invokes the hook on every dispatch in every
     Then append `- T-001: <one line of handoff observation>` under the plan section.
   - [X] [T-001-F] Run `git add -u .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`. Commit `docs: record the FEAT-011 V1-V3 measurements [FEAT-011]`. Expected: **1153 / 0**.
 
-- [ ] [T-002] **`scripts/orchestrate.mjs`: the router, the run file, and the five verbs** (AC1, AC2, AC4, AC7, AC8, AC9; Review Focus 4 and 5). Native. Depends on T-001's three verdicts.
+- [X] [T-002] **`scripts/orchestrate.mjs`: the router, the run file, and the five verbs** (AC1, AC2, AC4, AC7, AC8, AC9; Review Focus 4 and 5). Native. Depends on T-001's three verdicts.
   - [X] [T-002-A] Create `tests/scripts/orchestrate.test.js` with exactly this content (sha256 `88ab6418c72abefbd0e16b5de8f5107ecf850e62be361d9b8755cedfa7dc6897`, 50 tests; amended 2026-10-01 on the D1 ruling, adding the `ORCH_HANDBACK_CONFLICT` test):
     ```js
     import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -1116,14 +1116,14 @@ This matters because the new matcher invokes the hook on every dispatch in every
     if (invoked) process.exitCode = cli(process.argv.slice(2), process.env);
     ```
   - [X] [T-002-D] Run `npx vitest run tests/scripts/orchestrate.test.js`, expecting **50 / 50**. Then `npx vitest run tests/unit/snap-contract.test.js tests/unit/snap-validate.test.js tests/scripts/snap-build.test.js`, all passing with no file edited. Then `npm test`: **1203 / 0**, 45 files.
-  - [ ] [T-002-E] Append `- T-002: <one line>` under the plan section. Then:
+  - [X] [T-002-E] Append `- T-002: <one line>` under the plan section. Then:
     - `git add scripts/orchestrate.mjs tests/scripts/orchestrate.test.js`;
     - `git add -u .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`.
 
     Commit `feat: orchestrate.mjs, the band router and its run file [FEAT-011]`. Expected: **1203 / 0**.
 
 - [ ] [T-003] **Guard 6, with R7** (AC3, AC3a's `DISPATCH` half, AC4, AC5, AC6; Review Focus 1–3). **Subagent, then a reviewer.** It runs in the main checkout with no worktree, and the subagent does not commit. Depends on T-002, whose `RUN_FILE` and `WRITE_SURFACE` the test imports, and on T-001's V3 verdict.
-  - [ ] [T-003-A] Create `tests/hooks/guard6.test.js` with exactly this content: sha256 `31e7d6bdb9575672c55c851f8983c42668650b4682135f3fdee51beb4204c2f1`, 30 tests, for the measured `systemMessage` verdict. It was amended on the D1 ruling, adding R7 ×7 and `[AC3a]`, and the stderr variant is retired.
+  - [X] [T-003-A] Create `tests/hooks/guard6.test.js` with exactly this content: sha256 `31e7d6bdb9575672c55c851f8983c42668650b4682135f3fdee51beb4204c2f1`, 30 tests, for the measured `systemMessage` verdict. It was amended on the D1 ruling, adding R7 ×7 and `[AC3a]`, and the stderr variant is retired.
     ```js
     import { describe, it, expect, beforeEach, afterEach } from 'vitest';
     import { spawnSync } from 'node:child_process';
@@ -1344,8 +1344,8 @@ This matters because the new matcher invokes the hook on every dispatch in every
       });
     });
     ```
-  - [ ] [T-003-B] Run `npx vitest run tests/hooks/guard6.test.js`. Expected: **20 failed / 10 passed** (30). The ten that pass are R1, R2 and R5 ×4, the allow cases, and R7's four no-decision cases (see Predictions).
-  - [ ] [T-003-C] Modify `.claude/hooks/pre-tool-use.mjs` (sha256 before: `062c686f06daa03c70ef3384208c7d19a22680eca1dcccbcc9ee50cb5ed884d4`, 680 lines), with the Edit tool, in exactly this order (P15).
+  - [X] [T-003-B] Run `npx vitest run tests/hooks/guard6.test.js`. Expected: **20 failed / 10 passed** (30). The ten that pass are R1, R2 and R5 ×4, the allow cases, and R7's four no-decision cases (see Predictions).
+  - [X] [T-003-C] Modify `.claude/hooks/pre-tool-use.mjs` (sha256 before: `062c686f06daa03c70ef3384208c7d19a22680eca1dcccbcc9ee50cb5ed884d4`, 680 lines), with the Edit tool, in exactly this order (P15).
     - **C1, the shared helpers (P3).**
       - After `const isPlainObject = …;` (:121), insert:
         ```js
@@ -1471,9 +1471,9 @@ This matters because the new matcher invokes the hook on every dispatch in every
     - **The final state equalled the draft byte for byte.**
 
     Expected result: **750 lines**, sha256 `d03d21286de263ac5f38b0a4460de32ecbedce886bde83fa39c583afd463eba6`, the planning draft byte for byte (the `systemMessage` hook, amended with R7). **Halt rule:** a different sha256 stops the task for a diff review before anything else runs.
-  - [ ] [T-003-D] Copy `.claude/hooks/pre-tool-use.mjs` over `project-template/.claude/hooks/pre-tool-use.mjs`, and confirm both with `cmp`.
-  - [ ] [T-003-E] Run `npx vitest run tests/hooks tests/installer/templates.test.js`, all passing: 9 files, **503 tests** (473 + 30). Then `npm test`: **1233 / 0**, 46 files.
-  - [ ] [T-003-F] **Reviewer** (fresh, read-only):
+  - [X] [T-003-D] Copy `.claude/hooks/pre-tool-use.mjs` over `project-template/.claude/hooks/pre-tool-use.mjs`, and confirm both with `cmp`.
+  - [X] [T-003-E] Run `npx vitest run tests/hooks tests/installer/templates.test.js`, all passing: 9 files, **503 tests** (473 + 30). Then `npm test`: **1233 / 0**, 46 files.
+  - [X] [T-003-F] **Reviewer** (fresh, read-only):
     - confirm the hook's sha256 against T-003-C, and the mirror by `cmp`;
     - re-run all eight mutants on a scratch copy, with the real hook untouched. Each turns exactly its pinned tests red (Predictions: M1 4, M1b 1, M2 2, M2b 1, M3 1, M4 2, M5 2, M6 1);
     - confirm `git worktree list` shows one entry, and `git log` shows no subagent commit.

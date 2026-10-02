@@ -19,11 +19,21 @@ function debug(msg) {
 const deny = (reason) => ({ permissionDecision: 'deny', permissionDecisionReason: reason });
 const ask = (reason) => ({ permissionDecision: 'ask', permissionDecisionReason: reason });
 
+let warning = '';
+
+// A warning decides nothing (FEAT-011): it rides the call's decision, or goes out alone
+// once every guard has passed. systemMessage is the channel V3 measured reaching the user.
+function warn(msg) {
+  warning += (warning ? '\n' : '') + msg;
+  return null;
+}
+
 function emit(decision) {
   if (emitted) return;
   emitted = true;
   process.stdout.write(JSON.stringify({
-    hookSpecificOutput: { hookEventName: 'PreToolUse', ...decision },
+    ...(warning ? { systemMessage: warning } : {}),
+    ...(decision ? { hookSpecificOutput: { hookEventName: 'PreToolUse', ...decision } } : {}),
   }) + '\n');
 }
 
@@ -119,12 +129,14 @@ const BAND_ENVELOPE_MAX_BYTES = 10485760;
 const BAND_ENVELOPE_REL = ['.claude', 'memory', 'band-envelope.json'];
 
 const isPlainObject = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
+const payloadCwd = (payload) => (typeof payload.cwd === 'string' && payload.cwd ? payload.cwd : process.cwd());
 
 // The band root is the nearest ancestor of cwd holding the envelope; the scope globs
 // anchor there too, so discovery and anchoring are one rule (owner ruling, Case F).
-function findBandRoot(start) {
+// Guard 6 finds its run root by the same walk.
+function findRootHolding(start, rel) {
   let dir = resolve(start);
-  while (!existsSync(join(dir, ...BAND_ENVELOPE_REL))) {
+  while (!existsSync(join(dir, ...rel))) {
     const parent = dirname(dir);
     if (parent === dir) return null;
     dir = parent;
@@ -163,8 +175,8 @@ function globToRegExp(glob) {
 function guard5BandScope(input, payload) {
   const role = payload.agent_type;
   if (!BAND_ROLES.includes(role)) return null;
-  const cwd = typeof payload.cwd === 'string' && payload.cwd ? payload.cwd : process.cwd();
-  const root = findBandRoot(cwd);
+  const cwd = payloadCwd(payload);
+  const root = findRootHolding(cwd, BAND_ENVELOPE_REL);
   if (!root) return null;
   const file = join(root, ...BAND_ENVELOPE_REL);
   const env = readEnvelope(file);
@@ -176,6 +188,60 @@ function guard5BandScope(input, payload) {
   const inside = target !== '' && rel !== '' && rel !== '..' && !rel.startsWith('../') && !isAbsolute(rel);
   if (inside && env.ops.scope.some((g) => globToRegExp(g).test(rel))) return null;
   return deny(`Guard 5: BAND_SCOPE_VIOLATION: ${target || '<no path>'} is outside the declared scope [${env.ops.scope.join(', ')}]`);
+}
+
+// ── Guard 6 constants ─────────────────────────────────────────────────────────
+// Copies of scripts/orchestrate.mjs values (FEAT-011 AC4), carried for Guard 5's reason:
+// no import resolves from both install locations. tests/hooks/guard6.test.js pins them.
+const ORCH_RUN_REL = ['.claude', 'memory', 'orchestrator-run.json'];
+const ORCH_WRITE_SURFACE = ['.claude/memory/orchestrator-run.json', '.claude/memory/band-envelope.json', '.claude/memory/session-snapshot.json', '.conductor/**'];
+const ORCH_DISPATCH_TOOLS = ['Agent', 'SendMessage'];
+
+// Only what Guard 6 itself reads is checked: an object with a session to bind to.
+function readRunFile(path) {
+  try {
+    if (statSync(path).size > BAND_ENVELOPE_MAX_BYTES) return null;
+    const run = JSON.parse(readFileSync(path, 'utf8'));
+    return isPlainObject(run) && typeof run.session_id === 'string' && run.session_id !== '' ? run : null;
+  } catch { return null; }
+}
+
+// The deployed copy first, then source (FEAT-011 D11).
+const orchEnd = (root) => `node ${existsSync(join(root, '.claude', 'scripts', 'orchestrate.mjs')) ? '.claude/scripts' : 'scripts'}/orchestrate.mjs end`;
+
+// R7: on claude 2.1.287 a subagent can dispatch and message agents (FEAT-011 V1), so a role
+// could reach the envelope through a helper in two hops. During a live run only the main
+// session, which carries no agent_type, dispatches. Silent outside a live run: no warning.
+function guard6NestedDispatch(payload) {
+  if (payload.agent_type == null) return null;
+  const root = findRootHolding(payloadCwd(payload), ORCH_RUN_REL);
+  if (!root) return null;
+  const run = readRunFile(join(root, ...ORCH_RUN_REL));
+  if (!run || payload.session_id !== run.session_id) return null;
+  return deny(`Guard 6: ORCH_NESTED_DISPATCH: ${payload.tool_name} from agent ${payload.agent_type} is denied while run ${run.item} is live; only the orchestrator dispatches or messages agents during a run.`);
+}
+
+// Guard 6: while a run is live in this session, nothing but a band role writes outside the
+// orchestrator's write surface (FEAT-011 D3). Identity cannot mark the main session, so the
+// run's session_id is the key. Another session's run is stale: warned about, never enforced,
+// so a crashed run cannot lock a later session out. R7 precedes the role skip, because a
+// role's dispatch is exactly what it closes.
+function guard6OrchestratorRun(input, payload) {
+  if (ORCH_DISPATCH_TOOLS.includes(payload.tool_name)) return guard6NestedDispatch(payload);
+  if (BAND_ROLES.includes(payload.agent_type)) return null;
+  const cwd = payloadCwd(payload);
+  const root = findRootHolding(cwd, ORCH_RUN_REL);
+  if (!root) return null;
+  const file = join(root, ...ORCH_RUN_REL);
+  const run = readRunFile(file);
+  if (!run) return warn(`Guard 6: ORCH_RUN_INVALID: ${file} is unreadable or not a valid run file, so writes are not restricted. Clear it with: ${orchEnd(root)}`);
+  if (payload.session_id !== run.session_id) {
+    return warn(`Guard 6: ORCH_RUN_STALE: run ${run.item} (started ${run.started}) belongs to another session, so writes are not restricted. Clear it with: ${orchEnd(root)}`);
+  }
+  const target = targetPath(input);
+  const rel = relative(root, resolve(cwd, target)).split(sep).join('/');
+  if (target !== '' && ORCH_WRITE_SURFACE.some((g) => globToRegExp(g).test(rel))) return null;
+  return deny(`Guard 6: ORCH_WRITE_DENIED: ${target || '<no path>'} is outside the orchestrator's write surface while run ${run.item} is live; repository writes during a run go through a band role (Guard 5).`);
 }
 
 // ── Guard 3 constants ─────────────────────────────────────────────────────────
@@ -633,8 +699,11 @@ const DISPATCH = {
   Edit: [],
   Bash: [guard3BashScan],
 };
-// Guard 5 runs first on every write-family tool: a scope deny outranks Guard 2's ask.
-for (const tool of BAND_WRITE_TOOLS) DISPATCH[tool].unshift(guard5BandScope);
+// Guards 5 and 6 run first on every write-family tool, in that order: a scope deny
+// outranks Guard 2's ask, and Guard 6 steps aside for the band roles Guard 5 governs.
+for (const tool of BAND_WRITE_TOOLS) DISPATCH[tool].unshift(guard5BandScope, guard6OrchestratorRun);
+// R7 sees dispatch only where settings.json routes it: the matcher names Agent and SendMessage.
+for (const tool of ORCH_DISPATCH_TOOLS) DISPATCH[tool] = [guard6OrchestratorRun];
 
 // Case B. Unparseable input is not "nothing to verify", it is "the verifier could not
 // run", which is the condition that fails closed. CC_HOOK_ALLOW bypasses THIS denial only;
@@ -675,6 +744,7 @@ function main() {
     const decision = guard(input, payload);
     if (decision) { emit(decision); return; }
   }
+  if (warning) emit(null);
 }
 
 try { main(); } catch (e) { unreadable(`the hook threw (${e && e.message})`); }
