@@ -2440,3 +2440,10 @@ Handoff observations, one line per task:
 
   The two repository test diffs hash identically to the clone diffs that were measured (`53108ef1`, `21480e94`), so planning and execution measured the same bytes. The live `.claude/settings.json` matcher now routes `Agent` and `SendMessage` to the hook. Both settings files parsed immediately after each edit (the owner's parse check, with its halt rule in T-004-L). Every hook result after the edit was silent, and this session made no dispatch, so R7's no-run path is not yet live-observed.
   - **Standing rule, extended at T-004's go:** for the rest of FEAT-011, instruments **and records** are edited only through Write or Edit, where the owner sees the diff. `c5fea9c`'s rule covered instruments only, and its own T-003 append went through a Bash heredoc.
+- T-005: every row read as predicted:
+  - 2 failed / 30 skipped, each failure ENOENT;
+  - both mirrors written from the plan text at `c4d1b325` and identical by `cmp`;
+  - the leaf placed between cc-init and cc-plan, then plain `git add` at rc 0;
+  - staging before measuring, 36 / 36, and 1237 / 0.
+
+  The parity diff hashes identically to the clone's (`5e04f5ea`). One live effect worth knowing: the moment the command file existed, this session's skill list offered `cc-orchestrate`. The never-start-a-run-here constraint is therefore now one keystroke from being broken, not just a policy about a script, and from here it is held by discipline alone.

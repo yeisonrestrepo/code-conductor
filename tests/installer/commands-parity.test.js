@@ -167,3 +167,17 @@ describe('the fail-open session-row tail', () => {
     expect(text).not.toContain(TAIL_BEGIN);
   });
 });
+
+// The command resolves its script by presence (FEAT-011 D11), so unlike the mirrors above
+// the two copies carry no path nesting to undo: they are byte-identical.
+const ORCH_MIRRORS = ['.claude/commands/cc-orchestrate.md', 'project-template/.claude/commands/cc-orchestrate.md'];
+
+describe('cc-orchestrate mirrors [FEAT-011 AC10]', () => {
+  it('are byte-identical', () => {
+    expect(read(ORCH_MIRRORS[1])).toBe(read(ORCH_MIRRORS[0]));
+  });
+
+  it('probe the deployed script before the source script (D11)', () => {
+    expect(read(ORCH_MIRRORS[0])).toContain('S=.claude/scripts; [ -f "$S/orchestrate.mjs" ] || S=scripts');
+  });
+});

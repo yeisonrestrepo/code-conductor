@@ -36,6 +36,7 @@ tests/.tmp/
 /.claude/memory/*
 !/.claude/commands/cc-implement.md
 !/.claude/commands/cc-init.md
+!/.claude/commands/cc-orchestrate.md
 !/.claude/commands/cc-plan.md
 !/.claude/commands/cc-resume.md
 !/.claude/commands/cc-spec.md

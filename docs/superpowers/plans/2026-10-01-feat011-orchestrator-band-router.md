@@ -1485,7 +1485,7 @@ This matters because the new matcher invokes the hook on every dispatch in every
 
     Commit `feat: Guard 6 holds the orchestrator to its declared write surface [FEAT-011]`. Expected: **1233 / 0**.
 
-- [ ] [T-004] **Ignore and host-own the run file; ignore `.conductor/` in projects; route `Agent` and `SendMessage` to the hook** (AC10, AC3a, the folded `README.md:325` observation, P14). Native. Depends on T-000, and on T-003 for the matcher steps: `DISPATCH` must hold the `Agent` and `SendMessage` entries before any settings file routes those tools to the hook.
+- [X] [T-004] **Ignore and host-own the run file; ignore `.conductor/` in projects; route `Agent` and `SendMessage` to the hook** (AC10, AC3a, the folded `README.md:325` observation, P14). Native. Depends on T-000, and on T-003 for the matcher steps: `DISPATCH` must hold the `Agent` and `SendMessage` entries before any settings file routes those tools to the hook.
   - [X] [T-004-A] Modify `tests/installer/templates.test.js`: append inside `describe('project-template/gitignore', …)`, after the `[AC13]` test:
     ```js
       // Discriminator for the folded README:325 observation: red on the pre-FEAT-011 template,
@@ -1547,10 +1547,10 @@ This matters because the new matcher invokes the hook on every dispatch in every
     2. `git ls-files --error-unmatch .claude/memory/orchestrator-run.json`, expecting rc 1;
     3. `npx vitest run tests/installer tests/unit/host-owned-ignore-xor.test.js`, expecting **304 / 304** across 17 files (302 + 1 + 1);
     4. `npm test`, expecting **1235 / 0**.
-  - [ ] [T-004-N] Append `- T-004: <one line>` under the plan section. Then `git add -u project-template/gitignore lib/installer/host-owned.mjs tests/installer/templates.test.js tests/installer/deploy.test.js tests/installer/settings-merge.test.js .claude/settings.json project-template/.claude/settings.json .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`. Commit `feat: ignore and host-own the orchestrator run file, ignore .conductor/ in projects, and route Agent and SendMessage to the hook [FEAT-011]`. The commit gate expects **1235 / 0**.
+  - [X] [T-004-N] Append `- T-004: <one line>` under the plan section. Then `git add -u project-template/gitignore lib/installer/host-owned.mjs tests/installer/templates.test.js tests/installer/deploy.test.js tests/installer/settings-merge.test.js .claude/settings.json project-template/.claude/settings.json .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`. Commit `feat: ignore and host-own the orchestrator run file, ignore .conductor/ in projects, and route Agent and SendMessage to the hook [FEAT-011]`. The commit gate expects **1235 / 0**.
 
 - [ ] [T-005] **The `/cc-orchestrate` command, in both mirrors** (AC10, D7, D11, P10). Native. Depends on T-002.
-  - [ ] [T-005-A] Modify `tests/installer/commands-parity.test.js`: append at the end of the file:
+  - [X] [T-005-A] Modify `tests/installer/commands-parity.test.js`: append at the end of the file:
     ```js
 
     // The command resolves its script by presence (FEAT-011 D11), so unlike the mirrors above
@@ -1567,8 +1567,8 @@ This matters because the new matcher invokes the hook on every dispatch in every
       });
     });
     ```
-  - [ ] [T-005-B] Run `npx vitest run tests/installer/commands-parity.test.js -t "cc-orchestrate"`. Expected: **2 failed / 30 skipped (32)**, each failure `ENOENT`.
-  - [ ] [T-005-C] Create `.claude/commands/cc-orchestrate.md` with exactly this content (sha256 `c4d1b32537ff83cdfe63586d9d66671c1126f65bba104da6ed7aca9d27524ca7`). It was amended on the D1 ruling: a wait for the completion notice, the delivered `SubagentHandback` report as the hand-back, the second-report route to `ORCH_HANDBACK_CONFLICT`, the in-flight wait on a halt, and the brief's verify-first and no-dispatch lines. In the clone it measured 36 / 36 on parity, and 1237 / 0 on the full suite. Then copy it to `project-template/.claude/commands/cc-orchestrate.md` and confirm the two with `cmp`.
+  - [X] [T-005-B] Run `npx vitest run tests/installer/commands-parity.test.js -t "cc-orchestrate"`. Expected: **2 failed / 30 skipped (32)**, each failure `ENOENT`.
+  - [X] [T-005-C] Create `.claude/commands/cc-orchestrate.md` with exactly this content (sha256 `c4d1b32537ff83cdfe63586d9d66671c1126f65bba104da6ed7aca9d27524ca7`). It was amended on the D1 ruling: a wait for the completion notice, the delivered `SubagentHandback` report as the hand-back, the second-report route to `ORCH_HANDBACK_CONFLICT`, the in-flight wait on a halt, and the brief's verify-first and no-dispatch lines. In the clone it measured 36 / 36 on parity, and 1237 / 0 on the full suite. Then copy it to `project-template/.claude/commands/cc-orchestrate.md` and confirm the two with `cmp`.
     ````markdown
     ---
     description: "(Conductor) Route one backlog item through Define, Build and Verify by validated SNAP handoffs"
@@ -1661,11 +1661,11 @@ This matters because the new matcher invokes the hook on every dispatch in every
     | `audit` | Review the changes against the spec and the plan, read-only. | `rev` | `build_executed` |
     | `qa` | Run the project's tests and report. If verification fails, leave out the `SNAP_HANDBACK` line and say why. | `rev` | `verify_pass` |
     ````
-  - [ ] [T-005-D] Modify `.gitignore`: insert `!/.claude/commands/cc-orchestrate.md` between `!/.claude/commands/cc-init.md` (:38) and `!/.claude/commands/cc-plan.md`, in sorted position. This pays the toll before staging. Planning measured `gitignore-block-parity` at 2 failed / 2 passed with the file indexed and no leaf, and plain `git add` at rc 0 once the leaf was in.
-  - [ ] [T-005-E] Stage, before measuring, because block parity reads the index:
+  - [X] [T-005-D] Modify `.gitignore`: insert `!/.claude/commands/cc-orchestrate.md` between `!/.claude/commands/cc-init.md` (:38) and `!/.claude/commands/cc-plan.md`, in sorted position. This pays the toll before staging. Planning measured `gitignore-block-parity` at 2 failed / 2 passed with the file indexed and no leaf, and plain `git add` at rc 0 once the leaf was in.
+  - [X] [T-005-E] Stage, before measuring, because block parity reads the index:
     - `git add .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md`, plain, now that the leaf exists;
     - `git add -u .gitignore tests/installer/commands-parity.test.js`.
-  - [ ] [T-005-F] Run `npx vitest run tests/installer/commands-parity.test.js tests/unit/gitignore-block-parity.test.js`, expecting **36 / 36**. Then `npm test`: **1237 / 0**.
+  - [X] [T-005-F] Run `npx vitest run tests/installer/commands-parity.test.js tests/unit/gitignore-block-parity.test.js`, expecting **36 / 36**. Then `npm test`: **1237 / 0**.
   - [ ] [T-005-G] Append `- T-005: <one line>` under the plan section. Then `git add -u .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`. Commit `feat: add the /cc-orchestrate command [FEAT-011]`. Expected: **1237 / 0**.
 
 - [ ] [T-006] **AC12: the live demo, in a scratch project.** Owner driving, step mode. Depends on T-002 through T-005. **Halt rule:** any of the four facts landing otherwise than below stops the task for a ruling before release. **Every T-006 record states its session's `permission_mode`,** read from that session's payloads (AC12, amended on the D1 ruling).
