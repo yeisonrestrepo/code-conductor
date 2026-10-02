@@ -40,6 +40,15 @@ describe('this repository, at every commit', () => {
     expect(r.ok).toBe(true);
   });
 
+  // BUG-050: the merge gate once passed while this command failed on the same records,
+  // hidden by a filter inside the test. The command itself is asserted here, so the gate
+  // and the closeout can never disagree again.
+  it('runs the record-parity command green against this repository', () => {
+    const r = spawnSync(process.execPath, ['tools/record-parity.mjs'], { cwd: ROOT, encoding: 'utf8' });
+    expect(r.stdout).toContain('RECORD_PARITY_OK');
+    expect(r.status).toBe(0);
+  });
+
   // The ceiling itself is a query and is not asserted here: its remote leg needs a ref
   // actions/checkout@v7 does not fetch at its default depth, and fetch-depth: 0 was
   // declined because the both-legs filing rule already protects it. Duplicate-id

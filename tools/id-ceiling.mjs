@@ -18,25 +18,32 @@ export const BACKLOG = 'AGENT-READABLE BACKLOG.md';
 // \d{3,} and not \d{3}: an exact quantifier makes [BUG-1000] invisible forever,
 // freezing the ceiling at 999 and minting a duplicate with zero diagnostics. This is
 // the one thing worth carrying verbatim out of the retired survivor.
-const HEADING = /^### \[.\] `\[(BUG|FEAT|ARCH)-(\d{3,})\]`/;
+//
+// [BUG-050] A sub-shaped heading such as ARCH-008-S1 is seen, not skipped: it consumes
+// its parent's number even when the parent has no heading, and it is checked for
+// duplicates under its full id, because the ceiling's one job is that no id is minted
+// twice.
+const HEADING = /^### \[.\] `\[(BUG|FEAT|ARCH)-(\d{3,})((?:-[A-Za-z0-9]+)*)\]`/;
 
 export function scanHeadings(text) {
   const max = {};
   const counts = new Map();
+  const subShaped = [];
   let headings = 0;
   const lines = String(text).replace(/\r\n/g, '\n').split('\n');
   for (const line of lines) {
     const m = line.match(HEADING);
     if (!m) continue;
-    headings += 1;
-    const id = `${m[1]}-${m[2]}`;
+    const id = `${m[1]}-${m[2]}${m[3]}`;
     counts.set(id, (counts.get(id) ?? 0) + 1);
+    if (m[3]) subShaped.push(id);
+    else headings += 1;
     const n = Number(m[2]);
     if (max[m[1]] === undefined || n > max[m[1]]) max[m[1]] = n;
   }
   const duplicates = [];
   for (const [id, count] of counts) if (count > 1) duplicates.push({ id, count });
-  return { headings, max, duplicates };
+  return { headings, max, duplicates, subShaped };
 }
 
 function remoteLeg() {
@@ -67,9 +74,15 @@ function main() {
   const other = scanHeadings(remote.text);
   const report = (label, r) =>
     console.log(`${label}: headings=${r.headings} max=${JSON.stringify(r.max)} ` +
-      `dupes=${r.duplicates.length ? JSON.stringify(r.duplicates) : 'none'}`);
+      `dupes=${r.duplicates.length ? JSON.stringify(r.duplicates) : 'none'}` +
+      (r.subShaped.length ? ` sub-shaped seen=${JSON.stringify(r.subShaped)}` : ''));
   report('working tree', working);
   report('origin/main ', other);
+
+  const allSub = [...new Set([...working.subShaped, ...other.subShaped])];
+  if (allSub.length) {
+    console.error(`CEILING_NOTE: ${allSub.length} sub-shaped id(s) seen, each counted at its parent number: ${allSub.join(', ')}`);
+  }
 
   const union = {};
   for (const src of [working.max, other.max]) {

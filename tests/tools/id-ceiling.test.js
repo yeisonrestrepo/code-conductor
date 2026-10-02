@@ -53,4 +53,41 @@ describe('scanHeadings', () => {
   it('reads a heading with trailing whitespace after the closing backtick', () => {
     expect(scanHeadings('### [ ] `[BUG-010]` Item   ').headings).toBe(1);
   });
+
+  // [BUG-050] Sub-shaped ids are seen, never silently skipped.
+  it('sees a sub-shaped id like ARCH-008-S1 and reports it', () => {
+    const text = '### [X] `[ARCH-008-S1]` Sub-shaped item';
+    const r = scanHeadings(text);
+    expect(r.headings).toBe(0);
+    expect(r.subShaped).toEqual(['ARCH-008-S1']);
+  });
+
+  it('sees multiple sub-shaped ids alongside normal ones', () => {
+    const text = [
+      '### [X] `[BUG-010]` Normal item',
+      '### [ ] `[ARCH-008-S1]` Sub one',
+      '### [ ] `[ARCH-009-A]` Sub two',
+      '### [X] `[FEAT-020]` Another normal',
+    ].join('\n');
+    const r = scanHeadings(text);
+    expect(r.headings).toBe(2);
+    expect(r.max).toEqual({ BUG: 10, FEAT: 20, ARCH: 9 });
+    expect(r.subShaped).toEqual(['ARCH-008-S1', 'ARCH-009-A']);
+  });
+
+  it('does not report a top-level id as sub-shaped', () => {
+    expect(scanHeadings('### [ ] `[BUG-050]` Normal').subShaped).toEqual([]);
+  });
+
+  // The ceiling's one job is that no id is minted twice: a sub-item consumes its parent's
+  // number even when the parent has no heading of its own.
+  it('lifts the ceiling to a sub-shaped heading\'s parent number when the parent is absent', () => {
+    const text = ['### [X] `[ARCH-010]` Top', '### [X] `[ARCH-011-S1]` Orphan sub-item'].join('\n');
+    expect(scanHeadings(text).max).toEqual({ ARCH: 11 });
+  });
+
+  it('reports a duplicated sub-shaped heading', () => {
+    const text = ['### [X] `[ARCH-008-S1]` One', '### [ ] `[ARCH-008-S1]` Two'].join('\n');
+    expect(scanHeadings(text).duplicates).toEqual([{ id: 'ARCH-008-S1', count: 2 }]);
+  });
 });
