@@ -279,7 +279,7 @@ This matters because the new matcher invokes the hook on every dispatch in every
   - [X] [T-000-E] Run `node tools/id-ceiling.mjs`, expecting union `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`. Then `node tools/record-parity.mjs`, expecting `RECORD_PARITY_OK`.
   - [X] [T-000-F] Append `- T-000: <one line of handoff observation>` under the plan section. This line rides T-001's commit.
 
-- [!] [T-001] **V1–V3, the plan's opening measurements, before any code.** Live, owner driving, in a scratch repository outside this one. Depends on T-000. Each V has its own halt rule, and no later task starts until all three are recorded and none has halted.
+- [X] [T-001] **V1–V3, the plan's opening measurements, before any code.** Live, owner driving, in a scratch repository outside this one. Depends on T-000. Each V has its own halt rule, and no later task starts until all three are recorded and none has halted.
   - **V1 halt:** a payload shows a `Write` of `leaf.txt` with `agent_type=leaf`, and `leaf.txt` exists. That is, a subagent dispatched a subagent. Stop for a ruling on D1.
   - **V2 halt:** the `printenv` output is empty, or differs from the `session_id` of any logged payload. Stop for a ruling on D3.
   - **V3 halt:** the owner saw neither the `V3-STDERR` nor the `V3-SYSTEM` marker. Stop for a ruling on the warning channel. Otherwise P13 picks the channel.
@@ -362,7 +362,7 @@ This matters because the new matcher invokes the hook on every dispatch in every
   - [X] [T-001-F] Run `git add -u .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`. Commit `docs: record the FEAT-011 V1-V3 measurements [FEAT-011]`. Expected: **1153 / 0**.
 
 - [ ] [T-002] **`scripts/orchestrate.mjs`: the router, the run file, and the five verbs** (AC1, AC2, AC4, AC7, AC8, AC9; Review Focus 4 and 5). Native. Depends on T-001's three verdicts.
-  - [ ] [T-002-A] Create `tests/scripts/orchestrate.test.js` with exactly this content (sha256 `88ab6418c72abefbd0e16b5de8f5107ecf850e62be361d9b8755cedfa7dc6897`, 50 tests; amended 2026-10-01 on the D1 ruling, adding the `ORCH_HANDBACK_CONFLICT` test):
+  - [X] [T-002-A] Create `tests/scripts/orchestrate.test.js` with exactly this content (sha256 `88ab6418c72abefbd0e16b5de8f5107ecf850e62be361d9b8755cedfa7dc6897`, 50 tests; amended 2026-10-01 on the D1 ruling, adding the `ORCH_HANDBACK_CONFLICT` test):
     ```js
     import { describe, it, expect, beforeEach, afterEach } from 'vitest';
     import { spawnSync } from 'node:child_process';
@@ -773,8 +773,8 @@ This matters because the new matcher invokes the hook on every dispatch in every
       });
     });
     ```
-  - [ ] [T-002-B] Run `npx vitest run tests/scripts/orchestrate.test.js`. Expected: the file fails to load with `Cannot find module '../../scripts/orchestrate.mjs'`, reading `Test Files 1 failed (1)` and `Tests no tests`.
-  - [ ] [T-002-C] Create `scripts/orchestrate.mjs` with exactly this content (sha256 `cb99c5a0c97e17d4004439ef8c9d29a84db47fcde5a96a68409ce2682152ace9`, 338 lines; every function ≤ 30 lines; amended 2026-10-01 on the D1 ruling, adding the `ORCH_HANDBACK_CONFLICT` check ahead of the refusal):
+  - [X] [T-002-B] Run `npx vitest run tests/scripts/orchestrate.test.js`. Expected: the file fails to load with `Cannot find module '../../scripts/orchestrate.mjs'`, reading `Test Files 1 failed (1)` and `Tests no tests`.
+  - [X] [T-002-C] Create `scripts/orchestrate.mjs` with exactly this content (sha256 `cb99c5a0c97e17d4004439ef8c9d29a84db47fcde5a96a68409ce2682152ace9`, 338 lines; every function ≤ 30 lines; amended 2026-10-01 on the D1 ruling, adding the `ORCH_HANDBACK_CONFLICT` check ahead of the refusal):
     ```js
     #!/usr/bin/env node
     // scripts/orchestrate.mjs
@@ -1115,7 +1115,7 @@ This matters because the new matcher invokes the hook on every dispatch in every
     const invoked = process.argv[1] && pathToFileURL(realpathSync(process.argv[1])).href === import.meta.url;
     if (invoked) process.exitCode = cli(process.argv.slice(2), process.env);
     ```
-  - [ ] [T-002-D] Run `npx vitest run tests/scripts/orchestrate.test.js`, expecting **50 / 50**. Then `npx vitest run tests/unit/snap-contract.test.js tests/unit/snap-validate.test.js tests/scripts/snap-build.test.js`, all passing with no file edited. Then `npm test`: **1203 / 0**, 45 files.
+  - [X] [T-002-D] Run `npx vitest run tests/scripts/orchestrate.test.js`, expecting **50 / 50**. Then `npx vitest run tests/unit/snap-contract.test.js tests/unit/snap-validate.test.js tests/scripts/snap-build.test.js`, all passing with no file edited. Then `npm test`: **1203 / 0**, 45 files.
   - [ ] [T-002-E] Append `- T-002: <one line>` under the plan section. Then:
     - `git add scripts/orchestrate.mjs tests/scripts/orchestrate.test.js`;
     - `git add -u .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`.
