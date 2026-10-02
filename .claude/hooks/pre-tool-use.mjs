@@ -535,8 +535,8 @@ function g3ReadAllowlist() {
 // asserted by the corpus EXCEPTIONS row. Escaping also keeps an entry from adding a
 // capture group, which would shift the suffix index below.
 const g3EscapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const G3_BD = '(^|[ \\t\\n\\r\\f\\v|;()])';
-const G3_AD = '([ \\t\\n\\r\\f\\v|;()]|$)';
+const G3_BD = '(^|[ \\t\\n\\r\\f\\v|;()"\'])';
+const G3_AD = '([ \\t\\n\\r\\f\\v|;()"\']|$)';
 
 function g3AllowlistCovers(s, entries) {
   if (entries.length === 0) return false;
