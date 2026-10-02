@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sqliteAvailable, dbFlags } from '../helpers/sqlite.js';
+import { cleanGitEnv } from '../helpers/git-env.js';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const DB = join(REPO_ROOT, 'scripts/conductor-db.mjs');
@@ -30,7 +31,7 @@ afterEach(() => { while (trees.length) { try { rmSync(trees.pop(), { recursive: 
 function mkRepo() {
   const dir = mkdtempSync(join(tmpdir(), 'cycle-'));
   trees.push(dir);
-  const g = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  const g = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', env: cleanGitEnv(), stdio: ['ignore', 'pipe', 'ignore'] });
   g(['init', '-q']);
   g(['config', 'user.email', 't@t.t']);
   g(['config', 'user.name', 'T']);
