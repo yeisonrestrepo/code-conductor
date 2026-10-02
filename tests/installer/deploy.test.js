@@ -100,6 +100,17 @@ describe('deployProject', () => {
     expect(readFileSync(join(home, '.gitignore'), 'utf8')).toBe(TPL_GITIGNORE);
     expect(existsSync(join(home, 'gitignore'))).toBe(false);
   });
+  it('[BUG-052] refuses to deploy into the package own source tree', () => {
+    const pkgName = '@test/code-conductor';
+    writeFileSync(join(asset, 'package.json'), JSON.stringify({ name: pkgName }));
+    writeFileSync(join(home, 'package.json'), JSON.stringify({ name: pkgName }));
+    expect(() => deployProject(asset, home)).toThrow(/SELF_INSTALL|own source tree/);
+  });
+  it('[BUG-052] allows deploy when package names differ', () => {
+    writeFileSync(join(asset, 'package.json'), JSON.stringify({ name: '@test/code-conductor' }));
+    writeFileSync(join(home, 'package.json'), JSON.stringify({ name: 'my-project' }));
+    expect(() => deployProject(asset, home)).not.toThrow();
+  });
 });
 
 describe('deployGlobal — CLAUDE.md merge', () => {
