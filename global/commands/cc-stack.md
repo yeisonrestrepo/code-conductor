@@ -6,7 +6,7 @@ Detect the project stack dynamically and record it in the project's root `CLAUDE
 
 ## 1. Resolve the repository root
 
-Run `git rev-parse --show-toplevel`. If it fails (not a git repo), fall back to the directory that contains `scripts/detect-stack.mjs`. Run every command below from that root, and treat the root-level `CLAUDE.md` as the only write target regardless of the user's current subdirectory.
+Run `git rev-parse --show-toplevel`. If it fails (not a git repo), fall back to the directory that contains the detector script. Run every command below from that root, and treat the root-level `CLAUDE.md` as the only write target regardless of the user's current subdirectory.
 
 ## 2. Verify Node is available
 
@@ -14,7 +14,7 @@ Probe with `node --version`. If it exits non-zero or reports "not found", stop t
 
 ## 3. Run the detector
 
-Run `node scripts/detect-stack.mjs` from the repo root, capture stdout, and parse it as JSON. Nothing executes the JSON; consume it as data.
+Resolve the detector path: use `.claude/scripts/detect-stack.mjs` if it exists (the installed location), otherwise fall back to `scripts/detect-stack.mjs` (development layout). Run `node <resolved-path>` from the repo root, capture stdout, and parse it as JSON. Nothing executes the JSON; consume it as data.
 
 Treat all of the following identically as "no stack detected" - announce it in one line and leave `CLAUDE.md` unmodified (surface stderr if any, but it is non-fatal):
 - non-zero exit code,
