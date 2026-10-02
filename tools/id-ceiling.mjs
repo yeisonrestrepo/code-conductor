@@ -19,24 +19,30 @@ export const BACKLOG = 'AGENT-READABLE BACKLOG.md';
 // freezing the ceiling at 999 and minting a duplicate with zero diagnostics. This is
 // the one thing worth carrying verbatim out of the retired survivor.
 const HEADING = /^### \[.\] `\[(BUG|FEAT|ARCH)-(\d{3,})\]`/;
+const SUB_HEADING = /^### \[.\] `\[([A-Z]+-\d{3,}(?:-[A-Za-z0-9]+)+)\]`/;
 
 export function scanHeadings(text) {
   const max = {};
   const counts = new Map();
+  const subShaped = [];
   let headings = 0;
   const lines = String(text).replace(/\r\n/g, '\n').split('\n');
   for (const line of lines) {
     const m = line.match(HEADING);
-    if (!m) continue;
-    headings += 1;
-    const id = `${m[1]}-${m[2]}`;
-    counts.set(id, (counts.get(id) ?? 0) + 1);
-    const n = Number(m[2]);
-    if (max[m[1]] === undefined || n > max[m[1]]) max[m[1]] = n;
+    if (m) {
+      headings += 1;
+      const id = `${m[1]}-${m[2]}`;
+      counts.set(id, (counts.get(id) ?? 0) + 1);
+      const n = Number(m[2]);
+      if (max[m[1]] === undefined || n > max[m[1]]) max[m[1]] = n;
+      continue;
+    }
+    const sub = line.match(SUB_HEADING);
+    if (sub) subShaped.push(sub[1]);
   }
   const duplicates = [];
   for (const [id, count] of counts) if (count > 1) duplicates.push({ id, count });
-  return { headings, max, duplicates };
+  return { headings, max, duplicates, subShaped };
 }
 
 function remoteLeg() {
@@ -67,9 +73,15 @@ function main() {
   const other = scanHeadings(remote.text);
   const report = (label, r) =>
     console.log(`${label}: headings=${r.headings} max=${JSON.stringify(r.max)} ` +
-      `dupes=${r.duplicates.length ? JSON.stringify(r.duplicates) : 'none'}`);
+      `dupes=${r.duplicates.length ? JSON.stringify(r.duplicates) : 'none'}` +
+      (r.subShaped.length ? ` SUB_SHAPED_REJECTED=${JSON.stringify(r.subShaped)}` : ''));
   report('working tree', working);
   report('origin/main ', other);
+
+  const allSub = [...new Set([...working.subShaped, ...other.subShaped])];
+  if (allSub.length) {
+    console.error(`CEILING_WARN: ${allSub.length} sub-shaped id(s) skipped: ${allSub.join(', ')}`);
+  }
 
   const union = {};
   for (const src of [working.max, other.max]) {
