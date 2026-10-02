@@ -2698,3 +2698,13 @@ Handoff observations, one line per task:
 **`[ARCH-009]`:** `FEAT-011` is done. Of the items the 1.35.0 closeout named, it still waits on `FEAT-009`, `FEAT-012` and `FEAT-031` through `FEAT-036`.
 
 **Next:** `[FEAT-012]` opens with `/cc-spec` in a fresh session, after a `/cc-compact` here.
+
+## Spec: FEAT-012, the core role agents (spec, plan, code, audit, qa) [2026-10-02]
+
+The spec is `docs/superpowers/specs/2026-10-02-feat012-core-role-agents-design.md`. It was APPROVED 2026-10-02 after three question rounds and one approval round, and targets `1.37.0`, a minor release, at complexity L. Branch `feat/feat-012-core-role-agents`. No new id was minted, and there is no SNAP contract change.
+
+- **Shape:** five profiles in `project-template/.claude/agents/<role>.md`, mirrored byte-identically into `.claude/agents/`, each at most 999 tokens by `ceil(bytes/4)`, with the D2 tool masks; audit has Read, Grep and Glob only, derived from band row `AGENT-READABLE BACKLOG.md:122`.
+- **Guard 7 (role shell):** fail-closed on `Bash` for band roles. R1 denies spec, plan and audit; R2 denies chaining metacharacters; R3 denies when there is no live run file `test_command` (stale `session_id` included); R4 allows only a byte-exact match. code's allowance is process discipline, not a boundary; qa's is enforcement (T-003, F3).
+- **Run start:** `<pm> test` (bun → `bun run test`, no lockfile → `npm test`); `package.json` without `scripts.test` → `ORCH_TEST_COMMAND_UNRESOLVED`; non-JS → detect-stack's value; the record-time check halts `ORCH_TEST_COMMAND_UNSAFE`, so nothing is ever recorded that Guard 7 would not pass.
+- **Rulings recorded:** A1, the spec role is non-interactive (an approved deviation); A2, the allowlist is the test command only. Deferred to the plan: run-file strict keys (D9) and how the metacharacter constant is shared (D10).
+- **Residual risk, named:** the profiles are live in this repository; manual `/agents` use creates no envelope, so Guard 5 allows every write (ARCH-010 design); the standing rule forbids runs here, not the files.
