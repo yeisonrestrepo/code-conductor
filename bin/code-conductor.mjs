@@ -113,7 +113,7 @@ export function run(argv, env = process.env, { cwd = process.cwd(), log } = {}) 
     }
     // Precondition conflict (--project target is a non-directory) → exit 1, not 2:
     // nothing was partially written for the project, the path is simply unusable.
-    if (err.code === 'PROJECT_TARGET_NOT_DIR') { emit('stderr', `code-conductor: ${err.message}`); return 1; }
+    if (err.code === 'PROJECT_TARGET_NOT_DIR' || err.code === 'SELF_INSTALL') { emit('stderr', `code-conductor: ${err.message}`); return 1; }
     // Environment errors that surface on the very first write are still exit 1.
     if (err.code === 'EROFS') { emit('stderr', `code-conductor: cannot write to ${err.path} (read-only file system) — remount writable or adjust permissions`); return 1; }
     if (err.code === 'EACCES' || err.code === 'EPERM') { emit('stderr', `code-conductor: permission denied writing ${err.path} — fix with chmod/chown`); return 1; }
