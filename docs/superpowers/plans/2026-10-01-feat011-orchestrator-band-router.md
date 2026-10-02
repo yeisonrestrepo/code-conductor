@@ -12,12 +12,21 @@
 - **Guard 6** joins `.claude/hooks/pre-tool-use.mjs` and its `project-template/` mirror. On every write-family tool it runs after Guard 5 and before Guard 2.
   - It keys on the run file's `session_id`, never on identity.
   - It carries pinned copies of `orchestrate.mjs`'s write surface and run path, for the reason Guard 5 carries the band constants.
+  - **R7 (amended on the D1 ruling):** on `Agent` and `SendMessage` it denies any payload carrying `agent_type` while a run is live in its session (`ORCH_NESTED_DISPATCH`). The hook's matcher names both tools in both settings files (T-004).
 - **`/cc-orchestrate`** (new, byte-identical in both command mirrors) drives the verbs and the `Agent` tool. It resolves the script by presence (D11).
 - **The run file** is the seventh `skip` row of `PROJECT_HOST_OWNED`. It and `.conductor/` become the fifth and sixth managed entries of `project-template/gitignore`.
 
 **Tech Stack:** Node ≥ 20 ESM, zero-dependency scripts, vitest, the `tools/` instruments.
 
-**Spec:** `docs/superpowers/specs/2026-10-01-feat011-orchestrator-band-router-design.md`, APPROVED 2026-10-01 (`883da0b`).
+**Spec:** `docs/superpowers/specs/2026-10-01-feat011-orchestrator-band-router-design.md`, APPROVED 2026-10-01 (`883da0b`), amended on the D1 ruling (`e5901ae`).
+
+**Amended 2026-10-01 on the D1 ruling, after V1 halted (T-001).** The changes:
+- R7, `ORCH_HANDBACK_CONFLICT`, and the matcher change (AC3a);
+- re-derived predictions and red splits, with two mutants added;
+- P13 settled by measurement;
+- the hand-back and dispatch text of P10 and `/cc-orchestrate` brought to the delivered-report and completion-notice rules.
+
+Every new number was derived before it was measured in the clone.
 
 ## Global Constraints
 
@@ -29,7 +38,9 @@
   3. `.claude/memory/session-snapshot.json`
   4. `.conductor/**`
 - **Guard 6's order:** `[guard5BandScope, guard6OrchestratorRun, …existing]` on `Write`, `Edit`, `create_file` and `write_file`.
+- **R7's registration:** `Agent: [guard6OrchestratorRun]` and `SendMessage: [guard6OrchestratorRun]`, each a distinct array. The `PreToolUse` matcher reads `Read|Write|Edit|create_file|write_file|Bash|Agent|SendMessage` in both settings files.
 - **Deny text, verbatim:** `Guard 6: ORCH_WRITE_DENIED: <path> is outside the orchestrator's write surface while run <item> is live; repository writes during a run go through a band role (Guard 5).`
+- **R7 deny text, verbatim:** `Guard 6: ORCH_NESTED_DISPATCH: <tool> from agent <agent_type> is denied while run <item> is live; only the orchestrator dispatches or messages agents during a run.`
 - **Baseline (AC13):** this item adds passing tests only, so `tools/skip-baseline.json` does not change.
 - **Staging:**
   - `git add -u <path>` for a tracked file.
@@ -48,6 +59,8 @@
 
 Every number below was measured on 2026-10-01 during planning. The drafts ran in an independent `git clone --no-hardlinks` of `883da0b` in the session scratchpad: not a linked worktree (`[BUG-053]`), no hooks installed, and `node_modules` symlinked. The baseline there read **1153 / 0 across 44 files**, equal to the record.
 
+**Re-derived on the D1 ruling.** Every row was derived on paper first, then measured in the same clone. The clone's base blobs of both settings files, `templates.test.js` and `settings-merge.test.js` equal `HEAD`'s. Every measurement matched its derivation. One derivation slip, T-004-E written as 1232 / 1233, was corrected to 1233 / 1234 before anything measured it.
+
 **Per environment:**
 - **Local** runs every test. Its 0 skipped includes the 12 conditional `code-conductor-plugin` tests, which run because the 2026-10-01 install put the personal skills in `~/.claude/skills`, and the `heal` test.
 - **CI** lacks those skills. ci-node24's 13 skipped are exactly those 12 plus `heal` (1).
@@ -60,34 +73,69 @@ None of the files this plan adds or touches is in any skipped set, so every new 
 | now (`883da0b`, measured) | 1153 / 0, 44 files | 1057 / 96 | 1140 / 13 |
 | T-000 plan commit | 1153 / 0 | n/a | n/a |
 | T-001 V1–V3 live | 1153 / 0 | n/a | n/a |
-| T-002 `orchestrate.mjs` | **1202 / 0** (+49), 45 files | n/a | n/a |
-| T-003 Guard 6 | **1224 / 0** (+22), 46 files | n/a | n/a |
-| T-004 ignore and host-own | **1225 / 0** (+1) | n/a | n/a |
-| T-005 `/cc-orchestrate` | **1227 / 0** (+2) | n/a | n/a |
-| T-006 demo (AC12) | 1227 / 0 | n/a | n/a |
-| T-007 README and release | **1227 / 0** | **1131 / 96**, `SKIP_BASELINE_OK` | **1214 / 13**, `SKIP_BASELINE_OK` |
+| T-002 `orchestrate.mjs` | **1203 / 0** (+50), 45 files | n/a | n/a |
+| T-003 Guard 6 with R7 | **1233 / 0** (+30), 46 files | n/a | n/a |
+| T-004 ignore, host-own, matcher | **1235 / 0** (+2) | n/a | n/a |
+| T-005 `/cc-orchestrate` | **1237 / 0** (+2) | n/a | n/a |
+| T-006 demo (AC12) | 1237 / 0 | n/a | n/a |
+| T-007 README and release | **1237 / 0** | **1141 / 96**, `SKIP_BASELINE_OK` | **1224 / 13**, `SKIP_BASELINE_OK` |
 
 **Arithmetic:**
-- **The delta is 49 + 22 + 1 + 2 = 74.**
-- **Local:** 1153 + 74 = 1227.
-- **ci-node20:** 1057 + 74 = 1131 passed, and 1131 + 96 = 1227.
-- **ci-node24:** 1140 + 74 = 1214 passed, and 1214 + 13 = 1227.
+- **The delta is 50 + 30 + 2 + 2 = 84.**
+- **Local:** 1153 + 84 = 1237.
+- **ci-node20:** 1057 + 84 = 1141 passed, and 1141 + 96 = 1237.
+- **ci-node24:** 1140 + 84 = 1224 passed, and 1224 + 13 = 1237.
+
+**The new tests over v1:**
+- **T-002, +1:** `ORCH_HANDBACK_CONFLICT`.
+- **T-003, +8:**
+  - R7 deny ×3;
+  - R7 no-decision ×4;
+  - `[AC3a]` `DISPATCH`.
+- **T-004, +1:** the `[FEAT-011 AC3a]` settings-merge test.
+- **T-004 also amends `templates.test.js`'s union-matcher pin, two `it.each` cases, in place,** with no new test. Like the T-006-A red, it is never pushed: it is amended inside T-004's own commit.
+
+A full clone run with every draft applied read **1237 / 0, 46 files**.
 
 **Red splits, each measured in the clone, with every filter's full match set enumerated (`[BUG-054]` rule):**
 
 | step | command | match set | measured |
 |---|---|---|---|
 | T-002-B | `npx vitest run tests/scripts/orchestrate.test.js` | the whole new file | file fails to load: `Cannot find module '../../scripts/orchestrate.mjs'`, `Test Files 1 failed (1)`, `Tests no tests` |
-| T-003-B | `npx vitest run tests/hooks/guard6.test.js` | the whole new file, 22 tests | **16 failed / 6 passed** |
+| T-002-D | the same command, after `orchestrate.mjs` | 50 tests | **50 / 50**. Against the v1 router (no CONFLICT check), **1 failed / 49 passed**, the CONFLICT test: its discriminator. |
+| T-003-B | `npx vitest run tests/hooks/guard6.test.js` | the whole new file, 30 tests | **20 failed / 10 passed** |
+| T-003-E | `npx vitest run tests/hooks tests/installer/templates.test.js` | 9 files | **503** (`tests/hooks` 466 + `templates.test.js` 37) |
 | T-004-B | `npx vitest run tests/installer/templates.test.js -t "managed entr"` | `[AC13] … fourth managed entry` (ARCH-010's T-006-A test) and `[FEAT-011 AC10] … sixth managed entries`; no other title in the file contains the string | **1 failed / 1 passed / 36 skipped (38)**, with the new test red |
 | T-004-D | the same command, after the template edit | the same two | **1 failed / 1 passed / 36 skipped (38)**, with the T-006-A test red |
-| T-004-E | `npm test` at that point | the whole suite | **1 failed / 1224 passed (1225)**, and the one failure is the T-006-A test |
+| T-004-E | `npm test` at that point | the whole suite | **1 failed / 1233 passed (1234)**, and the one failure is the T-006-A test. Derived only: no planning run measured this state. |
+| T-004-J | `npx vitest run tests/installer/settings-merge.test.js -t "AC3a"` | `[FEAT-011 AC3a] carries the shipped …`, the only title containing `AC3a` | **1 failed / 17 skipped (18)**. The exact-entry assertion passes on the old template, and the `Agent`/`SendMessage` assertion fails. |
+| T-004-K | `npx vitest run tests/installer/templates.test.js -t "union matcher"` | the two `it.each` cases, one per settings file, the only titles containing the string | **2 failed / 36 skipped (38)** |
+| T-004-L | `npx vitest run tests/installer/settings-merge.test.js tests/installer/templates.test.js`, after both settings edits | both files | **56 / 56** (18 + 38) |
+| T-004-M | `npx vitest run tests/installer tests/unit/host-owned-ignore-xor.test.js` | 17 files | **304 / 304** (302 + 1 + 1). Measured with `commands-parity.test.js` at `HEAD`. With T-005's parity tests present the clone read 306, which is the T-005 state, not T-004's. |
 | T-005-B | `npx vitest run tests/installer/commands-parity.test.js -t "cc-orchestrate"` | the two tests of the new `cc-orchestrate mirrors` describe, the only full names containing the string | **2 failed / 30 skipped (32)** |
 
-**Why T-003-B passes six tests on the unedited hook.** R1, R2 and R5 ×4 assert *allow*, which the unedited hook already does. They become discriminating only against a wrong Guard 6. That was measured with three scratch mutants of the drafted hook:
-- dropping the `session_id` comparison turns R4 ×2, the warning-rides-the-ask test and the V3 pin red (4);
-- keying the role skip on `agent_id` turns the `agent_id`-only R6 and the `general-purpose` R6 red (2);
-- removing the role skip turns R1 red (1).
+**Why T-003-B passes ten tests on the unedited hook.**
+- **R1, R2 and R5 ×4** assert *allow*, which the unedited hook already does.
+- **R7's four no-decision cases** assert *no decision and no warning*. The unedited hook has no `Agent` entry, so it allows silently.
+
+Each becomes discriminating only against a wrong Guard 6. That was measured with eight scratch mutants of the drafted hook, each derived before it was measured:
+- **M1:** dropping the write path's `session_id` comparison turns R4 ×2, the warning-rides-the-ask test and the V3 pin red (4);
+- **M1b:** dropping R7's `session_id` comparison turns the R7 stale-run no-decision red (1);
+- **M2:** keying the role skip on `agent_id` turns the `agent_id`-only R6 and the `general-purpose` R6 red (2);
+- **M2b:** keying R7 on `agent_id` turns the R7 `agent_id`-only no-decision red (1);
+- **M3:** removing the role skip turns R1 red (1);
+- **M4:** ordering the role skip before R7 turns R7's code `Agent` and code `SendMessage` denies red (2);
+- **M5:** dropping R7's `agent_type` null check turns the R7 main-session and `agent_id`-only no-decisions red (2);
+- **M6:** R7 denying when no run file is found turns the R7 no-run no-decision red (1).
+
+**The no-decision cases also prove the hook tolerates path-less inputs.**
+- `fire` spawns the hook file itself, so the real `main()` runs.
+- A throw there is caught at the file's last line and turned into a fail-closed deny ("the hook threw").
+- So a no-decision result with exit 0 shows that `Agent` and `SendMessage` inputs, which carry no `file_path`, pass through every R7 line without throwing.
+
+This matters because the new matcher invokes the hook on every dispatch in every install.
+
+**The matcher pin, per environment.** `templates.test.js` and `settings-merge.test.js` are in no skipped set, so T-004-J/K's reds are the same on every leg. They are never pushed: T-004-L turns them green inside T-004's commit.
 
 **The T-006-A red, per environment.** `templates.test.js` is in no skipped set, so the red at T-004-D/E is the same on every leg. It is never pushed: T-004-F amends the test in the same commit, and no CI leg ever sees it. Every leg sees the amended test pass, and the new test with it.
 
@@ -106,7 +154,7 @@ None of the files this plan adds or touches is in any skipped set, so every new 
 - it does not commit;
 - its brief asks it for its handoff-observation line (owner ruling at ARCH-010 T-005-F).
 
-**The reviewer** re-runs the three mutants and confirms the hook's sha256 against the planning draft.
+**The reviewer** re-runs all eight mutants (M1, M1b, M2, M2b, M3, M4, M5, M6) and confirms the hook's sha256 against the planning draft.
 
 ## Review Focus
 
@@ -135,9 +183,20 @@ None of the files this plan adds or touches is in any skipped set, so every new 
   - a warning channel the user never sees makes R3/R4 silent.
 
   T-001 measures all three before any code, and each has its own halt.
+
+  **Measured 2026-10-01 on 2.1.287:**
+  - **V1 halted.** A subagent can dispatch. The ruling kept D1 on new grounds and added R7.
+  - **V2 holds.**
+  - **V3 holds,** on `systemMessage`.
+- **Asynchronous dispatch and the post-hand-back tail (V1, F3–F5).** Dispatch returns before the agent finishes. An agent can keep acting after its delivered hand-back, and can report again through `SendMessage`. Mitigated by:
+  - the completion-notice wait in `/cc-orchestrate`;
+  - R7, which denies subagent `Agent` and `SendMessage` during a run;
+  - `ORCH_HANDBACK_CONFLICT` as defense in depth.
+
+  The lingering same-role writer is the spec's stated D8 limit.
 - **Child-process seams.** `snap-build` and `snap-validate` are CLI scripts that call `process.exit` at import, so the router spawns them (P1). A spawn failure surfaces as a non-zero status, which halts with the validator's text quoted.
 - **Hand-back transport.** An agent's prose in a heredoc can trip Guard 3, whose heredoc-body scan landed in `[BUG-047]`. Hand-backs therefore travel by file under `.conductor/handback/` (P10).
-- **Two writers to one run file.** Dispatch is serial (D8), and every write is temp-plus-rename (AC9). A concurrent `orchestrate.mjs` invocation is outside the cooperative model.
+- **Two writers to one run file.** Dispatch is serial by construction (D8, amended): the orchestrator waits for each completion notice, `install` advances only from a recorded hand-back, and R7 blocks nested dispatch. Every write is temp-plus-rename (AC9). A concurrent `orchestrate.mjs` invocation is outside the cooperative model.
 
 **Boundary conditions:**
 - **Scope size:**
@@ -147,7 +206,8 @@ None of the files this plan adds or touches is in any skipped set, so every new 
   - a 301-character path: `ORCH_SCOPE_OVER_CAP`.
 - **Hand-back lines:**
   - zero or two `SNAP_HANDBACK` lines: `ORCH_HANDBACK_MISSING`;
-  - a valid v1 envelope: `ORCH_HANDBACK_INVALID`.
+  - a valid v1 envelope: `ORCH_HANDBACK_INVALID`;
+  - a second report for a position already handed back: `ORCH_HANDBACK_CONFLICT`, terminal (D12), with the first record kept.
 - **Run file:**
   - a payload without `session_id`: stale (R4), never denied;
   - an empty `CLAUDE_CODE_SESSION_ID`: `ORCH_NO_SESSION_ID`;
@@ -172,7 +232,7 @@ None of the files this plan adds or touches is in any skipped set, so every new 
 - **P8, `approve plan <plan path>`.** The path is relative to the run root, with no `..`. The owner approves the path the plan agent named in `ops.f`. Every task's scope is checked before `define_approved` is written, so a defective plan halts before any Build dispatch.
 - **P9, scopes are never truncated, element-wise too.** A path over `V3_CAPS['ops.scope'][1]` (300 characters) halts with `ORCH_SCOPE_OVER_CAP`. `snap-build`'s `normArray` would otherwise cut it silently.
 - **P10, hand-backs travel by file.**
-  - `/cc-orchestrate` writes the agent's final message with the Write tool to `.conductor/handback/<role>.txt`, or `code-<N>.txt` for code. That is inside the write surface (R5).
+  - After the agent's completion notice, `/cc-orchestrate` writes the agent's **delivered `SubagentHandback` report** with the Write tool to `.conductor/handback/<role>.txt`, or `code-<N>.txt` for code. That is inside the write surface (R5). (Amended on the D1 ruling: "final message" is undefined once an agent can report through two channels.)
   - It then feeds the file to `handback` on stdin.
   - A heredoc would carry the agent's prose through Guard 3's heredoc-body scan (`[BUG-047]`).
   - `end`, and a stale-run replacement, clear `.conductor/handback/`, so file names never collide across runs and Guard 2 never asks.
@@ -183,9 +243,11 @@ None of the files this plan adds or touches is in any skipped set, so every new 
   - If both do, it uses `systemMessage`, because it rides the decision in the one JSON object the hook emits.
   - If neither does, T-001 halts.
 
-  T-003 carries both variants in full. Each passes the whole suite at 1227 / 0, measured.
+  **Settled by T-001's V3:** on 2.1.287, stderr is invisible and `systemMessage` renders behind `PreToolUse:Write says: `. So T-003 carries the `systemMessage` variant only, and the stderr variants are retired. The warning text stays as written, because it reads well behind that prefix (owner ruling).
 - **P14, the T-006-A test keeps its own claim.** ARCH-010's `[AC13]` test goes red on AC10's two lines, as carried forward. It is amended to assert its claim, that the band envelope is the fourth entry, with `.slice(0, 4)`. The full exact list moves to the new `[FEAT-011 AC10]` test. Exactly one exact-list test therefore owns the template, and a band envelope moved from fourth place still turns `[AC13]` red.
-- **P15, the T-003 edit order is C1, C2, C3, C4, C5, with registration last.** Every intermediate state parses and registers nothing that is undefined. C1's rename touches Guard 5's only call site in the same edit.
+- **P15, the T-003 edit order is C1, C2a, C2b, C3, C4, C5, with registration last.** Every intermediate state parses, loads and runs, and registers nothing that is undefined. C1's rename touches Guard 5's only call site in the same edit.
+  - **C2a, the constants, strictly precedes C2b, the functions** (amended on the D1 ruling). `guard6OrchestratorRun`'s first line reads `ORCH_DISPATCH_TOOLS`. A function edit landing before its constant would throw on every write once registered, which is the ARCH-010 brick lesson.
+  - **Each step is checked by running the hook, not only by parsing it.** `node --check` cannot see a `ReferenceError`.
 - **P16, v1 routes writing-plans-format plans.**
   - A task is a `### Task N` heading.
   - Its scope is the backticked paths on `Create:`, `Modify:` and `Test:` lines of its `**Files:**` block.
@@ -300,7 +362,7 @@ None of the files this plan adds or touches is in any skipped set, so every new 
   - [X] [T-001-F] Run `git add -u .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`. Commit `docs: record the FEAT-011 V1-V3 measurements [FEAT-011]`. Expected: **1153 / 0**.
 
 - [ ] [T-002] **`scripts/orchestrate.mjs`: the router, the run file, and the five verbs** (AC1, AC2, AC4, AC7, AC8, AC9; Review Focus 4 and 5). Native. Depends on T-001's three verdicts.
-  - [ ] [T-002-A] Create `tests/scripts/orchestrate.test.js` with exactly this content (sha256 `b9928aa733148de2e1f8b89551022f14ff701418150ac1a37cc5ea9cb823a7fb`, 49 tests):
+  - [ ] [T-002-A] Create `tests/scripts/orchestrate.test.js` with exactly this content (sha256 `88ab6418c72abefbd0e16b5de8f5107ecf850e62be361d9b8755cedfa7dc6897`, 50 tests; amended 2026-10-01 on the D1 ruling, adding the `ORCH_HANDBACK_CONFLICT` test):
     ```js
     import { describe, it, expect, beforeEach, afterEach } from 'vitest';
     import { spawnSync } from 'node:child_process';
@@ -679,6 +741,16 @@ None of the files this plan adds or touches is in any skipped set, so every new 
         expect(orch(['install', 'plan']).status).toBe(2);
       });
 
+      it('[AC2] ORCH_HANDBACK_CONFLICT on a second report for one position, keeping the first', () => {
+        const before = dispatched('spec');
+        orch(['handback', 'spec'], { input: say('spec', 'boundary_routed') });
+        const first = runFile().handbacks;
+        const r = orch(['handback', 'spec'], { input: say('spec', 'boundary_routed') });
+        expectHalt(r, 'ORCH_HANDBACK_CONFLICT', before);
+        expect(r.err).toBe('ORCH_HANDBACK_CONFLICT: spec already handed back for this position; a second report is not routed');
+        expect(runFile().handbacks).toEqual(first);
+      });
+
       it('[AC2] SNAP_GATE_MISMATCH halts install as the backstop behind the router', () => {
         const before = dispatched('spec');
         orch(['handback', 'spec'], { input: say('spec', 'boundary_routed') });
@@ -702,7 +774,7 @@ None of the files this plan adds or touches is in any skipped set, so every new 
     });
     ```
   - [ ] [T-002-B] Run `npx vitest run tests/scripts/orchestrate.test.js`. Expected: the file fails to load with `Cannot find module '../../scripts/orchestrate.mjs'`, reading `Test Files 1 failed (1)` and `Tests no tests`.
-  - [ ] [T-002-C] Create `scripts/orchestrate.mjs` with exactly this content (sha256 `66d6b06bd1802a78a4c21b78945a7975dd4d6a4d814a44d54683e900b145f55b`, 334 lines; every function ≤ 30 lines):
+  - [ ] [T-002-C] Create `scripts/orchestrate.mjs` with exactly this content (sha256 `cb99c5a0c97e17d4004439ef8c9d29a84db47fcde5a96a68409ce2682152ace9`, 338 lines; every function ≤ 30 lines; amended 2026-10-01 on the D1 ruling, adding the `ORCH_HANDBACK_CONFLICT` check ahead of the refusal):
     ```js
     #!/usr/bin/env node
     // scripts/orchestrate.mjs
@@ -945,6 +1017,10 @@ None of the files this plan adds or touches is in any skipped set, so every new 
 
     function handback(root, sessionId, role, text) {
       const run = liveRun(root, sessionId);
+      // The binary refuses a second SubagentHandback, yet an agent can still report again (V1, F4).
+      if (!run.role && run.handbacks.at(-1)?.role === role) {
+        throw new Halt('ORCH_HANDBACK_CONFLICT', `${role} already handed back for this position; a second report is not routed`);
+      }
       if (!run.role || run.role !== role) throw new Refusal(`handback ${role}: the dispatched role is ${run.role ?? 'none'}`);
       const env = parseHandback(text);
       if (env.sys.role !== role) throw new Halt('ORCH_HANDBACK_ROLE_MISMATCH', `dispatched ${role}, the hand-back names ${env.sys.role}`);
@@ -1039,15 +1115,15 @@ None of the files this plan adds or touches is in any skipped set, so every new 
     const invoked = process.argv[1] && pathToFileURL(realpathSync(process.argv[1])).href === import.meta.url;
     if (invoked) process.exitCode = cli(process.argv.slice(2), process.env);
     ```
-  - [ ] [T-002-D] Run `npx vitest run tests/scripts/orchestrate.test.js`, expecting **49 / 49**. Then `npx vitest run tests/unit/snap-contract.test.js tests/unit/snap-validate.test.js tests/scripts/snap-build.test.js`, all passing with no file edited. Then `npm test`: **1202 / 0**, 45 files.
+  - [ ] [T-002-D] Run `npx vitest run tests/scripts/orchestrate.test.js`, expecting **50 / 50**. Then `npx vitest run tests/unit/snap-contract.test.js tests/unit/snap-validate.test.js tests/scripts/snap-build.test.js`, all passing with no file edited. Then `npm test`: **1203 / 0**, 45 files.
   - [ ] [T-002-E] Append `- T-002: <one line>` under the plan section. Then:
     - `git add scripts/orchestrate.mjs tests/scripts/orchestrate.test.js`;
     - `git add -u .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`.
 
-    Commit `feat: orchestrate.mjs, the band router and its run file [FEAT-011]`. Expected: **1202 / 0**.
+    Commit `feat: orchestrate.mjs, the band router and its run file [FEAT-011]`. Expected: **1203 / 0**.
 
-- [ ] [T-003] **Guard 6** (AC3, AC4, AC5, AC6; Review Focus 1–3). **Subagent, then a reviewer.** It runs in the main checkout with no worktree, and the subagent does not commit. Depends on T-002, whose `RUN_FILE` and `WRITE_SURFACE` the test imports, and on T-001's V3 verdict.
-  - [ ] [T-003-A] Create `tests/hooks/guard6.test.js` with exactly this content: sha256 `cca21ed9db65a0f8db63a1ddedfa47c694ec602b27df52b99b7df0134575bbbb`, 22 tests, written for the `systemMessage` verdict. **If V3 chose stderr,** replace the `[V3]` test with the block after it, giving sha256 `60c9aebdd3ae3fe3b79bd88fad089f032b6fe9f10efcbb418aa27d3b6d3eb69b`. The count stays 22.
+- [ ] [T-003] **Guard 6, with R7** (AC3, AC3a's `DISPATCH` half, AC4, AC5, AC6; Review Focus 1–3). **Subagent, then a reviewer.** It runs in the main checkout with no worktree, and the subagent does not commit. Depends on T-002, whose `RUN_FILE` and `WRITE_SURFACE` the test imports, and on T-001's V3 verdict.
+  - [ ] [T-003-A] Create `tests/hooks/guard6.test.js` with exactly this content: sha256 `31e7d6bdb9575672c55c851f8983c42668650b4682135f3fdee51beb4204c2f1`, 30 tests, for the measured `systemMessage` verdict. It was amended on the D1 ruling, adding R7 ×7 and `[AC3a]`, and the stderr variant is retired.
     ```js
     import { describe, it, expect, beforeEach, afterEach } from 'vitest';
     import { spawnSync } from 'node:child_process';
@@ -1095,6 +1171,13 @@ None of the files this plan adds or touches is in any skipped set, so every new 
     const asMain = (target, opts = {}) => fire(payload('Write', target, { cwd: root, ...opts }));
     const denied = (target) => `Guard 6: ORCH_WRITE_DENIED: ${target} is outside the orchestrator's write surface while run FEAT-011 is live; repository writes during a run go through a band role (Guard 5).`;
     const tracked = () => join(root, 'README.md');
+    // R7's tools carry no file_path. The inputs are the shapes FEAT-011 V1 logged on claude 2.1.287.
+    const DISPATCH_INPUT = {
+      Agent: { description: 'Write leaf.txt file', prompt: 'Write leaf.txt', subagent_type: 'leaf' },
+      SendMessage: { to: 'main', summary: 'report', message: 'done', type: 'message' },
+    };
+    const dispatch = (tool, opts = {}) => fire({ ...payload(tool, '', { cwd: root, ...opts }), tool_input: DISPATCH_INPUT[tool] });
+    const nested = (tool, agentType) => `Guard 6: ORCH_NESTED_DISPATCH: ${tool} from agent ${agentType} is denied while run FEAT-011 is live; only the orchestrator dispatches or messages agents during a run.`;
 
     describe('Guard 6: the orchestrator holds no repository write access [FEAT-011]', () => {
       it('[R1] steps aside for a band role, which Guard 5 governs', () => {
@@ -1219,6 +1302,40 @@ None of the files this plan adds or touches is in any skipped set, so every new 
         } finally { rmSync(dir, { recursive: true, force: true }); }
       });
 
+      // Discriminator: a Guard 6 that checks the role skip before R7 lets both role cases through.
+      it.each([['Agent', 'code'], ['Agent', 'general-purpose'], ['SendMessage', 'code']])(
+        '[R7] denies %s from agent %s while the run is live', (tool, agentType) => {
+          liveRun();
+          expect(dispatch(tool, { agentId: 'a3', agentType }).decision).toEqual({
+            hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: nested(tool, agentType),
+          });
+        });
+
+      // Silent, not warned: dispatch outside a live run is the shipped cooperative posture.
+      it.each([
+        ['the main-session shape during a live run', true, {}],
+        ['an agent_id-only payload during a live run', true, { agentId: 'adcc0758336c23e70' }],
+        ['a role with no run file', false, { agentId: 'a3', agentType: 'code' }],
+        ['a role during a stale run', 'stale', { agentId: 'a3', agentType: 'code' }],
+      ])('[R7] decides nothing for an Agent call from %s', (_, run, opts) => {
+        if (run === true) liveRun();
+        if (run === 'stale') liveRun({ session_id: 'sess-2' });
+        const r = dispatch('Agent', opts);
+        expect(r.decision).toBeNull();
+        expect(r.warning).toBe('');
+      });
+
+      it('[AC3a] registers Guard 6 alone on Agent and SendMessage, as distinct arrays', async () => {
+        const text = readFileSync(HOOK, 'utf8').replace(/try \{ main\(\); \}.*$/s, 'export { DISPATCH };\n');
+        const dir = mkdtempSync(join(tmpdir(), 'cc-guard6-r7-'));
+        try {
+          writeFileSync(join(dir, 'hook.mjs'), text);
+          const { DISPATCH } = await import(pathToFileURL(join(dir, 'hook.mjs')).href);
+          for (const tool of ['Agent', 'SendMessage']) expect(DISPATCH[tool].map((g) => g.name)).toEqual(['guard6OrchestratorRun']);
+          expect(new Set(['Agent', 'SendMessage', 'Write', 'Edit'].map((t) => DISPATCH[t])).size).toBe(4);
+        } finally { rmSync(dir, { recursive: true, force: true }); }
+      });
+
       it('[AC4] carries the write surface and run path equal to scripts/orchestrate.mjs', () => {
         const text = readFileSync(HOOK, 'utf8');
         const list = (name) => JSON.parse(text.match(new RegExp(`const ${name} = (\\[[^\\]]*\\]);`))[1].replace(/'/g, '"'));
@@ -1227,16 +1344,7 @@ None of the files this plan adds or touches is in any skipped set, so every new 
       });
     });
     ```
-    The stderr-verdict `[V3]` test:
-    ```js
-      it('[V3] warns on the channel V3 measured: stderr at exit 0, with no systemMessage', () => {
-        liveRun({ session_id: 'sess-2' });
-        const r = asMain(tracked());
-        expect(r.stderr).toContain('Guard 6: ORCH_RUN_STALE');
-        expect(r.out.systemMessage).toBeUndefined();
-      });
-    ```
-  - [ ] [T-003-B] Run `npx vitest run tests/hooks/guard6.test.js`. Expected: **16 failed / 6 passed** (22). The six that pass are R1, R2 and R5 ×4, the allow cases (see Predictions).
+  - [ ] [T-003-B] Run `npx vitest run tests/hooks/guard6.test.js`. Expected: **20 failed / 10 passed** (30). The ten that pass are R1, R2 and R5 ×4, the allow cases, and R7's four no-decision cases (see Predictions).
   - [ ] [T-003-C] Modify `.claude/hooks/pre-tool-use.mjs` (sha256 before: `062c686f06daa03c70ef3384208c7d19a22680eca1dcccbcc9ee50cb5ed884d4`, 680 lines), with the Edit tool, in exactly this order (P15).
     - **C1, the shared helpers (P3).**
       - After `const isPlainObject = …;` (:121), insert:
@@ -1256,14 +1364,17 @@ None of the files this plan adds or touches is in any skipped set, so every new 
         ```
 
       Make the rename and its one call site in consecutive edits. The main session carries no `agent_type`, so Guard 5 returns before the call, and the gap between those two edits never throws for this session.
-    - **C2, the Guard 6 block, unregistered.** Insert after `guard5BandScope`'s closing `}`, before `// ── Guard 3 constants`:
+    - **C2a, the Guard 6 constants, strictly before C2b (P15).** Insert immediately before `// ── Guard 3 constants`, followed by one blank line:
       ```js
       // ── Guard 6 constants ─────────────────────────────────────────────────────────
       // Copies of scripts/orchestrate.mjs values (FEAT-011 AC4), carried for Guard 5's reason:
       // no import resolves from both install locations. tests/hooks/guard6.test.js pins them.
       const ORCH_RUN_REL = ['.claude', 'memory', 'orchestrator-run.json'];
       const ORCH_WRITE_SURFACE = ['.claude/memory/orchestrator-run.json', '.claude/memory/band-envelope.json', '.claude/memory/session-snapshot.json', '.conductor/**'];
-
+      const ORCH_DISPATCH_TOOLS = ['Agent', 'SendMessage'];
+      ```
+    - **C2b, the Guard 6 functions, unregistered.** Insert immediately before `// ── Guard 3 constants`, after C2a's block, followed by one blank line:
+      ```js
       // Only what Guard 6 itself reads is checked: an object with a session to bind to.
       function readRunFile(path) {
         try {
@@ -1276,11 +1387,25 @@ None of the files this plan adds or touches is in any skipped set, so every new 
       // The deployed copy first, then source (FEAT-011 D11).
       const orchEnd = (root) => `node ${existsSync(join(root, '.claude', 'scripts', 'orchestrate.mjs')) ? '.claude/scripts' : 'scripts'}/orchestrate.mjs end`;
 
+      // R7: on claude 2.1.287 a subagent can dispatch and message agents (FEAT-011 V1), so a role
+      // could reach the envelope through a helper in two hops. During a live run only the main
+      // session, which carries no agent_type, dispatches. Silent outside a live run: no warning.
+      function guard6NestedDispatch(payload) {
+        if (payload.agent_type == null) return null;
+        const root = findRootHolding(payloadCwd(payload), ORCH_RUN_REL);
+        if (!root) return null;
+        const run = readRunFile(join(root, ...ORCH_RUN_REL));
+        if (!run || payload.session_id !== run.session_id) return null;
+        return deny(`Guard 6: ORCH_NESTED_DISPATCH: ${payload.tool_name} from agent ${payload.agent_type} is denied while run ${run.item} is live; only the orchestrator dispatches or messages agents during a run.`);
+      }
+
       // Guard 6: while a run is live in this session, nothing but a band role writes outside the
       // orchestrator's write surface (FEAT-011 D3). Identity cannot mark the main session, so the
       // run's session_id is the key. Another session's run is stale: warned about, never enforced,
-      // so a crashed run cannot lock a later session out.
+      // so a crashed run cannot lock a later session out. R7 precedes the role skip, because a
+      // role's dispatch is exactly what it closes.
       function guard6OrchestratorRun(input, payload) {
+        if (ORCH_DISPATCH_TOOLS.includes(payload.tool_name)) return guard6NestedDispatch(payload);
         if (BAND_ROLES.includes(payload.agent_type)) return null;
         const cwd = payloadCwd(payload);
         const root = findRootHolding(cwd, ORCH_RUN_REL);
@@ -1297,9 +1422,9 @@ None of the files this plan adds or touches is in any skipped set, so every new 
         return deny(`Guard 6: ORCH_WRITE_DENIED: ${target || '<no path>'} is outside the orchestrator's write surface while run ${run.item} is live; repository writes during a run go through a band role (Guard 5).`);
       }
       ```
-      `warn` is referenced only when Guard 6 runs, and nothing registers it until C5. So the unregistered block is inert, even before C3 defines `warn`.
-    - **C3, the warning channel, by T-001's V3 verdict.**
-      - **If `systemMessage`:** replace the whole `function emit(decision) { … }` (:22–28) with:
+      `warn` is referenced only when Guard 6 runs, and nothing registers `guard6OrchestratorRun` or `guard6NestedDispatch` until C5. So the unregistered block is inert, even before C3 defines `warn`. C2a has already defined every constant it reads.
+    - **C3, the warning channel: `systemMessage`, as T-001's V3 measured.**
+      - Replace the whole `function emit(decision) { … }` (:22–28) with:
         ```js
         let warning = '';
 
@@ -1320,17 +1445,7 @@ None of the files this plan adds or touches is in any skipped set, so every new 
         }
         ```
         Every existing `emit` call passes a decision, so its output is byte-identical while `warning` is empty.
-      - **If stderr:** insert immediately above `function emit(decision) {`, leaving `emit` unchanged:
-        ```js
-        // A warning decides nothing (FEAT-011): the remaining guards still run. stderr at exit 0
-        // is the channel V3 measured reaching the user.
-        function warn(msg) {
-          process.stderr.write(msg + '\n');
-          return null;
-        }
-
-        ```
-    - **C4, only if `systemMessage`.** In `main`, after the `for (const guard of guards) { … }` loop's closing `}`, insert `  if (warning) emit(null);`. Under stderr, C4 is skipped.
+    - **C4, the lone warning.** In `main`, after the `for (const guard of guards) { … }` loop's closing `}`, insert `  if (warning) emit(null);`.
     - **C5, the registration, last.** Replace:
       ```js
       // Guard 5 runs first on every write-family tool: a scope deny outranks Guard 2's ask.
@@ -1341,18 +1456,26 @@ None of the files this plan adds or touches is in any skipped set, so every new 
       // Guards 5 and 6 run first on every write-family tool, in that order: a scope deny
       // outranks Guard 2's ask, and Guard 6 steps aside for the band roles Guard 5 governs.
       for (const tool of BAND_WRITE_TOOLS) DISPATCH[tool].unshift(guard5BandScope, guard6OrchestratorRun);
+      // R7 sees dispatch only where settings.json routes it: the matcher names Agent and SendMessage.
+      for (const tool of ORCH_DISPATCH_TOOLS) DISPATCH[tool] = [guard6OrchestratorRun];
       ```
 
-    Run `node --check .claude/hooks/pre-tool-use.mjs` after C2, after C3/C4 and after C5. Expected results:
-    - **`systemMessage` verdict:** **733 lines**, sha256 `ef53973c17a52dec81ec6862e36b5d7d8459341b3c4f3dcaaac435738828742f`.
-    - **stderr verdict:** **729 lines**, sha256 `2ea3b7931892918072a75032ed91bc0637b3e6c948ad9a5a69f75b231bb3a354`.
+    **After every step, run the hook, not only parse it** (P15).
+    - **Before C1,** write two fixtures to `<scratchpad>`, with `<repo>` and `<scratchpad>` as absolute paths:
+      - `smoke-write.json`: `{"session_id":"smoke","cwd":"<repo>","hook_event_name":"PreToolUse","tool_use_id":"t","tool_name":"Write","tool_input":{"file_path":"<scratchpad>/smoke.txt","content":"x"}}`
+      - `smoke-agent.json`: `{"session_id":"smoke","cwd":"<repo>","hook_event_name":"PreToolUse","tool_use_id":"t","tool_name":"Agent","agent_id":"a","agent_type":"code","tool_input":{"subagent_type":"leaf","prompt":"p"}}`
+    - **After each of C1 (all four edits), C2a, C2b, C3, C4 and C5,** run `node .claude/hooks/pre-tool-use.mjs < <scratchpad>/smoke-write.json`, then the same with `smoke-agent.json`. Each must exit 0 with empty stdout. A stdout carrying "the hook threw" is a `ReferenceError` the parser cannot see. **Halt rule:** any other result stops the task before the next edit.
 
-    Each is the planning draft byte for byte. **Halt rule:** a different sha256 stops the task for a diff review before anything else runs.
+    **The replay that proves this order.** Planning replayed this exact order on the original hook as string replacements. After every step it ran five payloads: main-session `Write`, `general-purpose` `Edit`, role `Agent`, main-session `Read` and role `Write`.
+    - **Every state loaded and ran.** The one throw was a band-role `Write` between the C1 rename and its call site, which the hook turns into a fail-closed deny. That is the window C1's note already accepts: no band role runs during T-003, and its subagent is not one.
+    - **The final state equalled the draft byte for byte.**
+
+    Expected result: **750 lines**, sha256 `d03d21286de263ac5f38b0a4460de32ecbedce886bde83fa39c583afd463eba6`, the planning draft byte for byte (the `systemMessage` hook, amended with R7). **Halt rule:** a different sha256 stops the task for a diff review before anything else runs.
   - [ ] [T-003-D] Copy `.claude/hooks/pre-tool-use.mjs` over `project-template/.claude/hooks/pre-tool-use.mjs`, and confirm both with `cmp`.
-  - [ ] [T-003-E] Run `npx vitest run tests/hooks tests/installer/templates.test.js`, all passing: 9 files, **495 tests** (473 + 22). Then `npm test`: **1224 / 0**, 46 files.
+  - [ ] [T-003-E] Run `npx vitest run tests/hooks tests/installer/templates.test.js`, all passing: 9 files, **503 tests** (473 + 30). Then `npm test`: **1233 / 0**, 46 files.
   - [ ] [T-003-F] **Reviewer** (fresh, read-only):
     - confirm the hook's sha256 against T-003-C, and the mirror by `cmp`;
-    - re-run the three mutants on a scratch copy, with the real hook untouched. Each turns exactly its pinned tests red (Predictions: 4, 2 and 1);
+    - re-run all eight mutants on a scratch copy, with the real hook untouched. Each turns exactly its pinned tests red (Predictions: M1 4, M1b 1, M2 2, M2b 1, M3 1, M4 2, M5 2, M6 1);
     - confirm `git worktree list` shows one entry, and `git log` shows no subagent commit.
 
     Each finding is ruled by the owner before T-003-G.
@@ -1360,9 +1483,9 @@ None of the files this plan adds or touches is in any skipped set, so every new 
     - `git add tests/hooks/guard6.test.js`;
     - `git add -u .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`.
 
-    Commit `feat: Guard 6 holds the orchestrator to its declared write surface [FEAT-011]`. Expected: **1224 / 0**.
+    Commit `feat: Guard 6 holds the orchestrator to its declared write surface [FEAT-011]`. Expected: **1233 / 0**.
 
-- [ ] [T-004] **Ignore and host-own the run file; ignore `.conductor/` in projects** (AC10, the folded `README.md:325` observation, P14). Native. Depends on T-000.
+- [ ] [T-004] **Ignore and host-own the run file; ignore `.conductor/` in projects; route `Agent` and `SendMessage` to the hook** (AC10, AC3a, the folded `README.md:325` observation, P14). Native. Depends on T-000, and on T-003 for the matcher steps: `DISPATCH` must hold the `Agent` and `SendMessage` entries before any settings file routes those tools to the hook.
   - [ ] [T-004-A] Modify `tests/installer/templates.test.js`: append inside `describe('project-template/gitignore', …)`, after the `[AC13]` test:
     ```js
       // Discriminator for the folded README:325 observation: red on the pre-FEAT-011 template,
@@ -1378,18 +1501,51 @@ None of the files this plan adds or touches is in any skipped set, so every new 
   - [ ] [T-004-B] Run `npx vitest run tests/installer/templates.test.js -t "managed entr"`. Expected: **1 failed / 1 passed / 36 skipped (38)**. The new test is red and `[AC13]` is green.
   - [ ] [T-004-C] Modify `project-template/gitignore`: append `.claude/memory/orchestrator-run.json` and `.conductor/` as lines 6 and 7, keeping the trailing newline.
   - [ ] [T-004-D] Run the T-004-B command again. Expected: **1 failed / 1 passed / 36 skipped (38)**, now with **`[AC13]` red** (the carried-forward T-006-A red) and the new test green.
-  - [ ] [T-004-E] Run `npm test`. Expected: **1 failed / 1224 passed (1225)**, and the one failure is `[AC13]`. **Halt rule:** any other failure stops the task.
+  - [ ] [T-004-E] Run `npm test`. Expected: **1 failed / 1233 passed (1234)**, and the one failure is `[AC13]`. **Halt rule:** any other failure stops the task.
   - [ ] [T-004-F] Modify the `[AC13]` test in `tests/installer/templates.test.js` (P14):
     - insert above its `it(` line: `  // The full list is FEAT-011 AC10's below; this keeps ARCH-010's own claim, the fourth entry.`;
     - change `expect(lines.filter(l => l && !l.startsWith('#'))).toEqual([` to `expect(lines.filter(l => l && !l.startsWith('#')).slice(0, 4)).toEqual([`.
   - [ ] [T-004-G] Modify `lib/installer/host-owned.mjs`: insert `  ['memory/orchestrator-run.json', 'skip'],` after `  ['memory/band-envelope.json', 'skip'],` (:43).
   - [ ] [T-004-H] Modify `tests/installer/deploy.test.js:15`, the fixture that mirrors the template. In `TPL_GITIGNORE`, after `.claude/memory/band-envelope.json\n`, append `.claude/memory/orchestrator-run.json\n.conductor/\n`. **Halt rule:** `deploy.test.js` read 53 / 53 before and after this edit in planning. Any other reading stops the task, because a fixture change may not rewrite an expectation silently.
-  - [ ] [T-004-I] Run these checks:
+  - [ ] [T-004-I] Modify `tests/installer/settings-merge.test.js` (AC3a; amended on the D1 ruling):
+    - after `import { join } from 'node:path';`, insert `import { fileURLToPath } from 'node:url';`;
+    - change `import { MERGE_OWNED_KEYS } from '../../lib/installer/host-owned.mjs';` to `import { MERGE_OWNED_KEYS, PROJECT_SETTINGS_FINGERPRINTS } from '../../lib/installer/host-owned.mjs';`;
+    - inside `describe('mergeSettingsFile: owned entries', …)`, immediately before `it('is byte-identical on a second run of an unchanged release', …)`, insert:
+    ```js
+      // The shipped template over the entry a 1.35.0 install wrote: R7 is dead on a host the
+      // merge leaves on the old matcher, because the hook is never invoked for Agent. The whole
+      // entry is compared, so a merge that dropped Read through Bash (Guards 1-5) fails too.
+      it('[FEAT-011 AC3a] carries the shipped Agent and SendMessage matcher over a 1.35.0 entry', () => {
+        const shipped = fileURLToPath(new URL('../../project-template/.claude/settings.json', import.meta.url));
+        const earlier = { matcher: 'Read|Write|Edit|create_file|write_file|Bash', hooks: [{ type: 'command', command: 'node .claude/hooks/pre-tool-use.mjs' }] };
+        write(sp, { hooks: { PreToolUse: [HOST_ENTRY, earlier] } });
+        mergeSettingsFile(shipped, sp, PROJECT_SETTINGS_FINGERPRINTS);
+        const arr = read(sp).hooks.PreToolUse;
+        expect(arr).toHaveLength(2);
+        expect(arr[0]).toEqual(HOST_ENTRY);
+        expect(arr[1]).toEqual(read(shipped).hooks.PreToolUse[0]);
+        expect(arr[1].matcher.split('|')).toEqual(expect.arrayContaining(['Agent', 'SendMessage']));
+      });
+    ```
+    The exact-entry assertion is the owner's strengthening. With `arrayContaining` alone, a merge that collapsed the matcher to `Agent|SendMessage` would pass while stripping Guards 1–5 from every install.
+  - [ ] [T-004-J] Run `npx vitest run tests/installer/settings-merge.test.js -t "AC3a"`. Expected: **1 failed / 17 skipped (18)**. On the old template the exact-entry assertion passes and the `Agent`/`SendMessage` assertion fails.
+  - [ ] [T-004-K] Modify the union-matcher pin in `tests/installer/templates.test.js`:
+    - insert above its `it.each(SETTINGS)(` line: `  // Agent and SendMessage likewise: without them Guard 6's R7 never runs (FEAT-011 AC3a).`;
+    - change `expect(entries[0].matcher).toBe('Read|Write|Edit|create_file|write_file|Bash');` to `expect(entries[0].matcher).toBe('Read|Write|Edit|create_file|write_file|Bash|Agent|SendMessage');`;
+    - after `expect(entries[0].matcher.split('|')).toContain('Bash');`, insert `    expect(entries[0].matcher.split('|')).toContain('Agent');` and `    expect(entries[0].matcher.split('|')).toContain('SendMessage');`.
+
+    Then run `npx vitest run tests/installer/templates.test.js -t "union matcher"`. Expected: **2 failed / 36 skipped (38)**.
+  - [ ] [T-004-L] Modify `.claude/settings.json` and `project-template/.claude/settings.json`, one Edit each. Change `"matcher": "Read|Write|Edit|create_file|write_file|Bash",` to `"matcher": "Read|Write|Edit|create_file|write_file|Bash|Agent|SendMessage",`.
+    - **The live file takes effect in this session.** From here the hook runs on this session's `Agent` and `SendMessage` calls, and no run file exists here, so R7 decides nothing.
+    - Then run `npx vitest run tests/installer/settings-merge.test.js tests/installer/templates.test.js`. Expected: **56 / 56** (18 + 38).
+
+    **No full-suite run happens between T-004-I and T-004-L.** Those steps hold up to three reds at once: the AC3a merge test and both union-matcher cases. Only the targeted commands above run, until T-004-M.
+  - [ ] [T-004-M] Run these checks:
     1. `git check-ignore -v .claude/memory/orchestrator-run.json`, expecting `.gitignore:36:/.claude/memory/*`;
     2. `git ls-files --error-unmatch .claude/memory/orchestrator-run.json`, expecting rc 1;
-    3. `npx vitest run tests/installer tests/unit/host-owned-ignore-xor.test.js`, expecting **303 / 303** across 17 files (302 + 1);
-    4. `npm test`, expecting **1225 / 0**.
-  - [ ] [T-004-J] Append `- T-004: <one line>` under the plan section. Then `git add -u project-template/gitignore lib/installer/host-owned.mjs tests/installer/templates.test.js tests/installer/deploy.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`. Commit `feat: ignore and host-own the orchestrator run file, and ignore .conductor/ in projects [FEAT-011]`. Expected: **1225 / 0**.
+    3. `npx vitest run tests/installer tests/unit/host-owned-ignore-xor.test.js`, expecting **304 / 304** across 17 files (302 + 1 + 1);
+    4. `npm test`, expecting **1235 / 0**.
+  - [ ] [T-004-N] Append `- T-004: <one line>` under the plan section. Then `git add -u project-template/gitignore lib/installer/host-owned.mjs tests/installer/templates.test.js tests/installer/deploy.test.js tests/installer/settings-merge.test.js .claude/settings.json project-template/.claude/settings.json .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`. Commit `feat: ignore and host-own the orchestrator run file, ignore .conductor/ in projects, and route Agent and SendMessage to the hook [FEAT-011]`. The commit gate expects **1235 / 0**.
 
 - [ ] [T-005] **The `/cc-orchestrate` command, in both mirrors** (AC10, D7, D11, P10). Native. Depends on T-002.
   - [ ] [T-005-A] Modify `tests/installer/commands-parity.test.js`: append at the end of the file:
@@ -1410,7 +1566,7 @@ None of the files this plan adds or touches is in any skipped set, so every new 
     });
     ```
   - [ ] [T-005-B] Run `npx vitest run tests/installer/commands-parity.test.js -t "cc-orchestrate"`. Expected: **2 failed / 30 skipped (32)**, each failure `ENOENT`.
-  - [ ] [T-005-C] Create `.claude/commands/cc-orchestrate.md` with exactly this content (sha256 `e7c2cef77496836d8d34ea09f342981b542324f8ac0a1249dc0c733a4eb91ad4`). Then copy it to `project-template/.claude/commands/cc-orchestrate.md` and confirm the two with `cmp`.
+  - [ ] [T-005-C] Create `.claude/commands/cc-orchestrate.md` with exactly this content (sha256 `c4d1b32537ff83cdfe63586d9d66671c1126f65bba104da6ed7aca9d27524ca7`). It was amended on the D1 ruling: a wait for the completion notice, the delivered `SubagentHandback` report as the hand-back, the second-report route to `ORCH_HANDBACK_CONFLICT`, the in-flight wait on a halt, and the brief's verify-first and no-dispatch lines. In the clone it measured 36 / 36 on parity, and 1237 / 0 on the full suite. Then copy it to `project-template/.claude/commands/cc-orchestrate.md` and confirm the two with `cmp`.
     ````markdown
     ---
     description: "(Conductor) Route one backlog item through Define, Build and Verify by validated SNAP handoffs"
@@ -1442,7 +1598,7 @@ None of the files this plan adds or touches is in any skipped set, so every new 
     ## On any halt
 
     1. Print the stderr line verbatim.
-    2. Dispatch nothing further, and stop.
+    2. Dispatch nothing further. If an agent is still in flight, wait for its completion notice before you report the halt; its writes stay bounded by the envelope in force. Then stop.
 
     A halt is terminal in v1 (D12). Recovery is `node "$S/orchestrate.mjs" end`, then a fresh `start`, each only on the owner's word.
 
@@ -1458,10 +1614,12 @@ None of the files this plan adds or touches is in any skipped set, so every new 
        2. **Pause.** In step mode, ask the owner for a go. On a decline, stop: the run stays at its position, and nothing is installed. Under `--auto`, skip this pause.
        3. **Install.** Run `node "$S/orchestrate.mjs" install <role>`.
        4. **Dispatch.** Use the `Agent` tool with `subagent_type: <role>` and the brief below. Dispatch one agent at a time, never in parallel (D8).
-       5. **Hand back.**
-          1. Write the agent's final message, verbatim, with the Write tool, to `.conductor/handback/<role>.txt`. For code, use `.conductor/handback/code-<N>.txt`, where `<N>` is the task number.
+       5. **Wait.** Dispatch returns before the agent finishes, and an agent can keep acting after its hand-back. Wait for the agent's completion notice. Run nothing for this position until it arrives (D8).
+       6. **Hand back.**
+          1. Write the agent's **delivered `SubagentHandback` report** with the Write tool, verbatim, to `.conductor/handback/<role>.txt`. That is the one report the binary delivered, never a later message. For code, use `.conductor/handback/code-<N>.txt`, where `<N>` is the task number.
           2. Run `node "$S/orchestrate.mjs" handback <role> < <that file>`.
           3. Keep the agent's `Observation:` line for the report.
+          4. If a second `SNAP_HANDBACK` from that agent reaches you for the same position, write it to `.conductor/handback/<role>-second.txt` (`code-<N>-second.txt` for code) and run `handback <role>` on it. It halts with `ORCH_HANDBACK_CONFLICT`. Then follow "On any halt".
     3. **The two define approvals.** These pause in both modes.
        - **After spec:** show the owner the spec path from the hand-back. On approval, run `node "$S/orchestrate.mjs" approve spec`.
        - **After plan:** show the owner the plan path named in the hand-back's `ops.f`. On approval, run `node "$S/orchestrate.mjs" approve plan <plan path>`. This writes `define_approved`, the only gate you author after `boundary_routed`.
@@ -1484,7 +1642,9 @@ None of the files this plan adds or touches is in any skipped set, so every new 
     Guard 5 denies any write outside that scope. Do not get around a denial or a missing tool, for
     example with shell redirection. Report it instead.
     Task: <the role's task, below>
-    End your final message with exactly these two lines, each on its own line:
+    Verify your work before you hand back: your first hand-back is final, and a second is refused.
+    Do not dispatch or message other agents; Guard 6 denies it during a run.
+    End your hand-back report with exactly these two lines, each on its own line:
     Observation: <one line, what this handoff taught>
     SNAP_HANDBACK <one-line SNAP v3 JSON: {"v":3,"sys":{"ph":"<ph>","c":"<commit>","s":"<ITEM>","role":"<role>","tk":"<tk>"},"ops":{"n":[],"f":[<files you touched, as "path:C|M|D">],"gate":"<gate>"},"mem":{"d":[],"x":[]},"pr":""}>
     ```
@@ -1503,10 +1663,10 @@ None of the files this plan adds or touches is in any skipped set, so every new 
   - [ ] [T-005-E] Stage, before measuring, because block parity reads the index:
     - `git add .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md`, plain, now that the leaf exists;
     - `git add -u .gitignore tests/installer/commands-parity.test.js`.
-  - [ ] [T-005-F] Run `npx vitest run tests/installer/commands-parity.test.js tests/unit/gitignore-block-parity.test.js`, expecting **36 / 36**. Then `npm test`: **1227 / 0**.
-  - [ ] [T-005-G] Append `- T-005: <one line>` under the plan section. Then `git add -u .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`. Commit `feat: add the /cc-orchestrate command [FEAT-011]`. Expected: **1227 / 0**.
+  - [ ] [T-005-F] Run `npx vitest run tests/installer/commands-parity.test.js tests/unit/gitignore-block-parity.test.js`, expecting **36 / 36**. Then `npm test`: **1237 / 0**.
+  - [ ] [T-005-G] Append `- T-005: <one line>` under the plan section. Then `git add -u .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`. Commit `feat: add the /cc-orchestrate command [FEAT-011]`. Expected: **1237 / 0**.
 
-- [ ] [T-006] **AC12: the live demo, in a scratch project.** Owner driving, step mode. Depends on T-002 through T-005. **Halt rule:** any of the four facts landing otherwise than below stops the task for a ruling before release.
+- [ ] [T-006] **AC12: the live demo, in a scratch project.** Owner driving, step mode. Depends on T-002 through T-005. **Halt rule:** any of the four facts landing otherwise than below stops the task for a ruling before release. **Every T-006 record states its session's `permission_mode`,** read from that session's payloads (AC12, amended on the D1 ruling).
   - [ ] [T-006-A] Create `<scratchpad>/demo-feat011`. Run `git init`, write `README.md` containing `demo`, and commit it, so the run has a tracked path to be denied. Then copy in, from this branch:
     - `scripts/orchestrate.mjs`, `scripts/snap-contract.mjs`, `scripts/snap-build.mjs` and `scripts/snap-validate.mjs`, into `scripts/`. There is no `.claude/scripts/`, so D11 falls through to source;
     - `.claude/hooks/pre-tool-use.mjs`;
@@ -1518,7 +1678,7 @@ None of the files this plan adds or touches is in any skipped set, so every new 
       ```json
       { "hooks": { "PreToolUse": [
         { "matcher": "*", "hooks": [ { "type": "command", "command": "node .claude/hooks/log.mjs" } ] },
-        { "matcher": "Read|Write|Edit|create_file|write_file|Bash", "hooks": [ { "type": "command", "command": "node .claude/hooks/pre-tool-use.mjs" } ] }
+        { "matcher": "Read|Write|Edit|create_file|write_file|Bash|Agent|SendMessage", "hooks": [ { "type": "command", "command": "node .claude/hooks/pre-tool-use.mjs" } ] }
       ] } }
       ```
     - five fixture agents in `.claude/agents/`, each with the frontmatter `name` equal to its file stem. The fixtures are not deployed by the installer (`[FEAT-012]` owns shipped profiles):
@@ -1539,41 +1699,55 @@ None of the files this plan adds or touches is in any skipped set, so every new 
     3. approve the spec dispatch;
     4. observe the halt;
     5. **leave the run file in place** and `/exit`.
-  - [ ] [T-006-D] **Owner, a second session (fact 4):** start a new `claude` in the same folder and send verbatim: `Write README.md yourself with the content "second session", using the Write tool. Report the tool result and any message you were shown verbatim.` The write passes R4 and then meets Guard 2, because `README.md` exists. Approve Guard 2's duplicate-write ask so that the write completes (amended 2026-10-01 at plan approval by owner ruling: without the approval, "was not denied" is ambiguous in the evidence). Then run `node scripts/orchestrate.mjs end` from the shell, and `/exit`.
-  - [ ] [T-006-E] Read the evidence: `node read-payloads.mjs`, each run's `end` output, `git -C <demo> status --short`, `ls src`, and the owner's paste of each session's reports. Record the four AC12 facts, each read by `tool_use_id`:
+  - [ ] [T-006-D] **Owner, a second session (fact 4):** start a new `claude --permission-mode default` in the same folder. This is the pre-ruled AC12 contingency, which fired: V3 measured that under auto mode a hook ask does not prompt, so Guard 2's ask could not be observed or approved. Then send verbatim: `Write README.md yourself with the content "second session", using the Write tool. Report the tool result and any message you were shown verbatim.` The write passes R4 and then meets Guard 2, because `README.md` exists. Approve Guard 2's duplicate-write ask so that the write completes (amended 2026-10-01 at plan approval by owner ruling: without the approval, "was not denied" is ambiguous in the evidence). Then run `node scripts/orchestrate.mjs end` from the shell, and `/exit`.
+  - [ ] [T-006-E] Read the evidence: `node read-payloads.mjs`, each run's `end` output, `git -C <demo> status --short`, `ls src`, the owner's paste of each session's reports, and each session's `permission_mode` from its payloads. Fact 4's session must read `default`, or the task halts. Record the four AC12 facts, each read by `tool_use_id`:
     1. run A reached `verify_pass` on the two-task plan: six hand-backs, `spec`, `plan`, `code:Task 1`, `code:Task 2`, `audit` and `qa`, and both approvals in `end`'s record;
     2. the main session's `Write` of `README.md` during run A was denied with the T-003 deny text verbatim, and `README.md` still reads `demo` at that point;
     3. run B halted with `ORCH_GATE_UNEARNED: spec may hand back boundary_routed, not define_approved`, and no `plan` dispatch payload follows it;
     4. the second session's `Write` of `README.md` ran in this sequence, with no deny at any point:
-       1. a warn: `Guard 6: ORCH_RUN_STALE: run DEMO-002 …`, seen on the V3 channel;
+       1. a warn: `Guard 6: ORCH_RUN_STALE: run DEMO-002 …`, seen on the V3 channel, `systemMessage`, rendered behind `PreToolUse:Write says: `;
        2. an ask: Guard 2's duplicate-write prompt, which the owner approved;
        3. the completed write: `README.md` reads `second session`.
 
        (amended 2026-10-01 at plan approval by owner ruling)
   - [ ] [T-006-F] Modify `.claude/memory/project.md`. Insert, directly above the plan section, `## Demo: FEAT-011 orchestrated run (AC12) [<date>]`, holding:
     - the `claude` version;
+    - each session's `permission_mode`;
     - the four facts with their verbatim evidence;
     - the observation lines the fixtures returned;
     - any deviation the owner records.
 
-    Append `- T-006: <one line>` under the plan section. Then `git add -u .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`. Commit `docs: record the FEAT-011 orchestrated demo run (AC12) [FEAT-011]`. Expected: **1227 / 0**.
+    Append `- T-006: <one line>` under the plan section. Then `git add -u .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`. Commit `docs: record the FEAT-011 orchestrated demo run (AC12) [FEAT-011]`. Expected: **1237 / 0**.
 
 - [ ] [T-007] **README and release 1.36.0** (AC4's README half, AC13; `docs/RELEASE-CLOSEOUT.md` steps 1–5). Native. Depends on T-006.
   - [ ] [T-007-A] Modify `README.md`, placing each change by content, not line number (ARCH-010 T-008's drift note).
     - **The Guard 6 paragraph.** Insert after the Guard 5 paragraph (`**Band scope guard (Guard 5)**`, :294), separated by a blank line:
       ```markdown
-      **Orchestrator write guard (Guard 6)** - while a `/cc-orchestrate` run is live, its run file `.claude/memory/orchestrator-run.json` binds it to one session by `session_id`. In that session, a `Write`, `Edit`, `create_file` or `write_file` from anything but a band role (the main session, a payload carrying only `agent_id`, any other agent) is denied with `ORCH_WRITE_DENIED` unless its target lies inside the orchestrator's write surface, anchored at the run root: `.claude/memory/orchestrator-run.json`, `.claude/memory/band-envelope.json`, `.claude/memory/session-snapshot.json` and `.conductor/**`. Band roles stay under Guard 5. A run file from another session is stale and an unreadable one is invalid: both warn (`ORCH_RUN_STALE`, `ORCH_RUN_INVALID`) with the cleanup command and never block. Two limits are stated, not closed: `Bash` writes are not covered, as under Guard 5, and inside the live session any non-role agent may write the surface itself, the band envelope included, so Guard 6 bounds where the orchestrator writes, not who writes inside that surface.
+      **Orchestrator write guard (Guard 6)** - while a `/cc-orchestrate` run is live, its run file `.claude/memory/orchestrator-run.json` binds it to one session by `session_id`. In that session, a `Write`, `Edit`, `create_file` or `write_file` from anything but a band role (the main session, a payload carrying only `agent_id`, any other agent) is denied with `ORCH_WRITE_DENIED` unless its target lies inside the orchestrator's write surface, anchored at the run root: `.claude/memory/orchestrator-run.json`, `.claude/memory/band-envelope.json`, `.claude/memory/session-snapshot.json` and `.conductor/**`. Band roles stay under Guard 5. A run file from another session is stale and an unreadable one is invalid: both warn (`ORCH_RUN_STALE`, `ORCH_RUN_INVALID`) with the cleanup command and never block. While the run is live, a subagent's `Agent` or `SendMessage` call is denied with `ORCH_NESTED_DISPATCH`, so only the orchestrator dispatches or messages agents (R7; the hook's matcher names both tools). Outside a live run there is no Guard 6: any agent can dispatch agents, as before. Limits are stated, not closed:
+      - `Bash` writes are not covered, as under Guard 5. That includes a role spawning `claude -p`, whose child session carries another `session_id` and is warned, not blocked.
+      - Under auto permission mode no human stands behind a Bash write or a hook `ask`.
+      - Inside the live session, only a main-session-dispatched non-role agent can write the surface itself, the band envelope included. So Guard 6 bounds where the orchestrator writes, not who writes inside that surface.
+      - An agent that keeps writing after its hand-back is bounded only by the envelope in force.
       ```
     - **The command row.** In the Project commands table, insert after the `/cc-implement` row:
       ```markdown
-      | `/cc-orchestrate <ITEM> [--auto]` | Route one backlog item through Define, Build and Verify. For each role it builds, validates (`snap-validate --to`) and installs a SNAP v3 band envelope, dispatches the agent named after the role, and checks the agent's one-line `SNAP_HANDBACK` envelope before the next. It pauses before every dispatch unless `--auto`; the spec and plan approvals always pause. A failed validation halts the run, terminally in this version (recover with `end`, then `start`). It needs agent definitions named `spec`, `plan`, `code`, `audit` and `qa` in `.claude/agents/` or `~/.claude/agents/`, none of which ship yet, and plans in the writing-plans format (`### Task N` with a `**Files:**` block). Release stays human. |
+      | `/cc-orchestrate <ITEM> [--auto]` | Route one backlog item through Define, Build and Verify. For each role it builds, validates (`snap-validate --to`) and installs a SNAP v3 band envelope, dispatches the agent named after the role, waits for its completion notice, and checks the one `SNAP_HANDBACK` line of its delivered hand-back before the next. It pauses before every dispatch unless `--auto`; the spec and plan approvals always pause. A failed validation halts the run, terminally in this version (recover with `end`, then `start`). It needs agent definitions named `spec`, `plan`, `code`, `audit` and `qa` in `.claude/agents/` or `~/.claude/agents/`, none of which ship yet, and plans in the writing-plans format (`### Task N` with a `**Files:**` block). Release stays human. |
       ```
     - **The tree.**
       - After `│       │   ├── cc-implement.md   /cc-implement`, insert `│       │   ├── cc-orchestrate.md /cc-orchestrate`.
       - After `│   ├── session-id.mjs            Stable session-id resolver`, insert `│   ├── orchestrate.mjs           Band router: run file, envelopes, hand-backs (FEAT-011)`.
     - **Known limits.** Insert before `- **The \`P7\` false positive above**, still live.`:
       ```markdown
-      - **The orchestrator (`1.36.0`) assumes cooperative agents.** Guard 6 does not cover `Bash` writes; inside a live run any non-role agent may write the orchestrator's write surface, the band envelope included; agent definitions provided by plugins are not searched; and a halted run cannot be resumed, only ended and restarted. No role agent definitions ship until `[FEAT-012]`.
+      - **The orchestrator (`1.36.0`) assumes cooperative agents.**
+        - Guard 6 does not cover `Bash` writes, `claude -p` children included.
+        - Inside a live run, a non-role agent the main session dispatched may write the orchestrator's write surface, the band envelope included.
+        - R7 protects live runs only.
+        - An agent writing after its hand-back is bounded only by the envelope in force, so a same-role next task inherits it.
+        - Under auto permission mode no human stands behind a Bash write or a hook `ask`.
+        - Agent definitions provided by plugins are not searched.
+        - A halted run cannot be resumed, only ended and restarted.
+
+        No role agent definitions ship until `[FEAT-012]`.
       ```
   - [ ] [T-007-B] Run `npm version 1.36.0 --no-git-tag-version`, then write `1.36.0` into `VERSION`.
   - [ ] [T-007-C] Modify the records.
@@ -1581,7 +1755,7 @@ None of the files this plan adds or touches is in any skipped set, so every new 
       - At the line `` grep -n '^### \[ \] `\[FEAT-011\]`' `` reports (:159), change `### [ ]` to `### [X]`.
       - Insert as its first bullet:
         ```markdown
-        * **DONE, shipped as `1.36.0` on <date>.** `/cc-orchestrate <ITEM> [--auto]` and `scripts/orchestrate.mjs` route one item through Define, Build and Verify on the `[ARCH-010]` contract, unchanged: every envelope is built by `snap-build`, validated by `snap-validate` (`--to <role>` on install), and installed for one role at a time; every hand-back is a single `SNAP_HANDBACK` v3 line that must validate, name the dispatched role and claim a gate that role may hand back. A failed validation halts the receiving band. Gates cross only band boundaries; the orchestrator authors `boundary_routed` and, after the owner approves the plan, `define_approved`. Guard 6 holds the orchestrator to its four-entry write surface while a run is live in its session, keyed on the run file's `session_id` because identity cannot mark the main session; another session's run is stale and warned about, never enforced. The run file is ignored and host-owned. Folded, with no separate id: `project-template/gitignore` now lists `.conductor/`, as `README.md` always said. V1–V3 and the AC12 demo are recorded in `project.md`. Out of scope, as specified: `[FEAT-012]`, `[FEAT-031]`–`[FEAT-036]`, any SNAP contract change, parallel dispatch, a resume verb, and writes through `Bash`, `NotebookEdit`, MCP tools or symlinks.
+        * **DONE, shipped as `1.36.0` on <date>.** `/cc-orchestrate <ITEM> [--auto]` and `scripts/orchestrate.mjs` route one item through Define, Build and Verify on the `[ARCH-010]` contract, unchanged: every envelope is built by `snap-build`, validated by `snap-validate` (`--to <role>` on install), and installed for one role at a time, serialized by waiting for each agent's completion notice; every hand-back is the agent's delivered report, carrying a single `SNAP_HANDBACK` v3 line that must validate, name the dispatched role and claim a gate that role may hand back, and a second report for one position halts with `ORCH_HANDBACK_CONFLICT`. A failed validation halts the receiving band. V1 measured on `claude` 2.1.287 that a subagent can dispatch; the ruling kept the orchestrator in the main session and added R7, which denies a subagent's `Agent` and `SendMessage` while a run is live. Gates cross only band boundaries; the orchestrator authors `boundary_routed` and, after the owner approves the plan, `define_approved`. Guard 6 holds the orchestrator to its four-entry write surface while a run is live in its session, keyed on the run file's `session_id` because identity cannot mark the main session; another session's run is stale and warned about, never enforced. The run file is ignored and host-owned. Folded, with no separate id: `project-template/gitignore` now lists `.conductor/`, as `README.md` always said. V1–V3 and the AC12 demo are recorded in `project.md`. Out of scope, as specified: `[FEAT-012]`, `[FEAT-031]`–`[FEAT-036]`, any SNAP contract change, parallel dispatch, a resume verb, and writes through `Bash`, `NotebookEdit`, MCP tools or symlinks.
         ```
     - **`CHANGELOG.md`:** insert above `## [1.35.0]`:
       ```markdown
@@ -1589,10 +1763,11 @@ None of the files this plan adds or touches is in any skipped set, so every new 
 
       ### Added
       - **[FEAT-011]** `/cc-orchestrate <ITEM> [--auto]` and `scripts/orchestrate.mjs`, the band router. One run moves one backlog item through Define, Build and Verify by SNAP v3 envelopes that are built, validated with `snap-validate --to <role>` and installed one role at a time, and every role's hand-back is validated before the next dispatch. A failed validation halts the run. Step mode pauses before every dispatch; `--auto` skips those pauses but never the spec and plan approvals.
-      - **[FEAT-011]** Guard 6 in the PreToolUse front door. While a run is live in a session, a write-family call from anything but a band role is denied outside `.claude/memory/orchestrator-run.json`, `.claude/memory/band-envelope.json`, `.claude/memory/session-snapshot.json` and `.conductor/**`. A run file from another session, or an unreadable one, only warns.
+      - **[FEAT-011]** Guard 6 in the PreToolUse front door. While a run is live in a session, a write-family call from anything but a band role is denied outside `.claude/memory/orchestrator-run.json`, `.claude/memory/band-envelope.json`, `.claude/memory/session-snapshot.json` and `.conductor/**`, and a subagent's `Agent` or `SendMessage` call is denied (`ORCH_NESTED_DISPATCH`). A run file from another session, or an unreadable one, only warns.
 
       ### Changed
       - **[FEAT-011]** `.claude/memory/orchestrator-run.json` joins the installer's managed `.gitignore` block and is host-owned. `.conductor/` joins the block too, so a project's local cache is ignored as the README always said.
+      - **[FEAT-011]** The PreToolUse matcher in both settings files gains `Agent|SendMessage`, so the front door runs on every dispatch. The installer's settings merge carries it into existing projects.
       ```
 
     If the release commit lands on another date, use that date in both places.
@@ -1601,30 +1776,33 @@ None of the files this plan adds or touches is in any skipped set, so every new 
     - `node tools/record-parity.mjs`, expecting `RECORD_PARITY_OK`.
 
     **Discriminator:** flip the FEAT-011 heading back to `### [ ]` and expect a red run naming `1.36.0` and `FEAT-011`. Restore `[X]` and re-run green.
-  - [ ] [T-007-E] Run `npm test`, expecting **1227 / 0**. Then `node tools/id-ceiling.mjs`, expecting union `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`.
-  - [ ] [T-007-F] Append `- T-007: <one line>` under the plan section. Then `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`. Commit `chore: release 1.36.0 [FEAT-011]`. Expected: **1227 / 0**.
+  - [ ] [T-007-E] Run `npm test`, expecting **1237 / 0**. Then `node tools/id-ceiling.mjs`, expecting union `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`.
+  - [ ] [T-007-F] Append `- T-007: <one line>` under the plan section. Then `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`. Commit `chore: release 1.36.0 [FEAT-011]`. Expected: **1237 / 0**.
   - [ ] [T-007-G] **Confirm with the owner, then** push with `git push -u origin feat/feat-011-orchestrator-band-router` and open the PR against `main`. Expected CI:
-    - ci-node20 **1131 / 96**;
-    - ci-node24 **1214 / 13**;
+    - ci-node20 **1141 / 96**;
+    - ci-node24 **1224 / 13**;
     - both legs printing `SKIP_BASELINE_OK`;
     - `git diff origin/main -- tools/skip-baseline.json` empty (AC13).
   - [ ] [T-007-H] **Stop at the green PR.** Report both `SKIP_BASELINE_OK` lines, both run ids and the PR URL. The owner merges and publishes the GitHub Release `v1.36.0`.
 
 ## Test List
 
-- [ ] Unit and CLI, `tests/scripts/orchestrate.test.js`, 49 tests:
+- [ ] Unit and CLI, `tests/scripts/orchestrate.test.js`, 50 tests:
   - **Router (AC7):** `nextStep` ×8, the hand-back table, the role-artifact table, D6 ×6, `define_approved` written once through `approve plan`, a spec approval that writes no gate, and the end-to-end run to `verify_pass`.
   - **Scope (AC8):** extraction with suffix strip and the plan file, empty-task ×1, zero-task ×1, cap 19/20 files (20/21 entries), the 300-character element, and a code envelope holding `RW` with the exact scope.
   - **Run file (AC9):** start and mode, `ORCH_NO_SESSION_ID`, `ORCH_RUN_ACTIVE`, stale replacement, the atomic write, `end`, `ORCH_RUN_INVALID`, `ORCH_AGENT_MISSING`, the home agents directory, the halted-run refusal (D12), another session's run, a role that is not next, and `--check`.
-  - **AC1 ×2, AC2 ×7:**
+  - **AC1 ×2, AC2 ×8:**
     - `ORCH_HANDBACK_MISSING` ×2;
+    - `ORCH_HANDBACK_CONFLICT`, with the first record kept;
     - `ORCH_HANDBACK_INVALID` ×2 (malformed, and v1);
     - `ORCH_HANDBACK_ROLE_MISMATCH`;
     - `ORCH_GATE_UNEARNED`;
     - `SNAP_GATE_MISMATCH`.
   - **AC4:** the surface constant.
-- [ ] Integration through the hook's stdin/stdout contract, `tests/hooks/guard6.test.js`, 22 tests:
+- [ ] Integration through the hook's stdin/stdout contract, `tests/hooks/guard6.test.js`, 30 tests:
   - R1; R2; R3 ×2; R4 ×2 (AC5); R5 ×4; R6 ×4;
+  - R7 deny ×3 and R7 no-decision ×4. The no-decision cases run the real `main()`, so they also prove that path-less inputs pass without a throw;
+  - AC3a, the `Agent` and `SendMessage` registrations;
   - the near-miss names, above the root, and the run-root anchor;
   - outranking Guard 2, and the warning that decides nothing;
   - the V3 channel pin;
@@ -1633,7 +1811,8 @@ None of the files this plan adds or touches is in any skipped set, so every new 
 
   The mirror's byte identity stays pinned by `templates.test.js`, and every Guard 5 test runs unmodified.
 - [ ] Installer:
-  - `templates.test.js`: `[FEAT-011 AC10]` new, and `[AC13]` amended;
+  - `templates.test.js`: `[FEAT-011 AC10]` new, and `[AC13]` and the union-matcher pin amended;
+  - `settings-merge.test.js`: `[FEAT-011 AC3a]` new, comparing the whole merged entry with the shipped one;
   - `host-owned-ignore-xor.test.js` over the new row, with no new test;
   - the `deploy.test.js` fixture.
 - [ ] Mirrors: `commands-parity.test.js`, `cc-orchestrate mirrors` ×2.
@@ -1644,24 +1823,28 @@ None of the files this plan adds or touches is in any skipped set, so every new 
 
 1. T-000: `docs: add the FEAT-011 implementation plan [FEAT-011]`, at 1153 / 0.
 2. T-001: `docs: record the FEAT-011 V1-V3 measurements [FEAT-011]`, at 1153 / 0.
-3. T-002: `feat: orchestrate.mjs, the band router and its run file [FEAT-011]`, at 1202 / 0.
-4. T-003: `feat: Guard 6 holds the orchestrator to its declared write surface [FEAT-011]`, at 1224 / 0.
-5. T-004: `feat: ignore and host-own the orchestrator run file, and ignore .conductor/ in projects [FEAT-011]`, at 1225 / 0.
-6. T-005: `feat: add the /cc-orchestrate command [FEAT-011]`, at 1227 / 0.
-7. T-006: `docs: record the FEAT-011 orchestrated demo run (AC12) [FEAT-011]`, at 1227 / 0.
-8. T-007: `chore: release 1.36.0 [FEAT-011]`, at 1227 / 0. CI: 1131 / 96 and 1214 / 13.
+3. T-002: `feat: orchestrate.mjs, the band router and its run file [FEAT-011]`, at 1203 / 0.
+4. T-003: `feat: Guard 6 holds the orchestrator to its declared write surface [FEAT-011]`, at 1233 / 0.
+5. T-004: `feat: ignore and host-own the orchestrator run file, ignore .conductor/ in projects, and route Agent and SendMessage to the hook [FEAT-011]`, at 1235 / 0.
+6. T-005: `feat: add the /cc-orchestrate command [FEAT-011]`, at 1237 / 0.
+7. T-006: `docs: record the FEAT-011 orchestrated demo run (AC12) [FEAT-011]`, at 1237 / 0.
+8. T-007: `chore: release 1.36.0 [FEAT-011]`, at 1237 / 0. CI: 1141 / 96 and 1224 / 13.
 
 ## Identified Risks
 
 - **V1, V2 or V3 comes out the other way (T-001).**
   - **Caught by:** each V's halt rule, before any code exists.
   - **Cost:** a ruling on D1, D3 or the channel. T-002 does not depend on V3, but it waits anyway, so that the order the owner fixed holds.
+  - **Occurred:** V1 halted on 2.1.287. The D1 ruling (spec `e5901ae`) and this amendment are the cost, paid before any code.
 - **The edited hook breaks this session's own tool calls (T-003).**
   - **Prevented by:**
-    - the C1–C5 order (P15);
+    - the C1, C2a, C2b, C3, C4, C5 order, with constants before functions and registration last (P15);
     - no run file in this repository (R2);
     - the never-`start`-here constraint.
-  - **Caught by:** `node --check` after each stage, then the hook suites.
+  - **Caught by:** running the hook on two smoke payloads after each step, which catches the `ReferenceError` that `node --check` cannot see, then the hook suites.
+- **The new matcher runs the hook on every dispatch in every install (T-004).** A throw on a path-less `Agent` or `SendMessage` input would fail closed, denying every dispatch.
+  - **Prevented by:** R7's guard-clause order.
+  - **Caught by:** the R7 no-decision tests, which run the real `main()` on path-less inputs and expect no decision and exit 0.
   - **Recovery:** `! git checkout -- .claude/hooks/pre-tool-use.mjs`, or `CC_HOOK_ALLOW=1`.
 - **The T-003 subagent drifts into a worktree or commits.** This is the `[BUG-053]` damage path.
   - **Prevention:** its brief states both prohibitions, and the orchestrating session owns every commit.
@@ -1670,7 +1853,7 @@ None of the files this plan adds or touches is in any skipped set, so every new 
 - **The demo's interactive binary differs from the measurements (T-006).**
   - **Caught by:** T-006's halt rule.
   - **Prevention:** T-001 runs on the same binary the same day. The demo path is a realpath (`/private/tmp/…`, the T-005 known limit).
-- **The hand-back transport meets Guard 2.** A second Write to the same `.conductor/handback/<role>.txt` would ask. `end` and stale replacement clear the directory, and P10's file names are unique within one run.
+- **The hand-back transport meets Guard 2.** A second Write to the same `.conductor/handback/<role>.txt` would ask. `end` and stale replacement clear the directory, and P10's file names are unique within one run. A second report for one position goes to the distinct `<role>-second.txt`, so it reaches `ORCH_HANDBACK_CONFLICT` rather than a Guard 2 ask.
 - **The commit hook runs the full suite**, so an unpredicted count surfaces at commit time. Every task measures the full suite before staging, and halts on any difference.
 - **The installer re-appends `.claude/memory/orchestrator-run.json` to this repository's `.gitignore`** if it is ever run here, the way it re-appends `turn-count.txt`. `[BUG-052]` forbids that run. If it happens anyway, the line is redundant with `/.claude/memory/*`, and it is noted at the next memory touch rather than removed.
 
