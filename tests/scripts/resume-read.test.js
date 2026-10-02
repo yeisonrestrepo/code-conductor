@@ -4,6 +4,7 @@ import { mkdtempSync, writeFileSync, existsSync, readFileSync, rmSync, mkdirSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { cleanGitEnv } from '../helpers/git-env.js';
 
 const SCRIPT = fileURLToPath(new URL('../../scripts/resume-read.mjs', import.meta.url));
 const HANDOFF_REL = '.claude/memory/session-snapshot.json';
@@ -16,7 +17,7 @@ afterEach(() => { while (repos.length) { try { rmSync(repos.pop(), { recursive: 
 function mkRepo() {
   const dir = mkdtempSync(join(tmpdir(), 'resume-'));
   repos.push(dir);
-  const g = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  const g = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', env: cleanGitEnv(), stdio: ['ignore', 'pipe', 'ignore'] });
   g(['init', '-q']);
   g(['config', 'user.email', 't@t.t']);
   g(['config', 'user.name', 'T']);
@@ -168,7 +169,7 @@ describe.runIf(sqliteAvailable())('resume-read.mjs DB branch', () => {
 
   it('branch-switch isolation: context stored at A is restored at A, absent at B', () => {
     const { dir, head } = mkRepo(); // commit A = head
-    const g = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    const g = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', env: cleanGitEnv(), stdio: ['ignore', 'pipe', 'ignore'] });
     dbStore(dir, head, snap(head, { sys: { ph: 'plan', c: head, s: 'branch-a' } }));
     // switch to a NEW commit B with no stored snapshot
     g(['checkout', '-q', '-b', 'other']);
