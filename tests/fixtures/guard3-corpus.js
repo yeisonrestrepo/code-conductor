@@ -159,6 +159,12 @@ export const CORPUS = [
   { label: 'exact match (no trailing slash)', command: 'cat file.ts', allowlist: ['file.ts'], verdict: 'allow' },
   { label: 'substring not matched (docs vs doc_files)', command: 'cat doc_files/*.ts', allowlist: ['docs/'], verdict: 'deny' },
 
+  // [BUG-045] quoted paths: allowlist entries must cover paths inside quotes
+  { label: 'double-quoted path covered by dir entry', command: 'cat "docs/x.md" *.md', allowlist: ['docs/'], verdict: 'allow' },
+  { label: 'single-quoted path covered by dir entry', command: "cat 'docs/x.md' *.md", allowlist: ['docs/'], verdict: 'allow' },
+  { label: 'double-quoted exact match', command: 'cat "file.ts"', allowlist: ['file.ts'], verdict: 'allow' },
+  { label: 'quoted path still denied without allowlist entry', command: 'cat "src/x.ts" *.md', allowlist: ['docs/'], verdict: 'deny' },
+
   // These three are real commands this repository's own agent ran on 2026-09-27 and
   // Guard 3 denied. They were filed as KNOWN-FP rows asserting the verdict of the
   // day, to be flipped only by a refinement that predicted the red state first.
