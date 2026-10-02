@@ -416,8 +416,8 @@ _g3_check_allowlist() {
 
   # Delimiter: space/tab/newline, ;, |, (, )  — common shell command separators.
   # Written as a bracket class that is safe in ERE without backslash escaping issues.
-  local _bd='(^|[[:space:]|;()])'
-  local _ad='([[:space:]|;()]|$)'
+  local _bd='(^|[[:space:]|;()"'"'"'])'
+  local _ad='([[:space:]|;()"'"'"']|$)'
   local entry
   for entry in "${BASH_SCAN_ALLOWLIST[@]}"; do
     [[ -z "$entry" ]] && continue
