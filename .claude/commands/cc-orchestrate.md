@@ -74,9 +74,10 @@ example with shell redirection. Report it instead.
 Task: <the role's task, below>
 Verify your work before you hand back: your first hand-back is final, and a second is refused.
 Do not dispatch or message other agents; Guard 6 denies it during a run.
+Copy ops.scope verbatim from your envelope into the hand-back; if your envelope has no scope, leave the key out.
 End your hand-back report with exactly these two lines, each on its own line:
 Observation: <one line, what this handoff taught>
-SNAP_HANDBACK <one-line SNAP v3 JSON: {"v":3,"sys":{"ph":"<ph>","c":"<commit>","s":"<ITEM>","role":"<role>","tk":"<tk>"},"ops":{"n":[],"f":[<files you touched, as "path:C|M|D">],"gate":"<gate>"},"mem":{"d":[],"x":[]},"pr":""}>
+SNAP_HANDBACK <one-line SNAP v3 JSON: {"v":3,"sys":{"ph":"<ph>","c":"<commit>","s":"<ITEM>","role":"<role>","tk":"<tk>"},"ops":{"n":[],"f":[<files you touched, as "path:C|M|D">],"scope":<your envelope's ops.scope>,"gate":"<gate>"},"mem":{"d":[],"x":[]},"pr":""}>
 ```
 
 The role's task, its `ph`, and the gate it hands back:
