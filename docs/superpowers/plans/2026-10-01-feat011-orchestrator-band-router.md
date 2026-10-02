@@ -297,7 +297,7 @@ None of the files this plan adds or touches is in any skipped set, so every new 
     - **V3, warning channel:** V3-STDERR <seen where / not seen>; V3-SYSTEM <…>; V3-BOTH <…> with V3-ASK <…>. Verdict: Guard 6 warns on <systemMessage / stderr> (P13).
     ```
     Then append `- T-001: <one line of handoff observation>` under the plan section.
-  - [ ] [T-001-F] Run `git add -u .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`. Commit `docs: record the FEAT-011 V1-V3 measurements [FEAT-011]`. Expected: **1153 / 0**.
+  - [X] [T-001-F] Run `git add -u .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`. Commit `docs: record the FEAT-011 V1-V3 measurements [FEAT-011]`. Expected: **1153 / 0**.
 
 - [ ] [T-002] **`scripts/orchestrate.mjs`: the router, the run file, and the five verbs** (AC1, AC2, AC4, AC7, AC8, AC9; Review Focus 4 and 5). Native. Depends on T-001's three verdicts.
   - [ ] [T-002-A] Create `tests/scripts/orchestrate.test.js` with exactly this content (sha256 `b9928aa733148de2e1f8b89551022f14ff701418150ac1a37cc5ea9cb823a7fb`, 49 tests):

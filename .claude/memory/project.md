@@ -2379,12 +2379,19 @@ The spec is `docs/superpowers/specs/2026-10-01-feat011-orchestrator-band-router-
   - **The relay's tool list, as it reported it:** "Agent, Artifact, Bash, Edit, Read, Skill, ToolSearch, Write, SubagentHandback, mcp__claude_ai_Claude_Docs__batch, mcp__claude_ai_Claude_Docs__guide, mcp__claude_ai_Claude_Docs__update, SendMessage (loaded through ToolSearch)".
   - **Verdict: halts.** On 2.1.287 a subagent can dispatch a subagent, so D1's grounds are false on this binary. Awaiting the owner's ruling on D1.
 - **V2, session id:** printenv printed `7162b039-aa22-4dfc-8536-e5aaeba35edc`. All 20 logged payloads carry `session_id=7162b039-aa22-4dfc-8536-e5aaeba35edc`: the main session, the relay `aaf51707768e88daf`, and the two leaves `a7a0cdd53dc2e864d` and `aa97edc9b9cfff98a`. There is one distinct value. **Verdict: holds.**
-- **V3, warning channel:** pending the owner's four marker observations. Verdict: pending.
+- **V3, warning channel:** measured on a re-run: a fresh session, the same fixture, the same binary 2.1.287, `permission_mode=auto`. The markers appearing prove the hook ran, so the fresh session is valid for this measurement. Owner's screen:
+  - **V3-STDERR:** not seen. The `v3-stderr.txt` write completed with no marker anywhere on screen, so stderr at exit 0 is invisible in interactive mode on 2.1.287.
+  - **V3-SYSTEM:** seen, rendered inline with the tool result, verbatim: `PreToolUse:Write says: V3-SYSTEM marker`.
+  - **V3-BOTH:** seen, in the same rendering, verbatim: `PreToolUse:Write says: V3-BOTH marker`.
+  - **V3-ASK:** no prompt appeared and the write proceeded directly, so the classifier resolved the ask under `permission_mode=auto`.
+  - **Verdict: holds.** Guard 6 warns on `systemMessage` (P13), and not as a tie-break, since stderr is invisible. Guard 6's warning text is rendered behind the prefix `PreToolUse:Write says: ` and must read well behind it.
+  - **The AC12 contingency fired as pre-ruled.** Asks do not prompt under auto mode, so T-006-D runs in default permission mode and every T-006 record states `permission_mode`.
 - **Measured behaviors of 2.1.287 that the design leans on the opposite of:**
   1. **Asynchronous dispatch.**
      - The main session issued the relay dispatch (`toolu_01U3vW…`) and its own leaf dispatch (`toolu_01MhHea7…`) back to back. It then made its three `v3-*.txt` Writes before either subagent's first logged Write.
      - The `Agent` inputs carry no `run_in_background` field (`{"description","prompt","subagent_type"}` only), so asynchrony is not visible in the dispatch payload.
      - In the payloads, the only completion markers are the subagents' own `SubagentHandback` calls. The completion notices on screen are not tool calls, so the PreToolUse log cannot see them; they are recorded from the owner's screen report.
+     - **Owner screen observation:** both completion notices ("leaf finished 7s", "relay finished 1m 23s") appeared after all of that agent's activity, including the relay's late `SendMessage` report. The completion notice is therefore the correct wait point, and it bounds the post-hand-back tail.
   2. **The one-final-message assumption failed.**
      - **The relay sent three reports:**
        - `SubagentHandback` `toolu_01LvKvCWsLQuFTbrotjoX97s` says "Neither file's contents was checked independently… I took its report as given";
@@ -2403,6 +2410,7 @@ The spec is `docs/superpowers/specs/2026-10-01-feat011-orchestrator-band-router-
        - `toolu_01WDd3odSChnqNVZoTYTUn4G`, the relay, `cat …/leaf.txt; echo; ls -la <mistyped>/leaf.txt`;
        - `toolu_01AEtTFQPYXLEaa7kzKfX5ff`, main, `od -c leaf.txt && od -c main-leaf.txt && ls -la <mistyped>/leaf.txt`.
      - Which of these the classifier allowed without a prompt comes from the owner's screen report. The payloads show the mode, not the decision.
+     - **Owner screen observation:** no Bash call prompted across both runs. The `od -c` call showed "Allowed by auto mode classifier" explicitly.
   4. **A write outside the intended tree.**
      - The relay's dispatch prompt joined `code-conductor` and the session directory with `-` instead of `/`. The leaf wrote `/private/tmp/claude-501/-Users-yeison-Projects-code-conductor-207a0da0-8a9a-45dd-b7f1-578776d1c15e/scratchpad/probe-feat011/leaf.txt`, which `ls -la` confirms is 4 bytes, outside the probe repository.
      - Nothing stopped it. This is field evidence for scope enforcement by path rather than by prose.
@@ -2417,3 +2425,4 @@ Plan `docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`.
 Handoff observations, one line per task:
 - T-000: `f0fd9c6` passed the gate at 1153 / 0 across 44 files; the union ceiling is `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`, and `RECORD_PARITY_OK`. The plan embeds its four drafts by script, with each sha256 round-tripped out of the plan text. Owner review caught a gap the drafts could not show: `decides nothing with its warning` pins the R4-then-Guard-2 ask, but T-006-D's live script did not instruct approving that ask, so "was not denied" would have been ambiguous evidence. A behavior pinned in a unit test must also be scripted at the live step that observes it.
 - T-001: V1 halts on 2.1.287 (the relay dispatched leaf, which wrote leaf.txt with agent_type=leaf); V2 holds (all 20 payloads carry the printenv session_id); V3 pending the owner's marker observations. The probe also measured async dispatch, a refused second hand-back answered by SendMessage, permission_mode=auto throughout, and a mistyped-path write outside the probe tree. Each is a measured opposite of a design assumption, and T-002 waits on the D1 ruling.
+- T-001 (V3 and ruling): V3 holds on a fresh-session re-run. stderr is invisible and systemMessage renders behind "PreToolUse:Write says: ", so Guard 6 warns on systemMessage. The V1 halt was ruled: D1 stands on new grounds, R7 and ORCH_HANDBACK_CONFLICT were added, and D8 is serial by waiting for the completion notice (spec e5901ae). Lesson: a halt rule that fires is the plan working; the binary moved under a spec written against the previous build, and only re-measuring on the shipping build caught it.
