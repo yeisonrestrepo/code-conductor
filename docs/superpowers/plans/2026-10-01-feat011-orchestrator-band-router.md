@@ -1122,7 +1122,7 @@ This matters because the new matcher invokes the hook on every dispatch in every
 
     Commit `feat: orchestrate.mjs, the band router and its run file [FEAT-011]`. Expected: **1203 / 0**.
 
-- [ ] [T-003] **Guard 6, with R7** (AC3, AC3a's `DISPATCH` half, AC4, AC5, AC6; Review Focus 1–3). **Subagent, then a reviewer.** It runs in the main checkout with no worktree, and the subagent does not commit. Depends on T-002, whose `RUN_FILE` and `WRITE_SURFACE` the test imports, and on T-001's V3 verdict.
+- [X] [T-003] **Guard 6, with R7** (AC3, AC3a's `DISPATCH` half, AC4, AC5, AC6; Review Focus 1–3). **Subagent, then a reviewer.** It runs in the main checkout with no worktree, and the subagent does not commit. Depends on T-002, whose `RUN_FILE` and `WRITE_SURFACE` the test imports, and on T-001's V3 verdict.
   - [X] [T-003-A] Create `tests/hooks/guard6.test.js` with exactly this content: sha256 `31e7d6bdb9575672c55c851f8983c42668650b4682135f3fdee51beb4204c2f1`, 30 tests, for the measured `systemMessage` verdict. It was amended on the D1 ruling, adding R7 ×7 and `[AC3a]`, and the stderr variant is retired.
     ```js
     import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -1479,14 +1479,14 @@ This matters because the new matcher invokes the hook on every dispatch in every
     - confirm `git worktree list` shows one entry, and `git log` shows no subagent commit.
 
     Each finding is ruled by the owner before T-003-G.
-  - [ ] [T-003-G] Append `- T-003: <one line, written by the subagent per its brief>` under the plan section. Then:
+  - [X] [T-003-G] Append `- T-003: <one line, written by the subagent per its brief>` under the plan section. Then:
     - `git add tests/hooks/guard6.test.js`;
     - `git add -u .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs .claude/memory/project.md docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md`.
 
     Commit `feat: Guard 6 holds the orchestrator to its declared write surface [FEAT-011]`. Expected: **1233 / 0**.
 
 - [ ] [T-004] **Ignore and host-own the run file; ignore `.conductor/` in projects; route `Agent` and `SendMessage` to the hook** (AC10, AC3a, the folded `README.md:325` observation, P14). Native. Depends on T-000, and on T-003 for the matcher steps: `DISPATCH` must hold the `Agent` and `SendMessage` entries before any settings file routes those tools to the hook.
-  - [ ] [T-004-A] Modify `tests/installer/templates.test.js`: append inside `describe('project-template/gitignore', …)`, after the `[AC13]` test:
+  - [X] [T-004-A] Modify `tests/installer/templates.test.js`: append inside `describe('project-template/gitignore', …)`, after the `[AC13]` test:
     ```js
       // Discriminator for the folded README:325 observation: red on the pre-FEAT-011 template,
       // which never listed .conductor/.
@@ -1498,16 +1498,16 @@ This matters because the new matcher invokes the hook on every dispatch in every
         ]);
       });
     ```
-  - [ ] [T-004-B] Run `npx vitest run tests/installer/templates.test.js -t "managed entr"`. Expected: **1 failed / 1 passed / 36 skipped (38)**. The new test is red and `[AC13]` is green.
-  - [ ] [T-004-C] Modify `project-template/gitignore`: append `.claude/memory/orchestrator-run.json` and `.conductor/` as lines 6 and 7, keeping the trailing newline.
-  - [ ] [T-004-D] Run the T-004-B command again. Expected: **1 failed / 1 passed / 36 skipped (38)**, now with **`[AC13]` red** (the carried-forward T-006-A red) and the new test green.
-  - [ ] [T-004-E] Run `npm test`. Expected: **1 failed / 1233 passed (1234)**, and the one failure is `[AC13]`. **Halt rule:** any other failure stops the task.
-  - [ ] [T-004-F] Modify the `[AC13]` test in `tests/installer/templates.test.js` (P14):
+  - [X] [T-004-B] Run `npx vitest run tests/installer/templates.test.js -t "managed entr"`. Expected: **1 failed / 1 passed / 36 skipped (38)**. The new test is red and `[AC13]` is green.
+  - [X] [T-004-C] Modify `project-template/gitignore`: append `.claude/memory/orchestrator-run.json` and `.conductor/` as lines 6 and 7, keeping the trailing newline.
+  - [X] [T-004-D] Run the T-004-B command again. Expected: **1 failed / 1 passed / 36 skipped (38)**, now with **`[AC13]` red** (the carried-forward T-006-A red) and the new test green.
+  - [X] [T-004-E] Run `npm test`. Expected: **1 failed / 1233 passed (1234)**, and the one failure is `[AC13]`. **Halt rule:** any other failure stops the task.
+  - [X] [T-004-F] Modify the `[AC13]` test in `tests/installer/templates.test.js` (P14):
     - insert above its `it(` line: `  // The full list is FEAT-011 AC10's below; this keeps ARCH-010's own claim, the fourth entry.`;
     - change `expect(lines.filter(l => l && !l.startsWith('#'))).toEqual([` to `expect(lines.filter(l => l && !l.startsWith('#')).slice(0, 4)).toEqual([`.
-  - [ ] [T-004-G] Modify `lib/installer/host-owned.mjs`: insert `  ['memory/orchestrator-run.json', 'skip'],` after `  ['memory/band-envelope.json', 'skip'],` (:43).
-  - [ ] [T-004-H] Modify `tests/installer/deploy.test.js:15`, the fixture that mirrors the template. In `TPL_GITIGNORE`, after `.claude/memory/band-envelope.json\n`, append `.claude/memory/orchestrator-run.json\n.conductor/\n`. **Halt rule:** `deploy.test.js` read 53 / 53 before and after this edit in planning. Any other reading stops the task, because a fixture change may not rewrite an expectation silently.
-  - [ ] [T-004-I] Modify `tests/installer/settings-merge.test.js` (AC3a; amended on the D1 ruling):
+  - [X] [T-004-G] Modify `lib/installer/host-owned.mjs`: insert `  ['memory/orchestrator-run.json', 'skip'],` after `  ['memory/band-envelope.json', 'skip'],` (:43).
+  - [X] [T-004-H] Modify `tests/installer/deploy.test.js:15`, the fixture that mirrors the template. In `TPL_GITIGNORE`, after `.claude/memory/band-envelope.json\n`, append `.claude/memory/orchestrator-run.json\n.conductor/\n`. **Halt rule:** `deploy.test.js` read 53 / 53 before and after this edit in planning. Any other reading stops the task, because a fixture change may not rewrite an expectation silently.
+  - [X] [T-004-I] Modify `tests/installer/settings-merge.test.js` (AC3a; amended on the D1 ruling):
     - after `import { join } from 'node:path';`, insert `import { fileURLToPath } from 'node:url';`;
     - change `import { MERGE_OWNED_KEYS } from '../../lib/installer/host-owned.mjs';` to `import { MERGE_OWNED_KEYS, PROJECT_SETTINGS_FINGERPRINTS } from '../../lib/installer/host-owned.mjs';`;
     - inside `describe('mergeSettingsFile: owned entries', …)`, immediately before `it('is byte-identical on a second run of an unchanged release', …)`, insert:
@@ -1528,19 +1528,21 @@ This matters because the new matcher invokes the hook on every dispatch in every
       });
     ```
     The exact-entry assertion is the owner's strengthening. With `arrayContaining` alone, a merge that collapsed the matcher to `Agent|SendMessage` would pass while stripping Guards 1–5 from every install.
-  - [ ] [T-004-J] Run `npx vitest run tests/installer/settings-merge.test.js -t "AC3a"`. Expected: **1 failed / 17 skipped (18)**. On the old template the exact-entry assertion passes and the `Agent`/`SendMessage` assertion fails.
-  - [ ] [T-004-K] Modify the union-matcher pin in `tests/installer/templates.test.js`:
+  - [X] [T-004-J] Run `npx vitest run tests/installer/settings-merge.test.js -t "AC3a"`. Expected: **1 failed / 17 skipped (18)**. On the old template the exact-entry assertion passes and the `Agent`/`SendMessage` assertion fails.
+  - [X] [T-004-K] Modify the union-matcher pin in `tests/installer/templates.test.js`:
     - insert above its `it.each(SETTINGS)(` line: `  // Agent and SendMessage likewise: without them Guard 6's R7 never runs (FEAT-011 AC3a).`;
     - change `expect(entries[0].matcher).toBe('Read|Write|Edit|create_file|write_file|Bash');` to `expect(entries[0].matcher).toBe('Read|Write|Edit|create_file|write_file|Bash|Agent|SendMessage');`;
     - after `expect(entries[0].matcher.split('|')).toContain('Bash');`, insert `    expect(entries[0].matcher.split('|')).toContain('Agent');` and `    expect(entries[0].matcher.split('|')).toContain('SendMessage');`.
 
     Then run `npx vitest run tests/installer/templates.test.js -t "union matcher"`. Expected: **2 failed / 36 skipped (38)**.
-  - [ ] [T-004-L] Modify `.claude/settings.json` and `project-template/.claude/settings.json`, one Edit each. Change `"matcher": "Read|Write|Edit|create_file|write_file|Bash",` to `"matcher": "Read|Write|Edit|create_file|write_file|Bash|Agent|SendMessage",`.
+  - [X] [T-004-L] Modify `.claude/settings.json` and `project-template/.claude/settings.json`, one Edit each. Change `"matcher": "Read|Write|Edit|create_file|write_file|Bash",` to `"matcher": "Read|Write|Edit|create_file|write_file|Bash|Agent|SendMessage",`.
+    - **Parse check, added by owner ruling at T-004's go.** Immediately after each settings edit, and before anything else runs, `JSON.parse` both settings files. **Halt rule:** any parse failure stops the task before the next step.
+    - **Measured:** both files parsed after the `.claude/settings.json` edit, and both again after the template edit.
     - **The live file takes effect in this session.** From here the hook runs on this session's `Agent` and `SendMessage` calls, and no run file exists here, so R7 decides nothing.
     - Then run `npx vitest run tests/installer/settings-merge.test.js tests/installer/templates.test.js`. Expected: **56 / 56** (18 + 38).
 
     **No full-suite run happens between T-004-I and T-004-L.** Those steps hold up to three reds at once: the AC3a merge test and both union-matcher cases. Only the targeted commands above run, until T-004-M.
-  - [ ] [T-004-M] Run these checks:
+  - [X] [T-004-M] Run these checks:
     1. `git check-ignore -v .claude/memory/orchestrator-run.json`, expecting `.gitignore:36:/.claude/memory/*`;
     2. `git ls-files --error-unmatch .claude/memory/orchestrator-run.json`, expecting rc 1;
     3. `npx vitest run tests/installer tests/unit/host-owned-ignore-xor.test.js`, expecting **304 / 304** across 17 files (302 + 1 + 1);

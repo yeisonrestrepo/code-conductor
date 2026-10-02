@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, readdirSync, existsSync, lstatSync, mkdirSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { mergeSettingsFile, entryMatches, matchingFingerprints } from '../../lib/installer/settings-merge.mjs';
-import { MERGE_OWNED_KEYS } from '../../lib/installer/host-owned.mjs';
+import { MERGE_OWNED_KEYS, PROJECT_SETTINGS_FINGERPRINTS } from '../../lib/installer/host-owned.mjs';
 
 const FPS = ['pre-tool-use.mjs', 'post-compact.sh', 'verbosity-remind.sh'];
 const TPL = {
@@ -121,6 +122,20 @@ describe('mergeSettingsFile: owned entries', () => {
     expect(arr).toHaveLength(2);
     expect(arr[0].matcher).toBe('Read|Bash');
     expect(arr[1]).toEqual(HOST_ENTRY);
+  });
+  // The shipped template over the entry a 1.35.0 install wrote: R7 is dead on a host the
+  // merge leaves on the old matcher, because the hook is never invoked for Agent. The whole
+  // entry is compared, so a merge that dropped Read through Bash (Guards 1-5) fails too.
+  it('[FEAT-011 AC3a] carries the shipped Agent and SendMessage matcher over a 1.35.0 entry', () => {
+    const shipped = fileURLToPath(new URL('../../project-template/.claude/settings.json', import.meta.url));
+    const earlier = { matcher: 'Read|Write|Edit|create_file|write_file|Bash', hooks: [{ type: 'command', command: 'node .claude/hooks/pre-tool-use.mjs' }] };
+    write(sp, { hooks: { PreToolUse: [HOST_ENTRY, earlier] } });
+    mergeSettingsFile(shipped, sp, PROJECT_SETTINGS_FINGERPRINTS);
+    const arr = read(sp).hooks.PreToolUse;
+    expect(arr).toHaveLength(2);
+    expect(arr[0]).toEqual(HOST_ENTRY);
+    expect(arr[1]).toEqual(read(shipped).hooks.PreToolUse[0]);
+    expect(arr[1].matcher.split('|')).toEqual(expect.arrayContaining(['Agent', 'SendMessage']));
   });
   it('is byte-identical on a second run of an unchanged release', () => {
     write(sp, { hooks: { PreToolUse: [HOST_ENTRY] }, permissions: { allow: ['Bash(ls:*)'] } });

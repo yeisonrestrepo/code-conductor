@@ -72,10 +72,20 @@ describe('project-template/gitignore', () => {
     const text = readFileSync(join(root, 'project-template/gitignore'), 'utf8');
     expect(text.split('\n')[0]).toBe(GITIGNORE_HEADER);
   });
+  // The full list is FEAT-011 AC10's below; this keeps ARCH-010's own claim, the fourth entry.
   it('[AC13] ignores the band envelope as the fourth managed entry', () => {
+    const lines = readFileSync(join(root, 'project-template/gitignore'), 'utf8').split('\n').map(l => l.trim());
+    expect(lines.filter(l => l && !l.startsWith('#')).slice(0, 4)).toEqual([
+      '.claude/memory/turn-count.txt', '*.installer-backup.*', '*.installer-tmp.*', '.claude/memory/band-envelope.json',
+    ]);
+  });
+  // Discriminator for the folded README:325 observation: red on the pre-FEAT-011 template,
+  // which never listed .conductor/.
+  it('[FEAT-011 AC10] ignores the run file and .conductor/ as the fifth and sixth managed entries', () => {
     const lines = readFileSync(join(root, 'project-template/gitignore'), 'utf8').split('\n').map(l => l.trim());
     expect(lines.filter(l => l && !l.startsWith('#'))).toEqual([
       '.claude/memory/turn-count.txt', '*.installer-backup.*', '*.installer-tmp.*', '.claude/memory/band-envelope.json',
+      '.claude/memory/orchestrator-run.json', '.conductor/',
     ]);
   });
 });
@@ -109,12 +119,15 @@ describe('pre-tool-use wiring', () => {
 
   // Read and Bash are asserted by name: their absence from the matcher is the defect
   // that made Guards 1, 3 and 4 unreachable on every deployed machine.
+  // Agent and SendMessage likewise: without them Guard 6's R7 never runs (FEAT-011 AC3a).
   it.each(SETTINGS)('%s gates Read and Bash through one union matcher', (rel) => {
     const entries = JSON.parse(readText(rel)).hooks.PreToolUse;
     expect(entries).toHaveLength(1);
-    expect(entries[0].matcher).toBe('Read|Write|Edit|create_file|write_file|Bash');
+    expect(entries[0].matcher).toBe('Read|Write|Edit|create_file|write_file|Bash|Agent|SendMessage');
     expect(entries[0].matcher.split('|')).toContain('Read');
     expect(entries[0].matcher.split('|')).toContain('Bash');
+    expect(entries[0].matcher.split('|')).toContain('Agent');
+    expect(entries[0].matcher.split('|')).toContain('SendMessage');
     expect(entries[0].hooks.map(h => h.command)).toEqual(['node .claude/hooks/pre-tool-use.mjs']);
   });
 
