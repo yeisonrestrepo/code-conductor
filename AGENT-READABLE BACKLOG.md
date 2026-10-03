@@ -800,7 +800,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   - The 1.23.2 legacy root `scripts/` is still swept in a host project.
   - Red-green proof against a fixture of each case.
 
-### [ ] `[BUG-053]` The Pre-Commit Test Gate Writes Into the Real Repository When Run From a Linked Worktree
+### [X] `[BUG-053]` The Pre-Commit Test Gate Writes Into the Real Repository When Run From a Linked Worktree
+* **DONE, shipped as `1.38.3` on 2026-10-03.** Added shared `tests/helpers/git-env.js` with `cleanGitEnv()` that strips all 6 `GIT_*` vars, applied to 4 test files. Spec: `docs/superpowers/specs/2026-10-03-bug053-test-gate-git-env-design.md`. Plan: `docs/superpowers/plans/2026-10-03-bug053-test-gate-git-env.md`.
 * **Filed 2026-10-01 from the second incident of that day** (`.claude/memory/project.md`, "Incident 2026-10-01 (second)"). Minted after `node tools/id-ceiling.mjs` read working tree `{"BUG":52,"FEAT":40,"ARCH":9}` and `origin/main` `{"BUG":50,"FEAT":40,"ARCH":9}`, union next `BUG-053`.
 * **The defect.** The `code-conductor:test-gate` pre-commit hook runs `npm test` with the environment git hands to hooks. The suite's fixtures run `git` in their own temp directories, and they inherit that environment. From a linked worktree, that environment points every fixture `git` at the real repository.
 * **Cause, measured 2026-10-01 in a scratch repo outside this repository.** A hook printing `env | grep ^GIT_` showed the relative/absolute asymmetry:
