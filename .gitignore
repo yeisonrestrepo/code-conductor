@@ -28,12 +28,19 @@ tests/.tmp/
 # `.claude/` and `docs/` matched at any depth and reached into project-template/,
 # which needed `!project-template/*` to undo. That line is retired here.
 /.claude/*
+!/.claude/agents/
+/.claude/agents/*
 !/.claude/commands/
 /.claude/commands/*
 !/.claude/hooks/
 /.claude/hooks/*
 !/.claude/memory/
 /.claude/memory/*
+!/.claude/agents/audit.md
+!/.claude/agents/code.md
+!/.claude/agents/plan.md
+!/.claude/agents/qa.md
+!/.claude/agents/spec.md
 !/.claude/commands/cc-implement.md
 !/.claude/commands/cc-init.md
 !/.claude/commands/cc-orchestrate.md

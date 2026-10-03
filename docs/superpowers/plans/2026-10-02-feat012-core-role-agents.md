@@ -436,7 +436,7 @@ All seven matched. The script is `mutants.mjs` (Routing, T-002's reviewer).
   - [X] [T-001-E] Run `npm test`. Expected: **1261 / 0**, 46 files. Confirm `git diff --stat scripts/snap-contract.mjs scripts/detect-stack.mjs` is empty.
   - [X] [T-001-F] Append `- T-001: <one line>` under the plan section. Then `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-02-feat012-core-role-agents.md`. Commit `feat: resolve and record the run's test command at start [FEAT-012]`. Expected: **1261 / 0**.
 
-- [ ] [T-002] **Guard 7** (AC6, AC7, AC10, AC11). Native, then the reviewer. Depends on T-001 (`SHELL_METACHARACTERS`, and `start` for AC10).
+- [X] [T-002] **Guard 7** (AC6, AC7, AC10, AC11). Native, then the reviewer. Depends on T-001 (`SHELL_METACHARACTERS`, and `start` for AC10).
 
   **Files:**
   - Create: `tests/hooks/guard7.test.js`
@@ -670,9 +670,9 @@ All seven matched. The script is `mutants.mjs` (Routing, T-002's reviewer).
   - [X] [T-002-F] Run `npx vitest run tests/hooks/guard7.test.js`. Expected: **39 / 39**. Then `npx vitest run tests/hooks tests/installer/templates.test.js`, expecting every Guard 1–6 test unchanged and `templates.test.js`'s mirror identity green.
   - [X] [T-002-G] Run `npm test`. Expected: **1300 / 0**, 47 files.
   - [X] [T-002-H] Append `- T-002: <one line>` under the plan section. Then `git add tests/hooks/guard7.test.js` and `git add -u .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs .claude/memory/project.md docs/superpowers/plans/2026-10-02-feat012-core-role-agents.md`. Commit `feat: Guard 7 holds a band role's shell to the recorded test command [FEAT-012]`. Expected: **1300 / 0**.
-  - [ ] [T-002-I] Dispatch the reviewer (Routing) against that commit. Record its verdict and observation line in `project.md`; they ride T-003's commit. A reviewer finding halts T-003 until the owner rules on it.
+  - [X] [T-002-I] Dispatch the reviewer (Routing) against that commit. Record its verdict and observation line in `project.md`; they ride T-003's commit. A reviewer finding halts T-003 until the owner rules on it.
 
-- [ ] [T-003] **The five profiles** (D1, D2, D5, D8; AC1–AC5). Native. Depends on T-000 only, ordered after T-002 so the masks never ship without the guard beneath them.
+- [X] [T-003] **The five profiles** (D1, D2, D5, D8; AC1–AC5). Native. Depends on T-000 only, ordered after T-002 so the masks never ship without the guard beneath them.
 
   **Files:**
   - Create: `project-template/.claude/agents/spec.md`, `project-template/.claude/agents/plan.md`, `project-template/.claude/agents/code.md`, `project-template/.claude/agents/audit.md`, `project-template/.claude/agents/qa.md`
@@ -682,7 +682,7 @@ All seven matched. The script is `mutants.mjs` (Routing, T-002's reviewer).
 
   **Interfaces:** consumes `MAY_HAND_BACK` and `findAgent` from `orchestrate.mjs` and `GATES`, `ROLES` from `snap-contract.mjs`, all unchanged.
 
-  - [ ] [T-003-A] Create `tests/unit/role-profiles.test.js`:
+  - [X] [T-003-A] Create `tests/unit/role-profiles.test.js`:
     ```js
     import { describe, it, expect } from 'vitest';
     import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
@@ -772,8 +772,8 @@ All seven matched. The script is `mutants.mjs` (Routing, T-002's reviewer).
     });
     ```
     Expected sha256 prefix: `cbff7a07137777a3`.
-  - [ ] [T-003-B] Run `npx vitest run tests/unit/role-profiles.test.js`. Expected: **31 failed / 0 passed (31)**.
-  - [ ] [T-003-C] Create the five template profiles with Write, each exactly as below. Measured sizes and tokens: spec 1796 bytes (449), plan 2089 (523), code 2009 (503), audit 1725 (432), qa 1864 (466).
+  - [X] [T-003-B] Run `npx vitest run tests/unit/role-profiles.test.js`. Expected: **31 failed / 0 passed (31)**.
+  - [X] [T-003-C] Create the five template profiles with Write, each exactly as below. Measured sizes and tokens: spec 1796 bytes (449), plan 2089 (523), code 2009 (503), audit 1725 (432), qa 1864 (466).
 
     `project-template/.claude/agents/spec.md` (sha256 prefix `819553795a7b65a4`):
     ```markdown
@@ -918,16 +918,16 @@ All seven matched. The script is `mutants.mjs` (Routing, T-002's reviewer).
     - Deliver exactly one report, then stop. If the suite passed, end it in exactly one `SNAP_HANDBACK` line and claim only the gate `verify_pass`. If it failed, leave the `SNAP_HANDBACK` line out and say why, quoting the summary line.
     - Copy `ops.scope` verbatim from your envelope into the hand-back; if your envelope has no scope, leave the key out.
     ```
-  - [ ] [T-003-D] Create the five `.claude/agents/<role>.md` mirrors with Write, each byte-identical to its template, then `cmp` each pair (five `cmp` calls, each exiting 0).
-  - [ ] [T-003-E] Run `npx vitest run tests/unit/role-profiles.test.js`. Expected: **31 / 31**.
-  - [ ] [T-003-F] Modify `.gitignore`. This pays the toll before staging.
+  - [X] [T-003-D] Create the five `.claude/agents/<role>.md` mirrors with Write, each byte-identical to its template, then `cmp` each pair (five `cmp` calls, each exiting 0).
+  - [X] [T-003-E] Run `npx vitest run tests/unit/role-profiles.test.js`. Expected: **31 / 31**.
+  - [X] [T-003-F] Modify `.gitignore`. This pays the toll before staging.
     - After `/.claude/*` (:30), insert `!/.claude/agents/` and `/.claude/agents/*`, ahead of `!/.claude/commands/`.
     - After `/.claude/memory/*` (:36), insert the five leaves ahead of `!/.claude/commands/cc-implement.md`: `!/.claude/agents/audit.md`, `!/.claude/agents/code.md`, `!/.claude/agents/plan.md`, `!/.claude/agents/qa.md`, `!/.claude/agents/spec.md`.
 
     This is the order `tests/unit/gitignore-block-parity.test.js`'s `expectedBlock` computes: directories sorted before every leaf, and `.claude/agents` sorting before `.claude/commands`.
-  - [ ] [T-003-G] Stage, plain, now that the leaves exist (measured rc 0): `git add .claude/agents/audit.md .claude/agents/code.md .claude/agents/plan.md .claude/agents/qa.md .claude/agents/spec.md project-template/.claude/agents/audit.md project-template/.claude/agents/code.md project-template/.claude/agents/plan.md project-template/.claude/agents/qa.md project-template/.claude/agents/spec.md tests/unit/role-profiles.test.js`.
-  - [ ] [T-003-H] Run `npm test`. Expected: **1331 / 0**, 48 files, with `gitignore-block-parity` green against the staged index.
-  - [ ] [T-003-I] Append `- T-003: <one line>` under the plan section. Then `git add -u .gitignore .claude/memory/project.md docs/superpowers/plans/2026-10-02-feat012-core-role-agents.md`. Commit `feat: ship the five band role agent profiles [FEAT-012]`. Expected: **1331 / 0**.
+  - [X] [T-003-G] Stage, plain, now that the leaves exist (measured rc 0): `git add .claude/agents/audit.md .claude/agents/code.md .claude/agents/plan.md .claude/agents/qa.md .claude/agents/spec.md project-template/.claude/agents/audit.md project-template/.claude/agents/code.md project-template/.claude/agents/plan.md project-template/.claude/agents/qa.md project-template/.claude/agents/spec.md tests/unit/role-profiles.test.js`.
+  - [X] [T-003-H] Run `npm test`. Expected: **1331 / 0**, 48 files, with `gitignore-block-parity` green against the staged index.
+  - [X] [T-003-I] Append `- T-003: <one line>` under the plan section. Then `git add -u .gitignore .claude/memory/project.md docs/superpowers/plans/2026-10-02-feat012-core-role-agents.md`. Commit `feat: ship the five band role agent profiles [FEAT-012]`. Expected: **1331 / 0**.
 
 - [ ] [T-004] **`/cc-orchestrate` documents the start halts and the test command.** Native. Depends on T-001.
 
