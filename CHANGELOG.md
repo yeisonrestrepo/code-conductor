@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.38.2] - 2026-10-03
+
+### Fixed
+- **[BUG-051]** `/cc-stack` and `/cc-resume` referenced `scripts/detect-stack.mjs` at the repo root, but the installer deploys it to `.claude/scripts/detect-stack.mjs`. Both commands now resolve the detector by checking `.claude/scripts/` first (installed), falling back to `scripts/` (dev layout).
+
 ## [1.38.0] - 2026-10-02
 
 ### Added
