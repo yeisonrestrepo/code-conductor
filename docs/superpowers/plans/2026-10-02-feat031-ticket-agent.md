@@ -989,7 +989,7 @@ No file this plan adds or touches is in any skipped set, and none uses `node:sql
   - [X] [T-001-D] Run `npx vitest run tests/scripts/ticket.test.js`, expecting **57 / 57**. Then `npm test`, expecting **1389 / 0, 49 files**.
   - [X] [T-001-E] Append `- T-001: <one line>` under the plan section. Then `git add scripts/ticket.mjs tests/helpers/fake-gh-cli.mjs tests/helpers/fake-gh.js tests/scripts/ticket.test.js` and `git add -u .claude/memory/project.md docs/superpowers/plans/2026-10-02-feat031-ticket-agent.md`. Commit `feat: add the ticket module, intake and writeback through gh [FEAT-031]`. Expected: **1389 / 0**.
 
-- [ ] [T-002] **Intake at `start`** (B1, B4; AC1-AC4, AC12). Native, then the reviewer. Depends on T-001.
+- [X] [T-002] **Intake at `start`** (B1, B4; AC1-AC4, AC12). Native, then the reviewer. Depends on T-001.
 
   **Files:**
   - Modify: `scripts/orchestrate.mjs:11` (import), `:248-249` (`envelopeFields`), `:323-340` (`start`), `:368` (`cli`)
@@ -1252,16 +1252,16 @@ No file this plan adds or touches is in any skipped set, and none uses `node:sql
     ~~~~
   - [X] [T-002-C] Run `npx vitest run tests/scripts/orchestrate.test.js`, expecting **92 / 92**. Then `npm test`, expecting **1407 / 0, 49 files**.
   - [X] [T-002-D] Append `- T-002: <one line>` under the plan section. Then `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-02-feat031-ticket-agent.md`. Commit `feat: bind a run to a GitHub issue at start with --ticket [FEAT-031]`. Expected: **1407 / 0**.
-  - [ ] [T-002-E] Dispatch the T-002 reviewer (Routing). Record its verdict in the T-002 observation line by a surgical edit. Any mutant that does not match halts T-003 until the owner rules.
+  - [X] [T-002-E] Dispatch the T-002 reviewer (Routing). Record its verdict in the T-002 observation line by a surgical edit. Any mutant that does not match halts T-003 until the owner rules.
 
-- [ ] [T-003] **`/cc-orchestrate` and the pins** (B1.5, B1.6; AC13, AC15; T5). Native. Depends on T-002.
+- [X] [T-003] **`/cc-orchestrate` and the pins** (B1.5, B1.6; AC13, AC15; T5). Native. Depends on T-002.
 
   **Files:**
   - Modify: `.claude/commands/cc-orchestrate.md` and `project-template/.claude/commands/cc-orchestrate.md` (title, step 1, step 3, step 6, the spec row)
   - Modify: `tests/installer/commands-parity.test.js` (after `:187`)
   - Modify: `tests/unit/role-profiles.test.js` (one import, one `describe` appended)
 
-  - [ ] [T-003-A] Apply the parity diff (final sha256 `f977cfca8f561932feb0889df7ad6701ce8cac69dad121f73cc5a719262fc7a6`). Run `npx vitest run tests/installer/commands-parity.test.js`. Expected red: **1 failed / 33 passed**, the new test.
+  - [X] [T-003-A] Apply the parity diff (final sha256 `f977cfca8f561932feb0889df7ad6701ce8cac69dad121f73cc5a719262fc7a6`). Run `npx vitest run tests/installer/commands-parity.test.js`. Expected red: **1 failed / 33 passed**, the new test.
     <!-- diff tests/installer/commands-parity.test.js -->
     ~~~~diff
     diff --git a/tests/installer/commands-parity.test.js b/tests/installer/commands-parity.test.js
@@ -1281,7 +1281,7 @@ No file this plan adds or touches is in any skipped set, and none uses `node:sql
     +  });
      });
     ~~~~
-  - [ ] [T-003-B] Apply the command diff to `.claude/commands/cc-orchestrate.md`, then copy it byte for byte over `project-template/.claude/commands/cc-orchestrate.md`. Both must hash `ffd0e64698b8be749aa35b5bbd94a5936d99eb77895ff50b45da836419685bb1`.
+  - [X] [T-003-B] Apply the command diff to `.claude/commands/cc-orchestrate.md`, then copy it byte for byte over `project-template/.claude/commands/cc-orchestrate.md`. Both must hash `ffd0e64698b8be749aa35b5bbd94a5936d99eb77895ff50b45da836419685bb1`.
     <!-- diff .claude/commands/cc-orchestrate.md -->
     ~~~~diff
     diff --git a/.claude/commands/cc-orchestrate.md b/.claude/commands/cc-orchestrate.md
@@ -1337,8 +1337,8 @@ No file this plan adds or touches is in any skipped set, and none uses `node:sql
      | `code` | Implement `<Task N>` of `<plan>`, touching only its files, and tick its boxes in the plan. After your last edit, run the run's test command exactly and report its exit status and summary line. | `impl` | `build_executed` |
      | `audit` | Review the changes against the spec and the plan, read-only. | `rev` | `build_executed` |
     ~~~~
-  - [ ] [T-003-C] Run `npx vitest run tests/installer/commands-parity.test.js`, expecting **34 / 34**.
-  - [ ] [T-003-D] Apply the profiles diff (final sha256 `3b1ac11a4cdc220a3df517dce47dab984ec32ca65f455549c271419648a27cbe`). Run `npx vitest run tests/unit/role-profiles.test.js`, expecting **41 / 41**.
+  - [X] [T-003-C] Run `npx vitest run tests/installer/commands-parity.test.js`, expecting **34 / 34**.
+  - [X] [T-003-D] Apply the profiles diff (final sha256 `3b1ac11a4cdc220a3df517dce47dab984ec32ca65f455549c271419648a27cbe`). Run `npx vitest run tests/unit/role-profiles.test.js`, expecting **41 / 41**.
     <!-- diff tests/unit/role-profiles.test.js -->
     ~~~~diff
     diff --git a/tests/unit/role-profiles.test.js b/tests/unit/role-profiles.test.js
@@ -1374,7 +1374,7 @@ No file this plan adds or touches is in any skipped set, and none uses `node:sql
     +  });
     +});
     ~~~~
-  - [ ] [T-003-E] Run `npm test`, expecting **1418 / 0, 49 files**. Append `- T-003: <one line>` under the plan section. Then `git add -u .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md tests/installer/commands-parity.test.js tests/unit/role-profiles.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-02-feat031-ticket-agent.md`. Commit `feat: /cc-orchestrate takes --ticket and briefs spec on the snapshot [FEAT-031]`. Expected: **1418 / 0**.
+  - [X] [T-003-E] Run `npm test`, expecting **1418 / 0, 49 files**. Append `- T-003: <one line>` under the plan section. Then `git add -u .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md tests/installer/commands-parity.test.js tests/unit/role-profiles.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-02-feat031-ticket-agent.md`. Commit `feat: /cc-orchestrate takes --ticket and briefs spec on the snapshot [FEAT-031]`. Expected: **1418 / 0**.
 
 - [ ] [T-004] **README, closeout and release 1.38.0** (System Impact's docs; `docs/RELEASE-CLOSEOUT.md` steps 1-5). Native. Depends on T-001 through T-003.
 
