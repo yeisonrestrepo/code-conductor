@@ -763,7 +763,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   - A sub-shaped id in a backlog heading or a `CHANGELOG` claim is never silently skipped by either instrument. It is either read or rejected with a named failure, per the repair the spec chooses.
   - Red-green proof against a fixture holding each shape.
 
-### [ ] `[BUG-051]` Shipped Commands Run the Detector From a Path Installed Projects Do Not Have
+### [X] `[BUG-051]` Shipped Commands Run the Detector From a Path Installed Projects Do Not Have
+* **DONE, shipped as `1.38.2` on 2026-10-03.** Both `/cc-stack` and `/cc-resume` now resolve the detector by checking `.claude/scripts/` first (installed), falling back to `scripts/` (dev layout). Spec: `docs/superpowers/specs/2026-10-03-bug051-detector-path-design.md`. Plan: `docs/superpowers/plans/2026-10-03-bug051-detector-path.md`.
 * **Filed 2026-10-01 from the installer self-install incident.** Minted after `node tools/id-ceiling.mjs` on both legs read `{"BUG":50,"FEAT":40,"ARCH":9}`, next `BUG-051`. ARCH reads 9 because `[ARCH-010]` lives only in the unpushed feature-branch commit `85df4cb`.
 * **Scope amended 2026-10-01 to the class (owner ruling, `[BUG-042]` fold criterion).** Commands shipped to installs reference the detector at `scripts/detect-stack.mjs`, but `deployProject` deploys it to `.claude/scripts/` (`lib/installer/deploy.mjs:212`). An installed project has no root `scripts/detect-stack.mjs` unless it happens to own one. Repairing one instance while the other stays broken would ship a form that still needs its other half. There are two instances:
   - **`global/commands/cc-stack.md`**, in its run line (`:17`) and its step-1 not-a-git-repo fallback (`:9`).
