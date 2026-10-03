@@ -212,7 +212,7 @@ No file this plan adds or touches is in any skipped set, and none uses `node:sql
 
 ---
 
-- [ ] [T-000] **Plan commit.** First run the branch gate (`/cc-plan` Phase exit). The current branch is `main`, so it proposes `feat/feat-031-ticket-agent`; switch only on the owner's yes. Then run constraint 3's fetch and count.
+- [X] [T-000] **Plan commit.** First run the branch gate (`/cc-plan` Phase exit). The current branch is `main`, so it proposes `feat/feat-031-ticket-agent`; switch only on the owner's yes. Then run constraint 3's fetch and count.
   - [X] [T-000-A] Modify `.gitignore`: insert `!/docs/superpowers/plans/2026-10-02-feat031-ticket-agent.md` immediately after `!/docs/superpowers/plans/2026-10-02-feat012-core-role-agents.md` (:107), in sorted position.
   - [X] [T-000-B] Modify `.claude/memory/project.md`: append at the end of the file
     ```markdown
@@ -228,11 +228,11 @@ No file this plan adds or touches is in any skipped set, and none uses `node:sql
     Handoff observations, one line per task:
     ```
   - [X] [T-000-C] `git add -u .gitignore .claude/memory/project.md`, then `git add docs/superpowers/plans/2026-10-02-feat031-ticket-agent.md` (plain, now that its leaf exists).
-  - [ ] [T-000-D] Commit `docs: add the FEAT-031 implementation plan [FEAT-031]`. Expected: the hook suite passes at **1332 / 0**.
-  - [ ] [T-000-E] Run `node tools/id-ceiling.mjs`, expecting union `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`. Then `node tools/record-parity.mjs`, expecting `RECORD_PARITY_OK`.
-  - [ ] [T-000-F] Append `- T-000: <one line of handoff observation>` under the plan section. This line rides T-001's commit.
+  - [X] [T-000-D] Commit `docs: add the FEAT-031 implementation plan [FEAT-031]`. Expected: the hook suite passes at **1332 / 0**.
+  - [X] [T-000-E] Run `node tools/id-ceiling.mjs`, expecting union `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`. Then `node tools/record-parity.mjs`, expecting `RECORD_PARITY_OK`.
+  - [X] [T-000-F] Append `- T-000: <one line of handoff observation>` under the plan section. This line rides T-001's commit.
 
-- [ ] [T-001] **The ticket module** (B1.1, B1.3, B1.6, B1.7, B2, B3, B5; AC5-AC11, AC14; T1, T2, T4). Native. Depends on T-000.
+- [X] [T-001] **The ticket module** (B1.1, B1.3, B1.6, B1.7, B2, B3, B5; AC5-AC11, AC14; T1, T2, T4). Native. Depends on T-000.
 
   **Files:**
   - Create: `scripts/ticket.mjs`
@@ -250,7 +250,7 @@ No file this plan adds or touches is in any skipped set, and none uses `node:sql
   - The constants `TICKET_BODY_MAX_BYTES`, `WRITEBACK_CHANGELOG_MAX_BYTES`, `TITLE_MAX_CHARS`, `SNAPSHOT_DIR`, `WRITEBACK_DIR`, `SNAPSHOT_HEADER` and `UNTRUSTED_NOTICE`.
   - The test helper `fakeGh(state)`, which returns `{ env, calls, state, update, cleanup }`, plus `issue(repo, n, over)` and `pull(repo, n)`.
 
-  - [ ] [T-001-A] Create `tests/helpers/fake-gh-cli.mjs` (sha256 `8a40eb7008e5537a9ee40574946d474faa71e0dab81b43614e454538460770db`) and `tests/helpers/fake-gh.js` (sha256 `ffbcd2a5e23ad68158ff132164a778579768294abf061b5b40248afde68ac9eb`):
+  - [X] [T-001-A] Create `tests/helpers/fake-gh-cli.mjs` (sha256 `8a40eb7008e5537a9ee40574946d474faa71e0dab81b43614e454538460770db`) and `tests/helpers/fake-gh.js` (sha256 `ffbcd2a5e23ad68158ff132164a778579768294abf061b5b40248afde68ac9eb`):
     <!-- file tests/helpers/fake-gh-cli.mjs -->
     ~~~~js
     // The fake gh (FEAT-031 T1). It serves the few gh calls ticket.mjs makes from a JSON state
@@ -362,7 +362,7 @@ No file this plan adds or touches is in any skipped set, and none uses `node:sql
       };
     }
     ~~~~
-  - [ ] [T-001-B] Create `tests/scripts/ticket.test.js` (sha256 `dbee027d246aa68c79e59831da776fb0435a17d8b2e79a78b60e35062581989f`). Run `npx vitest run tests/scripts/ticket.test.js`. Expected red: `Test Files 1 failed (1)`, `Tests no tests`, the import of `scripts/ticket.mjs` failing.
+  - [X] [T-001-B] Create `tests/scripts/ticket.test.js` (sha256 `dbee027d246aa68c79e59831da776fb0435a17d8b2e79a78b60e35062581989f`). Run `npx vitest run tests/scripts/ticket.test.js`. Expected red: `Test Files 1 failed (1)`, `Tests no tests`, the import of `scripts/ticket.mjs` failing.
     <!-- file tests/scripts/ticket.test.js -->
     ~~~~js
     import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -702,7 +702,7 @@ No file this plan adds or touches is in any skipped set, and none uses `node:sql
       });
     });
     ~~~~
-  - [ ] [T-001-C] Create `scripts/ticket.mjs` (sha256 `fc34e6b2d7d754a824d5ea3068b3d1d074cd777b827a4aecb6e6c9a3b49847ed`). Then `node --check scripts/ticket.mjs`. Then run the ASCII probe over all four new files, expecting `0` for each: `node -e 'for (const p of process.argv.slice(1)) console.log(p, [...require("fs").readFileSync(p, "utf8")].filter((c) => { const n = c.codePointAt(0); return n > 126 || (n < 32 && n !== 10); }).length)' scripts/ticket.mjs tests/helpers/fake-gh-cli.mjs tests/helpers/fake-gh.js tests/scripts/ticket.test.js`.
+  - [X] [T-001-C] Create `scripts/ticket.mjs` (sha256 `fc34e6b2d7d754a824d5ea3068b3d1d074cd777b827a4aecb6e6c9a3b49847ed`). Then `node --check scripts/ticket.mjs`. Then run the ASCII probe over all four new files, expecting `0` for each: `node -e 'for (const p of process.argv.slice(1)) console.log(p, [...require("fs").readFileSync(p, "utf8")].filter((c) => { const n = c.codePointAt(0); return n > 126 || (n < 32 && n !== 10); }).length)' scripts/ticket.mjs tests/helpers/fake-gh-cli.mjs tests/helpers/fake-gh.js tests/scripts/ticket.test.js`.
     <!-- file scripts/ticket.mjs -->
     ~~~~js
     #!/usr/bin/env node
@@ -986,8 +986,8 @@ No file this plan adds or touches is in any skipped set, and none uses `node:sql
     }
     if (invokedDirectly()) process.exitCode = cli(process.argv.slice(2));
     ~~~~
-  - [ ] [T-001-D] Run `npx vitest run tests/scripts/ticket.test.js`, expecting **57 / 57**. Then `npm test`, expecting **1389 / 0, 49 files**.
-  - [ ] [T-001-E] Append `- T-001: <one line>` under the plan section. Then `git add scripts/ticket.mjs tests/helpers/fake-gh-cli.mjs tests/helpers/fake-gh.js tests/scripts/ticket.test.js` and `git add -u .claude/memory/project.md docs/superpowers/plans/2026-10-02-feat031-ticket-agent.md`. Commit `feat: add the ticket module, intake and writeback through gh [FEAT-031]`. Expected: **1389 / 0**.
+  - [X] [T-001-D] Run `npx vitest run tests/scripts/ticket.test.js`, expecting **57 / 57**. Then `npm test`, expecting **1389 / 0, 49 files**.
+  - [X] [T-001-E] Append `- T-001: <one line>` under the plan section. Then `git add scripts/ticket.mjs tests/helpers/fake-gh-cli.mjs tests/helpers/fake-gh.js tests/scripts/ticket.test.js` and `git add -u .claude/memory/project.md docs/superpowers/plans/2026-10-02-feat031-ticket-agent.md`. Commit `feat: add the ticket module, intake and writeback through gh [FEAT-031]`. Expected: **1389 / 0**.
 
 - [ ] [T-002] **Intake at `start`** (B1, B4; AC1-AC4, AC12). Native, then the reviewer. Depends on T-001.
 
