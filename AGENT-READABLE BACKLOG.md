@@ -557,7 +557,8 @@ git log --oneline -1
 * **Components Affected:** `.claude/hooks/pre-tool-use.mjs:427-435` (`g3Blocked`) and its mirror, `lib/installer/host-owned.mjs` (the `[BUG-039]` policy table), `tests/installer/templates.test.js`.
 * **Acceptance Criteria:** after the fix, a user who hits a Guard 3 denial can follow the message to a file that exists or to an instruction that creates it, without reading the source; the installer still cannot overwrite an existing allowlist.
 
-### [ ] `[BUG-045]` The Guard 3 Allowlist Cannot Cover a Quoted Path
+### [X] `[BUG-045]` The Guard 3 Allowlist Cannot Cover a Quoted Path
+* **DONE, shipped as `1.38.7` on 2026-10-03.** Added `"` and `'` to both `G3_BD` and `G3_AD` boundary sets. Spec: `docs/superpowers/specs/2026-10-03-bug045-guard3-quoted-paths-design.md`. Plan: `docs/superpowers/plans/2026-10-03-bug045-guard3-quoted-paths.md`.
 
 * **Measured while auditing `[BUG-044]`, verified by reading, not inferred.** `G3_BD` is `(^|[ \t\n\r\f\v|;()])` at `pre-tool-use.mjs:397` and `G3_AD` is its mirror at `:398`. Neither set contains a quote character, so the entry `docs/` does not cover `cat "docs/x.md" *.md`: the character before `docs/` is `"`, which is not a boundary, so the match fails and the command denies.
 * **Unchanged by `[BUG-043]`, deliberately.** The dispatch passes the **unmasked** string to `g3AllowlistCovers` at `:469`, because the allowlist matches paths as the operator wrote them. The mask exists for the code-reading checks and must not reach the allowlist.

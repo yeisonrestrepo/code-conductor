@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.38.7] - 2026-10-03
+
+### Fixed
+- **[BUG-045]** Guard 3's allowlist matcher used boundary sets that did not include quote characters. When a shell command quoted a path (e.g., `cat "docs/x.md"`), the allowlist regex failed to match. Added `"` and `'` to both `G3_BD` and `G3_AD` boundary sets.
+
 ## [1.38.0] - 2026-10-02
 
 ### Added
