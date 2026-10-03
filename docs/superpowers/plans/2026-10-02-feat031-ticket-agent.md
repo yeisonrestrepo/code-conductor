@@ -997,7 +997,7 @@ No file this plan adds or touches is in any skipped set, and none uses `node:sql
 
   **Interfaces consumed:** `TicketHalt`, `intake`, `writeSnapshot` (T-001). **Produced:** the run file's `ticket: { repo, number, url, sha256, snapshot }`; the spec envelope's `mem.p.ticket: { repo, number, url, sha256 }`; the start line `<begun>; ticket <repo>#<n> "<title>"; snapshot <path> sha256 <hex>; test command: <cmd>`; the refusal `usage: orchestrate.mjs start <ITEM> [--auto] [--ticket <N|issue URL>]`.
 
-  - [ ] [T-002-A] Apply the test diff (final sha256 `0ad50ee2da4dee0344121bb67e92a0a2369fd0bf4713c72fa7f2329b5cd1bc80`). Run `npx vitest run tests/scripts/orchestrate.test.js`. Expected red: **17 failed / 75 passed** (see *Why T-002-A*).
+  - [X] [T-002-A] Apply the test diff (final sha256 `0ad50ee2da4dee0344121bb67e92a0a2369fd0bf4713c72fa7f2329b5cd1bc80`). Run `npx vitest run tests/scripts/orchestrate.test.js`. Expected red: **17 failed / 75 passed** (see *Why T-002-A*).
     <!-- diff tests/scripts/orchestrate.test.js -->
     ~~~~diff
     diff --git a/tests/scripts/orchestrate.test.js b/tests/scripts/orchestrate.test.js
@@ -1156,7 +1156,7 @@ No file this plan adds or touches is in any skipped set, and none uses `node:sql
     +  });
     +});
     ~~~~
-  - [ ] [T-002-B] Apply the router diff (final sha256 `ca6fea00b201a35fdd8f2912d23494f3342c9db4851cd3bcaf7454a3ee028320`). Then `node --check scripts/orchestrate.mjs` and the ASCII probe on it, expecting `0`.
+  - [X] [T-002-B] Apply the router diff (final sha256 `ca6fea00b201a35fdd8f2912d23494f3342c9db4851cd3bcaf7454a3ee028320`). Then `node --check scripts/orchestrate.mjs` and the ASCII probe on it, expecting `0`.
     <!-- diff scripts/orchestrate.mjs -->
     ~~~~diff
     diff --git a/scripts/orchestrate.mjs b/scripts/orchestrate.mjs
@@ -1250,8 +1250,8 @@ No file this plan adds or touches is in any skipped set, and none uses `node:sql
          handback: () => handback(root, sid, a, readFileSync(0, 'utf8')),
          approve: () => approve(root, sid, a, b),
     ~~~~
-  - [ ] [T-002-C] Run `npx vitest run tests/scripts/orchestrate.test.js`, expecting **92 / 92**. Then `npm test`, expecting **1407 / 0, 49 files**.
-  - [ ] [T-002-D] Append `- T-002: <one line>` under the plan section. Then `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-02-feat031-ticket-agent.md`. Commit `feat: bind a run to a GitHub issue at start with --ticket [FEAT-031]`. Expected: **1407 / 0**.
+  - [X] [T-002-C] Run `npx vitest run tests/scripts/orchestrate.test.js`, expecting **92 / 92**. Then `npm test`, expecting **1407 / 0, 49 files**.
+  - [X] [T-002-D] Append `- T-002: <one line>` under the plan section. Then `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-02-feat031-ticket-agent.md`. Commit `feat: bind a run to a GitHub issue at start with --ticket [FEAT-031]`. Expected: **1407 / 0**.
   - [ ] [T-002-E] Dispatch the T-002 reviewer (Routing). Record its verdict in the T-002 observation line by a surgical edit. Any mutant that does not match halts T-003 until the owner rules.
 
 - [ ] [T-003] **`/cc-orchestrate` and the pins** (B1.5, B1.6; AC13, AC15; T5). Native. Depends on T-002.

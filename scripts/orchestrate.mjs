@@ -9,6 +9,8 @@ import { homedir, tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { GATES, ROLE_BAND, V3_CAPS } from './snap-contract.mjs';
+// Imported, not spawned: ticket.mjs holds the four import-safety conditions (FEAT-031 B1.7, T2).
+import { TicketHalt, intake, writeSnapshot } from './ticket.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -246,6 +248,11 @@ function envelopeFields(run, root, step) {
     const task = extractTasks(readPlan(root, run.plan)).find((t) => t.id === step.task);
     fields.scope = taskScope(task ?? { id: step.task, files: [] }, run.plan);
   } else if (scope) fields.scope = scope;
+  // Ruling 2: ticket identity rides the spec envelope only, never its content.
+  if (step.role === 'spec' && run.ticket) {
+    const { repo, number, url, sha256 } = run.ticket;
+    fields.p = { ticket: { repo, number, url, sha256 } };
+  }
   return fields;
 }
 
@@ -320,23 +327,50 @@ function approve(root, sessionId, what, planRel) {
   return `plan approved: define_approved, ${tasks.length} task(s)`;
 }
 
-function start(root, sessionId, item, flag) {
-  if (!/^[A-Z]+-\d{3,}$/.test(item ?? '') || (flag !== undefined && flag !== '--auto')) {
-    throw new Refusal('usage: orchestrate.mjs start <ITEM> [--auto]');
+const START_USAGE = 'usage: orchestrate.mjs start <ITEM> [--auto] [--ticket <N|issue URL>]';
+
+// The item first, then --auto and --ticket <ref> in either order, each at most once. A
+// --ticket with no value reaches intake as '' and halts there (FEAT-031 B1.1).
+function parseStartArgs(args) {
+  const [item, ...rest] = args;
+  const opts = { item, auto: false, ticket: undefined };
+  for (let i = 0; i < rest.length; i++) {
+    if (rest[i] === '--auto' && !opts.auto) opts.auto = true;
+    else if (rest[i] === '--ticket' && opts.ticket === undefined) opts.ticket = rest[++i] ?? '';
+    else throw new Refusal(START_USAGE);
   }
+  if (!/^[A-Z]+-\d{3,}$/.test(item ?? '')) throw new Refusal(START_USAGE);
+  return opts;
+}
+
+// Intake's halts keep ticket.mjs's codes and become the router's own start halts.
+function ticketIntake(root, item, ref) {
+  try { return intake(root, item, ref); } catch (e) {
+    if (e instanceof TicketHalt) throw new Halt(e.code, e.reason);
+    throw e;
+  }
+}
+
+const ticketNote = (t) => `ticket ${t.binding.repo}#${t.binding.number} "${t.title}"; snapshot ${t.path} sha256 ${t.binding.sha256}; `;
+
+function start(root, sessionId, args) {
+  const { item, auto, ticket } = parseStartArgs(args);
   if (!sessionId) throw new Halt('ORCH_NO_SESSION_ID', 'CLAUDE_CODE_SESSION_ID is absent or empty, so Guard 6 could never bind this run');
   const old = readRun(root);
   if (old && old.session_id === sessionId) throw new Halt('ORCH_RUN_ACTIVE', `run ${old.item} is live in this session; end it first`);
   // Resolved before a stale run is cleared, so a halt here leaves everything as it was.
   const testCommand = checkTestCommand(resolveTestCommand(root));
+  const bound = ticket === undefined ? null : ticketIntake(root, item, ticket);
   if (old) clearRunFiles(root);
+  if (bound) writeSnapshot(root, bound.path, bound.text);
   saveRun(root, {
-    v: 1, session_id: sessionId, item, mode: flag ? 'auto' : 'step', started: new Date().toISOString(),
+    v: 1, session_id: sessionId, item, mode: auto ? 'auto' : 'step', started: new Date().toISOString(),
     band: 'boundary', role: null, gate: 'boundary_routed', approvals: { spec: null, plan: null },
     plan: null, tasks: { ids: [], done: 0 }, handbacks: [], halt: null, test_command: testCommand,
+    ...(bound ? { ticket: { ...bound.binding, snapshot: bound.path } } : {}),
   });
   const begun = old ? `replaced the stale run ${old.item} started ${old.started}` : `run ${item} started`;
-  return `${begun}; test command: ${testCommand}`;
+  return `${begun}; ${bound ? ticketNote(bound) : ''}test command: ${testCommand}`;
 }
 
 function clearRunFiles(root) {
@@ -365,7 +399,7 @@ export function cli(argv, env, cwd = process.cwd()) {
   const root = findRunRoot(cwd);
   const sid = env.CLAUDE_CODE_SESSION_ID;
   const verbs = {
-    start: () => start(root, sid, a, b),
+    start: () => start(root, sid, argv.slice(1)),
     install: () => install(root, sid, a, b === '--check'),
     handback: () => handback(root, sid, a, readFileSync(0, 'utf8')),
     approve: () => approve(root, sid, a, b),
