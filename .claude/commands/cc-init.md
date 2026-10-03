@@ -13,7 +13,7 @@ If the count is 0 or only `CLAUDE.md` / config files exist, treat this as a **ne
 If the stack detector is present in the project, run it:
 
 ```bash
-node .claude/scripts/detect-stack.mjs "$PWD"
+node scripts/detect-stack.mjs "$PWD"
 ```
 
 **Environment flags:** `CC_GLOB_DEPTH` and any other `CC_*` env vars the user may have set are automatically inherited by the child `node` process — no explicit export or forwarding is required. The `/cc-init` command must NOT reset or unset these variables before calling detect-stack.
@@ -31,7 +31,7 @@ If the detector is absent or returns `{}`, skip auto-detection and continue belo
 Ask about the fields detection could not fill, and never about the ones it did. The script decides which is which; this prose only asks.
 
 ```bash
-node .claude/scripts/init-wizard.mjs report
+node scripts/init-wizard.mjs report
 ```
 
 stdout is JSON and nothing else:
@@ -57,7 +57,7 @@ stdout is JSON and nothing else:
 For each answer to `build`, `test`, `lint` or `format` other than `N/A`, run `check` first and pass any warning through verbatim. It is advisory; the value is written either way:
 
 ```bash
-node .claude/scripts/init-wizard.mjs check build --value-stdin <<'CC_VALUE'
+node scripts/init-wizard.mjs check build --value-stdin <<'CC_VALUE'
 npm run build
 CC_VALUE
 ```
@@ -65,7 +65,7 @@ CC_VALUE
 Then write the answer, one call per field:
 
 ```bash
-node .claude/scripts/init-wizard.mjs apply build --value-stdin <<'CC_VALUE'
+node scripts/init-wizard.mjs apply build --value-stdin <<'CC_VALUE'
 npm run build
 CC_VALUE
 ```
