@@ -28,12 +28,19 @@ tests/.tmp/
 # `.claude/` and `docs/` matched at any depth and reached into project-template/,
 # which needed `!project-template/*` to undo. That line is retired here.
 /.claude/*
+!/.claude/agents/
+/.claude/agents/*
 !/.claude/commands/
 /.claude/commands/*
 !/.claude/hooks/
 /.claude/hooks/*
 !/.claude/memory/
 /.claude/memory/*
+!/.claude/agents/audit.md
+!/.claude/agents/code.md
+!/.claude/agents/plan.md
+!/.claude/agents/qa.md
+!/.claude/agents/spec.md
 !/.claude/commands/cc-implement.md
 !/.claude/commands/cc-init.md
 !/.claude/commands/cc-orchestrate.md
@@ -97,6 +104,7 @@ tests/.tmp/
 !/docs/superpowers/plans/2026-09-30-bug049-claude-md-clobber.md
 !/docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md
 !/docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md
+!/docs/superpowers/plans/2026-10-02-feat012-core-role-agents.md
 !/docs/superpowers/specs/2026-06-09-bug001-cc-compact-design.md
 !/docs/superpowers/specs/2026-06-09-bug002-spec-read-budget-design.md
 !/docs/superpowers/specs/2026-06-11-bug006-feat018-bash-scan-guard-design.md
@@ -123,6 +131,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-09-30-arch010-band-contract-vertical-slice-design.md
 !/docs/superpowers/specs/2026-09-30-bug049-claude-md-clobber-design.md
 !/docs/superpowers/specs/2026-10-01-feat011-orchestrator-band-router-design.md
+!/docs/superpowers/specs/2026-10-02-feat012-core-role-agents-design.md
 # --- END tracked-surface block (BUG-042) ---
 
 # Kept for external writers. Both lines are redundant against the block above; each is

@@ -180,4 +180,9 @@ describe('cc-orchestrate mirrors [FEAT-011 AC10]', () => {
   it('probe the deployed script before the source script (D11)', () => {
     expect(read(ORCH_MIRRORS[0])).toContain('S=.claude/scripts; [ -f "$S/orchestrate.mjs" ] || S=scripts');
   });
+
+  it('names both start halts that write no run file [FEAT-012]', () => {
+    const text = read(ORCH_MIRRORS[0]);
+    expect(text).toContain('On `ORCH_TEST_COMMAND_UNRESOLVED` or `ORCH_TEST_COMMAND_UNSAFE`, report it and stop.');
+  });
 });

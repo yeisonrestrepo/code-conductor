@@ -2698,3 +2698,36 @@ Handoff observations, one line per task:
 **`[ARCH-009]`:** `FEAT-011` is done. Of the items the 1.35.0 closeout named, it still waits on `FEAT-009`, `FEAT-012` and `FEAT-031` through `FEAT-036`.
 
 **Next:** `[FEAT-012]` opens with `/cc-spec` in a fresh session, after a `/cc-compact` here.
+
+## Spec: FEAT-012, the core role agents (spec, plan, code, audit, qa) [2026-10-02]
+
+The spec is `docs/superpowers/specs/2026-10-02-feat012-core-role-agents-design.md`. It was APPROVED 2026-10-02 after three question rounds and one approval round, and targets `1.37.0`, a minor release, at complexity L. Branch `feat/feat-012-core-role-agents`. No new id was minted, and there is no SNAP contract change.
+
+- **Shape:** five profiles in `project-template/.claude/agents/<role>.md`, mirrored byte-identically into `.claude/agents/`, each at most 999 tokens by `ceil(bytes/4)`, with the D2 tool masks; audit has Read, Grep and Glob only, derived from band row `AGENT-READABLE BACKLOG.md:122`.
+- **Guard 7 (role shell):** fail-closed on `Bash` for band roles. R1 denies spec, plan and audit; R2 denies chaining metacharacters; R3 denies when there is no live run file `test_command` (stale `session_id` included); R4 allows only a byte-exact match. code's allowance is process discipline, not a boundary; qa's is enforcement (T-003, F3).
+- **Run start:** `<pm> test` (bun → `bun run test`, no lockfile → `npm test`); `package.json` without `scripts.test` → `ORCH_TEST_COMMAND_UNRESOLVED`; non-JS → detect-stack's value; the record-time check halts `ORCH_TEST_COMMAND_UNSAFE`, so nothing is ever recorded that Guard 7 would not pass.
+- **Rulings recorded:** A1, the spec role is non-interactive (an approved deviation); A2, the allowlist is the test command only. Deferred to the plan: run-file strict keys (D9) and how the metacharacter constant is shared (D10).
+- **Residual risk, named:** the profiles are live in this repository; manual `/agents` use creates no envelope, so Guard 5 allows every write (ARCH-010 design); the standing rule forbids runs here, not the files.
+
+## Plan: FEAT-012 implementation [2026-10-02]
+
+Plan `docs/superpowers/plans/2026-10-02-feat012-core-role-agents.md`.
+- **Approval:** APPROVED 2026-10-02 after a full review ("arithmetic re-derived, red splits checked case by case, the four test files recounted against their drafts, mutants G1-G7 checked against their declared discriminators, and the D5/AC4/AC5 phrase pins verified against all five profiles. The counts hold on all three legs."). Rulings, quoted:
+  1. "Routing: Native, with the fresh read-only reviewer on T-002 as planned."
+  2. "P11 stands as specified: R3 reads the spec's four conditions and a halted run still allows its recorded command. Overturning it would amend the approved spec for no measured need. If a halted run's shell ever proves harmful, that is a future item with its own evidence."
+  3. "P16 stands as a README Known limit. A host-owned row for agents is registered as an intake candidate on my list, not this item's work."
+  4. "P4, the detect-stack crash on a non-string scripts.test: record it as a dossier in the closeout, and I mint it by the normal process there, ceiling run on both legs first. The plan files nothing, as written."
+  5. "P17 is accepted as a named risk; cooperation is what a description can give."
+- **Fix before T-000:** the plan profile's "19 files or fewer" now cites its ground (P17a: `snap-contract.mjs:34`, `orchestrate.mjs:142-144`); re-measured 2089 bytes, 523 tokens, sha256 `3f1c61b66519fce2`.
+- **D9:** `v` stays 1; `test_command` is additive; neither run-file reader is strict-keyed. **D10:** one authority in `orchestrate.mjs`, one pinned copy in the hook.
+- **Routing:** native, with a fresh read-only reviewer on T-002 re-running mutants G1–G7 in a scratch clone.
+- **Predictions,** measured on drafts in a scratch clone: local 1237 → 1332 / 0 (+95), 48 files; ci-node20 1236 / 96; ci-node24 1319 / 13.
+
+Handoff observations, one line per task:
+- T-000: committed `2670fd1` at 1237 / 0; plain `git add` of the plan exited 0 once its leaf was in. The Write tool had decoded the plan's byte-order-mark escape into a literal invisible byte, which was restored before the commit; T-001-C greps for the same hazard, and it fired there too.
+- T-001: 74 / 74 file, 1261 / 0 suite, red as derived (file failed to load); the Edit tool again decoded the router's byte-order-mark escape (grep count 0), restored by a one-liner to the planned sha `e82d59e409be0807`, so the hazard is per-edit, not per-file.
+- T-002: red 27 / 12 and green 39 / 39 as derived, 1300 / 0 suite, hook sha `70ce2a2e669a6e50` in both mirrors; the C1-then-C2 smokes held, the code payload denying `ROLE_SHELL_UNRESOLVED` here because this repository has no run file.
+  - T-002 reviewer (fresh, read-only, own clone at `6a6f505`): PASS. Both hook mirrors hash `70ce2a2e…`, 39 / 39, mutants G1–G7 measured 1, 2, 10, 1, 2, 1, 2 with matching titles, and no deviation from R1–R5. Its observation: copying the mutant script so its relative `./clone/` pointed at a disposable clone kept every mutation off the live hook.
+- T-003: red 31 / 0 and green 31 / 31 as derived, 1331 / 0 suite on 48 files; all ten profiles hash to the planned prefixes, the five pairs `cmp` identical, and plain `git add` of the new `.claude/agents/` files exited 0 with their leaves already in.
+- T-004: red 1 / 32 and green 33 / 33 as derived, 1332 / 0 suite; both command mirrors hash `be871ea9…`. FEAT-011's D10 fixture note was never in `cc-orchestrate.md` (P18); it is dropped from `README.md` in T-005.
+- T-005: README byte-equal to the measured clone draft; `VERSION_GATE_OK 1.37.0`, `RECORD_PARITY_OK`, and the flipped heading turned red with 3 violations naming `1.37.0` and `FEAT-012` before it was restored; `snap-contract.mjs` unchanged against `origin/main` (AC13); 1332 / 0; ceiling `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`.
