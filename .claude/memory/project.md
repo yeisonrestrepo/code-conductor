@@ -2726,3 +2726,4 @@ Plan `docs/superpowers/plans/2026-10-02-feat012-core-role-agents.md`.
 Handoff observations, one line per task:
 - T-000: committed `2670fd1` at 1237 / 0; plain `git add` of the plan exited 0 once its leaf was in. The Write tool had decoded the plan's byte-order-mark escape into a literal invisible byte, which was restored before the commit; T-001-C greps for the same hazard, and it fired there too.
 - T-001: 74 / 74 file, 1261 / 0 suite, red as derived (file failed to load); the Edit tool again decoded the router's byte-order-mark escape (grep count 0), restored by a one-liner to the planned sha `e82d59e409be0807`, so the hazard is per-edit, not per-file.
+- T-002: red 27 / 12 and green 39 / 39 as derived, 1300 / 0 suite, hook sha `70ce2a2e669a6e50` in both mirrors; the C1-then-C2 smokes held, the code payload denying `ROLE_SHELL_UNRESOLVED` here because this repository has no run file.

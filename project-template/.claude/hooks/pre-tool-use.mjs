@@ -244,6 +244,45 @@ function guard6OrchestratorRun(input, payload) {
   return deny(`Guard 6: ORCH_WRITE_DENIED: ${target || '<no path>'} is outside the orchestrator's write surface while run ${run.item} is live; repository writes during a run go through a band role (Guard 5).`);
 }
 
+// ── Guard 7 constants ─────────────────────────────────────────────────────────
+// A copy of scripts/orchestrate.mjs SHELL_METACHARACTERS (FEAT-012 D10), carried for Guard
+// 5's reason: no import resolves from both install locations. tests/hooks/guard7.test.js pins it.
+const ROLE_SHELL_METACHARACTERS = [';', '&', '|', '`', '$(', '<', '>', '\n', '\r'];
+const ROLE_SHELL_ROLES = ['code', 'qa'];
+
+// R3: the test command a live run of this session recorded, or null. The run root is found
+// by Guard 5's walk and the file read by Guard 6's reader.
+function liveTestCommand(payload) {
+  const root = findRootHolding(payloadCwd(payload), ORCH_RUN_REL);
+  if (!root) return null;
+  const run = readRunFile(join(root, ...ORCH_RUN_REL));
+  if (!run || payload.session_id !== run.session_id) return null;
+  return typeof run.test_command === 'string' && run.test_command !== '' ? run.test_command : null;
+}
+
+// R1-R5, the first match decides. The match is exact: a prefix allowlist is walked around by
+// chaining, which is the T-003 vector.
+function roleShellDecision(role, input, payload) {
+  if (!ROLE_SHELL_ROLES.includes(role)) return deny(`Guard 7: ROLE_SHELL_DENIED: ${role} has no shell.`);
+  const command = typeof input.command === 'string' ? input.command : '';
+  const found = ROLE_SHELL_METACHARACTERS.find((m) => command.includes(m));
+  if (found !== undefined) return deny(`Guard 7: ROLE_SHELL_CHAINING: the command contains ${JSON.stringify(found)}; a role runs one command, never a chain.`);
+  const allowed = liveTestCommand(payload);
+  if (allowed === null) return deny(`Guard 7: ROLE_SHELL_UNRESOLVED: no live run in this session records a test command, so ${role} has no shell.`);
+  if (command !== allowed) return deny(`Guard 7: ROLE_SHELL_NOT_ALLOWED: allowed command is ${allowed}`);
+  return null;
+}
+
+// Guard 7: a band role's Bash (FEAT-012). The tool mask is the authority and this is the layer
+// beneath it: in FEAT-011's T-003 a declined Write was completed through Bash, so a prompt is
+// not enough. Fail-closed: a throw denies here, where CC_HOOK_ALLOW cannot reach it.
+function guard7RoleShell(input, payload) {
+  const role = payload.agent_type;
+  if (!BAND_ROLES.includes(role)) return null;
+  try { return roleShellDecision(role, input, payload); }
+  catch (e) { return deny(`Guard 7: ROLE_SHELL_UNRESOLVED: the guard could not decide (${e && e.message}), so the call is denied.`); }
+}
+
 // ── Guard 3 constants ─────────────────────────────────────────────────────────
 // POSIX ERE fragments from tests/fixtures/guard3-reference.sh, translated class by
 // class. [[:space:]] in the C locale is EXACTLY [ \t\n\r\f\v]; JavaScript \s also
@@ -704,6 +743,9 @@ const DISPATCH = {
 for (const tool of BAND_WRITE_TOOLS) DISPATCH[tool].unshift(guard5BandScope, guard6OrchestratorRun);
 // R7 sees dispatch only where settings.json routes it: the matcher names Agent and SendMessage.
 for (const tool of ORCH_DISPATCH_TOOLS) DISPATCH[tool] = [guard6OrchestratorRun];
+// Guard 7 runs before Guard 3 on Bash: under CC_GUARD3_WARN Guard 3 asks instead of denying,
+// and an ask must never outrank a role's shell deny.
+DISPATCH.Bash.unshift(guard7RoleShell);
 
 // Case B. Unparseable input is not "nothing to verify", it is "the verifier could not
 // run", which is the condition that fails closed. CC_HOOK_ALLOW bypasses THIS denial only;

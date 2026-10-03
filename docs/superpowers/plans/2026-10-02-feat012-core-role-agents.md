@@ -445,7 +445,7 @@ All seven matched. The script is `mutants.mjs` (Routing, T-002's reviewer).
 
   **Interfaces:** consumes `RUN_FILE`, `SHELL_METACHARACTERS` and the `start` CLI from T-001; reuses the hook's `findRootHolding`, `payloadCwd`, `readRunFile`, `ORCH_RUN_REL`, `BAND_ROLES` and `deny`. Produces `guard7RoleShell(input, payload)`, `ROLE_SHELL_METACHARACTERS` and `DISPATCH.Bash = [guard7RoleShell, guard3BashScan]`.
 
-  - [ ] [T-002-A] Create `tests/hooks/guard7.test.js`:
+  - [X] [T-002-A] Create `tests/hooks/guard7.test.js`:
     ```js
     import { describe, it, expect, beforeEach, afterEach } from 'vitest';
     import { spawnSync } from 'node:child_process';
@@ -612,8 +612,8 @@ All seven matched. The script is `mutants.mjs` (Routing, T-002's reviewer).
     });
     ```
     Expected sha256 prefix: `1baa5590ee378804`.
-  - [ ] [T-002-B] Run `npx vitest run tests/hooks/guard7.test.js`. Expected: **27 failed / 12 passed (39)**.
-  - [ ] [T-002-C] **C1, the section, unregistered.** Modify `.claude/hooks/pre-tool-use.mjs`: insert after `guard6OrchestratorRun`'s closing brace (:245) and before `// ── Guard 3 constants`, separated by one blank line on each side:
+  - [X] [T-002-B] Run `npx vitest run tests/hooks/guard7.test.js`. Expected: **27 failed / 12 passed (39)**.
+  - [X] [T-002-C] **C1, the section, unregistered.** Modify `.claude/hooks/pre-tool-use.mjs`: insert after `guard6OrchestratorRun`'s closing brace (:245) and before `// ── Guard 3 constants`, separated by one blank line on each side:
     ```js
     // ── Guard 7 constants ─────────────────────────────────────────────────────────
     // A copy of scripts/orchestrate.mjs SHELL_METACHARACTERS (FEAT-012 D10), carried for Guard
@@ -655,7 +655,7 @@ All seven matched. The script is `mutants.mjs` (Routing, T-002's reviewer).
     }
     ```
     Smoke: `printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git status"}}' | node .claude/hooks/pre-tool-use.mjs` prints nothing and exits 0.
-  - [ ] [T-002-D] **C2, the registration.** After `for (const tool of ORCH_DISPATCH_TOOLS) DISPATCH[tool] = [guard6OrchestratorRun];` (:706), insert:
+  - [X] [T-002-D] **C2, the registration.** After `for (const tool of ORCH_DISPATCH_TOOLS) DISPATCH[tool] = [guard6OrchestratorRun];` (:706), insert:
     ```js
     // Guard 7 runs before Guard 3 on Bash: under CC_GUARD3_WARN Guard 3 asks instead of denying,
     // and an ask must never outrank a role's shell deny.
@@ -666,10 +666,10 @@ All seven matched. The script is `mutants.mjs` (Routing, T-002's reviewer).
     - `printf '%s' '{"tool_name":"Bash","agent_type":"code","session_id":"x","tool_input":{"command":"npm test"}}' | node .claude/hooks/pre-tool-use.mjs` prints a deny whose reason starts `Guard 7: ROLE_SHELL_UNRESOLVED:`, since this repository has no run file.
 
     Expected sha256 prefix: `70ce2a2e669a6e50`.
-  - [ ] [T-002-E] Make the same two edits to `project-template/.claude/hooks/pre-tool-use.mjs` with Edit, then `cmp .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs` exits 0.
-  - [ ] [T-002-F] Run `npx vitest run tests/hooks/guard7.test.js`. Expected: **39 / 39**. Then `npx vitest run tests/hooks tests/installer/templates.test.js`, expecting every Guard 1–6 test unchanged and `templates.test.js`'s mirror identity green.
-  - [ ] [T-002-G] Run `npm test`. Expected: **1300 / 0**, 47 files.
-  - [ ] [T-002-H] Append `- T-002: <one line>` under the plan section. Then `git add tests/hooks/guard7.test.js` and `git add -u .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs .claude/memory/project.md docs/superpowers/plans/2026-10-02-feat012-core-role-agents.md`. Commit `feat: Guard 7 holds a band role's shell to the recorded test command [FEAT-012]`. Expected: **1300 / 0**.
+  - [X] [T-002-E] Make the same two edits to `project-template/.claude/hooks/pre-tool-use.mjs` with Edit, then `cmp .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs` exits 0.
+  - [X] [T-002-F] Run `npx vitest run tests/hooks/guard7.test.js`. Expected: **39 / 39**. Then `npx vitest run tests/hooks tests/installer/templates.test.js`, expecting every Guard 1–6 test unchanged and `templates.test.js`'s mirror identity green.
+  - [X] [T-002-G] Run `npm test`. Expected: **1300 / 0**, 47 files.
+  - [X] [T-002-H] Append `- T-002: <one line>` under the plan section. Then `git add tests/hooks/guard7.test.js` and `git add -u .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs .claude/memory/project.md docs/superpowers/plans/2026-10-02-feat012-core-role-agents.md`. Commit `feat: Guard 7 holds a band role's shell to the recorded test command [FEAT-012]`. Expected: **1300 / 0**.
   - [ ] [T-002-I] Dispatch the reviewer (Routing) against that commit. Record its verdict and observation line in `project.md`; they ride T-003's commit. A reviewer finding halts T-003 until the owner rules on it.
 
 - [ ] [T-003] **The five profiles** (D1, D2, D5, D8; AC1–AC5). Native. Depends on T-000 only, ordered after T-002 so the masks never ship without the guard beneath them.
