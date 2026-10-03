@@ -2815,3 +2815,13 @@ The spec is `docs/superpowers/specs/2026-10-02-feat031-ticket-agent-design.md`. 
 - **Ruled deviation, accepted at file review:** the `TICKET_UNBOUND` remedy reads "run a bound start, or pass --ticket" rather than naming the snapshot file, because no file exists to delete in the unbound case.
 - **Fold at file review:** a residual-risk line for a re-run under a different `gh` account posting a second comment. It is the same accepted class as the concurrent-writeback race.
 - **Deferred to the plan:** full reads of `orchestrate.mjs` (`start`, `envelopeFields`, `readRun`'s key validation against the new `ticket` key) and `deploy.mjs:137-212`; plan-time measurements V1–V3 on the owner's `gh`.
+
+## Plan: FEAT-031 implementation [2026-10-02]
+
+Plan `docs/superpowers/plans/2026-10-02-feat031-ticket-agent.md`.
+- **Approval:** APPROVED 2026-10-02 "subject to three plan-text amendments, none of which touches a measured draft". Applied before T-000: (1) the "Why T-002-A" prose now sums on its own terms, 14 ticket-passing tests plus 3 usage rows fail (17), AC1 plus the existing 74 pass (75); (2) the memory block's reviewer line reads "M1-M3 and M5-M15" (one occurrence found, fixed); (3) ruling P22, the title is reduced inside the snapshot fence as well, prose only. Re-hashed plan `d582a838cc8ab592efbc6629906a6e44d2451bb77ef07fa1028882c15b259154`; all 11 draft fences re-extracted identical. Confirmed, quoted: "Routing as proposed: every task native in this session, one fresh read-only reviewer after T-002 re-running M1-M3 and M5-M15 in its own scratch clone with the declared expectations." "The branch: yes to feat/feat-031-ticket-agent at the T-000 branch gate." The approval message was cut off mid-sentence at "The two slips stand as"; the rest is not recorded here.
+- **Measured at plan time:** V1-V6 on `gh 2.100.0`; drafts in a scratch clone of `d5377e7`, 1332 → 1418 / 0 (+86), 49 files; mutants M1-M3 and M5-M16 all matched, after two recorded slips (the fake's 64 KiB pipe truncation; M16's second red in the mirror identity test).
+- **Import, not spawn** (P1): the four T2 conditions hold; the entry gate is the router's realpath form.
+- **Routing:** native, with a fresh read-only reviewer on T-002 re-running M1-M3 and M5-M15 in a scratch clone.
+
+Handoff observations, one line per task:
