@@ -98,7 +98,6 @@ Four checks live in `tools/` as tracked repository infrastructure. Three of them
 
 ## Known limits
 
-- **`[BUG-045]`, open:** the Guard 3 allowlist cannot cover a quoted path, because the boundary sets it interpolates contain no quote character, so an entry `docs/` does not cover `cat "docs/x.md" *.md`. Filed with its ritual priced, untouched pending its own change.
 - **`[BUG-032]`, open:** global memory preferences sit outside the documented lookup chain. Nothing in the chain points at `~/.claude/memory/personal.md`, and the installer never deploys `global/memory/`, so a preference filed there is never read by the agent it was written for.
 - **`[BUG-050]`, open:** the release instruments are silent on sub-shaped ids. `tools/record-parity.mjs` and `tools/id-ceiling.mjs` neither read nor reject an id like `[ARCH-008-S1]`, so a release claiming one would pass record parity having read nothing. No shipped release does; releases claim top-level ids until the item's spec chooses its repair.
 - **`[BUG-051]`, open:** two shipped commands run `scripts/detect-stack.mjs`, but the installer deploys the detector to `.claude/scripts/`. In an installed project, `/cc-stack` fails loud (`MODULE_NOT_FOUND`, "no stack"), and `/cc-resume`'s blank-command auto-fill silently skips. Until it is fixed, `/cc-init`, which already uses the deployed path, records the stack and commands.
