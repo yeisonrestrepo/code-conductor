@@ -742,7 +742,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
     - a re-run over each end state, for idempotence.
   - **Ships as `1.34.4`.**
 
-### [ ] `[BUG-050]` The Release Instruments Are Silent on Sub-Shaped Ids
+### [X] `[BUG-050]` The Release Instruments Are Silent on Sub-Shaped Ids
+* **DONE, shipped as `1.38.6` on 2026-10-03.** Both `record-parity.mjs` and `id-ceiling.mjs` now detect and report sub-shaped ids. The 3 historical ARCH-008 sub-items are grandfathered. Spec: `docs/superpowers/specs/2026-10-03-bug050-sub-shaped-ids-design.md`. Plan: `docs/superpowers/plans/2026-10-03-bug050-sub-shaped-ids.md`.
 * **Filed 2026-09-30 from the `[ARCH-009]` spec, Q2.** Minted after `node tools/id-ceiling.mjs` on both legs read `{"BUG":49,"FEAT":40,"ARCH":9}`, next `BUG-050`.
 * **The defect is the silence, not any one regex.** `tools/record-parity.mjs` and `tools/id-ceiling.mjs` neither read nor reject an id with a suffix after its number, such as `[ARCH-008-S1]` or `[ARCH-009-S1]`:
   - A backlog heading of that shape is skipped.

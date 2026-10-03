@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.38.6] - 2026-10-03
+
+### Fixed
+- **[BUG-050]** `tools/record-parity.mjs` and `tools/id-ceiling.mjs` silently skipped sub-shaped ids (e.g. `ARCH-008-S1`). Both instruments now detect and report them with a named failure. The 3 historical ARCH-008 sub-items are grandfathered.
+
 ## [1.38.0] - 2026-10-02
 
 ### Added
