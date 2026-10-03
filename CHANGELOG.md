@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.38.5] - 2026-10-03
+
+### Fixed
+- **[BUG-032]** The orchestrator protocol's memory step only checked `.claude/memory/project.md`, ignoring `~/.claude/memory/personal.md` for global developer preferences. Step 1 now reads both paths.
+
 ## [1.38.0] - 2026-10-02
 
 ### Added

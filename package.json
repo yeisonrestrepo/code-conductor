@@ -1,6 +1,6 @@
 {
   "name": "@yeison.restrepo.r/code-conductor",
-  "version": "1.38.0",
+  "version": "1.38.5",
   "description": "A governance layer for Claude Code sessions: hooks that check an agent's commands before they run, a spec-first workflow, and project memory the next session reads.",
   "keywords": [
     "agentic-development",
