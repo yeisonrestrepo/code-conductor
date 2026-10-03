@@ -2892,3 +2892,19 @@ Handoff observations, one line per task:
 **`[ARCH-009]`:** `FEAT-031` is done. Its flip still waits on `FEAT-009` and `FEAT-032` through `FEAT-036`.
 
 **Next:** the next item is the owner's call. `BUG-055`'s mint stays the owner's, with the ceiling run on both legs first.
+
+## Checkpoint 2026-10-02 23:33
+
+Session span: `[FEAT-041]` added to the backlog (`9c50afe`, pushed to `main`); no code, no release. Ceiling `{"BUG":54,"FEAT":41,"ARCH":10}`, next `BUG-055`. Baselines unchanged: local 1418 / 0 across 49 files; ci-node20 1322 / 96; ci-node24 1405 / 13.
+
+### Decisions
+- `[FEAT-041]` Reviewer-in-Loop for the Define Band sits in Pillar 3 after `[FEAT-036]`, in the owner's text verbatim; it is open and unscheduled.
+- `[FEAT-041]` scope is Define only (spec and plan); audit and qa carry no reviewer, and the reviewer's verdict never replaces the owner's boundary approval.
+- The next item is the owner's to name in a fresh session.
+
+### Conventions
+- A backlog entry the owner pastes is inserted verbatim and committed alone with a `docs:` prefix and the id suffix.
+
+### Debt and workarounds
+- Guard 3 P7 blocks stdin redirection (`node script < file`); `/cc-compact` builds the snapshot through a scratch node script that passes the payload to `spawnSync` as `input`.
+- `[ARCH-009]` flip still waits on `[FEAT-009]` and `[FEAT-032]` through `[FEAT-036]`.
