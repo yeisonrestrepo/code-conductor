@@ -102,6 +102,7 @@ VERBOSITY: MIN (default)
 - Never skip the pre-tool-use hook; if it blocks a tool invocation, investigate — do not bypass.
 - Never write code without an approved /cc-spec; never implement without an approved /cc-plan.
 - Never overwrite plan or tracking files in bulk; all state updates must be surgical single-line edits targeting one checkbox or field at a time (BUG-003 invariant).
+- External contributions follow the hard constraints in [CONTRIBUTING.md](CONTRIBUTING.md#what-contributors-must-never-do); an agent working on a contribution is bound by its [If you are an AI agent](CONTRIBUTING.md#if-you-are-an-ai-agent) section.
 
 ## Staging Convention
 

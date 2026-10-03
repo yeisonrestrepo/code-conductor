@@ -538,3 +538,9 @@ and finishes the rest of the install. Fix the markers and re-run.
 > Uninstall steps that use `git checkout <tag>` or `git revert <sha>` require a git working tree. In CI/CD pipelines, Docker containers, or directories that are not git repositories, these commands will fail with `fatal: not a git repository`. This is expected and non-fatal.
 >
 > **In non-repo environments:** manually delete or restore `skills/verbosity/SKILL.md` and remove the `verbosity-remind` entry from `~/.claude/settings.json`. Hook removal (`rm ~/.claude/hooks/verbosity-remind.sh`) and `settings.json` cleanup work identically in all environments — no git is required.
+
+---
+
+## Contributing
+
+GitHub Issues are the inbox: an issue or PR is a candidate until the owner mints it an id. Nothing merges without a minted id and owner review, one item per PR. Versions, release branches, tags and GitHub Releases are owner-only. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR; its hard constraints bind AI agents working on a contributor's behalf as well.

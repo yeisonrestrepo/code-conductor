@@ -2792,3 +2792,9 @@ Handoff observations, one line per task:
 **`[ARCH-009]`:** `FEAT-012` is done. Its flip still waits on `FEAT-009` and `FEAT-031` through `FEAT-036`.
 
 **Next:** the next item opens in a fresh session, after `/cc-compact` here.
+
+## Contribution intake rules and hard constraints (owner docs task, no id) [2026-10-02]
+
+**Incident.** A collaborator and their AI agent opened feature PR #59 with no minted id, bundling seven fixes, and pushed `release/1.36.0` and `release/1.37.0` branches to origin claiming versions the owner had already published. Nothing landed: the PR did not merge, `main` and the published 1.36.0 and 1.37.0 are untouched, and no id was taken from the ceiling (`{"BUG":54,"FEAT":40,"ARCH":10}`, unchanged). Zero damage; the rules are codified before a repeat can do some.
+
+**Registered.** `CONTRIBUTING.md` now carries the owner-approved intake rule and hard constraints verbatim: "How work enters this repository", "What contributors must never do", "If you are an AI agent" and "What a good PR looks like". They sit after Code Style so that lines 23 and 37, which `/cc-plan` cites, keep their positions. Pointers, not restatements: a README `## Contributing` section, one line in `CLAUDE.md` Hard Constraints, the PR template (`.github/pull_request_template.md`, rewritten in place; its old "add an entry to `CHANGELOG.md`" line contradicted the constraints) and two new issue templates under `.github/ISSUE_TEMPLATE/`. `project-template/` is untouched: these rules govern this repository, not installed projects. Reference: the commit `docs: contribution intake rules and hard constraints for collaborators and their agents`.
