@@ -2798,3 +2798,20 @@ Handoff observations, one line per task:
 **Incident.** A collaborator and their AI agent opened feature PR #59 with no minted id, bundling seven fixes, and pushed `release/1.36.0` and `release/1.37.0` branches to origin claiming versions the owner had already published. Nothing landed: the PR did not merge, `main` and the published 1.36.0 and 1.37.0 are untouched, and no id was taken from the ceiling (`{"BUG":54,"FEAT":40,"ARCH":10}`, unchanged). Zero damage; the rules are codified before a repeat can do some.
 
 **Registered.** `CONTRIBUTING.md` now carries the owner-approved intake rule and hard constraints verbatim: "How work enters this repository", "What contributors must never do", "If you are an AI agent" and "What a good PR looks like". They sit after Code Style so that lines 23 and 37, which `/cc-plan` cites, keep their positions. Pointers, not restatements: a README `## Contributing` section, one line in `CLAUDE.md` Hard Constraints, the PR template (`.github/pull_request_template.md`, rewritten in place; its old "add an entry to `CHANGELOG.md`" line contradicted the constraints) and two new issue templates under `.github/ISSUE_TEMPLATE/`. `project-template/` is untouched: these rules govern this repository, not installed projects. Reference: the commit `docs: contribution intake rules and hard constraints for collaborators and their agents`.
+
+## Spec: FEAT-031, the ticket agent (boundary in and writeback out) [2026-10-02]
+
+The spec is `docs/superpowers/specs/2026-10-02-feat031-ticket-agent-design.md`. It was APPROVED 2026-10-02 after nine question rounds, a design round with three gaps closed, and a file review with one fold. It targets a minor release at complexity M. No new id was minted, and there is no SNAP contract change, no new role, no role profile change and no Guard 7 change.
+
+- **Shape:** new `scripts/ticket.mjs` (adapter interface: `fetch` and `comment` required, `transition` optional; GitHub through `spawnSync('gh')` only). `start <ITEM> --ticket <N|issue URL>` fetches once via `gh api repos/{owner}/{repo}/issues/<n>`, then writes a fenced, hashed snapshot `.conductor/ticket/<ITEM>.md` that the spec role reads. `p.ticket` is on the spec envelope only. Without `--ticket`, start is byte-identical to 1.37.0. `start` imports `ticket.mjs` under four import-safety conditions; otherwise it spawns it as it does detect-stack.
+- **Writeback:** the owner-run `ticket.mjs writeback <ITEM> --version <v> --pr <N|url> [--changelog <file>] [--ticket <ref>] [--close]`. Comments are idempotent via a `<ITEM>@<v>` marker that counts only from the authenticated login. `--close` is opt-in and a no-op when the issue is already closed. FEAT-035 later calls the same verb unchanged.
+- **Rulings recorded:**
+  - Four entry amendments: fail-closed only when a ticket is named; no `settings.json` touch; "Ship band" re-run becomes "verb" re-run; status becomes comment plus opt-in close.
+  - Amended ruling 3b: the binding lives in the snapshot header, because `end` deletes the run file (`orchestrate.mjs:351`) before closeout.
+  - Placement ruling: the untrusted-text item lives in the fence header, not `spec.md`.
+  - Stale binding (a): the binding persists across unbound restarts, and deleting the snapshot unbinds.
+  - `TICKET_BODY_EMPTY` approved; both caps confirmed (`TICKET_BODY_MAX_BYTES` 65536, `WRITEBACK_CHANGELOG_MAX_BYTES` 32768).
+  - No Windows CI leg (`test.yml:11`, `publish.yml:9`), so the fake `gh` targets POSIX only.
+- **Ruled deviation, accepted at file review:** the `TICKET_UNBOUND` remedy reads "run a bound start, or pass --ticket" rather than naming the snapshot file, because no file exists to delete in the unbound case.
+- **Fold at file review:** a residual-risk line for a re-run under a different `gh` account posting a second comment. It is the same accepted class as the concurrent-writeback race.
+- **Deferred to the plan:** full reads of `orchestrate.mjs` (`start`, `envelopeFields`, `readRun`'s key validation against the new `ticket` key) and `deploy.mjs:137-212`; plan-time measurements V1–V3 on the owner's `gh`.
