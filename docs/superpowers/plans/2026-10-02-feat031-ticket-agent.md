@@ -1381,7 +1381,7 @@ No file this plan adds or touches is in any skipped set, and none uses `node:sql
   **Files:**
   - Modify: `README.md`, `docs/RELEASE-CLOSEOUT.md`, `VERSION`, `package.json`, `package-lock.json`, `CHANGELOG.md`, `AGENT-READABLE BACKLOG.md`
 
-  - [ ] [T-004-A] Apply the README diff (final sha256 `fedf0db1458ac4aa112f1d1e208662098121ecf9a33b8c2f7d488236966d1d89`) and the closeout diff (final sha256 `5b594dbee17b58cfdeb59cf720f21cc2e93269ad06d4a0f1f6d8037cedc6c54e`). The clone measured the suite unchanged at 1418 / 0 with both.
+  - [X] [T-004-A] Apply the README diff (final sha256 `fedf0db1458ac4aa112f1d1e208662098121ecf9a33b8c2f7d488236966d1d89`) and the closeout diff (final sha256 `5b594dbee17b58cfdeb59cf720f21cc2e93269ad06d4a0f1f6d8037cedc6c54e`). The clone measured the suite unchanged at 1418 / 0 with both.
     <!-- diff README.md -->
     ~~~~diff
     diff --git a/README.md b/README.md
@@ -1436,8 +1436,8 @@ No file this plan adds or touches is in any skipped set, and none uses `node:sql
      
      ## Why the heading flip lives in the release commit
     ~~~~
-  - [ ] [T-004-B] Run `npm version 1.38.0 --no-git-tag-version`, then write `1.38.0` into `VERSION`.
-  - [ ] [T-004-C] Modify the records.
+  - [X] [T-004-B] Run `npm version 1.38.0 --no-git-tag-version`, then write `1.38.0` into `VERSION`.
+  - [X] [T-004-C] Modify the records.
     - **`AGENT-READABLE BACKLOG.md`:**
       - At the line `` grep -n '^### \[ \] `\[FEAT-031\]`' `` reports (:180), change `### [ ]` to `### [X]`.
       - Insert as its first bullet:
@@ -1457,14 +1457,14 @@ No file this plan adds or touches is in any skipped set, and none uses `node:sql
       ```
 
     If the release commit lands on another date, use that date in both places.
-  - [ ] [T-004-D] Run the release checks:
+  - [X] [T-004-D] Run the release checks:
     - `node tools/version-gate.mjs`, expecting `VERSION_GATE_OK 1.38.0`;
     - `node tools/record-parity.mjs`, expecting `RECORD_PARITY_OK`;
     - `git diff origin/main -- scripts/snap-contract.mjs scripts/snap-validate.mjs scripts/snap-build.mjs .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs lib/installer .claude/agents project-template/.claude/agents` empty (Global Constraints).
 
     **Discriminator:** flip the FEAT-031 heading back to `### [ ]` and expect a red run naming `1.38.0` and `FEAT-031`. Restore `[X]` and re-run green.
-  - [ ] [T-004-E] Run `npm test`, expecting **1418 / 0**. Then `node tools/id-ceiling.mjs`, expecting union `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`.
-  - [ ] [T-004-F] Append `- T-004: <one line>` under the plan section. Then `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md docs/RELEASE-CLOSEOUT.md .claude/memory/project.md docs/superpowers/plans/2026-10-02-feat031-ticket-agent.md`. Commit `chore: release 1.38.0 [FEAT-031]`. Expected: **1418 / 0**.
+  - [X] [T-004-E] Run `npm test`, expecting **1418 / 0**. Then `node tools/id-ceiling.mjs`, expecting union `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`.
+  - [X] [T-004-F] Append `- T-004: <one line>` under the plan section. Then `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md docs/RELEASE-CLOSEOUT.md .claude/memory/project.md docs/superpowers/plans/2026-10-02-feat031-ticket-agent.md`. Commit `chore: release 1.38.0 [FEAT-031]`. Expected: **1418 / 0**.
   - [ ] [T-004-G] Re-run constraint 3's fetch and count. **Confirm with the owner, then** push with `git push -u origin feat/feat-031-ticket-agent` and open the PR against `main`. Expected CI:
     - ci-node20 **1322 / 96**;
     - ci-node24 **1405 / 13**;

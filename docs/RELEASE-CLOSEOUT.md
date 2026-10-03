@@ -71,6 +71,14 @@ This document exists because the sentence "run it as a closeout step the ritual 
 
     **This step was missing until `1.33.0`**, and its absence was found the way `[BUG-046]` predicts such things are found: by an instruction citing "the checklist line" for a line that did not exist. The document `[BUG-046]` created reproduced `[BUG-046]`'s own defect one release later, which is the argument for instruments over documents restated against this file.
 
+11. **Write back to a bound ticket.** Only when the item's run was started with `--ticket`, so `.conductor/ticket/<ITEM>.md` exists. Inspect its header first: the binding persists across unbound restarts by design, and the success line names the issue it used.
+
+    ```bash
+    node scripts/ticket.mjs writeback <ITEM> --version <version> --pr <number> [--changelog <file>] [--close]
+    ```
+
+    Expect `posted to <owner>/<repo>#<n> (bound <fetched>)` at rc 0, or `already written to <owner>/<repo>#<n>` on a re-run: the hidden marker `<!-- conductor:writeback <ITEM>@<version> -->` makes the verb idempotent per version. `--changelog` takes a file holding the excerpt to quote, 32768 bytes at most; this repository extracts it from the version's `CHANGELOG.md` entry by hand. `--close` closes the issue as completed, and is a no-op on a closed one. The verb is the owner's, never a role's, and nothing runs it automatically. **Not CI-backed**: it is an outward write to the tracker.
+
 ---
 
 ## Why the heading flip lives in the release commit

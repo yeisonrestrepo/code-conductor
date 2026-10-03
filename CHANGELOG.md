@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.38.0] - 2026-10-02
+
+### Added
+- **[FEAT-031]** `scripts/ticket.mjs`, the ticket agent, reaching GitHub only through the `gh` binary. `/cc-orchestrate <ITEM> --ticket <N|issue URL>` fetches the issue once at `start`, halts on a pull request, a closed issue, or an empty or over-cap body, and writes the body into a fenced, hashed snapshot at `.conductor/ticket/<ITEM>.md`, which only the spec role reads, as untrusted requirement input. The spec envelope carries the ticket's identity as `p.ticket`.
+- **[FEAT-031]** `ticket.mjs writeback <ITEM> --version <v> --pr <N|url> [--changelog <file>] [--close]`, an owner-run verb that posts one outcome comment to the bound issue, idempotent per version through a hidden marker counted only from the authenticated login, and closes the issue as completed only with `--close`.
+
+### Changed
+- **[FEAT-031]** `orchestrate.mjs start` takes `--ticket <ref>` beside `--auto`, in either order; a start without it is unchanged. `docs/RELEASE-CLOSEOUT.md` gains step 11, the writeback for a bound item.
+
 ## [1.37.0] - 2026-10-02
 
 ### Added
