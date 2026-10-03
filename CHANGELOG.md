@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.39.0] - 2026-10-03
+
+### Added
+- **[FEAT-042]** Automatic OWASP Top 10 security guardrail as post-implement Step 4.5 in `cc-implement`. The agent reviews its own diff for injection, hardcoded secrets, XSS, SSRF, and seven other categories before marking a task complete. Findings emit `[SECURITY]` tags that are never suppressed, even in MIN mode. Phase 1 is prompt-based (zero code, zero dependencies).
+
 ## [1.38.0] - 2026-10-02
 
 ### Added
