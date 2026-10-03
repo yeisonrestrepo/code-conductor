@@ -2708,3 +2708,19 @@ The spec is `docs/superpowers/specs/2026-10-02-feat012-core-role-agents-design.m
 - **Run start:** `<pm> test` (bun → `bun run test`, no lockfile → `npm test`); `package.json` without `scripts.test` → `ORCH_TEST_COMMAND_UNRESOLVED`; non-JS → detect-stack's value; the record-time check halts `ORCH_TEST_COMMAND_UNSAFE`, so nothing is ever recorded that Guard 7 would not pass.
 - **Rulings recorded:** A1, the spec role is non-interactive (an approved deviation); A2, the allowlist is the test command only. Deferred to the plan: run-file strict keys (D9) and how the metacharacter constant is shared (D10).
 - **Residual risk, named:** the profiles are live in this repository; manual `/agents` use creates no envelope, so Guard 5 allows every write (ARCH-010 design); the standing rule forbids runs here, not the files.
+
+## Plan: FEAT-012 implementation [2026-10-02]
+
+Plan `docs/superpowers/plans/2026-10-02-feat012-core-role-agents.md`.
+- **Approval:** APPROVED 2026-10-02 after a full review ("arithmetic re-derived, red splits checked case by case, the four test files recounted against their drafts, mutants G1-G7 checked against their declared discriminators, and the D5/AC4/AC5 phrase pins verified against all five profiles. The counts hold on all three legs."). Rulings, quoted:
+  1. "Routing: Native, with the fresh read-only reviewer on T-002 as planned."
+  2. "P11 stands as specified: R3 reads the spec's four conditions and a halted run still allows its recorded command. Overturning it would amend the approved spec for no measured need. If a halted run's shell ever proves harmful, that is a future item with its own evidence."
+  3. "P16 stands as a README Known limit. A host-owned row for agents is registered as an intake candidate on my list, not this item's work."
+  4. "P4, the detect-stack crash on a non-string scripts.test: record it as a dossier in the closeout, and I mint it by the normal process there, ceiling run on both legs first. The plan files nothing, as written."
+  5. "P17 is accepted as a named risk; cooperation is what a description can give."
+- **Fix before T-000:** the plan profile's "19 files or fewer" now cites its ground (P17a: `snap-contract.mjs:34`, `orchestrate.mjs:142-144`); re-measured 2089 bytes, 523 tokens, sha256 `3f1c61b66519fce2`.
+- **D9:** `v` stays 1; `test_command` is additive; neither run-file reader is strict-keyed. **D10:** one authority in `orchestrate.mjs`, one pinned copy in the hook.
+- **Routing:** native, with a fresh read-only reviewer on T-002 re-running mutants G1–G7 in a scratch clone.
+- **Predictions,** measured on drafts in a scratch clone: local 1237 → 1332 / 0 (+95), 48 files; ci-node20 1236 / 96; ci-node24 1319 / 13.
+
+Handoff observations, one line per task:
