@@ -2731,3 +2731,64 @@ Handoff observations, one line per task:
 - T-003: red 31 / 0 and green 31 / 31 as derived, 1331 / 0 suite on 48 files; all ten profiles hash to the planned prefixes, the five pairs `cmp` identical, and plain `git add` of the new `.claude/agents/` files exited 0 with their leaves already in.
 - T-004: red 1 / 32 and green 33 / 33 as derived, 1332 / 0 suite; both command mirrors hash `be871ea9…`. FEAT-011's D10 fixture note was never in `cc-orchestrate.md` (P18); it is dropped from `README.md` in T-005.
 - T-005: README byte-equal to the measured clone draft; `VERSION_GATE_OK 1.37.0`, `RECORD_PARITY_OK`, and the flipped heading turned red with 3 violations naming `1.37.0` and `FEAT-012` before it was restored; `snap-contract.mjs` unchanged against `origin/main` (AC13); 1332 / 0; ceiling `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`.
+
+## Closeout: 1.37.0, the core role agents and Guard 7 (FEAT-012) [2026-10-02]
+
+**What shipped.** Minor **`1.37.0`** shipped `[FEAT-012]` (PR #63, squash `01572c5`).
+- Plan: `docs/superpowers/plans/2026-10-02-feat012-core-role-agents.md`.
+- Spec: `docs/superpowers/specs/2026-10-02-feat012-core-role-agents-design.md`.
+
+**One sha.** `npm view` reads version `1.37.0` and gitHead `01572c56388260719ab0fbe766736f683f4509d2`; the `v1.37.0` tag (release `v1.37.0`, not a draft) and the squash commit on `origin/main` are the same commit. The tag keeps the `v` prefix, as `v1.35.0` did.
+
+**Sync, measured first.** Local `main` was `4428cb4`, an ancestor of `origin/main`, with `git rev-list --count 4428cb4..origin/main` at **1**: 0 ahead, 1 behind, a clean squash sync. `main` was fast-forwarded to `01572c5`. The merged tree equals the branch tree at `4129efe`: `git diff --stat 4129efe 01572c5` is empty.
+
+**Instrument output on the merged tree:**
+- **`VERSION_GATE_OK 1.37.0`.**
+- **`RECORD_PARITY_OK`.** On the branch, the discriminator went red with `RECORD_PARITY_FAILED (3 violations)`, each reading `1.37.0 claims FEAT-012 but its heading reads [ ]`, then green on restore.
+- **Ceiling:** `UNION ceiling {"BUG":54,"FEAT":40,"ARCH":10}`, next **`BUG-055`**, both legs reporting. Nothing was minted in FEAT-012.
+- **PR run `37082160376`:** ci-node20 (job `111084831706`) `1236 passed | 96 skipped (1332)`; ci-node24 (job `111084831801`) `1319 passed | 13 skipped (1332)`; it printed `SKIP_BASELINE_OK ci-node20: 96 skipped identities match tools/skip-baseline.json` and `SKIP_BASELINE_OK ci-node24: 13 skipped identities match tools/skip-baseline.json`. `git diff origin/main -- tools/skip-baseline.json` was empty before the push.
+- **Push run on `main`, `37082349710`:** the same counts and both `SKIP_BASELINE_OK` lines. `tools/skip-baseline.json` is unchanged from `4428cb4` to `01572c5`.
+- **Publish run `37082427685`** succeeded, printing `+ @yeison.restrepo.r/code-conductor@1.37.0`.
+- **Local suite on `main`:** 1332 / 0, 48 test files.
+- **Reconciliation, total 1332 on all three legs:**
+
+  | Leg | Reading | Predicted |
+  |---|---|---|
+  | local | 1332 / 0, 48 files | 1332 / 0, 48 files |
+  | ci-node20 | 1236 / 96 | 1236 / 96 |
+  | ci-node24 | 1319 / 13 | 1319 / 13 |
+
+  Arithmetic: 1237 + 95 = 1332; 1141 + 95 = 1236, and 1236 + 96 = 1332; 1224 + 95 = 1319, and 1319 + 13 = 1332.
+
+**Every count boundary matched its prediction**, across six commits and two CI legs. The one planning-time slip (the first clone run of the non-string `scripts.test` draft, 1 failed / 73 passed) was recorded in the plan and fixed at its cause before approval; nothing was absorbed after a measurement.
+
+| Boundary | Measured |
+|---|---|
+| T-000 (`2670fd1`) | 1237 / 0, 46 files |
+| T-001 (`1b769a8`) | red: file failed to load; 74 / 74; 1261 / 0 |
+| T-002 (`6a6f505`) | red 27 / 12; 39 / 39; 1300 / 0, 47 files; reviewer PASS, mutants 1, 2, 10, 1, 2, 1, 2 |
+| T-003 (`15643ee`) | red 31 / 0; 31 / 31; 1331 / 0, 48 files |
+| T-004 (`6cc2c79`) | red 1 / 32; 33 / 33; 1332 / 0 |
+| T-005 (`4129efe`) | 1332 / 0 |
+| CI | 1236 / 96 and 1319 / 13 (1332 each) |
+
+**Dossier opened (owner ruling 4):** "detect-stack Fails Whole on a Non-String package.json Script", in `AGENT-READABLE BACKLOG.md`, with README's count moved to four. The probe corrected the plan's P4: the throw at `scripts/detect-stack.mjs:598-601` is masked by `main().catch` (`:678-681`, `"code":"UNKNOWN"`, stdout `{}`, exit 0), not by the `uncaughtException` handler, and the class covers `build`, `lint` and `format` as well as `test`. The mint is the owner's, by the normal process, ceiling on both legs first.
+
+**`[FEAT-012]` harvest, in one place.** Each item is evidenced in the Plan section's handoff observations above and in this record.
+
+- **The measurement binary is `claude` 2.1.287**, confirmed on the owner's host by `claude --version` at this closeout: `2.1.287 (Claude Code)`, the binary FEAT-011's V1–V3 measured.
+- **The `ORCH_SCOPE_OVER_CAP` citation, a sound deviation.** The owner asked for the plan profile's 19-file limit to cite its ground "with file:line". The plan cites `snap-contract.mjs:34` and `orchestrate.mjs:142-144`; the shipped profile names the mechanism and the halt code instead, because a halt name travels into every install while a line number drifts. Accepted by the owner at T-005-G.
+- **The U+FEFF editor hazard recurred, and the planned check caught it.**
+  - Drafting: the Edit tool decoded the escape into a literal byte in the clone's router; the Write tool did the same in the plan.
+  - T-001-C: the Edit tool did it again in the real router; the planned `grep -c 'uFEFF'` read 0, and a one-liner restored the escape to the planned sha `e82d59e4…`.
+  - It also reached a `project.md` line, reworded so no record carries an invisible byte; every commit was checked for literal BOM bytes before staging.
+  - **This argues the check becomes standing practice:** any Edit or Write carrying a `\u` escape is followed by a grep for the escape and for the literal bytes, before staging.
+- **The T-002 reviewer pattern held.** A fresh, read-only agent cloned `6a6f505` into the scratchpad, confirmed both hook mirrors at `70ce2a2e…`, re-ran G1–G7 against their declared discriminators, and found no deviation from R1–R5. Copying the mutant script so its relative `./clone/` pointed at its own disposable clone kept every mutation off the live hook.
+- **Every count matched prediction across six commits and two CI legs.** Derive on paper, measure drafts in an independent clone, then implement against hashes: the method held for the second item running.
+- **Carried forward:** the profiles are live in this repository (`.claude/agents/`) and now appear as dispatchable agent types in its sessions. The standing rule still forbids an orchestrated run here, and nothing in FEAT-012 dispatched one.
+
+**Observed and not acted on:** origin carries `release/1.37.0` and `release/1.36.0` branches; they are not this session's and were left untouched.
+
+**`[ARCH-009]`:** `FEAT-012` is done. Its flip still waits on `FEAT-009` and `FEAT-031` through `FEAT-036`.
+
+**Next:** the next item opens in a fresh session, after `/cc-compact` here.
