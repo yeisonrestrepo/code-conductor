@@ -143,11 +143,14 @@ Use this checklist when your environment restricts hook execution (restricted Po
 
 ### Resetting the Pre-Commit Hook to Upstream
 
-If your local `.claude/hooks/pre-tool-use.mjs` has diverged (e.g., manual edits, failed
-partial upgrade), delete it and re-run the installer to pull the current version from the
-project template:
+In a project where code-conductor is installed, if your local `.claude/hooks/pre-tool-use.mjs`
+has diverged (e.g., manual edits, failed partial upgrade), delete it and re-run
+`code-conductor --project` to restore the hook from the project template.
 
-**macOS / Linux / Windows:**
+**Never run the installer in this repository itself ([BUG-052]).** Here, the hook is restored
+with `git checkout -- .claude/hooks/pre-tool-use.mjs`.
+
+**In an installed project, macOS / Linux / Windows:**
 ```bash
 rm .claude/hooks/pre-tool-use.mjs   # (PowerShell: Remove-Item .claude\hooks\pre-tool-use.mjs)
 code-conductor --project
