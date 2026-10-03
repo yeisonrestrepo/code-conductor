@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.38.3] - 2026-10-03
+
+### Fixed
+- **[BUG-053]** Test fixtures using `git init` in temp directories inherit `GIT_DIR`, `GIT_WORK_TREE` and other `GIT_*` env vars from the parent process when run from a linked worktree. Added shared `tests/helpers/git-env.js` with `cleanGitEnv()` applied to 4 test files.
+
 ## [1.38.0] - 2026-10-02
 
 ### Added
