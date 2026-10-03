@@ -4,12 +4,12 @@ description: "(Conductor) Execute implementation tasks from an approved plan"
 
 ## Phase entry - Resume Read
 
-Before doing anything else, restore any stored context for the current commit by running `.claude/scripts/resume-read.mjs`. It resolves the current git hash, prefers a valid DB snapshot (`conductor-db get-snapshot`), falls back to the `.claude/memory/session-snapshot.json` handoff file, and prints a `RESUME_HIT` block on a hit / nothing on a miss. Capture its stdout **and** its exit code with the canonical per-platform form (each first probes for `node` and treats its absence as a clean miss, never an error):
+Before doing anything else, restore any stored context for the current commit by running `scripts/resume-read.mjs`. It resolves the current git hash, prefers a valid DB snapshot (`conductor-db get-snapshot`), falls back to the `.claude/memory/session-snapshot.json` handoff file, and prints a `RESUME_HIT` block on a hit / nothing on a miss. Capture its stdout **and** its exit code with the canonical per-platform form (each first probes for `node` and treats its absence as a clean miss, never an error):
 
 - **Unix / Git Bash:**
   ```sh
   if command -v node >/dev/null 2>&1; then
-    resume_out="$(node .claude/scripts/resume-read.mjs 2>>.conductor/last-write.log)"; resume_rc=$?
+    resume_out="$(node scripts/resume-read.mjs 2>>.conductor/last-write.log)"; resume_rc=$?
   else resume_rc=3; resume_out=""; fi
   ```
 - **PowerShell:**
@@ -20,7 +20,7 @@ Before doing anything else, restore any stored context for the current commit by
       $__nap = $PSNativeCommandUseErrorActionPreference; $PSNativeCommandUseErrorActionPreference = $false
     }
     try {
-      $resume_out = node .claude/scripts/resume-read.mjs 2>> .conductor/last-write.log; $resume_rc = $LASTEXITCODE
+      $resume_out = node scripts/resume-read.mjs 2>> .conductor/last-write.log; $resume_rc = $LASTEXITCODE
     } catch { $resume_rc = 3; $resume_out = "" }
     finally {
       $ErrorActionPreference = $__eap
@@ -133,7 +133,7 @@ Runs after both success (`[X]`) and failure (`[!]`) paths. Record the task's fin
    Each probe is a disposable child; a non-zero exit — including a fatal `bad option: --experimental-sqlite` from a Node that does not recognize the flag — is caught and simply advances to the next branch. The fatal startup error is therefore always contained inside a probe whose failure is expected; it never propagates and never aborts the hook.
 3. Launch the chosen form, from the repo root, with the active plan file path, the task ID, and the just-written state character (`X` or `!`):
 
-   `node <chosen-flags> .claude/scripts/conductor-db.mjs record "<plan_file>" "<task_id>" "<state>"`
+   `node <chosen-flags> scripts/conductor-db.mjs record "<plan_file>" "<task_id>" "<state>"`
 
    All three arguments **must** be wrapped in double quotes exactly as shown. A repository path can contain spaces (e.g. `/Users/me/My Projects/repo/docs/plan.md`); unquoted, the shell word-splits it into several argv entries and the recorder sees `!== 3` positionals, silently rejecting a legitimate write. `--no-warnings` (in both probe and launch) suppresses Node's `ExperimentalWarning: SQLite is an experimental feature` line so it never pollutes hook stderr; it does not affect the recorder's own `CONDUCTOR_DB:` diagnostics (those are direct `process.stderr` writes, not process warnings).
 
@@ -175,11 +175,11 @@ the completion summary has been output.
 **Preconditions.** `c` is the full-40 `git rev-parse HEAD`, lowercased, matching `/^[0-9a-f]{7,40}$/`, `"0000000"` on any failure; `s` is the active spec stem or `"none"`. Both are derived exactly as this command's body already specifies.
 
 1. Ensure `.conductor/` exists (`mkdir -p .conductor`, best-effort). If that fails, skip the tail entirely.
-2. Resolve the session id: `id="$(node .claude/scripts/session-id.mjs 2>>.conductor/last-write.log)"`.
+2. Resolve the session id: `id="$(node scripts/session-id.mjs 2>>.conductor/last-write.log)"`.
 3. Probe how to launch `node:sqlite`, the same probe the `cc-implement` Step 6 hook runs: no flag first, else `--experimental-sqlite --no-warnings`, else skip the write.
 4. Upsert the session row. Every argv scalar is double-quoted, because a repository path can contain spaces:
 
-   `node <probe-flags> .claude/scripts/conductor-db.mjs session "$id" "impl" "$s" "$c" >> .conductor/last-write.log 2>&1`
+   `node <probe-flags> scripts/conductor-db.mjs session "$id" "impl" "$s" "$c" >> .conductor/last-write.log 2>&1`
 5. **Loud degrade.** If the probe skipped the write, or the write exited non-zero, append one line naming the reason:
 
    `printf '%s\n' "CC_DB_TAIL: session row not written (<reason>)" >> .conductor/last-write.log`
@@ -188,5 +188,5 @@ the completion summary has been output.
 
 Every redirect uses append mode (`>>`), never `>`, so a rapid or parallel second run never truncates a preceding trace. Any failure in this block is **non-fatal**: the command reports its normal outcome regardless.
 
-**Cross-platform note.** The forms above are Unix-canonical; the `.md` file is an agent instruction, not a literal script. On Windows/PowerShell realize the same semantics: set `$OutputEncoding = [System.Text.UTF8Encoding]::new($false)` first, capture `$id = node .claude/scripts/session-id.mjs`, and append the log with `… 2>&1 | Out-File -Append -Encoding utf8 .conductor/last-write.log`, never the bare `*>>`, whose default encoding is UTF-16LE on PS 5.1 and would corrupt the trace. Ensure the directory with `New-Item -ItemType Directory -Force .conductor`.
+**Cross-platform note.** The forms above are Unix-canonical; the `.md` file is an agent instruction, not a literal script. On Windows/PowerShell realize the same semantics: set `$OutputEncoding = [System.Text.UTF8Encoding]::new($false)` first, capture `$id = node scripts/session-id.mjs`, and append the log with `… 2>&1 | Out-File -Append -Encoding utf8 .conductor/last-write.log`, never the bare `*>>`, whose default encoding is UTF-16LE on PS 5.1 and would corrupt the trace. Ensure the directory with `New-Item -ItemType Directory -Force .conductor`.
 <!-- SESSION-ROW-TAIL:END -->
