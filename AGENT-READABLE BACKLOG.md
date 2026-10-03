@@ -824,7 +824,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   - A full `npm test` run with the environment git hands to a linked-worktree hook leaves the real repository's refs, config and index byte-identical.
   - A red-green proof reproduces the leak with a fixture `GIT_DIR` and shows it closed.
 
-### [ ] `[BUG-054]` Generated Plans Omit the Plan File From Their Own Staging Steps
+### [X] `[BUG-054]` Generated Plans Omit the Plan File From Their Own Staging Steps
+* **DONE, shipped as `1.38.4` on 2026-10-03.** Added a "Plan file in staging steps" rule to both `cc-plan.md` mirrors. Spec: `docs/superpowers/specs/2026-10-03-bug054-plan-staging-design.md`. Plan: `docs/superpowers/plans/2026-10-03-bug054-plan-staging.md`.
 * **Filed 2026-10-01 at the `1.35.0` closeout**, from the ARCH-010 slice's plan-format notes (`.claude/memory/project.md`, "Plan: ARCH-010 implementation"). Minted on `main` after `node tools/id-ceiling.mjs` read working tree and `origin/main` both `{"BUG":53,"FEAT":40,"ARCH":10}`, union next `BUG-054`.
 * **The defect.** `/cc-plan` generates per-task staging steps that list the files the task edits but leave out the plan file itself. Under `cc-implement`, the plan file carries that task's ticked boxes, so the tick has no commit to ride. Its home is the generator, not any one plan. It belongs to `[BUG-031]`'s class: that item fixed the order of a staging step relative to its edit, and this one is a staging step that is missing a file.
 * **Sightings, all in `docs/superpowers/plans/2026-10-01-arch010-band-contract-vertical-slice.md`:**
