@@ -1376,7 +1376,7 @@ No file this plan adds or touches is in any skipped set, and none uses `node:sql
     ~~~~
   - [X] [T-003-E] Run `npm test`, expecting **1418 / 0, 49 files**. Append `- T-003: <one line>` under the plan section. Then `git add -u .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md tests/installer/commands-parity.test.js tests/unit/role-profiles.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-02-feat031-ticket-agent.md`. Commit `feat: /cc-orchestrate takes --ticket and briefs spec on the snapshot [FEAT-031]`. Expected: **1418 / 0**.
 
-- [ ] [T-004] **README, closeout and release 1.38.0** (System Impact's docs; `docs/RELEASE-CLOSEOUT.md` steps 1-5). Native. Depends on T-001 through T-003.
+- [X] [T-004] **README, closeout and release 1.38.0** (System Impact's docs; `docs/RELEASE-CLOSEOUT.md` steps 1-5). Native. Depends on T-001 through T-003.
 
   **Files:**
   - Modify: `README.md`, `docs/RELEASE-CLOSEOUT.md`, `VERSION`, `package.json`, `package-lock.json`, `CHANGELOG.md`, `AGENT-READABLE BACKLOG.md`
@@ -1465,12 +1465,12 @@ No file this plan adds or touches is in any skipped set, and none uses `node:sql
     **Discriminator:** flip the FEAT-031 heading back to `### [ ]` and expect a red run naming `1.38.0` and `FEAT-031`. Restore `[X]` and re-run green.
   - [X] [T-004-E] Run `npm test`, expecting **1418 / 0**. Then `node tools/id-ceiling.mjs`, expecting union `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`.
   - [X] [T-004-F] Append `- T-004: <one line>` under the plan section. Then `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md docs/RELEASE-CLOSEOUT.md .claude/memory/project.md docs/superpowers/plans/2026-10-02-feat031-ticket-agent.md`. Commit `chore: release 1.38.0 [FEAT-031]`. Expected: **1418 / 0**.
-  - [ ] [T-004-G] Re-run constraint 3's fetch and count. **Confirm with the owner, then** push with `git push -u origin feat/feat-031-ticket-agent` and open the PR against `main`. Expected CI:
+  - [X] [T-004-G] Re-run constraint 3's fetch and count. **Confirm with the owner, then** push with `git push -u origin feat/feat-031-ticket-agent` and open the PR against `main`. Expected CI:
     - ci-node20 **1322 / 96**;
     - ci-node24 **1405 / 13**;
     - both legs printing `SKIP_BASELINE_OK`;
     - `git diff origin/main -- tools/skip-baseline.json` empty.
-  - [ ] [T-004-H] **Stop at the green PR.** Report both `SKIP_BASELINE_OK` lines, both run ids and the PR URL. The owner merges and publishes the GitHub Release `v1.38.0`.
+  - [X] [T-004-H] **Stop at the green PR.** Report both `SKIP_BASELINE_OK` lines, both run ids and the PR URL. The owner merges and publishes the GitHub Release `v1.38.0`.
 
 ## Test List
 

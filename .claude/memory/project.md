@@ -2830,3 +2830,65 @@ Handoff observations, one line per task:
 - T-002: both diffs were extracted from the plan fences and applied with `git apply`, and both final files matched their plan sha256 values and the measured clone. The red split was 17 failed / 75 passed, all 17 in the `ticket intake` describe. `node --check` passed and the ASCII probe read 0 on `orchestrate.mjs`; orchestrate.test.js read 92 / 92; the suite read 1407 / 0 across 49 files. Reviewer (fresh, read-only, own no-hardlinks clone at `9969d1e`): all six hashes and both baselines (57 / 57, 92 / 92) confirmed; M1-M3 and M5-M15 each failed at exactly its predicted count (6, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2), no mismatch.
 - T-003: all three diffs were extracted from the plan fences and applied with `git apply`; each result matched its plan sha256 and the measured clone, and the template mirror is a byte copy hashing `ffd0e646...` like its source. The parity red split was 1 failed / 33 passed, the new AC15 test only; parity then read 34 / 34. role-profiles read 41 / 41, green on first run as designed (M16 is its plan-time discriminator). The suite read 1418 / 0 across 49 files. The owner noted that the plan's "four sha256 values" for the T-002 reviewer is a recorded imprecision: T-001 and T-002 name six, and the reviewer confirmed all six.
 - T-004: README and closeout diffs extracted from the plan fences, applied with `git apply`, and matched their plan sha256 values and the clone; the suite stayed 1418 / 0. 1.38.0 written to `package.json`, `package-lock.json` and `VERSION`. Backlog and CHANGELOG blocks taken verbatim from the plan with date 2026-10-02 (not drafted in the clone, so no clone comparison). Checks: `VERSION_GATE_OK 1.38.0`, `RECORD_PARITY_OK`, the protected-surface diff against `origin/main` empty (0 bytes). Heading-flip discriminator red with `RECORD_PARITY_FAILED (3 violations)`, each "1.38.0 claims FEAT-031 but its heading reads [ ]"; restored and green again. Suite 1418 / 0; union ceiling `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`.
+
+## Closeout: 1.38.0, the ticket agent (FEAT-031) [2026-10-02]
+
+**What shipped.** Minor **`1.38.0`** shipped `[FEAT-031]` (PR #64, squash `968698e`).
+- Plan: `docs/superpowers/plans/2026-10-02-feat031-ticket-agent.md`.
+- Spec: `docs/superpowers/specs/2026-10-02-feat031-ticket-agent-design.md`.
+
+**One sha.** `npm view` reads version `1.38.0` and gitHead `968698ebaefdd305ce71e6883751f97498668bd8`. The `v1.38.0` tag (release `v1.38.0`, not a draft, not a prerelease) and the squash commit on `origin/main` are the same commit.
+
+**Sync, measured first.** Local `main` was `d5377e7`, the FEAT-031 spec commit, which was committed on `main` and never pushed by itself. It measured **1 ahead / 1 behind** `origin/main`, the stranding case and not the clean `0 / 1`. Containment was checked before acting:
+- the spec file is byte-identical in `origin/main` (0-byte diff);
+- `.gitignore` and `project.md` are strict upstream supersets (0 removed lines, 16 added).
+
+`git rebase origin/main` stopped on that commit with a `project.md` conflict. On the owner's confirmation, `git rebase --skip` dropped it, and `main` re-measured `0 ahead / 0 behind` at `968698e`. **The pattern to recognize next time:** a spec committed on `main` before the branch switch reaches `origin` only inside the squash, so `1 / 1` with that one contained commit is expected. The ritual is containment evidence, then the rebase and skip. The merged tree equals the branch tree at `35b7ebd`: `git diff 35b7ebd 968698e` is empty.
+
+**Instrument output on the merged tree:**
+- **`VERSION_GATE_OK 1.38.0`.**
+- **`RECORD_PARITY_OK`.** On the branch, the discriminator went red with `RECORD_PARITY_FAILED (3 violations)`, each reading `1.38.0 claims FEAT-031 but its heading reads [ ]`, then green on restore.
+- **Ceiling:** `UNION ceiling {"BUG":54,"FEAT":40,"ARCH":10}`, next **`BUG-055`**, both legs reporting (`headings=66`, `dupes=none`). Nothing was minted in FEAT-031.
+- **PR run `37093163509`:**
+  - ci-node20 (job `111117612337`) `1322 passed | 96 skipped (1418)`, printing `SKIP_BASELINE_OK ci-node20: 96 skipped identities match tools/skip-baseline.json`;
+  - ci-node24 (job `111117612076`) `1405 passed | 13 skipped (1418)`, printing `SKIP_BASELINE_OK ci-node24: 13 skipped identities match tools/skip-baseline.json`;
+  - `git diff origin/main -- tools/skip-baseline.json` was empty before the push.
+- **Push run on `main`, `37093343761`:** the same counts and both `SKIP_BASELINE_OK` lines. `tools/skip-baseline.json` is unchanged from `cff6bd7` to `968698e`.
+- **Publish run `37093536955`** succeeded, printing `+ @yeison.restrepo.r/code-conductor@1.38.0`.
+- **Local suite on `main`:** 1418 / 0, 49 test files.
+- **Reconciliation, total 1418 on all three legs:**
+
+  | Leg | Reading | Predicted |
+  |---|---|---|
+  | local | 1418 / 0, 49 files | 1418 / 0, 49 files |
+  | ci-node20 | 1322 / 96 | 1322 / 96 |
+  | ci-node24 | 1405 / 13 | 1405 / 13 |
+
+  Arithmetic: 1332 + 86 = 1418; 1236 + 86 = 1322, and 1322 + 96 = 1418; 1319 + 86 = 1405, and 1405 + 13 = 1418.
+
+**Every count boundary matched its prediction**, across five commits and two CI legs. The two planning-time slips (the fake's 64 KiB pipe truncation; M16's second red) were recorded in the plan before approval. Nothing was absorbed after a measurement.
+
+| Boundary | Measured |
+|---|---|
+| T-000 (`4ac0b19`) | 1332 / 0, 48 files |
+| T-001 (`98a3a96`) | red: file failed to load, no tests; 57 / 57; 1389 / 0, 49 files |
+| T-002 (`9969d1e`) | red 17 / 75; 92 / 92; 1407 / 0; reviewer PASS, mutants 6, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2 |
+| T-003 (`29a731d`) | red 1 / 33; 34 / 34; 41 / 41 green by design; 1418 / 0 |
+| T-004 (`35b7ebd`) | 1418 / 0; discriminator red 3, green on restore |
+| CI | 1322 / 96 and 1405 / 13 (1418 each) |
+
+**Plan ticks.** T-004-G, T-004-H and the top-level T-004 are ticked in this record commit, not in a follow-up on the branch. A new branch commit would have moved the green head that CI certified; the 1.37.0 closeout followed the same pattern. The plan now has no unticked task line.
+
+**`[FEAT-031]` harvest, in one place.** Each item is evidenced in the Plan section's handoff observations above and in this record.
+
+- **The four-versus-six imprecision.** The plan's Routing told the T-002 reviewer to confirm "the four sha256 values T-001 and T-002 name". Those tasks name six: four files from T-001 and two from T-002. The dispatch asked for all six, the reviewer confirmed all six, and the owner recorded the plan's "four" as an imprecision rather than a gap. **Lesson:** a count written in prose next to a list must be re-counted against the list at self-review.
+- **A spawned fixture must write synchronously before `process.exit`.** This is a general fact about Node, not specific to `gh`. `process.stdout.write` to a pipe is asynchronous, and `process.exit()` right after it discards whatever has not drained. The pipe buffer is 64 KiB, so a payload over that arrives truncated, and the consumer sees malformed JSON instead of the fixture's intended output. The fake gh's AC3 over-cap row read 91 / 92 until the fake used `writeFileSync(1, ...)` / `writeFileSync(2, ...)`. **It applies to every spawned fixture in this suite** that prints and then exits: write synchronously, or set `process.exitCode` and let the process drain.
+- **P22: the title is reduced inside the snapshot fence too,** not only on the start line. Untrusted title text gets the same treatment everywhere it is rendered (control and format characters removed, line breaks folded, 120 code points), so no rendering of the issue carries a raw title.
+- **The method held a third time.** Derive on paper, measure drafts in an independent clone, then implement against hashes, extracting each file or diff from the plan's fence rather than retyping it. Every hash matched both the plan and the clone on the first apply.
+- **The T-002 reviewer pattern held again.** A fresh, read-only agent ran in its own `--no-hardlinks` clone at `9969d1e`, applied each mutant as a one-place string replacement, and checked both source hashes after every restore. Its stated realizations (M6 on the intake field, M8 as an `else rmSync`, M15 taking the version from the marker) were judged faithful.
+
+**Step 11 does not apply.** This repository never starts an orchestrated run, so no `.conductor/ticket/FEAT-031.md` binds the item and no writeback is owed.
+
+**`[ARCH-009]`:** `FEAT-031` is done. Its flip still waits on `FEAT-009` and `FEAT-032` through `FEAT-036`.
+
+**Next:** the next item is the owner's call. `BUG-055`'s mint stays the owner's, with the ceiling run on both legs first.
