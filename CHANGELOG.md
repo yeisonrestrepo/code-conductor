@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.37.0] - 2026-10-02
+
+### Added
+- **[FEAT-012]** Five band role agents, `spec`, `plan`, `code`, `audit` and `qa`, ship in `.claude/agents/`. Each frontmatter `tools:` list is the role's tool mask, and each prompt states a fixed success condition, stop-on-denial, one hand-back claiming only the role's own gate, no dispatch, and the verbatim scope copy, in 999 tokens or fewer.
+- **[FEAT-012]** Guard 7 in the PreToolUse front door. A band role's `Bash` is denied for `spec`, `plan` and `audit`; `code` and `qa` may run exactly the test command recorded for a run live in their session, and a chaining character, a missing or stale run, or any other command is denied. An error inside the guard denies.
+
+### Changed
+- **[FEAT-012]** `orchestrate.mjs start` resolves the run's test command before it writes the run file and records it as `test_command`: the package manager's `test` invocation for a root `package.json` with a `test` script (`bun run test` for bun), and detect-stack's command otherwise. It halts with `ORCH_TEST_COMMAND_UNRESOLVED` when none resolves and with `ORCH_TEST_COMMAND_UNSAFE` when the command chains. `/cc-orchestrate` documents both halts and briefs `code` and `qa` to run exactly that command.
+
 ## [1.36.0] - 2026-10-02
 
 ### Added

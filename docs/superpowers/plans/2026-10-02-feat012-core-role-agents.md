@@ -976,7 +976,7 @@ All seven matched. The script is `mutants.mjs` (Routing, T-002's reviewer).
   **Files:**
   - Modify: `README.md`, `VERSION`, `package.json`, `package-lock.json`, `CHANGELOG.md`, `AGENT-READABLE BACKLOG.md`
 
-  - [ ] [T-005-A] Modify `README.md`, placing each change by content, not line number. The clone measured the suite unchanged at 1332 / 0 with all four.
+  - [X] [T-005-A] Modify `README.md`, placing each change by content, not line number. The clone measured the suite unchanged at 1332 / 0 with all four.
     - **Known limits.** Replace the line `  No role agent definitions ship until \`[FEAT-012]\`.` (inside the 1.36.0 orchestrator item) with the block below, so the new item follows it, before `- **The \`P7\` false positive above**, still live.`:
       ```markdown
         The five role agent definitions it dispatches ship from `1.37.0`; their limits are the next item.
@@ -995,8 +995,8 @@ All seven matched. The script is `mutants.mjs` (Routing, T-002's reviewer).
       **Role shell guard (Guard 7)** - a `Bash` call from a subagent whose `agent_type` names a band role is decided before Guard 3, so Guard 3's `CC_GUARD3_WARN` ask can never outrank it. `spec`, `plan` and `audit` have no shell (`ROLE_SHELL_DENIED`). `code` and `qa` may run exactly one command, byte for byte: the `test_command` that `orchestrate.mjs start` recorded in the run file of a run live in their session. A command carrying `;`, `&`, `|`, a backtick, `$(`, `<`, `>` or a line break is denied first (`ROLE_SHELL_CHAINING`). No run file, a run of another session, or no recorded command is denied (`ROLE_SHELL_UNRESOLVED`), and any other command is denied naming the allowed one (`ROLE_SHELL_NOT_ALLOWED`). An error inside the guard denies too, and `CC_HOOK_ALLOW` does not reach it. The main session and every other agent are untouched. The two allowances differ in kind: for `qa`, which Guard 5 keeps from writing, the guard is enforcement; for `code`, which writes the tests the command runs, it is process discipline, not a security boundary. `start` resolves the command before it writes anything: the package manager's `test` invocation when a root `package.json` has a `test` script (`npm test`, `pnpm test`, `yarn test`, or `bun run test` by lockfile, and `npm test` with none), detect-stack's test command when there is no `package.json`, and otherwise a halt (`ORCH_TEST_COMMAND_UNRESOLVED`). A resolved command carrying a chaining character halts too (`ORCH_TEST_COMMAND_UNSAFE`), so nothing is recorded that Guard 7 would deny.
       ```
     - **The tree.** After `│       ├── settings.json         Hooks wiring (pre-tool-use, post-compact)`, insert `│       ├── agents/               Band roles: spec, plan, code, audit, qa (FEAT-012)`.
-  - [ ] [T-005-B] Run `npm version 1.37.0 --no-git-tag-version`, then write `1.37.0` into `VERSION`.
-  - [ ] [T-005-C] Modify the records.
+  - [X] [T-005-B] Run `npm version 1.37.0 --no-git-tag-version`, then write `1.37.0` into `VERSION`.
+  - [X] [T-005-C] Modify the records.
     - **`AGENT-READABLE BACKLOG.md`:**
       - At the line `` grep -n '^### \[ \] `\[FEAT-012\]`' `` reports (:167), change `### [ ]` to `### [X]`.
       - Insert as its first bullet:
@@ -1016,14 +1016,14 @@ All seven matched. The script is `mutants.mjs` (Routing, T-002's reviewer).
       ```
 
     If the release commit lands on another date, use that date in both places.
-  - [ ] [T-005-D] Run the release checks:
+  - [X] [T-005-D] Run the release checks:
     - `node tools/version-gate.mjs`, expecting `VERSION_GATE_OK 1.37.0`;
     - `node tools/record-parity.mjs`, expecting `RECORD_PARITY_OK`;
     - `git diff origin/main -- scripts/snap-contract.mjs` empty (AC13).
 
     **Discriminator:** flip the FEAT-012 heading back to `### [ ]` and expect a red run naming `1.37.0` and `FEAT-012`. Restore `[X]` and re-run green.
-  - [ ] [T-005-E] Run `npm test`, expecting **1332 / 0**. Then `node tools/id-ceiling.mjs`, expecting union `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`.
-  - [ ] [T-005-F] Append `- T-005: <one line>` under the plan section. Then `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md .claude/memory/project.md docs/superpowers/plans/2026-10-02-feat012-core-role-agents.md`. Commit `chore: release 1.37.0 [FEAT-012]`. Expected: **1332 / 0**.
+  - [X] [T-005-E] Run `npm test`, expecting **1332 / 0**. Then `node tools/id-ceiling.mjs`, expecting union `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`.
+  - [X] [T-005-F] Append `- T-005: <one line>` under the plan section. Then `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md .claude/memory/project.md docs/superpowers/plans/2026-10-02-feat012-core-role-agents.md`. Commit `chore: release 1.37.0 [FEAT-012]`. Expected: **1332 / 0**.
   - [ ] [T-005-G] **Confirm with the owner, then** push with `git push -u origin feat/feat-012-core-role-agents` and open the PR against `main`. Expected CI:
     - ci-node20 **1236 / 96**;
     - ci-node24 **1319 / 13**;
