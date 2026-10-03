@@ -108,6 +108,7 @@ tests/.tmp/
 !/docs/superpowers/plans/2026-10-02-feat012-core-role-agents.md
 !/docs/superpowers/plans/2026-10-02-feat031-ticket-agent.md
 !/docs/superpowers/plans/2026-10-03-bug032-global-memory-chain.md
+!/docs/superpowers/plans/2026-10-03-bug045-guard3-quoted-paths.md
 !/docs/superpowers/plans/2026-10-03-bug050-sub-shaped-ids.md
 !/docs/superpowers/plans/2026-10-03-bug051-detector-path.md
 !/docs/superpowers/plans/2026-10-03-bug052-self-install-guard.md
@@ -143,6 +144,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-10-02-feat012-core-role-agents-design.md
 !/docs/superpowers/specs/2026-10-02-feat031-ticket-agent-design.md
 !/docs/superpowers/specs/2026-10-03-bug032-global-memory-chain-design.md
+!/docs/superpowers/specs/2026-10-03-bug045-guard3-quoted-paths-design.md
 !/docs/superpowers/specs/2026-10-03-bug050-sub-shaped-ids-design.md
 !/docs/superpowers/specs/2026-10-03-bug051-detector-path-design.md
 !/docs/superpowers/specs/2026-10-03-bug052-self-install-guard-design.md
