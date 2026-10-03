@@ -777,7 +777,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   - In an installed project, `/cc-resume`'s auto-fill runs the detector from the deployed location instead of silently skipping.
   - A test pins every shipped command's detector path to the path `deployProject` actually deploys.
 
-### [ ] `[BUG-052]` The Installer Cannot Tell Its Own Source Tree From the Legacy Deployment It Sweeps
+### [X] `[BUG-052]` The Installer Cannot Tell Its Own Source Tree From the Legacy Deployment It Sweeps
+* **DONE, shipped as `1.38.1` on 2026-10-03.** `deployProject()` now compares package names and throws `SELF_INSTALL` (exit 1) before any file system mutation. Spec: `docs/superpowers/specs/2026-10-03-bug052-self-install-guard-design.md`. Plan: `docs/superpowers/plans/2026-10-03-bug052-self-install-guard.md`.
 * **Filed 2026-10-01 from the installer self-install incident.** Minted after `node tools/id-ceiling.mjs` on both legs read working tree `{"BUG":51,"FEAT":40,"ARCH":9}` and `origin/main` `{"BUG":50,"FEAT":40,"ARCH":9}`, union next `BUG-052`. The working-tree leg is ahead of `origin/main` only by `[BUG-051]`, which is committed and not yet pushed.
 * **The defect is the missing distinction.** The installer has no self-install guard, and the `sweepStaleRootScripts` heuristic (`lib/installer/deploy.mjs:142-149`, called from `deployProject` at `:211`) cannot tell the 1.23.2 legacy deployment from the installer's own source tree.
   - The heuristic removes `<cwd>/scripts` with `rmSync` whenever its file list equals the bundled `scripts/` list exactly (`:147-148`).
