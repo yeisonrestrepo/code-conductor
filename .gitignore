@@ -149,3 +149,9 @@ tests/.tmp/
 # appending absent lines, and turn-count.txt is one of its three; removing it means one
 # re-append per installer run against this repository
 .claude/memory/turn-count.txt
+
+# Code Conductor (added by the installer; safe to keep)
+*.installer-backup.*
+*.installer-tmp.*
+.claude/memory/band-envelope.json
+.claude/memory/orchestrator-run.json
