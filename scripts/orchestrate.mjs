@@ -34,6 +34,11 @@ export const MAY_HAND_BACK = {
   audit: ['build_executed'], qa: ['verify_pass'],
 };
 const PHASE = { spec: 'spec', plan: 'plan', code: 'impl', audit: 'rev', qa: 'rev' };
+// Guard 7's chaining set (FEAT-012 D7). The hook carries a copy pinned to this one (D10).
+export const SHELL_METACHARACTERS = [';', '&', '|', '`', '$(', '<', '>', '\n', '\r'];
+// D6: each package manager's invocation of the owner's `test` script. `bun test` would run
+// Bun's own test runner and ignore the script, so bun goes through `run`.
+export const PM_TEST_COMMAND = { npm: 'npm test', pnpm: 'pnpm test', yarn: 'yarn test', bun: 'bun run test' };
 
 // A halt stops the run and is recorded in it (D12). A refusal is a misuse of the CLI:
 // nothing is written and nothing is recorded.
@@ -172,6 +177,48 @@ function runScript(name, args, input = '') {
   return { status: r.status, out: r.stdout, err: (r.stderr || '').trim() };
 }
 
+// detect-stack installs process-wide error handlers when imported, so it is spawned. It prints
+// {} on any failure, which answers nothing either way.
+function detectStack(root) {
+  let out = null;
+  try { out = JSON.parse(runScript('detect-stack.mjs', [root]).out); } catch { /* judged below */ }
+  if (isPlainObject(out) && Object.keys(out).length > 0) return out;
+  throw new Halt('ORCH_TEST_COMMAND_UNRESOLVED', `detect-stack returned no result for ${root}`);
+}
+
+// Only a non-blank string is the owner's test script.
+function hasTestScript(pkgPath) {
+  let pkg;
+  try { pkg = JSON.parse(readFileSync(pkgPath, 'utf8').replace(/^\uFEFF/, '')); } catch {
+    throw new Halt('ORCH_TEST_COMMAND_UNRESOLVED', `${pkgPath} does not parse, so its test script cannot be read`);
+  }
+  const script = pkg?.scripts?.test;
+  return typeof script === 'string' && script.trim() !== '';
+}
+
+// D6: the one command code and qa may run, resolved before anything is recorded. The script
+// is checked before detect-stack runs, because a non-string script makes detect-stack fail
+// whole and the halt would then name the wrong cause.
+export function resolveTestCommand(root) {
+  const pkgPath = join(root, 'package.json');
+  if (existsSync(pkgPath)) {
+    if (!hasTestScript(pkgPath)) {
+      throw new Halt('ORCH_TEST_COMMAND_UNRESOLVED', 'package.json has no scripts.test; add a test script, the run does not guess a runner');
+    }
+    return PM_TEST_COMMAND[detectStack(root).packageManager] ?? PM_TEST_COMMAND.npm;
+  }
+  const { test } = detectStack(root);
+  if (typeof test === 'string' && test.trim() !== '') return test;
+  throw new Halt('ORCH_TEST_COMMAND_UNRESOLVED', `detect-stack names no test command for ${root}`);
+}
+
+// D7: no command is recorded that Guard 7 would not pass.
+export function checkTestCommand(command) {
+  const found = SHELL_METACHARACTERS.find((m) => command.includes(m));
+  if (found === undefined) return command;
+  throw new Halt('ORCH_TEST_COMMAND_UNSAFE', `${JSON.stringify(command)} contains ${JSON.stringify(found)}, which Guard 7 denies; nothing was recorded`);
+}
+
 // The validator reads a file, so the candidate goes through a private temp dir. Returns
 // the validator's error text, or '' when it passes.
 function validate(text, role) {
@@ -280,13 +327,16 @@ function start(root, sessionId, item, flag) {
   if (!sessionId) throw new Halt('ORCH_NO_SESSION_ID', 'CLAUDE_CODE_SESSION_ID is absent or empty, so Guard 6 could never bind this run');
   const old = readRun(root);
   if (old && old.session_id === sessionId) throw new Halt('ORCH_RUN_ACTIVE', `run ${old.item} is live in this session; end it first`);
+  // Resolved before a stale run is cleared, so a halt here leaves everything as it was.
+  const testCommand = checkTestCommand(resolveTestCommand(root));
   if (old) clearRunFiles(root);
   saveRun(root, {
     v: 1, session_id: sessionId, item, mode: flag ? 'auto' : 'step', started: new Date().toISOString(),
     band: 'boundary', role: null, gate: 'boundary_routed', approvals: { spec: null, plan: null },
-    plan: null, tasks: { ids: [], done: 0 }, handbacks: [], halt: null,
+    plan: null, tasks: { ids: [], done: 0 }, handbacks: [], halt: null, test_command: testCommand,
   });
-  return old ? `replaced the stale run ${old.item} started ${old.started}` : `run ${item} started`;
+  const begun = old ? `replaced the stale run ${old.item} started ${old.started}` : `run ${item} started`;
+  return `${begun}; test command: ${testCommand}`;
 }
 
 function clearRunFiles(root) {

@@ -5,20 +5,23 @@ import { tmpdir } from 'node:os';
 import { join, relative, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  ENVELOPE_FILE, HANDBACK_DIR, MAY_HAND_BACK, ROLE_ARTIFACTS, RUN_FILE, WRITE_SURFACE,
-  extractTasks, findAgent, forwardGate, nextStep, taskScope,
+  ENVELOPE_FILE, HANDBACK_DIR, MAY_HAND_BACK, ROLE_ARTIFACTS, RUN_FILE, SHELL_METACHARACTERS, WRITE_SURFACE,
+  checkTestCommand, extractTasks, findAgent, forwardGate, isValidRun, nextStep, taskScope,
 } from '../../scripts/orchestrate.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const SCRIPT = join(REPO_ROOT, 'scripts/orchestrate.mjs');
 const ROLES = ['spec', 'plan', 'code', 'audit', 'qa'];
 const PLAN = 'docs/superpowers/plans/demo.md';
+// Every root gets a test script with no lockfile, so start records `npm test` (FEAT-012 D6).
+const PKG = '{"scripts":{"test":"vitest run"}}';
 
 let root, home;
 beforeEach(() => {
   root = realpathSync(mkdtempSync(join(tmpdir(), 'cc-orch-root-')));
   home = realpathSync(mkdtempSync(join(tmpdir(), 'cc-orch-home-')));
   mkdirSync(join(root, '.claude', 'memory'), { recursive: true });
+  writeFileSync(join(root, 'package.json'), PKG);
 });
 afterEach(() => {
   rmSync(root, { recursive: true, force: true });
@@ -198,7 +201,7 @@ describe('scope [FEAT-011 AC8]', () => {
 describe('run file [FEAT-011 AC9]', () => {
   it('start records boundary_routed in step mode by default, and auto with --auto', () => {
     expect(orch(['start', 'FEAT-011']).status).toBe(0);
-    expect(runFile()).toMatchObject({ v: 1, session_id: 'sess-1', item: 'FEAT-011', mode: 'step', band: 'boundary', gate: 'boundary_routed', halt: null });
+    expect(runFile()).toMatchObject({ v: 1, session_id: 'sess-1', item: 'FEAT-011', mode: 'step', band: 'boundary', gate: 'boundary_routed', halt: null, test_command: 'npm test' });
     orch(['end']);
     orch(['start', 'FEAT-011', '--auto']);
     expect(runFile().mode).toBe('auto');
@@ -228,7 +231,7 @@ describe('run file [FEAT-011 AC9]', () => {
     writeFileSync(join(root, HANDBACK_DIR, 'spec.txt'), 'stale\n');
     const r = orch(['start', 'FEAT-012']);
     expect(r.status).toBe(0);
-    expect(r.out).toBe(`replaced the stale run FEAT-011 started ${started}`);
+    expect(r.out).toBe(`replaced the stale run FEAT-011 started ${started}; test command: npm test`);
     expect(runFile()).toMatchObject({ item: 'FEAT-012', session_id: 'sess-1' });
     expect(existsSync(join(root, ENVELOPE_FILE))).toBe(false);
     expect(existsSync(join(root, HANDBACK_DIR))).toBe(false);
@@ -404,5 +407,111 @@ describe('write surface [FEAT-011 AC4]', () => {
       '.claude/memory/session-snapshot.json',
       '.conductor/**',
     ]);
+  });
+});
+
+describe('test command [FEAT-012 AC8, AC9]', () => {
+  const start = () => orch(['start', 'FEAT-012']);
+  const files = (map) => {
+    for (const [rel, text] of Object.entries(map)) {
+      mkdirSync(dirname(join(root, rel)), { recursive: true });
+      writeFileSync(join(root, rel), text);
+    }
+  };
+  const unresolved = (reason) => {
+    const r = start();
+    expect(r.status).toBe(1);
+    expect(r.err).toBe(`ORCH_TEST_COMMAND_UNRESOLVED: ${reason}`);
+    expect(existsSync(join(root, RUN_FILE))).toBe(false);
+  };
+  const NO_SCRIPT = 'package.json has no scripts.test; add a test script, the run does not guess a runner';
+
+  it.each([
+    ['package-lock.json', 'npm test'],
+    ['pnpm-lock.yaml', 'pnpm test'],
+    ['yarn.lock', 'yarn test'],
+    ['bun.lockb', 'bun run test'],
+  ])('[AC8] records the package manager invocation for %s', (lock, expected) => {
+    files({ [lock]: '' });
+    const r = start();
+    expect(r.status).toBe(0);
+    expect(r.out).toBe(`run FEAT-012 started; test command: ${expected}`);
+    expect(runFile().test_command).toBe(expected);
+  });
+
+  it('[AC8] records npm test with no lockfile, the stated default', () => {
+    expect(start().out).toBe('run FEAT-012 started; test command: npm test');
+    expect(runFile().test_command).toBe('npm test');
+  });
+
+  // Discriminator: detect-stack offers jest here, and the run must not take it.
+  it('[AC8] halts on a package.json without scripts.test, though detect-stack offers a runner', () => {
+    files({ 'package.json': '{"dependencies":{"react":"18.0.0"}}' });
+    const detected = spawnSync(process.execPath, [join(REPO_ROOT, 'scripts/detect-stack.mjs'), root], { encoding: 'utf8' });
+    expect(JSON.parse(detected.stdout).test).toBe('jest');
+    unresolved(NO_SCRIPT);
+  });
+
+  it.each([['a blank', '{"scripts":{"test":"  "}}'], ['a non-string', '{"scripts":{"test":true}}']])(
+    '[AC8] reads %s scripts.test as no test script', (_, pkg) => {
+      files({ 'package.json': pkg });
+      unresolved(NO_SCRIPT);
+    });
+
+  it('[AC8] halts on a package.json that does not parse', () => {
+    files({ 'package.json': '{not json' });
+    unresolved(`${join(root, 'package.json')} does not parse, so its test script cannot be read`);
+  });
+
+  it('[AC8] records detect-stack\'s value for a stack with no package.json', () => {
+    rmSync(join(root, 'package.json'));
+    files({ 'go.mod': 'module example.com/demo\n\ngo 1.22\n' });
+    expect(start().status).toBe(0);
+    expect(runFile().test_command).toBe('go test ./...');
+  });
+
+  it('[AC8] halts when nothing names a test command', () => {
+    rmSync(join(root, 'package.json'));
+    unresolved(`detect-stack names no test command for ${root}`);
+  });
+
+  // A root with no package.json takes detect-stack's value as-is, and a workspace's script
+  // reaches it verbatim: the one path by which a chaining command can resolve.
+  it('[AC9] halts ORCH_TEST_COMMAND_UNSAFE on a resolved command that chains, recording nothing', () => {
+    rmSync(join(root, 'package.json'));
+    files({
+      'pnpm-workspace.yaml': "packages:\n  - 'apps/*'\n",
+      'apps/web/package.json': '{"dependencies":{"@angular/core":"17.0.0"},"scripts":{"test":"ng test && echo done"}}',
+    });
+    const r = start();
+    expect(r.status).toBe(1);
+    expect(r.err).toBe('ORCH_TEST_COMMAND_UNSAFE: "ng test && echo done" contains "&", which Guard 7 denies; nothing was recorded');
+    expect(existsSync(join(root, RUN_FILE))).toBe(false);
+  });
+
+  it.each(SHELL_METACHARACTERS)('[D7] checkTestCommand halts on %j', (m) => {
+    expect(() => checkTestCommand(`go test ${m} x`)).toThrow(/^ORCH_TEST_COMMAND_UNSAFE: /);
+  });
+
+  it('[D7] declares exactly the spec\'s metacharacter set', () => {
+    expect(SHELL_METACHARACTERS).toEqual([';', '&', '|', '`', '$(', '<', '>', '\n', '\r']);
+  });
+
+  it('a start halt leaves a stale run of another session as it was', () => {
+    orch(['start', 'FEAT-011'], { sid: 'old-session' });
+    const before = readFileSync(join(root, RUN_FILE), 'utf8');
+    writeFileSync(join(root, ENVELOPE_FILE), '{"stale":true}\n');
+    files({ 'package.json': '{}' });
+    const r = start();
+    expect(r.status).toBe(1);
+    expect(r.err).toBe(`ORCH_TEST_COMMAND_UNRESOLVED: ${NO_SCRIPT}`);
+    expect(readFileSync(join(root, RUN_FILE), 'utf8')).toBe(before);
+    expect(existsSync(join(root, ENVELOPE_FILE))).toBe(true);
+  });
+
+  // D9: the field is additive, so v stays 1 and a 1.36.0 run file still routes. Guard 7 is
+  // what refuses a shell to a run that records no command (R3).
+  it('[D9] still validates a run file that records no test_command', () => {
+    expect(isValidRun({ v: 1, session_id: 's', item: 'FEAT-011', gate: 'boundary_routed', approvals: {}, handbacks: [], tasks: { ids: [], done: 0 } })).toBe(true);
   });
 });

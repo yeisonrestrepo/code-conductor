@@ -2724,3 +2724,5 @@ Plan `docs/superpowers/plans/2026-10-02-feat012-core-role-agents.md`.
 - **Predictions,** measured on drafts in a scratch clone: local 1237 → 1332 / 0 (+95), 48 files; ci-node20 1236 / 96; ci-node24 1319 / 13.
 
 Handoff observations, one line per task:
+- T-000: committed `2670fd1` at 1237 / 0; plain `git add` of the plan exited 0 once its leaf was in. The Write tool had decoded the plan's byte-order-mark escape into a literal invisible byte, which was restored before the commit; T-001-C greps for the same hazard, and it fired there too.
+- T-001: 74 / 74 file, 1261 / 0 suite, red as derived (file failed to load); the Edit tool again decoded the router's byte-order-mark escape (grep count 0), restored by a one-liner to the planned sha `e82d59e409be0807`, so the hazard is per-edit, not per-file.

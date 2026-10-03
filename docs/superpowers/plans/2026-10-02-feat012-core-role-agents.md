@@ -195,7 +195,7 @@ All seven matched. The script is `mutants.mjs` (Routing, T-002's reviewer).
 
 ---
 
-- [ ] [T-000] **Plan commit.** The branch gate is silent: the current branch `feat/feat-012-core-role-agents` carries the item's id. `origin/main` is `4428cb4`, an ancestor of `HEAD`, so there is nothing to merge.
+- [X] [T-000] **Plan commit.** The branch gate is silent: the current branch `feat/feat-012-core-role-agents` carries the item's id. `origin/main` is `4428cb4`, an ancestor of `HEAD`, so there is nothing to merge.
   - [X] [T-000-A] Modify `.gitignore`: insert `!/docs/superpowers/plans/2026-10-02-feat012-core-role-agents.md` immediately after `!/docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md` (:99), in sorted position.
   - [X] [T-000-B] Modify `.claude/memory/project.md`: append at the end of the file
     ```markdown
@@ -217,11 +217,11 @@ All seven matched. The script is `mutants.mjs` (Routing, T-002's reviewer).
     Handoff observations, one line per task:
     ```
   - [X] [T-000-C] `git add -u .gitignore .claude/memory/project.md`, then `git add docs/superpowers/plans/2026-10-02-feat012-core-role-agents.md` (plain, now that its leaf exists).
-  - [ ] [T-000-D] Commit `docs: add the FEAT-012 implementation plan [FEAT-012]`. Expected: the hook suite passes at **1237 / 0**.
-  - [ ] [T-000-E] Run `node tools/id-ceiling.mjs`, expecting union `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`. Then `node tools/record-parity.mjs`, expecting `RECORD_PARITY_OK`.
-  - [ ] [T-000-F] Append `- T-000: <one line of handoff observation>` under the plan section. This line rides T-001's commit.
+  - [X] [T-000-D] Commit `docs: add the FEAT-012 implementation plan [FEAT-012]`. Expected: the hook suite passes at **1237 / 0**.
+  - [X] [T-000-E] Run `node tools/id-ceiling.mjs`, expecting union `{"BUG":54,"FEAT":40,"ARCH":10}`, next `BUG-055`. Then `node tools/record-parity.mjs`, expecting `RECORD_PARITY_OK`.
+  - [X] [T-000-F] Append `- T-000: <one line of handoff observation>` under the plan section. This line rides T-001's commit.
 
-- [ ] [T-001] **The test command at run start** (D6, D7, D9; AC8, AC9). Native. Depends on T-000.
+- [X] [T-001] **The test command at run start** (D6, D7, D9; AC8, AC9). Native. Depends on T-000.
 
   **Files:**
   - Modify: `scripts/orchestrate.mjs:36` (constants), `:170-173` (after `runScript`), `:283-289` (`start`)
@@ -229,7 +229,7 @@ All seven matched. The script is `mutants.mjs` (Routing, T-002's reviewer).
 
   **Interfaces produced:** `SHELL_METACHARACTERS: string[]`, `PM_TEST_COMMAND: Record<'npm'|'pnpm'|'yarn'|'bun', string>`, `resolveTestCommand(root: string): string` (throws `Halt`), `checkTestCommand(command: string): string` (throws `Halt`), and the run file's `test_command: string`. T-002 imports `RUN_FILE` and `SHELL_METACHARACTERS` and spawns `start`.
 
-  - [ ] [T-001-A] Modify `tests/scripts/orchestrate.test.js`.
+  - [X] [T-001-A] Modify `tests/scripts/orchestrate.test.js`.
     - Replace the import block and the setup (`:7-22`) with:
       ```js
       import {
@@ -363,8 +363,8 @@ All seven matched. The script is `mutants.mjs` (Routing, T-002's reviewer).
         });
       });
       ```
-  - [ ] [T-001-B] Run `npx vitest run tests/scripts/orchestrate.test.js`. Expected: the file fails to load on the missing exports, `Test Files 1 failed (1)`, `Tests no tests`.
-  - [ ] [T-001-C] Modify `scripts/orchestrate.mjs`.
+  - [X] [T-001-B] Run `npx vitest run tests/scripts/orchestrate.test.js`. Expected: the file fails to load on the missing exports, `Test Files 1 failed (1)`, `Tests no tests`.
+  - [X] [T-001-C] Modify `scripts/orchestrate.mjs`.
     - After `const PHASE = …` (:36), insert:
       ```js
       // Guard 7's chaining set (FEAT-012 D7). The hook carries a copy pinned to this one (D10).
@@ -432,9 +432,9 @@ All seven matched. The script is `mutants.mjs` (Routing, T-002's reviewer).
         return `${begun}; test command: ${testCommand}`;
       ```
     - Then confirm the escape survived: `grep -c 'uFEFF' scripts/orchestrate.mjs` prints `1`. If it prints `0`, the editor wrote a literal U+FEFF; rewrite that line with the escape before going on. Expected sha256 prefix after this step: `e82d59e409be0807`.
-  - [ ] [T-001-D] Run `npx vitest run tests/scripts/orchestrate.test.js`. Expected: **74 / 74**.
-  - [ ] [T-001-E] Run `npm test`. Expected: **1261 / 0**, 46 files. Confirm `git diff --stat scripts/snap-contract.mjs scripts/detect-stack.mjs` is empty.
-  - [ ] [T-001-F] Append `- T-001: <one line>` under the plan section. Then `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-02-feat012-core-role-agents.md`. Commit `feat: resolve and record the run's test command at start [FEAT-012]`. Expected: **1261 / 0**.
+  - [X] [T-001-D] Run `npx vitest run tests/scripts/orchestrate.test.js`. Expected: **74 / 74**.
+  - [X] [T-001-E] Run `npm test`. Expected: **1261 / 0**, 46 files. Confirm `git diff --stat scripts/snap-contract.mjs scripts/detect-stack.mjs` is empty.
+  - [X] [T-001-F] Append `- T-001: <one line>` under the plan section. Then `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-02-feat012-core-role-agents.md`. Commit `feat: resolve and record the run's test command at start [FEAT-012]`. Expected: **1261 / 0**.
 
 - [ ] [T-002] **Guard 7** (AC6, AC7, AC10, AC11). Native, then the reviewer. Depends on T-001 (`SHELL_METACHARACTERS`, and `start` for AC10).
 
