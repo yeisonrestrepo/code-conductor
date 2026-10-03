@@ -34,11 +34,12 @@ A halt is terminal in v1 (D12). Recovery is `node "$S/orchestrate.mjs" end`, the
 
 ## Steps
 
-1. **Start.** Run `node "$S/orchestrate.mjs" start $ARGUMENTS`.
+1. **Start.** Run `node "$S/orchestrate.mjs" start $ARGUMENTS`. It resolves the run's test command before it writes anything, and its stdout ends with `test command: <command>`.
    - If stdout names a replaced stale run, report its item and start time.
    - On `ORCH_RUN_ACTIVE`, report it, offer `end`, and stop.
+   - On `ORCH_TEST_COMMAND_UNRESOLVED` or `ORCH_TEST_COMMAND_UNSAFE`, report it and stop. No run file was written, so there is nothing to `end`. The owner adds a `test` script to `package.json`, or removes the chaining from the command it names, before a fresh `start`.
 
-   Print the run header: the item, the mode (`step` unless `--auto` was given), and the first role, `spec`.
+   Print the run header: the item, the mode (`step` unless `--auto` was given), the test command, and the first role, `spec`.
 2. **Each dispatch.** Take the roles in band order: `spec`, `plan`, then `code` once per plan task, then `audit`, then `qa`. For each one:
    1. **Check.** Run `node "$S/orchestrate.mjs" install <role> --check`. Print the role and the envelope it prints, and state that `--to <role>` passed.
    2. **Pause.** In step mode, ask the owner for a go. On a decline, stop: the run stays at its position, and nothing is installed. Under `--auto`, skip this pause.
@@ -86,6 +87,6 @@ The role's task, its `ph`, and the gate it hands back:
 |---|---|---|---|
 | `spec` | Write the spec for `<ITEM>` under `docs/superpowers/specs/`. | `spec` | `boundary_routed` |
 | `plan` | Write the plan under `docs/superpowers/plans/` in the writing-plans format: `### Task N` headings, each with a `**Files:**` block. Name the plan path in `ops.f`. | `plan` | `boundary_routed` |
-| `code` | Implement `<Task N>` of `<plan>`, touching only its files, and tick its boxes in the plan. | `impl` | `build_executed` |
+| `code` | Implement `<Task N>` of `<plan>`, touching only its files, and tick its boxes in the plan. After your last edit, run the run's test command exactly and report its exit status and summary line. | `impl` | `build_executed` |
 | `audit` | Review the changes against the spec and the plan, read-only. | `rev` | `build_executed` |
-| `qa` | Run the project's tests and report. If verification fails, leave out the `SNAP_HANDBACK` line and say why. | `rev` | `verify_pass` |
+| `qa` | Run the run's test command exactly and report. If the suite fails, leave out the `SNAP_HANDBACK` line and say why. | `rev` | `verify_pass` |

@@ -929,7 +929,7 @@ All seven matched. The script is `mutants.mjs` (Routing, T-002's reviewer).
   - [X] [T-003-H] Run `npm test`. Expected: **1331 / 0**, 48 files, with `gitignore-block-parity` green against the staged index.
   - [X] [T-003-I] Append `- T-003: <one line>` under the plan section. Then `git add -u .gitignore .claude/memory/project.md docs/superpowers/plans/2026-10-02-feat012-core-role-agents.md`. Commit `feat: ship the five band role agent profiles [FEAT-012]`. Expected: **1331 / 0**.
 
-- [ ] [T-004] **`/cc-orchestrate` documents the start halts and the test command.** Native. Depends on T-001.
+- [X] [T-004] **`/cc-orchestrate` documents the start halts and the test command.** Native. Depends on T-001.
 
   **Files:**
   - Modify: `.claude/commands/cc-orchestrate.md:37-41`, `:89`, `:91`
@@ -938,7 +938,7 @@ All seven matched. The script is `mutants.mjs` (Routing, T-002's reviewer).
 
   **The FEAT-011's D10 carry-forward (P18):** this task touches `cc-orchestrate.md`, and that file holds no FEAT-011's D10 fixture note to drop. The note lives in `README.md:125` and `:231`, which T-005-A rewrites.
 
-  - [ ] [T-004-A] Modify `tests/installer/commands-parity.test.js`: inside the `cc-orchestrate mirrors [FEAT-011 AC10]` describe, after the D11 test, insert:
+  - [X] [T-004-A] Modify `tests/installer/commands-parity.test.js`: inside the `cc-orchestrate mirrors [FEAT-011 AC10]` describe, after the D11 test, insert:
     ```js
 
       it('names both start halts that write no run file [FEAT-012]', () => {
@@ -946,8 +946,8 @@ All seven matched. The script is `mutants.mjs` (Routing, T-002's reviewer).
         expect(text).toContain('On `ORCH_TEST_COMMAND_UNRESOLVED` or `ORCH_TEST_COMMAND_UNSAFE`, report it and stop.');
       });
     ```
-  - [ ] [T-004-B] Run `npx vitest run tests/installer/commands-parity.test.js`. Expected: **1 failed / 32 passed (33)**, the new test.
-  - [ ] [T-004-C] Modify `.claude/commands/cc-orchestrate.md`.
+  - [X] [T-004-B] Run `npx vitest run tests/installer/commands-parity.test.js`. Expected: **1 failed / 32 passed (33)**, the new test.
+  - [X] [T-004-C] Modify `.claude/commands/cc-orchestrate.md`.
     - Replace step 1 (:37-41) with:
       ```markdown
       1. **Start.** Run `node "$S/orchestrate.mjs" start $ARGUMENTS`. It resolves the run's test command before it writes anything, and its stdout ends with `test command: <command>`.
@@ -967,9 +967,9 @@ All seven matched. The script is `mutants.mjs` (Routing, T-002's reviewer).
       ```
 
     Make the same edits to `project-template/.claude/commands/cc-orchestrate.md`, then `cmp` the pair. Expected sha256 prefix of both: `be871ea95421370e`.
-  - [ ] [T-004-D] Run `npx vitest run tests/installer/commands-parity.test.js`. Expected: **33 / 33**.
-  - [ ] [T-004-E] Run `npm test`. Expected: **1332 / 0**, 48 files.
-  - [ ] [T-004-F] Append `- T-004: <one line>` under the plan section. Then `git add -u .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md tests/installer/commands-parity.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-02-feat012-core-role-agents.md`. Commit `feat: /cc-orchestrate reports the test command and its start halts [FEAT-012]`. Expected: **1332 / 0**.
+  - [X] [T-004-D] Run `npx vitest run tests/installer/commands-parity.test.js`. Expected: **33 / 33**.
+  - [X] [T-004-E] Run `npm test`. Expected: **1332 / 0**, 48 files.
+  - [X] [T-004-F] Append `- T-004: <one line>` under the plan section. Then `git add -u .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md tests/installer/commands-parity.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-02-feat012-core-role-agents.md`. Commit `feat: /cc-orchestrate reports the test command and its start halts [FEAT-012]`. Expected: **1332 / 0**.
 
 - [ ] [T-005] **README and release 1.37.0** (AC12, AC13; `docs/RELEASE-CLOSEOUT.md` steps 1–5). Native. Depends on T-001 through T-004.
 
