@@ -4,6 +4,9 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpath
 import { tmpdir } from 'node:os';
 import { join, relative, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
+import { fakeGh, issue, pull } from '../helpers/fake-gh.js';
+import { parseSnapshotHeader } from '../../scripts/ticket.mjs';
 import {
   ENVELOPE_FILE, HANDBACK_DIR, MAY_HAND_BACK, ROLE_ARTIFACTS, RUN_FILE, SHELL_METACHARACTERS, WRITE_SURFACE,
   checkTestCommand, extractTasks, findAgent, forwardGate, isValidRun, nextStep, taskScope,
@@ -513,5 +516,142 @@ describe('test command [FEAT-012 AC8, AC9]', () => {
   // what refuses a shell to a run that records no command (R3).
   it('[D9] still validates a run file that records no test_command', () => {
     expect(isValidRun({ v: 1, session_id: 's', item: 'FEAT-011', gate: 'boundary_routed', approvals: {}, handbacks: [], tasks: { ids: [], done: 0 } })).toBe(true);
+  });
+});
+
+describe('ticket intake [FEAT-031 AC1-AC5, AC12]', () => {
+  const REPO = 'acme/widgets';
+  const SNAP = '.conductor/ticket/FEAT-031.md';
+  const TICKET_SCRIPT = join(REPO_ROOT, 'scripts/ticket.mjs');
+  const sha = (text) => createHash('sha256').update(text, 'utf8').digest('hex');
+  let gh;
+  afterEach(() => { gh?.cleanup(); gh = undefined; });
+
+  // orch() with the fake gh first on PATH; every other contract is orch()'s own.
+  function orchGh(args, sid = 'sess-1') {
+    const env = gh.env({ ...process.env, HOME: home, USERPROFILE: home, CLAUDE_CODE_SESSION_ID: sid });
+    const r = spawnSync(process.execPath, [SCRIPT, ...args], { cwd: root, env, encoding: 'utf8', timeout: 30000 });
+    if (r.error) throw new Error(`orchestrate spawn failed: ${r.error.message}`);
+    return { status: r.status, out: r.stdout.trim(), err: r.stderr.trim() };
+  }
+  const withIssues = (...list) => fakeGh({ issues: Object.fromEntries(list.map((i) => [`${REPO}#${i.number}`, i])) });
+  const snapText = () => readFileSync(join(root, SNAP), 'utf8');
+
+  it('an unbound start records no ticket key, writes no snapshot and runs no gh [AC1]', () => {
+    gh = withIssues(issue(REPO, 5));
+    expect(orchGh(['start', 'FEAT-031']).status).toBe(0);
+    expect('ticket' in runFile()).toBe(false);
+    expect(existsSync(join(root, '.conductor'))).toBe(false);
+    expect(gh.calls()).toEqual([]);
+  });
+
+  it('a bound start fetches once and writes the B2 snapshot and a matching ticket key [AC2]', () => {
+    const iss = issue(REPO, 5, { title: 'Add widgets' });
+    gh = withIssues(iss);
+    const r = orchGh(['start', 'FEAT-031', '--ticket', '5']);
+    const hash = sha(iss.body);
+    expect(r.out).toBe(`run FEAT-031 started; ticket ${REPO}#5 "Add widgets"; snapshot ${SNAP} sha256 ${hash}; test command: npm test`);
+    expect(gh.calls()).toEqual([['api', 'repos/{owner}/{repo}/issues/5']]);
+    const url = `https://github.com/${REPO}/issues/5`;
+    expect(runFile().ticket).toEqual({ repo: REPO, number: 5, url, sha256: hash, snapshot: SNAP });
+    expect(parseSnapshotHeader(snapText(), 'FEAT-031')).toMatchObject({ repo: REPO, number: 5, url, sha256: hash });
+  });
+
+  it.each([
+    ['TICKET_FLAG_INVALID', `https://github.com/${REPO}/pull/5`, []],
+    ['TICKET_UNREACHABLE', '404', []],
+    ['TICKET_NOT_ISSUE', '7', [pull(REPO, 7)]],
+    ['TICKET_CLOSED', '8', [issue(REPO, 8, { state: 'closed' })]],
+    ['TICKET_BODY_OVER_CAP', '9', [issue(REPO, 9, { body: String.fromCodePoint(0x20ac).repeat(21846) })]],
+    ['TICKET_BODY_EMPTY', '10', [issue(REPO, 10, { body: null })]],
+  ])('halts %s writing nothing, and leaves a stale run byte-unchanged [AC3]', (code, ref, list) => {
+    gh = withIssues(...list);
+    orchGh(['start', 'FEAT-011'], 'old-session');
+    writeFileSync(join(root, ENVELOPE_FILE), '{"stale":true}\n');
+    const before = readFileSync(join(root, RUN_FILE), 'utf8');
+    const r = orchGh(['start', 'FEAT-031', '--ticket', ref]);
+    expect(r.status).toBe(1);
+    expect(r.err.startsWith(`${code}: `)).toBe(true);
+    expect(readFileSync(join(root, RUN_FILE), 'utf8')).toBe(before);
+    expect(existsSync(join(root, ENVELOPE_FILE))).toBe(true);
+    expect(existsSync(join(root, SNAP))).toBe(false);
+  });
+
+  it('a --ticket with no value halts TICKET_FLAG_INVALID', () => {
+    gh = withIssues();
+    const r = orchGh(['start', 'FEAT-031', '--ticket']);
+    expect(r.status).toBe(1);
+    expect(r.err).toMatch(/^TICKET_FLAG_INVALID: /);
+  });
+
+  it('only the spec envelope carries p.ticket, identity only [AC4]', () => {
+    gh = withIssues(issue(REPO, 5));
+    agents();
+    plan(TWO_TASKS);
+    expect(orchGh(['start', 'FEAT-011', '--ticket', '5']).status).toBe(0);
+    const { repo, number, url, sha256 } = runFile().ticket;
+    const pOf = (role) => JSON.parse(orch(['install', role, '--check']).out).mem.p;
+    expect(pOf('spec')).toEqual({ ticket: { repo, number, url, sha256 } });
+    const seen = [];
+    const pass = (role, gate, ...after) => { seen.push(pOf(role)); orch(['install', role]); orch(['handback', role], { input: say(role, gate) }); for (const a of after) orch(a); };
+    pass('spec', 'boundary_routed', ['approve', 'spec']);
+    pass('plan', 'boundary_routed', ['approve', 'plan', PLAN]);
+    pass('code', 'build_executed');
+    pass('code', 'build_executed');
+    pass('audit', 'build_executed');
+    seen.push(pOf('qa'));
+    expect(seen.slice(1)).toEqual([undefined, undefined, undefined, undefined, undefined]);
+  });
+
+  it('prints the title on the start line reduced: one line, no ESC, 120 characters at most [AC5]', () => {
+    gh = withIssues(issue(REPO, 5, { title: `Fix\nthe \x1b[31mbug ${'x'.repeat(200)}` }));
+    const r = orchGh(['start', 'FEAT-031', '--ticket', '5']);
+    expect(r.out.split('\n')).toHaveLength(1);
+    expect(r.out).not.toContain('\x1b');
+    const title = r.out.match(/ticket acme\/widgets#5 "([^"]*)"/)[1];
+    expect(title.startsWith('Fix the [31mbug x')).toBe(true);
+    expect(title).toHaveLength(120);
+  });
+
+  it('keeps the binding across end and an unbound restart, and writeback targets it [AC12]', () => {
+    gh = withIssues(issue(REPO, 123));
+    orchGh(['start', 'FEAT-031', '--ticket', '123']);
+    const bound = snapText();
+    orch(['end']);
+    expect(orchGh(['start', 'FEAT-031']).status).toBe(0);
+    expect(snapText()).toBe(bound);
+    const wb = spawnSync(process.execPath, [TICKET_SCRIPT, 'writeback', 'FEAT-031', '--version', '1.38.0', '--pr', '64'], { cwd: root, env: gh.env(), encoding: 'utf8' });
+    expect(wb.stdout).toMatch(/^posted to acme\/widgets#123 /);
+  });
+
+  it.each([[['--bogus']], [['--auto', '--auto']], [['--ticket', '5', '--ticket', '6']]])('refuses start FEAT-031 %j with exit 2, running no gh', (extra) => {
+    gh = withIssues(issue(REPO, 5), issue(REPO, 6));
+    const r = orchGh(['start', 'FEAT-031', ...extra]);
+    expect(r.status).toBe(2);
+    expect(r.err).toBe('orchestrate: usage: orchestrate.mjs start <ITEM> [--auto] [--ticket <N|issue URL>]');
+    expect(existsSync(join(root, RUN_FILE))).toBe(false);
+    expect(gh.calls()).toEqual([]);
+  });
+
+  it('takes --ticket and --auto in either order', () => {
+    gh = withIssues(issue(REPO, 5));
+    expect(orchGh(['start', 'FEAT-031', '--ticket', '5', '--auto']).status).toBe(0);
+    expect(runFile()).toMatchObject({ mode: 'auto', ticket: { number: 5 } });
+  });
+
+  it('halts ORCH_RUN_ACTIVE before intake fetches anything', () => {
+    gh = withIssues(issue(REPO, 5));
+    orchGh(['start', 'FEAT-011']);
+    const r = orchGh(['start', 'FEAT-031', '--ticket', '5']);
+    expect(r.err).toMatch(/^ORCH_RUN_ACTIVE: /);
+    expect(gh.calls()).toEqual([]);
+  });
+
+  it('resolves the test command before intake fetches anything', () => {
+    gh = withIssues(issue(REPO, 5));
+    writeFileSync(join(root, 'package.json'), '{"scripts":{}}');
+    const r = orchGh(['start', 'FEAT-031', '--ticket', '5']);
+    expect(r.err).toMatch(/^ORCH_TEST_COMMAND_UNRESOLVED: /);
+    expect(gh.calls()).toEqual([]);
   });
 });

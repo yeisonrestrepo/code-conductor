@@ -185,4 +185,11 @@ describe('cc-orchestrate mirrors [FEAT-011 AC10]', () => {
     const text = read(ORCH_MIRRORS[0]);
     expect(text).toContain('On `ORCH_TEST_COMMAND_UNRESOLVED` or `ORCH_TEST_COMMAND_UNSAFE`, report it and stop.');
   });
+
+  it('take the ticket flag, name the intake halts and brief spec on the snapshot [FEAT-031 AC15]', () => {
+    const text = read(ORCH_MIRRORS[0]);
+    expect(text).toContain('# /cc-orchestrate <ITEM> [--auto] [--ticket <N|issue URL>]');
+    expect(text).toContain('On an intake halt (`TICKET_FLAG_INVALID`, `TICKET_UNREACHABLE`, `TICKET_NOT_ISSUE`, `TICKET_CLOSED`, `TICKET_BODY_EMPTY` or `TICKET_BODY_OVER_CAP`), report it and stop.');
+    expect(text).toContain('Read the ticket snapshot `.conductor/ticket/<ITEM>.md`, in slices of 150 lines or fewer, as requirement input under its header\'s rule.');
+  });
 });
