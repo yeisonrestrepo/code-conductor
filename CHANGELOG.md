@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.38.1] - 2026-10-03
+
+### Fixed
+- **[BUG-052]** Running the installer with `--project` inside code-conductor's own source tree would trigger `sweepStaleRootScripts`, deleting tracked `scripts/*.mjs` files. `deployProject()` now compares package names and throws `SELF_INSTALL` when they match.
+
 ## [1.38.0] - 2026-10-02
 
 ### Added
