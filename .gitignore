@@ -134,6 +134,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-10-01-feat011-orchestrator-band-router-design.md
 !/docs/superpowers/specs/2026-10-02-feat012-core-role-agents-design.md
 !/docs/superpowers/specs/2026-10-02-feat031-ticket-agent-design.md
+!/docs/superpowers/specs/2026-10-06-feat041-reviewer-in-loop-design.md
 # --- END tracked-surface block (BUG-042) ---
 
 # Kept for external writers. Both lines are redundant against the block above; each is
