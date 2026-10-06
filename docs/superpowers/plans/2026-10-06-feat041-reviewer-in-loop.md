@@ -620,14 +620,14 @@
 
     Commit `feat: ship the review loop auto mode exception and declare its costs [FEAT-041]`.
 
-- [ ] [T-005] **Release `1.39.0`.** Native. Depends on T-001 to T-004.
+- [>] [T-005] **Release `1.39.0`.** Native. Depends on T-001 to T-004.
 
   **Files:**
   - Modify: `VERSION`, `package.json`, `package-lock.json`, `CHANGELOG.md`, `AGENT-READABLE BACKLOG.md`, `README.md`
 
-  - [ ] [T-005-A] Set `1.39.0` in `VERSION`, in `package.json` `version`, and in `package-lock.json` (the root `version` and `packages[""].version`).
-  - [ ] [T-005-B] **`README.md`:** in the `/cc-orchestrate` row of the Project commands table (:237), after `the spec and plan approvals always pause.`, add: `Before each, a review loop checks the document with a fresh read-only \`define-review\` agent and sends open rows back to its author, at most three passes; it is advisory and fails open (see Review loop configurations).`
-  - [ ] [T-005-C] **Records.**
+  - [X] [T-005-A] Set `1.39.0` in `VERSION`, in `package.json` `version`, and in `package-lock.json` (the root `version` and `packages[""].version`).
+  - [X] [T-005-B] **`README.md`:** in the `/cc-orchestrate` row of the Project commands table (:237), after `the spec and plan approvals always pause.`, add: `Before each, a review loop checks the document with a fresh read-only \`define-review\` agent and sends open rows back to its author, at most three passes; it is advisory and fails open (see Review loop configurations).`
+  - [X] [T-005-C] **Records.**
     - **`AGENT-READABLE BACKLOG.md`:** at the line that `` grep -n '^### \[ \] `\[FEAT-041\]`' `` reports (:217), change `### [ ]` to `### [X]`. Insert as its first bullet:
       ```markdown
       * **DONE, shipped as `1.39.0` on <date>.** Before each define approval, `/cc-orchestrate` runs an advisory review loop: a fresh `define-review` agent (`Read, Grep, Glob`; not a band role, no SNAP line, no gate) checks the spec or plan against the declared AC, FMT and CR rows, and while rows stay open the orchestrator revives the handed-back generator through `SendMessage` to revise under its still-installed envelope, reporting as prose. Hard cap 3 reviewer passes, at most 2 revisions; `orchestrate.mjs review <role> --round|--close` counts rounds in an optional run field, and `ORCH_REVIEW_CAP` is a refusal, never a halt. Fail-open on any error; only an owner message approves, after a re-hash. Zero wakes per round holds under `claude --permission-mode auto --settings .claude/review-loop.settings.json`, the shipped owner-approved exception; default mode and plain auto mode have declared, measured costs. No hook, SNAP contract, `ROLES` or gate change. Out of scope, as specified: code, audit and QA reviewers, the manual `/cc-spec` flow, a revision verb, gating Guard 5 on an open round, the D8 anomaly, and global `autoMode`.
@@ -646,15 +646,15 @@
       ```
 
     If the release commit lands on another date, use that date in both places.
-  - [ ] [T-005-D] Run the release checks:
+  - [X] [T-005-D] Run the release checks:
     - `node tools/version-gate.mjs`, expecting `VERSION_GATE_OK 1.39.0`;
     - `node tools/record-parity.mjs`, expecting `RECORD_PARITY_OK`;
     - `git diff origin/main -- scripts/snap-contract.mjs scripts/snap-validate.mjs scripts/snap-build.mjs .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs lib/installer .claude/settings.json project-template/.claude/settings.json global/settings.json` empty (Global Constraints);
     - `git diff --name-only origin/main -- .claude/agents project-template/.claude/agents` listing only the two `define-review.md` files.
 
     **Discriminator:** flip the FEAT-041 heading back to `### [ ]` and expect a red run naming `1.39.0` and `FEAT-041`. Restore `[X]` and re-run green.
-  - [ ] [T-005-E] Run `npm test`, expecting **1453 / 0, 50 files**. Then `node tools/id-ceiling.mjs`, and report the union and the next ids. Nothing is minted.
-  - [ ] [T-005-F] Append `- T-005: <one line>` under the plan section. Then `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md .claude/memory/project.md docs/superpowers/plans/2026-10-06-feat041-reviewer-in-loop.md`. Commit `chore: release 1.39.0 [FEAT-041]`.
+  - [X] [T-005-E] Run `npm test`, expecting **1453 / 0, 50 files**. Then `node tools/id-ceiling.mjs`, and report the union and the next ids. Nothing is minted.
+  - [X] [T-005-F] Append `- T-005: <one line>` under the plan section. Then `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md .claude/memory/project.md docs/superpowers/plans/2026-10-06-feat041-reviewer-in-loop.md`. Commit `chore: release 1.39.0 [FEAT-041]`.
   - [ ] [T-005-G] **Confirm with the owner, then** push with `git push -u origin feat/feat-041-reviewer-in-loop` and open the PR against `main`. Expected CI (`[BUG-048]`, absolute per environment):
     - ci-node20 **1357 passed / 96 skipped**;
     - ci-node24 **1440 passed / 13 skipped**;
