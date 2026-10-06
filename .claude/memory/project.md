@@ -2919,3 +2919,13 @@ The spec is `docs/superpowers/specs/2026-10-06-feat041-reviewer-in-loop-design.m
 - **Cost per round, declared:** 0 wakes under auto mode with the shipped `project-template/.claude/review-loop.settings.json` (`claude --permission-mode auto --settings .claude/review-loop.settings.json`); default mode, one approval per generator write plus session prompts; plain auto mode degrades to `skipped:denied`. The installer never writes `autoMode` globally.
 - **Boundary:** never auto-continues; only an owner message approves (not a reviewer `CLEAN`, `--auto` or a UI placeholder, observed in PROBE C); re-hash the document before `approve`.
 - **Deferred to the plan:** full reads of `scripts/orchestrate.mjs` and `.claude/hooks/pre-tool-use.mjs` (the spec read both at offsets past the 30-line cap, disclosed); `role-profiles.test.js:49` amendment; the manual `/cc-spec` flow and Guard 5 gating stay follow-ups.
+
+## Plan: FEAT-041 implementation [2026-10-06]
+
+Plan `docs/superpowers/plans/2026-10-06-feat041-reviewer-in-loop.md`.
+- **Approval:** "Approved. The plan ... is approved as reviewed (sha256 96748663f9d96dff5ca6122f6803649b54d260c44209c411b822b17bca95005b), with the three corrections confirmed and ruling 7 as rewritten." Corrections: ruling 7 halt discipline restored (any count outside its row halts and comes to the owner; predictions amended before measurement, never absorbed after); T-001-B red is a module-load failure on the missing exports; T-005-G CI predictions absolute (ci-node20 1357 / 96, ci-node24 1440 / 13). Rulings 1-6 and 8 accepted.
+- **Shape:** T-001 the `review` verb; T-002 the `define-review` profile; T-003 the `/cc-orchestrate` loop prose; T-004 the shipped settings file and README; T-005 release `1.39.0`.
+- **Predicted, not measured:** 1418 -> 1453 / 0, 49 -> 50 files.
+- **Routing:** native. Stop for owner confirmation at T-005-G before pushing or opening the PR.
+
+Handoff observations, one line per task:
