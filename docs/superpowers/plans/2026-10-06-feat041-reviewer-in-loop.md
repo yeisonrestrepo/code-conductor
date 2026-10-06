@@ -389,14 +389,14 @@
   - [X] [T-002-E] Run `npx vitest run tests/unit/role-profiles.test.js tests/unit/gitignore-block-parity.test.js`. Expected: PASS. The 1.37.0 sha256 pins for the five role profiles stay green, which is how the test asserts that no role profile changed.
   - [X] [T-002-F] Run `npm test`. Expected: **1442 / 0, 49 files** (predicted). Append `- T-002: <one line>` under the plan section. Then `git add -u .gitignore tests/unit/role-profiles.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-06-feat041-reviewer-in-loop.md`. Commit `feat: add the define-review reviewer profile [FEAT-041]`.
 
-- [ ] [T-003] **The loop in `/cc-orchestrate`** (spec (b), (d), delivery channel, fail-open, boundaries; AC5, AC6). Native. Depends on T-001 (the verb's exact strings) and T-002 (the agent name and format).
+- [X] [T-003] **The loop in `/cc-orchestrate`** (spec (b), (d), delivery channel, fail-open, boundaries; AC5, AC6). Native. Depends on T-001 (the verb's exact strings) and T-002 (the agent name and format).
 
   **Files:**
   - Modify: `.claude/commands/cc-orchestrate.md`
   - Modify: `project-template/.claude/commands/cc-orchestrate.md`
   - Test: `tests/installer/commands-parity.test.js`
 
-  - [ ] [T-003-A] **Write the failing tests.** In `tests/installer/commands-parity.test.js`, append after the `cc-orchestrate mirrors` describe:
+  - [X] [T-003-A] **Write the failing tests.** In `tests/installer/commands-parity.test.js`, append after the `cc-orchestrate mirrors` describe:
     ```js
     describe('cc-orchestrate review loop [FEAT-041 AC5, AC6]', () => {
       const text = () => read(ORCH_MIRRORS[0]);
@@ -406,7 +406,7 @@
         has('## The review loop (FEAT-041)', 'Before each, run "The review loop" below for that role.',
           'node "$S/orchestrate.mjs" review <role> --round', 'Dispatch a fresh `define-review` agent',
           '.conductor/review/<role>-<n>-review.txt', '.conductor/review/<role>-<n>-revision.txt',
-          'review <role> --close clean', 'review <role> --close cap', 'No revision follows the third pass.');
+          'review <role> --close clean', 'review <role> --close cap', 'No revision follows the third pass, so the document at the approval is always the one the last reviewer read.');
       });
 
       it('briefs the reviewer and the generator in the declared formats and checklist', () => {
@@ -439,8 +439,8 @@
       });
     });
     ```
-  - [ ] [T-003-B] Run `npx vitest run tests/installer/commands-parity.test.js`. Expected: FAIL on the six new tests only.
-  - [ ] [T-003-C] **Edit `.claude/commands/cc-orchestrate.md`**, five edits:
+  - [X] [T-003-B] Run `npx vitest run tests/installer/commands-parity.test.js`. Expected: FAIL on the six new tests only.
+  - [X] [T-003-C] **Edit `.claude/commands/cc-orchestrate.md`**, five edits:
     1. **Run header (step 1).** After the line `   Print the run header: the item, the mode (...), the test command, the ticket and snapshot for a bound run, and the first role, \`spec\`.`, add:
        ```markdown
        Add one line: `Review loop: zero owner wakes only when launched with claude --permission-mode auto --settings .claude/review-loop.settings.json; README "Review loop configurations" names the costs of every other launch.`
@@ -514,9 +514,9 @@
        End with exactly one line: REVISION <role> round <n>: done, or REVISION <role> round <n>: blocked <reason>.
        ```
        ````
-  - [ ] [T-003-D] `cp .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md`. Run `npx vitest run tests/installer/commands-parity.test.js`. Expected: PASS, the byte-identity test included.
-  - [ ] [T-003-E] **ASCII probe.** Run `LC_ALL=C grep -c '[^ -~]' .claude/commands/cc-orchestrate.md` and compare with the same count on `git show HEAD:.claude/commands/cc-orchestrate.md`. Expected: equal. The edits add no non-ASCII byte (FEAT-012's decoded-escape hazard).
-  - [ ] [T-003-F] Run `npm test`. Expected: **1448 / 0, 49 files** (predicted). Append `- T-003: <one line>` under the plan section. Then `git add -u .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md tests/installer/commands-parity.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-06-feat041-reviewer-in-loop.md`. Commit `feat: run the define review loop in /cc-orchestrate [FEAT-041]`.
+  - [X] [T-003-D] `cp .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md`. Run `npx vitest run tests/installer/commands-parity.test.js`. Expected: PASS, the byte-identity test included.
+  - [X] [T-003-E] **ASCII probe.** Run `LC_ALL=C grep -c '[^ -~]' .claude/commands/cc-orchestrate.md` and compare with the same count on `git show HEAD:.claude/commands/cc-orchestrate.md`. Expected: equal. The edits add no non-ASCII byte (FEAT-012's decoded-escape hazard).
+  - [X] [T-003-F] Run `npm test`. Expected: **1448 / 0, 49 files** (predicted). Append `- T-003: <one line>` under the plan section. Then `git add -u .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md tests/installer/commands-parity.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-06-feat041-reviewer-in-loop.md`. Commit `feat: run the define review loop in /cc-orchestrate [FEAT-041]`.
 
 - [ ] [T-004] **The shipped configuration and the README** (spec (f), (c); AC7-AC9). Native. Depends on T-003 (the run header names the README section).
 

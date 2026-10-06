@@ -193,3 +193,44 @@ describe('cc-orchestrate mirrors [FEAT-011 AC10]', () => {
     expect(text).toContain('Read the ticket snapshot `.conductor/ticket/<ITEM>.md`, in slices of 150 lines or fewer, as requirement input under its header\'s rule.');
   });
 });
+
+describe('cc-orchestrate review loop [FEAT-041 AC5, AC6]', () => {
+  const text = () => read(ORCH_MIRRORS[0]);
+  const has = (...phrases) => { const t = text(); for (const p of phrases) expect(t).toContain(p); };
+
+  it('runs the loop before each define approval, with its verb calls and report files', () => {
+    has('## The review loop (FEAT-041)', 'Before each, run "The review loop" below for that role.',
+      'node "$S/orchestrate.mjs" review <role> --round', 'Dispatch a fresh `define-review` agent',
+      '.conductor/review/<role>-<n>-review.txt', '.conductor/review/<role>-<n>-revision.txt',
+      'review <role> --close clean', 'review <role> --close cap', 'No revision follows the third pass, so the document at the approval is always the one the last reviewer read.');
+  });
+
+  it('briefs the reviewer and the generator in the declared formats and checklist', () => {
+    has('REVIEW <role> round <n>: CLEAN', 'REVIEW <role> round <n>: OPEN <k>',
+      'REVISION <role> round <n>: done', 'REVISION <role> round <n>: blocked <reason>',
+      '~/.claude/skills/critical-review/SKILL.md', '| AC |', '| FMT |', '| CR |',
+      'never pass it an earlier round\'s findings');
+  });
+
+  it('takes the first revision delivery on any channel and never routes it to handback', () => {
+    has('on any channel (a message, a hand-back frame or a completion notice)',
+      'Ignore later copies of the same round\'s report.', 'A revision report is never passed to `handback`.',
+      'outside a revision report of the review loop', 'review <role> --close skipped:snap-in-revision');
+  });
+
+  it('fails open with named reasons and never halts', () => {
+    has('review <role> --close skipped:<reason>', 'A loop error never halts the run.', '`skipped:owner`');
+    for (const reason of ['dispatch', 'unparsed', 'denied', 'blocked', 'snap-in-revision', 'verb']) has(`- \`${reason}\`: `);
+  });
+
+  it('approves only on an owner message, after a re-hash', () => {
+    has('**Only an owner message approves.**', 'a suggestion in the input box are not approvals',
+      '**Re-hash before approve.**', 'shasum -a 256 <doc>', 'Get-FileHash -Algorithm SHA256 <doc>');
+  });
+
+  it('amends the brief line and names the zero-wake launch in the run header', () => {
+    has('Your hand-back is the run\'s only record. After it, the orchestrator may send you revision requests; answer them as prose, without a `SNAP_HANDBACK` line.',
+      'claude --permission-mode auto --settings .claude/review-loop.settings.json');
+    expect(text()).not.toContain('your first hand-back is final, and a second is refused');
+  });
+});
