@@ -45,8 +45,9 @@ const CLAIM = {
 };
 
 describe('role agent profiles [FEAT-012]', () => {
-  it('ships exactly the five ROLES in both agents directories', () => {
-    for (const dir of [TEMPLATE, MIRROR]) expect(readdirSync(join(ROOT, dir)).sort()).toEqual(ROLES.map((r) => `${r}.md`).sort());
+  it('ships exactly the five ROLES plus define-review in both agents directories [FEAT-041]', () => {
+    const expected = [...ROLES, 'define-review'].map((r) => `${r}.md`).sort();
+    for (const dir of [TEMPLATE, MIRROR]) expect(readdirSync(join(ROOT, dir)).sort()).toEqual(expected);
   });
 
   it.each(ROLES)('[AC1] %s names its role and carries the D2 mask exactly', (role) => {
@@ -101,5 +102,40 @@ describe('profiles unchanged since 1.37.0 [FEAT-031 AC13]', () => {
   const rows = [TEMPLATE, MIRROR].flatMap((dir) => Object.keys(PROFILE_SHA256_1_37_0).map((role) => [`${dir}/${role}.md`, role]));
   it.each(rows)('%s has its 1.37.0 sha256', (rel, role) => {
     expect(createHash('sha256').update(read(rel)).digest('hex')).toBe(PROFILE_SHA256_1_37_0[role]);
+  });
+});
+
+// FEAT-041 (e): the reviewer profile. Not a band role: outside ROLES, no SNAP line, no gate.
+const REVIEWER = 'define-review';
+const REVIEWER_PHRASES = [
+  '~/.claude/skills/critical-review/SKILL.md',
+  '- [<row>] <what is missing> (lines <a-b> | absent)',
+  'REVIEW <role> round <n>: CLEAN',
+  'REVIEW <role> round <n>: OPEN <k>',
+  'You have no shell and no write tools.',
+  'A hook or owner denial is an instruction to stop and report, never an obstacle to route around.',
+  'Never dispatch or message another agent.',
+];
+
+describe('define-review profile [FEAT-041 AC1]', () => {
+  it('names itself, carries Read, Grep, Glob exactly, and stays out of ROLES', () => {
+    const text = profile(REVIEWER);
+    expect(field(text, 'name')).toBe(REVIEWER);
+    expect(field(text, 'tools').split(', ')).toEqual(['Read', 'Grep', 'Glob']);
+    expect(ROLES).not.toContain(REVIEWER);
+  });
+
+  it('is byte-identical in the .claude/agents mirror', () => {
+    expect(read(`${MIRROR}/${REVIEWER}.md`)).toBe(profile(REVIEWER));
+  });
+
+  it('measures at most 999 tokens as ceil(bytes / 4)', () => {
+    expect(Math.ceil(Buffer.byteLength(profile(REVIEWER), 'utf8') / 4)).toBeLessThanOrEqual(999);
+  });
+
+  it('carries the verdict format, the skill path, and the no-write and no-dispatch rules, and names no gate', () => {
+    const text = profile(REVIEWER);
+    for (const phrase of REVIEWER_PHRASES) expect(text).toContain(phrase);
+    for (const gate of GATES) expect(text).not.toContain(gate);
   });
 });

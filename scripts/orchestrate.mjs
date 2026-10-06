@@ -21,6 +21,12 @@ export const WRITE_SURFACE = [RUN_FILE, ENVELOPE_FILE, '.claude/memory/session-s
 // Where /cc-orchestrate writes each agent's final message for `handback` to read: inside
 // the surface, and cleared with the run so file names never collide across runs.
 export const HANDBACK_DIR = '.conductor/handback';
+// FEAT-041: the Define review loop's reports, cleared with the run like the hand-backs.
+export const REVIEW_DIR = '.conductor/review';
+// Three reviewer passes, so at most two revisions, each re-reviewed (FEAT-041 (d)).
+export const REVIEW_CAP = 3;
+const REVIEW_OUTCOME = /^(clean|cap|skipped:[a-z][a-z0-9-]{0,39})$/;
+const REVIEW_USAGE = 'usage: orchestrate.mjs review <spec|plan> --round | --close <clean|cap|skipped:<reason>>';
 
 // D5: the reviewed role-artifact table. Code's scope comes from its plan task instead.
 export const ROLE_ARTIFACTS = {
@@ -327,6 +333,34 @@ function approve(root, sessionId, what, planRel) {
   return `plan approved: define_approved, ${tasks.length} task(s)`;
 }
 
+// FEAT-041 (e): the review loop's round counter. Advisory: approve never reads it, and the
+// cap is a refusal, never a halt, so the loop can never freeze the run.
+function review(root, sessionId, [role, flag, outcome, extra]) {
+  const run = liveRun(root, sessionId);
+  const wellFormed = extra === undefined && (flag === '--round' ? outcome === undefined : flag === '--close' && outcome !== undefined);
+  if (!wellFormed) throw new Refusal(REVIEW_USAGE);
+  const step = nextStep(run);
+  if (step.await !== role) throw new Refusal(`review ${role}: the next step is ${describeStep(step)}`);
+  const loops = isPlainObject(run.review) ? run.review : {};
+  const loop = isPlainObject(loops[role]) && Number.isInteger(loops[role].round) ? loops[role] : { round: 0, outcome: null };
+  if (loop.outcome) throw new Refusal(`review ${role}: the loop closed ${loop.outcome}; a closed loop does not reopen`);
+  const next = flag === '--round' ? openRound(role, loop) : closeLoop(role, loop, outcome);
+  saveRun(root, { ...run, review: { ...loops, [role]: next } });
+  return flag === '--round' ? `review ${role} round ${next.round} of ${REVIEW_CAP}` : `review ${role} closed ${next.outcome} at round ${next.round}`;
+}
+
+function openRound(role, loop) {
+  if (loop.round >= REVIEW_CAP) throw new Refusal(`ORCH_REVIEW_CAP: review ${role} has run ${REVIEW_CAP} rounds; close it with --close cap`);
+  return { round: loop.round + 1, outcome: null };
+}
+
+function closeLoop(role, loop, outcome) {
+  if (!REVIEW_OUTCOME.test(outcome)) throw new Refusal(REVIEW_USAGE);
+  if (outcome === 'clean' && loop.round === 0) throw new Refusal(`review ${role}: clean needs a reviewer pass; none has run`);
+  if (outcome === 'cap' && loop.round < REVIEW_CAP) throw new Refusal(`review ${role}: cap needs round ${REVIEW_CAP}; the loop is at round ${loop.round}`);
+  return { round: loop.round, outcome };
+}
+
 const START_USAGE = 'usage: orchestrate.mjs start <ITEM> [--auto] [--ticket <N|issue URL>]';
 
 // The item first, then --auto and --ticket <ref> in either order, each at most once. A
@@ -376,6 +410,7 @@ function start(root, sessionId, args) {
 function clearRunFiles(root) {
   rmSync(join(root, ENVELOPE_FILE), { force: true });
   rmSync(join(root, HANDBACK_DIR), { recursive: true, force: true });
+  rmSync(join(root, REVIEW_DIR), { recursive: true, force: true });
 }
 
 // Prints the run it removes, so the closing report reads the record rather than memory.
@@ -403,10 +438,11 @@ export function cli(argv, env, cwd = process.cwd()) {
     install: () => install(root, sid, a, b === '--check'),
     handback: () => handback(root, sid, a, readFileSync(0, 'utf8')),
     approve: () => approve(root, sid, a, b),
+    review: () => review(root, sid, argv.slice(1)),
     end: () => end(root),
   };
   try {
-    if (!verbs[verb]) throw new Refusal('usage: orchestrate.mjs start|install|handback|approve|end');
+    if (!verbs[verb]) throw new Refusal('usage: orchestrate.mjs start|install|handback|approve|review|end');
     process.stdout.write(verbs[verb]() + '\n');
     return 0;
   } catch (e) {

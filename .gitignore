@@ -38,6 +38,7 @@ tests/.tmp/
 /.claude/memory/*
 !/.claude/agents/audit.md
 !/.claude/agents/code.md
+!/.claude/agents/define-review.md
 !/.claude/agents/plan.md
 !/.claude/agents/qa.md
 !/.claude/agents/spec.md
@@ -106,6 +107,7 @@ tests/.tmp/
 !/docs/superpowers/plans/2026-10-01-feat011-orchestrator-band-router.md
 !/docs/superpowers/plans/2026-10-02-feat012-core-role-agents.md
 !/docs/superpowers/plans/2026-10-02-feat031-ticket-agent.md
+!/docs/superpowers/plans/2026-10-06-feat041-reviewer-in-loop.md
 !/docs/superpowers/specs/2026-06-09-bug001-cc-compact-design.md
 !/docs/superpowers/specs/2026-06-09-bug002-spec-read-budget-design.md
 !/docs/superpowers/specs/2026-06-11-bug006-feat018-bash-scan-guard-design.md
@@ -134,6 +136,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-10-01-feat011-orchestrator-band-router-design.md
 !/docs/superpowers/specs/2026-10-02-feat012-core-role-agents-design.md
 !/docs/superpowers/specs/2026-10-02-feat031-ticket-agent-design.md
+!/docs/superpowers/specs/2026-10-06-feat041-reviewer-in-loop-design.md
 # --- END tracked-surface block (BUG-042) ---
 
 # Kept for external writers. Both lines are redundant against the block above; each is
