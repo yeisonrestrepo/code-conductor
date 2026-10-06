@@ -300,7 +300,7 @@
     - delete the `REVIEW_DIR` line from `clearRunFiles`, expecting both clear tests red.
   - [X] [T-001-F] Run `npm test`. Expected: **1438 / 0, 49 files** (predicted). Append `- T-001: <one line>` under the plan section of `.claude/memory/project.md`. Then `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-06-feat041-reviewer-in-loop.md`. Commit `feat: add the review loop round counter to the router [FEAT-041]`.
 
-- [ ] [T-002] **The `define-review` profile** (spec (e) profile; AC1, AC10). Native. Independent of T-001; runs after it.
+- [X] [T-002] **The `define-review` profile** (spec (e) profile; AC1, AC10). Native. Independent of T-001; runs after it.
 
   **Files:**
   - Create: `project-template/.claude/agents/define-review.md`
@@ -311,7 +311,7 @@
   **Interfaces:**
   - Produces: the agent type `define-review`, `tools: Read, Grep, Glob`, that T-003 dispatches by name, and the verdict format T-003's reviewer brief repeats.
 
-  - [ ] [T-002-A] **Write the failing tests.** In `tests/unit/role-profiles.test.js`:
+  - [X] [T-002-A] **Write the failing tests.** In `tests/unit/role-profiles.test.js`:
     1. Replace the test at :48-50 with:
        ```js
        it('ships exactly the five ROLES plus define-review in both agents directories [FEAT-041]', () => {
@@ -356,8 +356,8 @@
          });
        });
        ```
-  - [ ] [T-002-B] Run `npx vitest run tests/unit/role-profiles.test.js`. Expected: FAIL on the amended directory test and the four new tests (the file is absent).
-  - [ ] [T-002-C] **Create** `project-template/.claude/agents/define-review.md` with exactly:
+  - [X] [T-002-B] Run `npx vitest run tests/unit/role-profiles.test.js`. Expected: FAIL on the amended directory test and the four new tests (the file is absent).
+  - [X] [T-002-C] **Create** `project-template/.claude/agents/define-review.md` with exactly:
     ````markdown
     ---
     name: define-review
@@ -385,13 +385,9 @@
     - You are not a band role: write no hand-back line and claim no gate. Your report is advice; the owner decides.
     ````
     Then `cp project-template/.claude/agents/define-review.md .claude/agents/define-review.md`.
-  - [ ] [T-002-D] Modify `.gitignore`: insert `!/.claude/agents/define-review.md` immediately after `!/.claude/agents/code.md` (:40), in sorted position.
-  - [ ] [T-002-E] Run `npx vitest run tests/unit/role-profiles.test.js tests/unit/gitignore-block-parity.test.js`. Expected: PASS. The 1.37.0 sha256 pins for the five role profiles stay green, which is how the test asserts that no role profile changed.
-  - [ ] [T-002-F] Run `npm test`. Expected: **1442 / 0, 49 files** (predicted). Append `- T-002: <one line>` under the plan section. Then:
-    - `git add project-template/.claude/agents/define-review.md .claude/agents/define-review.md` (plain: the first sits outside any ignored directory, and the second's leaf now exists);
-    - `git add -u .gitignore tests/unit/role-profiles.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-06-feat041-reviewer-in-loop.md`.
-
-    Commit `feat: add the define-review reviewer profile [FEAT-041]`.
+  - [X] [T-002-D] Modify `.gitignore`: insert `!/.claude/agents/define-review.md` immediately after `!/.claude/agents/code.md` (:40), in sorted position. Then `git add project-template/.claude/agents/define-review.md .claude/agents/define-review.md` (plain: the first sits outside any ignored directory, and the second's leaf now exists). **AMENDED 2026-10-06 by owner ruling after a halt:** the staging moves here from T-002-F because `gitignore-block-parity` derives its expected block from the git index, so T-002-E needs the profiles indexed (a plan-ordering defect the plan review also missed).
+  - [X] [T-002-E] Run `npx vitest run tests/unit/role-profiles.test.js tests/unit/gitignore-block-parity.test.js`. Expected: PASS. The 1.37.0 sha256 pins for the five role profiles stay green, which is how the test asserts that no role profile changed.
+  - [X] [T-002-F] Run `npm test`. Expected: **1442 / 0, 49 files** (predicted). Append `- T-002: <one line>` under the plan section. Then `git add -u .gitignore tests/unit/role-profiles.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-06-feat041-reviewer-in-loop.md`. Commit `feat: add the define-review reviewer profile [FEAT-041]`.
 
 - [ ] [T-003] **The loop in `/cc-orchestrate`** (spec (b), (d), delivery channel, fail-open, boundaries; AC5, AC6). Native. Depends on T-001 (the verb's exact strings) and T-002 (the agent name and format).
 
