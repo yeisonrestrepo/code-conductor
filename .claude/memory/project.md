@@ -2929,3 +2929,5 @@ Plan `docs/superpowers/plans/2026-10-06-feat041-reviewer-in-loop.md`.
 - **Routing:** native. Stop for owner confirmation at T-005-G before pushing or opening the PR.
 
 Handoff observations, one line per task:
+- T-000: plan committed 5ab5fbd at 1418 / 0, 49 files, as predicted; branch gate silent (feat/feat-041-reviewer-in-loop matches FEAT-041).
+- T-001: review verb committed at 1438 / 0, 49 files, as predicted; file 112 / 0 (+20). HALT at T-001-B: vitest delivers a missing named export as undefined (absent under plain Node), so the file loaded and ran 93 pass / 19 fail instead of the predicted module-load SyntaxError; owner ruled all 19 reds trace to the feature's absence (15 CLI refusals, 4 via the undefined exports) and amended T-001-B to the measured split, reversing the review ruling that imposed Node ESM semantics. Discriminators: CAP=4 reds 5 incl. the cap test; Halt reds the cap test; no REVIEW_DIR clear reds both clear tests.

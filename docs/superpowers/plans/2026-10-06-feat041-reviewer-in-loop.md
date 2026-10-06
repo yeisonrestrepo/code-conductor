@@ -88,9 +88,9 @@
 
 ---
 
-- [ ] [T-000] **Plan commit.** First run the branch gate (`/cc-plan` Phase exit). The current branch is `feat/feat-041-reviewer-in-loop`, which matches the item, so the gate is silent.
-  - [ ] [T-000-A] Modify `.gitignore`: insert `!/docs/superpowers/plans/2026-10-06-feat041-reviewer-in-loop.md` immediately after `!/docs/superpowers/plans/2026-10-02-feat031-ticket-agent.md` (:108), in sorted position.
-  - [ ] [T-000-B] Modify `.claude/memory/project.md`: append at the end of the file
+- [X] [T-000] **Plan commit.** First run the branch gate (`/cc-plan` Phase exit). The current branch is `feat/feat-041-reviewer-in-loop`, which matches the item, so the gate is silent.
+  - [X] [T-000-A] Modify `.gitignore`: insert `!/docs/superpowers/plans/2026-10-06-feat041-reviewer-in-loop.md` immediately after `!/docs/superpowers/plans/2026-10-02-feat031-ticket-agent.md` (:108), in sorted position.
+  - [X] [T-000-B] Modify `.claude/memory/project.md`: append at the end of the file
     ```markdown
 
     ## Plan: FEAT-041 implementation [<date>]
@@ -103,11 +103,11 @@
 
     Handoff observations, one line per task:
     ```
-  - [ ] [T-000-C] `git add -u .gitignore .claude/memory/project.md`, then `git add docs/superpowers/plans/2026-10-06-feat041-reviewer-in-loop.md` (plain, now that its leaf exists).
-  - [ ] [T-000-D] Commit `docs: add the FEAT-041 reviewer-in-loop implementation plan [FEAT-041]`. Expected: the hook suite passes at **1418 / 0, 49 files**.
-  - [ ] [T-000-E] Append `- T-000: <one line of handoff observation>` under the plan section. This line rides T-001's commit.
+  - [X] [T-000-C] `git add -u .gitignore .claude/memory/project.md`, then `git add docs/superpowers/plans/2026-10-06-feat041-reviewer-in-loop.md` (plain, now that its leaf exists).
+  - [X] [T-000-D] Commit `docs: add the FEAT-041 reviewer-in-loop implementation plan [FEAT-041]`. Expected: the hook suite passes at **1418 / 0, 49 files**.
+  - [X] [T-000-E] Append `- T-000: <one line of handoff observation>` under the plan section. This line rides T-001's commit.
 
-- [ ] [T-001] **The `review` verb** (spec (e) round counter; AC2-AC4). Native. Depends on T-000.
+- [X] [T-001] **The `review` verb** (spec (e) round counter; AC2-AC4). Native. Depends on T-000.
 
   **Files:**
   - Modify: `scripts/orchestrate.mjs`
@@ -117,7 +117,7 @@
   - Produces: `export const REVIEW_DIR = '.conductor/review'`, `export const REVIEW_CAP = 3`; the CLI `review <role> --round` prints `review <role> round <n> of 3`; `review <role> --close <outcome>` prints `review <role> closed <outcome> at round <n>`; the run field `review: { <role>: { round: <int>, outcome: null | 'clean' | 'cap' | 'skipped:<reason>' } }`.
   - Consumes: `liveRun`, `nextStep`, `describeStep`, `saveRun`, `isPlainObject`, `Refusal` (all existing).
 
-  - [ ] [T-001-A] **Write the failing tests.** In `tests/scripts/orchestrate.test.js`, add `REVIEW_CAP, REVIEW_DIR` to the import list from `../../scripts/orchestrate.mjs` (alphabetical among the constants, after `ROLE_ARTIFACTS`). Append at the end of the file:
+  - [X] [T-001-A] **Write the failing tests.** In `tests/scripts/orchestrate.test.js`, add `REVIEW_CAP, REVIEW_DIR` to the import list from `../../scripts/orchestrate.mjs` (alphabetical among the constants, after `ROLE_ARTIFACTS`). Append at the end of the file:
     ```js
     // Drives a fresh run into the await window after `role`'s hand-back, where the loop runs (FEAT-041).
     function awaiting(role) {
@@ -250,8 +250,8 @@
       });
     });
     ```
-  - [ ] [T-001-B] Run `npx vitest run tests/scripts/orchestrate.test.js`. Expected: FAIL at module load. The static import names `REVIEW_CAP` and `REVIEW_DIR` before `orchestrate.mjs` exports them, so ESM rejects the file with a SyntaxError naming a missing export (`does not provide an export named 'REVIEW_CAP'` or `'REVIEW_DIR'`), and zero tests execute in this file, existing ones included. That is the right-reason red. Any other red, or any test executing, halts the task. The per-test accounting lives in T-001-D.
-  - [ ] [T-001-C] **Implement.** In `scripts/orchestrate.mjs`:
+  - [X] [T-001-B] Run `npx vitest run tests/scripts/orchestrate.test.js`. **Expected, as measured 2026-10-06 (AMENDED by owner ruling after a halt):** the file loads under vitest, whose transform delivers a missing named export as `undefined`; the exports are verified absent under plain Node (`'REVIEW_CAP' in m === false`). 112 tests run (92 existing + 20 new): 93 pass, 19 fail. The one passing new test is `[AC4] isValidRun accepts a run with and without review`. 15 fail on the CLI's refusal of the unknown `review` verb (the old usage line `orchestrate: usage: orchestrate.mjs start|install|handback|approve|end`, or the empty stdout that goes with it; the 5 `it.each` rows included). 4 fail tracing to the undefined exports: the cap test on its fourth-call assertion after a zero-iteration loop (`n <= REVIEW_CAP` is false); the end and stale-start tests crashing in `mkdirSync(join(root, REVIEW_DIR))` with `TypeError: The "path" argument must be of type string. Received undefined`; and the approve test on the never-written `review` field. All 19 trace to the feature's absence and none to a defective test; T-001-E's discriminators exercise the four less precise reds after the green. The review ruling that imposed a module-load SyntaxError (Node ESM semantics) is reversed: the plan's original split was directionally right for vitest, and this measured split is the authority. The per-test accounting lives in T-001-D.
+  - [X] [T-001-C] **Implement.** In `scripts/orchestrate.mjs`:
     1. After the `HANDBACK_DIR` export (:23), add:
        ```js
        // FEAT-041: the Define review loop's reports, cleared with the run like the hand-backs.
@@ -293,12 +293,12 @@
        ```
     3. In `clearRunFiles` (:376-379), add a third line: `rmSync(join(root, REVIEW_DIR), { recursive: true, force: true });`
     4. In `cli`'s `verbs` (:401-407), add `review: () => review(root, sid, argv.slice(1)),` between `approve` and `end`. Change the usage refusal (:409) to `'usage: orchestrate.mjs start|install|handback|approve|review|end'`.
-  - [ ] [T-001-D] Run `npx vitest run tests/scripts/orchestrate.test.js`. Expected: PASS, the whole file loading and running. The new describe `review loop round counter [FEAT-041 AC2-AC4]` passes exactly 20 tests (15 `it` plus 5 `it.each` rows), and the file's total is its pre-T-001 count plus 20 with zero failures. Any other count halts the task (Ruling 7). Then `grep -rn "start|install|handback|approve|end" scripts tests .claude/commands project-template README.md` and expect no remaining match of the old usage text.
-  - [ ] [T-001-E] **Discriminators**, each reverted after its red run:
+  - [X] [T-001-D] Run `npx vitest run tests/scripts/orchestrate.test.js`. Expected: PASS, the whole file loading and running. The new describe `review loop round counter [FEAT-041 AC2-AC4]` passes exactly 20 tests (15 `it` plus 5 `it.each` rows), and the file's total is its pre-T-001 count plus 20 with zero failures. Any other count halts the task (Ruling 7). Then `grep -rn "start|install|handback|approve|end" scripts tests .claude/commands project-template README.md` and expect no remaining match of the old usage text.
+  - [X] [T-001-E] **Discriminators**, each reverted after its red run:
     - change `REVIEW_CAP` to `4`, expecting the cap test red;
     - throw `new Halt('ORCH_REVIEW_CAP', ...)` in `openRound`, expecting the cap test red on `status` and `halt`;
     - delete the `REVIEW_DIR` line from `clearRunFiles`, expecting both clear tests red.
-  - [ ] [T-001-F] Run `npm test`. Expected: **1438 / 0, 49 files** (predicted). Append `- T-001: <one line>` under the plan section of `.claude/memory/project.md`. Then `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-06-feat041-reviewer-in-loop.md`. Commit `feat: add the review loop round counter to the router [FEAT-041]`.
+  - [X] [T-001-F] Run `npm test`. Expected: **1438 / 0, 49 files** (predicted). Append `- T-001: <one line>` under the plan section of `.claude/memory/project.md`. Then `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-06-feat041-reviewer-in-loop.md`. Commit `feat: add the review loop round counter to the router [FEAT-041]`.
 
 - [ ] [T-002] **The `define-review` profile** (spec (e) profile; AC1, AC10). Native. Independent of T-001; runs after it.
 
