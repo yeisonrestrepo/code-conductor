@@ -126,8 +126,9 @@ Four checks live in `tools/` as tracked repository infrastructure. Three of them
 - **The role agents (`1.37.0`) are bounded by their tool masks, and Guard 7 bounds one thing beneath them: the shell.**
   - `qa`'s test command is enforcement: Guard 5 keeps qa from writing, so qa only ever runs files it did not write. `code`'s identical allowance is process discipline, not a security boundary, because code writes the tests that command runs.
   - The profiles are live in this repository, because the mirror convention puts them in `.claude/agents/`. The standing rule forbids starting an orchestrator run here; it does not forbid the files being present. A role dispatched by hand through `/agents` or `Agent` creates no band envelope, so Guard 5 allows every write its mask holds, which is `[ARCH-010]`'s no-envelope rule. Guard 7 still denies it the shell. This is named, not fixed.
-  - Installing or updating copies `.claude/agents/{spec,plan,code,audit,qa}.md` over the host project's files of the same names, as it does every shipped `.claude/` asset.
+  - Installing or updating copies `.claude/agents/{spec,plan,code,audit,qa,define-review}.md` over the host project's files of the same names, as it does every shipped `.claude/` asset.
   - A gate certifies protocol position and the claim its role states, never the truth of the work beyond that claim.
+- **The review loop (`1.39.0`) is process discipline.** The spec or plan envelope stays installed after its hand-back, so the role can revise. Outside a round, its writes are bounded by its tool mask, Guard 5's scope, the re-hash before `approve`, and your review. Gating Guard 5 on an open round is a follow-up candidate.
 - **The `P7` false positive above**, still live.
 - **A re-run against an untouched `project.md` prints a recovery hint it cannot prove is needed.** If you install, never write anything into `.claude/memory/project.md`, and install again, you get a line suggesting the file may have been overwritten by a pre-`1.30.0` re-run. It was not; it equals the stub because it was seeded and never edited. The check compares content and **cannot distinguish "seeded and untouched" from "clobbered"**, which is why the wording is hedged to "may have been" rather than "was". This residual is named and accepted in [`BUG-039`'s spec at `:129`](docs/superpowers/specs/2026-09-27-bug039-installer-host-owned-state-design.md), where the alternative (restoring from the host's own git history) was rejected as writing host files out of the host's history with new failure modes. A **fresh** install is silent, which the Quickstart shows.
 - **Four open dossiers**, which are the evidence-collection pipeline working rather than a backlog: a session denial tally, one for interleaved-artifact reports, an intermittent commit-hook hang in the `snap-build` suite, and detect-stack failing whole on a non-string `package.json` script. A dossier holds specimens until a mechanism is characterized by probe; an id is minted only when the written condition is met. `[BUG-047]` is what that pipeline produces when it completes: an out-of-scope note, then a dossier, then four specimens across four sessions, then a mint, then a release.
@@ -244,6 +245,18 @@ Each of `/cc-spec`, `/cc-plan`, and `/cc-implement` opens its phase with a **res
 | `/cc-docs [scope]` | Audit existing documentation, write inline docs in the correct format for your stack (JSDoc / docstrings / JavaDoc / GoDoc), and preview before writing. |
 
 ---
+
+### Review loop configurations
+
+Before each define approval, `/cc-orchestrate` runs a review loop (`[FEAT-041]`): a fresh read-only `define-review` agent checks the spec or plan against a declared checklist, and while rows stay open the orchestrator sends them back to the role that wrote the document, up to three reviewer passes and two revisions. It is advisory: it never gates, never halts the run, and never replaces your approval, which only a message you send gives. What a round costs depends on how you launched Claude Code, measured on `claude` 2.1.292:
+
+| Configuration | Per round |
+|---|---|
+| Auto mode with the shipped exception: `claude --permission-mode auto --settings .claude/review-loop.settings.json` | 0 owner wakes, 0 prompts |
+| Default (ask) permission mode | 0 wakes; one approval per revision write, plus the orchestrator's `review` calls and report writes |
+| Plain auto mode | the auto mode classifier denies the first revision request; the loop closes `skipped:denied`, and you get round 1's findings, unrevised |
+
+`.claude/review-loop.settings.json` holds one auto mode allow rule that names this protocol. The installer never writes `autoMode` into `~/.claude/settings.json`, and Claude Code ignores `autoMode` in project settings, so the rule applies only when you pass the file yourself. Read it before you pass it: a cloned repository could ship a different file under the same name.
 
 ## Skills
 
@@ -426,7 +439,8 @@ code-conductor/
 │   ├── gitignore                 Merged into the host project's .gitignore
 │   └── .claude/
 │       ├── settings.json         Hooks wiring (pre-tool-use, post-compact)
-│       ├── agents/               Band roles: spec, plan, code, audit, qa (FEAT-012)
+│       ├── review-loop.settings.json Auto mode exception for the review loop (FEAT-041)
+│       ├── agents/               Band roles: spec, plan, code, audit, qa (FEAT-012); define-review (FEAT-041)
 │       ├── commands/
 │       │   ├── cc-init.md        /cc-init — session initialization
 │       │   ├── cc-resume.md      /cc-resume — session context restore

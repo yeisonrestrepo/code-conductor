@@ -518,14 +518,14 @@
   - [X] [T-003-E] **ASCII probe.** Run `LC_ALL=C grep -c '[^ -~]' .claude/commands/cc-orchestrate.md` and compare with the same count on `git show HEAD:.claude/commands/cc-orchestrate.md`. Expected: equal. The edits add no non-ASCII byte (FEAT-012's decoded-escape hazard).
   - [X] [T-003-F] Run `npm test`. Expected: **1448 / 0, 49 files** (predicted). Append `- T-003: <one line>` under the plan section. Then `git add -u .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md tests/installer/commands-parity.test.js .claude/memory/project.md docs/superpowers/plans/2026-10-06-feat041-reviewer-in-loop.md`. Commit `feat: run the define review loop in /cc-orchestrate [FEAT-041]`.
 
-- [ ] [T-004] **The shipped configuration and the README** (spec (f), (c); AC7-AC9). Native. Depends on T-003 (the run header names the README section).
+- [X] [T-004] **The shipped configuration and the README** (spec (f), (c); AC7-AC9). Native. Depends on T-003 (the run header names the README section).
 
   **Files:**
   - Create: `project-template/.claude/review-loop.settings.json`
   - Modify: `README.md`
   - Test: `tests/installer/review-loop-settings.test.js` (new)
 
-  - [ ] [T-004-A] **Write the failing tests.** Create `tests/installer/review-loop-settings.test.js`:
+  - [X] [T-004-A] **Write the failing tests.** Create `tests/installer/review-loop-settings.test.js`:
     ```js
     import { describe, it, expect, beforeEach, afterEach } from 'vitest';
     import { createHash } from 'node:crypto';
@@ -585,13 +585,13 @@
       });
     });
     ```
-  - [ ] [T-004-B] Run `npx vitest run tests/installer/review-loop-settings.test.js`. Expected: FAIL on four tests (AC9 already passes, because nothing writes `autoMode` today).
-  - [ ] [T-004-C] **Create** `project-template/.claude/review-loop.settings.json` from the test's own constant, so no hand-typed byte can drift:
+  - [X] [T-004-B] Run `npx vitest run tests/installer/review-loop-settings.test.js`. Expected: FAIL on four tests (AC9 already passes, because nothing writes `autoMode` today).
+  - [X] [T-004-C] **Create** `project-template/.claude/review-loop.settings.json` from the test's own constant, so no hand-typed byte can drift:
     ```sh
     node -e "const fs = require('node:fs'); const t = fs.readFileSync('tests/installer/review-loop-settings.test.js', 'utf8'); const x = JSON.parse(t.match(/^const EXCEPTION = (\".*\");\$/m)[1]); fs.writeFileSync('project-template/.claude/review-loop.settings.json', JSON.stringify({ autoMode: { allow: ['\$defaults', x] } }) + '\n');"
     ```
     This exact command was dry-run at plan time in the session scratchpad against a fixture holding the constant, and produced the pinned hash. Then `shasum -a 256 project-template/.claude/review-loop.settings.json`, expecting `05ce114dfb80f28eedc7e3537092356b6bea1c7ba68afe9ae2316212b75e6d4c`. A mismatch halts the task: the test constant was mistyped, and the pin, measured from the probe, is the authority.
-  - [ ] [T-004-D] **Edit `README.md`.** Read lines 225-250 and 425-432 first.
+  - [X] [T-004-D] **Edit `README.md`.** Read lines 225-250 and 425-432 first.
     1. Insert immediately before the line `## Skills`:
        ```markdown
        ### Review loop configurations
@@ -613,8 +613,8 @@
        ```
     3. At :129, change `.claude/agents/{spec,plan,code,audit,qa}.md` to `.claude/agents/{spec,plan,code,audit,qa,define-review}.md`.
     4. In the file tree (:429), change `Band roles: spec, plan, code, audit, qa (FEAT-012)` to `Band roles: spec, plan, code, audit, qa (FEAT-012); define-review (FEAT-041)`. Below the `settings.json` line at :428, add a `review-loop.settings.json` line in the same column style, described as `Auto mode exception for the review loop (FEAT-041)`.
-  - [ ] [T-004-E] Run `git check-ignore -v project-template/.claude/review-loop.settings.json`. Expected: exit 1, so the file is not ignored. Run `npx vitest run tests/installer/review-loop-settings.test.js`. Expected: PASS.
-  - [ ] [T-004-F] Run `npm test`. Expected: **1453 / 0, 50 files** (predicted). Append `- T-004: <one line>` under the plan section. Then:
+  - [X] [T-004-E] Run `git check-ignore -v project-template/.claude/review-loop.settings.json`. Expected: exit 1, so the file is not ignored. Run `npx vitest run tests/installer/review-loop-settings.test.js`. Expected: PASS.
+  - [X] [T-004-F] Run `npm test`. Expected: **1453 / 0, 50 files** (predicted). Append `- T-004: <one line>` under the plan section. Then:
     - `git add project-template/.claude/review-loop.settings.json tests/installer/review-loop-settings.test.js`;
     - `git add -u README.md .claude/memory/project.md docs/superpowers/plans/2026-10-06-feat041-reviewer-in-loop.md`.
 
