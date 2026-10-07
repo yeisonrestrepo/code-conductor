@@ -78,9 +78,10 @@ describe.skipIf(!BASH)('guard3 - pre-tool-use.sh', () => {
 
   // 108 translation rows plus the 3 KNOWN-FP specimens added under [BUG-041].
   // The specimens assert the CURRENT verdict, which both subjects agree on, so
-  // they belong in the shared corpus rather than in a divergence list.
-  it('the corpus table carries exactly 155 rows', () => {
-    expect(CORPUS).toHaveLength(155)
+  // they belong in the shared corpus rather than in a divergence list. Later items
+  // grew the table to 155; [BUG-045] added the 12 quoted-path rows, for 167.
+  it('the corpus table carries exactly 167 rows', () => {
+    expect(CORPUS).toHaveLength(167)
   })
 
   it.each(CORPUS.map(r => [r.label, r]))('%s', (_label, row) => {
