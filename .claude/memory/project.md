@@ -2992,3 +2992,21 @@ Handoff observations, one line per task:
 **Step 11 does not apply.** This repository never starts an orchestrated run, so no ticket binds the item and no writeback is owed.
 
 **Next:** the next item is the owner's call. Follow-up candidates recorded by the plan, none minted: the manual `/cc-spec` flow, Guard 5 gating on an open round, the revision verb, and the D8 sequencing anomaly. `BUG-055`'s mint stays the owner's, with the ceiling run on both legs first.
+
+## Checkpoint 2026-10-06 19:26
+
+### Decisions
+- FEAT-041 shipped as 1.39.0 (PR #66, squash 4505d37 = tag v1.39.0 = npm gitHead); closeout record 0694e16 is on origin/main and the feature branch is deleted on both sides.
+- Three plan amendments were ruled by the owner before any re-measure: T-001-B red is the measured 93 / 19 under vitest, T-002-D stages the new profiles with their .gitignore leaf, T-003-D pins the full sentence.
+- The ceiling union stands at BUG 54 / FEAT 41 / ARCH 10; the next item and the BUG-055 mint are the owner's call.
+
+### Conventions
+- Predict a red under the runner that will execute it: vitest delivers a missing named export as undefined, while plain Node ESM throws at load.
+- When a task adds a .gitignore leaf, stage its new files in the same step, before any run of gitignore-block-parity (it reads git ls-files).
+- Every content pin is checked by substring against the block it pins, in the same plan, at self-review.
+
+### Workarounds
+- Guard 3 P7 trips on sed bracket patterns chained with other commands and P9 on shell loops; use scratchpad node scripts or the Edit tool.
+- `git switch main` refuses over uncommitted plan ticks that differ at the branch base; copy the plan to the scratchpad, restore, switch and fast-forward, then copy back.
+- GitHub auto-deletes the merged remote branch; a failed `git push --delete` is cleared with `git fetch --prune`.
+- The npm registry lags a publish by about 3 minutes; an early `npm view` miss is not evidence against the publish.
