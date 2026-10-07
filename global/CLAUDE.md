@@ -62,7 +62,9 @@ Auto-run `/cc-stack` at the start of every session. It runs the dynamic detector
 ## Memory
 
 - `project.md` — at `.claude/memory/project.md`, in git, shared with the team. Decisions, conventions, debt, workarounds.
-- `personal.md` — at `~/.claude/memory/personal.md`, local only, never committed. Developer preferences, personal shortcuts. Read it at session start alongside project memory.
+- `personal.md` — local only, never committed. Developer preferences, personal shortcuts. Two files carry this name:
+  - `~/.claude/memory/personal.md` is the cross-project default. Read it at session start alongside project memory.
+  - `.claude/memory/personal.md` is this project's copy, written by `/cc-checkpoint` and read by `/cc-resume`. It wins on any clash, because the most specific layer wins, as in settings.
 - Run `/cc-checkpoint` before `/compact`, after feature completion, after key architectural decisions.
 
 ## Delegation
