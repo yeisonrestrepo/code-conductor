@@ -73,6 +73,20 @@ describe('cc-plan mirrors', () => {
     const count = NORM(read(rel)).split(NORM(ORDERING_CLAUSE)).length - 1;
     expect(count).toBe(1);
   });
+
+  // BUG-054 AC1 and AC2, two-sided for the same reason as the ordering clause above.
+  const CARRY_CLAUSE =
+    'Ticks from a task\'s final commit ride the next task\'s first commit, and the last ' +
+    'task\'s ride the closeout commit.';
+  const MATCH_SET_CLAUSE = 'a filtered red-step prediction lists the filter\'s full match set';
+
+  it.each(PLAN_MIRRORS)('%s carries the plan-file tick carry rule [BUG-054]', (rel) => {
+    expect(NORM(read(rel))).toContain(NORM(CARRY_CLAUSE));
+  });
+
+  it.each(PLAN_MIRRORS)('%s carries the filtered red-step match-set rule [BUG-054]', (rel) => {
+    expect(NORM(read(rel))).toContain(NORM(MATCH_SET_CLAUSE));
+  });
 });
 
 const INIT_MIRRORS = ['.claude/commands/cc-init.md', 'project-template/.claude/commands/cc-init.md'];

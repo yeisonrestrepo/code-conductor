@@ -107,8 +107,16 @@ Each step must include:
   on habit, because `-u` exits 128 on an untracked path whether or not an ignore rule exists.
 - **Plan file in staging steps.** Every commit group that ticks checkboxes in the plan file must
   include a `git add -u <plan-file-path>` step after the checkbox edits so the ticked state
-  rides the commit. The last task's ticks ride the closeout commit. Without this step,
-  `cc-implement` marks checkboxes `[X]` but the committed file still shows the previous state.
+  rides the commit. Ticks from a task's final commit ride the next task's first commit, and
+  the last task's ride the closeout commit. A tick made after a group's `git commit` step has
+  run, including the tick on that step itself, cannot ride that commit, so it belongs to the
+  next commit group that stages the plan file. Without this step, `cc-implement` marks
+  checkboxes `[X]` but the committed file still shows the previous state.
+- **Filtered red-step predictions.** When a red step runs the suite through a runner filter
+  (`-t`, a file path or a name pattern), a filtered red-step prediction lists the filter's full
+  match set: every test the filter selects with its expected state, not only the new tests.
+  A filter that also matches already-green tests reads more passes than the new tests alone
+  predict, and the mismatch halts a run that is otherwise correct.
 
 ## Test List
 - [ ] Unit tests for [unit]
