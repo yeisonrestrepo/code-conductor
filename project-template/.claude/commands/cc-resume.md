@@ -19,9 +19,15 @@ Read `CLAUDE.md`. Extract:
 
 Use `—` for any missing fields.
 
-**Auto-fill blank command fields (BUG-015):** After reading the identity fields, check if any of `Build`, `Test`, `Lint`, `Format`, `Setup` in CLAUDE.md are still `<command>` (any case) or blank after the colon. If at least one is blank, resolve the detector path: use `.claude/scripts/detect-stack.mjs` if it exists (installed location), otherwise `scripts/detect-stack.mjs` (development layout). If neither exists, skip silently.
+**Auto-fill blank command fields (BUG-015):** After reading the identity fields, check if any of `Build`, `Test`, `Lint`, `Format`, `Setup` in CLAUDE.md are still `<command>` (any case) or blank after the colon. If at least one is blank, resolve the detector by presence, the deployed copy first:
 
-1. Run `node <resolved-detector-path> "$PWD"` and capture the JSON output.
+```bash
+D=.claude/scripts/detect-stack.mjs; [ -f "$D" ] || D=scripts/detect-stack.mjs
+```
+
+If neither file exists, skip this step silently.
+
+1. Run `node "$D" "$PWD"` and capture the JSON output.
 2. For each blank/placeholder command field, if the JSON contains a matching key (`build`, `test`, `lint`, `format`, `setup`), replace the placeholder with the detected value using a single `Edit` call.
 3. Never overwrite a field that already contains a non-placeholder value.
 4. If all five fields are already populated, skip this step silently.
