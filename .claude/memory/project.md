@@ -3099,3 +3099,57 @@ Handoff observations, one line per task:
 **Unminted candidates recorded today.**
 - **Path-convention harmonization:** presence-based detector resolution in `cc-stack`, `cc-resume` and `cc-orchestrate`, versus the nesting split in the `cc-init` copies.
 - **Allowlist entry-as-data semantics:** an entry anywhere in the command lifts the whole denial, D1 included. Changing it is an allowlist redesign.
+
+## Closeout: 1.39.1, the Ludocius contribution queue [2026-10-06]
+
+**What shipped.** Patch **`1.39.1`** shipped seven contributed fixes: `[BUG-032]`, `[BUG-045]`, `[BUG-050]`, `[BUG-051]`, `[BUG-052]`, `[BUG-053]` and `[BUG-054]`. They came through PR #67 from `land/ludocius-batch`, merged as a **merge commit** `bb07d14` (parents `a05a555` and `cbd731c`), so all 20 train commits keep their authorship. The batch record above is this release's harvest.
+
+**One sha.**
+- `npm view` reads version `1.39.1`, `dist-tags.latest` `1.39.1`, and gitHead `bb07d14bbdeac9dda129a70e9dfb8674fae13db4`. The `v1.39.1` tag (release `v1.39.1`, not a draft, published 2026-10-07T02:27:28Z) and the origin/main merge commit are the same commit.
+- Publish run `37562068460` succeeded at 02:28:54Z, printing `+ @yeison.restrepo.r/code-conductor@1.39.1`.
+- The registry lagged the publish, as at 1.39.0. `npm view` still answered `1.39.0` at 02:29Z and 02:31:05Z, the registry time for `1.39.1` reads 2026-10-07T02:31:36.615Z, and the re-query at 02:33:11Z matched.
+
+**Sync, measured first.** Local `main` `a05a555` measured **0 ahead / 21 behind** `origin/main`: the 20 train commits plus the merge commit. It fast-forwarded to `bb07d14`, and `git diff cbd731c bb07d14` is empty, so the merged tree equals the train tree.
+
+**Instrument output on `main` (`bb07d14`):**
+- `VERSION_GATE_OK 1.39.1`.
+- `sub-shaped headings seen: ARCH-008-S1, ARCH-008-A, ARCH-008-B`, then `RECORD_PARITY_OK`.
+- **Ceiling, both legs:** `headings=67 max={"BUG":54,"FEAT":41,"ARCH":10} dupes=none`, with the three ARCH-008 sub-shaped headings seen. `UNION ceiling {"BUG":54,"FEAT":41,"ARCH":10}`, next **`BUG-055`**, unchanged by the queue. Nothing was minted.
+- Local suite: 1507 / 0, 51 test files.
+
+**PR run `37561743465` (head `cbd731c`):**
+- ci-node20 (job `112600328989`): `Tests 1411 passed | 96 skipped (1507)`, `SKIP_BASELINE_OK ci-node20: 96 skipped identities match tools/skip-baseline.json (report: vitest-report.json)`.
+- ci-node24 (job `112600328474`): `Tests 1494 passed | 13 skipped (1507)`, `SKIP_BASELINE_OK ci-node24: 13 skipped identities match tools/skip-baseline.json (report: vitest-report.json)`.
+- `git diff origin/main -- tools/skip-baseline.json` was empty before the push. Both legs matched the prediction derived from the +54 delta, none of whose tests is in a file with skipped identities.
+
+**Baselines of record, from `bb07d14`:**
+
+| Leg | Reading |
+|---|---|
+| local | 1507 / 0, 51 files |
+| ci-node20 | 1411 / 96 |
+| ci-node24 | 1494 / 13 |
+
+Arithmetic: 1453 + 54 = 1507; 1357 + 54 = 1411, and 1411 + 96 = 1507; 1440 + 54 = 1494, and 1494 + 13 = 1507.
+
+**Interim rules formally retired** as of `bb07d14`. Each piece of evidence is recorded in full under "Batch: 1.39.1" above.
+- **`[BUG-051]` "`/cc-init` records the stack":** retired. Evidence: the `commands-parity` detector-path, probe-line and `cc-resume` byte-identity tests, each watched red against the pre-fix commands.
+- **`[BUG-052]` "never run the installer against this repository":** retired as an interim rule. Evidence: the sandbox installer probe, control `0ec9e9e` against train `25f6ae5`. Contributor policy keeps it in CONTRIBUTING.md.
+- **`[BUG-053]` "never run the gate from a linked worktree":** retired. Evidence: the sandbox linked-worktree probe at train `2ed12da`, 1466 passed, primary repository unchanged.
+
+**Closing comments.** The seven contributor PRs got the owner's texts, then were closed in review order:
+- #54 `issuecomment-6029718221`
+- #53 `issuecomment-6029718689`
+- #50 `issuecomment-6029719170`
+- #52 `issuecomment-6029719641`
+- #55 `issuecomment-6029720104`
+- #51 `issuecomment-6029720554`
+- #56 `issuecomment-6029721057`
+
+His branches stay his. The train branch is deleted. PR #59 remains open as an intake candidate (issue #58).
+
+**Pre-push CHANGELOG check.** The file's 1.39.1 section was verified manually to carry all seven entries, each complete. A splice seen in a pasted report was a rendering artifact, and `cbd731c` was not amended.
+
+**Unminted candidate added:** `record-parity` cannot catch a heading flipped to `[X]` with no CHANGELOG claim behind it. Direction A starts from claims and direction C from DONE versions, so a flip without either is invisible, and the pre-push check above had to be manual. This joins path-convention harmonization and allowlist entry-as-data semantics.
+
+**Next:** the next item is the owner's call. `BUG-055`'s mint stays the owner's, with the ceiling run on both legs first.
