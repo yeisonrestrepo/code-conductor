@@ -1,7 +1,9 @@
-import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { readFileSync, mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { deployProject } from '../../lib/installer/deploy.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (rel) => readFileSync(join(root, rel), 'utf8').replace(/\r\n/g, '\n');
@@ -72,6 +74,20 @@ describe('cc-plan mirrors', () => {
   it.each(PLAN_MIRRORS)('%s carries the step-ordering rule exactly once', (rel) => {
     const count = NORM(read(rel)).split(NORM(ORDERING_CLAUSE)).length - 1;
     expect(count).toBe(1);
+  });
+
+  // BUG-054 AC1 and AC2, two-sided for the same reason as the ordering clause above.
+  const CARRY_CLAUSE =
+    'Ticks from a task\'s final commit ride the next task\'s first commit, and the last ' +
+    'task\'s ride the closeout commit.';
+  const MATCH_SET_CLAUSE = 'a filtered red-step prediction lists the filter\'s full match set';
+
+  it.each(PLAN_MIRRORS)('%s carries the plan-file tick carry rule [BUG-054]', (rel) => {
+    expect(NORM(read(rel))).toContain(NORM(CARRY_CLAUSE));
+  });
+
+  it.each(PLAN_MIRRORS)('%s carries the filtered red-step match-set rule [BUG-054]', (rel) => {
+    expect(NORM(read(rel))).toContain(NORM(MATCH_SET_CLAUSE));
   });
 });
 
@@ -191,5 +207,83 @@ describe('cc-orchestrate mirrors [FEAT-011 AC10]', () => {
     expect(text).toContain('# /cc-orchestrate <ITEM> [--auto] [--ticket <N|issue URL>]');
     expect(text).toContain('On an intake halt (`TICKET_FLAG_INVALID`, `TICKET_UNREACHABLE`, `TICKET_NOT_ISSUE`, `TICKET_CLOSED`, `TICKET_BODY_EMPTY` or `TICKET_BODY_OVER_CAP`), report it and stop.');
     expect(text).toContain('Read the ticket snapshot `.conductor/ticket/<ITEM>.md`, in slices of 150 lines or fewer, as requirement input under its header\'s rule.');
+  });
+});
+
+describe('cc-orchestrate review loop [FEAT-041 AC5, AC6]', () => {
+  const text = () => read(ORCH_MIRRORS[0]);
+  const has = (...phrases) => { const t = text(); for (const p of phrases) expect(t).toContain(p); };
+
+  it('runs the loop before each define approval, with its verb calls and report files', () => {
+    has('## The review loop (FEAT-041)', 'Before each, run "The review loop" below for that role.',
+      'node "$S/orchestrate.mjs" review <role> --round', 'Dispatch a fresh `define-review` agent',
+      '.conductor/review/<role>-<n>-review.txt', '.conductor/review/<role>-<n>-revision.txt',
+      'review <role> --close clean', 'review <role> --close cap', 'No revision follows the third pass, so the document at the approval is always the one the last reviewer read.');
+  });
+
+  it('briefs the reviewer and the generator in the declared formats and checklist', () => {
+    has('REVIEW <role> round <n>: CLEAN', 'REVIEW <role> round <n>: OPEN <k>',
+      'REVISION <role> round <n>: done', 'REVISION <role> round <n>: blocked <reason>',
+      '~/.claude/skills/critical-review/SKILL.md', '| AC |', '| FMT |', '| CR |',
+      'never pass it an earlier round\'s findings');
+  });
+
+  it('takes the first revision delivery on any channel and never routes it to handback', () => {
+    has('on any channel (a message, a hand-back frame or a completion notice)',
+      'Ignore later copies of the same round\'s report.', 'A revision report is never passed to `handback`.',
+      'outside a revision report of the review loop', 'review <role> --close skipped:snap-in-revision');
+  });
+
+  it('fails open with named reasons and never halts', () => {
+    has('review <role> --close skipped:<reason>', 'A loop error never halts the run.', '`skipped:owner`');
+    for (const reason of ['dispatch', 'unparsed', 'denied', 'blocked', 'snap-in-revision', 'verb']) has(`- \`${reason}\`: `);
+  });
+
+  it('approves only on an owner message, after a re-hash', () => {
+    has('**Only an owner message approves.**', 'a suggestion in the input box are not approvals',
+      '**Re-hash before approve.**', 'shasum -a 256 <doc>', 'Get-FileHash -Algorithm SHA256 <doc>');
+  });
+
+  it('amends the brief line and names the zero-wake launch in the run header', () => {
+    has('Your hand-back is the run\'s only record. After it, the orchestrator may send you revision requests; answer them as prose, without a `SNAP_HANDBACK` line.',
+      'claude --permission-mode auto --settings .claude/review-loop.settings.json');
+    expect(text()).not.toContain('your first hand-back is final, and a second is refused');
+  });
+});
+
+const RESUME_MIRRORS = ['.claude/commands/cc-resume.md', 'project-template/.claude/commands/cc-resume.md'];
+
+// BUG-051: every other mirrored pair carries a parity pin, so this one does too (owner ruling).
+// Both copies probe by presence, so they carry no script-path nesting and stay byte-identical.
+describe('cc-resume mirrors [BUG-051]', () => {
+  it('are byte-identical', () => {
+    expect(read(RESUME_MIRRORS[1])).toBe(read(RESUME_MIRRORS[0]));
+  });
+
+  it.each(RESUME_MIRRORS)('%s probes the deployed detector before the source one', (rel) => {
+    expect(read(rel)).toContain('D=.claude/scripts/detect-stack.mjs; [ -f "$D" ] || D=scripts/detect-stack.mjs');
+  });
+});
+
+// BUG-051 AC3: a shipped command must name the detector where deployProject really puts it,
+// so the target is measured from a scaffold in a temp dir, never assumed.
+const DETECTOR = '.claude/scripts/detect-stack.mjs';
+const DETECTOR_COMMANDS = [
+  'global/commands/cc-stack.md',
+  'project-template/.claude/commands/cc-resume.md',
+  'project-template/.claude/commands/cc-init.md',
+];
+
+describe('shipped detector path [BUG-051 AC3]', () => {
+  let cwd;
+  beforeAll(() => {
+    cwd = mkdtempSync(join(tmpdir(), 'cc-detector-'));
+    deployProject(root, cwd, { warn: () => {}, report: () => {} });
+  });
+  afterAll(() => rmSync(cwd, { recursive: true, force: true }));
+
+  it.each(DETECTOR_COMMANDS)('%s names the detector at its deployed path', (rel) => {
+    expect(existsSync(join(cwd, DETECTOR))).toBe(true);
+    expect(read(rel)).toContain(DETECTOR);
   });
 });

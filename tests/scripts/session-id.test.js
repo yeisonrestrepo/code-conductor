@@ -5,19 +5,20 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
+import { cleanGitEnv } from '../helpers/git-env.js';
 
 const SCRIPT = fileURLToPath(new URL('../../scripts/session-id.mjs', import.meta.url));
-const NO_GIT_ENV = { ...process.env, PATH: '' };
+const NO_GIT_ENV = { ...cleanGitEnv(), PATH: '' };
 delete NO_GIT_ENV.CLAUDE_CODE_SESSION_ID;
 const dirs = [];
 function repo() { const d = mkdtempSync(join(tmpdir(), 'sid-')); dirs.push(d); mkdirSync(join(d, '.git')); return d; }
-function run(cwd, env) { return spawnSync(process.execPath, [SCRIPT], { cwd, encoding: 'utf8', env: env ?? process.env }); }
+function run(cwd, env) { return spawnSync(process.execPath, [SCRIPT], { cwd, encoding: 'utf8', env: env ?? cleanGitEnv() }); }
 afterEach(() => { while (dirs.length) { try { rmSync(dirs.pop(), { recursive: true }); } catch {} } });
 
 describe('session-id.mjs', () => {
   it('prints CLAUDE_CODE_SESSION_ID verbatim when set', () => {
     const cwd = repo();
-    const r = run(cwd, { ...process.env, CLAUDE_CODE_SESSION_ID: 'sess-123' });
+    const r = run(cwd, { ...cleanGitEnv(), CLAUDE_CODE_SESSION_ID: 'sess-123' });
     expect(r.status).toBe(0);
     expect(r.stdout.trim()).toBe('sess-123');
     expect(existsSync(join(cwd, '.conductor', 'session-id'))).toBe(false); // env path is cacheless
@@ -25,7 +26,7 @@ describe('session-id.mjs', () => {
 
   it('generates and persists a UUID when env is unset', () => {
     const cwd = repo();
-    const env = { ...process.env }; delete env.CLAUDE_CODE_SESSION_ID;
+    const env = { ...cleanGitEnv() }; delete env.CLAUDE_CODE_SESSION_ID;
     const r = run(cwd, env);
     expect(r.status).toBe(0);
     const id = r.stdout.trim();
@@ -35,7 +36,7 @@ describe('session-id.mjs', () => {
 
   it('returns the cached id on the second invocation', () => {
     const cwd = repo();
-    const env = { ...process.env }; delete env.CLAUDE_CODE_SESSION_ID;
+    const env = { ...cleanGitEnv() }; delete env.CLAUDE_CODE_SESSION_ID;
     const first = run(cwd, env).stdout.trim();
     const second = run(cwd, env).stdout.trim();
     expect(second).toBe(first);
@@ -45,7 +46,7 @@ describe('session-id.mjs', () => {
     const cwd = repo();
     mkdirSync(join(cwd, '.conductor'));
     writeFileSync(join(cwd, '.conductor', 'session-id'), 'cached-xyz\n');
-    const env = { ...process.env }; delete env.CLAUDE_CODE_SESSION_ID;
+    const env = { ...cleanGitEnv() }; delete env.CLAUDE_CODE_SESSION_ID;
     expect(run(cwd, env).stdout.trim()).toBe('cached-xyz');
   });
 

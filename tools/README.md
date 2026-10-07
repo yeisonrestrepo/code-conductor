@@ -94,6 +94,17 @@ Direction B applies to `[X]` alone, not to the whole terminal set. `[~]` is term
 
 ---
 
+## Sub-shaped ids: what each instrument sees
+
+An id with a suffix after its number, such as `[ARCH-008-S1]`, is sub-shaped. Before `[BUG-050]` both instruments skipped that shape silently. Each now declares what it does with it (owner ruling, repair (b)):
+
+- **`id-ceiling.mjs` sees every sub-shaped heading.** The heading counts at its parent's number, even when the parent has no heading of its own, and duplicates are checked under the full id. Each leg's line names the sub-shaped ids it saw, and stderr carries one `CEILING_NOTE`. The `headings=` figure still counts top-level headings only, so it stays comparable with earlier records. The ceiling remains a query and exits 0.
+- **`record-parity.mjs` reads a sub-shaped heading as its own entry**, so its body is never credited to its parent. Existing sub-shaped headings are legitimate history: the command names them on a `sub-shaped headings seen:` line and does not fail on them. **Releases claim only top-level ids.** A sub-shaped claim under a shipped section is a named `[SUB]` failure. Under `### Filed` and `### Notes` it is not a claim at all, by the same two-level rule as any other id.
+
+There is no grandfather list. The three live sub-shaped headings, `[ARCH-008-S1]`, `[ARCH-008-A]` and `[ARCH-008-B]`, pass because the rule treats history correctly, not because they are exempt.
+
+---
+
 ## External writers to this repository's files
 
 Two processes outside this repository append lines to its `.gitignore` when they find them absent:

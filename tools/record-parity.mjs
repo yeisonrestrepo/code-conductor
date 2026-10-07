@@ -17,11 +17,16 @@ import { fileURLToPath } from 'node:url';
 // produced on the first run of the single-level form.
 export const SHIPPED_SECTIONS = new Set(['Added', 'Fixed', 'Changed', 'Removed', 'Deprecated', 'Security']);
 
-const HEADING = /^### \[(.)\] `\[([A-Z]+-\d{3,})\]`/;
+// [BUG-050] An id may carry suffixes after its number, such as ARCH-008-S1. Both
+// patterns read that shape, so a sub-shaped heading is its own entry (its body is never
+// credited to its parent) and a sub-shaped claim is seen instead of silently skipped.
+const ID = '[A-Z]+-\\d{3,}(?:-[A-Za-z0-9]+)*';
+const SUB_SHAPED = /^[A-Z]+-\d{3,}-/;
+const HEADING = new RegExp(`^### \\[(.)\\] \`\\[(${ID})\\]\``);
 const VERSION_HEADING = /^## \[?(\d+\.\d+\.\d+)\]?/;
 const SECTION = /^### (.+?)\s*$/;
 // Level two: the id marker must be the bullet's FIRST token.
-const CLAIM = /^\s*[-*]\s+\*\*\[([A-Z]+-\d{3,})\]\*\*/;
+const CLAIM = new RegExp(`^\\s*[-*]\\s+\\*\\*\\[(${ID})\\]\\*\\*`);
 const SHIPPED_AS = /shipped as `?(\d+\.\d+\.\d+)`?/;
 const TERMINAL = new Set(['X', '~']);
 
@@ -82,9 +87,17 @@ export function checkParity({ backlogText, changelogText, versionFile }) {
   const backlog = parseBacklog(backlogText);
   const current = versions[0].version;
 
+  // [BUG-050] repair (b), owner-ruled: releases claim only top-level ids. A sub-shaped
+  // claim under a shipped section is a named failure; Filed and Notes never reach here.
+  for (const { version, claims } of versions) {
+    for (const id of claims.filter((c) => SUB_SHAPED.test(c))) {
+      violations.push({ direction: 'SUB', id, version, detail: `${version} claims sub-shaped ${id}; releases claim only top-level ids` });
+    }
+  }
+
   // Direction A, unscoped: every claim maps to a heading in a terminal state.
   for (const { version, claims } of versions) {
-    for (const id of claims) {
+    for (const id of claims.filter((c) => !SUB_SHAPED.test(c))) {
       const e = backlog.get(id);
       if (!e) {
         violations.push({ direction: 'A', id, version, detail: `${version} claims ${id} but there is no backlog heading for it` });
@@ -99,7 +112,7 @@ export function checkParity({ backlogText, changelogText, versionFile }) {
   // headings, 6 carrying a shipped version. A 28-entry grandfather list maintained
   // forever is a toll, priced out loud and declined. Tightening this is a one-line
   // scope change if the convention back-fills.
-  for (const id of versions[0].claims) {
+  for (const id of versions[0].claims.filter((c) => !SUB_SHAPED.test(c))) {
     const e = backlog.get(id);
     // [X] only, not the whole TERMINAL set. [~] is terminal for direction A because a
     // superseded item is legitimately closed, but it never shipped, so demanding a
@@ -126,7 +139,9 @@ export function checkParity({ backlogText, changelogText, versionFile }) {
     }
   }
 
-  return { ok: violations.length === 0, violations };
+  // Existing sub-shaped headings are legitimate history: named, never failed.
+  const subShaped = [...backlog.keys()].filter((id) => SUB_SHAPED.test(id));
+  return { ok: violations.length === 0, violations, subShaped };
 }
 
 function main() {
@@ -137,6 +152,7 @@ function main() {
     versionFile: readFileSync(join(root, 'VERSION'), 'utf8').trim(),
   });
   for (const v of r.violations) console.log(`FAIL [${v.direction}] ${v.detail}`);
+  if (r.subShaped.length) console.log(`sub-shaped headings seen: ${r.subShaped.join(', ')}`);
   console.log(r.ok ? 'RECORD_PARITY_OK' : `RECORD_PARITY_FAILED (${r.violations.length} violations)`);
   process.exit(r.ok ? 0 : 1);
 }

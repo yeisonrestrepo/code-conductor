@@ -2908,3 +2908,271 @@ Session span: `[FEAT-041]` added to the backlog (`9c50afe`, pushed to `main`); n
 ### Debt and workarounds
 - Guard 3 P7 blocks stdin redirection (`node script < file`); `/cc-compact` builds the snapshot through a scratch node script that passes the payload to `spawnSync` as `input`.
 - `[ARCH-009]` flip still waits on `[FEAT-009]` and `[FEAT-032]` through `[FEAT-036]`.
+
+## Spec: FEAT-041, reviewer-in-loop for the Define band [2026-10-06]
+
+The spec is `docs/superpowers/specs/2026-10-06-feat041-reviewer-in-loop-design.md`, APPROVED 2026-10-06 as reviewed (sha256 `bd0e396abb157d224ce59650f6a6856ac533fb7acdbbef0677537ca3734bc2fd`) after a closed measurement phase and one file-review round (three fixes, two rulings). Complexity M. No hook, SNAP contract, `ROLES` or gate change; branch `feat/feat-041-reviewer-in-loop`.
+
+- **Shape:** after a Define hand-back, the orchestrator session runs up to 3 reviewer passes (at most 2 revisions, so the boundary document is always the one last reviewed). Each pass is a fresh `define-review` profile (`tools: Read, Grep, Glob`, reads the deployed critical-review skill) against a declared checklist (AC, FMT, CR rows); open rows go to the handed-back generator, revived by `SendMessage`, which revises under its persistent envelope and reports as prose ending `REVISION <role> round <n>: done|blocked`. New `orchestrate.mjs review <role> --round|--close` verb and optional `review` run field; `ORCH_REVIEW_CAP` is a refusal, never a halt.
+- **Measured (V-facts in the spec):** MEASURE-041 (in-repo, 2.1.288; a recorded breach of the no-live-run rule), sandbox v1 (2.1.288), PROBE v2, C-CONTROL and C (2.1.292). Guard 5 permits the revived band agent's edit (v2, C). The revision `SendMessage` is allowed in default mode, denied `[Auto-Mode Bypass]` in plain auto mode, allowed under the owner-approved `--settings` exception. W_dispatch = 0 on 2.1.288 and 2.1.292; F3 stays cited at 2.1.287.
+- **Rulings recorded:** decision (i) prose-only revision reports, revision verb deferred; O1 (A), the spec reviewer reads the bound ticket snapshot, a scope clarification of FEAT-031 `:223` grounded in `:228`; O2 (B), an AMENDMENT of decision (i)'s failure mode: a revision report is never routed into `handback`, and a `SNAP_HANDBACK` in one closes the loop `skipped:snap-in-revision` (fail-open).
+- **Cost per round, declared:** 0 wakes under auto mode with the shipped `project-template/.claude/review-loop.settings.json` (`claude --permission-mode auto --settings .claude/review-loop.settings.json`); default mode, one approval per generator write plus session prompts; plain auto mode degrades to `skipped:denied`. The installer never writes `autoMode` globally.
+- **Boundary:** never auto-continues; only an owner message approves (not a reviewer `CLEAN`, `--auto` or a UI placeholder, observed in PROBE C); re-hash the document before `approve`.
+- **Deferred to the plan:** full reads of `scripts/orchestrate.mjs` and `.claude/hooks/pre-tool-use.mjs` (the spec read both at offsets past the 30-line cap, disclosed); `role-profiles.test.js:49` amendment; the manual `/cc-spec` flow and Guard 5 gating stay follow-ups.
+
+## Plan: FEAT-041 implementation [2026-10-06]
+
+Plan `docs/superpowers/plans/2026-10-06-feat041-reviewer-in-loop.md`.
+- **Approval:** "Approved. The plan ... is approved as reviewed (sha256 96748663f9d96dff5ca6122f6803649b54d260c44209c411b822b17bca95005b), with the three corrections confirmed and ruling 7 as rewritten." Corrections: ruling 7 halt discipline restored (any count outside its row halts and comes to the owner; predictions amended before measurement, never absorbed after); T-001-B red is a module-load failure on the missing exports; T-005-G CI predictions absolute (ci-node20 1357 / 96, ci-node24 1440 / 13). Rulings 1-6 and 8 accepted.
+- **Shape:** T-001 the `review` verb; T-002 the `define-review` profile; T-003 the `/cc-orchestrate` loop prose; T-004 the shipped settings file and README; T-005 release `1.39.0`.
+- **Predicted, not measured:** 1418 -> 1453 / 0, 49 -> 50 files.
+- **Routing:** native. Stop for owner confirmation at T-005-G before pushing or opening the PR.
+
+Handoff observations, one line per task:
+- T-000: plan committed 5ab5fbd at 1418 / 0, 49 files, as predicted; branch gate silent (feat/feat-041-reviewer-in-loop matches FEAT-041).
+- T-001: review verb committed at 1438 / 0, 49 files, as predicted; file 112 / 0 (+20). HALT at T-001-B: vitest delivers a missing named export as undefined (absent under plain Node), so the file loaded and ran 93 pass / 19 fail instead of the predicted module-load SyntaxError; owner ruled all 19 reds trace to the feature's absence (15 CLI refusals, 4 via the undefined exports) and amended T-001-B to the measured split, reversing the review ruling that imposed Node ESM semantics. Discriminators: CAP=4 reds 5 incl. the cap test; Halt reds the cap test; no REVIEW_DIR clear reds both clear tests.
+- T-002: define-review profile committed at 1442 / 0, 49 files, as predicted; 1603 bytes, ASCII, mirrors byte-identical. HALT at T-002-E: gitignore-block-parity derives its expected block from the git index, and the plan staged the profiles in T-002-F, one step after the run that needs them indexed (2 parity tests red, role-profiles green); owner ruled it a plan-ordering defect the review also missed and moved the plain git add into T-002-D; re-run green at 49 / 0.
+- T-003: review loop prose committed at 1448 / 0, 49 files, as predicted; mirrors byte-identical, ASCII probe 0 = 0 at HEAD. HALT at T-003-D: the T-003-A pin 'No revision follows the third pass.' (period) contradicted the plan's own command prose, which continues ', so the document at the approval is always the one the last reviewer read.' (39 / 1); owner ruled an internal plan inconsistency the review also missed, the test yielding to the document; pin amended to the full sentence in the plan and the test, re-run 40 / 0.
+- T-004: settings file, test and README committed at 1453 / 0, 50 files, as predicted; generated file 582 bytes, sha256 05ce114d matching the pin first time; not ignored (check-ignore rc 1); red was 4 / 1 with AC9 passing, as predicted; tree line for review-loop.settings.json overflows the name column with one space, as cc-orchestrate.md does.
+- T-005: release 1.39.0 committed at 1453 / 0, 50 files, as predicted; VERSION_GATE_OK 1.39.0, RECORD_PARITY_OK, protected-files diff vs origin/main empty, agents diff only the two define-review.md; discriminator ([ ] heading) red with 4 violations naming 1.39.0 and FEAT-041, restored green; origin/main still 0ec9e9e, so no third-party merge and the CI predictions stand; ceiling BUG 54 / FEAT 41 / ARCH 10, next BUG-055, nothing minted.
+
+## Closeout: 1.39.0, reviewer-in-loop for the Define band (FEAT-041) [2026-10-06]
+
+**What shipped.** Minor **`1.39.0`** shipped `[FEAT-041]` (PR #66, squash `4505d37`).
+- Plan: `docs/superpowers/plans/2026-10-06-feat041-reviewer-in-loop.md`.
+- Spec: `docs/superpowers/specs/2026-10-06-feat041-reviewer-in-loop-design.md`.
+
+**One sha.** `npm view` reads version `1.39.0` and gitHead `4505d37a22c53bb3e6c7a681e09e53d01b2753c6`. The registry lagged the publish: the run printed its `+` line at 23:58:07Z, `npm view` still answered `1.38.0` (and E404 for `@1.39.0`) at 23:59:51Z, and the registry time for `1.39.0` reads 2026-10-07T00:01:16Z. A first `npm view` within minutes of a publish is not evidence against it. The `v1.39.0` tag (release `v1.39.0`, not a draft, published 2026-10-06T23:57:16Z) and the squash commit on `origin/main` are the same commit, `4505d37a22c53bb3e6c7a681e09e53d01b2753c6`.
+
+**Sync, measured first.** Local `main` was `0ec9e9e`, the branch base. It measured **0 ahead / 1 behind** `origin/main`, the clean case. The first `git switch main` refused, because the uncommitted plan ticks touch a file that differs at `0ec9e9e`; nothing moved. The ticks were copied to the scratchpad (sha256 `ada5eca7…`), the file was restored, `main` fast-forwarded to `4505d37`, and the ticks were copied back. The plan file at `4505d37` equals the branch's, so the copy-back carries exactly the three ticks. The merged tree equals the branch tree at `9d015b0`: `git diff 9d015b0 4505d37` is empty.
+
+**Instrument output on the merged tree:**
+- **`VERSION_GATE_OK 1.39.0`.**
+- **`RECORD_PARITY_OK`.** On the branch, the discriminator went red with `RECORD_PARITY_FAILED (4 violations)`, each reading `1.39.0 claims FEAT-041 but its heading reads [ ]`, then green on restore.
+- **Ceiling:** `UNION ceiling {"BUG":54,"FEAT":41,"ARCH":10}`, next **`BUG-055`**, both legs reporting (`headings=67`, `dupes=none`). Nothing was minted in FEAT-041.
+- **PR run `37548969041`:**
+  - ci-node20 (job `112559649523`) `1357 passed | 96 skipped (1453)`, printing `SKIP_BASELINE_OK ci-node20: 96 skipped identities match tools/skip-baseline.json (report: vitest-report.json)`;
+  - ci-node24 (job `112559649266`) `1440 passed | 13 skipped (1453)`, printing `SKIP_BASELINE_OK ci-node24: 13 skipped identities match tools/skip-baseline.json (report: vitest-report.json)`;
+  - `git diff origin/main -- tools/skip-baseline.json` was empty before the push.
+- **Push run on `main`, `37549205289`:** the same counts and both `SKIP_BASELINE_OK` lines. `tools/skip-baseline.json` is unchanged from `0ec9e9e` to `4505d37`.
+- **Publish run `37549355116`** succeeded, printing `+ @yeison.restrepo.r/code-conductor@1.39.0`.
+- **Local suite on `main`:** 1453 / 0, 50 test files.
+- **Reconciliation, total 1453 on all three legs:**
+
+  | Leg | Reading | Predicted |
+  |---|---|---|
+  | local | 1453 / 0, 50 files | 1453 / 0, 50 files |
+  | ci-node20 | 1357 / 96 | 1357 / 96 |
+  | ci-node24 | 1440 / 13 | 1440 / 13 |
+
+  Arithmetic: 1418 + 35 = 1453; 1322 + 35 = 1357, and 1357 + 96 = 1453; 1405 + 35 = 1440, and 1440 + 13 = 1453.
+
+**Every count boundary matched its prediction**, across five commits and two CI legs, although the counts were predicted, not measured in a scratch clone (Ruling 7). Three steps halted on a red that did not match the plan. Each was ruled on by the owner and amended in the plan before any re-measure. Nothing was absorbed after a measurement.
+
+| Boundary | Measured |
+|---|---|
+| T-000 (`5ab5fbd`) | 1418 / 0, 49 files |
+| T-001 (`d15b898`) | red 93 / 19 (amended); 112 / 112 (+20); discriminators 5, 1, 2; 1438 / 0 |
+| T-002 (`6705a27`) | red 5; parity red 2 (halt, amended), re-run 49 / 49; 1442 / 0 |
+| T-003 (`5a62ac2`) | red 6; 39 / 1 (halt, amended), re-run 40 / 40; ASCII 0 = 0; 1448 / 0 |
+| T-004 (`66a401e`) | red 4 / 1; sha256 `05ce114d…` first time; 5 / 5; 1453 / 0, 50 files |
+| T-005 (`9d015b0`) | 1453 / 0; discriminator red 4, green on restore |
+| CI | 1357 / 96 and 1440 / 13 (1453 each) |
+
+**Plan ticks.** T-005-G, T-005-H and the top-level T-005 are ticked in this record commit, not in a follow-up on the branch, as at 1.37.0 and 1.38.0. The plan now has no unticked task line.
+
+**`[FEAT-041]` harvest, in one place.** Each item is evidenced in the Plan section's handoff observations above and in the amended plan lines.
+
+- **Vitest is not Node ESM for a missing named export.** Under plain Node, importing an export a module does not provide is a load-time SyntaxError (`'REVIEW_CAP' in m` was `false`). Under vitest's transform, the same import arrives as `undefined`, the file loads, and every test runs. The plan's original split was directionally right for vitest, and the review ruling that imposed Node semantics was reversed. **Lesson:** predict a red under the runner that will execute it. Where a test uses a missing constant as a loop bound or a path, its red shows up late (a zero-iteration loop, a `TypeError` in `join`), and the task's discriminators are what make those tests precise after the green.
+- **Index-reading tests force staging order inside the task.** `gitignore-block-parity` derives its expected block from `git ls-files`, so a new leaf line is red until its file is in the index. The plan staged the new profiles one step after the run that needed them; the plain `git add` moved into T-002-D. **Lesson:** when a task adds a `.gitignore` leaf, its new files are staged in the same step as the leaf, before any run of the parity test.
+- **The pin yields to the document.** T-003-A pinned `'No revision follows the third pass.'` with a period, while the plan's own command prose continues `, so the document at the approval is always the one the last reviewer read.` The pin became the full sentence, because the clause carries the invariant worth pinning. **Lesson:** at self-review, each content pin is checked by substring against the text block it pins, in the same plan.
+- **Extract, never retype.** Every inserted block (tests, profile, command prose, README, records) was extracted from the plan's fence by line range, de-indented with an indentation guard, and anchored by unique-match replacement. The settings file was generated from the test's own constant and hit the pin the first time. One slip: a block extracted from deeper indentation lost its two-space nesting and was re-indented before the run.
+- **Guard 3 shaped the shell work.** P7 fired on `sed` edits whose pattern held `[X]` / `[ ]` brackets next to other commands, and P9 fired on `for` and `until` loops. Small `node` scripts in the scratchpad and the Edit tool were the authorized routes; no allowlist entry was proposed.
+
+**Step 11 does not apply.** This repository never starts an orchestrated run, so no ticket binds the item and no writeback is owed.
+
+**Next:** the next item is the owner's call. Follow-up candidates recorded by the plan, none minted: the manual `/cc-spec` flow, Guard 5 gating on an open round, the revision verb, and the D8 sequencing anomaly. `BUG-055`'s mint stays the owner's, with the ceiling run on both legs first.
+
+## Checkpoint 2026-10-06 19:26
+
+### Decisions
+- FEAT-041 shipped as 1.39.0 (PR #66, squash 4505d37 = tag v1.39.0 = npm gitHead); closeout record 0694e16 is on origin/main and the feature branch is deleted on both sides.
+- Three plan amendments were ruled by the owner before any re-measure: T-001-B red is the measured 93 / 19 under vitest, T-002-D stages the new profiles with their .gitignore leaf, T-003-D pins the full sentence.
+- The ceiling union stands at BUG 54 / FEAT 41 / ARCH 10; the next item and the BUG-055 mint are the owner's call.
+
+### Conventions
+- Predict a red under the runner that will execute it: vitest delivers a missing named export as undefined, while plain Node ESM throws at load.
+- When a task adds a .gitignore leaf, stage its new files in the same step, before any run of gitignore-block-parity (it reads git ls-files).
+- Every content pin is checked by substring against the block it pins, in the same plan, at self-review.
+
+### Workarounds
+- Guard 3 P7 trips on sed bracket patterns chained with other commands and P9 on shell loops; use scratchpad node scripts or the Edit tool.
+- `git switch main` refuses over uncommitted plan ticks that differ at the branch base; copy the plan to the scratchpad, restore, switch and fast-forward, then copy back.
+- GitHub auto-deletes the merged remote branch; a failed `git push --delete` is cleared with `git fetch --prune`.
+- The npm registry lags a publish by about 3 minutes; an early `npm view` miss is not evidence against the publish.
+
+## Batch: 1.39.1, the Ludocius contribution queue (BUG-032, BUG-045, BUG-050, BUG-051, BUG-052, BUG-053, BUG-054) [2026-10-06]
+
+**Shape.** Seven contributor PRs, reviewed in the owner's order: #54, #53, #50, #52, #55, #51, #56. PR #59 stayed out (an intake candidate tied to issue #58).
+- All seven forked from `0ec9e9e` and conflicted with `main` at `a05a555`. Each carried its own VERSION, CHANGELOG, backlog-flip and README records, which went stale against 1.39.0.
+- They landed on one owner-side train, `land/ludocius-batch`, from `a05a555`. His code, tests, specs, plans and `.gitignore` leaves were cherry-picked with his authorship; his records were dropped and superseded by this record commit.
+- The train merges preserving individual commits, so every commit was required green on its own row. His PRs stay untouched until the train merges, and are then closed with the owner's crediting comments.
+- His specs and plans are kept unmodified as his record, including where they describe replaced approaches.
+
+**Per item: what was contributed, what the owner side added, and why.**
+- **`[BUG-032]` (#54).**
+  - Contributed: the chain step and the Memory section in `global/CLAUDE.md`.
+  - Owner side (`786da48`): the `memory-first` skill now agrees with the chain; it had kept checking `project.md` alone, so the chain and its enforcer disagreed. Both `personal.md` files are named, with the owner-ruled precedence (the project copy wins, most specific layer first; `cc-checkpoint.md:19` writes it and `cc-resume.md:45` reads it). A `repo-invariants` test, watched red, closes the demonstration criterion.
+  - The backlog's "Verified while filing" note was stale: BUG-039's seed at `lib/installer/host-owned.mjs:19` satisfies the deploy half. It is corrected in the backlog by this commit.
+- **`[BUG-054]` (#53).**
+  - Contributed: the plan-file staging rule.
+  - Owner side (`d988684`): the next-task carry clause, which settles what "commit group" means; the filtered red-step match-set rule; and two-sided presence anchors on both `cc-plan.md` copies (4 tests, watched red). Criteria 2 and 3 were missing from the PR.
+- **`[BUG-051]` (#50).**
+  - Contributed: presence-based detector resolution in prose.
+  - Owner side (`5bd7ce4`):
+    - a concrete D11-style probe line;
+    - the `/cc-stack` step-1 root fix: read literally, "the directory that contains the detector script" was `.claude/scripts/`, so the command would have run from, and written `CLAUDE.md` into, the scripts directory;
+    - tests pinning every shipped detector path to a real `deployProject` scaffold;
+    - the `cc-resume` byte-identity pin.
+  - Parity ruling (owner): mirror parity widens to the `cc-resume` pair, on the ground that the copies are identical, the fix keeps them so, and every other mirrored pair carries a pin.
+- **`[BUG-053]` (#52).**
+  - Contributed: the `cleanGitEnv()` helper with a hand-kept 6-variable list. His spec named `GIT_CEILING_DIRECTORIES` where his code had `GIT_COMMON_DIR`.
+  - Owner side (`2ed12da`): the list is derived from `git rev-parse --local-env-vars`, which has 15 entries, `GIT_PREFIX` among them. It throws on failure with no fallback (owner ruling: a stale list applied silently scrubs incompletely and lets a leaking test pass).
+  - The script-launch sweep closes the 10 tests that still resolved the real repository under a linked-worktree hook. A decoy-repository red-green proof ships as `tests/unit/git-env.test.js`.
+  - Design note: the fix is fixture-side because the gate lives untracked in `.git/hooks`.
+- **`[BUG-050]` (#55).**
+  - Contributed: sub-shaped detection that rejected every sub-shaped heading, plus an in-test grandfather list.
+  - **Central finding of the queue's instrument review:** with that list, the merge gate passed while `node tools/record-parity.mjs` exited 1 on the same records. That is a green covering less than its name, the defect class BUG-050 itself names.
+  - Owner ruling, repair (b):
+    - history is named, not failed;
+    - a sub-shaped claim under a shipped section is a named failure;
+    - `Filed` and `Notes` are ignored (his scan was section-blind and reintroduced the single-level false positive);
+    - the ceiling counts the parent number and checks sub-shaped duplicates (two latent mint-twice gaps);
+    - `parseBacklog` treats a sub-shaped heading as its own entry (the body bleed);
+    - no grandfather list (BUG-046 Gate 4).
+  - The grandfather commit `f6fc2f0` was not landed. The owner completion is folded into his commit `5c54eea`, which keeps his authorship and adds co-author trailers, because his commit alone was red on the violation the list had hidden.
+- **`[BUG-052]` (#51).**
+  - Contributed: the package-name self-guard inside `deployProject`.
+  - Owner side (`25f6ae5`):
+    - The guard moves to the CLI pre-flight, because under `--project` the whole global install into `~/.claude` ran before the guard fired, and the command then exited 1, the code meaning nothing was written.
+    - His exit mapping is kept as a commented backstop (owner ruling).
+    - The catch is narrowed: ENOENT or a JSON parse error means not-self; any other read error refuses (owner ruling: a tree that cannot be read is suspect, not a green light to sweep).
+    - CLI, host-sweep and read-error tests, in temp dirs only.
+- **`[BUG-045]` (#56).** Landed as an **owner redesign**, `70766b9`: owner-authored, with `Co-Authored-By: Luis`. His target shapes and four corpus rows are kept.
+  - **Central finding:** on a protected surface, his boundary-append form (quote characters added to `G3_BD`/`G3_AD`) was measured on both subjects to open four traversal shapes and two concatenation shapes:
+    - T1 `cat "docs/"../*.md`
+    - T2 `cat docs/"../"*.md`
+    - T3 `cat 'docs/'..'/'*.md`
+    - T5 `cat "docs/x y/../../z.md" *.md`
+    - P1 `cat foo"docs/x.md" *.md`
+    - S1 `cat "docs/x.md"EXTRA *.md`
+
+    Review measurement caught them.
+  - **Ritual skip, plainly:** he edited the frozen authority with no sanctioned exception, no header amendment and no predicted red table. His spec claimed 6 corpus rows against a 4-row diff.
+  - The redesign is a whole-token quoted alternative, with the bare boundaries byte-identical to main. It is exception six; the header count is corrected to "Six" (BUG-047 had left it at "Four" while listing five; the omission is BUG-047's, not the contributor's).
+  - **Measurement overturned an owner design ruling before adoption.** The owner-specified quoted suffix, "the entire quoted remainder", opened X1, `cat "docs/$(echo ../..)/x.md"`, because `$( )` executes inside double quotes and the BUG-043 mask leaves the allowlist deciding alone. C-path (the bare path class plus a space) met every expected cell, denied X1, and kept T5 matchable. This is the failure the measure-first condition exists to catch, and the second instance today after FEAT-041's vitest-semantics reversal. Single quotes do not execute `$( )`, but the same class applies symmetrically as the safe, simple shape.
+  - D1 is ruled allowed: an entry used as quoted data lifts the denial as its unquoted form does.
+  - Corpus 155 to 167. Predicted red, as written: 6 failed (A1, A2, D1 per suite) of 1507. Discriminators: his subjects 12 failed, C-any 2 failed. The fail convention was re-checked (no new throw path, the allowlist read unchanged).
+
+**Interim rules retired by this release, effective as this commit lands on `main` with the train:**
+- **`[BUG-051]`, "`/cc-init` records the stack."** Evidence: the `commands-parity` tests. Three pin every shipped command that names the detector to `.claude/scripts/detect-stack.mjs`, checked against a real `deployProject` scaffold in a temp dir. Two anchor the probe line on both `cc-resume` copies, and one asserts their byte identity. All were watched red against the pre-fix commands.
+- **`[BUG-052]`, "never run the installer against this repository."** Evidence: a scratchpad clone with a temp `HOME`, isolation checked first, running `node bin/code-conductor.mjs --project` inside the clone.
+  - Control at `0ec9e9e`: rc=2 `PARTIAL_WRITE` (ENOENT lstat on the clone's `scripts`). `git status --porcelain --ignored` CHANGED: four `.claude/commands/*`, `.claude/hooks/context-guard.sh`, `.claude/settings.json`, `.gitignore` and `CLAUDE.md` modified; 11 `scripts/*.mjs` deleted; backups and new ignored files added. The temp `HOME` was written (25 entries). It is 11 rather than the incident's 9 because `orchestrate.mjs` and `ticket.mjs` were added since. It is rc 2 because in the node-bin form the asset root is the clone, so the sweep deleted the copy source.
+  - Train `25f6ae5`: rc=1, `cannot start install: cannot deploy --project into code-conductor's own source tree (...)`; porcelain `--ignored` IDENTICAL before and after; 0 scripts deleted; temp `HOME` 0 entries.
+  - The CONTRIBUTING rule "never run the installer in this repository" stands as contributor policy.
+- **`[BUG-053]`, "never run the gate from a linked worktree."** Evidence: a scratchpad clone with a linked worktree and a pre-commit hook running `npm test`, one real commit from the worktree.
+  - Fork `0ec9e9e`: 31 failed / 1387 passed of 1418, primary config CHANGED (`core.bare=true`, `user.name=T`, `user.email=t@t.t`).
+  - PR head: 10 failed / 1408 passed, state UNCHANGED.
+  - Train `2ed12da`: `Tests 1466 passed (1466)`, `Test Files 51 passed (51)`, state `before=c30d05807b78 after=c30d05807b78 UNCHANGED`, `core.bare=false`.
+
+**Patterns across the queue.**
+- **Invented criteria:** every one of the seven specs wrote acceptance criteria of its own instead of answering the minted entry's. BUG-050's chose neither recorded repair; BUG-045's miscounted its own rows.
+- **Installer runs in this repository:** 4 of 7 PRs carried a `node bin/code-conductor.mjs --project` commit with a net-empty revert (#54 `34265f9`, #53 `36ae7cf`, #50 `4a6bb24`, #52 `aa77386`), each dropped.
+- **Records in PRs:** contributor PRs carrying VERSION bumps, CHANGELOG entries and backlog flips are exactly what made all seven conflict at once. CONTRIBUTING.md gains "Records are owner-side" in this commit, with this queue as its founding case.
+
+**Process observations (owner-accepted).**
+- **A verification command that can match nothing and print empty passes vacuously:** the instruments archetype in shell form. zsh does not word-split an unquoted `$P`, which voided the first five protected-surface checks. Re-run under POSIX `sh`, the conclusions held. Every protected-surface check now prints the path list it diffed.
+- **Whole-commit cherry-picks bypass the pre-commit gate.** The per-commit suite in a sandbox clone is part of the train protocol, and runs again before any push.
+
+**Train rows (sandbox, per commit):** 1453 (2 commits), 1454 (3), 1458 (3), 1464 (3), 1466 (1), 1478 (2), 1480 (2), 1483 (1), 1507 (2). Every commit green; final 1507 / 0, 51 files.
+
+**Unminted candidates recorded today.**
+- **Path-convention harmonization:** presence-based detector resolution in `cc-stack`, `cc-resume` and `cc-orchestrate`, versus the nesting split in the `cc-init` copies.
+- **Allowlist entry-as-data semantics:** an entry anywhere in the command lifts the whole denial, D1 included. Changing it is an allowlist redesign.
+
+## Closeout: 1.39.1, the Ludocius contribution queue [2026-10-06]
+
+**What shipped.** Patch **`1.39.1`** shipped seven contributed fixes: `[BUG-032]`, `[BUG-045]`, `[BUG-050]`, `[BUG-051]`, `[BUG-052]`, `[BUG-053]` and `[BUG-054]`. They came through PR #67 from `land/ludocius-batch`, merged as a **merge commit** `bb07d14` (parents `a05a555` and `cbd731c`), so all 20 train commits keep their authorship. The batch record above is this release's harvest.
+
+**One sha.**
+- `npm view` reads version `1.39.1`, `dist-tags.latest` `1.39.1`, and gitHead `bb07d14bbdeac9dda129a70e9dfb8674fae13db4`. The `v1.39.1` tag (release `v1.39.1`, not a draft, published 2026-10-07T02:27:28Z) and the origin/main merge commit are the same commit.
+- Publish run `37562068460` succeeded at 02:28:54Z, printing `+ @yeison.restrepo.r/code-conductor@1.39.1`.
+- The registry lagged the publish, as at 1.39.0. `npm view` still answered `1.39.0` at 02:29Z and 02:31:05Z, the registry time for `1.39.1` reads 2026-10-07T02:31:36.615Z, and the re-query at 02:33:11Z matched.
+
+**Sync, measured first.** Local `main` `a05a555` measured **0 ahead / 21 behind** `origin/main`: the 20 train commits plus the merge commit. It fast-forwarded to `bb07d14`, and `git diff cbd731c bb07d14` is empty, so the merged tree equals the train tree.
+
+**Instrument output on `main` (`bb07d14`):**
+- `VERSION_GATE_OK 1.39.1`.
+- `sub-shaped headings seen: ARCH-008-S1, ARCH-008-A, ARCH-008-B`, then `RECORD_PARITY_OK`.
+- **Ceiling, both legs:** `headings=67 max={"BUG":54,"FEAT":41,"ARCH":10} dupes=none`, with the three ARCH-008 sub-shaped headings seen. `UNION ceiling {"BUG":54,"FEAT":41,"ARCH":10}`, next **`BUG-055`**, unchanged by the queue. Nothing was minted.
+- Local suite: 1507 / 0, 51 test files.
+
+**PR run `37561743465` (head `cbd731c`):**
+- ci-node20 (job `112600328989`): `Tests 1411 passed | 96 skipped (1507)`, `SKIP_BASELINE_OK ci-node20: 96 skipped identities match tools/skip-baseline.json (report: vitest-report.json)`.
+- ci-node24 (job `112600328474`): `Tests 1494 passed | 13 skipped (1507)`, `SKIP_BASELINE_OK ci-node24: 13 skipped identities match tools/skip-baseline.json (report: vitest-report.json)`.
+- `git diff origin/main -- tools/skip-baseline.json` was empty before the push. Both legs matched the prediction derived from the +54 delta, none of whose tests is in a file with skipped identities.
+
+**Baselines of record, from `bb07d14`:**
+
+| Leg | Reading |
+|---|---|
+| local | 1507 / 0, 51 files |
+| ci-node20 | 1411 / 96 |
+| ci-node24 | 1494 / 13 |
+
+Arithmetic: 1453 + 54 = 1507; 1357 + 54 = 1411, and 1411 + 96 = 1507; 1440 + 54 = 1494, and 1494 + 13 = 1507.
+
+**Interim rules formally retired** as of `bb07d14`. Each piece of evidence is recorded in full under "Batch: 1.39.1" above.
+- **`[BUG-051]` "`/cc-init` records the stack":** retired. Evidence: the `commands-parity` detector-path, probe-line and `cc-resume` byte-identity tests, each watched red against the pre-fix commands.
+- **`[BUG-052]` "never run the installer against this repository":** retired as an interim rule. Evidence: the sandbox installer probe, control `0ec9e9e` against train `25f6ae5`. Contributor policy keeps it in CONTRIBUTING.md.
+- **`[BUG-053]` "never run the gate from a linked worktree":** retired. Evidence: the sandbox linked-worktree probe at train `2ed12da`, 1466 passed, primary repository unchanged.
+
+**Closing comments.** The seven contributor PRs got the owner's texts, then were closed in review order:
+- #54 `issuecomment-6029718221`
+- #53 `issuecomment-6029718689`
+- #50 `issuecomment-6029719170`
+- #52 `issuecomment-6029719641`
+- #55 `issuecomment-6029720104`
+- #51 `issuecomment-6029720554`
+- #56 `issuecomment-6029721057`
+
+His branches stay his. The train branch is deleted. PR #59 remains open as an intake candidate (issue #58).
+
+**Pre-push CHANGELOG check.** The file's 1.39.1 section was verified manually to carry all seven entries, each complete. A splice seen in a pasted report was a rendering artifact, and `cbd731c` was not amended.
+
+**Unminted candidate added:** `record-parity` cannot catch a heading flipped to `[X]` with no CHANGELOG claim behind it. Direction A starts from claims and direction C from DONE versions, so a flip without either is invisible, and the pre-push check above had to be manual. This joins path-convention harmonization and allowlist entry-as-data semantics.
+
+**Next:** the next item is the owner's call. `BUG-055`'s mint stays the owner's, with the ceiling run on both legs first.
+
+## Checkpoint 2026-10-06 21:43
+
+### Decisions
+- The seven Ludocius PRs landed as 1.39.1 through one train branch. PR #67 was merged as a merge commit, `bb07d14`, so each commit keeps its author. The closeout record is `c044ef6`. PRs #50-#56 are closed with the owner's comments, and #59 stays open as an intake candidate.
+- Contributor records (VERSION, CHANGELOG, backlog flips, README limits) are owner-side, as stated in CONTRIBUTING.md "Records are owner-side". External PRs ship code, tests and design docs only.
+- The BUG-051, BUG-052 and BUG-053 interim rules are retired as of `bb07d14`, each with sandbox or test evidence in the 1.39.1 batch record.
+- Local branches are pruned to `main`. The seven fix branches and three shipped branches (#41, #42, #60) were deleted after verifying each squash commit is byte-identical on the files the branch touched.
+
+### Conventions
+- A train merges as a merge commit, never a squash. Every train commit must be green on its own row in a sandbox per-commit run, which is repeated before any push.
+- A protected-surface check prints the path list it diffed. Run it under POSIX `sh`, since zsh does not word-split an unquoted variable.
+- Measure a design before adopting it, including an owner's design. The quoted-suffix ruling was overturned by the X1 measurement before any corpus row was written.
+- Probes that run the installer or a hook against a changed copy run in a scratchpad sandbox clone, never in this repository, whose `.claude/hooks/pre-tool-use.mjs` guards the live session.
+
+### Debt
+- Unminted: `record-parity` cannot see a heading flipped to `[X]` with no CHANGELOG claim; path-convention harmonization; allowlist entry-as-data semantics, D1 included.
+- The 1.36.0 release tag is named `1.36.0`, without the `v` every other tag carries.
+
+### Workarounds
+- Whole-commit cherry-picks skip the pre-commit gate; a sandbox clone runs the suite per commit instead.
+- `git commit -- <paths>` runs the gate against a temporary index, which fails `gitignore-block-parity` when other staged files carry `.gitignore` leaves. Set the other staged work aside with `git stash` and commit against a consistent tree.
+- macOS `sed` does not strip `\x1b`, and `gh` run logs carry ANSI escapes as literal `^[`. Strip them in node before matching CI count lines.

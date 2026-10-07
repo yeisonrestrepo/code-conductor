@@ -642,20 +642,33 @@ function g3ReadAllowlist() {
 const g3EscapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const G3_BD = '(^|[ \\t\\n\\r\\f\\v|;()])';
 const G3_AD = '([ \\t\\n\\r\\f\\v|;()]|$)';
+// The suffix a directory entry may cover: bare, and inside quotes the same class plus a
+// space, because a space inside quotes is part of the path. Nothing wider: inside double
+// quotes $( ) still executes, and the BUG-043 mask hides quoted text from every pattern
+// check, so a quoted suffix admitting $ would let the allowlist cover a substitution
+// alone. [BUG-045]
+const G3_SUFFIX = '([A-Za-z0-9_./@%*?-]*)';
+const G3_QSUFFIX = '([A-Za-z0-9_./@%*? -]*)';
+
+// A path is covered bare or as ONE whole quoted token, opened right after a boundary and
+// closed right before one. A quote mid-word is never a boundary, so a quote that splits a
+// path cannot end the match before a ../ the traversal check must see. [BUG-045]
+function g3EntryForms(e, dir) {
+  if (!dir) return [e, `"${e}"`, `'${e}'`];
+  return [e + G3_SUFFIX, `"${e}${G3_QSUFFIX}"`, `'${e}${G3_QSUFFIX}'`];
+}
 
 function g3AllowlistCovers(s, entries) {
   if (entries.length === 0) return false;
   for (const entry of entries) {
-    if (entry.endsWith('/')) {
-      const m = new RegExp(G3_BD + g3EscapeRe(entry) + '([A-Za-z0-9_./@%*?-]*)' + G3_AD).exec(s);
-      if (m) {
-        // G3_BD contributes group 1, so the suffix is group 2, matching the
-        // authority's BASH_REMATCH[2]. A suffix that walks up the tree is not
-        // covered: an allowlist entry must not become a path-traversal gift.
-        if (/(^|\/)\.\.(\/|$)/.test(m[2])) continue;
-        return true;
-      }
-    } else if (new RegExp(G3_BD + g3EscapeRe(entry) + G3_AD).test(s)) {
+    const dir = entry.endsWith('/');
+    for (const form of g3EntryForms(g3EscapeRe(entry), dir)) {
+      const m = new RegExp(G3_BD + form + G3_AD).exec(s);
+      if (!m) continue;
+      // G3_BD contributes group 1, so the suffix is group 2, matching the
+      // authority's BASH_REMATCH[2]. A suffix that walks up the tree is not
+      // covered: an allowlist entry must not become a path-traversal gift.
+      if (dir && /(^|\/)\.\.(\/|$)/.test(m[2])) break;
       return true;
     }
   }

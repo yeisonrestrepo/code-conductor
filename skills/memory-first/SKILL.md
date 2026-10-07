@@ -1,6 +1,6 @@
 ---
 name: memory-first
-description: "Lookup chain enforced before any file read or search: project memory, grep/glob, targeted read — stop at the first step that answers"
+description: "Lookup chain enforced before any file read or search: project and global memory, grep/glob, targeted read — stop at the first step that answers"
 type: skill
 ---
 
@@ -10,13 +10,14 @@ Follow this lookup chain in strict order before reading any file, running any se
 
 ## Chain
 
-### 1. Project Memory
-Check `.claude/memory/project.md`.
+### 1. Memory
+Check `.claude/memory/project.md` (project) and `~/.claude/memory/personal.md` (global preferences).
 
-Use the Grep tool to check project.md first:
+Use the Grep tool on both files:
 
 ```
 Grep pattern="<keyword>" path=".claude/memory/project.md"
+Grep pattern="<keyword>" path="~/.claude/memory/personal.md"
 ```
 
 If Grep returns matches, use that information and stop. If no matches, proceed to step 2.

@@ -7,8 +7,9 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { fakeGh, issue, pull } from '../helpers/fake-gh.js';
 import { parseSnapshotHeader } from '../../scripts/ticket.mjs';
+import { cleanGitEnv } from '../helpers/git-env.js';
 import {
-  ENVELOPE_FILE, HANDBACK_DIR, MAY_HAND_BACK, ROLE_ARTIFACTS, RUN_FILE, SHELL_METACHARACTERS, WRITE_SURFACE,
+  ENVELOPE_FILE, HANDBACK_DIR, MAY_HAND_BACK, ROLE_ARTIFACTS, REVIEW_CAP, REVIEW_DIR, RUN_FILE, SHELL_METACHARACTERS, WRITE_SURFACE,
   checkTestCommand, extractTasks, findAgent, forwardGate, isValidRun, nextStep, taskScope,
 } from '../../scripts/orchestrate.mjs';
 
@@ -33,7 +34,7 @@ afterEach(() => {
 
 // Through the CLI's real contract: verb on argv, hand-back on stdin, this session's id in env.
 function orch(args, { input = '', sid = 'sess-1' } = {}) {
-  const env = { ...process.env, HOME: home, USERPROFILE: home };
+  const env = { ...cleanGitEnv(), HOME: home, USERPROFILE: home };
   delete env.CLAUDE_CODE_SESSION_ID;
   if (sid !== null) env.CLAUDE_CODE_SESSION_ID = sid;
   const r = spawnSync(process.execPath, [SCRIPT, ...args], { cwd: root, env, input, encoding: 'utf8', timeout: 30000 });
@@ -529,7 +530,7 @@ describe('ticket intake [FEAT-031 AC1-AC5, AC12]', () => {
 
   // orch() with the fake gh first on PATH; every other contract is orch()'s own.
   function orchGh(args, sid = 'sess-1') {
-    const env = gh.env({ ...process.env, HOME: home, USERPROFILE: home, CLAUDE_CODE_SESSION_ID: sid });
+    const env = gh.env({ ...cleanGitEnv(), HOME: home, USERPROFILE: home, CLAUDE_CODE_SESSION_ID: sid });
     const r = spawnSync(process.execPath, [SCRIPT, ...args], { cwd: root, env, encoding: 'utf8', timeout: 30000 });
     if (r.error) throw new Error(`orchestrate spawn failed: ${r.error.message}`);
     return { status: r.status, out: r.stdout.trim(), err: r.stderr.trim() };
@@ -620,7 +621,7 @@ describe('ticket intake [FEAT-031 AC1-AC5, AC12]', () => {
     orch(['end']);
     expect(orchGh(['start', 'FEAT-031']).status).toBe(0);
     expect(snapText()).toBe(bound);
-    const wb = spawnSync(process.execPath, [TICKET_SCRIPT, 'writeback', 'FEAT-031', '--version', '1.38.0', '--pr', '64'], { cwd: root, env: gh.env(), encoding: 'utf8' });
+    const wb = spawnSync(process.execPath, [TICKET_SCRIPT, 'writeback', 'FEAT-031', '--version', '1.38.0', '--pr', '64'], { cwd: root, env: gh.env(cleanGitEnv()), encoding: 'utf8' });
     expect(wb.stdout).toMatch(/^posted to acme\/widgets#123 /);
   });
 
@@ -653,5 +654,136 @@ describe('ticket intake [FEAT-031 AC1-AC5, AC12]', () => {
     const r = orchGh(['start', 'FEAT-031', '--ticket', '5']);
     expect(r.err).toMatch(/^ORCH_TEST_COMMAND_UNRESOLVED: /);
     expect(gh.calls()).toEqual([]);
+  });
+});
+
+// Drives a fresh run into the await window after `role`'s hand-back, where the loop runs (FEAT-041).
+function awaiting(role) {
+  driveTo(role);
+  orch(['install', role]);
+  orch(['handback', role], { input: say(role, 'boundary_routed') });
+}
+const loop = (role) => runFile().review?.[role];
+const USAGE = 'orchestrate: usage: orchestrate.mjs review <spec|plan> --round | --close <clean|cap|skipped:<reason>>';
+
+describe('review loop round counter [FEAT-041 AC2-AC4]', () => {
+  it('refuses --round outside the await window, writing nothing', () => {
+    driveTo('spec');
+    const before = readFileSync(join(root, RUN_FILE), 'utf8');
+    expect(orch(['review', 'spec', '--round'])).toMatchObject({ status: 2, err: 'orchestrate: review spec: the next step is install spec' });
+    expect(readFileSync(join(root, RUN_FILE), 'utf8')).toBe(before);
+  });
+
+  it('opens round 1 after the spec hand-back and records it', () => {
+    awaiting('spec');
+    expect(orch(['review', 'spec', '--round'])).toMatchObject({ status: 0, out: 'review spec round 1 of 3' });
+    expect(loop('spec')).toEqual({ round: 1, outcome: null });
+  });
+
+  it('refuses a fourth round with ORCH_REVIEW_CAP, a refusal that sets no halt', () => {
+    awaiting('spec');
+    for (let n = 1; n <= REVIEW_CAP; n++) expect(orch(['review', 'spec', '--round']).out).toBe(`review spec round ${n} of 3`);
+    expect(orch(['review', 'spec', '--round'])).toMatchObject({ status: 2, err: 'orchestrate: ORCH_REVIEW_CAP: review spec has run 3 rounds; close it with --close cap' });
+    expect(runFile().halt).toBeNull();
+    expect(loop('spec')).toEqual({ round: 3, outcome: null });
+  });
+
+  it('closes clean, and a closed loop refuses --round and a second --close', () => {
+    awaiting('spec');
+    orch(['review', 'spec', '--round']);
+    expect(orch(['review', 'spec', '--close', 'clean'])).toMatchObject({ status: 0, out: 'review spec closed clean at round 1' });
+    for (const args of [['--round'], ['--close', 'cap']]) {
+      expect(orch(['review', 'spec', ...args])).toMatchObject({ status: 2, err: 'orchestrate: review spec: the loop closed clean; a closed loop does not reopen' });
+    }
+    expect(loop('spec')).toEqual({ round: 1, outcome: 'clean' });
+  });
+
+  it('accepts cap only at round 3', () => {
+    awaiting('spec');
+    orch(['review', 'spec', '--round']);
+    expect(orch(['review', 'spec', '--close', 'cap'])).toMatchObject({ status: 2, err: 'orchestrate: review spec: cap needs round 3; the loop is at round 1' });
+    orch(['review', 'spec', '--round']);
+    orch(['review', 'spec', '--round']);
+    expect(orch(['review', 'spec', '--close', 'cap'])).toMatchObject({ status: 0, out: 'review spec closed cap at round 3' });
+  });
+
+  it('refuses clean before any pass, and accepts a skip at round 0', () => {
+    awaiting('spec');
+    expect(orch(['review', 'spec', '--close', 'clean'])).toMatchObject({ status: 2, err: 'orchestrate: review spec: clean needs a reviewer pass; none has run' });
+    expect(orch(['review', 'spec', '--close', 'skipped:verb'])).toMatchObject({ status: 0, out: 'review spec closed skipped:verb at round 0' });
+    expect(loop('spec')).toEqual({ round: 0, outcome: 'skipped:verb' });
+  });
+
+  it.each(['skipped:', 'skipped:Denied', 'skipped:a b', `skipped:${'a'.repeat(41)}`, 'done'])('refuses the outcome %j, writing nothing', (outcome) => {
+    awaiting('spec');
+    expect(orch(['review', 'spec', '--close', outcome])).toMatchObject({ status: 2, err: USAGE });
+    expect(loop('spec')).toBeUndefined();
+  });
+
+  it('refuses a malformed call with the usage line', () => {
+    awaiting('spec');
+    for (const args of [['spec'], ['spec', '--open'], ['spec', '--round', 'x'], ['spec', '--close'], ['spec', '--close', 'clean', 'x']]) {
+      expect(orch(['review', ...args])).toMatchObject({ status: 2, err: USAGE });
+    }
+    expect(loop('spec')).toBeUndefined();
+  });
+
+  it('runs a separate loop for plan in its own window, and refuses spec there', () => {
+    awaiting('plan');
+    expect(orch(['review', 'plan', '--round']).out).toBe('review plan round 1 of 3');
+    expect(orch(['review', 'spec', '--round'])).toMatchObject({ status: 2, err: 'orchestrate: review spec: the next step is approve plan' });
+    expect(runFile().review).toEqual({ plan: { round: 1, outcome: null } });
+  });
+
+  it('[AC4] approve ignores an open loop and keeps its record', () => {
+    awaiting('spec');
+    orch(['review', 'spec', '--round']);
+    expect(orch(['approve', 'spec']).status).toBe(0);
+    expect(runFile()).toMatchObject({ approvals: { spec: { by: expect.any(String) } }, review: { spec: { round: 1, outcome: null } } });
+  });
+
+  it('[AC4] isValidRun accepts a run with and without review', () => {
+    const run = { v: 1, session_id: 's', item: 'FEAT-041', ...blank };
+    expect(isValidRun(run)).toBe(true);
+    expect(isValidRun({ ...run, review: { spec: { round: 1, outcome: 'clean' } } })).toBe(true);
+  });
+
+  it('[AC4] end prints the review record and removes .conductor/review', () => {
+    awaiting('spec');
+    orch(['review', 'spec', '--round']);
+    mkdirSync(join(root, REVIEW_DIR), { recursive: true });
+    writeFileSync(join(root, REVIEW_DIR, 'spec-1-review.txt'), 'REVIEW spec round 1: CLEAN\n');
+    expect(JSON.parse(orch(['end']).out).review).toEqual({ spec: { round: 1, outcome: null } });
+    expect(existsSync(join(root, REVIEW_DIR))).toBe(false);
+  });
+
+  it('a start over a stale run clears .conductor/review', () => {
+    orch(['start', 'FEAT-011'], { sid: 'old-session' });
+    mkdirSync(join(root, REVIEW_DIR), { recursive: true });
+    writeFileSync(join(root, REVIEW_DIR, 'spec-1-review.txt'), 'stale\n');
+    expect(orch(['start', 'FEAT-012']).status).toBe(0);
+    expect(existsSync(join(root, REVIEW_DIR))).toBe(false);
+  });
+
+  it('refuses on a halted run, writing nothing', () => {
+    awaiting('spec');
+    runFileText(JSON.stringify({ ...runFile(), halt: { code: 'SNAP_ERROR', reason: 'x', at: 'y' } }));
+    const r = orch(['review', 'spec', '--round']);
+    expect(r.status).toBe(2);
+    expect(r.err).toContain('halted with SNAP_ERROR');
+    expect(loop('spec')).toBeUndefined();
+  });
+
+  it('[RF2] starts fresh over a corrupt review field instead of crashing', () => {
+    awaiting('spec');
+    runFileText(JSON.stringify({ ...runFile(), review: 'corrupt' }));
+    expect(orch(['review', 'spec', '--round']).out).toBe('review spec round 1 of 3');
+    runFileText(JSON.stringify({ ...runFile(), review: { spec: { round: 'two', outcome: null } } }));
+    expect(orch(['review', 'spec', '--round']).out).toBe('review spec round 1 of 3');
+    expect(runFile().review).toEqual({ spec: { round: 1, outcome: null } });
+  });
+
+  it('names review in the usage line', () => {
+    expect(orch(['nope']).err).toBe('orchestrate: usage: orchestrate.mjs start|install|handback|approve|review|end');
   });
 });

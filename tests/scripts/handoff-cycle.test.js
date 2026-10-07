@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sqliteAvailable, dbFlags } from '../helpers/sqlite.js';
+import { cleanGitEnv } from '../helpers/git-env.js';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const DB = join(REPO_ROOT, 'scripts/conductor-db.mjs');
@@ -30,7 +31,7 @@ afterEach(() => { while (trees.length) { try { rmSync(trees.pop(), { recursive: 
 function mkRepo() {
   const dir = mkdtempSync(join(tmpdir(), 'cycle-'));
   trees.push(dir);
-  const g = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  const g = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', env: cleanGitEnv(), stdio: ['ignore', 'pipe', 'ignore'] });
   g(['init', '-q']);
   g(['config', 'user.email', 't@t.t']);
   g(['config', 'user.name', 'T']);
@@ -44,7 +45,7 @@ function mkRepo() {
 
 const db = (dir, args, input) =>
   spawnSync(process.execPath, dbFlags().concat([DB, ...args]),
-    { cwd: dir, input, encoding: 'utf8', env: process.env });
+    { cwd: dir, input, encoding: 'utf8', env: cleanGitEnv() });
 
 describe.skipIf(!sqliteAvailable())('the checkpoint-to-resume handoff cycle', () => {
   it('resumes the phase the boundary wrote, through a blob the old cap discarded', () => {
@@ -64,7 +65,7 @@ describe.skipIf(!sqliteAvailable())('the checkpoint-to-resume handoff cycle', ()
     const prose = '## Checkpoint\n' + 'decision line\n'.repeat(500);
     const built = spawnSync(process.execPath, [BUILD], {
       input: JSON.stringify({ ph: planPhase, c: head, s: 'my-spec', n: ['next'], f: [], d: [], x: [], pr: prose }),
-      encoding: 'utf8',
+      encoding: 'utf8', env: cleanGitEnv(),
     });
     expect(built.status).toBe(0);
     const blob = built.stdout.trim();
@@ -72,7 +73,7 @@ describe.skipIf(!sqliteAvailable())('the checkpoint-to-resume handoff cycle', ()
     expect(db(dir, ['snapshot', head], blob).status).toBe(0);
 
     // 4. The next phase entry resumes it instead of discarding it.
-    const r = spawnSync(process.execPath, [RESUME], { cwd: dir, encoding: 'utf8', env: process.env });
+    const r = spawnSync(process.execPath, [RESUME], { cwd: dir, encoding: 'utf8', env: cleanGitEnv() });
     expect(r.status).toBe(0);
     const lines = r.stdout.split('\n');
     expect(lines[0]).toBe('RESUME_HIT');
