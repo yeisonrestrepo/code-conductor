@@ -45,7 +45,7 @@ function mkRepo() {
 
 const db = (dir, args, input) =>
   spawnSync(process.execPath, dbFlags().concat([DB, ...args]),
-    { cwd: dir, input, encoding: 'utf8', env: process.env });
+    { cwd: dir, input, encoding: 'utf8', env: cleanGitEnv() });
 
 describe.skipIf(!sqliteAvailable())('the checkpoint-to-resume handoff cycle', () => {
   it('resumes the phase the boundary wrote, through a blob the old cap discarded', () => {
@@ -65,7 +65,7 @@ describe.skipIf(!sqliteAvailable())('the checkpoint-to-resume handoff cycle', ()
     const prose = '## Checkpoint\n' + 'decision line\n'.repeat(500);
     const built = spawnSync(process.execPath, [BUILD], {
       input: JSON.stringify({ ph: planPhase, c: head, s: 'my-spec', n: ['next'], f: [], d: [], x: [], pr: prose }),
-      encoding: 'utf8',
+      encoding: 'utf8', env: cleanGitEnv(),
     });
     expect(built.status).toBe(0);
     const blob = built.stdout.trim();
@@ -73,7 +73,7 @@ describe.skipIf(!sqliteAvailable())('the checkpoint-to-resume handoff cycle', ()
     expect(db(dir, ['snapshot', head], blob).status).toBe(0);
 
     // 4. The next phase entry resumes it instead of discarding it.
-    const r = spawnSync(process.execPath, [RESUME], { cwd: dir, encoding: 'utf8', env: process.env });
+    const r = spawnSync(process.execPath, [RESUME], { cwd: dir, encoding: 'utf8', env: cleanGitEnv() });
     expect(r.status).toBe(0);
     const lines = r.stdout.split('\n');
     expect(lines[0]).toBe('RESUME_HIT');

@@ -30,7 +30,7 @@ function mkRepo() {
   return { dir, head };
 }
 function run(dir) {
-  return spawnSync(process.execPath, [SCRIPT], { cwd: dir, encoding: 'utf8', env: process.env });
+  return spawnSync(process.execPath, [SCRIPT], { cwd: dir, encoding: 'utf8', env: cleanGitEnv() });
 }
 function writeHandoff(dir, obj) { writeFileSync(join(dir, HANDOFF_REL), JSON.stringify(obj) + '\n', 'utf8'); }
 function snap(head, extra = {}) {
@@ -138,7 +138,7 @@ const DB = fileURLToPath(new URL('../../scripts/conductor-db.mjs', import.meta.u
 // Store a snapshot blob for a hash via the real conductor-db writer, into the repo's .conductor/cache.db.
 function dbStore(dir, hash, obj) {
   const args = dbFlags().concat([DB, 'snapshot', hash]);
-  const r = spawnSync(process.execPath, args, { cwd: dir, input: JSON.stringify(obj), encoding: 'utf8', env: process.env });
+  const r = spawnSync(process.execPath, args, { cwd: dir, input: JSON.stringify(obj), encoding: 'utf8', env: cleanGitEnv() });
   expect(r.status).toBe(0);
 }
 
@@ -223,7 +223,7 @@ describe.runIf(sqliteAvailable())('resume-read.mjs DB branch', () => {
 });
 
 describe('resume-read.mjs root resolution fallbacks (no git)', () => {
-  const NO_GIT_ENV = { ...process.env, PATH: '' };
+  const NO_GIT_ENV = { ...cleanGitEnv(), PATH: '' };
 
   it('tier 3: script-dir parent is root at scripts/ (dev checkout)', () => {
     const tree = mkdtempSync(join(tmpdir(), 'resume-nogit-'));

@@ -6,17 +6,25 @@
 //
 // See BUG-053 for the full incident report.
 
-const GIT_ENV_KEYS = [
-  'GIT_DIR',
-  'GIT_INDEX_FILE',
-  'GIT_WORK_TREE',
-  'GIT_OBJECT_DIRECTORY',
-  'GIT_ALTERNATE_OBJECT_DIRECTORIES',
-  'GIT_COMMON_DIR',
-];
+import { execFileSync } from 'node:child_process';
 
-export function cleanGitEnv() {
-  const env = { ...process.env };
-  for (const key of GIT_ENV_KEYS) delete env[key];
+// The list is git's own, so it cannot go stale. There is no fallback list: a
+// silent partial scrub would let a leaking test pass, and a suite without a
+// working git cannot run its fixtures anyway.
+function localEnvVars() {
+  try {
+    return execFileSync('git', ['rev-parse', '--local-env-vars'], { encoding: 'utf8' })
+      .split('\n').filter(Boolean);
+  } catch (err) {
+    throw new Error(`cleanGitEnv: \`git rev-parse --local-env-vars\` failed, so the GIT_* scrub list is unknown: ${err.message}`);
+  }
+}
+
+let keys;
+
+export function cleanGitEnv(base = process.env) {
+  keys ??= localEnvVars();
+  const env = { ...base };
+  for (const key of keys) delete env[key];
   return env;
 }

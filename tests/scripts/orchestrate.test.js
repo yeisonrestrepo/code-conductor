@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { fakeGh, issue, pull } from '../helpers/fake-gh.js';
 import { parseSnapshotHeader } from '../../scripts/ticket.mjs';
+import { cleanGitEnv } from '../helpers/git-env.js';
 import {
   ENVELOPE_FILE, HANDBACK_DIR, MAY_HAND_BACK, ROLE_ARTIFACTS, REVIEW_CAP, REVIEW_DIR, RUN_FILE, SHELL_METACHARACTERS, WRITE_SURFACE,
   checkTestCommand, extractTasks, findAgent, forwardGate, isValidRun, nextStep, taskScope,
@@ -33,7 +34,7 @@ afterEach(() => {
 
 // Through the CLI's real contract: verb on argv, hand-back on stdin, this session's id in env.
 function orch(args, { input = '', sid = 'sess-1' } = {}) {
-  const env = { ...process.env, HOME: home, USERPROFILE: home };
+  const env = { ...cleanGitEnv(), HOME: home, USERPROFILE: home };
   delete env.CLAUDE_CODE_SESSION_ID;
   if (sid !== null) env.CLAUDE_CODE_SESSION_ID = sid;
   const r = spawnSync(process.execPath, [SCRIPT, ...args], { cwd: root, env, input, encoding: 'utf8', timeout: 30000 });
@@ -529,7 +530,7 @@ describe('ticket intake [FEAT-031 AC1-AC5, AC12]', () => {
 
   // orch() with the fake gh first on PATH; every other contract is orch()'s own.
   function orchGh(args, sid = 'sess-1') {
-    const env = gh.env({ ...process.env, HOME: home, USERPROFILE: home, CLAUDE_CODE_SESSION_ID: sid });
+    const env = gh.env({ ...cleanGitEnv(), HOME: home, USERPROFILE: home, CLAUDE_CODE_SESSION_ID: sid });
     const r = spawnSync(process.execPath, [SCRIPT, ...args], { cwd: root, env, encoding: 'utf8', timeout: 30000 });
     if (r.error) throw new Error(`orchestrate spawn failed: ${r.error.message}`);
     return { status: r.status, out: r.stdout.trim(), err: r.stderr.trim() };
@@ -620,7 +621,7 @@ describe('ticket intake [FEAT-031 AC1-AC5, AC12]', () => {
     orch(['end']);
     expect(orchGh(['start', 'FEAT-031']).status).toBe(0);
     expect(snapText()).toBe(bound);
-    const wb = spawnSync(process.execPath, [TICKET_SCRIPT, 'writeback', 'FEAT-031', '--version', '1.38.0', '--pr', '64'], { cwd: root, env: gh.env(), encoding: 'utf8' });
+    const wb = spawnSync(process.execPath, [TICKET_SCRIPT, 'writeback', 'FEAT-031', '--version', '1.38.0', '--pr', '64'], { cwd: root, env: gh.env(cleanGitEnv()), encoding: 'utf8' });
     expect(wb.stdout).toMatch(/^posted to acme\/widgets#123 /);
   });
 
