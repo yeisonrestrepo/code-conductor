@@ -848,6 +848,25 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   - The rules require a filtered red-step prediction to list the filter's full match set.
   - Both rules ship in both `cc-plan.md` mirrors and are pinned by presence anchors in the existing parity suite.
 
+### [ ] `[BUG-055]` detect-stack: .trim() on truthy non-string script fields crashes and masks all output as {}
+
+- Symptom: scripts/detect-stack.mjs calls .trim() on scripts.build,
+  scripts.test, scripts.lint and scripts.format after a truthiness
+  check only (detect-stack.mjs:598-601, verified at 2374ab6). A
+  truthy non-string value throws (s.test.trim is not a function);
+  the .catch on the main() call (detect-stack.mjs:678-682) prints
+  {"error":...,"code":"UNKNOWN"} to stderr and {} to stdout and
+  exits 0, so one bad field masks ALL detected fields.
+- Note: that .catch is only attached when the script runs as the
+  entrypoint (argv check at detect-stack.mjs:677); direct imports of
+  main() are outside the dossier's claim and for the spec to scope.
+- Exposed consumers: /cc-stack and /cc-init read {} as "no stack";
+  the BUG-015 auto-fill in /cc-resume silently skips.
+- Not exposed: orchestrate.mjs start; resolveTestCommand reads the
+  script itself and treats {} as ORCH_TEST_COMMAND_UNRESOLVED.
+- Fix shape is for the spec to decide; the dossier notes a per-field
+  typeof === 'string' check as a candidate, not a decision.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
@@ -1003,18 +1022,3 @@ A holding pen, on the same terms as the two above it. It empties when the mechan
 #### Minting condition
 
 **Recurrence.** A second specimen of this test, or of any `spawnSync`-with-`input` test, stalling with both processes idle mints a BUG. Until then this is one observation, and a single hang gets no speculative fix (no timeout added, no test skipped). On recurrence, capture the child's fd table and the parent's stack before killing it (`lsof -p <child>`, `sample <parent>` on macOS). Record the payload size and machine load, because a pipe deadlock under load and a lost end-of-input are different mechanisms with different fixes.
-
-### DOSSIER (unfiled, no id yet): detect-stack Fails Whole on a Non-String package.json Script
-
-**Not an item, and it adds no filed heading, so the ceiling is unaffected.** Opened 2026-10-02 at the `1.37.0` closeout, by owner ruling 4 on the `[FEAT-012]` plan (P4). The mechanism is characterized by probe; the mint is the owner's, by the normal process, with the ceiling run on both legs first.
-
-#### Specimen 1, 2026-10-02, the FEAT-012 planning clone
-
-- **Where it surfaced:** the first run of the `[AC8] reads a non-string scripts.test as no test script` draft read 1 failed / 73 passed against 74 / 74 derived. `start` halted `detect-stack returned no result` instead of naming the missing script, because the draft spawned detect-stack before reading `package.json`.
-- **Mechanism, probed on `01572c5`:** `scripts/detect-stack.mjs:598-601` calls `.trim()` on `scripts.build`, `scripts.test`, `scripts.lint` and `scripts.format` after a truthiness check only. A non-string truthy value throws (`s.test.trim is not a function`, and with `"build": 42`, `s.build.trim is not a function`). `main().catch` (`:678-681`) prints `{"error":"…","code":"UNKNOWN"}` to stderr and `{}` to stdout and exits 0, so every field is lost, not only the bad one. (The `[FEAT-012]` plan's P4 attributed the masking to the `uncaughtException` handler at `:669-673`; the probe shows the rejection path. Corrected here, at the first record.)
-- **Who is exposed:** `/cc-stack` and `/cc-init` read a `{}` as "no stack"; `/cc-resume`'s BUG-015 auto-fill skips silently. `orchestrate.mjs start` is not exposed: it reads the script itself before spawning detect-stack (`resolveTestCommand`, `1.37.0`), and treats a `{}` as `ORCH_TEST_COMMAND_UNRESOLVED`, never as a default.
-- **No fix in `[FEAT-012]`:** its spec leaves detect-stack's output unchanged.
-
-#### Minting condition
-
-**Owner's mint, by the normal process:** `node tools/id-ceiling.mjs` with both legs reporting, then the next id (`BUG-055` at this record). The fix shape, a `typeof … === 'string'` guard per field at `:598-601`, is the spec's to choose, not this dossier's.
