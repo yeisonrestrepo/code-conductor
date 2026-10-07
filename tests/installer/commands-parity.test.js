@@ -1,7 +1,9 @@
-import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { readFileSync, mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { deployProject } from '../../lib/installer/deploy.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (rel) => readFileSync(join(root, rel), 'utf8').replace(/\r\n/g, '\n');
@@ -72,6 +74,20 @@ describe('cc-plan mirrors', () => {
   it.each(PLAN_MIRRORS)('%s carries the step-ordering rule exactly once', (rel) => {
     const count = NORM(read(rel)).split(NORM(ORDERING_CLAUSE)).length - 1;
     expect(count).toBe(1);
+  });
+
+  // BUG-054 AC1 and AC2, two-sided for the same reason as the ordering clause above.
+  const CARRY_CLAUSE =
+    'Ticks from a task\'s final commit ride the next task\'s first commit, and the last ' +
+    'task\'s ride the closeout commit.';
+  const MATCH_SET_CLAUSE = 'a filtered red-step prediction lists the filter\'s full match set';
+
+  it.each(PLAN_MIRRORS)('%s carries the plan-file tick carry rule [BUG-054]', (rel) => {
+    expect(NORM(read(rel))).toContain(NORM(CARRY_CLAUSE));
+  });
+
+  it.each(PLAN_MIRRORS)('%s carries the filtered red-step match-set rule [BUG-054]', (rel) => {
+    expect(NORM(read(rel))).toContain(NORM(MATCH_SET_CLAUSE));
   });
 });
 
@@ -232,5 +248,42 @@ describe('cc-orchestrate review loop [FEAT-041 AC5, AC6]', () => {
     has('Your hand-back is the run\'s only record. After it, the orchestrator may send you revision requests; answer them as prose, without a `SNAP_HANDBACK` line.',
       'claude --permission-mode auto --settings .claude/review-loop.settings.json');
     expect(text()).not.toContain('your first hand-back is final, and a second is refused');
+  });
+});
+
+const RESUME_MIRRORS = ['.claude/commands/cc-resume.md', 'project-template/.claude/commands/cc-resume.md'];
+
+// BUG-051: every other mirrored pair carries a parity pin, so this one does too (owner ruling).
+// Both copies probe by presence, so they carry no script-path nesting and stay byte-identical.
+describe('cc-resume mirrors [BUG-051]', () => {
+  it('are byte-identical', () => {
+    expect(read(RESUME_MIRRORS[1])).toBe(read(RESUME_MIRRORS[0]));
+  });
+
+  it.each(RESUME_MIRRORS)('%s probes the deployed detector before the source one', (rel) => {
+    expect(read(rel)).toContain('D=.claude/scripts/detect-stack.mjs; [ -f "$D" ] || D=scripts/detect-stack.mjs');
+  });
+});
+
+// BUG-051 AC3: a shipped command must name the detector where deployProject really puts it,
+// so the target is measured from a scaffold in a temp dir, never assumed.
+const DETECTOR = '.claude/scripts/detect-stack.mjs';
+const DETECTOR_COMMANDS = [
+  'global/commands/cc-stack.md',
+  'project-template/.claude/commands/cc-resume.md',
+  'project-template/.claude/commands/cc-init.md',
+];
+
+describe('shipped detector path [BUG-051 AC3]', () => {
+  let cwd;
+  beforeAll(() => {
+    cwd = mkdtempSync(join(tmpdir(), 'cc-detector-'));
+    deployProject(root, cwd, { warn: () => {}, report: () => {} });
+  });
+  afterAll(() => rmSync(cwd, { recursive: true, force: true }));
+
+  it.each(DETECTOR_COMMANDS)('%s names the detector at its deployed path', (rel) => {
+    expect(existsSync(join(cwd, DETECTOR))).toBe(true);
+    expect(read(rel)).toContain(DETECTOR);
   });
 });

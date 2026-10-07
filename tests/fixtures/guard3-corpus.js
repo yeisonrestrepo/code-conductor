@@ -159,6 +159,30 @@ export const CORPUS = [
   { label: 'exact match (no trailing slash)', command: 'cat file.ts', allowlist: ['file.ts'], verdict: 'allow' },
   { label: 'substring not matched (docs vs doc_files)', command: 'cat doc_files/*.ts', allowlist: ['docs/'], verdict: 'deny' },
 
+  // [BUG-045] Quoted paths. An entry covers a path written as one whole quoted token, and
+  // the suffix inside the quotes is held to the unquoted path class plus a space, so the
+  // traversal check still sees everything after the entry. The first four rows are from
+  // Ludocius's #56. The rest are the shapes his boundary-append form opened, measured on
+  // both subjects: a quote that splits the path (T1-T3), traversal after a quoted space
+  // (T5), quote concatenation (P1, S1), and command substitution inside double quotes (X1),
+  // which the BUG-043 mask hides from every pattern check.
+  { label: 'double-quoted path covered by dir entry', command: 'cat "docs/x.md" *.md', allowlist: ['docs/'], verdict: 'allow' },
+  { label: 'single-quoted path covered by dir entry', command: "cat 'docs/x.md' *.md", allowlist: ['docs/'], verdict: 'allow' },
+  { label: 'double-quoted exact match', command: 'cat "file.ts"', allowlist: ['file.ts'], verdict: 'allow' },
+  { label: 'quoted path still denied without allowlist entry', command: 'cat "src/x.ts" *.md', allowlist: ['docs/'], verdict: 'deny' },
+  { label: 'quote closing before ../ does not cover traversal', command: 'cat "docs/"../*.md', allowlist: ['docs/'], verdict: 'deny' },
+  { label: 'quote opening after the entry does not cover traversal', command: 'cat docs/"../"*.md', allowlist: ['docs/'], verdict: 'deny' },
+  { label: 'single quotes splitting ../ do not cover traversal', command: "cat 'docs/'..'/'*.md", allowlist: ['docs/'], verdict: 'deny' },
+  { label: 'traversal after a space inside quotes is not covered', command: 'cat "docs/x y/../../z.md" *.md', allowlist: ['docs/'], verdict: 'deny' },
+  { label: 'quote concatenated onto a prefix is not covered', command: 'cat foo"docs/x.md" *.md', allowlist: ['docs/'], verdict: 'deny' },
+  { label: 'quote concatenated onto a suffix is not covered', command: 'cat "docs/x.md"EXTRA *.md', allowlist: ['docs/'], verdict: 'deny' },
+  { label: 'command substitution inside a quoted path is not covered', command: 'cat "docs/$(echo ../..)/x.md" *.md', allowlist: ['docs/'], verdict: 'deny' },
+  // Owner ruling 2026-10-06: an entry used as quoted data still lifts the denial, exactly as
+  // its unquoted form does. "An entry anywhere in the command lifts the denial" is the
+  // allowlist's existing semantics; changing it would redesign the allowlist, an unminted
+  // candidate and not BUG-045's work.
+  { label: 'quoted entry used as data lifts the denial, as unquoted does', command: 'cat **/*.md; echo "docs/"', allowlist: ['docs/'], verdict: 'allow' },
+
   // These three are real commands this repository's own agent ran on 2026-09-27 and
   // Guard 3 denied. They were filed as KNOWN-FP rows asserting the verdict of the
   // day, to be flipped only by a refinement that predicted the red state first.

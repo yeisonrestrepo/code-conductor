@@ -7,7 +7,7 @@
 # the [BUG-037] port is verified against, exercised unchanged by the 108 cases in
 # tests/hooks/guard3.test.js. Do not edit to make a port pass.
 #
-# Four sanctioned exceptions exist. The first two are recorded in
+# Six sanctioned exceptions exist. The first two are recorded in
 # docs/superpowers/specs/2026-09-25-bug037-guard3-port-and-first-ship-design.md:
 #   1. The allowlist is populated from .claude/memory/bash-scan-allowlist.txt
 #      instead of an array literal, so both subjects read one source.
@@ -51,6 +51,16 @@
 #      heredoc would otherwise lose its command position and a real dump would stop
 #      denying. Added in both subjects under [BUG-047], recorded in
 #      docs/superpowers/specs/2026-09-29-bug047-heredoc-body-scanning-design.md.
+#   6. _g3_check_allowlist covers a path written as ONE whole quoted token, "docs/x"
+#      or 'docs/x', besides the bare form. The quote must open right after a
+#      boundary and close right before one, so a quote mid-word is never a boundary:
+#      a quote splitting a path cannot end the match before a ../ the traversal check
+#      must see, and quote concatenation cannot cover a path the entry does not name.
+#      The quoted suffix is the bare class plus a space and nothing wider, because $( )
+#      executes inside double quotes and the mask leaves the allowlist deciding alone.
+#      The bare boundaries are unchanged. An owner redesign under [BUG-045], which
+#      replaced a boundary-append form that measurably opened four traversal shapes and
+#      two concatenation shapes on both subjects. The quoted-path corpus rows record it.
 # Nothing else in this file moves.
 
 set -euo pipefail
@@ -418,21 +428,29 @@ _g3_check_allowlist() {
   # Written as a bracket class that is safe in ERE without backslash escaping issues.
   local _bd='(^|[[:space:]|;()])'
   local _ad='([[:space:]|;()]|$)'
-  local entry
+  # [BUG-045] A path is covered bare or as ONE whole quoted token. Inside quotes the
+  # suffix is the same class plus a space; nothing wider, because $( ) still executes
+  # inside double quotes and the mask hides quoted text from every pattern check.
+  local _sfx='([A-Za-z0-9_./@%*?-]*)'
+  local _qsfx='([A-Za-z0-9_./@%*? -]*)'
+  local _dq='"' _sq="'"
+  local entry form pat
   for entry in "${BASH_SCAN_ALLOWLIST[@]}"; do
     [[ -z "$entry" ]] && continue
     if [[ "${entry: -1}" == "/" ]]; then
       # Directory entry: suffix may contain globs (*?) but must not traverse up with ..
-      local pat="${_bd}${entry}([A-Za-z0-9_./@%*?-]*)${_ad}"
-      if [[ "$s" =~ $pat ]]; then
-        local suffix="${BASH_REMATCH[2]}"
-        [[ "$suffix" =~ (^|/)\.\.(/|$) ]] && continue
+      for form in "${entry}${_sfx}" "${_dq}${entry}${_qsfx}${_dq}" "${_sq}${entry}${_qsfx}${_sq}"; do
+        pat="${_bd}${form}${_ad}"
+        [[ "$s" =~ $pat ]] || continue
+        [[ "${BASH_REMATCH[2]}" =~ (^|/)\.\.(/|$) ]] && break
         return 0
-      fi
+      done
     else
-      # Exact whole-token match
-      local pat="${_bd}${entry}${_ad}"
-      [[ "$s" =~ $pat ]] && return 0
+      # Exact whole-token match, bare or whole-quoted
+      for form in "${entry}" "${_dq}${entry}${_dq}" "${_sq}${entry}${_sq}"; do
+        pat="${_bd}${form}${_ad}"
+        [[ "$s" =~ $pat ]] && return 0
+      done
     fi
   done
   return 1

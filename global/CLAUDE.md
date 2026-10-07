@@ -23,7 +23,7 @@ Never write code without an approved spec. Never start implementing without an a
 
 Before reading any file or spawning any search, classify the task and walk this chain. Stop at the first step that answers the question.
 
-1. **Memory**: check `.claude/memory/project.md`. If the answer is there, stop.
+1. **Memory**: check `.claude/memory/project.md` (project) and `~/.claude/memory/personal.md` (global preferences). If the answer is there, stop.
 2. **Grep / Glob** — pattern search? Use `Grep` or `Glob` inline. Stop.
 3. **Explore sub-agent** — need 3+ files to answer one question? Spawn an `Explore` sub-agent. It returns a ≤200-word summary. Main context receives only the summary. Stop.
 4. **Parallel agents** — 2+ independent implementation tasks? Spawn parallel agents in worktrees. Each returns a ≤200-word summary.
@@ -61,8 +61,10 @@ Auto-run `/cc-stack` at the start of every session. It runs the dynamic detector
 
 ## Memory
 
-- `project.md` — in git, shared with the team. Decisions, conventions, debt, workarounds.
-- `personal.md` — local only, never committed. Developer preferences, personal shortcuts.
+- `project.md` — at `.claude/memory/project.md`, in git, shared with the team. Decisions, conventions, debt, workarounds.
+- `personal.md` — local only, never committed. Developer preferences, personal shortcuts. Two files carry this name:
+  - `~/.claude/memory/personal.md` is the cross-project default. Read it at session start alongside project memory.
+  - `.claude/memory/personal.md` is this project's copy, written by `/cc-checkpoint` and read by `/cc-resume`. It wins on any clash, because the most specific layer wins, as in settings.
 - Run `/cc-checkpoint` before `/compact`, after feature completion, after key architectural decisions.
 
 ## Delegation

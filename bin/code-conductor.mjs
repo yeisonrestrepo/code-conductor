@@ -3,7 +3,7 @@ import { readFileSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { resolveAssetRoot, resolveHome, nodeMajorAtLeast } from '../lib/installer/env.mjs';
-import { assertAssets, assertMergeTargets, deployGlobal, deployProject, chmodHooks } from '../lib/installer/deploy.mjs';
+import { assertAssets, assertMergeTargets, assertNotSelfInstall, deployGlobal, deployProject, chmodHooks } from '../lib/installer/deploy.mjs';
 import { verbosityHookCommand, mergeVerbosityHook } from '../lib/installer/settings.mjs';
 import { healGraphifyHook } from '../lib/installer/heal.mjs';
 import { writeVerbosity, writeVersionFile } from '../lib/installer/config.mjs';
@@ -90,6 +90,7 @@ export function run(argv, env = process.env, { cwd = process.cwd(), log } = {}) 
   try {
     assertAssets(assetRoot, ['global', 'skills', 'scripts', 'project-template']); // pre-flight
     assertMergeTargets(home, cwd, opts.project);                                  // pre-flight
+    if (opts.project) assertNotSelfInstall(assetRoot, cwd);                       // pre-flight, BUG-052
     writing = true;                                                    // copy phase begins
     const claudeDir = deployGlobal(assetRoot, home, { warn: (m) => emit('stderr', m), report: (m) => emit('stdout', m) });
     chmodHooks(claudeDir);
@@ -113,7 +114,8 @@ export function run(argv, env = process.env, { cwd = process.cwd(), log } = {}) 
     }
     // Precondition conflict (--project target is a non-directory) → exit 1, not 2:
     // nothing was partially written for the project, the path is simply unusable.
-    if (err.code === 'PROJECT_TARGET_NOT_DIR') { emit('stderr', `code-conductor: ${err.message}`); return 1; }
+    // SELF_INSTALL is caught in pre-flight; this mapping is the backstop should that ordering ever change.
+    if (err.code === 'PROJECT_TARGET_NOT_DIR' || err.code === 'SELF_INSTALL') { emit('stderr', `code-conductor: ${err.message}`); return 1; }
     // Environment errors that surface on the very first write are still exit 1.
     if (err.code === 'EROFS') { emit('stderr', `code-conductor: cannot write to ${err.path} (read-only file system) — remount writable or adjust permissions`); return 1; }
     if (err.code === 'EACCES' || err.code === 'EPERM') { emit('stderr', `code-conductor: permission denied writing ${err.path} — fix with chmod/chown`); return 1; }

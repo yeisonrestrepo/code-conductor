@@ -40,6 +40,15 @@ describe('this repository, at every commit', () => {
     expect(r.ok).toBe(true);
   });
 
+  // BUG-050: the merge gate once passed while this command failed on the same records,
+  // hidden by a filter inside the test. The command itself is asserted here, so the gate
+  // and the closeout can never disagree again.
+  it('runs the record-parity command green against this repository', () => {
+    const r = spawnSync(process.execPath, ['tools/record-parity.mjs'], { cwd: ROOT, encoding: 'utf8' });
+    expect(r.stdout).toContain('RECORD_PARITY_OK');
+    expect(r.status).toBe(0);
+  });
+
   // The ceiling itself is a query and is not asserted here: its remote leg needs a ref
   // actions/checkout@v7 does not fetch at its default depth, and fetch-depth: 0 was
   // declined because the both-legs filing rule already protects it. Duplicate-id
@@ -144,5 +153,19 @@ describe('this repository, at every commit', () => {
     const firstDiff = f.findIndex((n, i) => n !== v[i]);
     expect(firstDiff === -1 || f[firstDiff] < v[firstDiff]).toBe(true);
     for (const h of ['Quickstart', 'Install']) expect(section(read('README.md'), h)).toContain('code-conductor@latest');
+  });
+
+  // BUG-032: a preference file the lookup chain never names is never read. The chain in
+  // the global CLAUDE.md and the memory-first skill that enforces it must name the same
+  // two memory files, so neither can drift back to project memory alone.
+  it('names both memory files in the lookup chain, and memory-first step 1 agrees', () => {
+    const PATHS = ['.claude/memory/project.md', '~/.claude/memory/personal.md'];
+    const chainStep = section(read('global/CLAUDE.md'), 'Orchestrator Protocol').match(/^1\. \*\*Memory\*\*.*$/m)?.[0];
+    const skill = read('skills/memory-first/SKILL.md');
+    const skillStep = skill.slice(skill.indexOf('### 1. '), skill.indexOf('### 2. '));
+    for (const p of PATHS) {
+      expect(chainStep).toContain(`\`${p}\``);
+      expect(skillStep).toContain(`\`${p}\``);
+    }
   });
 });
