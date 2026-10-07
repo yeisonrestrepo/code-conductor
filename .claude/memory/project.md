@@ -3010,3 +3010,92 @@ Handoff observations, one line per task:
 - `git switch main` refuses over uncommitted plan ticks that differ at the branch base; copy the plan to the scratchpad, restore, switch and fast-forward, then copy back.
 - GitHub auto-deletes the merged remote branch; a failed `git push --delete` is cleared with `git fetch --prune`.
 - The npm registry lags a publish by about 3 minutes; an early `npm view` miss is not evidence against the publish.
+
+## Batch: 1.39.1, the Ludocius contribution queue (BUG-032, BUG-045, BUG-050, BUG-051, BUG-052, BUG-053, BUG-054) [2026-10-06]
+
+**Shape.** Seven contributor PRs, reviewed in the owner's order: #54, #53, #50, #52, #55, #51, #56. PR #59 stayed out (an intake candidate tied to issue #58).
+- All seven forked from `0ec9e9e` and conflicted with `main` at `a05a555`. Each carried its own VERSION, CHANGELOG, backlog-flip and README records, which went stale against 1.39.0.
+- They landed on one owner-side train, `land/ludocius-batch`, from `a05a555`. His code, tests, specs, plans and `.gitignore` leaves were cherry-picked with his authorship; his records were dropped and superseded by this record commit.
+- The train merges preserving individual commits, so every commit was required green on its own row. His PRs stay untouched until the train merges, and are then closed with the owner's crediting comments.
+- His specs and plans are kept unmodified as his record, including where they describe replaced approaches.
+
+**Per item: what was contributed, what the owner side added, and why.**
+- **`[BUG-032]` (#54).**
+  - Contributed: the chain step and the Memory section in `global/CLAUDE.md`.
+  - Owner side (`786da48`): the `memory-first` skill now agrees with the chain; it had kept checking `project.md` alone, so the chain and its enforcer disagreed. Both `personal.md` files are named, with the owner-ruled precedence (the project copy wins, most specific layer first; `cc-checkpoint.md:19` writes it and `cc-resume.md:45` reads it). A `repo-invariants` test, watched red, closes the demonstration criterion.
+  - The backlog's "Verified while filing" note was stale: BUG-039's seed at `lib/installer/host-owned.mjs:19` satisfies the deploy half. It is corrected in the backlog by this commit.
+- **`[BUG-054]` (#53).**
+  - Contributed: the plan-file staging rule.
+  - Owner side (`d988684`): the next-task carry clause, which settles what "commit group" means; the filtered red-step match-set rule; and two-sided presence anchors on both `cc-plan.md` copies (4 tests, watched red). Criteria 2 and 3 were missing from the PR.
+- **`[BUG-051]` (#50).**
+  - Contributed: presence-based detector resolution in prose.
+  - Owner side (`5bd7ce4`):
+    - a concrete D11-style probe line;
+    - the `/cc-stack` step-1 root fix: read literally, "the directory that contains the detector script" was `.claude/scripts/`, so the command would have run from, and written `CLAUDE.md` into, the scripts directory;
+    - tests pinning every shipped detector path to a real `deployProject` scaffold;
+    - the `cc-resume` byte-identity pin.
+  - Parity ruling (owner): mirror parity widens to the `cc-resume` pair, on the ground that the copies are identical, the fix keeps them so, and every other mirrored pair carries a pin.
+- **`[BUG-053]` (#52).**
+  - Contributed: the `cleanGitEnv()` helper with a hand-kept 6-variable list. His spec named `GIT_CEILING_DIRECTORIES` where his code had `GIT_COMMON_DIR`.
+  - Owner side (`2ed12da`): the list is derived from `git rev-parse --local-env-vars`, which has 15 entries, `GIT_PREFIX` among them. It throws on failure with no fallback (owner ruling: a stale list applied silently scrubs incompletely and lets a leaking test pass).
+  - The script-launch sweep closes the 10 tests that still resolved the real repository under a linked-worktree hook. A decoy-repository red-green proof ships as `tests/unit/git-env.test.js`.
+  - Design note: the fix is fixture-side because the gate lives untracked in `.git/hooks`.
+- **`[BUG-050]` (#55).**
+  - Contributed: sub-shaped detection that rejected every sub-shaped heading, plus an in-test grandfather list.
+  - **Central finding of the queue's instrument review:** with that list, the merge gate passed while `node tools/record-parity.mjs` exited 1 on the same records. That is a green covering less than its name, the defect class BUG-050 itself names.
+  - Owner ruling, repair (b):
+    - history is named, not failed;
+    - a sub-shaped claim under a shipped section is a named failure;
+    - `Filed` and `Notes` are ignored (his scan was section-blind and reintroduced the single-level false positive);
+    - the ceiling counts the parent number and checks sub-shaped duplicates (two latent mint-twice gaps);
+    - `parseBacklog` treats a sub-shaped heading as its own entry (the body bleed);
+    - no grandfather list (BUG-046 Gate 4).
+  - The grandfather commit `f6fc2f0` was not landed. The owner completion is folded into his commit `5c54eea`, which keeps his authorship and adds co-author trailers, because his commit alone was red on the violation the list had hidden.
+- **`[BUG-052]` (#51).**
+  - Contributed: the package-name self-guard inside `deployProject`.
+  - Owner side (`25f6ae5`):
+    - The guard moves to the CLI pre-flight, because under `--project` the whole global install into `~/.claude` ran before the guard fired, and the command then exited 1, the code meaning nothing was written.
+    - His exit mapping is kept as a commented backstop (owner ruling).
+    - The catch is narrowed: ENOENT or a JSON parse error means not-self; any other read error refuses (owner ruling: a tree that cannot be read is suspect, not a green light to sweep).
+    - CLI, host-sweep and read-error tests, in temp dirs only.
+- **`[BUG-045]` (#56).** Landed as an **owner redesign**, `70766b9`: owner-authored, with `Co-Authored-By: Luis`. His target shapes and four corpus rows are kept.
+  - **Central finding:** on a protected surface, his boundary-append form (quote characters added to `G3_BD`/`G3_AD`) was measured on both subjects to open four traversal shapes and two concatenation shapes:
+    - T1 `cat "docs/"../*.md`
+    - T2 `cat docs/"../"*.md`
+    - T3 `cat 'docs/'..'/'*.md`
+    - T5 `cat "docs/x y/../../z.md" *.md`
+    - P1 `cat foo"docs/x.md" *.md`
+    - S1 `cat "docs/x.md"EXTRA *.md`
+
+    Review measurement caught them.
+  - **Ritual skip, plainly:** he edited the frozen authority with no sanctioned exception, no header amendment and no predicted red table. His spec claimed 6 corpus rows against a 4-row diff.
+  - The redesign is a whole-token quoted alternative, with the bare boundaries byte-identical to main. It is exception six; the header count is corrected to "Six" (BUG-047 had left it at "Four" while listing five; the omission is BUG-047's, not the contributor's).
+  - **Measurement overturned an owner design ruling before adoption.** The owner-specified quoted suffix, "the entire quoted remainder", opened X1, `cat "docs/$(echo ../..)/x.md"`, because `$( )` executes inside double quotes and the BUG-043 mask leaves the allowlist deciding alone. C-path (the bare path class plus a space) met every expected cell, denied X1, and kept T5 matchable. This is the failure the measure-first condition exists to catch, and the second instance today after FEAT-041's vitest-semantics reversal. Single quotes do not execute `$( )`, but the same class applies symmetrically as the safe, simple shape.
+  - D1 is ruled allowed: an entry used as quoted data lifts the denial as its unquoted form does.
+  - Corpus 155 to 167. Predicted red, as written: 6 failed (A1, A2, D1 per suite) of 1507. Discriminators: his subjects 12 failed, C-any 2 failed. The fail convention was re-checked (no new throw path, the allowlist read unchanged).
+
+**Interim rules retired by this release, effective as this commit lands on `main` with the train:**
+- **`[BUG-051]`, "`/cc-init` records the stack."** Evidence: the `commands-parity` tests. Three pin every shipped command that names the detector to `.claude/scripts/detect-stack.mjs`, checked against a real `deployProject` scaffold in a temp dir. Two anchor the probe line on both `cc-resume` copies, and one asserts their byte identity. All were watched red against the pre-fix commands.
+- **`[BUG-052]`, "never run the installer against this repository."** Evidence: a scratchpad clone with a temp `HOME`, isolation checked first, running `node bin/code-conductor.mjs --project` inside the clone.
+  - Control at `0ec9e9e`: rc=2 `PARTIAL_WRITE` (ENOENT lstat on the clone's `scripts`). `git status --porcelain --ignored` CHANGED: four `.claude/commands/*`, `.claude/hooks/context-guard.sh`, `.claude/settings.json`, `.gitignore` and `CLAUDE.md` modified; 11 `scripts/*.mjs` deleted; backups and new ignored files added. The temp `HOME` was written (25 entries). It is 11 rather than the incident's 9 because `orchestrate.mjs` and `ticket.mjs` were added since. It is rc 2 because in the node-bin form the asset root is the clone, so the sweep deleted the copy source.
+  - Train `25f6ae5`: rc=1, `cannot start install: cannot deploy --project into code-conductor's own source tree (...)`; porcelain `--ignored` IDENTICAL before and after; 0 scripts deleted; temp `HOME` 0 entries.
+  - The CONTRIBUTING rule "never run the installer in this repository" stands as contributor policy.
+- **`[BUG-053]`, "never run the gate from a linked worktree."** Evidence: a scratchpad clone with a linked worktree and a pre-commit hook running `npm test`, one real commit from the worktree.
+  - Fork `0ec9e9e`: 31 failed / 1387 passed of 1418, primary config CHANGED (`core.bare=true`, `user.name=T`, `user.email=t@t.t`).
+  - PR head: 10 failed / 1408 passed, state UNCHANGED.
+  - Train `2ed12da`: `Tests 1466 passed (1466)`, `Test Files 51 passed (51)`, state `before=c30d05807b78 after=c30d05807b78 UNCHANGED`, `core.bare=false`.
+
+**Patterns across the queue.**
+- **Invented criteria:** every one of the seven specs wrote acceptance criteria of its own instead of answering the minted entry's. BUG-050's chose neither recorded repair; BUG-045's miscounted its own rows.
+- **Installer runs in this repository:** 4 of 7 PRs carried a `node bin/code-conductor.mjs --project` commit with a net-empty revert (#54 `34265f9`, #53 `36ae7cf`, #50 `4a6bb24`, #52 `aa77386`), each dropped.
+- **Records in PRs:** contributor PRs carrying VERSION bumps, CHANGELOG entries and backlog flips are exactly what made all seven conflict at once. CONTRIBUTING.md gains "Records are owner-side" in this commit, with this queue as its founding case.
+
+**Process observations (owner-accepted).**
+- **A verification command that can match nothing and print empty passes vacuously:** the instruments archetype in shell form. zsh does not word-split an unquoted `$P`, which voided the first five protected-surface checks. Re-run under POSIX `sh`, the conclusions held. Every protected-surface check now prints the path list it diffed.
+- **Whole-commit cherry-picks bypass the pre-commit gate.** The per-commit suite in a sandbox clone is part of the train protocol, and runs again before any push.
+
+**Train rows (sandbox, per commit):** 1453 (2 commits), 1454 (3), 1458 (3), 1464 (3), 1466 (1), 1478 (2), 1480 (2), 1483 (1), 1507 (2). Every commit green; final 1507 / 0, 51 files.
+
+**Unminted candidates recorded today.**
+- **Path-convention harmonization:** presence-based detector resolution in `cc-stack`, `cc-resume` and `cc-orchestrate`, versus the nesting split in the `cc-init` copies.
+- **Allowlist entry-as-data semantics:** an entry anywhere in the command lifts the whole denial, D1 included. Changing it is an allowlist redesign.

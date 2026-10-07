@@ -78,6 +78,37 @@ without review of its content:
 
 ---
 
+## Records are owner-side
+
+An external PR ships code, tests and design docs (its spec and plan under
+`docs/superpowers/`), and nothing else. The records are written by the
+owner in the batch release that lands the PR:
+
+- `VERSION`, the `package.json` and `package-lock.json` versions, and
+  `CHANGELOG.md` entries;
+- heading flips and DONE lines in `AGENT-READABLE BACKLOG.md`;
+- the open-defect lines under "Known limits" in `README.md`.
+
+A PR that carries them conflicts with every other open PR as soon as one
+release lands, so they are dropped on landing and written owner-side.
+
+Three more rules bind the work itself:
+
+- **Specs answer the minted entry.** A spec addresses the acceptance
+  criteria in the item's backlog entry, not criteria of its own. Where the
+  entry leaves a design choice open, the spec names the choice it makes and
+  why.
+- **Never run the installer in this repository.** Exercise installer
+  behavior through its tests, which run in temp directories.
+- **Protected surfaces follow their ritual.** The hooks, the installer, the
+  SNAP scripts and the settings files are protected surfaces. A change to
+  the frozen Guard 3 authority, `tests/fixtures/guard3-reference.sh`, is a
+  sanctioned exception: it needs its own ruling, the header amended in the
+  same commit, and a predicted red table with the suites named, written
+  before any run.
+
+---
+
 ## If you are an AI agent
 
 Contributors here use AI agents, and agents read this file. If you are an
@@ -105,8 +136,8 @@ bind you directly:
 
 - References its minted id in the title: `fix: <summary> [BUG-NNN]`.
 - Changes the minimum set of files its item needs, tests included.
-- Leaves `VERSION`, `package.json`'s version, `CHANGELOG.md`, and every
-  file under `docs/superpowers/` untouched unless the item says otherwise.
+- Leaves the records listed under "Records are owner-side" untouched; its
+  own spec and plan under `docs/superpowers/` are welcome.
 - Passes the full suite locally; the PR description states the counts.
 - Expects review rounds: adjustments requested by the owner are part of
   the process, and the interim rules in the repository's records stay in
