@@ -3153,3 +3153,26 @@ His branches stay his. The train branch is deleted. PR #59 remains open as an in
 **Unminted candidate added:** `record-parity` cannot catch a heading flipped to `[X]` with no CHANGELOG claim behind it. Direction A starts from claims and direction C from DONE versions, so a flip without either is invisible, and the pre-push check above had to be manual. This joins path-convention harmonization and allowlist entry-as-data semantics.
 
 **Next:** the next item is the owner's call. `BUG-055`'s mint stays the owner's, with the ceiling run on both legs first.
+
+## Checkpoint 2026-10-06 21:43
+
+### Decisions
+- The seven Ludocius PRs landed as 1.39.1 through one train branch. PR #67 was merged as a merge commit, `bb07d14`, so each commit keeps its author. The closeout record is `c044ef6`. PRs #50-#56 are closed with the owner's comments, and #59 stays open as an intake candidate.
+- Contributor records (VERSION, CHANGELOG, backlog flips, README limits) are owner-side, as stated in CONTRIBUTING.md "Records are owner-side". External PRs ship code, tests and design docs only.
+- The BUG-051, BUG-052 and BUG-053 interim rules are retired as of `bb07d14`, each with sandbox or test evidence in the 1.39.1 batch record.
+- Local branches are pruned to `main`. The seven fix branches and three shipped branches (#41, #42, #60) were deleted after verifying each squash commit is byte-identical on the files the branch touched.
+
+### Conventions
+- A train merges as a merge commit, never a squash. Every train commit must be green on its own row in a sandbox per-commit run, which is repeated before any push.
+- A protected-surface check prints the path list it diffed. Run it under POSIX `sh`, since zsh does not word-split an unquoted variable.
+- Measure a design before adopting it, including an owner's design. The quoted-suffix ruling was overturned by the X1 measurement before any corpus row was written.
+- Probes that run the installer or a hook against a changed copy run in a scratchpad sandbox clone, never in this repository, whose `.claude/hooks/pre-tool-use.mjs` guards the live session.
+
+### Debt
+- Unminted: `record-parity` cannot see a heading flipped to `[X]` with no CHANGELOG claim; path-convention harmonization; allowlist entry-as-data semantics, D1 included.
+- The 1.36.0 release tag is named `1.36.0`, without the `v` every other tag carries.
+
+### Workarounds
+- Whole-commit cherry-picks skip the pre-commit gate; a sandbox clone runs the suite per commit instead.
+- `git commit -- <paths>` runs the gate against a temporary index, which fails `gitignore-block-parity` when other staged files carry `.gitignore` leaves. Set the other staged work aside with `git stash` and commit against a consistent tree.
+- macOS `sed` does not strip `\x1b`, and `gh` run logs carry ANSI escapes as literal `^[`. Strip them in node before matching CI count lines.
