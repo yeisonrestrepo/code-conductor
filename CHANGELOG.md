@@ -14,6 +14,7 @@
 ## [1.39.0] - 2026-10-06
 
 ### Added
+- **[FEAT-042]** Automatic OWASP Top 10 security guardrail as post-implement Step 4.5 in `cc-implement`. The agent reviews its own diff for injection, hardcoded secrets, XSS, SSRF, and seven other categories before marking a task complete. Findings emit `[SECURITY]` tags that are never suppressed, even in MIN mode. Phase 1 is prompt-based (zero code, zero dependencies).
 - **[FEAT-041]** A review loop before each define approval in `/cc-orchestrate`. A fresh read-only `define-review` agent checks the spec or plan against a declared checklist; open rows go back to the role that wrote the document through `SendMessage`, at most three reviewer passes and two revisions. Advisory and fail-open; the approval stays the owner's message, taken after a re-hash of the document.
 - **[FEAT-041]** `orchestrate.mjs review <spec|plan> --round | --close <clean|cap|skipped:<reason>>`, the loop's round counter, recorded in an optional `review` run field. `ORCH_REVIEW_CAP` refuses a fourth round without halting the run.
 - **[FEAT-041]** `.claude/review-loop.settings.json`, an auto mode allow rule for the loop's revision requests, applied only when passed with `claude --permission-mode auto --settings .claude/review-loop.settings.json`. The installer never writes `autoMode` globally.
