@@ -166,6 +166,21 @@ describe('run', () => {
     expect(existsSync(join(home, '.claude', 'settings.json'))).toBe(false);
     expect(existsSync(join(home, '.claude', 'skills'))).toBe(false);
   });
+  // BUG-052: a --project run inside the package's own source tree writes nothing at all.
+  // The global half is included: before the pre-flight guard it ran in full and the
+  // command then exited 1, which the exit code says means nothing was written.
+  it('[BUG-052] exits 1 and writes nothing, global half included, inside its own source tree', () => {
+    const root = join(dirname(binPath), '..');
+    writeFileSync(join(cwd, 'package.json'), readFileSync(join(root, 'package.json')));
+    mkdirSync(join(cwd, 'scripts'));
+    const bundled = readdirSync(join(root, 'scripts'));
+    for (const f of bundled) writeFileSync(join(cwd, 'scripts', f), 'tracked source');
+    expect(run(['--project'], { HOME: home }, { cwd, log })).toBe(1);
+    expect(logs.join('\n')).toMatch(/own source tree/);
+    expect(existsSync(join(home, '.claude'))).toBe(false);
+    expect(existsSync(join(cwd, '.claude'))).toBe(false);
+    expect(readdirSync(join(cwd, 'scripts')).sort()).toEqual([...bundled].sort());
+  });
   it('exits 1 when --project is passed and the project CLAUDE.md is a directory', () => {
     mkdirSync(join(cwd, 'CLAUDE.md'), { recursive: true });
     expect(run(['--project'], { HOME: home }, { cwd, log })).toBe(1);

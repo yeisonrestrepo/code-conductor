@@ -104,7 +104,29 @@ describe('deployProject', () => {
     const pkgName = '@test/code-conductor';
     writeFileSync(join(asset, 'package.json'), JSON.stringify({ name: pkgName }));
     writeFileSync(join(home, 'package.json'), JSON.stringify({ name: pkgName }));
+    // The source tree satisfies the legacy sweep by identity: same file list as the bundle.
+    mkdirSync(join(home, 'scripts'));
+    writeFileSync(join(home, 'scripts', 'conductor-db.mjs'), 'tracked source');
     expect(() => deployProject(asset, home)).toThrow(/SELF_INSTALL|own source tree/);
+    expect(existsSync(join(home, '.claude'))).toBe(false);
+    expect(readFileSync(join(home, 'scripts', 'conductor-db.mjs'), 'utf8')).toBe('tracked source');
+  });
+  // BUG-052 AC2: a host that owns a package.json still gets the 1.23.2 legacy sweep.
+  it('[BUG-052] still sweeps the legacy root scripts/ in a host with its own package.json', () => {
+    writeFileSync(join(asset, 'package.json'), JSON.stringify({ name: '@test/code-conductor' }));
+    writeFileSync(join(home, 'package.json'), JSON.stringify({ name: 'my-project' }));
+    mkdirSync(join(home, 'scripts'));
+    writeFileSync(join(home, 'scripts', 'conductor-db.mjs'), 'legacy copy');
+    deployProject(asset, home);
+    expect(existsSync(join(home, 'scripts'))).toBe(false);
+    expect(readFileSync(join(home, '.claude', 'scripts', 'conductor-db.mjs'), 'utf8')).toBe('db-engine');
+  });
+  // A tree whose package.json cannot be read is suspect state, never a green light to sweep.
+  it('[BUG-052] refuses, naming the path, when the host package.json cannot be read', () => {
+    writeFileSync(join(asset, 'package.json'), JSON.stringify({ name: '@test/code-conductor' }));
+    mkdirSync(join(home, 'package.json'));
+    expect(() => deployProject(asset, home)).toThrow(/cannot read .*package\.json/);
+    expect(existsSync(join(home, '.claude'))).toBe(false);
   });
   it('[BUG-052] allows deploy when package names differ', () => {
     writeFileSync(join(asset, 'package.json'), JSON.stringify({ name: '@test/code-conductor' }));
