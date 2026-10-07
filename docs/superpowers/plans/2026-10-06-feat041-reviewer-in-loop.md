@@ -620,7 +620,7 @@
 
     Commit `feat: ship the review loop auto mode exception and declare its costs [FEAT-041]`.
 
-- [>] [T-005] **Release `1.39.0`.** Native. Depends on T-001 to T-004.
+- [X] [T-005] **Release `1.39.0`.** Native. Depends on T-001 to T-004.
 
   **Files:**
   - Modify: `VERSION`, `package.json`, `package-lock.json`, `CHANGELOG.md`, `AGENT-READABLE BACKLOG.md`, `README.md`
@@ -655,14 +655,14 @@
     **Discriminator:** flip the FEAT-041 heading back to `### [ ]` and expect a red run naming `1.39.0` and `FEAT-041`. Restore `[X]` and re-run green.
   - [X] [T-005-E] Run `npm test`, expecting **1453 / 0, 50 files**. Then `node tools/id-ceiling.mjs`, and report the union and the next ids. Nothing is minted.
   - [X] [T-005-F] Append `- T-005: <one line>` under the plan section. Then `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md .claude/memory/project.md docs/superpowers/plans/2026-10-06-feat041-reviewer-in-loop.md`. Commit `chore: release 1.39.0 [FEAT-041]`.
-  - [ ] [T-005-G] **Confirm with the owner, then** push with `git push -u origin feat/feat-041-reviewer-in-loop` and open the PR against `main`. Expected CI (`[BUG-048]`, absolute per environment):
+  - [X] [T-005-G] **Confirm with the owner, then** push with `git push -u origin feat/feat-041-reviewer-in-loop` and open the PR against `main`. Expected CI (`[BUG-048]`, absolute per environment):
     - ci-node20 **1357 passed / 96 skipped**;
     - ci-node24 **1440 passed / 13 skipped**;
     - both legs printing `SKIP_BASELINE_OK`;
     - `git diff origin/main -- tools/skip-baseline.json` empty.
 
     Any other count halts before the PR is reported green (Ruling 7). If any third-party PR merges into `main` before T-005 runs, the baselines move, and every prediction in this plan is re-derived before anything is measured.
-  - [ ] [T-005-H] **Stop at the green PR.** Report both `SKIP_BASELINE_OK` lines, both run ids and the PR URL. The owner merges and publishes the GitHub Release `v1.39.0`.
+  - [X] [T-005-H] **Stop at the green PR.** Report both `SKIP_BASELINE_OK` lines, both run ids and the PR URL. The owner merges and publishes the GitHub Release `v1.39.0`.
 
 ## Test List
 

@@ -2935,3 +2935,60 @@ Handoff observations, one line per task:
 - T-003: review loop prose committed at 1448 / 0, 49 files, as predicted; mirrors byte-identical, ASCII probe 0 = 0 at HEAD. HALT at T-003-D: the T-003-A pin 'No revision follows the third pass.' (period) contradicted the plan's own command prose, which continues ', so the document at the approval is always the one the last reviewer read.' (39 / 1); owner ruled an internal plan inconsistency the review also missed, the test yielding to the document; pin amended to the full sentence in the plan and the test, re-run 40 / 0.
 - T-004: settings file, test and README committed at 1453 / 0, 50 files, as predicted; generated file 582 bytes, sha256 05ce114d matching the pin first time; not ignored (check-ignore rc 1); red was 4 / 1 with AC9 passing, as predicted; tree line for review-loop.settings.json overflows the name column with one space, as cc-orchestrate.md does.
 - T-005: release 1.39.0 committed at 1453 / 0, 50 files, as predicted; VERSION_GATE_OK 1.39.0, RECORD_PARITY_OK, protected-files diff vs origin/main empty, agents diff only the two define-review.md; discriminator ([ ] heading) red with 4 violations naming 1.39.0 and FEAT-041, restored green; origin/main still 0ec9e9e, so no third-party merge and the CI predictions stand; ceiling BUG 54 / FEAT 41 / ARCH 10, next BUG-055, nothing minted.
+
+## Closeout: 1.39.0, reviewer-in-loop for the Define band (FEAT-041) [2026-10-06]
+
+**What shipped.** Minor **`1.39.0`** shipped `[FEAT-041]` (PR #66, squash `4505d37`).
+- Plan: `docs/superpowers/plans/2026-10-06-feat041-reviewer-in-loop.md`.
+- Spec: `docs/superpowers/specs/2026-10-06-feat041-reviewer-in-loop-design.md`.
+
+**One sha.** `npm view` reads version `1.39.0` and gitHead `4505d37a22c53bb3e6c7a681e09e53d01b2753c6`. The registry lagged the publish: the run printed its `+` line at 23:58:07Z, `npm view` still answered `1.38.0` (and E404 for `@1.39.0`) at 23:59:51Z, and the registry time for `1.39.0` reads 2026-10-07T00:01:16Z. A first `npm view` within minutes of a publish is not evidence against it. The `v1.39.0` tag (release `v1.39.0`, not a draft, published 2026-10-06T23:57:16Z) and the squash commit on `origin/main` are the same commit, `4505d37a22c53bb3e6c7a681e09e53d01b2753c6`.
+
+**Sync, measured first.** Local `main` was `0ec9e9e`, the branch base. It measured **0 ahead / 1 behind** `origin/main`, the clean case. The first `git switch main` refused, because the uncommitted plan ticks touch a file that differs at `0ec9e9e`; nothing moved. The ticks were copied to the scratchpad (sha256 `ada5eca7…`), the file was restored, `main` fast-forwarded to `4505d37`, and the ticks were copied back. The plan file at `4505d37` equals the branch's, so the copy-back carries exactly the three ticks. The merged tree equals the branch tree at `9d015b0`: `git diff 9d015b0 4505d37` is empty.
+
+**Instrument output on the merged tree:**
+- **`VERSION_GATE_OK 1.39.0`.**
+- **`RECORD_PARITY_OK`.** On the branch, the discriminator went red with `RECORD_PARITY_FAILED (4 violations)`, each reading `1.39.0 claims FEAT-041 but its heading reads [ ]`, then green on restore.
+- **Ceiling:** `UNION ceiling {"BUG":54,"FEAT":41,"ARCH":10}`, next **`BUG-055`**, both legs reporting (`headings=67`, `dupes=none`). Nothing was minted in FEAT-041.
+- **PR run `37548969041`:**
+  - ci-node20 (job `112559649523`) `1357 passed | 96 skipped (1453)`, printing `SKIP_BASELINE_OK ci-node20: 96 skipped identities match tools/skip-baseline.json (report: vitest-report.json)`;
+  - ci-node24 (job `112559649266`) `1440 passed | 13 skipped (1453)`, printing `SKIP_BASELINE_OK ci-node24: 13 skipped identities match tools/skip-baseline.json (report: vitest-report.json)`;
+  - `git diff origin/main -- tools/skip-baseline.json` was empty before the push.
+- **Push run on `main`, `37549205289`:** the same counts and both `SKIP_BASELINE_OK` lines. `tools/skip-baseline.json` is unchanged from `0ec9e9e` to `4505d37`.
+- **Publish run `37549355116`** succeeded, printing `+ @yeison.restrepo.r/code-conductor@1.39.0`.
+- **Local suite on `main`:** 1453 / 0, 50 test files.
+- **Reconciliation, total 1453 on all three legs:**
+
+  | Leg | Reading | Predicted |
+  |---|---|---|
+  | local | 1453 / 0, 50 files | 1453 / 0, 50 files |
+  | ci-node20 | 1357 / 96 | 1357 / 96 |
+  | ci-node24 | 1440 / 13 | 1440 / 13 |
+
+  Arithmetic: 1418 + 35 = 1453; 1322 + 35 = 1357, and 1357 + 96 = 1453; 1405 + 35 = 1440, and 1440 + 13 = 1453.
+
+**Every count boundary matched its prediction**, across five commits and two CI legs, although the counts were predicted, not measured in a scratch clone (Ruling 7). Three steps halted on a red that did not match the plan. Each was ruled on by the owner and amended in the plan before any re-measure. Nothing was absorbed after a measurement.
+
+| Boundary | Measured |
+|---|---|
+| T-000 (`5ab5fbd`) | 1418 / 0, 49 files |
+| T-001 (`d15b898`) | red 93 / 19 (amended); 112 / 112 (+20); discriminators 5, 1, 2; 1438 / 0 |
+| T-002 (`6705a27`) | red 5; parity red 2 (halt, amended), re-run 49 / 49; 1442 / 0 |
+| T-003 (`5a62ac2`) | red 6; 39 / 1 (halt, amended), re-run 40 / 40; ASCII 0 = 0; 1448 / 0 |
+| T-004 (`66a401e`) | red 4 / 1; sha256 `05ce114d…` first time; 5 / 5; 1453 / 0, 50 files |
+| T-005 (`9d015b0`) | 1453 / 0; discriminator red 4, green on restore |
+| CI | 1357 / 96 and 1440 / 13 (1453 each) |
+
+**Plan ticks.** T-005-G, T-005-H and the top-level T-005 are ticked in this record commit, not in a follow-up on the branch, as at 1.37.0 and 1.38.0. The plan now has no unticked task line.
+
+**`[FEAT-041]` harvest, in one place.** Each item is evidenced in the Plan section's handoff observations above and in the amended plan lines.
+
+- **Vitest is not Node ESM for a missing named export.** Under plain Node, importing an export a module does not provide is a load-time SyntaxError (`'REVIEW_CAP' in m` was `false`). Under vitest's transform, the same import arrives as `undefined`, the file loads, and every test runs. The plan's original split was directionally right for vitest, and the review ruling that imposed Node semantics was reversed. **Lesson:** predict a red under the runner that will execute it. Where a test uses a missing constant as a loop bound or a path, its red shows up late (a zero-iteration loop, a `TypeError` in `join`), and the task's discriminators are what make those tests precise after the green.
+- **Index-reading tests force staging order inside the task.** `gitignore-block-parity` derives its expected block from `git ls-files`, so a new leaf line is red until its file is in the index. The plan staged the new profiles one step after the run that needed them; the plain `git add` moved into T-002-D. **Lesson:** when a task adds a `.gitignore` leaf, its new files are staged in the same step as the leaf, before any run of the parity test.
+- **The pin yields to the document.** T-003-A pinned `'No revision follows the third pass.'` with a period, while the plan's own command prose continues `, so the document at the approval is always the one the last reviewer read.` The pin became the full sentence, because the clause carries the invariant worth pinning. **Lesson:** at self-review, each content pin is checked by substring against the text block it pins, in the same plan.
+- **Extract, never retype.** Every inserted block (tests, profile, command prose, README, records) was extracted from the plan's fence by line range, de-indented with an indentation guard, and anchored by unique-match replacement. The settings file was generated from the test's own constant and hit the pin the first time. One slip: a block extracted from deeper indentation lost its two-space nesting and was re-indented before the run.
+- **Guard 3 shaped the shell work.** P7 fired on `sed` edits whose pattern held `[X]` / `[ ]` brackets next to other commands, and P9 fired on `for` and `until` loops. Small `node` scripts in the scratchpad and the Edit tool were the authorized routes; no allowlist entry was proposed.
+
+**Step 11 does not apply.** This repository never starts an orchestrated run, so no ticket binds the item and no writeback is owed.
+
+**Next:** the next item is the owner's call. Follow-up candidates recorded by the plan, none minted: the manual `/cc-spec` flow, Guard 5 gating on an open round, the revision verb, and the D8 sequencing anomaly. `BUG-055`'s mint stays the owner's, with the ceiling run on both legs first.
