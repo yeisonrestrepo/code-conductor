@@ -1,0 +1,54 @@
+name: Wiki Sync
+
+# The wiki is a derived artifact: its pages are the templates under .github/wiki/pages,
+# with the generated tables filled in. A direct edit on the wiki is overwritten by the
+# next sync, so change the template instead.
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/wiki/**'
+      - '.github/workflows/wiki-sync.yml'
+      - 'scripts/snap-contract.mjs'
+      - 'skills/*/SKILL.md'
+      - '.claude/agents/*.md'
+
+# Two merges in quick succession would otherwise race on the push.
+concurrency:
+  group: wiki-sync
+  cancel-in-progress: false
+
+jobs:
+  sync-wiki:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Fail-open: a sync failure is a warning on this run and never a red pipeline.
+    continue-on-error: true
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+
+      - name: Generate the wiki pages
+        run: node .github/wiki/wiki-gen.mjs --out wiki-out
+
+      - name: Push the pages that changed
+        env:
+          WIKI_REMOTE: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git
+        run: |
+          git clone --quiet --depth 1 "$WIKI_REMOTE" wiki-repo
+          cp wiki-out/*.md wiki-repo/
+          cd wiki-repo
+          git add -A
+          if git diff --cached --quiet; then
+            echo "wiki already current"
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" \
+              -c user.email="github-actions[bot]@users.noreply.github.com" \
+              commit --quiet -m "docs: sync wiki from ${GITHUB_SHA::7}"
+          git push --quiet
