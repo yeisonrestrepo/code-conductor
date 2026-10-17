@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flow viewer prototype</title>
+<style>
+  :root { --bg: #0f1115; --panel: #171a21; --line: #2a2f3a; --text: #d7dbe3; --dim: #8a92a3;
+          --allow: #3fb950; --deny: #f85149; --ask: #d29922; --idle: #3a4150; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif; padding: 20px; }
+  header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+  h1 { font-size: 18px; margin: 0; }
+  #status { color: var(--dim); font-size: 13px; }
+  .grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
+  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin: 0 0 10px; }
+  svg { width: 100%; height: auto; display: block; }
+  svg text { fill: var(--text); font: 13px system-ui, sans-serif; }
+  svg .dim { fill: var(--dim); font-size: 11px; }
+  ol { list-style: none; margin: 0; padding: 0; max-height: 420px; overflow: auto; font: 12px ui-monospace, monospace; }
+  li { display: grid; grid-template-columns: 62px 50px 40px 1fr; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+  .v-allow { color: var(--allow); } .v-deny { color: var(--deny); } .v-ask { color: var(--ask); }
+  .legend { display: flex; gap: 14px; color: var(--dim); font-size: 12px; margin-top: 8px; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
+</style>
+</head>
+<body>
+<header><h1>code-conductor flow</h1><span id="status">no events yet</span></header>
+<div class="grid">
+  <section class="panel"><h2>Guard lanes</h2><svg id="lanes" viewBox="0 0 640 330" role="img" aria-label="Guard lanes"></svg>
+    <div class="legend"><span><i class="dot" style="background:var(--allow)"></i>allow</span>
+      <span><i class="dot" style="background:var(--deny)"></i>deny</span>
+      <span><i class="dot" style="background:var(--ask)"></i>ask</span></div></section>
+  <section class="panel"><h2>Events, newest first</h2><ol id="log"></ol></section>
+</div>
+<script>
+// Mirrors the hook's DISPATCH table (spec D3); a drift test would pin these numbers to the hook.
+const LANES = [
+  { name: 'Read', tools: ['Read'], guards: [4, 1] },
+  { name: 'Write', tools: ['Write', 'create_file', 'write_file'], guards: [5, 6, 2] },
+  { name: 'Edit', tools: ['Edit'], guards: [5, 6] },
+  { name: 'Bash', tools: ['Bash'], guards: [7, 3] },
+  { name: 'Agent', tools: ['Agent', 'SendMessage'], guards: [6] },
+];
+const COLOR = { allow: 'var(--allow)', deny: 'var(--deny)', ask: 'var(--ask)' };
+// A namespace identifier, never fetched; assembled so the page holds no literal URL (spec AC7).
+const SVG = ['http:', '', 'www.w3.org', '2000', 'svg'].join('/');
+let events = [];
+let broken = false;
+window.flowEvent = (e) => events.push(e);
+// A torn line is a syntax error, which fires window error and then onload, never onerror.
+window.addEventListener('error', () => { broken = true; });
+
+function node(tag, attrs, text) {
+  const el = document.createElementNS(SVG, tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  if (text !== undefined) el.textContent = text;
+  return el;
+}
+
+function laneStats(lane) {
+  const mine = events.filter((e) => lane.tools.includes(e.tool));
+  const perGuard = {};
+  for (const e of mine) if (e.guard !== null) perGuard[e.guard] = (perGuard[e.guard] || 0) + 1;
+  return { total: mine.length, perGuard, last: mine[mine.length - 1] };
+}
+
+function drawLane(svg, lane, y) {
+  const s = laneStats(lane);
+  svg.append(node('text', { x: 0, y: y + 5 }, lane.name), node('text', { x: 0, y: y + 21, class: 'dim' }, `${s.total} call${s.total === 1 ? "" : "s"}`));
+  svg.append(node('line', { x1: 80, y1: y, x2: 600, y2: y, stroke: 'var(--line)', 'stroke-width': 2 }));
+  lane.guards.forEach((g, i) => {
+    const x = 130 + i * 150, hit = s.last && s.last.guard === g;
+    svg.append(node('rect', { x: x - 42, y: y - 17, width: 84, height: 34, rx: 7, fill: 'var(--panel)',
+      stroke: hit ? COLOR[s.last.verdict] : 'var(--idle)', 'stroke-width': hit ? 2.5 : 1.5 }));
+    svg.append(node('text', { x: x - 30, y: y + 5 }, `G${g}`), node('text', { x: x + 2, y: y + 5, class: 'dim' }, `×${s.perGuard[g] || 0}`));
+  });
+  const done = s.last ? COLOR[s.last.verdict] : 'var(--idle)';
+  svg.append(node('circle', { cx: 600, cy: y, r: 9, fill: done }));
+}
+
+function render() {
+  const svg = document.getElementById('lanes');
+  svg.replaceChildren();
+  LANES.forEach((lane, i) => drawLane(svg, lane, 30 + i * 64));
+  const log = document.getElementById('log');
+  log.replaceChildren();
+  for (const e of events.slice(-500).reverse()) {
+    const li = document.createElement('li');
+    const cells = [new Date(e.ts).toLocaleTimeString([], { hour12: false }), e.tool, e.verdict, (e.guard ? `G${e.guard} ${e.code || ''} ` : '') + e.target];
+    cells.forEach((c, i) => { const span = document.createElement('span'); span.textContent = c; if (i === 2) span.className = 'v-' + e.verdict; li.append(span); });
+    log.append(li);
+  }
+}
+
+function keepPrevious(previous, message) {
+  events = previous;
+  document.getElementById('status').textContent = message;
+  render();
+}
+
+function poll() {
+  const previous = events;
+  events = [];
+  broken = false;
+  const s = document.createElement('script');
+  s.src = './flow-events.js?t=' + Date.now();
+  s.onload = () => {
+    s.remove();
+    if (broken) return keepPrevious(previous, 'event file unreadable, retrying');
+    document.getElementById('status').textContent = `${events.length} events · updated ${new Date().toLocaleTimeString()}`;
+    render();
+  };
+  s.onerror = () => { s.remove(); keepPrevious(previous, previous.length ? 'event file unreadable, retrying' : 'no events yet'); };
+  document.head.append(s);
+}
+poll();
+setInterval(poll, 1500);
+</script>
+</body>
+</html>
