@@ -8,6 +8,10 @@ Proofs of concept for the flow viewer candidate. Spec and plan are in PR #81. Th
 | `hook-bench.mjs` | Emitter cost on the real hook, the D5 event shape, AC2 fail-open, AC9 secret handling, rotation behind a lock file |
 | `viewer-probe.mjs` | D1 viewer side: parse cost by event count, and what one torn line does to a `<script>`-loaded file |
 | `viewer-prototype.html` + `screenshot.mjs` | What the D3 lanes look like, fed by real events from the patched hook, opened from `file://` |
+| `hook-edge-cases.mjs` | 16 emitter edge cases, PASS/FAIL: opt-out, no `.claude/`, unparseable payload, unknown tool, secrets, `</script>`, caps, unicode, torn tail, fresh and stale locks |
+| `flow-cli.mjs` | Opt-in terminal view: full view (a `/cc-flow` command), `--line` (a statusLine), `--watch` (a second pane) |
+| `edge-visual.mjs` | Screenshots of the viewer's edge cases and of the CLI view, over the Chrome DevTools Protocol, into `shots/` |
+| `sample-session.mjs` | The 12-call session the screenshot probes drive through the hook |
 
 Run any of them with `node tests/probes/flow-viewer/<script>.mjs`.
 
@@ -23,3 +27,13 @@ Windows 11, Node v24.16.0, 8 cores, NTFS, Chrome and Edge headless. macOS, Linux
 - **Viewer parse cost:** 1.3 ms at 500 events, 8 ms at 5,000, 77 ms at 50,000.
 - **Fail-open (AC2) holds.** Output is byte-identical to a `CC_FLOW_OFF` run on an allow, a deny and an ask. A Bearer token in a Bash command leaves only `curl` in the file.
 - **Pulling `code` out of the reason text is fragile.** Guard 2's ask yields `ALREADY`.
+
+### Edge cases, first run, and what changed in the candidate emitter
+
+Three of the 16 failed against the emitter as the spec describes it. Each is now fixed in `patched-hook.mjs`, and all 16 pass.
+
+- **Secret in an env assignment.** "First word" recorded `TOKEN=sk-...` from `TOKEN=sk-... curl`. Leading `VAR=value` words are now skipped. **Spec D5/AC9 need the same rule.**
+- **Stale lock.** A hook that dies mid-rotation leaves its lock behind, and the file then grows without bound (2,003 lines at a 1 KiB cap). A lock older than 10 s is now broken.
+- **Torn tail.** The next append fuses onto a torn last line, and the viewer stays blind until rotation. Each call now checks the file's last byte (one 1-byte read), and rotation drops lines that do not parse, so the next call repairs the file.
+
+These changes add 20 lines to the emitter: 806 to 870 in total, against the spec's estimate of about 40. Hook p50 is still inside the noise.

@@ -12,23 +12,31 @@
   header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
   h1 { font-size: 18px; margin: 0; }
   #status { color: var(--dim); font-size: 13px; }
-  .grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; }
+  .grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 4fr); gap: 16px; }
   .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
   .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin: 0 0 10px; }
   svg { width: 100%; height: auto; display: block; }
   svg text { fill: var(--text); font: 13px system-ui, sans-serif; }
   svg .dim { fill: var(--dim); font-size: 11px; }
-  ol { list-style: none; margin: 0; padding: 0; max-height: 420px; overflow: auto; font: 12px ui-monospace, monospace; }
+  ol { list-style: none; margin: 0; padding: 0; max-height: 640px; overflow: auto; font: 12px ui-monospace, monospace; }
   li { display: grid; grid-template-columns: 62px 50px 40px 1fr; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--line); }
   .v-allow { color: var(--allow); } .v-deny { color: var(--deny); } .v-ask { color: var(--ask); }
   .legend { display: flex; gap: 14px; color: var(--dim); font-size: 12px; margin-top: 8px; }
   .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
+  .lanes-scroll { overflow-x: auto; }
+  /* Narrow screens: stack the panels, keep the lanes legible by scrolling them sideways, wrap log rows. */
+  @media (max-width: 760px) {
+    body { padding: 16px; }
+    .grid { grid-template-columns: 1fr; }
+    .lanes-scroll svg { min-width: 640px; }
+    li { grid-template-columns: 62px 1fr; }
+  }
 </style>
 </head>
 <body>
 <header><h1>code-conductor flow</h1><span id="status">no events yet</span></header>
 <div class="grid">
-  <section class="panel"><h2>Guard lanes</h2><svg id="lanes" viewBox="0 0 640 330" role="img" aria-label="Guard lanes"></svg>
+  <section class="panel"><h2>Guard lanes</h2><div class="lanes-scroll"><svg id="lanes" viewBox="0 0 716 560" role="img" aria-label="Guard lanes"></svg></div>
     <div class="legend"><span><i class="dot" style="background:var(--allow)"></i>allow</span>
       <span><i class="dot" style="background:var(--deny)"></i>deny</span>
       <span><i class="dot" style="background:var(--ask)"></i>ask</span></div></section>
@@ -59,36 +67,84 @@ function node(tag, attrs, text) {
   return el;
 }
 
-function laneStats(lane) {
-  const mine = events.filter((e) => lane.tools.includes(e.tool));
-  const perGuard = {};
-  for (const e of mine) if (e.guard !== null) perGuard[e.guard] = (perGuard[e.guard] || 0) + 1;
-  return { total: mine.length, perGuard, last: mine[mine.length - 1] };
+// Names and one-line purposes from the guard comments in pre-tool-use.mjs.
+const GUARDS = {
+  1: ['Large read', 'over 150 lines, no limit'],
+  2: ['Duplicate write', 'Write over an existing file'],
+  3: ['Bash scan', 'mass content-dump patterns'],
+  4: ['Blocked read', 'node_modules/'],
+  5: ['Band scope', 'role writes outside its scope'],
+  6: ['Orchestrator run', 'writes and dispatch mid-run'],
+  7: ['Role shell', "a band role's Bash"],
+};
+const NODE_W = 178, NODE_H = 92, LANE_H = 112, TICKS = 14;
+
+// Every lane event that reached guard g: it either passed g or g decided it.
+function guardStats(laneEvents, g) {
+  const reached = laneEvents.filter((e) => e.guard === g || (e.passed || []).includes(g));
+  const decided = reached.filter((e) => e.guard === g);
+  return {
+    passed: reached.length - decided.length,
+    deny: decided.filter((e) => e.verdict === 'deny').length,
+    ask: decided.filter((e) => e.verdict === 'ask').length,
+    lastHit: decided[decided.length - 1],
+    ticks: reached.slice(-TICKS).map((e) => (e.guard === g ? e.verdict : 'allow')),
+  };
+}
+
+// The guards this call went through, in order: "G7✓ → G3✕".
+function guardChain(e) {
+  const mark = { deny: '✕', ask: '?' };
+  const steps = (e.passed || []).map((g) => `G${g}✓`);
+  if (e.guard) steps.push(`G${e.guard}${mark[e.verdict] || ''}`);
+  return steps.length ? '[' + steps.join(' → ') + ']' : '[no guards]';
+}
+
+function clip(text, max) {
+  return text.length > max ? text.slice(0, max - 1) + '…' : text;
+}
+
+function drawCounts(svg, x, y, st) {
+  const parts = [['✓', st.passed, 'var(--allow)'], ['✕', st.deny, 'var(--deny)'], ['?', st.ask, 'var(--ask)']];
+  parts.forEach(([sym, n, color], i) => {
+    svg.append(node('text', { x: x + 12 + i * 52, y: y + 56, fill: n ? color : 'var(--dim)' }, `${sym} ${n}`));
+  });
+}
+
+function drawGuardNode(svg, x, y, g, st, isLastDecider, lastVerdict) {
+  const [name, purpose] = GUARDS[g];
+  svg.append(node('rect', { x, y: y - NODE_H / 2, width: NODE_W, height: NODE_H, rx: 8, fill: 'var(--panel)',
+    stroke: isLastDecider ? COLOR[lastVerdict] : 'var(--idle)', 'stroke-width': isLastDecider ? 2.5 : 1.5 }));
+  const top = y - NODE_H / 2;
+  svg.append(node('text', { x: x + 12, y: top + 20, 'font-weight': 600 }, `G${g} · ${name}`));
+  svg.append(node('text', { x: x + 12, y: top + 36, class: 'dim' }, purpose));
+  drawCounts(svg, x, top, st);
+  const last = st.lastHit ? clip(`${st.lastHit.code || st.lastHit.verdict} · ${st.lastHit.target}`, 26) : 'no decisions yet';
+  svg.append(node('text', { x: x + 12, y: top + 73, class: 'dim' }, last));
+  st.ticks.forEach((v, i) => svg.append(node('rect', { x: x + 12 + i * 11, y: top + 80, width: 8, height: 5, rx: 1.5, fill: COLOR[v] })));
 }
 
 function drawLane(svg, lane, y) {
-  const s = laneStats(lane);
-  svg.append(node('text', { x: 0, y: y + 5 }, lane.name), node('text', { x: 0, y: y + 21, class: 'dim' }, `${s.total} call${s.total === 1 ? "" : "s"}`));
-  svg.append(node('line', { x1: 80, y1: y, x2: 600, y2: y, stroke: 'var(--line)', 'stroke-width': 2 }));
+  const mine = events.filter((e) => lane.tools.includes(e.tool));
+  const last = mine[mine.length - 1];
+  svg.append(node('text', { x: 0, y: y - 4, 'font-weight': 600 }, lane.name), node('text', { x: 0, y: y + 14, class: 'dim' }, `${mine.length} call${mine.length === 1 ? '' : 's'}`));
+  svg.append(node('line', { x1: 82, y1: y, x2: 700, y2: y, stroke: 'var(--line)', 'stroke-width': 2 }));
   lane.guards.forEach((g, i) => {
-    const x = 130 + i * 150, hit = s.last && s.last.guard === g;
-    svg.append(node('rect', { x: x - 42, y: y - 17, width: 84, height: 34, rx: 7, fill: 'var(--panel)',
-      stroke: hit ? COLOR[s.last.verdict] : 'var(--idle)', 'stroke-width': hit ? 2.5 : 1.5 }));
-    svg.append(node('text', { x: x - 30, y: y + 5 }, `G${g}`), node('text', { x: x + 2, y: y + 5, class: 'dim' }, `×${s.perGuard[g] || 0}`));
+    drawGuardNode(svg, 96 + i * 196, y, g, guardStats(mine, g), last && last.guard === g, last && last.verdict);
   });
-  const done = s.last ? COLOR[s.last.verdict] : 'var(--idle)';
-  svg.append(node('circle', { cx: 600, cy: y, r: 9, fill: done }));
+  svg.append(node('circle', { cx: 700, cy: y, r: 9, fill: last ? COLOR[last.verdict] : 'var(--idle)' }));
 }
 
 function render() {
   const svg = document.getElementById('lanes');
   svg.replaceChildren();
-  LANES.forEach((lane, i) => drawLane(svg, lane, 30 + i * 64));
+  LANES.forEach((lane, i) => drawLane(svg, lane, 52 + i * LANE_H));
   const log = document.getElementById('log');
   log.replaceChildren();
   for (const e of events.slice(-500).reverse()) {
     const li = document.createElement('li');
-    const cells = [new Date(e.ts).toLocaleTimeString([], { hour12: false }), e.tool, e.verdict, (e.guard ? `G${e.guard} ${e.code || ''} ` : '') + e.target];
+    const chain = guardChain(e);
+    const cells = [new Date(e.ts).toLocaleTimeString([], { hour12: false }), e.tool, e.verdict, `${e.target}  ${chain}${e.code ? ' ' + e.code : ''}`];
     cells.forEach((c, i) => { const span = document.createElement('span'); span.textContent = c; if (i === 2) span.className = 'v-' + e.verdict; li.append(span); });
     log.append(li);
   }
