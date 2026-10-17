@@ -77,8 +77,28 @@ function fullView({ events, bad, missing }) {
   return out.join('\n');
 }
 
+// The cc-flow mod's band, as text: the same rows it draws above the prompt, collapsed or expanded.
+function bandView({ events, bad }, expanded) {
+  if (!events.length) return '';
+  const toggle = dim(expanded ? 'e: collapse' : 'e: expand');
+  const rows = [`${statusLine({ events })}  ${toggle}`];
+  if (!expanded) return rows.join('\n');
+  rows.push('');
+  for (const [name, tools, guards] of LANES) {
+    const mine = events.filter((e) => tools.includes(e.tool));
+    rows.push(`${bold(name.padEnd(6))}${dim(String(mine.length).padStart(3))} ${guards.map((g) => '  ' + guardCell(mine, g)).join('')}`);
+  }
+  rows.push(dim('recent'));
+  for (const e of events.slice(-6).reverse()) {
+    rows.push(` ${MARK[e.verdict]} ${e.tool.padEnd(6)} ${String(e.target).slice(0, 30).padEnd(30)} ${chain(e)}${e.code ? ' ' + red(e.code) : ''}`);
+  }
+  if (bad) rows.push(amber(`${bad} unreadable line(s) skipped`));
+  return rows.join('\n');
+}
+
 const args = process.argv.slice(2);
 const dir = projectDir(args);
-if (args.includes('--line')) console.log(statusLine(loadEvents(dir)));
+if (args.includes('--band')) console.log(bandView(loadEvents(dir), args.includes('--expanded')));
+else if (args.includes('--line')) console.log(statusLine(loadEvents(dir)));
 else if (args.includes('--watch')) setInterval(() => process.stdout.write('\x1b[2J\x1b[H' + fullView(loadEvents(dir)) + '\n'), 1500);
 else console.log(fullView(loadEvents(dir)));

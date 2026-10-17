@@ -125,20 +125,22 @@ function terminalPage(text, title) {
 async function cliScenarios(cdp, work, normalDir) {
   const cli = join(HERE, 'flow-cli.mjs');
   const env = { ...process.env, FORCE_COLOR: '1' };
-  const full = execFileSync(process.execPath, [cli, normalDir], { encoding: 'utf8', env });
-  const status = execFileSync(process.execPath, [cli, '--line', normalDir], { encoding: 'utf8', env });
-  const prompt = '\x1b[2m> \x1b[0mrefactor the parser and run the tests\n\n';
+  const run = (...a) => execFileSync(process.execPath, [cli, ...a, normalDir], { encoding: 'utf8', env }).trimEnd();
+  const transcript = '\x1b[1m> \x1b[0mrefactor the parser and run the tests\n\n' +
+    '\x1b[32m●\x1b[0m Read(src/parser.js)\n  \x1b[2m⎿  Read 120 lines\x1b[0m\n\n\x1b[32m●\x1b[0m Bash(npm test)\n  \x1b[2m⎿  42 passed\x1b[0m\n\n';
+  const composer = (band) => `${band}${' '.repeat(4)}\x1b[2m[-]\x1b[0m\n${'─'.repeat(100)}\n\x1b[1m>\x1b[0m \n${'─'.repeat(100)}\n\x1b[2m  ? for shortcuts\x1b[0m`;
   const pages = [
-    ['08-cli-cc-flow-command', `$ /cc-flow\n\n${full}`, 'Terminal — on demand: /cc-flow'],
-    ['09-cli-status-line', `${prompt}  ● Reading src/parser.js…\n\n\n${'─'.repeat(96)}\n${status}`, 'Terminal — opt-in status line under the prompt'],
+    ['08-cli-band-collapsed', transcript + composer(run('--band')), 'Claude Code (mock-up) — cc-flow band, collapsed (default)', 330],
+    ['09-cli-band-expanded', transcript + composer(run('--band', '--expanded')), 'Claude Code (mock-up) — cc-flow band, expanded with e or /cc-flow', 600],
+    ['10-cli-cc-flow-full', `$ node flow-cli.mjs\n\n${run()}`, 'Terminal — full view on demand (flow-cli.mjs)', 560],
   ];
-  for (const [name, text, title] of pages) {
+  for (const [name, text, title, height] of pages) {
     const file = join(work, name + '.html');
     writeFileSync(file, terminalPage(text, title));
-    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1180, height: name.includes('status') ? 230 : 560, deviceScaleFactor: 2, mobile: false });
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1180, height, deviceScaleFactor: 2, mobile: false });
     await cdp.send('Page.navigate', { url: pathToFileURL(file).href });
     await sleep(500);
-    await shoot(cdp, name, 1180, name.includes('status') ? 230 : 560);
+    await shoot(cdp, name, 1180, height);
   }
 }
 

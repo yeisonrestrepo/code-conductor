@@ -9,7 +9,8 @@ Proofs of concept for the flow viewer candidate. Spec and plan are in PR #81. Th
 | `viewer-probe.mjs` | D1 viewer side: parse cost by event count, and what one torn line does to a `<script>`-loaded file |
 | `viewer-prototype.html` + `screenshot.mjs` | What the D3 lanes look like, fed by real events from the patched hook, opened from `file://` |
 | `hook-edge-cases.mjs` | 16 emitter edge cases, PASS/FAIL: opt-out, no `.claude/`, unparseable payload, unknown tool, secrets, `</script>`, caps, unicode, torn tail, fresh and stale locks |
-| `flow-cli.mjs` | Opt-in terminal view: full view (a `/cc-flow` command), `--line` (a statusLine), `--watch` (a second pane) |
+| `cc-flow-mod/` | **Interactive CLI view.** A Claude Code mod that adds a band above the prompt: one line by default, expanded or collapsed with `e` (after ctrl+x tab) or `/cc-flow`. It stays hidden while there are no events. 7 tests (`claude plugin test tests/probes/flow-viewer/cc-flow-mod`) on the terminal and desktop surfaces. Try it with `claude --plugin-dir tests/probes/flow-viewer/cc-flow-mod`. |
+| `flow-cli.mjs` | The same views from a plain terminal: full view, `--band [--expanded]` (the mod's rows as text), `--line`, `--watch` |
 | `edge-visual.mjs` | Screenshots of the viewer's edge cases and of the CLI view, over the Chrome DevTools Protocol, into `shots/` |
 | `sample-session.mjs` | The 12-call session the screenshot probes drive through the hook |
 

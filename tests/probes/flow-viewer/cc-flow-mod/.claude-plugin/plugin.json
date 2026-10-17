@@ -1,0 +1,6 @@
+{
+  "name": "cc-flow",
+  "version": "0.1.0",
+  "description": "code-conductor guard verdicts above the prompt: one line by default, expandable with e or /cc-flow",
+  "types": "./types/index.d.ts"
+}
