@@ -11,8 +11,8 @@ design choices and the capabilities of the host terminal.
 ### What works well
 
 - **Pure text interface.** All output is plain text rendered by the user's
-  terminal and is compatible with screen readers that support terminal
-  applications (e.g. NVDA, JAWS, VoiceOver, Orca).
+  terminal, the format screen readers that support terminal applications
+  (e.g. NVDA, JAWS, VoiceOver, Orca) are built to handle.
 - **No colour-only signalling.** Blocked and allowed outcomes are
   communicated through words (`BLOCKED`, `DENIED`, `allowed`), not colour
   alone.
@@ -36,16 +36,17 @@ design choices and the capabilities of the host terminal.
 
 ## Supported environments
 
-code-conductor is tested on:
+code-conductor emits plain text only, so it is designed to work in any
+xterm-compatible terminal, including:
 
 - **Windows:** Windows Terminal, PowerShell, Git Bash
 - **macOS:** Terminal.app, iTerm2
 - **Linux:** GNOME Terminal, Konsole, common xterm-compatible emulators
 
-Screen reader compatibility has been verified with:
-
-- NVDA (Windows)
-- VoiceOver (macOS)
+Screen reader compatibility follows from the pure-text design rather than from
+a formal verification program: no systematic testing with NVDA, VoiceOver or
+other assistive technology has been performed yet. Reports from assistive
+technology users are welcome and are treated as bugs.
 
 ## Reporting barriers
 
