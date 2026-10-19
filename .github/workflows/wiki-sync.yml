@@ -18,12 +18,20 @@ concurrency:
   group: wiki-sync
   cancel-in-progress: false
 
+# Deny every scope by default; the job below grants back only what the push needs.
+permissions: {}
+
 jobs:
   sync-wiki:
+    # Forks have no wiki to push to and their token cannot reach ours.
+    if: github.repository == 'yeisonrestrepo/code-conductor'
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # Fail-open: a sync failure is a warning on this run and never a red pipeline.
+    # Fail-open: the wiki is a derived docs mirror, rebuilt in full on the next
+    # merge, so a failed sync loses nothing durable. Reddening CI over it would
+    # block or alarm on a change whose source of truth already landed in main.
     continue-on-error: true
+    # Minimum scope: contents:write is what GITHUB_TOKEN needs to push the wiki repo.
     permissions:
       contents: write
     steps:

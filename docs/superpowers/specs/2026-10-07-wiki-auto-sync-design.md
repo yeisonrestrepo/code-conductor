@@ -115,6 +115,13 @@ The workflow must never fail the CI run:
 - The generator catches all errors internally and exits 0 with a warning
 - A missing or unreachable wiki repo logs a warning, not an error
 
+Rationale: the wiki is a derived mirror rebuilt in full on the next merge, so a failed sync loses nothing durable; the workflow states this in a comment beside `continue-on-error`.
+
+### 3a. Token Scope and Fork Guard
+
+- Workflow-level `permissions: {}` denies every scope; the job grants back `contents: write` only, the minimum `GITHUB_TOKEN` needs to push the wiki repo.
+- The job carries `if: github.repository == 'yeisonrestrepo/code-conductor'`, so forks never attempt the push.
+
 ### 4. Page-Source Mapping
 
 The generator maintains a static map of `pageName → [sourceFiles]`. When a source file changes, only the pages that depend on it are regenerated. The workflow's `paths` filter is the coarse gate; the generator's map is the fine gate.
