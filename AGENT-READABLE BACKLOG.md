@@ -951,6 +951,25 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   so `[BUG-059]` lands with or before the leg is activated.
 - Filed from issue #76.
 
+### [ ] `[BUG-059]` fake-gh is POSIX-only, so on Windows the suites reach the real logged-in gh CLI
+
+- Symptom: tests/helpers/fake-gh.js:22 writes a `#!/bin/sh` script
+  named `gh` onto PATH, which Windows cannot execute, and no
+  `fake-gh.cmd` exists; no consuming test skips on win32 (verified at
+  3797c2b). Once suites load on Windows, the ticket/orchestrate tests
+  resolve the REAL `gh` — a logged-in developer's `npm test` can post
+  comments or close issues on the live repository.
+- This is a side-effect hazard in test infrastructure, not just a red
+  suite; issue #76 excludes it from its five causes by design, and the
+  cause-1 fix there is what exposes it.
+- Acceptance: the fake resolves on win32 (a `.cmd`/`.bat` shim or a
+  Node-based shim) so the suites run hermetically; and a fail-fast
+  guard makes any test path that would invoke the real `gh` die with a
+  named error before the call leaves the process, on every platform.
+- Ordering: lands with or before `[BUG-058]` activates the Windows CI
+  leg.
+- Filed from issue #75.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
