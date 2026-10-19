@@ -86,6 +86,7 @@ After modifying any method, variable, class, or component:
 | [TESTS]      | Omitted in MIN mode — test files affected or written                                              |
 | [BUG]        | Always when a bug is found — format: `file:line — one-sentence description`. Never suppressed, including in MIN mode. |
 | [VALIDATION] | After implementation tasks only — edge cases, risks, justification                               |
+| [SECURITY]   | Always when OWASP finding detected — format: `file:line — A0X: description`. Never suppressed     |
 
 ## Verbosity Protocol
 VERBOSITY: MIN (default)
@@ -93,6 +94,7 @@ VERBOSITY: MIN (default)
 - [CHANGES] tag: modified file list only.
 - [VALIDATION] tag: included after implementation tasks only (code changes, file rewrites, behavioral modifications); condensed to exactly three lines — one each for: edge cases covered, residual risks, justification. Omitted entirely for non-implementation tasks (file deletions, config-only chores, maintenance commits, pure documentation edits).
 - [BUG] tag: always included in MIN mode when a bug is found; format: `[BUG] file:line — one-sentence description`. Never suppressed.
+- [SECURITY] tag: always included in MIN mode when an OWASP finding is detected; format: `[SECURITY] file:line — A0X: one-sentence description`. Never suppressed.
 - All other tags ([REASON], [PLAN], [DEPS], [TESTS]) are omitted in MIN mode.
 - Ambiguity: one clarifying question, nothing else.
 
