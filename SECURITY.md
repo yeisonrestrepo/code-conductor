@@ -7,8 +7,8 @@ not patched.
 
 | Version | Supported |
 |---|---|
-| latest (`1.39.x`) | ✅ |
-| < 1.39.0 | ❌ |
+| latest published minor | ✅ |
+| anything older | ❌ |
 
 Users should always run `npx @yeison.restrepo.r/code-conductor@latest` to get
 the most recent fixes.
@@ -31,13 +31,13 @@ denies a class of operations before they execute:
 
 | Guard | Scope |
 |---|---|
-| Guard 1 | Mass-content-dump patterns (e.g. `cat *`) |
-| Guard 2 | Enforces the orchestrator lookup chain |
-| Guard 3 | Bash scan allowlist gating |
-| Guard 4 | File-scope restrictions |
-| Guard 5 | Band-role write scope enforcement |
-| Guard 6 | Orchestrator nested-dispatch denial |
-| Guard 7 | Band-role Bash denial / test-command-only enforcement |
+| Guard 1 | Blocks a `Read` of a large file (>150 lines) with no explicit line limit |
+| Guard 2 | Asks before a `Write` overwrites a file that already exists |
+| Guard 3 | Scans every `Bash` command for mass-content-dump patterns; exceptions live in a reviewed allowlist |
+| Guard 4 | Blocks direct reads under `node_modules/` |
+| Guard 5 | Confines a band role's writes to its SNAP v3 envelope's declared scope |
+| Guard 6 | While an orchestrator run is live, denies nested dispatch and writes outside the run's own files |
+| Guard 7 | Denies shell to non-shell roles and pins shell roles to the run's recorded test command, unchained |
 
 A security issue in any guard — a bypass, a false allow, or a denial that can
 be circumvented — is a security vulnerability.
@@ -75,13 +75,14 @@ Include:
 
 | Step | Timeline |
 |---|---|
-| Acknowledgement | Within 48 hours |
-| Initial assessment | Within 7 days |
-| Fix development and release | Best effort, typically within 14 days |
+| Acknowledgement | Best effort, usually within a few days |
+| Initial assessment | Best effort |
+| Fix development and release | Best effort, prioritized by severity |
 | Public disclosure | After the fix is published |
 
-The reporter will be credited in the CHANGELOG entry unless they request
-anonymity.
+This is a single-maintainer project; timelines are best effort, not a
+contractual SLA. Reporters may be credited in the release notes unless they
+request anonymity.
 
 ### What qualifies as a security issue
 
@@ -107,7 +108,7 @@ anonymity.
 ### Bash scan allowlist
 
 Entries in `.claude/memory/bash-scan-allowlist.txt` create permanent exceptions
-to Guard 1. These entries:
+to Guard 3 (the Bash command scanner). These entries:
 
 - Are reviewed in git (they are committed, not local-only)
 - Must be proposed by an agent but **added by a human**
