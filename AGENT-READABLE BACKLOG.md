@@ -902,6 +902,26 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   session-start reset is enough or the metric itself moves.
 - Filed from issue #78.
 
+### [ ] `[BUG-057]` project.md grows without bound while the phase commands instruct a full read Guard 1 then blocks
+
+- Symptom: .claude/memory/project.md is append-only by design
+  (cc-spec.md:127 and /cc-checkpoint append; nothing prunes or caps),
+  and the phase commands instruct reading it whole: cc-implement.md:42,
+  cc-plan.md:58, cc-resume.md:40 (verified at 6f4607d). This
+  repository's own copy is 3,178 lines / ~433 KB.
+- The instruction collides with the project's own Guard 1: a Read of a
+  >150-line file without a limit is denied, so the agent either burns
+  tokens chunking thousands of lines through 150-line windows or skips
+  the read; either way the memory-first chain degrades as the file
+  grows, and the cost grows linearly with project age, inverting the
+  token-efficiency pillar.
+- Exposed consumers: every phase entry (/cc-implement, /cc-plan,
+  /cc-resume) on any long-lived project.
+- Fix shape is for the spec to decide; the issue sketches candidates
+  (index header, checkpoint digests, cap-with-archive), none a
+  decision.
+- Filed from issue #77.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
