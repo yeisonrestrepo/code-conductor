@@ -922,6 +922,35 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   decision.
 - Filed from issue #77.
 
+### [ ] `[BUG-058]` The test suite does not pass on Windows: five independent causes, invisible to a Linux-only CI
+
+- Symptom: a Windows 11 clone with git defaults (autocrlf=true) runs
+  `npx vitest run` to 19 failed suites / 16 failed tests; with
+  autocrlf=false, 391 previously-unloaded tests run and the count moves
+  to 38 failures (issue #76, measured on main at 0b0fb72, still present
+  at 3797c2b). Five causes, none fixed by 1.39.1:
+  1. `.gitattributes:1` sets EOL only for `*.sh`/`*.ps1`, so `.mjs`
+     checks out CRLF and 11 shebang-led suites fail at import, plus two
+     byte-comparison tests (merge-md AC9b, templates gitignore header).
+  2. `--import` is handed a Windows path instead of a `file://` URL
+     (conductor-db.test.js:326, :703) — ERR_UNSUPPORTED_ESM_URL_SCHEME.
+  3. Symlink creation without a privilege check (file-merge, deploy,
+     settings-merge suites) — EPERM without developer mode.
+  4. `chmod`-based read-only/unreadable fixtures
+     (handoff-cycle.test.js:105 confirmed; two likely peers untraced).
+  5. `spawnSync('npm', ...)` without a shell (smoke.test.js) — ENOENT,
+     the binary is `npm.cmd`.
+- CI runs ubuntu-latest only (test.yml), so none of this is visible
+  upstream; that absence is part of the defect.
+- Acceptance includes the enforcement, absorbing issue #65's first
+  candidate: a `windows-latest` leg in test.yml, green, asserting its
+  own measured skip set under its key in tools/skip-baseline.json (the
+  per-leg machinery exists since BUG-048). Tests that cannot run on
+  Windows self-skip with a named reason rather than fail.
+- Ordering: the cause-1 fix makes the fake-gh suites load on Windows,
+  so `[BUG-059]` lands with or before the leg is activated.
+- Filed from issue #76.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
