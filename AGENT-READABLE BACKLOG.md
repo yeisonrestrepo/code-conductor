@@ -885,6 +885,23 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Fix shape is for the spec to decide; the dossier notes a per-field
   typeof === 'string' check as a candidate, not a decision.
 
+### [ ] `[BUG-056]` context-guard: the turn counter persists across sessions, so a fresh session can start at CRITICAL
+
+- Symptom: .claude/hooks/context-guard.sh increments
+  .claude/memory/turn-count.txt on every UserPromptSubmit
+  (context-guard.sh:19-29, verified at 6f4607d) and nothing resets it
+  at session start; the only reset is the PostCompact hook, so the
+  count survives session boundaries. A fresh session inherits the
+  previous session's count and its first prompt can emit the 80%
+  warning or the CRITICAL banner urging /cc-compact against a
+  near-empty context.
+- The .ps1 mirror and both project-template copies carry the same
+  logic; a fix lands in all four.
+- The counter also measures prompts, not context size, which is the
+  assumption the thresholds encode; the spec decides whether a
+  session-start reset is enough or the metric itself moves.
+- Filed from issue #78.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
