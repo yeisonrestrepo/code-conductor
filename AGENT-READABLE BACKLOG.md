@@ -221,6 +221,13 @@ The factory is five bands. Work enters through the Boundary band, flows Define, 
 * **Components Affected:** To be derived by the spec from the codebase and from measurement before any owner round: dispatch form (orchestrator dispatch with the recorded T-002 pattern versus a new band role, the latter a SNAP v4 major decision the spec halts to bring to the owner if the codebase forces it; R7 bounds it: a role does not dispatch, the orchestrator session does), cycle mechanics against F4 (a second hand-back in the same position is refused with ORCH_HANDBACK_CONFLICT, yet the agent keeps reporting) and F5 (a handed-back agent can be revived by SendMessage), `cc-orchestrate.md` steps, possibly a round counter in the run file, possibly a read-only reviewer profile, and whether the manual `/cc-spec` flow consumes it in v1 or in a follow-up.
 * **Acceptance Criteria:** The reviewer's verdict informs the owner's boundary approval and never replaces it; it writes no gate and approves nothing alone. Termination criteria are declared before any round runs (the ticket's acceptance criteria as verifiable rows citing document lines, document format requirements, critical-review phases), with a hard round cap that stops and escalates to the owner carrying the open-items report, and a fresh reviewer on every round. The internal loop costs zero owner wakes if the background-agent pattern observed in the FEAT-031 sessions (claude 2.1.287: the T-002 background dispatch waited and continued in the same turn, where F3 measured one manual wake per band dispatch) is characterized and sustains inside a live orchestrated run; otherwise the design declares the measured fallback and its cost. The Define boundaries never auto-continue.
 
+### [ ] `[FEAT-047]` Spec and Plan Location Discovery, Defaults, and Backlog Grouping for /cc-orchestrate
+* **Priority:** HIGH, owner-set 2026-10-19; picked next, after `[BUG-060]` and `[BUG-061]`.
+* **Description:** `/cc-orchestrate` writes specs and plans to `docs/superpowers/specs` and `docs/superpowers/plans` in every project. That path is right for this repository and wrong for host projects, which already use `.claude/specs` + `.claude/plans`, `docs/specs` + `docs/plans`, or `docs/superpowers/specs` + `docs/superpowers/plans`. The command should look for an existing specs/plans pair before writing, and only when none exists default to `docs/specs` and `docs/plans`. When the host backlog groups items by phase, epic or pillar, specs and plans go into a subfolder named for the item's group, so related documents sit together.
+* **Impact:** Host projects stop collecting a second, foreign `docs/superpowers/` tree next to their own spec folders, and the orchestrator's documents land where the team already looks.
+* **Components Affected:** `scripts/orchestrate.mjs:33-34` (the folders each role may write to), `project-template/.claude/agents/{spec,plan}.md:3,11,15`, `project-template/.claude/commands/cc-orchestrate.md:151-152`, `project-template/.claude/review-loop.settings.json`, the `.claude/` mirrors of each, `cc-resume.md`, and the tests that pin the current paths (`tests/scripts/orchestrate.test.js`, `tests/unit/role-profiles.test.js`, `tests/unit/snap-validate.test.js`, `tests/installer/review-loop-settings.test.js`, guard3 fixtures). No discovery logic or config key exists today.
+* **Acceptance Criteria:** Discovery order and its tie-break when more than one candidate pair exists are declared in the spec; this repository keeps `docs/superpowers/` with no migration of existing files; a project with no candidate gets `docs/specs` and `docs/plans`; the role write scopes follow the resolved location rather than a hardcoded glob; grouping applies only when the backlog's phase/epic/pillar is unambiguous for the item, with a declared folder-name format and a flat fallback otherwise; the resolved location is recorded once per project so every phase agrees on it.
+
 ---
 
 ## PILLAR 4: DYNAMIC INITIALIZATION AND ONBOARDING
@@ -981,6 +988,53 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Ordering: lands with or before `[BUG-058]` activates the Windows CI
   leg.
 - Filed from issue #75.
+
+### [ ] `[BUG-060]` Installer rejects a supported Node under npx on Windows: env.node aliases npm's NODE path
+
+- Priority: HIGH, owner-set 2026-10-19; picked next, ahead of the
+  other open items.
+- Symptom: bin/code-conductor.mjs:60 passes `env.node` to
+  `nodeMajorAtLeast` (lib/installer/env.mjs:32) and reuses it in the
+  error at :61. Windows environment variable names are
+  case-insensitive, and npm sets `NODE` to node.exe's path, so the
+  check parses `C:\...\node.exe` as a version, gets NaN, and prints
+  "Node >=20 required" on Node 22.20.0. Every Windows `npx` install
+  fails; the installer only ran after `Remove-Item Env:NODE` and
+  invoking the script directly (field report, owner, 2026-10-15).
+- No test sets `env.node`; tests pass version strings to
+  `nodeMajorAtLeast` directly, and a plain-object `env` is
+  case-sensitive, so the clash is invisible off Windows.
+- Fix shape: default to `process.versions.node`; any test override
+  moves to a namespaced key (e.g. `CC_TEST_NODE_VERSION`).
+- Acceptance: a test calling the check with
+  `{ NODE: 'C:\\Program Files\\nodejs\\node.exe' }` passes on a
+  supported Node.
+
+### [ ] `[BUG-061]` PreToolUse hook command is cwd-relative, so on Windows nearly every tool call reports MODULE_NOT_FOUND
+
+- Priority: HIGH, owner-set 2026-10-19; picked next, after
+  `[BUG-060]`.
+- Symptom: on Windows (PowerShell and WSL) almost every Bash call
+  shows "PreToolUse:Bash hook error. Failed with non-blocking status
+  code: node:internal/modules/cjs/loader:1520", Node's
+  MODULE_NOT_FOUND path (owner field report, 2026-10-19).
+- The command is `node .claude/hooks/pre-tool-use.mjs`
+  (project-template/.claude/settings.json:2-10): a bare relative path
+  resolved against the shell's cwd, with no `$CLAUDE_PROJECT_DIR` and
+  no existence guard, while its siblings guard (post-compact `:19`
+  `[ -f "$h" ] || exit 0`; context-guard `:34` walks up from `$PWD`).
+  pre-tool-use.mjs:210 builds the same relative form for
+  `orchestrate.mjs end`.
+- Hypotheses to confirm, in order: (1) cwd drifts from the project
+  root (a persisted `cd`); (2) the command reaches a directory with
+  no `.claude/hooks/` (global settings, or an uninstalled project);
+  (3) Windows hook-shell or WSL `/mnt/c` path differences.
+- Safety note: the failure is non-blocking, so Guards 1-5 are
+  silently skipped on every failed call. The fix must not add a
+  second silent skip; a missing guard is reported, not swallowed.
+- Acceptance: the hook resolves from the project root regardless of
+  cwd on Windows, WSL and POSIX, and a test runs it from a
+  subdirectory.
 
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
