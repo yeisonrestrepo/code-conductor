@@ -44,8 +44,8 @@ The `.gitignore` in the worktree already holds the BUG-055 and BUG-060 spec leav
 - [X] [T-000-0] Create and switch to the fix branch: `git switch -c "fix/bug-060-node-env-alias"`. Expected: `git branch --show-current` prints `fix/bug-060-node-env-alias`. Uncommitted and untracked files carry over to the new branch.
 - [X] [T-000-A] Add `!/docs/superpowers/plans/2026-10-20-bug060-node-env-alias.md` to `.gitignore` directly after the `2026-10-06-feat041-reviewer-in-loop.md` plan leaf. This is the BUG-042 toll. `/docs/superpowers/plans/*` (`.gitignore:64`) denies the file until its leaf exists: `git check-ignore -v` on 2026-10-20 matched that line. Without the leaf, `gitignore-block-parity` fails once the file is tracked.
 - [X] [T-000-B] Stage the tracked files: `git add -u .gitignore .claude/memory/project.md`
-- [ ] [T-000-C] Stage the new files: `git add docs/superpowers/specs/2026-10-07-bug055-non-string-manifest-fields-design.md docs/superpowers/specs/2026-10-20-bug060-node-env-alias-design.md docs/superpowers/plans/2026-10-20-bug060-node-env-alias.md`. After T-000-A every leaf is present, so plain `git add` stages all three at rc 0 and `-f` is not needed.
-- [ ] [T-000-D] Commit: `git commit -m "docs: add the BUG-060 spec and implementation plan [BUG-060]" -m "Also carries the BUG-055 spec and its project.md notes, because .gitignore already names that spec and gitignore-block-parity requires the file to be tracked alongside its leaf."`. Expected: the pre-commit suite passes, including `gitignore-block-parity`.
+- [X] [T-000-C] Stage the new files: `git add docs/superpowers/specs/2026-10-07-bug055-non-string-manifest-fields-design.md docs/superpowers/specs/2026-10-20-bug060-node-env-alias-design.md docs/superpowers/plans/2026-10-20-bug060-node-env-alias.md`. After T-000-A every leaf is present, so plain `git add` stages all three at rc 0 and `-f` is not needed.
+- [X] [T-000-D] Commit: `git commit -m "docs: add the BUG-060 spec and implementation plan [BUG-060]" -m "Also carries the BUG-055 spec and its project.md notes, because .gitignore already names that spec and gitignore-block-parity requires the file to be tracked alongside its leaf."`. Expected: the pre-commit suite passes, including `gitignore-block-parity`.
 
 ### Task 1: Read the Node version from options, not the environment
 
@@ -57,7 +57,7 @@ The `.gitignore` in the worktree already holds the BUG-055 and BUG-060 spec leav
 - Consumes: `nodeMajorAtLeast(min, version)` from `lib/installer/env.mjs`, unchanged.
 - Produces: `run(argv, env = process.env, { cwd = process.cwd(), log, nodeVersion = process.versions.node } = {})`. The only production caller (`:140`) passes no options.
 
-- [ ] [T-001-A] Replace the test at `tests/installer/cli.test.js:92-97` (`'exits 1 on Node below the >=20 floor'`) with these five tests, in the same `describe('run')` block:
+- [X] [T-001-A] Replace the test at `tests/installer/cli.test.js:92-97` (`'exits 1 on Node below the >=20 floor'`) with these five tests, in the same `describe('run')` block:
 
 ```js
   const refused = () => logs.some(l => l.startsWith('stderr:') && /Node >=20/.test(l));
@@ -89,14 +89,14 @@ The `.gitignore` in the worktree already holds the BUG-055 and BUG-060 spec leav
   });
 ```
 
-- [ ] [T-001-B] Run the red step: `npx vitest run tests/installer/cli.test.js -t "BUG-060"`. The filter selects exactly these five tests and nothing else in the file. Expected:
+- [X] [T-001-B] Run the red step: `npx vitest run tests/installer/cli.test.js -t "BUG-060"`. The filter selects exactly these five tests and nothing else in the file. Expected:
   - AC1 lowercase `node`: FAIL (rc 1, refused with the path as the "found" value).
   - AC1 uppercase `NODE`: PASS (a plain object is case-sensitive, so the key is never read).
   - AC2 `nodeVersion: '18.19.1'`: FAIL (the option is ignored, the real runtime passes, rc 0).
   - AC3 `env.node: '18.19.1'`: FAIL (refused).
   - AC4 `nodeVersion: '20.0.0'`: PASS (the option is ignored and the real runtime passes).
   - Totals: 3 failed, 2 passed.
-- [ ] [T-001-C] Edit `bin/code-conductor.mjs:55-62` to:
+- [X] [T-001-C] Edit `bin/code-conductor.mjs:55-62` to:
 
 ```js
 export function run(argv, env = process.env, { cwd = process.cwd(), log, nodeVersion = process.versions.node } = {}) {
@@ -110,10 +110,10 @@ export function run(argv, env = process.env, { cwd = process.cwd(), log, nodeVer
 ```
 
   Keep the lines after `:62` unchanged. Match the existing comment's wording where it still holds, and replace only the clause about `env.node`.
-- [ ] [T-001-D] Run the green step: `npx vitest run tests/installer/cli.test.js -t "BUG-060"`. Expected: 5 passed, 0 failed.
-- [ ] [T-001-E] AC5 check: `grep -n "env\.node" bin/code-conductor.mjs`. Expected: no output, exit 1.
-- [ ] [T-001-F] Dependency check: `grep -rn "env\.node\|node: '" tests/installer bin lib`. Expected: the only hits are the `[BUG-060]` AC1 lowercase and AC3 tests, which set `env.node` on purpose to prove it is ignored. Any other hit is a caller that still injects the version through `env`: repair it inside this task. A grep on 2026-10-20 found exactly one such site, `cli.test.js:93`, which T-001-A replaces.
-- [ ] [T-001-G] AC6: `npm test`. Expected: the full suite passes.
+- [X] [T-001-D] Run the green step: `npx vitest run tests/installer/cli.test.js -t "BUG-060"`. Expected: 5 passed, 0 failed.
+- [X] [T-001-E] AC5 check: `grep -n "env\.node" bin/code-conductor.mjs`. Expected: no output, exit 1.
+- [X] [T-001-F] Dependency check: `grep -rn "env\.node\|node: '" tests/installer bin lib`. Expected: the only hits are the `[BUG-060]` AC1 lowercase and AC3 tests, which set `env.node` on purpose to prove it is ignored. Any other hit is a caller that still injects the version through `env`: repair it inside this task. A grep on 2026-10-20 found exactly one such site, `cli.test.js:93`, which T-001-A replaces.
+- [X] [T-001-G] AC6: `npm test`. Expected: the full suite passes.
 - [ ] [T-001-H] Stage: `git add -u bin/code-conductor.mjs tests/installer/cli.test.js docs/superpowers/plans/2026-10-20-bug060-node-env-alias.md`
 - [ ] [T-001-I] Commit: `git commit -m "fix: read the installer Node floor from options, not env [BUG-060]"`. Expected: the pre-commit suite passes.
 

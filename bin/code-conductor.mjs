@@ -52,13 +52,15 @@ function pkgVersion(assetRoot) {
 }
 
 // log(stream, msg) is injected so tests capture output without spawning a process.
-export function run(argv, env = process.env, { cwd = process.cwd(), log } = {}) {
+export function run(argv, env = process.env, { cwd = process.cwd(), log, nodeVersion = process.versions.node } = {}) {
   const emit = log || ((stream, msg) => process[stream].write(`${msg}\n`));
 
   // Hard runtime floor: refuse to run on Node < 20 with a clear message rather than
-  // failing obscurely inside cpSync/ESM later. env.node lets tests inject a version.
-  if (!nodeMajorAtLeast(20, env.node)) {
-    emit('stderr', `code-conductor: Node >=20 required, found ${env.node || process.versions.node}`);
+  // failing obscurely inside cpSync/ESM later. The version comes from options, never env:
+  // on Windows env lookups are case-insensitive and npm sets NODE to node.exe's path,
+  // so a lowercase node key read that path (BUG-060).
+  if (!nodeMajorAtLeast(20, nodeVersion)) {
+    emit('stderr', `code-conductor: Node >=20 required, found ${nodeVersion}`);
     return 1;
   }
 
