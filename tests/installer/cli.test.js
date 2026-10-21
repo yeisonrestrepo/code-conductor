@@ -89,11 +89,32 @@ describe('run', () => {
     expect(rc).toBe(1);
     expect(logs.some(l => l.startsWith('stderr:') && /home/i.test(l))).toBe(true);
   });
-  it('exits 1 on Node below the >=20 floor', () => {
-    const rc = run([], { HOME: home, node: '18.19.1' }, { cwd, log });
+  const refused = () => logs.some(l => l.startsWith('stderr:') && /Node >=20/.test(l));
+  it('[BUG-060] AC1 ignores a lowercase node key holding a path', () => {
+    const rc = run([], { HOME: home, node: 'C:\\Program Files\\nodejs\\node.exe' }, { cwd, log });
+    expect(refused()).toBe(false);
+    expect(rc).toBe(0);
+  });
+  it('[BUG-060] AC1 ignores an uppercase NODE key holding a path', () => {
+    const rc = run([], { HOME: home, NODE: 'C:\\Program Files\\nodejs\\node.exe' }, { cwd, log });
+    expect(refused()).toBe(false);
+    expect(rc).toBe(0);
+  });
+  it('[BUG-060] AC2 exits 1 when the injected nodeVersion is below the >=20 floor', () => {
+    const rc = run([], { HOME: home }, { cwd, log, nodeVersion: '18.19.1' });
     expect(rc).toBe(1);
-    expect(logs.some(l => l.startsWith('stderr:') && /Node >=20/.test(l))).toBe(true);
+    expect(logs.some(l => l.startsWith('stderr:') && /Node >=20 required, found 18\.19\.1/.test(l))).toBe(true);
     expect(existsSync(join(home, '.claude'))).toBe(false);
+  });
+  it('[BUG-060] AC3 ignores a version-shaped env.node', () => {
+    const rc = run([], { HOME: home, node: '18.19.1' }, { cwd, log });
+    expect(refused()).toBe(false);
+    expect(rc).toBe(0);
+  });
+  it('[BUG-060] AC4 passes a nodeVersion exactly at the floor', () => {
+    const rc = run([], { HOME: home }, { cwd, log, nodeVersion: '20.0.0' });
+    expect(refused()).toBe(false);
+    expect(rc).toBe(0);
   });
   it('exits 2 on a mid-copy write failure (PARTIAL_WRITE)', () => {
     // Plant a plain FILE at <home>/.claude so mkdirSync(target) throws EEXIST

@@ -3176,3 +3176,32 @@ His branches stay his. The train branch is deleted. PR #59 remains open as an in
 - Whole-commit cherry-picks skip the pre-commit gate; a sandbox clone runs the suite per commit instead.
 - `git commit -- <paths>` runs the gate against a temporary index, which fails `gitignore-block-parity` when other staged files carry `.gitignore` leaves. Set the other staged work aside with `git stash` and commit against a consistent tree.
 - macOS `sed` does not strip `\x1b`, and `gh` run logs carry ANSI escapes as literal `^[`. Strip them in node before matching CI count lines.
+
+## Spec: BUG-055, detect-stack non-string package.json fields [2026-10-07]
+
+The spec is `docs/superpowers/specs/2026-10-07-bug055-non-string-manifest-fields-design.md`, approved by the owner 2026-10-07 after two review rounds (file sha256 at approval `992344ef3b4b0930cdf4bee2db19673e775ea60300b7154ac0ffadbe82a4f8d8`; its Status line still reads DRAFT). Complexity S. Target `1.39.2`, branch `fix/bug-055-non-string-manifest-fields`, baseline `2374ab6`.
+
+- **Mint:** committed as `46aa4da` (2026-10-07): `[BUG-055]` entry at backlog `:851`, README Known limits bullet, detect-stack dossier retired from the backlog, open-dossier count Four to Three. Pre-commit gate 1507 / 0 across 51 files, as predicted.
+- **Scope:** widened to the whole class by owner ruling 2026-10-07: `name`, `description` and `scripts.build/test/lint/format`, at the six detectors (`:245-279`), `:598-601`, `:614` and `:623`. The dossier was cited, not amended.
+- **Design answers:** Q1, the read rule is string-only (`typeof === 'string'`), not non-blank, because blank handling already belongs to the output filter at `:654`. Q2, falsy non-strings (`0`, `false`, `null`) are covered, so the detector and `:598` paths agree. Q3, one ASCII WARN per offending field per manifest via `warn()`: `WARN: non-string package.json field ignored - <field>: <path>`.
+- **Stated behavior changes:** a detector default replaces a raw non-string script (`"test": 42` under Next becomes `"test": "jest"`); a non-string `name` without a TS dependency no longer matches `detectTSNode` (`:278`), so `stack` and `setup` drop out (the nameless-manifest shape).
+- **Pattern established, dossier-to-mint after the 1.34.3 sweep:** the mint commit carries the entry, the README bullet, the retired dossier heading and the decremented count together. BUG-047 (`de5f8ae`) predates the 1.34.3 sweep checks and `8887e11` had no dossier, so neither documented it.
+- **Lesson:** Known limits bullets are drafted against the measured probes, not the summary. The first draft tied the description crash to "no detector matched"; class c is measured with a detector match.
+- **New owner-side candidate, NOT part of BUG-055:** ASCII-fy the existing non-ASCII in `scripts/detect-stack.mjs` (17 lines, including the `warn()` strings at `:39`, `:84`, `:532` and `:541` and the section banners).
+- **Deferred to the plan:** full reads of `scripts/detect-stack.mjs` (merge loop `:582-587`, `readManifest` `:44-60`, the six detectors) and `tests/scripts/detect-stack.test.js`; the spawn harness location for AC1-AC9.
+
+## Decision: specs exclude release records [2026-10-20]
+
+- **Rule (owner ruling, BUG-060 spec review):** a spec's Acceptance Criteria and System Impact cover only the implementation. These are human-owned release work and go under Out of Scope: the version bump (`VERSION`, `package.json`, both `package-lock.json` fields), the `CHANGELOG.md` entry, the backlog heading flip and DONE bullet, the README "Known limits" removal, and the `project.md` closeout. Release stays human, by `docs/RELEASE-CLOSEOUT.md`.
+- **Why:** a review asked for those records as ACs, citing `tools/record-parity.mjs` and `tools/version-gate.mjs`. The instruments check the release commit, which is the owner's, not the implementation.
+- **How to apply:** when a reviewer or instrument suggests adding release records to a spec, cite this entry and list them under Out of Scope.
+- **Memory placement:** project rules and decisions are appended here, never to the agent's private auto-memory.
+
+## Spec: BUG-060, installer Node floor reads npm's NODE path on Windows [2026-10-20]
+
+- **Spec:** `docs/superpowers/specs/2026-10-20-bug060-node-env-alias-design.md`, APPROVED 2026-10-20, approach 1 of 3. Driven manually through `/cc-spec` because of the standing no-live-run rule for this repository.
+- **Root cause:** `bin/code-conductor.mjs:60` checks `nodeMajorAtLeast(20, env.node)` against `process.env`. Windows env lookups are case-insensitive and npm sets `NODE` to node.exe's path, so the check parses a path, gets NaN, and refuses Node 22 under every Windows `npx`.
+- **Fix:** the version moves into `run()`'s options bag, `nodeVersion = process.versions.node`, beside `cwd` and `log`. The floor check and message use it, and no environment key decides the version. `tests/installer/cli.test.js:93` moves to `{ nodeVersion: '18.19.1' }`.
+- **ACs:** AC1 `node`/`NODE` path values do not refuse (lowercase red before the fix); AC2 18.19.1 refuses with the version in the message and writes nothing; AC3 `env.node` is ignored; AC4 20.0.0 passes; AC5 no `env.node` in the bin; AC6 the suite passes.
+- **Correction recorded:** the backlog entry said no test sets `env.node`, but `cli.test.js:93` does. The investigation agent missed it and a grep caught it before the spec.
+- **Out of scope:** release records (see the Decision entry above), `[BUG-061]`, `[BUG-058]`, `nodeMajorAtLeast` itself.
