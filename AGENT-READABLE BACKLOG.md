@@ -989,7 +989,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   leg.
 - Filed from issue #75.
 
-### [ ] `[BUG-060]` Installer rejects a supported Node under npx on Windows: env.node aliases npm's NODE path
+### [X] `[BUG-060]` Installer rejects a supported Node under npx on Windows: env.node aliases npm's NODE path
+* **DONE, shipped as `1.39.2` on 2026-10-20.** `run()` takes the version from its options bag, `nodeVersion = process.versions.node`, beside `cwd` and `log`; the floor check and its message read that value, and `bin/code-conductor.mjs` no longer contains `env.node`. The recorded fix shape (a namespaced env key) was superseded at spec time by the options injection, so no environment key decides the version. Five `[BUG-060]` tests in `tests/installer/cli.test.js` replace the old `env.node` refusal test. Spec: `docs/superpowers/specs/2026-10-20-bug060-node-env-alias-design.md`; plan: `docs/superpowers/plans/2026-10-20-bug060-node-env-alias.md`.
 
 - Priority: HIGH, owner-set 2026-10-19; picked next, ahead of the
   other open items.

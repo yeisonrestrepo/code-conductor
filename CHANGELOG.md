@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.39.2] - 2026-10-20
+
+### Fixed
+- **[BUG-060]** The installer reads its Node floor from `run()`'s options (`nodeVersion`, defaulting to `process.versions.node`) instead of `env.node`. On Windows, environment lookups are case-insensitive and npm sets `NODE` to node.exe's path, so every `npx` install on a supported Node was refused with "Node >=20 required". No environment variable, in any case or on any platform, now affects the check. Five `[BUG-060]` tests in `tests/installer/cli.test.js` pin the lowercase and uppercase keys, an injected version below the floor, a version-shaped `env.node`, and a version exactly at the floor.
+
 ## [1.39.1] - 2026-10-06
 
 ### Fixed

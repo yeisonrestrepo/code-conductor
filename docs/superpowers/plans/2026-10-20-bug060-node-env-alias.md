@@ -114,8 +114,8 @@ export function run(argv, env = process.env, { cwd = process.cwd(), log, nodeVer
 - [X] [T-001-E] AC5 check: `grep -n "env\.node" bin/code-conductor.mjs`. Expected: no output, exit 1.
 - [X] [T-001-F] Dependency check: `grep -rn "env\.node\|node: '" tests/installer bin lib`. Expected: the only hits are the `[BUG-060]` AC1 lowercase and AC3 tests, which set `env.node` on purpose to prove it is ignored. Any other hit is a caller that still injects the version through `env`: repair it inside this task. A grep on 2026-10-20 found exactly one such site, `cli.test.js:93`, which T-001-A replaces.
 - [X] [T-001-G] AC6: `npm test`. Expected: the full suite passes.
-- [ ] [T-001-H] Stage: `git add -u bin/code-conductor.mjs tests/installer/cli.test.js docs/superpowers/plans/2026-10-20-bug060-node-env-alias.md`
-- [ ] [T-001-I] Commit: `git commit -m "fix: read the installer Node floor from options, not env [BUG-060]"`. Expected: the pre-commit suite passes.
+- [X] [T-001-H] Stage: `git add -u bin/code-conductor.mjs tests/installer/cli.test.js docs/superpowers/plans/2026-10-20-bug060-node-env-alias.md`
+- [X] [T-001-I] Commit: `git commit -m "fix: read the installer Node floor from options, not env [BUG-060]"`. Expected: the pre-commit suite passes.
 
 The ticks for T-001-H and T-001-I are made after their commit. Only the human-owned closeout commit can carry them. This plan does not add a closeout commit.
 
