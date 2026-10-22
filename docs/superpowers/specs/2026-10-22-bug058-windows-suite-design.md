@@ -191,6 +191,21 @@ Base → branch: 11 suites move from load failure to loaded (395 tests appear, a
 
 **The `ci-windows-node24` key is provisional.** It holds the 14 identities measured locally plus the 13 that every CI leg skips for runner reasons (shallow clone, skills absent), copied verbatim from the measured `ci-node24` key: 27 identities. If the hosted runner can create symlinks, its first run reports `−7` (the `CAN_SYMLINK` skips), and the key is corrected to that run's set in the same PR. The first CI run confirms or corrects the key; it is not final until then.
 
+### First CI run (run `39836298082`) and what it changed
+
+- **Skips:** the Windows leg skipped **20**, the prediction for a runner that can create symlinks: `deploy`, `file-merge` and `settings-merge` reported 0 skipped. The key is corrected from 27 to those 20 by removing the 7 `CAN_SYMLINK` identities. The other 20 match the leg's per-file skip counts in its log.
+- **One production defect, found only on the runner (D8).** 3 `conductor-db` tests failed with `plan_file` read as `../../../../../RUNNER~1/AppData/Local/Temp/…/plan.md`. The runner's `TEMP` is an 8.3 spelling (`C:\Users\RUNNER~1\…`). `git rev-parse --show-toplevel` prints the long spelling and the child's `process.cwd()` keeps the short one, so `relative(root, resolve(cwd, plan))` crosses between the two spellings of one directory and climbs out of the root. Reproduced locally with `TEMP` set to an 8.3 alias of a long-named directory: the same 3 failures.
+
+### D8: canonicalize both sides before `relative()` in `conductor-db`
+
+`scripts/conductor-db.mjs` `normalizePlanFile` now computes `relative(canonical(root), resolve(canonical(process.cwd()), planFile))`. Here `canonical` is `realpathSync.native` with an unchanged-path fallback. The native realpath matters because the JS `realpathSync` keeps 8.3 names (measured: `CC-LON~1` stays `CC-LON~1`; `.native` returns the long name).
+
+This is a real user-facing Windows defect, not a test artifact. A session whose cwd is an 8.3 or symlinked spelling of the project stores the plan under a `../…` key, so the cache and resume never find it again. The fix is 7 lines, and it is needed for this item's own AC (a green Windows leg).
+
+The same test file's dedup case passed an absolute plan built with the JS `realpathSync(repo)`, which still carries the 8.3 spelling. The fixture now uses `realpathSync.native`, matching its own comment's intent of matching git's physical path.
+
+Measured after the fix: `tests/scripts` 383 passed / 0 failed with both a long and an 8.3 `TEMP`, and the full suite 1535 / 0 / 14 with an 8.3 `TEMP`.
+
 ## Acceptance Criteria
 
 From the backlog entry, not invented:
@@ -214,7 +229,7 @@ From the backlog entry, not invented:
 
 ### Unchanged
 
-- [ ] No file under `bin/`, `lib/`, `scripts/`, `global/`, `skills/`, `project-template/` changes; `tests/fixtures/guard3-reference.sh` is untouched; no dependency is added.
+- [ ] No file under `bin/`, `lib/`, `global/`, `skills/`, `project-template/` changes, and under `scripts/` only D8's `conductor-db.mjs` fix (found by the first Windows CI run); `tests/fixtures/guard3-reference.sh` is untouched; no dependency is added.
 - [ ] Release surfaces (`VERSION`, `package.json` version, `CHANGELOG.md` release entry, backlog checkbox) are owner-side and not edited on this branch.
 
 ## Out of Scope
@@ -242,7 +257,8 @@ From the backlog entry, not invented:
 | `tests/installer/smoke.test.js` | D5 |
 | `tests/scripts/orchestrate.test.js` | D6 |
 | `.github/workflows/test.yml` | D7 |
-| `tools/skip-baseline.json` | new key `ci-windows-node24`, provisional until the first CI run confirms it |
+| `tools/skip-baseline.json` | new key `ci-windows-node24`: 20 identities, corrected to the first CI run's measured set |
+| `scripts/conductor-db.mjs` | D8: canonical root and cwd before `relative()` (8.3 / symlink spellings) |
 
 **Pillar fit.** Pillar 5 (Infrastructure, Ecosystem, QA): the defect is a platform the project claims to support (the installer, hooks and `.ps1` launchers ship for Windows) with no executed evidence; the leg makes that claim measured and the baseline makes Windows coverage loss red. Pillar 1 (simplicity): one attributes line instead of a growing list; one tiny probe helper; no platform branches in shipped code; skips only where POCs showed no portable fixture exists; zero dependencies.
 
