@@ -3205,3 +3205,12 @@ The spec is `docs/superpowers/specs/2026-10-07-bug055-non-string-manifest-fields
 - **ACs:** AC1 `node`/`NODE` path values do not refuse (lowercase red before the fix); AC2 18.19.1 refuses with the version in the message and writes nothing; AC3 `env.node` is ignored; AC4 20.0.0 passes; AC5 no `env.node` in the bin; AC6 the suite passes.
 - **Correction recorded:** the backlog entry said no test sets `env.node`, but `cli.test.js:93` does. The investigation agent missed it and a grep caught it before the spec.
 - **Out of scope:** release records (see the Decision entry above), `[BUG-061]`, `[BUG-058]`, `nodeMajorAtLeast` itself.
+
+## Spec: BUG-061, PreToolUse hook command resolves against the working directory [2026-10-21]
+
+- **Spec:** `docs/superpowers/specs/2026-10-21-bug061-hook-project-root-design.md`, APPROVED 2026-10-21, approach 1 of 3 (`$CLAUDE_PROJECT_DIR`; the owner confirmed Git Bash on the Windows field machine).
+- **Root cause:** the registered command `node .claude/hooks/pre-tool-use.mjs` is cwd-relative, so a session whose shell is not at the project root gets `MODULE_NOT_FOUND`, and the non-blocking failure skips Guards 1-7. A second cwd dependency: Guard 3 reads its allowlist from `process.cwd()` (`pre-tool-use.mjs:628`).
+- **Fix:** both settings copies register `node "${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/pre-tool-use.mjs"`; the allowlist root becomes `process.env.CLAUDE_PROJECT_DIR || process.cwd()`, identically in `project-template/.claude/hooks/pre-tool-use.mjs` and `.claude/hooks/pre-tool-use.mjs` (byte-identical pair pinned by `templates.test.js:116-118`). The installer's fingerprint merge replaces the old command in hosts in place.
+- **Decision:** no existence guard on the hook command; a guard exiting 0 would turn a visible failure into a silent skip of every guard.
+- **ACs:** AC1 exact command in both settings; AC2 hook loads from a subdirectory; AC3 allowlist honored from a subdirectory, with a deny control; AC4 unset variable keeps today's behavior; AC5 re-install leaves one entry with the new command; AC6 change in both hook copies; AC7 the suite passes.
+- **Out of scope:** release records, the PostCompact and UserPromptSubmit hooks, the relative `orchestrate.mjs end` hint (`:210`), Windows without Git Bash, `[BUG-058]`.

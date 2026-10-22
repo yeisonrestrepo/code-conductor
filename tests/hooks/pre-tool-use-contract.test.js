@@ -8,6 +8,15 @@ import { fileURLToPath } from 'node:url';
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const HOOK = join(REPO_ROOT, '.claude/hooks/pre-tool-use.mjs');
 
+// The hook roots its allowlist at CLAUDE_PROJECT_DIR when set (BUG-061). A run inside
+// Claude Code, or in a worktree, may inherit one that names another checkout, whose
+// allowlist would then decide the Guard 3 assertions below.
+const contractEnv = () => {
+  const env = { ...process.env };
+  delete env.CLAUDE_PROJECT_DIR;
+  return env;
+};
+
 // Invoke the hook the way Claude Code does: spawn it, write one PreToolUse payload
 // to stdin, close stdin, read the exit code and stdout back. process.execPath rather
 // than 'node' so PATH can be emptied by a caller without breaking the spawn itself.
@@ -18,7 +27,7 @@ function fire(payload, env = {}) {
     cwd: REPO_ROOT,
     timeout: 15000,
     input: raw,
-    env: { ...process.env, ...env },
+    env: { ...contractEnv(), ...env },
   });
   if (r.error) throw new Error(`hook spawn failed: ${r.error.message}`);
   const stdout = (r.stdout ?? Buffer.alloc(0)).toString();
