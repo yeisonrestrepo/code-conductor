@@ -52,30 +52,30 @@ All in the spec's tables; the ones this plan's predictions rest on:
 
 **Files:** Modify `.gitattributes`.
 
-- [ ] **Step 1:** Replace the file with:
+- [x] **Step 1:** Replace the file with:
   ```
   * text=auto eol=lf
   *.sh text eol=lf
   *.ps1 text eol=crlf
   ```
-- [ ] **Step 2:** `git add --renormalize .` then `git status --short`. Expected: only `M  .gitattributes`. If any other path is staged, halt: the index was not all-LF.
-- [ ] **Step 3:** Commit the attributes file, then on the clean tree re-check-out every file: `git rm --cached -r -q . && git checkout HEAD -- .`. Verify `git ls-files --eol | grep w/crlf` lists exactly the six `.ps1` files.
-- [ ] **Step 4:** Run the suite (safety env). Expected: 38 failed / 1544, none of them in the 11 shebang-led suites, `merge-md` AC9b or `templates` header.
-- [ ] **Step 5:** Commit: `fix: check out every text file LF except .ps1 [BUG-058]`.
+- [x] **Step 2:** `git add --renormalize .` then `git status --short`. Expected: only `M  .gitattributes`. If any other path is staged, halt: the index was not all-LF. *(Measured: only `.gitattributes` staged.)*
+- [x] **Step 3:** Commit the attributes file, then on the clean tree re-check-out every file: `git rm --cached -r -q . && git checkout HEAD -- .`. Verify `git ls-files --eol | grep w/crlf` lists exactly the six `.ps1` files. *(Measured: exactly the six `.ps1` files.)*
+- [x] **Step 4:** Run the suite (safety env). Expected: 38 failed / 1544, none of them in the 11 shebang-led suites, `merge-md` AC9b or `templates` header. *(Superseded: the branch was rebased onto `[BUG-059]` before implementing, so the per-task runs were folded into one full run after Task 8 Step 1; 0 failed, 14 skipped, see the spec.)*
+- [x] **Step 5:** Commit: `fix: check out every text file LF except .ps1 [BUG-058]`.
 
 ### Task 2: `--import` URL (cause 2)
 
 **Files:** Modify `tests/scripts/conductor-db.test.js` (lines ~326 and ~703).
 
-- [ ] **Step 1:** At both sites: `const BLOCK = new URL('./fixtures/block-sqlite.mjs', import.meta.url).href;`. If `fileURLToPath` is then unused in the file, drop it from the import.
-- [ ] **Step 2:** `npx vitest run tests/scripts/conductor-db.test.js` (safety env). Expected: 1 failed (the read-only test, Task 4), the 3 `--import` tests green.
-- [ ] **Step 3:** Commit: `test: pass --import a file URL so win32 resolves it [BUG-058]`.
+- [x] **Step 1:** At both sites: `const BLOCK = new URL('./fixtures/block-sqlite.mjs', import.meta.url).href;`. If `fileURLToPath` is then unused in the file, drop it from the import.
+- [x] **Step 2:** `npx vitest run tests/scripts/conductor-db.test.js` (safety env). Expected: 1 failed (the read-only test, Task 4), the 3 `--import` tests green. *(Superseded: the branch was rebased onto `[BUG-059]` before implementing, so the per-task runs were folded into one full run after Task 8 Step 1; 0 failed, 14 skipped, see the spec.)*
+- [x] **Step 3:** Commit: `test: pass --import a file URL so win32 resolves it [BUG-058]`. *(Folded with Task 4 Step 2 into one commit, since both edit `conductor-db.test.js`.)*
 
 ### Task 3: symlink probe and junctions (cause 3)
 
 **Files:** Create `tests/helpers/can-symlink.js`; modify `tests/installer/file-merge.test.js`, `tests/installer/settings-merge.test.js`, `tests/installer/deploy.test.js`.
 
-- [ ] **Step 1:** Create the helper:
+- [x] **Step 1:** Create the helper:
   ```js
   // File symlinks need Developer Mode or elevation on win32; a host that can make one runs the tests.
   import { mkdtempSync, symlinkSync, rmSync } from 'node:fs';
@@ -91,56 +91,56 @@ All in the spec's tables; the ones this plan's predictions rest on:
 
   export const CAN_SYMLINK = probe();
   ```
-- [ ] **Step 2:** `file-merge.test.js`: `it.skipIf(!CAN_SYMLINK)` on "[AC3] merges through a symlink and leaves the link intact" and "leaves a dangling symlink target untouched with a warning"; add `'junction'` as the third argument to the `symlinkSync` calls in "reports absent, file, directory and dangling-symlink targets" and "reports a symlink to a directory as a directory".
-- [ ] **Step 3:** `settings-merge.test.js`: `it.skipIf(!CAN_SYMLINK)` on "skips a dangling symlink rather than replacing it with a file" and "writes through the link and leaves it a link".
-- [ ] **Step 4:** `deploy.test.js`: `it.skipIf(!CAN_SYMLINK)` on "merges a symlinked CLAUDE.md through realpath and keeps the link", "merges a symlinked .gitignore through realpath and keeps the link" and "[Review Focus 4, R2] reports a symlinked target's backup…".
-- [ ] **Step 5:** Each file imports `{ CAN_SYMLINK }` from `'../helpers/can-symlink.js'`. Titles are unchanged, so no Linux identity moves.
-- [ ] **Step 6:** Run the three files (safety env). Expected locally: 0 failed, 7 skipped, the two junction tests passed.
-- [ ] **Step 7:** Commit: `test: probe symlink privilege, use junctions for directory links [BUG-058]`.
+- [x] **Step 2:** `file-merge.test.js`: `it.skipIf(!CAN_SYMLINK)` on "[AC3] merges through a symlink and leaves the link intact" and "leaves a dangling symlink target untouched with a warning"; add `'junction'` as the third argument to the `symlinkSync` calls in "reports absent, file, directory and dangling-symlink targets" and "reports a symlink to a directory as a directory".
+- [x] **Step 3:** `settings-merge.test.js`: `it.skipIf(!CAN_SYMLINK)` on "skips a dangling symlink rather than replacing it with a file" and "writes through the link and leaves it a link".
+- [x] **Step 4:** `deploy.test.js`: `it.skipIf(!CAN_SYMLINK)` on "merges a symlinked CLAUDE.md through realpath and keeps the link", "merges a symlinked .gitignore through realpath and keeps the link" and "[Review Focus 4, R2] reports a symlinked target's backup…".
+- [x] **Step 5:** Each file imports `{ CAN_SYMLINK }` from `'../helpers/can-symlink.js'`. Titles are unchanged, so no Linux identity moves.
+- [x] **Step 6:** Run the three files (safety env). Expected locally: 0 failed, 7 skipped, the two junction tests passed. *(Superseded: the branch was rebased onto `[BUG-059]` before implementing, so the per-task runs were folded into one full run after Task 8 Step 1; 0 failed, 14 skipped, see the spec.)*
+- [x] **Step 7:** Commit: `test: probe symlink privilege, use junctions for directory links [BUG-058]`.
 
 ### Task 4: permission fixtures (cause 4)
 
 **Files:** Modify `tests/scripts/handoff-cycle.test.js` (~:98–99), `tests/scripts/conductor-db.test.js` (~:373–375).
 
-- [ ] **Step 1:** `handoff-cycle`: condition becomes `process.platform === 'win32' || (process.getuid && process.getuid() === 0)`; the comment above it reads: "Skipped as root and on win32, where the permission bit this case depends on is not enforced."
-- [ ] **Step 2:** `conductor-db`: `it.skipIf(process.platform === 'win32')(…)`; the parenthetical comment becomes "(Skipped on win32: chmod there, Git's included, does not make a directory read-only.)". Keep the existing `try … chmod` guard for POSIX hosts without `chmod`.
-- [ ] **Step 3:** Run both files (safety env). Expected: 0 failed; 1 skipped each.
-- [ ] **Step 4:** Commit: `test: skip the chmod-enforced fixtures on win32 by name [BUG-058]`.
+- [x] **Step 1:** `handoff-cycle`: condition becomes `process.platform === 'win32' || (process.getuid && process.getuid() === 0)`; the comment above it reads: "Skipped as root and on win32, where the permission bit this case depends on is not enforced."
+- [x] **Step 2:** `conductor-db`: `it.skipIf(process.platform === 'win32')(…)`; the parenthetical comment becomes "(Skipped on win32: chmod there, Git's included, does not make a directory read-only.)". Keep the existing `try … chmod` guard for POSIX hosts without `chmod`.
+- [x] **Step 3:** Run both files (safety env). Expected: 0 failed; 1 skipped each. *(Superseded: the branch was rebased onto `[BUG-059]` before implementing, so the per-task runs were folded into one full run after Task 8 Step 1; 0 failed, 14 skipped, see the spec.)*
+- [x] **Step 4:** Commit: `test: skip the chmod-enforced fixtures on win32 by name [BUG-058]`.
 
 ### Task 5: `npm pack` and `tar` (cause 5)
 
 **Files:** Modify `tests/installer/smoke.test.js` (:2, :16, :19).
 
-- [ ] **Step 1:** Import `execSync` beside `execFileSync`.
-- [ ] **Step 2:** `const packOut = execSync(\`npm pack --silent --pack-destination "${work}"\`, { cwd: root }).toString();` with a one-line comment: a shell string resolves `npm.cmd` on win32 without DEP0190's args-with-shell warning.
-- [ ] **Step 3:** `execFileSync('tar', ['-xzf', tarball], { cwd: work });` with a one-line comment: a relative name, because GNU tar reads `C:` as a remote host.
-- [ ] **Step 4:** Run the file with Git's `usr/bin` first on PATH (so GNU tar is chosen). Expected: 7 passed, no `DEP0190` in the output.
-- [ ] **Step 5:** Commit: `test: pack and extract the smoke tarball portably [BUG-058]`.
+- [x] **Step 1:** Import `execSync` beside `execFileSync`.
+- [x] **Step 2:** `const packOut = execSync(\`npm pack --silent --pack-destination "${work}"\`, { cwd: root }).toString();` with a one-line comment: a shell string resolves `npm.cmd` on win32 without DEP0190's args-with-shell warning.
+- [x] **Step 3:** `execFileSync('tar', ['-xzf', tarball], { cwd: work });` with a one-line comment: a relative name, because GNU tar reads `C:` as a remote host.
+- [x] **Step 4:** Run the file with Git's `usr/bin` first on PATH (so GNU tar is chosen). Expected: 7 passed, no `DEP0190` in the output. *(Superseded: the branch was rebased onto `[BUG-059]` before implementing, so the per-task runs were folded into one full run after Task 8 Step 1; 0 failed, 14 skipped, see the spec.)*
+- [x] **Step 5:** Commit: `test: pack and extract the smoke tarball portably [BUG-058]`.
 
 ### Task 6: separator in the orchestrate expectation (cause 6)
 
 **Files:** Modify `tests/scripts/orchestrate.test.js` (:266).
 
-- [ ] **Step 1:** Expectation uses `relative(root, SCRIPT).split('\\').join('/')`, mirroring `scripts/orchestrate.mjs:79`.
-- [ ] **Step 2:** Full suite (safety env). Expected: **23 failed** (`ticket` 14, `orchestrate` 9, all fake-gh), **14 skipped**. Any other failure: halt.
-- [ ] **Step 3:** Commit: `test: expect the forward-slash script path orchestrate prints [BUG-058]`.
+- [x] **Step 1:** Expectation uses `relative(root, SCRIPT).split('\\').join('/')`, mirroring `scripts/orchestrate.mjs:79`.
+- [x] **Step 2:** Full suite (safety env). Expected: **23 failed** (`ticket` 14, `orchestrate` 9, all fake-gh), **14 skipped**. Any other failure: halt. *(Superseded: the branch was rebased onto `[BUG-059]` before implementing, so the per-task runs were folded into one full run after Task 8 Step 1; 0 failed, 14 skipped, see the spec.)*
+- [x] **Step 3:** Commit: `test: expect the forward-slash script path orchestrate prints [BUG-058]`.
 
 ### Task 7: rebase onto `[BUG-059]` and confirm locally
 
-- [ ] **Step 1:** Confirm `[BUG-059]` is merged to `main` (or, if the owner prefers a train, that `fix/bug-059-fake-gh-win32` is the agreed base). Rebase this branch onto it.
-- [ ] **Step 2:** Full suite on Windows (safety env kept: belt and braces). Expected: 0 failed; skipped = 14 plus `[BUG-059]`'s own delta as its plan states. Halt on any difference.
+- [x] **Step 1:** Confirm `[BUG-059]` is merged to `main` (or, if the owner prefers a train, that `fix/bug-059-fake-gh-win32` is the agreed base). Rebase this branch onto it. *(Done first: rebased onto `fix/bug-059-fake-gh-win32` at `70a5c6c`; the PR stacks on BUG-059's.)*
+- [x] **Step 2:** Full suite on Windows (safety env kept: belt and braces). Expected: 0 failed; skipped = 14 plus `[BUG-059]`'s own delta as its plan states. Halt on any difference. *(Measured: 1535 passed / 0 failed / 14 skipped / 1549.)*
 - [ ] **Step 3:** Full suite on Linux or macOS if available (or rely on the CI legs in Task 8). Expected: unchanged from main plus `[BUG-059]`'s delta.
 
 ### Task 8: the Windows leg, bootstrapped across two CI runs
 
 **Files:** Modify `.github/workflows/test.yml`; later `tools/skip-baseline.json`, `tools/README.md`, `CONTRIBUTING.md`.
 
-- [ ] **Step 1 (run 1, gate unarmed for Windows):** Edit `test.yml` per spec D7 (matrix `include` with `os`/`node`/`env`, `runs-on: ${{ matrix.os }}`, `defaults.run.shell: bash`, `timeout-minutes: 20`, instrument step `--env ${{ matrix.env }}`), **except** that in this first push the Windows entry's instrument step runs report-only (no `--env`), because an `--env` with no key aborts without listing the identities. Concretely, the run-1 step is `node tools/skip-baseline.mjs ${{ matrix.env && format('--env {0}', matrix.env) || '' }} --report vitest-report.json` and the Windows include entry omits `env`. The Linux legs assert as today; the Windows leg prints `SKIPPED "…"` lines and `SKIP_BASELINE_REPORT_ONLY`. (Report-only still aborts on a red suite, so this step also proves the leg green.)
+- [x] **Step 1 (run 1, gate unarmed for Windows):** Edit `test.yml` per spec D7 (matrix `include` with `os`/`node`/`env`, `runs-on: ${{ matrix.os }}`, `defaults.run.shell: bash`, `timeout-minutes: 20`, instrument step `--env ${{ matrix.env }}`), **except** that in this first push the Windows entry's instrument step runs report-only (no `--env`), because an `--env` with no key aborts without listing the identities. Concretely, the run-1 step is `node tools/skip-baseline.mjs ${{ matrix.env && format('--env {0}', matrix.env) || '' }} --report vitest-report.json` and the Windows include entry omits `env`. The Linux legs assert as today; the Windows leg prints `SKIPPED "…"` lines and `SKIP_BASELINE_REPORT_ONLY`. (Report-only still aborts on a red suite, so this step also proves the leg green.) *(Deviation, coordinator-directed: armed from the first push with a provisional key, not report-only.)*
 - [ ] **Step 2:** Push the branch and open a **draft** PR only when the operator authorizes it. From the Windows leg's log, copy the `SKIPPED "…"` identity lines under `SKIP_BASELINE_OBSERVED`.
 - [ ] **Step 3:** Compare with the prediction (20, or 27 if every one of the 7 extra is a `CAN_SYMLINK` skip). Any other difference: halt and report it named before committing anything.
 - [ ] **Step 4:** Check identity stability: re-run the Windows leg once; the set must be byte-identical (`[BUG-048]`'s `IDENTITY_UNSTABLE` rule).
-- [ ] **Step 5 (run 2, armed):** Add key `ci-windows-node24` with the measured, sorted set to `tools/skip-baseline.json`; leave the other two keys byte-unchanged (verify with `git diff`). Add `env: ci-windows-node24` to the Windows include entry and return the instrument step to the plain `--env ${{ matrix.env }}` form, so no leg can run report-only.
-- [ ] **Step 6:** `tools/README.md`: the row "on every matrix leg" stays true; add the Windows key to the sentence about keys if it enumerates them. `CONTRIBUTING.md:160`: name the Windows leg in the sentence that describes the legs. Single-line surgical edits.
+- [x] **Step 5 (run 2, armed):** Add key `ci-windows-node24` with the measured, sorted set to `tools/skip-baseline.json`; leave the other two keys byte-unchanged (verify with `git diff`). Add `env: ci-windows-node24` to the Windows include entry and return the instrument step to the plain `--env ${{ matrix.env }}` form, so no leg can run report-only. *(Provisional: local 14 plus the 13 CI-common identities from `ci-node24`; the first CI run confirms or corrects it.)*
+- [x] **Step 6:** `tools/README.md`: the row "on every matrix leg" stays true; add the Windows key to the sentence about keys if it enumerates them. `CONTRIBUTING.md:160`: name the Windows leg in the sentence that describes the legs. Single-line surgical edits. *(Deviation: neither file edited; both describe the legs generically and stay true.)*
 - [ ] **Step 7:** Push. Expected: three green legs; three `SKIP_BASELINE_OK` lines (`ci-node20` 96, `ci-node24` 13, `ci-windows-node24` measured).
 - [ ] **Step 8:** Commit messages: `ci: add a windows-latest leg to the test matrix [BUG-058]` (Step 1), `ci: commit the measured windows skip baseline [BUG-058]` (Step 5).
 

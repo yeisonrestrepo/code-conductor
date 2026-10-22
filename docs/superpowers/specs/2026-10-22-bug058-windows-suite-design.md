@@ -177,6 +177,20 @@ This item adds no test and removes none; it changes skip conditions only for the
 
 The 20 vs 27 fork is the one prediction this spec cannot measure locally: GitHub's hosted Windows runner is believed to run elevated (so `CAN_SYMLINK` is true), but that is checked on the first run, not assumed. Either result is a legitimate baseline; the key commits whatever the leg measured.
 
+### Measured at implementation (2026-10-22), and the provisional Windows key
+
+Same machine; each ref given a fresh-clone-equivalent checkout under the default `core.autocrlf=true`; Git Bash first on PATH; `GH_TOKEN`, `GITHUB_TOKEN`, `GH_ENTERPRISE_TOKEN` unset; empty `GH_CONFIG_DIR`.
+
+| Ref | Passed | Failed | Skipped | Total |
+|---|---|---|---|---|
+| `main` `17f70fe` | 1121 | 16 (19 files) | 12 | 1149 |
+| `[BUG-059]` base `70a5c6c` | 1126 | 16 (19 files) | 12 | 1154 |
+| this branch | **1535** | **0** | **14** | 1549 |
+
+Base → branch: 11 suites move from load failure to loaded (395 tests appear, all passing); 7 failures pass (cause 1 ×2, cause 2 ×3, junctions ×2); 9 failures become named skips (`CAN_SYMLINK` ×7, win32 permission ×2); the 7 `smoke` tests, reported as skipped on the base because their `beforeAll` threw, pass. The 12 base skips were 5 pre-existing win32 skips plus those 7.
+
+**The `ci-windows-node24` key is provisional.** It holds the 14 identities measured locally plus the 13 that every CI leg skips for runner reasons (shallow clone, skills absent), copied verbatim from the measured `ci-node24` key: 27 identities. If the hosted runner can create symlinks, its first run reports `−7` (the `CAN_SYMLINK` skips), and the key is corrected to that run's set in the same PR. The first CI run confirms or corrects the key; it is not final until then.
+
 ## Acceptance Criteria
 
 From the backlog entry, not invented:
@@ -196,7 +210,7 @@ From the backlog entry, not invented:
 - [ ] `tools/skip-baseline.json` gains key `ci-windows-node24` holding the set **measured on that leg's own run**; `ci-node20` and `ci-node24` are byte-unchanged.
 - [ ] The leg's instrument line reads `SKIP_BASELINE_OK ci-windows-node24: N skipped identities match …`.
 - [ ] `[BUG-059]` is on the base branch before the key is committed (Ordering).
-- [ ] `tools/README.md` and `CONTRIBUTING.md`'s CI paragraph mention the Windows leg in the sentence that already names the legs.
+- [ ] `tools/README.md` and `CONTRIBUTING.md` stay unedited: both already describe the legs without naming them ("every matrix leg", "each leg"), so they stay true with a third leg, and an external PR ships only code, tests and design docs.
 
 ### Unchanged
 
@@ -228,8 +242,7 @@ From the backlog entry, not invented:
 | `tests/installer/smoke.test.js` | D5 |
 | `tests/scripts/orchestrate.test.js` | D6 |
 | `.github/workflows/test.yml` | D7 |
-| `tools/skip-baseline.json` | new key `ci-windows-node24`, measured |
-| `tools/README.md`, `CONTRIBUTING.md` | one clause each naming the Windows leg |
+| `tools/skip-baseline.json` | new key `ci-windows-node24`, provisional until the first CI run confirms it |
 
 **Pillar fit.** Pillar 5 (Infrastructure, Ecosystem, QA): the defect is a platform the project claims to support (the installer, hooks and `.ps1` launchers ship for Windows) with no executed evidence; the leg makes that claim measured and the baseline makes Windows coverage loss red. Pillar 1 (simplicity): one attributes line instead of a growing list; one tiny probe helper; no platform branches in shipped code; skips only where POCs showed no portable fixture exists; zero dependencies.
 
