@@ -1,6 +1,6 @@
 # BUG-059: The Fake gh Is POSIX-Only, So on Windows the Suites Reach the Real gh
 
-**Status:** Draft — awaiting operator approval. **Target:** a patch release, which the owner cuts. **Ordering:** lands with or before `[BUG-058]` activates the `windows-latest` CI leg (backlog entry). **Approach:** one preload, `tests/helpers/gh-intercept.mjs`, is both the win32-resolvable fake and the fail-fast guard; an empty gh config is the suspenders.
+**Status:** Approved by the operator on 2026-10-22 (the `ticket.test.js:306` opt-out, the setup file mutating `process.env`, and the Node >=20.6 floor for the guard all accepted). **Target:** a patch release, which the owner cuts. **Ordering:** lands with or before `[BUG-058]` activates the `windows-latest` CI leg (backlog entry). **Approach:** one preload, `tests/helpers/gh-intercept.mjs`, is both the win32-resolvable fake and the fail-fast guard; an empty gh config is the suspenders.
 
 ## Problem
 
@@ -96,7 +96,7 @@ G1 alone meets criterion 2. G2 is the belt-and-suspenders layer: it covers what 
 
 ### Error cases
 
-- **Node older than 20.6**, where `--import` is not allowed in `NODE_OPTIONS`: every node child refuses to start and the suite goes red. Fail-closed by construction. CI's `node: '20'` resolves to the newest 20.x, and `conductor-db.test.js` already depends on `--import`.
+- **Node older than 20.6** (the guard's floor, operator-accepted 2026-10-22), where `--import` is not allowed in `NODE_OPTIONS`: every node child refuses to start and the suite goes red. Fail-closed by construction. CI's `node: '20'` resolves to the newest 20.x, and `conductor-db.test.js` already depends on `--import`.
 - **The intercept file missing or broken:** every node child fails to load it. Loud, not silent.
 
 ## Acceptance Criteria Mapping
