@@ -1,15 +1,15 @@
-# Wiki auto-sync implementation plan
+# FEAT-043 Wiki auto-sync implementation plan
 
 **Issue:** #70
-**Spec:** `docs/superpowers/specs/2026-10-07-wiki-auto-sync-design.md`
-**Date:** 2026-10-12
-**Status:** Candidate (unminted; the id is assigned by the maintainer)
+**Spec:** `docs/superpowers/specs/2026-10-07-feat043-wiki-auto-sync-design.md`
+**Date:** 2026-10-12, revised 2026-10-21
+**Status:** DRAFT for owner approval, against the `[FEAT-043]` entry minted in `80dd54f`
 
 ---
 
-## Where this plan departs from the spec, and why
+## Where this plan departed from the first spec draft, and why
 
-The spec generates each page from source files. Measured against the live wiki on 2026-10-12, that cannot reproduce what is there: the wiki is 981 lines of hand-written prose, and most of it has no source to regenerate from.
+The revised spec (2026-10-21) now describes the design below; this section records why it changed. The first draft generated each page from source files. Measured against the live wiki on 2026-10-12, that cannot reproduce what is there: the wiki is 981 lines of hand-written prose, and most of it has no source to regenerate from.
 
 - `Commands-Reference` describes 15 commands. `.claude/commands/` holds 6; the rest are in `global/commands/` and `project-template/.claude/commands/`.
 - The agent files carry `name`, `description` and `tools`. The spec expected `role`, `band` and `tool_kind`.
@@ -31,6 +31,7 @@ The spec's per-page regeneration map (section 4) is dropped. Every page is rende
 - [X] [T-003] Add `tests/wiki/wiki-gen.test.js`.
 - [X] [T-004] Add `.github/workflows/wiki-sync.yml`.
 - [X] [T-005] Add this plan and its `.gitignore` leaf line.
+- [X] [T-006] Round-2 review: carry `[FEAT-043]` in the spec and plan names, revise the spec to the template design, drop the FEAT-042 line from `Architecture-Overview`, add the `[AC-4]` token-scope test.
 
 ## Tests
 
@@ -38,19 +39,23 @@ The spec's per-page regeneration map (section 4) is dropped. Every page is rende
 - Failure paths: an unknown block, a source without frontmatter, a missing field. Each asserts that no output directory exists afterwards.
 - Drift: every shipped command is named in `Commands-Reference`, every skill has a heading in `Skills`, every page is linked from `_Sidebar` and `Home`.
 - CLI: exit 0, 1 and 2.
-- Workflow, by inspection: the two allowed actions only, `continue-on-error`, push-to-main only, and a path filter that covers every source the generator reads.
+- Workflow, by inspection: the two allowed actions only, `continue-on-error`, push-to-main only, a path filter that covers every source the generator reads, and `permissions: {}` with a single `contents: write` grant and the fork guard.
 
 ## Acceptance criteria
 
 | # | State | Evidence |
 |---|---|---|
-| AC-1 | Met | `[AC-1] writes the 12 pages and the sidebar` |
+Numbered as in the revised spec.
+
+| # | State | Evidence |
+|---|---|---|
+| AC-1 | Partly | `[AC-1] [AC-7]` asserts the path filter; a real trigger needs a merge to `main` |
 | AC-2 | Met | The templates are the live pages; a local sync changes 3 files, the ones carrying a marker |
-| AC-3 | Partly | The path filter is asserted; a real trigger needs a merge to `main` |
-| AC-4 | Partly | Same: asserted by inspection, not by a run |
-| AC-5 | Met | `continue-on-error: true` asserted |
-| AC-6 | Met | `uses:` lines asserted |
-| AC-7 | Met | `package.json` untouched |
+| AC-3 | Met | `[AC-3]` asserts `continue-on-error: true` and push-to-`main` only |
+| AC-4 | Met | `[AC-4]` asserts `permissions: {}`, a single `contents: write` grant and the fork guard; red when either is broken |
+| AC-5 | Met | `[AC-5]` asserts the `uses:` lines; `package.json` untouched |
+| AC-6 | Met | `[AC-6] writes the 12 pages and the sidebar`, plus the failure-path tests |
+| AC-7 | Partly | Same as AC-1: asserted by inspection, not by a run |
 
 ## Local end-to-end run, 2026-10-12
 
@@ -64,7 +69,8 @@ The `SNAP-Protocol` change corrects drift the hand-written page already had: it 
 ## Not verified
 
 - Whether `GITHUB_TOKEN` with `contents: write` may push to the wiki repository. That needs a run on GitHub.
-- The `Commands-Reference` template mentions "Step 4.5: OWASP security scan", which is not on `main`. It is carried over unchanged from the live wiki.
+
+The `Architecture-Overview` template no longer carries the live wiki's "Step 4.5: OWASP security scan" line: that step is `[FEAT-042]`, not on `main`, and a docs mirror must not depend on an unmerged feature. FEAT-042's own PR adds the line back when it lands.
 
 ## Risks
 

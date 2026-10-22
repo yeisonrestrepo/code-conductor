@@ -44,7 +44,6 @@ Session Start
     │                              │                              │
     │                              │                              ├── per task:
     │                              │                              │   grep → read → flip [>] → execute → flip [X]
-    │                              │                              │   └── Step 4.5: OWASP security scan
     │                              │                              │   └── Step 6: SQLite cache write
     │                              │                              │
     ▼                              ▼                              ▼

@@ -34,7 +34,7 @@ function fixture(pages = {}) {
 }
 
 describe('generateWiki on this repository', () => {
-  it('[AC-1] writes the 12 pages and the sidebar', async () => {
+  it('[AC-6] writes the 12 pages and the sidebar', async () => {
     const out = join(tmp, 'out');
     expect(await generateWiki({ outDir: out, projectRoot: ROOT })).toEqual(EXPECTED_PAGES);
     expect(mdNames(out)).toEqual(EXPECTED_PAGES);
@@ -173,19 +173,28 @@ describe('the CLI', () => {
 describe('wiki-sync.yml', () => {
   const workflow = readFileSync(join(ROOT, '.github/workflows/wiki-sync.yml'), 'utf8').replace(/\r\n/g, '\n');
 
-  it('[AC-6] uses only actions/checkout and actions/setup-node', () => {
+  it('[AC-5] uses only actions/checkout and actions/setup-node', () => {
     const used = [...workflow.matchAll(/uses:\s*(\S+)@/g)].map((m) => m[1]).sort();
     expect(used).toEqual(['actions/checkout', 'actions/setup-node']);
   });
 
-  it('[AC-5] is fail-open, and runs on pushes to main only', () => {
+  it('[AC-3] is fail-open, and runs on pushes to main only', () => {
     expect(workflow).toContain('continue-on-error: true');
     expect(workflow).toContain('branches: [main]');
     expect(workflow).not.toContain('pull_request');
   });
 
-  it('[AC-3] triggers on every source the generator reads', () => {
+  it('[AC-1] [AC-7] triggers on every source the generator reads, and only through a path filter', () => {
     const paths = ["'.github/wiki/**'", "'scripts/snap-contract.mjs'", "'skills/*/SKILL.md'", "'.claude/agents/*.md'"];
     expect(paths.filter((p) => !workflow.includes(`- ${p}`))).toEqual([]);
+    expect(workflow).toMatch(/^ {4}paths:$/m);
+  });
+
+  it('[AC-4] denies every token scope but contents:write, and never runs on a fork', () => {
+    expect(workflow).toMatch(/^permissions: \{\}$/m);
+    // Every scope granted anywhere in the file: the job block must be the only grant.
+    const grants = [...workflow.matchAll(/^ +permissions:\n((?: {6}\S.*\n)+)/gm)].map((m) => m[1].trim());
+    expect(grants).toEqual(['contents: write']);
+    expect(workflow).toContain("if: github.repository == 'yeisonrestrepo/code-conductor'");
   });
 });
