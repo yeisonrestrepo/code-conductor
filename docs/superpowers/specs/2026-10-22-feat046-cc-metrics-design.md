@@ -2,7 +2,7 @@
 
 **Issue:** #82
 **Date:** 2026-10-22
-**Status:** Draft — awaiting operator approval. Answers the `[FEAT-046]` entry in `AGENT-READABLE BACKLOG.md`.
+**Status:** Approved by the operator on 2026-10-22 (R1 to R4 thresholds as proposed; `--since` stays out of scope). Answers the `[FEAT-046]` entry in `AGENT-READABLE BACKLOG.md`.
 
 This is a design document only. No code ships with it.
 

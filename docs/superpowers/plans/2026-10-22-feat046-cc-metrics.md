@@ -3,7 +3,7 @@
 **Issue:** #82
 **Spec:** `docs/superpowers/specs/2026-10-22-feat046-cc-metrics-design.md`
 **Date:** 2026-10-22
-**Status:** Draft — awaiting operator approval. Not started.
+**Status:** Approved by the operator on 2026-10-22. In progress.
 
 ---
 
