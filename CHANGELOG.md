@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.41.0] - 2026-10-21
+
+### Added
+- **[FEAT-043]** The GitHub wiki is synced from page templates kept in the repository. The 13 pages live under `.github/wiki/pages/`, and `.github/wiki/wiki-gen.mjs` fills three generated tables from the files that own them: the SNAP field caps from `scripts/snap-contract.mjs`, the skills index from each `skills/*/SKILL.md` and the agent tools from each `.claude/agents/*.md`. `.github/workflows/wiki-sync.yml` runs after a merge to `main` that touches a template or one of those sources, replaces the wiki's pages with the rendered ones, so a page deleted from the templates is deleted from the wiki, and pushes only when something changed. The job grants only `contents: write`, never runs on a fork, uses only `actions/checkout` and `actions/setup-node`, and is fail-open, so a failed sync never turns CI red. A generation error writes nothing, so a partial wiki is never pushed. Drift tests fail a pull request that adds a command, a skill or a page without naming it in the wiki. Zero dependencies; nothing under `.github/` ships in the package. Contributed by Ludocius (#80).
+
 ## [1.40.0] - 2026-10-21
 
 ### Added
