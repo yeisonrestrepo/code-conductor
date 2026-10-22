@@ -137,6 +137,17 @@ describe('mergeSettingsFile: owned entries', () => {
     expect(arr[1]).toEqual(read(shipped).hooks.PreToolUse[0]);
     expect(arr[1].matcher.split('|')).toEqual(expect.arrayContaining(['Agent', 'SendMessage']));
   });
+  // A host installed before BUG-061 holds the cwd-relative command. The pre-tool-use.mjs
+  // fingerprint must replace it in place, leaving one entry that carries the rooted command.
+  it('[BUG-061] AC5 replaces the cwd-relative hook command with the rooted one', () => {
+    const shipped = fileURLToPath(new URL('../../project-template/.claude/settings.json', import.meta.url));
+    const earlier = { matcher: 'Read|Write|Edit|create_file|write_file|Bash|Agent|SendMessage', hooks: [{ type: 'command', command: 'node .claude/hooks/pre-tool-use.mjs' }] };
+    write(sp, { hooks: { PreToolUse: [HOST_ENTRY, earlier] } });
+    mergeSettingsFile(shipped, sp, PROJECT_SETTINGS_FINGERPRINTS);
+    const commands = read(sp).hooks.PreToolUse.flatMap(e => e.hooks.map(h => h.command));
+    expect(commands.filter(c => c.includes('pre-tool-use.mjs'))).toEqual([`node --input-type=commonjs -e "import(require('url').pathToFileURL(require('path').resolve(process.env.CLAUDE_PROJECT_DIR||'.','.claude/hooks/pre-tool-use.mjs')).href)"`]);
+    expect(read(sp).hooks.PreToolUse[0]).toEqual(HOST_ENTRY);
+  });
   it('is byte-identical on a second run of an unchanged release', () => {
     write(sp, { hooks: { PreToolUse: [HOST_ENTRY] }, permissions: { allow: ['Bash(ls:*)'] } });
     mergeSettingsFile(tpl, sp, FPS);

@@ -20,10 +20,11 @@ function bash(command, { cwd, sid = 'sess-1', agentType } = {}) {
   };
 }
 
-// CC_GUARD3_WARN is cleared unless a test sets it, so a developer's shell cannot flip a verdict.
+// CC_GUARD3_WARN and CLAUDE_PROJECT_DIR are cleared unless a test sets them, so a developer's shell cannot flip a verdict or point Guard 3 at another checkout's allowlist (BUG-061).
 function fire(p, extraEnv = {}) {
   const env = { ...process.env };
   delete env.CC_GUARD3_WARN;
+  delete env.CLAUDE_PROJECT_DIR;
   const r = spawnSync(process.execPath, [HOOK], { input: JSON.stringify(p), cwd: p.cwd, env: { ...env, ...extraEnv }, encoding: 'utf8', timeout: 15000 });
   if (r.error) throw new Error(`hook spawn failed: ${r.error.message}`);
   expect(r.status).toBe(0);

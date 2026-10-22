@@ -1,0 +1,64 @@
+name: Wiki Sync
+
+# The wiki is a derived artifact: its pages are the templates under .github/wiki/pages,
+# with the generated tables filled in. A direct edit on the wiki is overwritten by the
+# next sync, and a page created only on the wiki is removed, so change the templates instead.
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/wiki/**'
+      - '.github/workflows/wiki-sync.yml'
+      - 'scripts/snap-contract.mjs'
+      - 'skills/*/SKILL.md'
+      - '.claude/agents/*.md'
+
+# Two merges in quick succession would otherwise race on the push.
+concurrency:
+  group: wiki-sync
+  cancel-in-progress: false
+
+# Deny every scope by default; the job below grants back only what the push needs.
+permissions: {}
+
+jobs:
+  sync-wiki:
+    # Forks have no wiki to push to and their token cannot reach ours.
+    if: github.repository == 'yeisonrestrepo/code-conductor'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Fail-open: the wiki is a derived docs mirror, rebuilt in full on the next
+    # merge, so a failed sync loses nothing durable. Reddening CI over it would
+    # block or alarm on a change whose source of truth already landed in main.
+    continue-on-error: true
+    # Minimum scope: contents:write is what GITHUB_TOKEN needs to push the wiki repo.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+
+      - name: Generate the wiki pages
+        run: node .github/wiki/wiki-gen.mjs --out wiki-out
+
+      - name: Push the pages that changed
+        env:
+          WIKI_REMOTE: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git
+        run: |
+          git clone --quiet --depth 1 "$WIKI_REMOTE" wiki-repo
+          # The templates are the whole wiki, so a page removed from them is removed here too.
+          rm -f wiki-repo/*.md
+          cp wiki-out/*.md wiki-repo/
+          cd wiki-repo
+          git add -A
+          if git diff --cached --quiet; then
+            echo "wiki already current"
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" \
+              -c user.email="github-actions[bot]@users.noreply.github.com" \
+              commit --quiet -m "docs: sync wiki from ${GITHUB_SHA::7}"
+          git push --quiet

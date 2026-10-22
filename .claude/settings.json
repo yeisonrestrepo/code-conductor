@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/pre-tool-use.mjs"
+            "command": "node --input-type=commonjs -e \"import(require('url').pathToFileURL(require('path').resolve(process.env.CLAUDE_PROJECT_DIR||'.','.claude/hooks/pre-tool-use.mjs')).href)\""
           }
         ]
       }

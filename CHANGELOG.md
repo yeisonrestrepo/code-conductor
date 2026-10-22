@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.41.0] - 2026-10-21
+
+### Added
+- **[FEAT-043]** The GitHub wiki is synced from page templates kept in the repository. The 13 pages live under `.github/wiki/pages/`, and `.github/wiki/wiki-gen.mjs` fills three generated tables from the files that own them: the SNAP field caps from `scripts/snap-contract.mjs`, the skills index from each `skills/*/SKILL.md` and the agent tools from each `.claude/agents/*.md`. `.github/workflows/wiki-sync.yml` runs after a merge to `main` that touches a template or one of those sources, replaces the wiki's pages with the rendered ones, so a page deleted from the templates is deleted from the wiki, and pushes only when something changed. The job grants only `contents: write`, never runs on a fork, uses only `actions/checkout` and `actions/setup-node`, and is fail-open, so a failed sync never turns CI red. A generation error writes nothing, so a partial wiki is never pushed. Drift tests fail a pull request that adds a command, a skill or a page without naming it in the wiki. Zero dependencies; nothing under `.github/` ships in the package. Contributed by Ludocius (#80).
+
+## [1.40.0] - 2026-10-21
+
+### Added
+- **[FEAT-042]** `/cc-implement` runs an OWASP Top 10 check after each task that writes or edits code (Step 4.5, both command copies). It scans only the lines the task added or changed, only in code files, and stays silent when they are clean. Each finding is reported as `[SECURITY] file:line — A0X: description`, a tag never suppressed in MIN mode, and is fixed and re-scanned before the task is ticked. A finding that cannot be fixed within the task's scope marks the task `[!]` and halts the loop with `SECURITY_FINDING_UNRESOLVED` for human review. Both `CLAUDE.md` copies add the `[SECURITY]` row. The check is prompt-based and adds no dependencies. Contributed by Ludocius (#59).
+
+## [1.39.3] - 2026-10-21
+
+### Fixed
+- **[BUG-061]** The PreToolUse hook no longer depends on the session's working directory or on the shell that runs it. In both `settings.json` copies the command is `node --input-type=commonjs -e "import(...)"`, which resolves `.claude/hooks/pre-tool-use.mjs` against `CLAUDE_PROJECT_DIR` inside Node and falls back to the working directory when the variable is unset. The command has no shell expansion syntax, so bash, Git Bash, cmd and PowerShell all run it alike. The `--input-type=commonjs` flag keeps an inherited `NODE_OPTIONS=--input-type=module` from breaking the launcher. A session whose working directory had drifted from the root used to fail with a non-blocking `MODULE_NOT_FOUND` that skipped every guard. Guard 3 reads its allowlist from `CLAUDE_PROJECT_DIR` too, in both hook copies. A re-install replaces the old command in place through the existing fingerprint merge. `tests/hooks/hook-project-root.test.js` runs the registered command through `bash -c`, and its inline script with no shell, from a subdirectory of a root with a space in its path. A settings-merge test pins the in-place replacement. The port, contract, Guard 4 and Guard 7 suites strip an inherited `CLAUDE_PROJECT_DIR`.
+
 ## [1.39.2] - 2026-10-20
 
 ### Fixed
