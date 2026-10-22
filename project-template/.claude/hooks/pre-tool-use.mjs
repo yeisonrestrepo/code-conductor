@@ -17,9 +17,13 @@ function debug(msg) {
 }
 
 // `code` is the guard's own short reason token for the flow log (FEAT-044 D5), so the
-// readers never parse the human-readable reason. emit() strips it from the output.
-const deny = (reason, code = null) => ({ permissionDecision: 'deny', permissionDecisionReason: reason, code });
-const ask = (reason, code = null) => ({ permissionDecision: 'ask', permissionDecisionReason: reason, code });
+// readers never parse the human-readable reason. It is non-enumerable on purpose: a
+// decision's shape, and the hookSpecificOutput emit() spreads it into, stay exactly
+// { permissionDecision, permissionDecisionReason }, and only the emitter reads it.
+const makeDecision = (permissionDecision, reason, code) =>
+  Object.defineProperty({ permissionDecision, permissionDecisionReason: reason }, 'code', { value: code });
+const deny = (reason, code = null) => makeDecision('deny', reason, code);
+const ask = (reason, code = null) => makeDecision('ask', reason, code);
 
 let warning = '';
 
@@ -33,10 +37,9 @@ function warn(msg) {
 function emit(decision) {
   if (emitted) return;
   emitted = true;
-  const { code: _flowOnly, ...output } = decision ?? {};
   process.stdout.write(JSON.stringify({
     ...(warning ? { systemMessage: warning } : {}),
-    ...(decision ? { hookSpecificOutput: { hookEventName: 'PreToolUse', ...output } } : {}),
+    ...(decision ? { hookSpecificOutput: { hookEventName: 'PreToolUse', ...decision } } : {}),
   }) + '\n');
 }
 
