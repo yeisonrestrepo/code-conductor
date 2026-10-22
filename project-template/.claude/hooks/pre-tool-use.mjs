@@ -799,7 +799,7 @@ const SHELL_ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
 // VAR=value words are skipped so `TOKEN=sk-... curl` records `curl`, never the token (D5).
 function flowTarget(name, input, cwd) {
   if (name === 'Bash') {
-    const words = (typeof input.command === 'string' ? input.command : '').trim().split(/\s+/);
+    const words = (typeof input.command === 'string' ? input.command : '').split(IFS_SPLIT);
     return words.find((w) => w && !SHELL_ASSIGNMENT.test(w)) ?? '';
   }
   if (ORCH_DISPATCH_TOOLS.includes(name)) return String(input.subagent_type ?? input.to ?? '');

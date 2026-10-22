@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { deployProject } from '../../lib/installer/deploy.mjs';
+import { mergeFlowStatusLine, FLOW_STATUS_COMMAND } from '../../lib/installer/settings.mjs';
 
 // FEAT-044 T-007: the flow status line script and /cc-flow, spawned against seeded files.
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -160,5 +162,96 @@ describe('shipped surfaces (AC7)', () => {
     for (const rel of ['project-template/.claude/flow-status.mjs', 'project-template/.claude/commands/cc-flow.md']) {
       expect(readFileSync(join(ROOT, rel), 'utf8')).not.toMatch(/https?:\/\//);
     }
+  });
+});
+
+// AC5, through the real asset tree into temporary directories. The installer is never run
+// against this repository.
+describe('--project deploys the flow status line (AC5)', () => {
+  let proj, home, said;
+  const CANONICAL = { type: 'command', command: FLOW_STATUS_COMMAND };
+  const projectSettings = () => join(proj, '.claude', 'settings.json');
+  const userSettings = () => join(home, '.claude', 'settings.json');
+  const deploy = () => deployProject(ROOT, proj, { warn: () => {}, report: (m) => said.push(m), home });
+  const writeJson = (path, obj) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, `${JSON.stringify(obj, null, 2)}\n`); };
+
+  beforeEach(() => {
+    proj = join(work, 'proj');
+    home = join(work, 'home');
+    mkdirSync(proj);
+    mkdirSync(home);
+    said = [];
+  });
+
+  it('deploys flow-status.mjs and commands/cc-flow.md', () => {
+    deploy();
+    expect(existsSync(join(proj, '.claude', 'flow-status.mjs'))).toBe(true);
+    expect(existsSync(join(proj, '.claude', 'commands', 'cc-flow.md'))).toBe(true);
+  });
+
+  it('adds the entry when no statusLine exists anywhere, and a second run is byte-identical and silent', () => {
+    deploy();
+    const first = readFileSync(projectSettings(), 'utf8');
+    expect(JSON.parse(first).statusLine).toEqual(CANONICAL);
+    expect(JSON.parse(first).hooks.PreToolUse).toBeDefined();
+    expect(said.filter((m) => m.includes('flow status line'))).toHaveLength(1);
+    said = [];
+    deploy();
+    expect(readFileSync(projectSettings(), 'utf8')).toBe(first);
+    expect(said.filter((m) => m.includes('flow status line'))).toEqual([]);
+  });
+
+  it('replaces an owned entry whose command is stale', () => {
+    deploy();
+    const obj = JSON.parse(readFileSync(projectSettings(), 'utf8'));
+    obj.statusLine = { type: 'command', command: 'node ./old/flow-status.mjs --legacy' };
+    writeJson(projectSettings(), obj);
+    deploy();
+    expect(JSON.parse(readFileSync(projectSettings(), 'utf8')).statusLine).toEqual(CANONICAL);
+    expect(said.filter((m) => m.includes('updated the flow status line'))).toHaveLength(1);
+  });
+
+  it('leaves a host statusLine in the project settings byte-identical and prints one skip line', () => {
+    deploy();
+    const obj = JSON.parse(readFileSync(projectSettings(), 'utf8'));
+    obj.statusLine = { type: 'command', command: 'starship prompt' };
+    writeJson(projectSettings(), obj);
+    const before = readFileSync(projectSettings(), 'utf8');
+    said = [];
+    deploy();
+    expect(readFileSync(projectSettings(), 'utf8')).toBe(before);
+    expect(said.filter((m) => m.includes('flow status line was skipped'))).toHaveLength(1);
+  });
+
+  it('leaves both files byte-identical when the user settings hold a statusLine', () => {
+    writeJson(userSettings(), { statusLine: { type: 'command', command: 'my-line' } });
+    const user = readFileSync(userSettings(), 'utf8');
+    // Two runs first: a CRLF checkout's template is written verbatim on the fresh run and
+    // re-serialized by the hooks merge on the next, which is not this rule's write.
+    deploy();
+    deploy();
+    const project = readFileSync(projectSettings(), 'utf8');
+    expect(JSON.parse(project).statusLine).toBeUndefined();
+    deploy();
+    expect(readFileSync(userSettings(), 'utf8')).toBe(user);
+    expect(readFileSync(projectSettings(), 'utf8')).toBe(project);
+    expect(said.filter((m) => m.includes('flow status line was skipped'))).toHaveLength(3);
+  });
+
+  it('backs up a malformed project settings.json and leaves it untouched', () => {
+    mkdirSync(join(proj, '.claude'), { recursive: true });
+    writeFileSync(projectSettings(), '{ not json');
+    expect(mergeFlowStatusLine(projectSettings(), userSettings())).toBe('malformed-skipped');
+    expect(readFileSync(projectSettings(), 'utf8')).toBe('{ not json');
+    const backups = readdirSync(join(proj, '.claude')).filter((n) => n.startsWith('settings.json.malformed-backup.'));
+    expect(backups.map((n) => readFileSync(join(proj, '.claude', n), 'utf8'))).toEqual(['{ not json']);
+  });
+
+  it('treats an unreadable user settings.json as holding a statusLine', () => {
+    writeJson(projectSettings(), {});
+    mkdirSync(join(home, '.claude'), { recursive: true });
+    writeFileSync(userSettings(), '{ not json');
+    expect(mergeFlowStatusLine(projectSettings(), userSettings())).toBe('host-skipped');
+    expect(readFileSync(projectSettings(), 'utf8')).toBe('{}\n');
   });
 });
