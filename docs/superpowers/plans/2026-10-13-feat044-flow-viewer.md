@@ -121,6 +121,8 @@ Taken 2026-10-22 on Windows 11 Pro 10.0.26300, Node v24, from `main` at `17f70fe
 
 **T-001-C.** No torn line, and a per-message cadence is the R2 case the spec already accepts for a summary line. The spec does not return to the owner.
 
+**Operator decision, 2026-10-22 (latency).** The per-call read of the last byte (D7's torn-tail check) is replaced by a newline that leads each line instead of ending it: a single `O_APPEND` write cannot tear (M7), so a tail torn by a crash or hand edit is fenced off by the next event and dropped at the next rotation. Departs from D1's "followed by `\n`"; readers skip blank lines. Emitter cost on Windows 11, 600 interleaved calls: p50 2.1 to 2.3 ms → 0.9 ms, p95 3.1 to 3.6 ms → 1.5 to 1.6 ms.
+
 **T-002, predicted red** (existing suites only, before any run):
 
 | Suite | Predicted | Why |

@@ -207,17 +207,24 @@ describe('rotation under the lock (AC6)', () => {
     expect(last().tool).toBe('Bash');
   });
 
-  it('repairs a torn tail: the torn line is gone and the new line parses', () => {
+  it('fences a torn tail: the next event is its own line and parses', () => {
     writeFileSync(events, '{"ts":1,"tool":"Read","verdict":"allow"}\n{"ts":1,"tool":"Ba');
     fire(bash('git status'));
-    expect(read().map((e) => e.tool)).toEqual(['Read', 'Bash']);
+    expect(lines()).toEqual(['{"ts":1,"tool":"Read","verdict":"allow"}', '{"ts":1,"tool":"Ba', lines().at(-1)]);
+    expect(JSON.parse(lines().at(-1)).tool).toBe('Bash');
   });
 
-  it('never fuses a torn tail onto the next line, even when the lock is held', () => {
-    writeFileSync(events, '{"ts":1,"tool":"Read","verdict":"allow"}\n{"ts":1,"tool":"Ba');
-    writeFileSync(join(cwd, '.claude', '.flow-events.lock'), '');
+  it('drops a fenced torn line at the next rotation', () => {
+    writeFileSync(events, `${'{"ts":1,"tool":"Read","verdict":"allow"}\n'.repeat(5000)}{"ts":1,"tool":"Ba`);
     fire(bash('git status'));
-    expect(JSON.parse(lines().at(-1)).tool).toBe('Bash');
+    expect(lines()).toHaveLength(251);
+    expect(read().at(-1).tool).toBe('Bash');
+  });
+
+  it('writes no line ending for a later event to fuse onto: each event leads with its newline', () => {
+    fire(bash('git status'));
+    fire(bash('git log'));
+    expect(readFileSync(events, 'utf8')).toMatch(/^\n\{[^\n]*\}\n\{[^\n]*\}$/);
   });
 
   it('64 parallel hook calls past the cap leave every line parseable and nothing stranded', async () => {

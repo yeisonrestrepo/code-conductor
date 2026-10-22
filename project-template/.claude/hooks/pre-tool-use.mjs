@@ -4,7 +4,7 @@
 // hookSpecificOutput.permissionDecision and EVERY path exits 0. Nothing here exits 2:
 // a deliberate denial must never be indistinguishable from a crashed script.
 // Zero dependencies by design; node: builtins only.
-import { appendFileSync, closeSync, existsSync, openSync, readFileSync, readSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, closeSync, existsSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { posix, join, resolve, dirname, relative, isAbsolute, sep } from 'node:path';
 
 const LINE_LIMIT = 150;
@@ -835,37 +835,25 @@ function isJsonLine(line) {
 
 // Also the repair path: unparseable lines are dropped, so one torn write cannot blind the
 // readers for good. The lock exists because an unlocked rename fails with EPERM on Windows
-// under parallel hooks (spec M8). Returns whether the file was rewritten.
+// under parallel hooks (spec M8). No trailing newline: the next append brings its own.
 function rotateFlowEvents(path) {
   const lock = join(dirname(path), '.flow-events.lock');
   const fd = takeFlowLock(lock);
-  if (fd === null) return false;
+  if (fd === null) return;
   const tmp = `${path}.tmp`;
   try {
     const keep = readFileSync(path, 'utf8').split('\n').filter((l) => l && isJsonLine(l)).slice(-FLOW_KEEP_LINES);
-    writeFileSync(tmp, keep.length ? `${keep.join('\n')}\n` : '');
+    writeFileSync(tmp, keep.join('\n'));
     renameSync(tmp, path);
-    return true;
   } catch (e) {
     try { unlinkSync(tmp); } catch { /* never written */ }
     debug(`flow rotate: ${e.message}`);
-    return false;
   } finally {
     closeSync(fd);
     try { unlinkSync(lock); } catch { /* already gone */ }
   }
 }
 
-// A last line with no newline is torn, and the next append would fuse onto it.
-function flowTailTorn(path, size) {
-  if (size === 0) return false;
-  const fd = openSync(path, 'r');
-  try {
-    const byte = Buffer.alloc(1);
-    readSync(fd, byte, 0, 1, size - 1);
-    return byte[0] !== 0x0a;
-  } finally { closeSync(fd); }
-}
 
 // Runs after emit(), so it can never delay, change or suppress a decision, and its own
 // catch keeps a full disk from reaching the fail-closed catch around main() (spec, Error
@@ -876,11 +864,12 @@ function recordFlowEvent(payload, input, decision, passed, guard) {
     if (process.env.CC_FLOW_OFF || typeof payload.cwd !== 'string' || !payload.cwd) return;
     const path = join(payload.cwd, '.claude', '.flow-events.jsonl');
     const size = statSync(path, { throwIfNoEntry: false })?.size ?? 0;
-    const torn = flowTailTorn(path, size);
-    const rotated = (size > FLOW_MAX_BYTES || torn) && rotateFlowEvents(path);
-    const line = JSON.stringify(flowEvent(payload, input, decision, passed, guard));
-    // A torn tail that could not be rotated (lock held) is fenced off, never fused.
-    appendFileSync(path, `${torn && !rotated ? '\n' : ''}${line}\n`);
+    if (size > FLOW_MAX_BYTES) rotateFlowEvents(path);
+    // The newline LEADS the line: one O_APPEND write per event (spec M7: no torn line under
+    // parallel appends) can only ever end a line, so a tail torn by a crash or a hand edit is
+    // fenced off by the next event instead of fused with it, and no per-call read of the last
+    // byte is needed. Readers skip blank lines; rotation drops the torn one.
+    appendFileSync(path, `\n${JSON.stringify(flowEvent(payload, input, decision, passed, guard))}`);
   } catch (e) { debug(`flow event: ${e.message}`); }
 }
 
