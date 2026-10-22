@@ -294,7 +294,7 @@ const contractEnv = () => {
 - [X] [T-003-E] Dependency check: `grep -rln "pre-tool-use.mjs" tests/hooks`. For each file that spawns the hook, confirm that its spawn env strips `CLAUDE_PROJECT_DIR` or sets it explicitly: `guard3-port.test.js` (T-002-E), `hook-project-root.test.js` (T-002-A), and `pre-tool-use-contract.test.js` (this task). Any other spawner is repaired inside this task.
 - [X] [T-003-F] Full suite: `npm test`. Expected: passes.
 - [X] [T-003-G] Stage: `git add -u tests/hooks/pre-tool-use-contract.test.js docs/superpowers/plans/2026-10-21-bug061-hook-project-root.md`
-- [ ] [T-003-H] Commit: `git commit -m "test: isolate the contract harness from an inherited CLAUDE_PROJECT_DIR [BUG-061]"`. Expected: the pre-commit suite passes.
+- [X] [T-003-H] Commit: `git commit -m "test: isolate the contract harness from an inherited CLAUDE_PROJECT_DIR [BUG-061]"`. Expected: the pre-commit suite passes.
 
 The T-002-L tick rides T-003-G. The T-003-H tick rides T-004-J.
 
@@ -330,9 +330,9 @@ PowerShell is not installed on this machine, so the no-shell spawn plus the no-e
 - Consumes: `g3ReadAllowlist()` rooted at `CLAUDE_PROJECT_DIR` (Task 2); the fingerprint merge on the `pre-tool-use.mjs` substring, which the new command still contains.
 - Produces: the registered command above; `INLINE = /^node -e "([^"]+)"$/` in the test file, from which the no-shell test extracts the script.
 
-- [ ] [T-004-A] In `tests/installer/templates.test.js:131`, change the expected array to ``[`node -e "import(require('url').pathToFileURL(require('path').resolve(process.env.CLAUDE_PROJECT_DIR||'.','.claude/hooks/pre-tool-use.mjs')).href)"`]``, a template literal with no `${`.
-- [ ] [T-004-B] In `tests/installer/settings-merge.test.js`, in the `[BUG-061] AC5` test, change the expected array of the `commands.filter(...)` assertion to the same template-literal string as T-004-A.
-- [ ] [T-004-C] In `tests/hooks/hook-project-root.test.js`, make three edits:
+- [X] [T-004-A] In `tests/installer/templates.test.js:131`, change the expected array to ``[`node -e "import(require('url').pathToFileURL(require('path').resolve(process.env.CLAUDE_PROJECT_DIR||'.','.claude/hooks/pre-tool-use.mjs')).href)"`]``, a template literal with no `${`.
+- [X] [T-004-B] In `tests/installer/settings-merge.test.js`, in the `[BUG-061] AC5` test, change the expected array of the `commands.filter(...)` assertion to the same template-literal string as T-004-A.
+- [X] [T-004-C] In `tests/hooks/hook-project-root.test.js`, make three edits:
   1. Add `const INLINE = /^node -e "([^"]+)"$/;` below the `ROOTED` constant.
   2. Replace the three-line header comment above `let base, root, sub;` with:
 
@@ -381,19 +381,19 @@ describe('[BUG-061] command runs under any shell', () => {
 });
 ```
 
-- [ ] [T-004-D] Red step: `npx vitest run tests/installer/templates.test.js tests/installer/settings-merge.test.js tests/hooks/hook-project-root.test.js -t "gates Read and Bash|BUG-061"`. The filter selects twelve tests. Expected:
+- [X] [T-004-D] Red step: `npx vitest run tests/installer/templates.test.js tests/installer/settings-merge.test.js tests/hooks/hook-project-root.test.js -t "gates Read and Bash|BUG-061"`. The filter selects twelve tests. Expected:
   - The two `templates.test.js` `gates Read and Bash through one union matcher` tests: FAIL (old string).
   - `[BUG-061] AC5 replaces the cwd-relative hook command with the rooted one`: FAIL (old string).
   - The seven existing `hook-project-root.test.js` tests: PASS (the bash path still runs the old command).
   - `the command carries no shell expansion syntax`: FAIL.
   - `the inline script roots the allowlist with no shell`: FAIL (`INLINE` does not match the old command).
   - Totals: 5 failed, 7 passed.
-- [ ] [T-004-E] In `project-template/.claude/settings.json:9`, replace the command line with `            "command": "node -e \"import(require('url').pathToFileURL(require('path').resolve(process.env.CLAUDE_PROJECT_DIR||'.','.claude/hooks/pre-tool-use.mjs')).href)\""`.
-- [ ] [T-004-F] Make the same replacement in `.claude/settings.json:9`. Expected afterwards: `node -e "for (const f of ['.claude/settings.json','project-template/.claude/settings.json']) console.log(require('./'+f).hooks.PreToolUse[0].hooks[0].command)"` prints the new command twice. This session's live hook keeps working, because the session cwd is the root.
-- [ ] [T-004-G] Green step: rerun the T-004-D command. Expected: 12 passed, 0 failed.
-- [ ] [T-004-H] Dependency check: `grep -rn "CLAUDE_PROJECT_DIR:-" tests lib bin project-template .claude/settings.json`. Expected: zero hits.
-- [ ] [T-004-I] Full suite: `npm test`. Expected: passes.
-- [ ] [T-004-J] Stage: `git add -u project-template/.claude/settings.json .claude/settings.json tests/installer/templates.test.js tests/installer/settings-merge.test.js tests/hooks/hook-project-root.test.js docs/superpowers/plans/2026-10-21-bug061-hook-project-root.md`
+- [X] [T-004-E] In `project-template/.claude/settings.json:9`, replace the command line with `            "command": "node -e \"import(require('url').pathToFileURL(require('path').resolve(process.env.CLAUDE_PROJECT_DIR||'.','.claude/hooks/pre-tool-use.mjs')).href)\""`.
+- [X] [T-004-F] Make the same replacement in `.claude/settings.json:9`. Expected afterwards: `node -e "for (const f of ['.claude/settings.json','project-template/.claude/settings.json']) console.log(require('./'+f).hooks.PreToolUse[0].hooks[0].command)"` prints the new command twice. This session's live hook keeps working, because the session cwd is the root.
+- [X] [T-004-G] Green step: rerun the T-004-D command. Expected: 12 passed, 0 failed.
+- [X] [T-004-H] Dependency check: `grep -rn "CLAUDE_PROJECT_DIR:-" tests lib bin project-template .claude/settings.json`. Expected: zero hits.
+- [X] [T-004-I] Full suite: `npm test`. Expected: passes.
+- [X] [T-004-J] Stage: `git add -u project-template/.claude/settings.json .claude/settings.json tests/installer/templates.test.js tests/installer/settings-merge.test.js tests/hooks/hook-project-root.test.js docs/superpowers/plans/2026-10-21-bug061-hook-project-root.md`
 - [ ] [T-004-K] Commit: `git commit -m "fix: launch the PreToolUse hook without shell expansion [BUG-061]"`. Expected: the pre-commit suite passes.
 
 The T-004-K tick rides T-005-K.

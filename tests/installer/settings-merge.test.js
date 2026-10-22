@@ -145,7 +145,7 @@ describe('mergeSettingsFile: owned entries', () => {
     write(sp, { hooks: { PreToolUse: [HOST_ENTRY, earlier] } });
     mergeSettingsFile(shipped, sp, PROJECT_SETTINGS_FINGERPRINTS);
     const commands = read(sp).hooks.PreToolUse.flatMap(e => e.hooks.map(h => h.command));
-    expect(commands.filter(c => c.includes('pre-tool-use.mjs'))).toEqual(['node "${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/pre-tool-use.mjs"']);
+    expect(commands.filter(c => c.includes('pre-tool-use.mjs'))).toEqual([`node -e "import(require('url').pathToFileURL(require('path').resolve(process.env.CLAUDE_PROJECT_DIR||'.','.claude/hooks/pre-tool-use.mjs')).href)"`]);
     expect(read(sp).hooks.PreToolUse[0]).toEqual(HOST_ENTRY);
   });
   it('is byte-identical on a second run of an unchanged release', () => {
