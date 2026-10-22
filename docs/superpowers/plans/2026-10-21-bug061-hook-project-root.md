@@ -97,7 +97,7 @@
 - [X] [T-001-G] Dependency check: `grep -rn "node .claude/hooks/pre-tool-use.mjs" tests lib bin project-template .claude/settings.json`. Expected hits only: the `earlier` fixtures in `settings-merge.test.js` (the AC3a test and the new AC5 test), the `TPL` and owned-entry fixtures at `settings-merge.test.js:12,108,118`, and the `PROJECT_SETTINGS` fixture at `deploy.test.js:349`. Each is a self-contained input fixture, not an assertion on the shipped string, so none changes. Any other hit is repaired inside this task.
 - [X] [T-001-H] Full suite: `npm test`. Expected: passes.
 - [X] [T-001-I] Stage: `git add -u project-template/.claude/settings.json .claude/settings.json tests/installer/templates.test.js tests/installer/settings-merge.test.js docs/superpowers/plans/2026-10-21-bug061-hook-project-root.md`
-- [ ] [T-001-J] Commit: `git commit -m "fix: anchor the PreToolUse hook command at CLAUDE_PROJECT_DIR [BUG-061]"`. Expected: the pre-commit suite passes.
+- [X] [T-001-J] Commit: `git commit -m "fix: anchor the PreToolUse hook command at CLAUDE_PROJECT_DIR [BUG-061]"`. Expected: the pre-commit suite passes.
 
 ### Task 2: Root the Guard 3 allowlist at the project directory (AC2, AC3, AC4, AC6)
 
@@ -111,7 +111,7 @@
 - Consumes: the registered command from Task 1, read at test time from `project-template/.claude/settings.json` (`hooks.PreToolUse[0].hooks[0].command`).
 - Produces: `g3ReadAllowlist()` reads `join(process.env.CLAUDE_PROJECT_DIR || process.cwd(), '.claude', 'memory', 'bash-scan-allowlist.txt')`. Signature and return shape unchanged.
 
-- [ ] [T-002-A] Create `tests/hooks/hook-project-root.test.js`:
+- [X] [T-002-A] Create `tests/hooks/hook-project-root.test.js`:
 
 ```js
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -208,7 +208,7 @@ describe('[BUG-061] allowlist root in both hook copies', () => {
 });
 ```
 
-- [ ] [T-002-B] Red step: `npx vitest run tests/hooks/hook-project-root.test.js`. The file holds seven tests. Expected:
+- [X] [T-002-B] Red step: `npx vitest run tests/hooks/hook-project-root.test.js`. The file holds seven tests. Expected:
   - AC2 loads from a subdirectory cwd: PASS (Task 1's command already loads the hook).
   - AC3 honours the root allowlist: FAIL (the hook reads the subdirectory cwd, finds no allowlist, denies).
   - AC3 denies with no covering entry: PASS.
@@ -217,7 +217,7 @@ describe('[BUG-061] allowlist root in both hook copies', () => {
   - AC6 `.claude/hooks/pre-tool-use.mjs`: FAIL.
   - AC6 `project-template/.claude/hooks/pre-tool-use.mjs`: FAIL.
   - Totals: 4 failed, 3 passed.
-- [ ] [T-002-C] In `project-template/.claude/hooks/pre-tool-use.mjs`, replace the comment block and read line of `g3ReadAllowlist` (`:620-628`) so the function opens:
+- [X] [T-002-C] In `project-template/.claude/hooks/pre-tool-use.mjs`, replace the comment block and read line of `g3ReadAllowlist` (`:620-628`) so the function opens:
 
 ```js
 // Operator policy, read fresh on every invocation so a change applies without a
@@ -234,8 +234,8 @@ function g3ReadAllowlist() {
 ```
 
   Lines after the `readFileSync` call stay unchanged.
-- [ ] [T-002-D] Make the identical edit in `.claude/hooks/pre-tool-use.mjs`. Expected: `cmp .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs` exits 0.
-- [ ] [T-002-E] In `tests/hooks/guard3-port.test.js`, inside `runRow`, replace `env: { ...process.env },` with `env: portEnv(),` and add this helper directly above `runRow`:
+- [X] [T-002-D] Make the identical edit in `.claude/hooks/pre-tool-use.mjs`. Expected: `cmp .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs` exits 0.
+- [X] [T-002-E] In `tests/hooks/guard3-port.test.js`, inside `runRow`, replace `env: { ...process.env },` with `env: portEnv(),` and add this helper directly above `runRow`:
 
 ```js
 // The hook roots its allowlist at CLAUDE_PROJECT_DIR when set (BUG-061). A suite run
@@ -249,12 +249,12 @@ const portEnv = () => {
 ```
 
   No corpus row or assertion changes.
-- [ ] [T-002-F] Green step: rerun the T-002-B command. Expected: 7 passed, 0 failed.
-- [ ] [T-002-G] AC4 isolation check: `CLAUDE_PROJECT_DIR="$PWD" npx vitest run tests/hooks/guard3-port.test.js`. Expected: passes, proving the port corpus ignores an inherited variable. This repository's `.claude/memory/bash-scan-allowlist.txt` has zero live entries today, so also confirm T-002-E is present with `grep -n "delete env.CLAUDE_PROJECT_DIR" tests/hooks/guard3-port.test.js` (one hit).
-- [ ] [T-002-H] Dependency check: `grep -n "process.cwd()" .claude/hooks/pre-tool-use.mjs`. Expected: two hits, `:132` (`payloadCwd`, Guard 1/2 target paths, out of scope) and the new rooted line. No other cwd read exists.
-- [ ] [T-002-I] AC7: `npm test`. Expected: the full suite passes, including `templates.test.js` `'ships the front door as one byte-identical mirrored pair'`.
-- [ ] [T-002-J] Stage: `git add -u project-template/.claude/hooks/pre-tool-use.mjs .claude/hooks/pre-tool-use.mjs tests/hooks/guard3-port.test.js docs/superpowers/plans/2026-10-21-bug061-hook-project-root.md`
-- [ ] [T-002-K] Stage the new test: `git add tests/hooks/hook-project-root.test.js`
+- [X] [T-002-F] Green step: rerun the T-002-B command. Expected: 7 passed, 0 failed.
+- [X] [T-002-G] AC4 isolation check: `CLAUDE_PROJECT_DIR="$PWD" npx vitest run tests/hooks/guard3-port.test.js`. Expected: passes, proving the port corpus ignores an inherited variable. This repository's `.claude/memory/bash-scan-allowlist.txt` has zero live entries today, so also confirm T-002-E is present with `grep -n "delete env.CLAUDE_PROJECT_DIR" tests/hooks/guard3-port.test.js` (one hit).
+- [X] [T-002-H] Dependency check: `grep -n "process.cwd()" .claude/hooks/pre-tool-use.mjs`. Expected: two hits, `:132` (`payloadCwd`, Guard 1/2 target paths, out of scope) and the new rooted line. No other cwd read exists.
+- [X] [T-002-I] AC7: `npm test`. Expected: the full suite passes, including `templates.test.js` `'ships the front door as one byte-identical mirrored pair'`.
+- [X] [T-002-J] Stage: `git add -u project-template/.claude/hooks/pre-tool-use.mjs .claude/hooks/pre-tool-use.mjs tests/hooks/guard3-port.test.js docs/superpowers/plans/2026-10-21-bug061-hook-project-root.md`
+- [X] [T-002-K] Stage the new test: `git add tests/hooks/hook-project-root.test.js`
 - [ ] [T-002-L] Commit: `git commit -m "fix: read the Guard 3 allowlist from CLAUDE_PROJECT_DIR [BUG-061]"`. Expected: the pre-commit suite passes.
 
 The ticks for T-002-J through T-002-L are made after their commit. Only the human-owned closeout commit can carry them. This plan does not add a closeout commit.

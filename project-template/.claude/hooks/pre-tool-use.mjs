@@ -622,10 +622,12 @@ const G3_CHECKS = [
 // Present-but-unreadable means an empty list PLUS a debug line, because that is a
 // fault worth seeing, and neither condition may throw: a permissions problem on a
 // policy file must never escalate into denying every tool call in the session.
+// The root is CLAUDE_PROJECT_DIR because the session's cwd drifts; cwd is only the
+// fallback for a launcher that does not set it (BUG-061).
 function g3ReadAllowlist() {
   let raw;
   try {
-    raw = readFileSync(join(process.cwd(), ...G3_ALLOWLIST_REL), 'utf8');
+    raw = readFileSync(join(process.env.CLAUDE_PROJECT_DIR || process.cwd(), ...G3_ALLOWLIST_REL), 'utf8');
   } catch (e) {
     if (e.code !== 'ENOENT') debug(`guard 3 allowlist unreadable: ${e.message}`);
     return [];
