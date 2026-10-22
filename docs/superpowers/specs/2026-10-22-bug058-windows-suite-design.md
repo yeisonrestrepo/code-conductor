@@ -1,7 +1,7 @@
 # BUG-058: The Test Suite Does Not Pass on Windows, and No CI Leg Would Notice
 
-**Status:** Draft — awaiting operator approval
-**Branch:** `fix/bug-058-windows-suite` (to be stacked on `fix/bug-059-fake-gh-win32`; see Ordering)
+**Status:** Approved by the operator on 2026-10-22
+**Branch:** `fix/bug-058-windows-suite`, stacked on `fix/bug-059-fake-gh-win32` (its PR merges first; see Ordering)
 **Backlog:** `[BUG-058]`, filed from issue #76
 **Measured on:** Windows 11 Pro 10.0.26300, Node v24.16.0, npm 11.13.0, Vitest 3.2.6, Git for Windows with `core.autocrlf=true`, no Developer Mode, main at `17f70fe`
 

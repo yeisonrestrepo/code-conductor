@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Draft — awaiting operator approval (the spec must be approved first)
+**Status:** Approved by the operator on 2026-10-22
 
 **Goal:** Make `npx vitest run` green on Windows by fixing the five causes `[BUG-058]` names (plus the sixth found while measuring), and enforce it with a `windows-latest` CI leg asserting its own measured skipped set.
 
