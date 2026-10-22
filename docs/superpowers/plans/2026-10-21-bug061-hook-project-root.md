@@ -255,9 +255,186 @@ const portEnv = () => {
 - [X] [T-002-I] AC7: `npm test`. Expected: the full suite passes, including `templates.test.js` `'ships the front door as one byte-identical mirrored pair'`.
 - [X] [T-002-J] Stage: `git add -u project-template/.claude/hooks/pre-tool-use.mjs .claude/hooks/pre-tool-use.mjs tests/hooks/guard3-port.test.js docs/superpowers/plans/2026-10-21-bug061-hook-project-root.md`
 - [X] [T-002-K] Stage the new test: `git add tests/hooks/hook-project-root.test.js`
-- [ ] [T-002-L] Commit: `git commit -m "fix: read the Guard 3 allowlist from CLAUDE_PROJECT_DIR [BUG-061]"`. Expected: the pre-commit suite passes.
+- [X] [T-002-L] Commit: `git commit -m "fix: read the Guard 3 allowlist from CLAUDE_PROJECT_DIR [BUG-061]"`. Expected: the pre-commit suite passes.
 
 The ticks for T-002-J through T-002-L are made after their commit. Only the human-owned closeout commit can carry them. This plan does not add a closeout commit.
+
+### Task 3: Isolate the contract harness from an inherited CLAUDE_PROJECT_DIR (review finding)
+
+Added 2026-10-21 by owner approval of the whole-branch review's finding 1. `fire()` in `tests/hooks/pre-tool-use-contract.test.js:14-22` spawns the hook with `{ ...process.env, ...env }` and `cwd: REPO_ROOT`. An inherited `CLAUDE_PROJECT_DIR` therefore points Guard 3 at another root's allowlist. A permissive entry there flips three deny assertions. Reproduced before this task: 3 failed, 17 passed.
+
+**Files:**
+- Modify: `tests/hooks/pre-tool-use-contract.test.js:14-22` (`fire` env)
+- Scratch (gitignored, not staged): `tests/.tmp/bug061-permissive/.claude/memory/bash-scan-allowlist.txt`
+
+**Interfaces:**
+- Consumes: the rooted allowlist read from Task 2.
+- Produces: `fire(payload, env)` strips the inherited `CLAUDE_PROJECT_DIR` before applying `env`. A caller that passes `CLAUDE_PROJECT_DIR` in `env` still sets it. No caller does today.
+
+- [X] [T-003-A] Create `tests/.tmp/bug061-permissive/.claude/memory/bash-scan-allowlist.txt` with the single line `*.ts`. `tests/.tmp/` is gitignored.
+- [X] [T-003-B] Red step: `CLAUDE_PROJECT_DIR="$PWD/tests/.tmp/bug061-permissive" npx vitest run tests/hooks/pre-tool-use-contract.test.js`. Expected:
+  - `routes a Bash payload to Guard 3, which denies a mass-dump command`: FAIL.
+  - `a pattern denial names the allowlist as operator policy`: FAIL.
+  - `CC_GUARD3_WARN > converts Guard 3 denial into ask, carrying the same reason`: FAIL.
+  - Totals: 3 failed, 17 passed.
+- [X] [T-003-C] In `fire`, replace `env: { ...process.env, ...env },` with `env: { ...contractEnv(), ...env },` and add this helper directly above the comment that precedes `fire`:
+
+```js
+// The hook roots its allowlist at CLAUDE_PROJECT_DIR when set (BUG-061). A run inside
+// Claude Code, or in a worktree, may inherit one that names another checkout, whose
+// allowlist would then decide the Guard 3 assertions below.
+const contractEnv = () => {
+  const env = { ...process.env };
+  delete env.CLAUDE_PROJECT_DIR;
+  return env;
+};
+```
+
+- [X] [T-003-D] Green step: rerun the T-003-B command. Expected: 20 passed, 0 failed.
+- [X] [T-003-E] Dependency check: `grep -rln "pre-tool-use.mjs" tests/hooks`. For each file that spawns the hook, confirm that its spawn env strips `CLAUDE_PROJECT_DIR` or sets it explicitly: `guard3-port.test.js` (T-002-E), `hook-project-root.test.js` (T-002-A), and `pre-tool-use-contract.test.js` (this task). Any other spawner is repaired inside this task.
+- [X] [T-003-F] Full suite: `npm test`. Expected: passes.
+- [X] [T-003-G] Stage: `git add -u tests/hooks/pre-tool-use-contract.test.js docs/superpowers/plans/2026-10-21-bug061-hook-project-root.md`
+- [ ] [T-003-H] Commit: `git commit -m "test: isolate the contract harness from an inherited CLAUDE_PROJECT_DIR [BUG-061]"`. Expected: the pre-commit suite passes.
+
+The T-002-L tick rides T-003-G. The T-003-H tick rides T-004-J.
+
+### Task 4: Launch the hook without shell expansion (review finding 2, owner-directed)
+
+Added 2026-10-21 at the owner's direction, which overrides the spec's Out of Scope line for Windows without Git Bash and AC1's exact string. `${CLAUDE_PROJECT_DIR:-.}` is bash syntax. Under cmd or PowerShell it stays literal, and the hook fails even from the root, where the old relative command worked. The replacement command uses no shell expansion: Node reads the variable itself.
+
+```text
+node -e "import(require('url').pathToFileURL(require('path').resolve(process.env.CLAUDE_PROJECT_DIR||'.','.claude/hooks/pre-tool-use.mjs')).href)"
+```
+
+Why it is shell-agnostic:
+- There is no `$`, `%`, backtick or `^`, so bash, sh, cmd and PowerShell all pass the script unchanged.
+- The `||` and the single quotes sit inside one double-quoted argument, where cmd and PowerShell treat them as literal and bash does not expand them.
+- `pathToFileURL` turns a Windows `C:\...` path into a valid `import()` specifier.
+- `||'.'` keeps the unset-variable fallback, which is today's behavior.
+
+The hook runs `main()` on import and reads neither `process.argv` nor `import.meta` (grep on 2026-10-21: zero hits), so importing it from `-e` is equivalent to running it as a file. A missing script still fails visibly with `ERR_MODULE_NOT_FOUND`, rc 1, which keeps the spec's "no existence guard" rule.
+
+Prototyped on 2026-10-21 from `tests/hooks` with `CLAUDE_PROJECT_DIR` at the root:
+- Through `bash -c`, `sh -c` and a direct no-shell spawn: rc 0 and a Guard 3 deny, in each case.
+- With the variable unset and the cwd at the root: rc 0 and a deny.
+- With a nonexistent root: rc 1 and `ERR_MODULE_NOT_FOUND`.
+
+PowerShell is not installed on this machine, so the no-shell spawn plus the no-expansion-syntax assertion stand in for it. A Windows PowerShell session is the owner's field check at release.
+
+**Files:**
+- Modify: `project-template/.claude/settings.json:9`, `.claude/settings.json:9`
+- Modify: `tests/installer/templates.test.js:131`, `tests/installer/settings-merge.test.js` (the `[BUG-061] AC5` expected string)
+- Modify: `tests/hooks/hook-project-root.test.js` (header comment, `runHook`, two new tests)
+
+**Interfaces:**
+- Consumes: `g3ReadAllowlist()` rooted at `CLAUDE_PROJECT_DIR` (Task 2); the fingerprint merge on the `pre-tool-use.mjs` substring, which the new command still contains.
+- Produces: the registered command above; `INLINE = /^node -e "([^"]+)"$/` in the test file, from which the no-shell test extracts the script.
+
+- [ ] [T-004-A] In `tests/installer/templates.test.js:131`, change the expected array to ``[`node -e "import(require('url').pathToFileURL(require('path').resolve(process.env.CLAUDE_PROJECT_DIR||'.','.claude/hooks/pre-tool-use.mjs')).href)"`]``, a template literal with no `${`.
+- [ ] [T-004-B] In `tests/installer/settings-merge.test.js`, in the `[BUG-061] AC5` test, change the expected array of the `commands.filter(...)` assertion to the same template-literal string as T-004-A.
+- [ ] [T-004-C] In `tests/hooks/hook-project-root.test.js`, make three edits:
+  1. Add `const INLINE = /^node -e "([^"]+)"$/;` below the `ROOTED` constant.
+  2. Replace the three-line header comment above `let base, root, sub;` with:
+
+```js
+// The registered command is run the way Claude Code runs it, through a shell, and its
+// inline script is also run with no shell at all, which is what cmd or PowerShell amount
+// to for a command that carries no expansion syntax. The root has a space in its path
+// because Windows home directories often do. [BUG-061]
+```
+
+  3. Replace `runHook` with the function below, and append the new `describe` block at the end of the file:
+
+```js
+// Strip every variable that could steer the hook, then set only what the test names.
+function runHook({ cwd, projectDir, command = 'cat docs/*.md', viaShell = true }) {
+  const env = { ...process.env };
+  for (const k of ['CLAUDE_PROJECT_DIR', 'CC_HOOK_ALLOW', 'CC_GUARD3_WARN']) delete env[k];
+  if (projectDir !== undefined) env.CLAUDE_PROJECT_DIR = projectDir;
+  const [file, args] = viaShell ? ['bash', ['-c', COMMAND]] : [process.execPath, ['-e', COMMAND.match(INLINE)[1]]];
+  const r = spawnSync(file, args, {
+    cwd, env, encoding: 'utf8', timeout: 15000,
+    input: JSON.stringify({ tool_name: 'Bash', tool_input: { command } }),
+  });
+  if (r.error) throw new Error(`hook spawn failed: ${r.error.message}`);
+  const out = r.stdout.trim();
+  return { status: r.status, stderr: r.stderr, decision: out === '' ? null : JSON.parse(out).hookSpecificOutput };
+}
+```
+
+```js
+describe('[BUG-061] command runs under any shell', () => {
+  it('[BUG-061] the command carries no shell expansion syntax', () => {
+    expect(COMMAND).toMatch(INLINE);
+    expect(COMMAND).not.toMatch(/[$%`^]/);
+  });
+
+  // The deny half proves the hook loaded, so the allow half cannot pass on a script
+  // that imported nothing.
+  it('[BUG-061] the inline script roots the allowlist with no shell from a subdirectory cwd', () => {
+    expect(runHook({ cwd: sub, projectDir: root, viaShell: false }).decision.permissionDecision).toBe('deny');
+    writeAllowlist(root, ['docs/']);
+    const r = runHook({ cwd: sub, projectDir: root, viaShell: false });
+    expect(r.status).toBe(0);
+    expect(r.decision).toBeNull();
+  });
+});
+```
+
+- [ ] [T-004-D] Red step: `npx vitest run tests/installer/templates.test.js tests/installer/settings-merge.test.js tests/hooks/hook-project-root.test.js -t "gates Read and Bash|BUG-061"`. The filter selects twelve tests. Expected:
+  - The two `templates.test.js` `gates Read and Bash through one union matcher` tests: FAIL (old string).
+  - `[BUG-061] AC5 replaces the cwd-relative hook command with the rooted one`: FAIL (old string).
+  - The seven existing `hook-project-root.test.js` tests: PASS (the bash path still runs the old command).
+  - `the command carries no shell expansion syntax`: FAIL.
+  - `the inline script roots the allowlist with no shell`: FAIL (`INLINE` does not match the old command).
+  - Totals: 5 failed, 7 passed.
+- [ ] [T-004-E] In `project-template/.claude/settings.json:9`, replace the command line with `            "command": "node -e \"import(require('url').pathToFileURL(require('path').resolve(process.env.CLAUDE_PROJECT_DIR||'.','.claude/hooks/pre-tool-use.mjs')).href)\""`.
+- [ ] [T-004-F] Make the same replacement in `.claude/settings.json:9`. Expected afterwards: `node -e "for (const f of ['.claude/settings.json','project-template/.claude/settings.json']) console.log(require('./'+f).hooks.PreToolUse[0].hooks[0].command)"` prints the new command twice. This session's live hook keeps working, because the session cwd is the root.
+- [ ] [T-004-G] Green step: rerun the T-004-D command. Expected: 12 passed, 0 failed.
+- [ ] [T-004-H] Dependency check: `grep -rn "CLAUDE_PROJECT_DIR:-" tests lib bin project-template .claude/settings.json`. Expected: zero hits.
+- [ ] [T-004-I] Full suite: `npm test`. Expected: passes.
+- [ ] [T-004-J] Stage: `git add -u project-template/.claude/settings.json .claude/settings.json tests/installer/templates.test.js tests/installer/settings-merge.test.js tests/hooks/hook-project-root.test.js docs/superpowers/plans/2026-10-21-bug061-hook-project-root.md`
+- [ ] [T-004-K] Commit: `git commit -m "fix: launch the PreToolUse hook without shell expansion [BUG-061]"`. Expected: the pre-commit suite passes.
+
+The T-004-K tick rides T-005-K.
+
+### Task 5: Release 1.39.3 (owner-directed)
+
+Added 2026-10-21 at the owner's direction. It overrides the spec's Out of Scope line for `VERSION`, `package.json`, `package-lock.json`, `CHANGELOG.md`, the backlog flip and the README "Known limits" removal. `docs/RELEASE-CLOSEOUT.md` step 2 requires all of these in one commit: record parity fails a `CHANGELOG` claim whose backlog heading still reads `[ ]`, and `repo-invariants.test.js:115-119` fails a flipped heading whose README Known-limits bullet remains. The release PR, merge, sync, the `project.md` closeout record and branch deletion (steps 1 and 5-10) stay with the owner.
+
+**Files:**
+- Modify: `VERSION`, `package.json:3`, `package-lock.json` (`version` and `packages[""].version`)
+- Modify: `CHANGELOG.md:3` (new first entry)
+- Modify: `AGENT-READABLE BACKLOG.md:1014` (heading flip and DONE bullet)
+- Modify: `README.md:460` (remove the `[BUG-061]` Known-limits bullet)
+
+**Interfaces:**
+- Consumes: the merged behavior of Tasks 1-4.
+- Produces: version `1.39.3` in all five gate locations.
+
+- [ ] [T-005-A] Run `npm version 1.39.3 --no-git-tag-version`. It moves `package.json` `version` plus both `package-lock.json` fields. Expected: prints `v1.39.3`.
+- [ ] [T-005-B] In `VERSION`, replace `1.39.2` with `1.39.3`.
+- [ ] [T-005-C] In `CHANGELOG.md`, insert this entry directly above `## [1.39.2] - 2026-10-20`:
+
+```markdown
+## [1.39.3] - 2026-10-21
+
+### Fixed
+- **[BUG-061]** The PreToolUse hook no longer depends on the session's working directory or on the shell that runs it. In both `settings.json` copies the command is `node -e "import(...)"`, which resolves `.claude/hooks/pre-tool-use.mjs` against `CLAUDE_PROJECT_DIR` inside Node and falls back to the working directory when the variable is unset. The command has no shell expansion syntax, so bash, Git Bash, cmd and PowerShell all run it alike. A session whose working directory had drifted from the root used to fail with a non-blocking `MODULE_NOT_FOUND` that skipped every guard. Guard 3 reads its allowlist from `CLAUDE_PROJECT_DIR` too, in both hook copies. A re-install replaces the old command in place through the existing fingerprint merge. `tests/hooks/hook-project-root.test.js` runs the registered command through `bash -c`, and its inline script with no shell, from a subdirectory of a root with a space in its path. A settings-merge test pins the in-place replacement. The port and contract suites strip an inherited `CLAUDE_PROJECT_DIR`.
+
+```
+
+- [ ] [T-005-D] In `AGENT-READABLE BACKLOG.md:1014`, flip `### [ ] \`[BUG-061]\`` to `### [X] \`[BUG-061]\`` on the heading line only.
+- [ ] [T-005-E] Directly below that heading, insert one line in the `[BUG-060]` DONE style: `* **DONE, shipped as \`1.39.3\` on 2026-10-21.** The hook command is a shell-agnostic \`node -e "import(...)"\` that resolves the script against \`CLAUDE_PROJECT_DIR\` inside Node, falling back to the working directory, in both settings copies. Guard 3 reads its allowlist from \`process.env.CLAUDE_PROJECT_DIR || process.cwd()\` in both hook copies. The installer's fingerprint merge rewrites the old command in place. The recorded \`${CLAUDE_PROJECT_DIR:-.}\` fix shape was superseded after review, because it is bash-only. Spec: \`docs/superpowers/specs/2026-10-21-bug061-hook-project-root-design.md\`; plan: \`docs/superpowers/plans/2026-10-21-bug061-hook-project-root.md\`.`
+- [ ] [T-005-F] In `README.md`, delete the single line that starts `- **\`[BUG-061]\`, open:**` (`:460`).
+- [ ] [T-005-G] Version gate: `node tools/version-gate.mjs`. Expected: five `ok` lines and `VERSION_GATE_OK 1.39.3`, rc 0.
+- [ ] [T-005-H] Record parity: `node tools/record-parity.mjs`. Expected: `RECORD_PARITY_OK`, rc 0.
+- [ ] [T-005-I] Full suite: `npm test`. Expected: passes, including `repo-invariants.test.js` `'lists every open filed defect in Known limits, and only those'`.
+- [ ] [T-005-J] Stage: `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md`
+- [ ] [T-005-K] Stage the plan: `git add -u docs/superpowers/plans/2026-10-21-bug061-hook-project-root.md`
+- [ ] [T-005-L] Commit: `git commit -m "chore: release 1.39.3 [BUG-061]"`. Expected: the pre-commit suite passes.
+
+The T-005-L tick is made after its commit, so it rides the owner's closeout record commit.
 
 ## Test List
 
@@ -270,6 +447,9 @@ The ticks for T-002-J through T-002-L are made after their commit. Only the huma
 1. Task 0: spec, plan, `.gitignore` leaf and `project.md` (docs).
 2. Task 1: rooted command in both settings copies, its assertion and the AC5 merge test (fix).
 3. Task 2: rooted allowlist in both hook copies, the project-root suite and the port-suite isolation (fix).
+4. Task 3: contract-harness env isolation (test).
+5. Task 4: shell-agnostic `node -e` launcher in both settings copies, with its tests (fix).
+6. Task 5: release 1.39.3, with the five version locations, the CHANGELOG, the backlog flip and the README Known-limits removal (chore).
 
 ## Identified Risks
 
