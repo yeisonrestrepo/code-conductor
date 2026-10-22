@@ -1,10 +1,12 @@
-# Flow viewer design spec
+# FEAT-044: Real-Time Pipeline Flow Viewer
 
 **Issue:** #57
-**Date:** 2026-10-13, revised 2026-10-18
-**Status:** Candidate (unminted; the id is assigned by the maintainer)
+**Date:** 2026-10-13, revised 2026-10-18 and 2026-10-21
+**Status:** Approved by the owner on 2026-10-19 (PR #81, comment "Spec approval — owner decisions on D1-D7", https://github.com/yeisonrestrepo/code-conductor/pull/81#issuecomment-6257678335), against the `[FEAT-044]` entry minted in `6f4607d`.
 
-This is a design document only. No code ships with it. Implementation starts when the owner mints an id and approves this spec, after the queue named in the issue's triage comment.
+This is a design document only. No code ships with it. Implementation starts against this approved spec.
+
+**Owner decisions, 2026-10-19.** D2 takes option (b): the HTML page is dropped. D1 follows: plain JSONL at `.claude/.flow-events.jsonl`. The `statusLine` settings entry is approved as a protected-surface change, under the `verbosity-remind` merge-and-fingerprint discipline (Installer). D3, D4, D5, D6 and D7 are approved as written. The text below is revised to those decisions; where it mentions the HTML page, it is only to record why it is out.
 
 **Revision 2026-10-18.** The first draft made a static HTML page the primary display. The proofs of concept in #83 backed the emitter and the event file, but not that page as the place users look. This revision moves the primary display into the CLI: a status line, plus a `/cc-flow` command for detail. The HTML page becomes optional, for debugging guards (D2). It also folds in the amendments #83 measured: a locked rotation (D7), `VAR=value` skipping, an `agent` field and guard-owned reason codes (D5), and a Guard 4 entry for the event file (D8). The emitter, its transport (D1) and fail-open (AC2) are unchanged.
 
@@ -18,7 +20,7 @@ A session under code-conductor is opaque to the person running it. The `PreToolU
 
 Three parts, none with runtime dependencies or a background process:
 
-1. **Emitter.** The `PreToolUse` hook appends one line per routed tool call to `.claude/flow-events.js`, after its decision is already written.
+1. **Emitter.** The `PreToolUse` hook appends one JSON line per routed tool call to `.claude/.flow-events.jsonl`, after its decision is already written.
 2. **Status line (primary display).** A script, `.claude/flow-status.mjs`, that Claude Code runs as its status line. It reads the tail of the event file and prints one line, always visible, for example `⛔ G3 P9 · 12 calls · 3 deny`. It needs no browser, costs no tokens, and adds nothing to the transcript.
 3. **`/cc-flow` (on demand).** A slash command that prints the D3 lanes with per-guard counts and the latest events as text.
 
@@ -44,7 +46,7 @@ Taken in #83 on candidate code:
 | M9 | Rotation under a `wx` lock, 960 parallel calls | 0 errors, 0 torn lines, 0 leftover files |
 | M10 | Fail-open (AC2) on an allow, a deny and an ask | Byte-identical to a `CC_FLOW_OFF` run |
 
-M3 and M6 against M5 put the write within the hook's existing noise. M8 is why D7 changed.
+M3 and M6 against M5 put the write within the hook's existing noise. M8 is why D7 changed. M1 and M2 were taken for the HTML page; with the page dropped (D2) they are kept as the record of why D1 first chose a script file.
 
 **Not measured:** macOS and Linux for M7 to M9, a disk behind real-time antivirus scanning, and how often Claude Code refreshes the status line on the current release (T-001-B).
 
@@ -52,27 +54,25 @@ M3 and M6 against M5 put the write within the hook's existing noise. M8 is why D
 
 Each one names the choice, the alternative, and where it departs from the issue as written.
 
-### D1. Transport: a script file, not JSONL plus `fetch`
+### D1. Transport: JSON Lines
 
-The event file is `.claude/flow-events.js`. Each line is one complete statement:
+The event file is `.claude/.flow-events.jsonl`, the name and format the issue filed. Each line is one `JSON.stringify(event)` followed by `\n`:
 
 ```
-flowEvent({"ts":1760364151000,"tool":"Bash","verdict":"deny","guard":3,"code":"P5 P9","target":"git","agent":null,"passed":[7]});
+{"ts":1760364151000,"tool":"Bash","verdict":"deny","guard":3,"code":"P5 P9","target":"git","agent":null,"passed":[7]}
 ```
 
-Stripping the `flowEvent(` prefix and the `);` suffix from a line leaves plain JSON. The status line and `/cc-flow` do exactly that. The wrapper exists so the optional HTML page (D2) can load the file from `file://` through a `<script>` element (M1, M2) without a server.
+The status line and `/cc-flow` read it with `JSON.parse`, one line at a time, and skip a line that does not parse.
 
-- **Departs from the issue:** the file is not named `.flow-events.jsonl` and is not JSON Lines.
-- **Alternative:** plain JSONL. That is simpler for the two CLI readers, and the right choice if the owner drops the HTML page (D2, option b). It is a one-line change in the emitter and the readers.
-- **Safety of executing the file:** the line is `'flowEvent(' + JSON.stringify(event) + ');'`. JSON text is a valid ECMAScript expression, so no value inside the event can leave the literal. The emitter is the only writer.
+- **Decided 2026-10-19:** follows D2 option (b). The earlier draft wrapped each line as `flowEvent(…);` so an HTML page could load the file from `file://` through a `<script>` element (M1, M2). With no page, the wrapper has no reader, and nothing executes the file.
+- **Leading dot:** the file is hidden in a directory listing, like the issue named it. The lock and the rotation temporary share the prefix (`.claude/.flow-events.lock`, `.claude/.flow-events.jsonl.tmp`), so one ignore pattern covers all three.
 
-### D2. Display: status line first, `/cc-flow` on demand, HTML optional
+### D2. Display: status line first, `/cc-flow` on demand, no HTML page
 
 | Surface | Role | When the user sees it |
 |---|---|---|
 | Status line | Primary | Always, below the prompt |
 | `/cc-flow` | Detail | When asked |
-| `flow-viewer.html` | Debugging guards, demos | Opened by hand |
 
 **Status line.** Claude Code runs the configured command on conversation updates and shows the first line of its stdout. It passes session JSON on stdin; the script uses only the working directory from it. The script reads at most the last 32 KiB of the event file, never the whole file, and prints one line:
 
@@ -88,10 +88,7 @@ The counts cover the current session: events are filtered to `ts` at or after th
 
 **`/cc-flow`.** A command file under `.claude/commands/`. It runs `node .claude/flow-status.mjs --detail`, which prints the D3 lanes, one row per lane with per-guard pass and deny counts, then the newest 20 events, one per line. The agent echoes the output and adds nothing. The command costs one tool call and its output tokens, and only when the user asks.
 
-**HTML page.** The first draft's viewer: the D3 lanes as inline SVG, polling the event file through a `<script>` element (D1). It is no longer the primary display, and whether it ships is the owner's call:
-
-- **(a) Ship it, not deployed by default.** It lives in the repository for maintainers tuning guards and for demos. `--project` does not copy it. This is the recommended option.
-- **(b) Drop it.** D1 then switches to JSONL.
+**HTML page: dropped (owner decision, option b).** The first draft's viewer had already demoted itself to "debugging guards, demos": a maintained artifact without a stated need. The status line and `/cc-flow` cover the problem this item states. If demand appears, it enters as its own candidate; D1's format is plain JSON, so a later reader needs no emitter change beyond its own transport.
 
 The proof of concept in #83 also ran the display as a Claude Code plugin band ("`cc-flow` mod"). That needs the plugin to be installed and deployed by the installer, which is a larger protected-surface change than a status line. It is not proposed here.
 
@@ -99,7 +96,7 @@ The proof of concept in #83 also ran the display as a Claude Code plugin band ("
 
 The issue draws `init → stack → spec → plan → implement` with guards branching off each stage. The hook cannot see stages: its matcher is `Read|Write|Edit|create_file|write_file|Bash|Agent|SendMessage`, and a slash command reaches Claude Code as a prompt, not as a tool call. What the hook does know exactly is which guards ran on which tool, in which order.
 
-So `/cc-flow` (and the optional HTML page) shows one lane per tool family, with the guards in dispatch order:
+So `/cc-flow` shows one lane per tool family, with the guards in dispatch order:
 
 | Lane | Guards, in order |
 |---|---|
@@ -141,7 +138,7 @@ The issue names `post-tool-use.mjs`. This repository has no such hook, and every
 
 The issue caps the file at 500 lines, rotated on write. Counting lines means reading the file on every tool call. Instead the emitter takes the size from `statSync` and rotates when the file passes 160 KiB, about 500 events at the capped line length:
 
-1. Take `.claude/flow-events.lock` with `openSync(…, 'wx')`. If it exists and is older than 10 s, break it and retry once; a hook that died mid-rotation must not stop rotation forever. If it is held, skip rotation this call and just append.
+1. Take `.claude/.flow-events.lock` with `openSync(…, 'wx')`. If it exists and is older than 10 s, break it and retry once; a hook that died mid-rotation must not stop rotation forever. If it is held, skip rotation this call and just append.
 2. Keep the last 250 lines that parse, write them to a temporary file, rename it over the original, release the lock.
 
 Before each append, the emitter reads the file's last byte. If it is not a newline, the tail is torn, and the emitter rotates (step 1 and 2) so the unparseable line is dropped instead of fused with the next append.
@@ -151,7 +148,7 @@ Before each append, the emitter reads the file's last byte. If it is not a newli
 
 ### D8. Guard 4 covers the event file
 
-Guard 4 already blocks reads under `node_modules/`. It also blocks `Read` of `.claude/flow-events.js`, so the agent does not pull its own audit log into context. The status line and `/cc-flow` read it from Node, not through the `Read` tool, so they are unaffected.
+Guard 4 already blocks reads under `node_modules/`. It also blocks `Read` of `.claude/.flow-events.jsonl`, so the agent does not pull its own audit log into context. The status line and `/cc-flow` read it from Node, not through the `Read` tool, so they are unaffected.
 
 ## Behavior
 
@@ -178,7 +175,7 @@ The hook's outermost `catch` fails closed: any throw becomes a denial unless `CC
 - The emitter runs after `emit(decision)`. It can never delay, change or suppress a decision.
 - The emitter adds no top-level statement that can throw at load. Its new imports are `node:fs` names only.
 
-The status line script follows the same rule in its own process: every path exits 0, and an error prints nothing. Event fields are printed as data and never evaluated; the readers strip the wrapper and use `JSON.parse`, never `eval`.
+The status line script follows the same rule in its own process: every path exits 0, and an error prints nothing. Event fields are printed as data and never evaluated; the readers use `JSON.parse`, never `eval`.
 
 ### Installer
 
@@ -192,7 +189,14 @@ The status line is configured in the project's `.claude/settings.json`:
 
 - `--project` adds the entry only when neither the project's nor the user's `settings.json` has a `statusLine`. Otherwise it leaves both untouched and prints one line saying the flow status line was skipped and how to add it by hand.
 - An existing `statusLine` is never modified or removed, consistent with the installer's rule of keeping host-modified blocks byte-identical.
-- **Owner approval required** for this entry before implementation. It is the one change in this item to a host-owned file.
+- **Approved by the owner on 2026-10-19**, under the same idempotent merge-and-fingerprint discipline `lib/installer/settings.mjs` applies to the `verbosity-remind` hook. The fingerprint is `flow-status.mjs`:
+  - the project `statusLine` already has the exact canonical command: no write (idempotent, byte-identical on a re-run);
+  - the project `statusLine` contains the fingerprint but differs: it is ours, and is replaced by the canonical command;
+  - a `statusLine` without the fingerprint at either level is the host's: no write, one skip line;
+  - a malformed project `settings.json` is backed up and skipped, never rewritten;
+  - every write is the canonical two-space JSON with one trailing newline.
+
+  A scratch prototype of this rule passed seven scenarios on 2026-10-21 (fresh, existing hooks, re-run, owned stale command, host project entry, host user entry, malformed file); T-004 makes them real tests.
 
 ## Acceptance criteria
 
@@ -202,17 +206,20 @@ Mapped to the issue's five, with the departures above applied.
 - [ ] **AC2** (issue 1, fail-open). With the event path unwritable, the hook's stdout, stderr and exit code are byte-identical to a run with `CC_FLOW_OFF` set, on an allow, a deny and an ask.
 - [ ] **AC3** (issue 2). Given a seeded event file, `flow-status.mjs` prints the D2 line for each state in its table, exits 0 on every one, and reads no more than the last 32 KiB. `--detail` prints every D3 lane.
 - [ ] **AC4** (issue 2, drift). A test fails when a guard number in the hook's dispatch has no lane entry in `flow-status.mjs`, or the reverse.
-- [ ] **AC5** (issue 3). `--project` deploys `flow-status.mjs` and `/cc-flow`, and adds the `statusLine` entry only under the D2 installer rule. A host `statusLine` at either level is left byte-identical, and the skip prints one line.
-- [ ] **AC6** (issue 4). Past 160 KiB the file rotates to its last 250 parseable lines under the D7 lock. A stale lock older than 10 s is broken. A torn tail is dropped, not fused. The template `gitignore` ignores `.claude/flow-events.*`.
-- [ ] **AC7** (issue 5). No surface needs a server. The status line and `/cc-flow` need no browser. If D2 option (a) is chosen, the HTML page works from `file://` in Chrome and Edge and contains no `http://` or `https://` URL.
+- [ ] **AC5** (issue 3). `--project` deploys `flow-status.mjs` and `/cc-flow`, and adds the `statusLine` entry only under the Installer rule. A re-run is byte-identical, an owned entry with a stale command is replaced, a host `statusLine` at either level is left byte-identical and the skip prints one line, and a malformed `settings.json` is backed up and left untouched.
+- [ ] **AC6** (issue 4). Past 160 KiB the file rotates to its last 250 parseable lines under the D7 lock. A stale lock older than 10 s is broken. A torn tail is dropped, not fused. The template `gitignore` ignores `.claude/.flow-events.*`.
+- [ ] **AC7** (issue 5). No surface needs a server, a browser, `fetch()` or a CDN. The change ships no `.html` file, and neither `flow-status.mjs` nor `/cc-flow` contains an `http://` or `https://` URL.
 - [ ] **AC8.** `dependencies` in `package.json` is still `{}`. Both copies of the hook are byte-identical.
 - [ ] **AC9.** No Bash command text beyond its first non-`VAR=value` word appears in any event.
-- [ ] **AC10.** Guard 4 denies `Read` of `.claude/flow-events.js`.
+- [ ] **AC10.** Guard 4 denies `Read` of `.claude/.flow-events.jsonl`.
+- [ ] **AC11** (entry). Works on Windows, macOS and Linux: the new suites (`flow-events.test.js`, `flow-status.test.js`) and the parallel-append and locked-rotation probes (M7, M9) pass on all three, with 0 torn lines and 0 errors. CI runs Linux only (Node 20 and 24 legs, `.github/workflows/test.yml`), so Linux is proven in CI and Windows and macOS by recorded runs whose output the implementation PR states. Proven by the plan's T-001-A.
+- [ ] **AC12** (entry). No persistent background process: the emitter runs inside the hook process, and the status line runs per refresh and exits.
 
 ## Out of scope
 
 - The stage row and any `UserPromptSubmit` emitter (D3).
 - A Claude Code plugin band as the display (D2).
+- The HTML viewer page (D2, option b).
 - Phase 2 of the issue: the SSE server.
 - A `post-tool-use` hook (D6).
 - History beyond the rotation window, filtering, search, export.
@@ -227,11 +234,10 @@ Mapped to the issue's five, with the departures above applied.
 | `.claude/hooks/pre-tool-use.mjs` | Same bytes; the copies are identical today | Yes |
 | `project-template/.claude/flow-status.mjs` | New. Status line and `--detail` | No |
 | `project-template/.claude/commands/cc-flow.md` | New. `/cc-flow` | No |
-| `project-template/.claude/settings.json` handling in `lib/installer/deploy.mjs` | Conditional `statusLine` merge and one `report()` line | Yes, owner approval |
-| `project-template/gitignore` | One line: `.claude/flow-events.*` | No |
+| `project-template/.claude/settings.json` handling in `lib/installer/deploy.mjs` and `lib/installer/settings.mjs` | Conditional `statusLine` merge under the fingerprint rule, and one `report()` line | Yes, approved 2026-10-19 |
+| `project-template/gitignore` | One line: `.claude/.flow-events.*` | No |
 | `tests/installer/templates.test.js` | The pinned ignore-line lists at lines 78 and 86 gain the entry | No |
 | `tests/hooks/flow-events.test.js`, `tests/installer/flow-status.test.js` | New | No |
-| `tools/flow-viewer.html` | New, only under D2 option (a); not deployed | No |
 
 Guard 3's frozen authority, `tests/fixtures/guard3-reference.sh`, is not touched. No guard's allow or deny logic changes; guards gain a returned `code` and Guard 4 gains one path.
 
@@ -240,7 +246,7 @@ Not touched, by rule: `VERSION`, the `version` fields of `package.json` and `pac
 ### Files requiring full read (deferred to the plan)
 
 - `project-template/.claude/hooks/pre-tool-use.mjs`, lines 746 to 805
-- `lib/installer/deploy.mjs`, the `settings.json` merge
+- `lib/installer/deploy.mjs` and `lib/installer/settings.mjs`, the `settings.json` merge
 - `tests/hooks/pre-tool-use-contract.test.js`
 - `tests/installer/templates.test.js`, lines 60 to 95
 - `tests/installer/deploy.test.js`, the host-modified `settings.json` cases
