@@ -127,6 +127,8 @@ Wait for explicit approval before proceeding to `/cc-plan`.
 Once approved, append a summary to `.claude/memory/project.md` under:
 `## Spec: [name] [YYYY-MM-DD]`
 
+Then, in its `## Current State` section, replace the single `- Active spec:` line with that heading text, without its leading `## `, in one Edit. If the section is absent, skip this step: the next `/cc-checkpoint` inserts it.
+
 ---
 
 ## Phase exit

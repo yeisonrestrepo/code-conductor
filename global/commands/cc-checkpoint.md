@@ -14,6 +14,24 @@ Identify and extract:
 - Add a timestamped section: `## Checkpoint [YYYY-MM-DD HH:MM]`
 - List decisions, conventions, and debt from this session
 
+**Then update its `## Current State` section**, the bounded digest at the top of `project.md` that phase commands read with a `limit` instead of the whole file:
+- If the section is absent, make the one-time bootstrap insert: add this skeleton directly after the file's `# Project Memory` intro paragraph, in one Edit. It inserts a new section and never rewrites an existing line, so it keeps the BUG-003 invariant.
+
+```markdown
+## Current State
+<!-- Bounded digest, max 40 lines, each line max 200 characters. History below is append-only. -->
+- Active spec: none
+- Last checkpoint: none
+### Conventions
+### Debt
+<!-- end current state -->
+```
+
+- Replace the single `- Last checkpoint:` line with the heading text of the entry just appended, without its leading `## `.
+- Add each new convention as a bullet under `### Conventions` and each new debt item or workaround as a bullet under `### Debt`, one Edit per bullet.
+- Caps: the section stays within 40 lines, each list within 12 bullets, each line within 200 characters. Before adding to a full list, remove the one bullet that is superseded or resolved, in its own Edit. A removed or shortened bullet loses nothing: the history entry holds the full text.
+- If the `<!-- end current state -->` line is missing, report the malformed section and leave it as it is. Never rewrite it in bulk.
+
 **Staging that update, where the workflow commits it:** stage by tracked-ness, with an explicit path. A `project.md` that is already tracked takes `git add -u ".claude/memory/project.md"`; one that is not yet tracked takes plain `git add ".claude/memory/project.md"`, or `git add -f` where the project ignores `.claude/`. **Never an unconditional `-u` here.** This command is global and also runs in freshly scaffolded projects, which do not ignore `.claude/` and whose `project.md` is not yet tracked: there `-u` exits 128 and would halt the checkpoint before its DB tail, trading a defect those projects never had for one they would.
 
 **Update `.claude/memory/personal.md`** (local only):
