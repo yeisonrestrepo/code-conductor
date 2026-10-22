@@ -10,7 +10,7 @@ const TEMPLATE_HOOK = join(REPO_ROOT, 'project-template/.claude/hooks/pre-tool-u
 const COMMAND = JSON.parse(readFileSync(join(REPO_ROOT, 'project-template/.claude/settings.json'), 'utf8'))
   .hooks.PreToolUse[0].hooks[0].command;
 const ROOTED = 'process.env.CLAUDE_PROJECT_DIR || process.cwd()';
-const INLINE = /^node -e "([^"]+)"$/;
+const INLINE = /^node --input-type=commonjs -e "([^"]+)"$/;
 const HAS_BASH = !spawnSync('bash', ['--version'], { stdio: 'pipe', timeout: 5000 }).error;
 
 // The registered command is run the way Claude Code runs it, through a shell, and its
@@ -34,11 +34,12 @@ const writeAllowlist = (dir, entries) => {
 };
 
 // Strip every variable that could steer the hook, then set only what the test names.
-function runHook({ cwd, projectDir, command = 'cat docs/*.md', viaShell = true }) {
+function runHook({ cwd, projectDir, command = 'cat docs/*.md', viaShell = true, extraEnv = {} }) {
   const env = { ...process.env };
   for (const k of ['CLAUDE_PROJECT_DIR', 'CC_HOOK_ALLOW', 'CC_GUARD3_WARN']) delete env[k];
   if (projectDir !== undefined) env.CLAUDE_PROJECT_DIR = projectDir;
-  const [file, args] = viaShell ? ['bash', ['-c', COMMAND]] : [process.execPath, ['-e', COMMAND.match(INLINE)[1]]];
+  Object.assign(env, extraEnv);
+  const [file, args] = viaShell ? ['bash', ['-c', COMMAND]] : [process.execPath, ['--input-type=commonjs', '-e', COMMAND.match(INLINE)[1]]];
   const r = spawnSync(file, args, {
     cwd, env, encoding: 'utf8', timeout: 15000,
     input: JSON.stringify({ tool_name: 'Bash', tool_input: { command } }),
@@ -108,5 +109,14 @@ describe('[BUG-061] command runs under any shell', () => {
     const r = runHook({ cwd: sub, projectDir: root, viaShell: false });
     expect(r.status).toBe(0);
     expect(r.decision).toBeNull();
+  });
+
+  // NODE_OPTIONS can carry --input-type=module from the developer's shell; the launcher's
+  // own flag must win, or require is undefined and every guard is skipped.
+  it('[BUG-061] survives an inherited NODE_OPTIONS=--input-type=module', () => {
+    const r = runHook({ cwd: sub, projectDir: root, extraEnv: { NODE_OPTIONS: '--input-type=module' } });
+    expect(r.stderr).not.toMatch(/require is not defined/);
+    expect(r.status).toBe(0);
+    expect(r.decision.permissionDecision).toBe('deny');
   });
 });

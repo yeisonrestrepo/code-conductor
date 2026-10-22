@@ -12,6 +12,14 @@ const HOOK = join(REPO_ROOT, '.claude/hooks/pre-tool-use.mjs')
 
 const WIN32 = process.platform === 'win32'
 
+// The hook roots its allowlist at CLAUDE_PROJECT_DIR when set (BUG-061); an inherited
+// one is cleared so no row depends on the developer's checkout.
+const guard4Env = () => {
+  const env = { ...process.env };
+  delete env.CLAUDE_PROJECT_DIR;
+  return env;
+};
+
 // These 19 cases are Guard 4's logic of record; rows 18 and 19 are FEAT-021's flip. The runtime and the input contract both
 // changed under them, so the mechanics move (JSON on stdin, decision in stdout, exit 0
 // always) while the verdicts do not, except at row14 and row16, which the contract itself
@@ -23,7 +31,7 @@ function runRead(filePath, { toolName = 'Read', input = null, env = {} } = {}) {
     cwd: REPO_ROOT,
     timeout: 15000,
     input: payload,
-    env: { ...process.env, ...env },
+    env: { ...guard4Env(), ...env },
   })
   if (result.error) throw new Error(`hook spawn failed: ${result.error.message}`)
   const strip = s => s.replace(/\r\n|\r/g, '\n').replace(/\x1b\[[0-9;]*m/g, '')

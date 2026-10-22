@@ -128,7 +128,7 @@ describe('pre-tool-use wiring', () => {
     expect(entries[0].matcher.split('|')).toContain('Bash');
     expect(entries[0].matcher.split('|')).toContain('Agent');
     expect(entries[0].matcher.split('|')).toContain('SendMessage');
-    expect(entries[0].hooks.map(h => h.command)).toEqual([`node -e "import(require('url').pathToFileURL(require('path').resolve(process.env.CLAUDE_PROJECT_DIR||'.','.claude/hooks/pre-tool-use.mjs')).href)"`]);
+    expect(entries[0].hooks.map(h => h.command)).toEqual([`node --input-type=commonjs -e "import(require('url').pathToFileURL(require('path').resolve(process.env.CLAUDE_PROJECT_DIR||'.','.claude/hooks/pre-tool-use.mjs')).href)"`]);
   });
 
   it('leaves no CLAUDE_TOOL_NAME or CLAUDE_TOOL_INPUT reference in the shipped tree', () => {

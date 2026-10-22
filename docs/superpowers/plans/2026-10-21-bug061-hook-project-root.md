@@ -432,9 +432,88 @@ Added 2026-10-21 at the owner's direction. It overrides the spec's Out of Scope 
 - [X] [T-005-I] Full suite: `npm test`. Expected: passes, including `repo-invariants.test.js` `'lists every open filed defect in Known limits, and only those'`.
 - [X] [T-005-J] Stage: `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md`
 - [X] [T-005-K] Stage the plan: `git add -u docs/superpowers/plans/2026-10-21-bug061-hook-project-root.md`
-- [ ] [T-005-L] Commit: `git commit -m "chore: release 1.39.3 [BUG-061]"`. Expected: the pre-commit suite passes.
+- [X] [T-005-L] Commit: `git commit -m "chore: release 1.39.3 [BUG-061]"`. Expected: the pre-commit suite passes.
 
-The T-005-L tick is made after its commit, so it rides the owner's closeout record commit.
+The T-005-L tick rides T-006-K.
+
+### Task 6: Harden the launcher and close the review's residuals (second review, owner-directed)
+
+Added 2026-10-21 by the owner's approval of the Tasks 3-5 review. It addresses three findings.
+
+1. An inherited `NODE_OPTIONS=--input-type=module` makes `node -e` evaluate the script as ESM. `require` is then undefined, the hook exits 1 (non-blocking), and every guard is skipped. A command-line `--input-type=commonjs` overrides `NODE_OPTIONS`. Measured 2026-10-21: `NODE_OPTIONS=--input-type=module node --input-type=commonjs -e "console.log(typeof require)"` prints `function`; without the flag it prints `undefined`.
+2. `guard4.test.js:26` and `guard7.test.js:24-27` pass an inherited `CLAUDE_PROJECT_DIR` to the hook. T-003-E missed this: it wrongly found no Guard 3 verdict assertions in either file, and its permissive allowlist covered only `*.ts`. Measured 2026-10-21 with the scratch allowlist widened to `*.ts` and `*.md`: guard7's `outranks Guard 3 under CC_GUARD3_WARN` fails (1 failed, 57 passed across both files). Guard 4 has no Guard 3 verdict to flip, so its strip is for consistency only and has no red step.
+3. `cc-init.md:89`, in both copies, still says the hook "is launched as `node <path>`".
+
+The fix sits after the 1.39.3 release commit, so the `CHANGELOG` entry and the backlog DONE line are amended in this task. The version stays `1.39.3`.
+
+**Files:**
+- Modify: `project-template/.claude/settings.json:9`, `.claude/settings.json:9`
+- Modify: `tests/installer/templates.test.js:131`, `tests/installer/settings-merge.test.js` (the AC5 expected string)
+- Modify: `tests/hooks/hook-project-root.test.js` (`INLINE`, `runHook`, one new test)
+- Modify: `tests/hooks/guard4.test.js:26`, `tests/hooks/guard7.test.js:24-27`
+- Modify: `.claude/commands/cc-init.md:89`, `project-template/.claude/commands/cc-init.md:89`
+- Modify: `CHANGELOG.md` (the 1.39.3 `[BUG-061]` bullet), `AGENT-READABLE BACKLOG.md` (the `[BUG-061]` DONE line)
+- Scratch (gitignored, not staged): `tests/.tmp/bug061-permissive/.claude/memory/bash-scan-allowlist.txt` now holds `*.ts` and `*.md`
+
+**Interfaces:**
+- Produces: the command `node --input-type=commonjs -e "import(require('url').pathToFileURL(require('path').resolve(process.env.CLAUDE_PROJECT_DIR||'.','.claude/hooks/pre-tool-use.mjs')).href)"`; `INLINE = /^node --input-type=commonjs -e "([^"]+)"$/`; `runHook({ ..., extraEnv = {} })`.
+
+- [X] [T-006-A] Edit the tests:
+  - In `templates.test.js:131` and in the AC5 assertion of `settings-merge.test.js`, change the expected template literal to the Produces command.
+  - In `hook-project-root.test.js`:
+    - Change `INLINE` to the Produces pattern.
+    - In `runHook`, add `extraEnv = {}` to the destructured options and apply `Object.assign(env, extraEnv);` after the `CLAUDE_PROJECT_DIR` line.
+    - Change the no-shell args to `['--input-type=commonjs', '-e', COMMAND.match(INLINE)[1]]`.
+    - Append this test inside `describe('[BUG-061] command runs under any shell')`:
+
+```js
+  // NODE_OPTIONS can carry --input-type=module from the developer's shell; the launcher's
+  // own flag must win, or require is undefined and every guard is skipped.
+  it('[BUG-061] survives an inherited NODE_OPTIONS=--input-type=module', () => {
+    const r = runHook({ cwd: sub, projectDir: root, extraEnv: { NODE_OPTIONS: '--input-type=module' } });
+    expect(r.stderr).not.toMatch(/require is not defined/);
+    expect(r.status).toBe(0);
+    expect(r.decision.permissionDecision).toBe('deny');
+  });
+```
+
+- [X] [T-006-B] Red step: `npx vitest run tests/installer/templates.test.js tests/installer/settings-merge.test.js tests/hooks/hook-project-root.test.js -t "gates Read and Bash|BUG-061"`. The filter selects 13 tests. Expected:
+  - The two `gates Read and Bash` tests and AC5: FAIL (old string).
+  - `the command carries no shell expansion syntax`: FAIL (`INLINE` mismatch).
+  - `the inline script roots the allowlist with no shell`: FAIL (no match).
+  - `survives an inherited NODE_OPTIONS=--input-type=module`: FAIL (exit 1, `require is not defined`).
+  - The seven original `hook-project-root` tests: PASS.
+  - Totals: 6 failed, 7 passed.
+- [X] [T-006-C] In both settings files at `:9`, set the command line to `            "command": "node --input-type=commonjs -e \"import(require('url').pathToFileURL(require('path').resolve(process.env.CLAUDE_PROJECT_DIR||'.','.claude/hooks/pre-tool-use.mjs')).href)\""`.
+- [X] [T-006-D] Green step: rerun the T-006-B command. Expected: 13 passed, 0 failed. Then check the live hook with the next Bash call, `cat *.ts`. Expected: denied with `BASH SCAN BLOCKED`.
+- [X] [T-006-E] Guard 7 red step: `CLAUDE_PROJECT_DIR="$PWD/tests/.tmp/bug061-permissive" npx vitest run tests/hooks/guard7.test.js tests/hooks/guard4.test.js`. Expected: 1 failed (`outranks Guard 3 under CC_GUARD3_WARN`), 57 passed.
+- [X] [T-006-F] Strip the inherited variable in both files:
+  - In `guard7.test.js` `fire`, add `delete env.CLAUDE_PROJECT_DIR;` after `delete env.CC_GUARD3_WARN;`. Change the comment above `fire` to: `// CC_GUARD3_WARN and CLAUDE_PROJECT_DIR are cleared unless a test sets them, so a developer's shell cannot flip a verdict or point Guard 3 at another checkout's allowlist (BUG-061).`
+  - In `guard4.test.js` `runRead`, replace `env: { ...process.env, ...env },` with `env: { ...guard4Env(), ...env },`. Add this directly above the comment that precedes `runRead`:
+
+```js
+// The hook roots its allowlist at CLAUDE_PROJECT_DIR when set (BUG-061); an inherited
+// one is cleared so no row depends on the developer's checkout.
+const guard4Env = () => {
+  const env = { ...process.env };
+  delete env.CLAUDE_PROJECT_DIR;
+  return env;
+};
+```
+
+- [X] [T-006-G] Green step: rerun the T-006-E command. Expected: 58 passed, 0 failed.
+- [X] [T-006-H] In both `cc-init.md` copies at `:89`, replace `It is launched as \`node <path>\`, so it needs no execute bit:` with `It is loaded by \`node\` through the PreToolUse command in \`.claude/settings.json\`, so it needs no execute bit:`. Expected: `cmp .claude/commands/cc-init.md project-template/.claude/commands/cc-init.md` exits 0. Correction at execution: `cmp` exits 1 because the copies already differed before this edit. The four `scripts/` and `.claude/scripts/` path lines (`:16`, `:34`, `:60`, `:68`) are an intended divergence between the repo copy and the shipped copy. `git diff HEAD` shows the one-line edit identical in both.
+- [X] [T-006-I] Amend the release records. In `CHANGELOG.md`'s 1.39.3 `[BUG-061]` bullet:
+  - Replace `` the command is `node -e "import(...)"`, `` with `` the command is `node --input-type=commonjs -e "import(...)"`, ``.
+  - Insert `` The `--input-type=commonjs` flag keeps an inherited `NODE_OPTIONS=--input-type=module` from breaking the launcher. `` after the sentence ending `run it alike.`.
+  - Replace `The port and contract suites strip` with `The port, contract, Guard 4 and Guard 7 suites strip`.
+  - In the backlog DONE line, replace `` `node -e "import(...)"` `` with `` `node --input-type=commonjs -e "import(...)"` ``.
+  - Then run `node tools/version-gate.mjs` (expect `VERSION_GATE_OK 1.39.3`) and `node tools/record-parity.mjs` (expect `RECORD_PARITY_OK`).
+- [X] [T-006-J] Full suite: `npm test`. Expected: passes. Also run `CLAUDE_PROJECT_DIR="$PWD/tests/.tmp/bug061-permissive" npx vitest run tests/hooks`. Expected: passes.
+- [X] [T-006-K] Stage: `git add -u project-template/.claude/settings.json .claude/settings.json tests/installer/templates.test.js tests/installer/settings-merge.test.js tests/hooks/hook-project-root.test.js tests/hooks/guard4.test.js tests/hooks/guard7.test.js .claude/commands/cc-init.md project-template/.claude/commands/cc-init.md CHANGELOG.md "AGENT-READABLE BACKLOG.md" docs/superpowers/plans/2026-10-21-bug061-hook-project-root.md`
+- [ ] [T-006-L] Commit: `git commit -m "fix: harden the hook launcher against NODE_OPTIONS and close review residuals [BUG-061]"`. Expected: the pre-commit suite passes.
+
+The T-006-L tick is made after its commit, so it rides the owner's closeout record commit.
 
 ## Test List
 
@@ -450,6 +529,7 @@ The T-005-L tick is made after its commit, so it rides the owner's closeout reco
 4. Task 3: contract-harness env isolation (test).
 5. Task 4: shell-agnostic `node -e` launcher in both settings copies, with its tests (fix).
 6. Task 5: release 1.39.3, with the five version locations, the CHANGELOG, the backlog flip and the README Known-limits removal (chore).
+7. Task 6: `--input-type=commonjs` launcher hardening, guard4 and guard7 env isolation, cc-init wording, and the 1.39.3 record amendments (fix).
 
 ## Identified Risks
 
