@@ -43,8 +43,8 @@
 - [X] [T-000-0] Create and switch to the fix branch: `git switch -c "fix/bug-061-hook-project-root"`. Expected: `git branch --show-current` prints `fix/bug-061-hook-project-root`. Uncommitted and untracked files carry over.
 - [X] [T-000-A] Add `!/docs/superpowers/plans/2026-10-21-bug061-hook-project-root.md` to `.gitignore` directly after the `!/docs/superpowers/plans/2026-10-20-bug060-node-env-alias.md` line. This is the BUG-042 toll: `/docs/superpowers/plans/*` denies the file until its leaf exists, and `gitignore-block-parity` fails once it is tracked without one.
 - [X] [T-000-B] Stage the tracked files: `git add -u .gitignore .claude/memory/project.md`
-- [ ] [T-000-C] Stage the new files: `git add docs/superpowers/specs/2026-10-21-bug061-hook-project-root-design.md docs/superpowers/plans/2026-10-21-bug061-hook-project-root.md`. Both leaves exist after T-000-A, so plain `git add` exits 0.
-- [ ] [T-000-D] Commit: `git commit -m "docs: add the BUG-061 spec and implementation plan [BUG-061]"`. Expected: the pre-commit suite passes, including `gitignore-block-parity`.
+- [X] [T-000-C] Stage the new files: `git add docs/superpowers/specs/2026-10-21-bug061-hook-project-root-design.md docs/superpowers/plans/2026-10-21-bug061-hook-project-root.md`. Both leaves exist after T-000-A, so plain `git add` exits 0.
+- [X] [T-000-D] Commit: `git commit -m "docs: add the BUG-061 spec and implementation plan [BUG-061]"`. Expected: the pre-commit suite passes, including `gitignore-block-parity`.
 
 ### Task 1: Register the rooted hook command (AC1, AC5)
 
@@ -58,14 +58,14 @@
 - Consumes: `mergeSettingsFile(templatePath, settingsPath, fingerprints)` and `PROJECT_SETTINGS_FINGERPRINTS`, unchanged.
 - Produces: the registered command string `node "${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/pre-tool-use.mjs"`, which Task 2's tests read from `project-template/.claude/settings.json` and run through `bash -c`.
 
-- [ ] [T-001-A] In `tests/installer/templates.test.js:131`, change the expected array to:
+- [X] [T-001-A] In `tests/installer/templates.test.js:131`, change the expected array to:
 
 ```js
     expect(entries[0].hooks.map(h => h.command)).toEqual(['node "${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/pre-tool-use.mjs"']);
 ```
 
   The string is single-quoted, so `${...}` stays literal.
-- [ ] [T-001-B] In `tests/installer/settings-merge.test.js`, add this test directly after the `[FEAT-011 AC3a]` test:
+- [X] [T-001-B] In `tests/installer/settings-merge.test.js`, add this test directly after the `[FEAT-011 AC3a]` test:
 
 ```js
   // A host installed before BUG-061 holds the cwd-relative command. The pre-tool-use.mjs
@@ -81,22 +81,22 @@
   });
 ```
 
-- [ ] [T-001-C] Red step: `npx vitest run tests/installer/templates.test.js tests/installer/settings-merge.test.js -t "gates Read and Bash|BUG-061"`. The filter selects exactly three tests. Expected:
+- [X] [T-001-C] Red step: `npx vitest run tests/installer/templates.test.js tests/installer/settings-merge.test.js -t "gates Read and Bash|BUG-061"`. The filter selects exactly three tests. Expected:
   - `.claude/settings.json gates Read and Bash through one union matcher`: FAIL (old command).
   - `project-template/.claude/settings.json gates Read and Bash through one union matcher`: FAIL (old command).
   - `[BUG-061] AC5 replaces the cwd-relative hook command with the rooted one`: FAIL (the shipped template still carries the old command).
   - Totals: 3 failed, 0 passed.
-- [ ] [T-001-D] In `project-template/.claude/settings.json:9`, replace `"command": "node .claude/hooks/pre-tool-use.mjs"` with:
+- [X] [T-001-D] In `project-template/.claude/settings.json:9`, replace `"command": "node .claude/hooks/pre-tool-use.mjs"` with:
 
 ```json
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/pre-tool-use.mjs\""
 ```
 
-- [ ] [T-001-E] In `.claude/settings.json:9`, make the same replacement as T-001-D. Expected afterwards: `node -e "for (const f of ['.claude/settings.json','project-template/.claude/settings.json']) console.log(require('./'+f).hooks.PreToolUse[0].hooks[0].command)"` prints `node "${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/pre-tool-use.mjs"` twice. This repository's live hook keeps working: the session cwd is the root, and the `:-.` fallback covers an unset variable.
-- [ ] [T-001-F] Green step: rerun the T-001-C command. Expected: 3 passed, 0 failed.
-- [ ] [T-001-G] Dependency check: `grep -rn "node .claude/hooks/pre-tool-use.mjs" tests lib bin project-template .claude/settings.json`. Expected hits only: the `earlier` fixtures in `settings-merge.test.js` (the AC3a test and the new AC5 test), the `TPL` and owned-entry fixtures at `settings-merge.test.js:12,108,118`, and the `PROJECT_SETTINGS` fixture at `deploy.test.js:349`. Each is a self-contained input fixture, not an assertion on the shipped string, so none changes. Any other hit is repaired inside this task.
-- [ ] [T-001-H] Full suite: `npm test`. Expected: passes.
-- [ ] [T-001-I] Stage: `git add -u project-template/.claude/settings.json .claude/settings.json tests/installer/templates.test.js tests/installer/settings-merge.test.js docs/superpowers/plans/2026-10-21-bug061-hook-project-root.md`
+- [X] [T-001-E] In `.claude/settings.json:9`, make the same replacement as T-001-D. Expected afterwards: `node -e "for (const f of ['.claude/settings.json','project-template/.claude/settings.json']) console.log(require('./'+f).hooks.PreToolUse[0].hooks[0].command)"` prints `node "${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/pre-tool-use.mjs"` twice. This repository's live hook keeps working: the session cwd is the root, and the `:-.` fallback covers an unset variable.
+- [X] [T-001-F] Green step: rerun the T-001-C command. Expected: 3 passed, 0 failed.
+- [X] [T-001-G] Dependency check: `grep -rn "node .claude/hooks/pre-tool-use.mjs" tests lib bin project-template .claude/settings.json`. Expected hits only: the `earlier` fixtures in `settings-merge.test.js` (the AC3a test and the new AC5 test), the `TPL` and owned-entry fixtures at `settings-merge.test.js:12,108,118`, and the `PROJECT_SETTINGS` fixture at `deploy.test.js:349`. Each is a self-contained input fixture, not an assertion on the shipped string, so none changes. Any other hit is repaired inside this task.
+- [X] [T-001-H] Full suite: `npm test`. Expected: passes.
+- [X] [T-001-I] Stage: `git add -u project-template/.claude/settings.json .claude/settings.json tests/installer/templates.test.js tests/installer/settings-merge.test.js docs/superpowers/plans/2026-10-21-bug061-hook-project-root.md`
 - [ ] [T-001-J] Commit: `git commit -m "fix: anchor the PreToolUse hook command at CLAUDE_PROJECT_DIR [BUG-061]"`. Expected: the pre-commit suite passes.
 
 ### Task 2: Root the Guard 3 allowlist at the project directory (AC2, AC3, AC4, AC6)
