@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.39.3] - 2026-10-21
+
+### Fixed
+- **[BUG-061]** The PreToolUse hook no longer depends on the session's working directory or on the shell that runs it. In both `settings.json` copies the command is `node -e "import(...)"`, which resolves `.claude/hooks/pre-tool-use.mjs` against `CLAUDE_PROJECT_DIR` inside Node and falls back to the working directory when the variable is unset. The command has no shell expansion syntax, so bash, Git Bash, cmd and PowerShell all run it alike. A session whose working directory had drifted from the root used to fail with a non-blocking `MODULE_NOT_FOUND` that skipped every guard. Guard 3 reads its allowlist from `CLAUDE_PROJECT_DIR` too, in both hook copies. A re-install replaces the old command in place through the existing fingerprint merge. `tests/hooks/hook-project-root.test.js` runs the registered command through `bash -c`, and its inline script with no shell, from a subdirectory of a root with a space in its path. A settings-merge test pins the in-place replacement. The port and contract suites strip an inherited `CLAUDE_PROJECT_DIR`.
+
 ## [1.39.2] - 2026-10-20
 
 ### Fixed

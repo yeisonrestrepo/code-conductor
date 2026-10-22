@@ -1011,7 +1011,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   `{ NODE: 'C:\\Program Files\\nodejs\\node.exe' }` passes on a
   supported Node.
 
-### [ ] `[BUG-061]` PreToolUse hook command is cwd-relative, so on Windows nearly every tool call reports MODULE_NOT_FOUND
+### [X] `[BUG-061]` PreToolUse hook command is cwd-relative, so on Windows nearly every tool call reports MODULE_NOT_FOUND
+* **DONE, shipped as `1.39.3` on 2026-10-21.** The hook command is a shell-agnostic `node -e "import(...)"` that resolves the script against `CLAUDE_PROJECT_DIR` inside Node, falling back to the working directory, in both settings copies. Guard 3 reads its allowlist from `process.env.CLAUDE_PROJECT_DIR || process.cwd()` in both hook copies. The installer's fingerprint merge rewrites the old command in place. The recorded `${CLAUDE_PROJECT_DIR:-.}` fix shape was superseded after review, because it is bash-only. Spec: `docs/superpowers/specs/2026-10-21-bug061-hook-project-root-design.md`; plan: `docs/superpowers/plans/2026-10-21-bug061-hook-project-root.md`.
 
 - Priority: HIGH, owner-set 2026-10-19; picked next, after
   `[BUG-060]`.

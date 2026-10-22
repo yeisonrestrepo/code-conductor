@@ -394,7 +394,7 @@ describe('[BUG-061] command runs under any shell', () => {
 - [X] [T-004-H] Dependency check: `grep -rn "CLAUDE_PROJECT_DIR:-" tests lib bin project-template .claude/settings.json`. Expected: zero hits.
 - [X] [T-004-I] Full suite: `npm test`. Expected: passes.
 - [X] [T-004-J] Stage: `git add -u project-template/.claude/settings.json .claude/settings.json tests/installer/templates.test.js tests/installer/settings-merge.test.js tests/hooks/hook-project-root.test.js docs/superpowers/plans/2026-10-21-bug061-hook-project-root.md`
-- [ ] [T-004-K] Commit: `git commit -m "fix: launch the PreToolUse hook without shell expansion [BUG-061]"`. Expected: the pre-commit suite passes.
+- [X] [T-004-K] Commit: `git commit -m "fix: launch the PreToolUse hook without shell expansion [BUG-061]"`. Expected: the pre-commit suite passes.
 
 The T-004-K tick rides T-005-K.
 
@@ -412,9 +412,9 @@ Added 2026-10-21 at the owner's direction. It overrides the spec's Out of Scope 
 - Consumes: the merged behavior of Tasks 1-4.
 - Produces: version `1.39.3` in all five gate locations.
 
-- [ ] [T-005-A] Run `npm version 1.39.3 --no-git-tag-version`. It moves `package.json` `version` plus both `package-lock.json` fields. Expected: prints `v1.39.3`.
-- [ ] [T-005-B] In `VERSION`, replace `1.39.2` with `1.39.3`.
-- [ ] [T-005-C] In `CHANGELOG.md`, insert this entry directly above `## [1.39.2] - 2026-10-20`:
+- [X] [T-005-A] Run `npm version 1.39.3 --no-git-tag-version`. It moves `package.json` `version` plus both `package-lock.json` fields. Expected: prints `v1.39.3`.
+- [X] [T-005-B] In `VERSION`, replace `1.39.2` with `1.39.3`.
+- [X] [T-005-C] In `CHANGELOG.md`, insert this entry directly above `## [1.39.2] - 2026-10-20`:
 
 ```markdown
 ## [1.39.3] - 2026-10-21
@@ -424,14 +424,14 @@ Added 2026-10-21 at the owner's direction. It overrides the spec's Out of Scope 
 
 ```
 
-- [ ] [T-005-D] In `AGENT-READABLE BACKLOG.md:1014`, flip `### [ ] \`[BUG-061]\`` to `### [X] \`[BUG-061]\`` on the heading line only.
-- [ ] [T-005-E] Directly below that heading, insert one line in the `[BUG-060]` DONE style: `* **DONE, shipped as \`1.39.3\` on 2026-10-21.** The hook command is a shell-agnostic \`node -e "import(...)"\` that resolves the script against \`CLAUDE_PROJECT_DIR\` inside Node, falling back to the working directory, in both settings copies. Guard 3 reads its allowlist from \`process.env.CLAUDE_PROJECT_DIR || process.cwd()\` in both hook copies. The installer's fingerprint merge rewrites the old command in place. The recorded \`${CLAUDE_PROJECT_DIR:-.}\` fix shape was superseded after review, because it is bash-only. Spec: \`docs/superpowers/specs/2026-10-21-bug061-hook-project-root-design.md\`; plan: \`docs/superpowers/plans/2026-10-21-bug061-hook-project-root.md\`.`
-- [ ] [T-005-F] In `README.md`, delete the single line that starts `- **\`[BUG-061]\`, open:**` (`:460`).
-- [ ] [T-005-G] Version gate: `node tools/version-gate.mjs`. Expected: five `ok` lines and `VERSION_GATE_OK 1.39.3`, rc 0.
-- [ ] [T-005-H] Record parity: `node tools/record-parity.mjs`. Expected: `RECORD_PARITY_OK`, rc 0.
-- [ ] [T-005-I] Full suite: `npm test`. Expected: passes, including `repo-invariants.test.js` `'lists every open filed defect in Known limits, and only those'`.
-- [ ] [T-005-J] Stage: `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md`
-- [ ] [T-005-K] Stage the plan: `git add -u docs/superpowers/plans/2026-10-21-bug061-hook-project-root.md`
+- [X] [T-005-D] In `AGENT-READABLE BACKLOG.md:1014`, flip `### [ ] \`[BUG-061]\`` to `### [X] \`[BUG-061]\`` on the heading line only.
+- [X] [T-005-E] Directly below that heading, insert one line in the `[BUG-060]` DONE style: `* **DONE, shipped as \`1.39.3\` on 2026-10-21.** The hook command is a shell-agnostic \`node -e "import(...)"\` that resolves the script against \`CLAUDE_PROJECT_DIR\` inside Node, falling back to the working directory, in both settings copies. Guard 3 reads its allowlist from \`process.env.CLAUDE_PROJECT_DIR || process.cwd()\` in both hook copies. The installer's fingerprint merge rewrites the old command in place. The recorded \`${CLAUDE_PROJECT_DIR:-.}\` fix shape was superseded after review, because it is bash-only. Spec: \`docs/superpowers/specs/2026-10-21-bug061-hook-project-root-design.md\`; plan: \`docs/superpowers/plans/2026-10-21-bug061-hook-project-root.md\`.`
+- [X] [T-005-F] In `README.md`, delete the single line that starts `- **\`[BUG-061]\`, open:**` (`:460`).
+- [X] [T-005-G] Version gate: `node tools/version-gate.mjs`. Expected: five `ok` lines and `VERSION_GATE_OK 1.39.3`, rc 0.
+- [X] [T-005-H] Record parity: `node tools/record-parity.mjs`. Expected: `RECORD_PARITY_OK`, rc 0.
+- [X] [T-005-I] Full suite: `npm test`. Expected: passes, including `repo-invariants.test.js` `'lists every open filed defect in Known limits, and only those'`.
+- [X] [T-005-J] Stage: `git add -u VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md`
+- [X] [T-005-K] Stage the plan: `git add -u docs/superpowers/plans/2026-10-21-bug061-hook-project-root.md`
 - [ ] [T-005-L] Commit: `git commit -m "chore: release 1.39.3 [BUG-061]"`. Expected: the pre-commit suite passes.
 
 The T-005-L tick is made after its commit, so it rides the owner's closeout record commit.
