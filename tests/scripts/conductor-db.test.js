@@ -240,7 +240,8 @@ describe.skipIf(!HAS_SQLITE)('conductor-db plan_file normalization', () => {
     // An absolute plan arg in symlink form would not be realpath'd by path.resolve,
     // producing a cross-namespace key that never dedups. The real hook passes
     // repo-relative paths (always physical via cwd), so this only affects the test.
-    const plan = join(realpathSync(repo), 'docs', 'plan.md');
+    // The native realpath also expands a Windows 8.3 tmpdir (RUNNER~1) [BUG-058].
+    const plan = join(realpathSync.native(repo), 'docs', 'plan.md');
 
     // Absolute path from repo root, then the same plan referenced from a deep CWD.
     runDb(['record', plan, 'T-001', '>'], { cwd: repo });
