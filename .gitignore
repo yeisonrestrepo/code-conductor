@@ -120,6 +120,7 @@ tests/.tmp/
 !/docs/superpowers/plans/2026-10-13-feat044-flow-viewer.md
 !/docs/superpowers/plans/2026-10-20-bug060-node-env-alias.md
 !/docs/superpowers/plans/2026-10-21-bug061-hook-project-root.md
+!/docs/superpowers/plans/2026-10-22-feat046-cc-metrics.md
 !/docs/superpowers/specs/2026-06-09-bug001-cc-compact-design.md
 !/docs/superpowers/specs/2026-06-09-bug002-spec-read-budget-design.md
 !/docs/superpowers/specs/2026-06-11-bug006-feat018-bash-scan-guard-design.md
@@ -162,6 +163,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-10-13-feat044-flow-viewer-design.md
 !/docs/superpowers/specs/2026-10-20-bug060-node-env-alias-design.md
 !/docs/superpowers/specs/2026-10-21-bug061-hook-project-root-design.md
+!/docs/superpowers/specs/2026-10-22-feat046-cc-metrics-design.md
 # --- END tracked-surface block (BUG-042) ---
 
 # Kept for external writers. Both lines are redundant against the block above; each is
