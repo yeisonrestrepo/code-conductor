@@ -133,7 +133,8 @@ After executing the task, review every code change you made in Step 4 against th
 
 **Behavior:**
 
-- **Finding detected:** emit `[SECURITY] file:line — A0X: one-sentence description` for each finding. Fix all findings immediately before proceeding to Step 5. If a finding cannot be fixed without changing the task's scope, flag it for human review: `[SECURITY-REVIEW] file:line — A0X: description (requires human decision)` and proceed.
+- **Finding detected:** emit `[SECURITY] file:line — A0X: one-sentence description` for each finding. Fix all findings immediately, re-scan the fixed lines, and proceed to Step 5 only when the re-scan is clean.
+- **Finding unresolved:** if a finding cannot be fixed without changing the task's scope, do not proceed. Take the Step 5 failure path (`[>]` → `[!]`), run Step 6, then halt with `SECURITY_FINDING_UNRESOLVED`, re-emitting each open `[SECURITY]` line. The halt escalates to human review: the loop stays stopped until the developer resolves the finding and resets the task to `[ ]`.
 - **Clean:** silent — no output, proceed directly to Step 5.
 
 ### Step 5: Post-flip
@@ -178,6 +179,7 @@ After the hook: if the task state is `[!]`, halt with the failure report from St
 | Pre-flip Edit no-match >= 3 (same task) | Mark `[!]`, halt |
 | Post-flip Edit no-match | Halt; manual resolution |
 | Task execution failure | Mark `[>]` → `[!]`, halt |
+| Unfixable OWASP finding (Step 4.5) | Mark `[>]` → `[!]`, halt; `SECURITY_FINDING_UNRESOLVED`; report open `[SECURITY]` lines |
 | Hook write failure | Log warning, continue |
 | `[>]` prerequisite | Halt; `PREREQUISITE_IN_PROGRESS`; report task ID |
 | `DEPENDENCY_FAILED` | Halt; report failed prerequisite |

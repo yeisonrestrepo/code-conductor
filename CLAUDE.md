@@ -86,7 +86,7 @@ After modifying any method, variable, class, or component:
 | [TESTS]      | Omitted in MIN mode — test files affected or written                                              |
 | [BUG]        | Always when a bug is found — format: `file:line — one-sentence description`. Never suppressed, including in MIN mode. |
 | [VALIDATION] | After implementation tasks only — edge cases, risks, justification                               |
-| [SECURITY]   | Always when OWASP finding detected — format: `file:line — A0X: description`. Never suppressed     |
+| [SECURITY]   | Always when OWASP finding detected — format: `file:line — A0X: description`. Never suppressed; an unfixable finding halts with `SECURITY_FINDING_UNRESOLVED` |
 
 ## Verbosity Protocol
 VERBOSITY: MIN (default)
