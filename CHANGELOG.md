@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.40.0] - 2026-10-21
+
+### Added
+- **[FEAT-042]** `/cc-implement` runs an OWASP Top 10 check after each task that writes or edits code (Step 4.5, both command copies). It scans only the lines the task added or changed, only in code files, and stays silent when they are clean. Each finding is reported as `[SECURITY] file:line — A0X: description`, a tag never suppressed in MIN mode, and is fixed and re-scanned before the task is ticked. A finding that cannot be fixed within the task's scope marks the task `[!]` and halts the loop with `SECURITY_FINDING_UNRESOLVED` for human review. Both `CLAUDE.md` copies add the `[SECURITY]` row. The check is prompt-based and adds no dependencies. Contributed by Ludocius (#59).
+
 ## [1.39.3] - 2026-10-21
 
 ### Fixed
