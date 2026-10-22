@@ -262,6 +262,7 @@ All commands are tagged `(Conductor)` in the Claude Code command palette, so the
 | `/cc-refactor [file\|module]` | Diagnose complexity, plan ordered changes, apply one step at a time, and verify tests pass after each step. |
 | `/cc-test [scope]` | Find coverage gaps, write AAA-pattern tests (plus Playwright E2E where applicable), run after confirmation, and report results. |
 | `/cc-docs [scope]` | Audit documentation, write inline docs in your stack's format (JSDoc / docstrings / Javadoc / GoDoc), and preview before writing. |
+| `/cc-flow` | Print the guard lanes with per-guard pass, deny and ask counts, then the newest 20 hook decisions. See [Flow status](#flow-status). |
 
 ---
 
@@ -294,7 +295,7 @@ Hooks run automatically at specific points in a Claude Code session and need no 
 | **1: Large-file read** | `Read` | A file over 150 lines needs an explicit `limit`; otherwise denied with a redirect to memory, grep, then a bounded read. |
 | **2: Duplicate write** | `Write`, `create_file`, `write_file` | Writing to an existing path asks first, showing the path, line count, and last-modified time: edit in place, confirm the overwrite, or cancel. `Edit` is deliberately not gated, because editing in place is what this guard recommends. |
 | **3: Bash scan** | `Bash` | Twelve mass content-dump patterns denied before execution. Commands over 8192 characters, and commands with unclosed quotes, are denied fail-closed. |
-| **4: node_modules** | `Read` | A path carrying `node_modules` as an exact path component is denied, with backslashes and `..` resolved first. Use Glob for existence checks. |
+| **4: node_modules** | `Read` | A path carrying `node_modules` as an exact path component is denied, with backslashes and `..` resolved first. Use Glob for existence checks. `.claude/.flow-events.jsonl` is denied too: see [Flow status](#flow-status). |
 | **5: Band scope** | role-agent writes | During orchestration, a band role can only write inside its installed envelope's scope. |
 | **6: Orchestrator writes** | live orchestrate runs | The orchestrator session can only write its own run-state surface; nested agent dispatch is denied. |
 | **7: Role shell** | role-agent `Bash` | `spec`, `plan` and `audit` get no shell; `code` and `qa` may run exactly one command, the recorded test command, byte for byte, no chaining. |
@@ -312,6 +313,15 @@ Hit a block you believe is wrong? Re-run the command with `CC_GUARD3_WARN=1` and
 **Guard 7 in detail.** A `Bash` call from a sub-agent whose `agent_type` names a band role is decided before Guard 3, so Guard 3's `CC_GUARD3_WARN` ask can never outrank it. `spec`, `plan` and `audit` have no shell (`ROLE_SHELL_DENIED`). `code` and `qa` may run exactly one command, byte for byte: the `test_command` that `orchestrate.mjs start` recorded in the run file of a run live in their session. A command carrying `;`, `&`, `|`, a backtick, `$(`, `<`, `>`, or a line break is denied first (`ROLE_SHELL_CHAINING`). No run file, a run of another session, or no recorded command is denied (`ROLE_SHELL_UNRESOLVED`), and any other command is denied naming the allowed one (`ROLE_SHELL_NOT_ALLOWED`). An error inside the guard denies too, and `CC_HOOK_ALLOW` does not reach it. The main session and every other agent are untouched.
 
 **Unparseable input fails closed.** It is denied with one stderr line naming `CC_HOOK_ALLOW=1`, which overrides that denial alone and leaves every guard fully active on every payload the hook can read. Set `CC_HOOK_DEBUG=1` to see the diagnostic lines it otherwise swallows.
+
+### Flow status
+
+After each decision is written, the pre-tool-use hook appends one JSON line to `.claude/.flow-events.jsonl`: the tool, the verdict, the deciding guard and its reason code, the guards that passed before it, and a short target (a path relative to the project, an agent type, or the first word of a Bash command after any `VAR=value` words, never the full command). The file is capped at about 160 KiB and rotated to its last 250 lines, it is git-ignored by the managed `.gitignore` block, and Guard 4 keeps the agent from reading it into context. Writing it can never block or change a tool call: any error is swallowed.
+
+- **Status line.** `--project` sets `"statusLine": {"type": "command", "command": "node .claude/flow-status.mjs"}` in `.claude/settings.json`. It shows one line below the prompt for the current session, for example `⛔ G3 P9 · 12 calls · 3 deny` after a denial or `✓ 12 calls · 3 deny` after an allow. Claude Code refreshes it when a new assistant message arrives, not on every tool call.
+- **`/cc-flow`.** Prints one lane per tool family with each guard's pass, deny and ask counts, then the newest 20 events.
+- **`CC_FLOW_OFF=1`** stops the hook from writing events; the status line goes blank and `/cc-flow` says the log is off.
+- **An existing status line wins.** If your project or user `settings.json` already has a `statusLine`, the installer leaves both files untouched and prints a line saying the flow status line was skipped; `/cc-flow` still works, and you can set the entry above by hand. An entry whose command names `flow-status.mjs` is treated as the installer's own and kept current.
 
 ### The other hooks
 

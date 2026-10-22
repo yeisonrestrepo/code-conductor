@@ -3,7 +3,7 @@
 **Issue:** #57
 **Spec:** `docs/superpowers/specs/2026-10-13-feat044-flow-viewer-design.md`
 **Date:** 2026-10-13, revised 2026-10-18 (status line as the primary display) and 2026-10-21 (owner decisions)
-**Status:** Spec approved by the owner on 2026-10-19 (https://github.com/yeisonrestrepo/code-conductor/pull/81#issuecomment-6257678335), against `[FEAT-044]`. Not started.
+**Status:** Spec approved by the owner on 2026-10-19 (https://github.com/yeisonrestrepo/code-conductor/pull/81#issuecomment-6257678335), against `[FEAT-044]`. Implemented on branch `feat/feat044-flow-viewer-impl` on 2026-10-22 (T-001 to T-009, T-011); T-012's manual protocol and the macOS run are open for the operator.
 
 ---
 
