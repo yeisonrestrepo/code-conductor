@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { CAN_SYMLINK } from '../helpers/can-symlink.js';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, lstatSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -77,7 +78,7 @@ describe('mergeFileInto', () => {
     expect(readFileSync(join(dir, backup), 'utf8')).toBe(before);
     expect(readFileSync(target, 'utf8')).toBe(before + '\n' + FM_BLOCK);
   });
-  it('[AC3] merges through a symlink and leaves the link intact', () => {
+  it.skipIf(!CAN_SYMLINK)('[AC3] merges through a symlink and leaves the link intact', () => {
     const real = join(dir, 'real-CLAUDE.md');
     writeFileSync(real, '# Mine\n\n## Deployment\n\nkubectl\n');
     symlinkSync(real, target);
@@ -88,7 +89,7 @@ describe('mergeFileInto', () => {
     expect(readdirSync(dir).filter(n => n.startsWith('real-CLAUDE.md.installer-backup.'))).toHaveLength(1);
     expect(readdirSync(dir).filter(n => n.startsWith('CLAUDE.md.installer-backup.'))).toEqual([]);
   });
-  it('leaves a dangling symlink target untouched with a warning', () => {
+  it.skipIf(!CAN_SYMLINK)('leaves a dangling symlink target untouched with a warning', () => {
     symlinkSync(join(dir, 'missing-CLAUDE.md'), target);
     expect(mergeFileInto(tplPath, target, mergeClaudeMdText, { warn })).toBe('skipped-dangling');
     expect(lstatSync(target).isSymbolicLink()).toBe(true);
@@ -140,12 +141,12 @@ describe('resolveRealTarget', () => {
     expect(resolveRealTarget(target)).toMatchObject({ exists: true, isDir: false });
     mkdirSync(join(dir, 'adir'));
     expect(resolveRealTarget(join(dir, 'adir')).isDir).toBe(true);
-    symlinkSync(join(dir, 'missing'), join(dir, 'dangling'));
+    symlinkSync(join(dir, 'missing'), join(dir, 'dangling'), 'junction');
     expect(resolveRealTarget(join(dir, 'dangling'))).toMatchObject({ exists: true, dangling: true });
   });
   it('reports a symlink to a directory as a directory', () => {
     mkdirSync(join(dir, 'realdir'));
-    symlinkSync(join(dir, 'realdir'), join(dir, 'linkdir'));
+    symlinkSync(join(dir, 'realdir'), join(dir, 'linkdir'), 'junction');
     expect(resolveRealTarget(join(dir, 'linkdir')).isDir).toBe(true);
   });
 });
