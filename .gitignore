@@ -44,6 +44,7 @@ tests/.tmp/
 !/.claude/agents/spec.md
 !/.claude/commands/cc-implement.md
 !/.claude/commands/cc-init.md
+!/.claude/commands/cc-metrics.md
 !/.claude/commands/cc-orchestrate.md
 !/.claude/commands/cc-plan.md
 !/.claude/commands/cc-resume.md
