@@ -95,8 +95,8 @@ describe.skipIf(!sqliteAvailable())('the checkpoint-to-resume handoff cycle', ()
     expect(JSON.parse(got.stdout).phase).toBe(implPhase);
   });
 
-  // Skipped as root, where the permission bit this case depends on is not enforced.
-  it.skipIf(process.getuid && process.getuid() === 0)(
+  // Skipped as root and on win32, where the permission bit this case depends on is not enforced.
+  it.skipIf(process.platform === 'win32' || (process.getuid && process.getuid() === 0))(
     'survives a DB write failure at the boundary: no row, no crash, exit 0', () => {
       const { dir, head } = mkRepo();
       expect(head).toMatch(/^[0-9a-f]{40}$/);   // a real hash: the failure is the FS, not the input
