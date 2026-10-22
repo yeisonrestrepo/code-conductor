@@ -53,6 +53,11 @@ describe('the D2 state table (AC3)', () => {
     expect(run()).toMatchObject({ status: 0, stdout: '✓ 12 calls · 3 deny\n' });
   });
 
+  it('reads the hook\'s leading-newline layout, which has no trailing newline', () => {
+    writeFileSync(events, [...allows(2), ...denies(1)].map((e) => `\n${JSON.stringify(e)}`).join(''));
+    expect(run().stdout).toBe('⛔ G3 P9 · 3 calls · 1 deny\n');
+  });
+
   it('an unreadable tail', () => {
     writeFileSync(events, `${JSON.stringify(ev({}))}\n{"ts":1,"tool":"Ba`);
     expect(run()).toMatchObject({ status: 0, stdout: 'flow: unreadable, retrying\n' });
