@@ -4,7 +4,7 @@
 // hookSpecificOutput.permissionDecision and EVERY path exits 0. Nothing here exits 2:
 // a deliberate denial must never be indistinguishable from a crashed script.
 // Zero dependencies by design; node: builtins only.
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { appendFileSync, closeSync, existsSync, openSync, readFileSync, readSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { posix, join, resolve, dirname, relative, isAbsolute, sep } from 'node:path';
 
 const LINE_LIMIT = 150;
@@ -16,8 +16,10 @@ function debug(msg) {
   if (process.env.CC_HOOK_DEBUG) process.stderr.write(`PRE_TOOL_USE: ${msg}\n`);
 }
 
-const deny = (reason) => ({ permissionDecision: 'deny', permissionDecisionReason: reason });
-const ask = (reason) => ({ permissionDecision: 'ask', permissionDecisionReason: reason });
+// `code` is the guard's own short reason token for the flow log (FEAT-044 D5), so the
+// readers never parse the human-readable reason. emit() strips it from the output.
+const deny = (reason, code = null) => ({ permissionDecision: 'deny', permissionDecisionReason: reason, code });
+const ask = (reason, code = null) => ({ permissionDecision: 'ask', permissionDecisionReason: reason, code });
 
 let warning = '';
 
@@ -31,9 +33,10 @@ function warn(msg) {
 function emit(decision) {
   if (emitted) return;
   emitted = true;
+  const { code: _flowOnly, ...output } = decision ?? {};
   process.stdout.write(JSON.stringify({
     ...(warning ? { systemMessage: warning } : {}),
-    ...(decision ? { hookSpecificOutput: { hookEventName: 'PreToolUse', ...decision } } : {}),
+    ...(decision ? { hookSpecificOutput: { hookEventName: 'PreToolUse', ...output } } : {}),
   }) + '\n');
 }
 
@@ -71,10 +74,22 @@ function guard4BlockedRead(input) {
   if (!path) return null; // Case A: nothing to verify
   const normalized = posix.normalize(path.replace(/\\/g, '/'));
   const parts = normalized.split('/').filter(p => p && p !== '.');
+  if (isFlowEventsPath(parts)) return deny(FLOW_EVENTS_DENIAL, 'FLOW_EVENTS_READ');
   if (!parts.some(p => BLOCKED_COMPONENTS.has(p.toLowerCase()))) return null;
   return deny(
-    'Guard 4: direct reads of node_modules/ are forbidden. Use Glob for existence checks.'
+    'Guard 4: direct reads of node_modules/ are forbidden. Use Glob for existence checks.',
+    'NODE_MODULES'
   );
+}
+
+// FEAT-044 D8: the agent must not pull its own audit log into context. The status line and
+// /cc-flow read it from Node, never through the Read tool, so they are unaffected.
+const FLOW_EVENTS_DENIAL =
+  'Guard 4: .claude/.flow-events.jsonl is the hook\'s own flow log and is not read into context. Run /cc-flow for a summary.';
+
+function isFlowEventsPath(parts) {
+  const [dir, file] = parts.slice(-2).map(p => p.toLowerCase());
+  return dir === '.claude' && file === '.flow-events.jsonl';
 }
 
 // Guard 1: a large-file Read with no limit. A path that cannot be stat'd has no size to
@@ -91,7 +106,8 @@ function guard1LargeRead(input) {
     `Guard 1: LARGE FILE READ BLOCKED. File: ${path}. Lines: ${lines} ` +
     `(>${LINE_LIMIT}, no limit specified). Follow the orchestrator lookup chain: ` +
     '1. Check .claude/memory/project.md  2. Use Grep/Glob for pattern searches  ' +
-    '3. Read with explicit offset + limit.'
+    '3. Read with explicit offset + limit.',
+    'LARGE_FILE_READ'
   );
 }
 
@@ -114,7 +130,8 @@ function guard2DuplicateWrite(input) {
     '   Choose an action:\n' +
     '   1. Edit the existing file instead of overwriting\n' +
     '   2. Confirm you want to overwrite (re-issue the command)\n' +
-    '   3. Cancel'
+    '   3. Cancel',
+    'FILE_EXISTS'
   );
 }
 
@@ -180,14 +197,14 @@ function guard5BandScope(input, payload) {
   if (!root) return null;
   const file = join(root, ...BAND_ENVELOPE_REL);
   const env = readEnvelope(file);
-  if (!env) return deny(`Guard 5: BAND_ENVELOPE_INVALID: ${file} is unreadable or not a valid v3 band envelope.`);
-  if (env.sys.role !== role) return deny(`Guard 5: BAND_ROLE_MISMATCH: agent ${role} is not the envelope's role ${env.sys.role}.`);
-  if (env.sys.tk !== 'RW') return deny(`Guard 5: BAND_READ_ONLY: role ${role} holds tk ${env.sys.tk}, not RW.`);
+  if (!env) return deny(`Guard 5: BAND_ENVELOPE_INVALID: ${file} is unreadable or not a valid v3 band envelope.`, 'BAND_ENVELOPE_INVALID');
+  if (env.sys.role !== role) return deny(`Guard 5: BAND_ROLE_MISMATCH: agent ${role} is not the envelope's role ${env.sys.role}.`, 'BAND_ROLE_MISMATCH');
+  if (env.sys.tk !== 'RW') return deny(`Guard 5: BAND_READ_ONLY: role ${role} holds tk ${env.sys.tk}, not RW.`, 'BAND_READ_ONLY');
   const target = targetPath(input);
   const rel = relative(root, resolve(cwd, target)).split(sep).join('/');
   const inside = target !== '' && rel !== '' && rel !== '..' && !rel.startsWith('../') && !isAbsolute(rel);
   if (inside && env.ops.scope.some((g) => globToRegExp(g).test(rel))) return null;
-  return deny(`Guard 5: BAND_SCOPE_VIOLATION: ${target || '<no path>'} is outside the declared scope [${env.ops.scope.join(', ')}]`);
+  return deny(`Guard 5: BAND_SCOPE_VIOLATION: ${target || '<no path>'} is outside the declared scope [${env.ops.scope.join(', ')}]`, 'BAND_SCOPE_VIOLATION');
 }
 
 // ── Guard 6 constants ─────────────────────────────────────────────────────────
@@ -218,7 +235,7 @@ function guard6NestedDispatch(payload) {
   if (!root) return null;
   const run = readRunFile(join(root, ...ORCH_RUN_REL));
   if (!run || payload.session_id !== run.session_id) return null;
-  return deny(`Guard 6: ORCH_NESTED_DISPATCH: ${payload.tool_name} from agent ${payload.agent_type} is denied while run ${run.item} is live; only the orchestrator dispatches or messages agents during a run.`);
+  return deny(`Guard 6: ORCH_NESTED_DISPATCH: ${payload.tool_name} from agent ${payload.agent_type} is denied while run ${run.item} is live; only the orchestrator dispatches or messages agents during a run.`, 'ORCH_NESTED_DISPATCH');
 }
 
 // Guard 6: while a run is live in this session, nothing but a band role writes outside the
@@ -241,7 +258,7 @@ function guard6OrchestratorRun(input, payload) {
   const target = targetPath(input);
   const rel = relative(root, resolve(cwd, target)).split(sep).join('/');
   if (target !== '' && ORCH_WRITE_SURFACE.some((g) => globToRegExp(g).test(rel))) return null;
-  return deny(`Guard 6: ORCH_WRITE_DENIED: ${target || '<no path>'} is outside the orchestrator's write surface while run ${run.item} is live; repository writes during a run go through a band role (Guard 5).`);
+  return deny(`Guard 6: ORCH_WRITE_DENIED: ${target || '<no path>'} is outside the orchestrator's write surface while run ${run.item} is live; repository writes during a run go through a band role (Guard 5).`, 'ORCH_WRITE_DENIED');
 }
 
 // ── Guard 7 constants ─────────────────────────────────────────────────────────
@@ -263,13 +280,13 @@ function liveTestCommand(payload) {
 // R1-R5, the first match decides. The match is exact: a prefix allowlist is walked around by
 // chaining, which is the T-003 vector.
 function roleShellDecision(role, input, payload) {
-  if (!ROLE_SHELL_ROLES.includes(role)) return deny(`Guard 7: ROLE_SHELL_DENIED: ${role} has no shell.`);
+  if (!ROLE_SHELL_ROLES.includes(role)) return deny(`Guard 7: ROLE_SHELL_DENIED: ${role} has no shell.`, 'ROLE_SHELL_DENIED');
   const command = typeof input.command === 'string' ? input.command : '';
   const found = ROLE_SHELL_METACHARACTERS.find((m) => command.includes(m));
-  if (found !== undefined) return deny(`Guard 7: ROLE_SHELL_CHAINING: the command contains ${JSON.stringify(found)}; a role runs one command, never a chain.`);
+  if (found !== undefined) return deny(`Guard 7: ROLE_SHELL_CHAINING: the command contains ${JSON.stringify(found)}; a role runs one command, never a chain.`, 'ROLE_SHELL_CHAINING');
   const allowed = liveTestCommand(payload);
-  if (allowed === null) return deny(`Guard 7: ROLE_SHELL_UNRESOLVED: no live run in this session records a test command, so ${role} has no shell.`);
-  if (command !== allowed) return deny(`Guard 7: ROLE_SHELL_NOT_ALLOWED: allowed command is ${allowed}`);
+  if (allowed === null) return deny(`Guard 7: ROLE_SHELL_UNRESOLVED: no live run in this session records a test command, so ${role} has no shell.`, 'ROLE_SHELL_UNRESOLVED');
+  if (command !== allowed) return deny(`Guard 7: ROLE_SHELL_NOT_ALLOWED: allowed command is ${allowed}`, 'ROLE_SHELL_NOT_ALLOWED');
   return null;
 }
 
@@ -280,7 +297,7 @@ function guard7RoleShell(input, payload) {
   const role = payload.agent_type;
   if (!BAND_ROLES.includes(role)) return null;
   try { return roleShellDecision(role, input, payload); }
-  catch (e) { return deny(`Guard 7: ROLE_SHELL_UNRESOLVED: the guard could not decide (${e && e.message}), so the call is denied.`); }
+  catch (e) { return deny(`Guard 7: ROLE_SHELL_UNRESOLVED: the guard could not decide (${e && e.message}), so the call is denied.`, 'ROLE_SHELL_UNRESOLVED'); }
 }
 
 // ── Guard 3 constants ─────────────────────────────────────────────────────────
@@ -708,10 +725,10 @@ const G3_OPERATOR_POLICY =
   '.claude/memory/bash-scan-allowlist.txt, are reviewed in git, and an agent may propose ' +
   'one but must not add it to clear its own denial.';
 
-function g3Blocked(detail, { allowlistApplies = false } = {}) {
+function g3Blocked(detail, code, { allowlistApplies = false } = {}) {
   const decide = process.env.CC_GUARD3_WARN ? ask : deny;
   const policy = allowlistApplies ? ` ${G3_OPERATOR_POLICY}` : '';
-  return decide(`BASH SCAN BLOCKED. ${detail} ${G3_ALTERNATIVES}${policy}`);
+  return decide(`BASH SCAN BLOCKED. ${detail} ${G3_ALTERNATIVES}${policy}`, code);
 }
 
 // Guard 3: the bash command scanner, ported from tests/fixtures/guard3-reference.sh.
@@ -720,11 +737,11 @@ function guard3BashScan(input) {
   const command = typeof input.command === 'string' ? input.command : '';
   if (command === '') return null;
   if (command.length > G3_MAX_LEN) {
-    return g3Blocked(`The command string exceeds the maximum scan length (${G3_MAX_LEN} chars).`);
+    return g3Blocked(`The command string exceeds the maximum scan length (${G3_MAX_LEN} chars).`, 'MAX_LENGTH');
   }
   const scan = g3Scan('strip', g3Chomp(g3JoinContinuations(command)));
   if (scan.malformed) {
-    return g3Blocked('Malformed shell syntax (unclosed quote), blocked as a precaution.');
+    return g3Blocked('Malformed shell syntax (unclosed quote), blocked as a precaution.', 'MALFORMED');
   }
   // Real newlines become semicolons so a multi-line script reads as a command
   // sequence to every position-anchored pattern above.
@@ -742,7 +759,7 @@ function guard3BashScan(input) {
   for (const { id, check } of G3_CHECKS) if (check(UNMASKED_CHECKS.has(id) ? pre : masked)) ids.push(id);
   if (ids.length === 0) return null;
   if (g3AllowlistCovers(pre, g3ReadAllowlist())) return null;
-  return g3Blocked(`The command triggered a mass content-dump pattern. Pattern ids: ${ids.join(' ')}.`, { allowlistApplies: true });
+  return g3Blocked(`The command triggered a mass content-dump pattern. Pattern ids: ${ids.join(' ')}.`, ids.join(' '), { allowlistApplies: true });
 }
 
 const DISPATCH = {
@@ -761,6 +778,111 @@ for (const tool of ORCH_DISPATCH_TOOLS) DISPATCH[tool] = [guard6OrchestratorRun]
 // Guard 7 runs before Guard 3 on Bash: under CC_GUARD3_WARN Guard 3 asks instead of denying,
 // and an ask must never outrank a role's shell deny.
 DISPATCH.Bash.unshift(guard7RoleShell);
+
+// ── Flow events (FEAT-044) ────────────────────────────────────────────────────
+// The guard numbers the flow log records. flow-status.mjs carries the same numbers in its
+// lane table, and tests/installer/flow-status.test.js fails when the two drift.
+const GUARD_NUMBER = new Map([
+  [guard1LargeRead, 1], [guard2DuplicateWrite, 2], [guard3BashScan, 3], [guard4BlockedRead, 4],
+  [guard5BandScope, 5], [guard6OrchestratorRun, 6], [guard7RoleShell, 7],
+]);
+// About 500 events at the capped line length (D7). Size rather than a line count, because
+// counting lines would read the whole file on every tool call.
+const FLOW_MAX_BYTES = 160 * 1024;
+const FLOW_KEEP_LINES = 250;
+// A lock older than this belongs to a hook that died mid-rotation; without the cutoff the
+// file would grow forever.
+const FLOW_LOCK_STALE_MS = 10000;
+const SHELL_ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
+
+// Full command text is never written: commands carry inline tokens often enough. Leading
+// VAR=value words are skipped so `TOKEN=sk-... curl` records `curl`, never the token (D5).
+function flowTarget(name, input, cwd) {
+  if (name === 'Bash') {
+    const words = (typeof input.command === 'string' ? input.command : '').trim().split(/\s+/);
+    return words.find((w) => w && !SHELL_ASSIGNMENT.test(w)) ?? '';
+  }
+  if (ORCH_DISPATCH_TOOLS.includes(name)) return String(input.subagent_type ?? input.to ?? '');
+  const path = targetPath(input);
+  return (isAbsolute(path) ? relative(cwd, path) : path).split(sep).join('/');
+}
+
+function flowEvent(payload, input, decision, passed, guard) {
+  return {
+    ts: Date.now(),
+    tool: payload.tool_name,
+    verdict: decision ? decision.permissionDecision : 'allow',
+    guard: decision ? guard : null,
+    code: decision && decision.code ? String(decision.code).slice(0, 80) : null,
+    target: flowTarget(payload.tool_name, input, payload.cwd).slice(0, 200),
+    agent: BAND_ROLES.includes(payload.agent_type) ? payload.agent_type : null,
+    passed,
+  };
+}
+
+function takeFlowLock(lock) {
+  try { return openSync(lock, 'wx'); } catch { /* held or stale: decided below */ }
+  try {
+    if (Date.now() - statSync(lock).mtimeMs < FLOW_LOCK_STALE_MS) return null;
+    unlinkSync(lock);
+    return openSync(lock, 'wx');
+  } catch { return null; }
+}
+
+function isJsonLine(line) {
+  try { JSON.parse(line); return true; } catch { return false; }
+}
+
+// Also the repair path: unparseable lines are dropped, so one torn write cannot blind the
+// readers for good. The lock exists because an unlocked rename fails with EPERM on Windows
+// under parallel hooks (spec M8). Returns whether the file was rewritten.
+function rotateFlowEvents(path) {
+  const lock = join(dirname(path), '.flow-events.lock');
+  const fd = takeFlowLock(lock);
+  if (fd === null) return false;
+  const tmp = `${path}.tmp`;
+  try {
+    const keep = readFileSync(path, 'utf8').split('\n').filter((l) => l && isJsonLine(l)).slice(-FLOW_KEEP_LINES);
+    writeFileSync(tmp, keep.length ? `${keep.join('\n')}\n` : '');
+    renameSync(tmp, path);
+    return true;
+  } catch (e) {
+    try { unlinkSync(tmp); } catch { /* never written */ }
+    debug(`flow rotate: ${e.message}`);
+    return false;
+  } finally {
+    closeSync(fd);
+    try { unlinkSync(lock); } catch { /* already gone */ }
+  }
+}
+
+// A last line with no newline is torn, and the next append would fuse onto it.
+function flowTailTorn(path, size) {
+  if (size === 0) return false;
+  const fd = openSync(path, 'r');
+  try {
+    const byte = Buffer.alloc(1);
+    readSync(fd, byte, 0, 1, size - 1);
+    return byte[0] !== 0x0a;
+  } finally { closeSync(fd); }
+}
+
+// Runs after emit(), so it can never delay, change or suppress a decision, and its own
+// catch keeps a full disk from reaching the fail-closed catch around main() (spec, Error
+// cases). It never creates a directory: with no .claude/ the append throws ENOENT, which the
+// catch swallows, so a missing directory costs no separate existence check per call.
+function recordFlowEvent(payload, input, decision, passed, guard) {
+  try {
+    if (process.env.CC_FLOW_OFF || typeof payload.cwd !== 'string' || !payload.cwd) return;
+    const path = join(payload.cwd, '.claude', '.flow-events.jsonl');
+    const size = statSync(path, { throwIfNoEntry: false })?.size ?? 0;
+    const torn = flowTailTorn(path, size);
+    const rotated = (size > FLOW_MAX_BYTES || torn) && rotateFlowEvents(path);
+    const line = JSON.stringify(flowEvent(payload, input, decision, passed, guard));
+    // A torn tail that could not be rotated (lock held) is fenced off, never fused.
+    appendFileSync(path, `${torn && !rotated ? '\n' : ''}${line}\n`);
+  } catch (e) { debug(`flow event: ${e.message}`); }
+}
 
 // Case B. Unparseable input is not "nothing to verify", it is "the verifier could not
 // run", which is the condition that fails closed. CC_HOOK_ALLOW bypasses THIS denial only;
@@ -797,11 +919,18 @@ function main() {
   const input = (rawInput && typeof rawInput === 'object' && !Array.isArray(rawInput)) ? rawInput : {};
   const guards = DISPATCH[name];
   if (!guards) { debug(`no guard registered for tool_name "${name}"; allowing`); return; }
+  const passed = [];
   for (const guard of guards) {
     const decision = guard(input, payload);
-    if (decision) { emit(decision); return; }
+    if (decision) {
+      emit(decision);
+      recordFlowEvent(payload, input, decision, passed, GUARD_NUMBER.get(guard));
+      return;
+    }
+    passed.push(GUARD_NUMBER.get(guard));
   }
   if (warning) emit(null);
+  recordFlowEvent(payload, input, null, passed, null);
 }
 
 try { main(); } catch (e) { unreadable(`the hook threw (${e && e.message})`); }
