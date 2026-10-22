@@ -9,6 +9,15 @@ import { CORPUS, DIALECT, EXCEPTIONS } from '../fixtures/guard3-corpus.js';
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const HOOK = join(REPO_ROOT, '.claude/hooks/pre-tool-use.mjs');
 
+// The hook roots its allowlist at CLAUDE_PROJECT_DIR when set (BUG-061). A suite run
+// inside Claude Code may inherit it, which would point every row at the developer's
+// own allowlist instead of the row's throwaway cwd.
+const portEnv = () => {
+  const env = { ...process.env };
+  delete env.CLAUDE_PROJECT_DIR;
+  return env;
+};
+
 // Every row spawns with a throwaway cwd, so the allowlist a row asks for is the only
 // one the guard can see and the developer's own .claude/memory/ is unreachable.
 function runRow(row) {
@@ -25,7 +34,7 @@ function runRow(row) {
       cwd: dir,
       timeout: 15000,
       input: JSON.stringify({ tool_name: toolName, tool_input }),
-      env: { ...process.env },
+      env: portEnv(),
     });
     if (r.error) throw new Error(`hook spawn failed: ${r.error.message}`);
     const stdout = (r.stdout ?? Buffer.alloc(0)).toString();

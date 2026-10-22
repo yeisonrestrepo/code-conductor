@@ -86,7 +86,7 @@ Run `/cc-checkpoint`. Persist current architectural state to `.claude/memory/pro
 
 ## Step 5 — Hook integrity check
 
-Verify `.claude/hooks/pre-tool-use.mjs` exists. It is launched as `node <path>`, so it needs no execute bit:
+Verify `.claude/hooks/pre-tool-use.mjs` exists. It is loaded by `node` through the PreToolUse command in `.claude/settings.json`, so it needs no execute bit:
 
 ```bash
 HOOK=".claude/hooks/pre-tool-use.mjs"
