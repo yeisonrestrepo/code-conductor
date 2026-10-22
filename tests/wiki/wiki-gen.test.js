@@ -197,4 +197,11 @@ describe('wiki-sync.yml', () => {
     expect(grants).toEqual(['contents: write']);
     expect(workflow).toContain("if: github.repository == 'yeisonrestrepo/code-conductor'");
   });
+
+  it('removes the wiki pages before copying, so a deleted template is deleted from the wiki', () => {
+    const remove = workflow.indexOf('rm -f wiki-repo/*.md');
+    expect(remove).toBeGreaterThan(workflow.indexOf('git clone'));
+    expect(remove).toBeLessThan(workflow.indexOf('cp wiki-out/*.md wiki-repo/'));
+    expect(workflow).toContain('git add -A');
+  });
 });

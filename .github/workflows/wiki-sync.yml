@@ -2,7 +2,7 @@ name: Wiki Sync
 
 # The wiki is a derived artifact: its pages are the templates under .github/wiki/pages,
 # with the generated tables filled in. A direct edit on the wiki is overwritten by the
-# next sync, so change the template instead.
+# next sync, and a page created only on the wiki is removed, so change the templates instead.
 on:
   push:
     branches: [main]
@@ -49,6 +49,8 @@ jobs:
           WIKI_REMOTE: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git
         run: |
           git clone --quiet --depth 1 "$WIKI_REMOTE" wiki-repo
+          # The templates are the whole wiki, so a page removed from them is removed here too.
+          rm -f wiki-repo/*.md
           cp wiki-out/*.md wiki-repo/
           cd wiki-repo
           git add -A

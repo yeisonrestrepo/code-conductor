@@ -2,7 +2,7 @@
 
 **Issue:** #70
 **Date:** 2026-10-07, revised 2026-10-21
-**Status:** DRAFT for owner approval. Answers the `[FEAT-043]` entry minted in `80dd54f` (intake of issue #70). Single source for the wiki-sync design since #71 closed in PR #80's favor.
+**Status:** Approved by the owner on 2026-10-21. Answers the `[FEAT-043]` entry minted in `80dd54f` (intake of issue #70). Single source for the wiki-sync design since #71 closed in PR #80's favor.
 
 ---
 
@@ -86,7 +86,7 @@ await generateWiki({ outDir: './wiki-out', projectRoot: '.', pages: ['Skills'] }
 
 ### 3. Workflow: `.github/workflows/wiki-sync.yml`
 
-Runs on push to `main` when a template, the workflow itself, or a source the generator reads changes (`.github/wiki/**`, `.github/workflows/wiki-sync.yml`, `scripts/snap-contract.mjs`, `skills/*/SKILL.md`, `.claude/agents/*.md`). It renders every page, clones the wiki repository with `GITHUB_TOKEN`, copies the pages in, and commits and pushes only when `git diff --cached --quiet` reports a change. A `concurrency` group serializes back-to-back merges. Actions used: `actions/checkout` and `actions/setup-node` only.
+Runs on push to `main` when a template, the workflow itself, or a source the generator reads changes (`.github/wiki/**`, `.github/workflows/wiki-sync.yml`, `scripts/snap-contract.mjs`, `skills/*/SKILL.md`, `.claude/agents/*.md`). It renders every page, clones the wiki repository with `GITHUB_TOKEN`, removes its pages and copies the rendered ones in, so a page deleted from the templates is deleted from the wiki, and commits and pushes only when `git diff --cached --quiet` reports a change. A `concurrency` group serializes back-to-back merges. Actions used: `actions/checkout` and `actions/setup-node` only.
 
 Every page is rendered on each run. The first draft's per-page regeneration map is dropped: the diff check already decides what is pushed, so a map would be a table to maintain that changes nothing reaching the wiki.
 
@@ -101,7 +101,7 @@ Every page is rendered on each run. The first draft's per-page regeneration map 
 
 ### 4. Source of truth
 
-The templates in the repository are the source of truth. A direct edit on the wiki is overwritten by the next sync; the workflow's header comment says so.
+The templates in the repository are the source of truth. A direct edit on the wiki is overwritten by the next sync, and a page created only on the wiki is removed by it; the workflow's header comment says so.
 
 ### 5. Drift tests
 
