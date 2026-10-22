@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Draft — awaiting operator approval (follows the spec's approval).
+**Status:** Approved by the operator on 2026-10-22.
 
 **Goal:** Every phase entry reads a bounded `## Current State` digest at the top of `project.md` instead of the whole file, at a constant cost whatever the project's age.
 
@@ -10,7 +10,7 @@
 
 **Tech Stack:** Markdown commands, vitest.
 
-**Spec:** `docs/superpowers/specs/2026-10-22-bug057-bounded-project-memory-design.md`, Draft.
+**Spec:** `docs/superpowers/specs/2026-10-22-bug057-bounded-project-memory-design.md`, Approved 2026-10-22.
 
 ## Global Constraints
 

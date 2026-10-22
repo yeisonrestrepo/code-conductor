@@ -1,6 +1,6 @@
 # BUG-057: Bounded Project Memory at Phase Entry
 
-**Status:** Draft — awaiting operator approval. **Target:** a patch release, which the owner cuts. **Approach:** B of 4 (a bounded `## Current State` digest at the top of `project.md`, history kept below and untouched).
+**Status:** Approved by the operator on 2026-10-22. **Target:** a patch release, which the owner cuts. **Approach:** B of 4 (a bounded `## Current State` digest at the top of `project.md`, history kept below and untouched).
 
 ## Problem
 
@@ -72,7 +72,7 @@ Field values never start with `## `, so the post-compact hooks' unanchored `grep
 - **Pillar 1:** phase-entry read cost is constant: at most 60 lines × 200 characters, about 12 KB worst case, 3.5 KB measured, against 442 KB today. It no longer grows with project age.
 - **Pillar 2:** history stays append-only and byte-for-byte intact. The digest is derived data that can always be rebuilt from history. No file moves, no deletion, no new store.
 - **Simplicity:** command text only, with no script, no new file, and no hook or installer change.
-- **BUG-003:** every digest update is one single-line Edit. The single bootstrap insert is the only multi-line Edit, and it adds new lines without overwriting any (see Open Questions).
+- **BUG-003:** every digest update is one single-line Edit. The single bootstrap insert is the only multi-line Edit, and it is consistent with BUG-003 because it inserts a new section and never rewrites an existing line (operator ruling, 2026-10-22).
 
 ## Behavior
 
@@ -155,8 +155,8 @@ Before counts measured locally on 2026-10-22 (Windows, gh isolated). N is the CI
 
 ## Open Questions
 
-1. Is the one-time multi-line bootstrap insert acceptable under BUG-003, or should the skeleton be inserted one line per Edit (7 Edits)?
-2. Caps: 40 lines, 12 bullets per list and 200 characters per line came from this POC. Does the owner want different numbers?
+1. Resolved 2026-10-22: the one-time multi-line bootstrap insert is accepted under BUG-003.
+2. Resolved 2026-10-22: the caps of 40 lines, 12 bullets per list and 200 characters per line are accepted.
 
 ## Complexity Estimate
 
