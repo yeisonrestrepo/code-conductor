@@ -107,7 +107,7 @@ G1 alone meets criterion 2. G2 is the belt-and-suspenders layer: it covers what 
 - [X] AC4 (criterion 2, in process): `spawnSync('gh')` and `execFileSync('<dir>/gh.exe')` in the test worker throw before spawning.
 - [X] AC5 (fake still routes): the AC2 call under `fakeGh().env()` reaches the fake with argv intact and no `CC_REAL_GH_BLOCKED`.
 - [X] AC6 (suspenders): in the worker, the four token variables are unset and `GH_CONFIG_DIR` is an empty directory.
-- [ ] AC7: the full suite passes on the Linux CI matrix (`node: ['20', '24']`), with no new skip (`tools/skip-baseline.json` unchanged).
+- [X] AC7: the full suite passes on the Linux CI matrix (`node: ['20', '24']`), with no new skip (`tools/skip-baseline.json` unchanged).
 
 AC2-AC6 run on every platform; none skips on win32 or POSIX. Their gh argv is `--version`, so a red run, before the guard exists, reaches nothing that writes.
 
