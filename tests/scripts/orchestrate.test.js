@@ -263,7 +263,7 @@ describe('run file [FEAT-011 AC9]', () => {
     runFileText('{not json');
     const r = orch(['install', 'spec']);
     expect(r.status).toBe(1);
-    expect(r.err).toBe(`ORCH_RUN_INVALID: ${join(root, RUN_FILE)} is unreadable or not a v1 run file; clear it with: node ${relative(root, SCRIPT)} end`);
+    expect(r.err).toBe(`ORCH_RUN_INVALID: ${join(root, RUN_FILE)} is unreadable or not a v1 run file; clear it with: node ${relative(root, SCRIPT).split('\\').join('/')} end`);
     expect(readFileSync(join(root, RUN_FILE), 'utf8')).toBe('{not json');
     expect(orch(['end']).status).toBe(0);
   });
