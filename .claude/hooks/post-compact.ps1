@@ -10,7 +10,8 @@ try {
   $enc    = [System.Text.UTF8Encoding]::new($false)
   [System.IO.File]::WriteAllText($tmp, "0`n", $enc)
   try {
-    [System.IO.File]::Replace($tmp, $target, $null)
+    # PowerShell turns a bare $null into "" for a string argument, which Replace rejects.
+    [System.IO.File]::Replace($tmp, $target, [NullString]::Value)
   } catch [System.IO.FileNotFoundException] {
     try {
       [System.IO.File]::Move($tmp, $target)

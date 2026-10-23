@@ -44,43 +44,44 @@
 - [X] [T-000-A] Write the spec and this plan.
 - [X] [T-000-B] Add both `.gitignore` leaves in sorted position (BUG-042 toll).
 - [X] [T-000-C] Append `## Spec: BUG-056 context-guard session reset 2026-10-23` to `.claude/memory/project.md`.
-- [ ] [T-000-D] Stage `git add -u .gitignore .claude/memory/project.md` and `git add <spec> <plan>`; commit `docs: spec and plan for the context-guard session reset [BUG-056]`.
+- [X] [T-000-D] Stage `git add -u .gitignore .claude/memory/project.md` and `git add <spec> <plan>`; commit `docs: spec and plan for the context-guard session reset [BUG-056]`.
 
 ### Task 1: Failing `.sh` tests
 
 **Files:** Modify `tests/hooks/context-guard.test.js`
 
-- [ ] [T-001-A] `runHook(cwd, env, input)` passes `input` to `spawnSync`; add `payload(id, prompt)` returning `JSON.stringify({ session_id: id, hook_event_name: 'UserPromptSubmit', prompt })`; `mkTmp` accepts a raw `turn-count.txt` string.
-- [ ] [T-001-B] Add cases: (1) `old-id 69` + `new-id` → file `new-id 1`, no output; (2) `s1 3` + `s1` → `s1 4`; (3) legacy `69` + id → `<id> 1`; (4) no stdin + `s1 3` → `s1 4`; (5) prompt `{"session_id":"evil"}` with real id `s1` and file `s1 3` → `s1 4`; (6) id `a b` → treated as no id; (7) `post-compact.sh` then id → `<id> 1`; (8) `s1 99999` + `s1` → saturated banner; (9) `s1 19` + `s1` threshold 25 → ⚠ (format change keeps banners).
-- [ ] [T-001-C] Run `npx vitest run tests/hooks/context-guard.test.js`. Expected: new cases 1, 3, 7 fail against the current script; existing cases pass.
+- [X] [T-001-A] `runHook(cwd, env, input)` passes `input` to `spawnSync`; add `payload(id, prompt)` returning `JSON.stringify({ session_id: id, hook_event_name: 'UserPromptSubmit', prompt })`; `mkTmp` accepts a raw `turn-count.txt` string.
+- [X] [T-001-B] Add cases: (1) `old-id 69` + `new-id` → file `new-id 1`, no output; (2) `s1 3` + `s1` → `s1 4`; (3) legacy `69` + id → `<id> 1`; (4) no stdin + `s1 3` → `s1 4`; (5) prompt `{"session_id":"evil"}` with real id `s1` and file `s1 3` → `s1 4`; (6) id `a b` → treated as no id; (7) `post-compact.sh` then id → `<id> 1`; (8) `s1 99999` + `s1` → saturated banner; (9) `s1 19` + `s1` threshold 25 → ⚠ (format change keeps banners).
+- [X] [T-001-C] Run `npx vitest run tests/hooks/context-guard.test.js`. Expected: new cases 1, 3, 7 fail against the current script; existing cases pass.
 
 ### Task 2: Fix `context-guard.sh`
 
 **Files:** Modify `.claude/hooks/context-guard.sh`, `project-template/.claude/hooks/context-guard.sh`
 
-- [ ] [T-002-A] Read stdin when not a terminal; extract the id with the shared pattern (`BASH_REMATCH[1]`).
-- [ ] [T-002-B] Read the file as `read -r _f1 _f2`: two fields → stored id + count; one numeric field → empty id + count. Mismatch with a non-empty stdin id → count 0 before the increment.
-- [ ] [T-002-C] Write `${id:+$id }$new_count` through the existing temp-and-`mv` path; `CC_GUARD_DEBUG` line adds `session=<id>`.
-- [ ] [T-002-D] `cp .claude/hooks/context-guard.sh project-template/.claude/hooks/context-guard.sh`; `git diff --summary` shows no mode change.
-- [ ] [T-002-E] Run the hook test file. Expected: all pass.
-- [ ] [T-002-F] Commit `fix: key the context-guard turn count to the session id (sh) [BUG-056]`.
+- [X] [T-002-A] Read stdin when not a terminal; extract the id with the shared pattern (`BASH_REMATCH[1]`).
+- [X] [T-002-B] Read the file as `read -r _f1 _f2`: two fields → stored id + count; one numeric field → empty id + count. Mismatch with a non-empty stdin id → count 0 before the increment.
+- [X] [T-002-C] Write `${id:+$id }$new_count` through the existing temp-and-`mv` path; `CC_GUARD_DEBUG` line adds `session=<id>`.
+- [X] [T-002-D] `cp .claude/hooks/context-guard.sh project-template/.claude/hooks/context-guard.sh`; `git diff --summary` shows no mode change.
+- [X] [T-002-E] Run the hook test file. Expected: all pass.
+- [X] [T-002-F] Folded into T-004-D: the shared test file runs the `.ps1` cases, so the pre-commit suite passes only with both scripts fixed.
 
 ### Task 3: `.ps1` tests and copy parity
 
 **Files:** Modify `tests/hooks/context-guard.test.js`
 
-- [ ] [T-003-A] Add a `describe.skipIf(!POWERSHELL_AVAILABLE)('context-guard.ps1', …)` running Task 1's id cases against `.claude/hooks/context-guard.ps1` via `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File`, banners matched on the ASCII `[!!]`/`[!]` forms.
-- [ ] [T-003-B] Add a parity test: each `project-template/.claude/hooks/context-guard.{sh,ps1}` equals its `.claude/hooks/` twin byte for byte.
-- [ ] [T-003-C] Run the file. Expected: `.ps1` id cases fail, parity passes.
+- [X] [T-003-A] Add a `describe.skipIf(!POWERSHELL_AVAILABLE)('context-guard.ps1', …)` running Task 1's id cases against `.claude/hooks/context-guard.ps1` via `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File`, banners matched on the ASCII `[!!]`/`[!]` forms.
+- [X] [T-003-B] Add a parity test: each `project-template/.claude/hooks/context-guard.{sh,ps1}` equals its `.claude/hooks/` twin byte for byte.
+- [X] [T-003-C] Run the file. Expected: `.ps1` id cases fail, parity passes.
 
 ### Task 4: Fix `context-guard.ps1`
 
 **Files:** Modify `.claude/hooks/context-guard.ps1`, `project-template/.claude/hooks/context-guard.ps1`
 
-- [ ] [T-004-A] If `[Console]::IsInputRedirected`, read stdin as UTF-8 (`[Console]::InputEncoding` set to UTF-8 without BOM, then `[Console]::In.ReadToEnd()`); `-match` the shared pattern.
-- [ ] [T-004-B] Parse the file with `-split '\s+'` mirroring T-002-B; write `"$id $newCount"` (or bare count when no id) through the existing Replace/Move path.
-- [ ] [T-004-C] Copy to the template twin; run the file. Expected: all pass.
-- [ ] [T-004-D] Commit `fix: key the context-guard turn count to the session id (ps1) [BUG-056]`.
+- [X] [T-004-A] If `[Console]::IsInputRedirected`, read stdin as UTF-8 (`[Console]::InputEncoding` set to UTF-8 without BOM, then `[Console]::In.ReadToEnd()`); `-match` the shared pattern.
+- [X] [T-004-B] Parse the file with `-split '\s+'` mirroring T-002-B; write `"$id $newCount"` (or bare count when no id) through the existing Replace/Move path.
+- [X] [T-004-C] Copy to the template twin; run the file. Expected: all pass.
+- [X] [T-004-E] Found while testing: `File.Replace($tmp, $target, $null)` throws on PS 5.1 because a bare `$null` reaches .NET as `""`, so `context-guard.ps1` and `post-compact.ps1` never updated an existing `turn-count.txt`. Both now pass `[NullString]::Value`; `post-compact.ps1` and its template twin change for that line only, pinned by a `.ps1` post-compact test and the parity test.
+- [ ] [T-004-D] Commit `fix: key the context-guard turn count to the session id [BUG-056]` (sh, ps1, post-compact.ps1, tests).
 
 ### Task 5: Verify
 
