@@ -81,16 +81,16 @@
 - [X] [T-004-B] Parse the file with `-split '\s+'` mirroring T-002-B; write `"$id $newCount"` (or bare count when no id) through the existing Replace/Move path.
 - [X] [T-004-C] Copy to the template twin; run the file. Expected: all pass.
 - [X] [T-004-E] Found while testing: `File.Replace($tmp, $target, $null)` throws on PS 5.1 because a bare `$null` reaches .NET as `""`, so `context-guard.ps1` and `post-compact.ps1` never updated an existing `turn-count.txt`. Both now pass `[NullString]::Value`; `post-compact.ps1` and its template twin change for that line only, pinned by a `.ps1` post-compact test and the parity test.
-- [ ] [T-004-D] Commit `fix: key the context-guard turn count to the session id [BUG-056]` (sh, ps1, post-compact.ps1, tests).
+- [X] [T-004-D] Commit `fix: key the context-guard turn count to the session id [BUG-056]` (sh, ps1, post-compact.ps1, tests).
 
 ### Task 5: Verify
 
-- [ ] [T-005-A] `npx vitest run` full suite on the branch and on `main` under identical conditions; record both counts for the PR.
+- [X] [T-005-A] `npx vitest run` full suite on the branch and on `main` under identical conditions; record both counts for the PR.
 - [ ] [T-005-B] Live check: next prompt in a fresh Claude Code session in this repo shows no banner and `turn-count.txt` reads `<id> 1`.
 
 ### Task 6: Bug-vs-fix evidence (PR only, never committed)
 
-- [ ] [T-006-A] In the scratchpad, build one fixture with `turn-count.txt` = `69` and a payload carrying a new `session_id`.
-- [ ] [T-006-B] Run `main`'s hook (`git show main:.claude/hooks/context-guard.sh`) and the branch hook on that fixture; capture each output with the command line shown. Expected: bug prints `🚨 CONTEXT CRITICAL: Turn 70/25`; fix prints nothing and writes `<id> 1`.
-- [ ] [T-006-C] Render the bug and fix captures, plus the vitest summaries, to PNG with headless Edge in the scratchpad.
+- [X] [T-006-A] In the scratchpad, build one fixture with `turn-count.txt` = `69` and a payload carrying a new `session_id`.
+- [X] [T-006-B] Run `main`'s hook (`git show main:.claude/hooks/context-guard.sh`) and the branch hook on that fixture; capture each output with the command line shown. Expected: bug prints `🚨 CONTEXT CRITICAL: Turn 70/25`; fix prints nothing and writes `<id> 1`.
+- [X] [T-006-C] Render the bug and fix captures, plus the vitest summaries, to PNG with headless Edge in the scratchpad.
 - [ ] [T-006-D] Attach all PNGs with `gh pr create --attach` under `Closes #78`, with the explanation and suite counts vs `main`.
