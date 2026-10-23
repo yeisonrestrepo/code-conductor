@@ -3214,3 +3214,9 @@ The spec is `docs/superpowers/specs/2026-10-07-bug055-non-string-manifest-fields
 - **Decision:** no existence guard on the hook command; a guard exiting 0 would turn a visible failure into a silent skip of every guard.
 - **ACs:** AC1 exact command in both settings; AC2 hook loads from a subdirectory; AC3 allowlist honored from a subdirectory, with a deny control; AC4 unset variable keeps today's behavior; AC5 re-install leaves one entry with the new command; AC6 change in both hook copies; AC7 the suite passes.
 - **Out of scope:** release records, the PostCompact and UserPromptSubmit hooks, the relative `orchestrate.mjs end` hint (`:210`), Windows without Git Bash, `[BUG-058]`.
+
+## Spec: BUG-056 context-guard session reset 2026-10-23
+
+Key `turn-count.txt` to the hook stdin `session_id` (`<id> <count>`); a missing or different stored id restarts the count at 1, so a fresh session never opens on a stale WARNING/CRITICAL. Shared extraction pattern `[{,]\s*"session_id"\s*:\s*"([A-Za-z0-9_-]+)"` in `.sh` and `.ps1`; no stdin id keeps the old increment. All four copies change; settings, installer and post-compact do not. Context-size metric deferred.
+- Spec: `docs/superpowers/specs/2026-10-23-bug056-context-guard-session-reset-design.md`
+- Plan: `docs/superpowers/plans/2026-10-23-bug056-context-guard-session-reset.md`
