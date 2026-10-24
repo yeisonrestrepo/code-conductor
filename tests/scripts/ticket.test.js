@@ -303,7 +303,8 @@ describe('writeback [FEAT-031 B3, AC8-AC11]', () => {
   it('halts TICKET_UNREACHABLE when gh is not on PATH', () => {
     const empty = join(root, 'empty-path');
     mkdirSync(empty);
-    const r = ticket([...WB, '--ticket', ISSUE_URL], { ...process.env, PATH: empty });
+    // The empty PATH is what keeps the real gh out, so this one test runs without the BUG-059 guard.
+    const r = ticket([...WB, '--ticket', ISSUE_URL], { ...process.env, PATH: empty, NODE_OPTIONS: '' });
     expect(r.status).toBe(1);
     expect(r.err).toBe('TICKET_UNREACHABLE: gh is not on PATH; install GitHub CLI, then run gh auth login');
   });
