@@ -12,7 +12,7 @@
 // The plan markdown remains the authoritative task-state record.
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, existsSync, renameSync, unlinkSync, statSync, readSync } from 'node:fs';
+import { mkdirSync, existsSync, renameSync, unlinkSync, statSync, readSync, realpathSync } from 'node:fs';
 import { dirname, basename, join, resolve, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PRE_PARSE_MAX_BYTES as MAX_SNAP_BYTES } from './snap-contract.mjs';
@@ -81,12 +81,19 @@ function resolveRoot() {
   return basename(parent) === '.claude' ? resolve(parent, '..') : parent;
 }
 
+// git prints the root's long spelling while cwd may carry an 8.3 (`RUNNER~1`) or
+// symlinked spelling of the same directory; relative() across two spellings climbs
+// out of the root [BUG-058]. The native realpath expands 8.3 names; the JS one does not.
+function canonical(path) {
+  try { return realpathSync.native(path); } catch { return path; }
+}
+
 function normalizePlanFile(planFile, root) {
   // Repo-relative, then force POSIX separators so a Windows `\` key never
   // duplicates the same plan's POSIX `/` key. `sep` is `\` on Windows, `/` on POSIX.
   // `resolve`/`relative` already collapse redundant separators (`a//b` -> `a/b`);
   // the trailing replace is a defensive guarantee that no `//` ever persists.
-  return relative(root, resolve(process.cwd(), planFile))
+  return relative(canonical(root), resolve(canonical(process.cwd()), planFile))
     .split(sep).join('/')
     .replace(/\/{2,}/g, '/');
 }

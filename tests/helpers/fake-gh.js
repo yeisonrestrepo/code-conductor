@@ -1,11 +1,11 @@
-// Installs the fake gh (FEAT-031 T1) first on PATH for one test. POSIX only: there is no
-// Windows CI leg (test.yml:11, publish.yml:9), so the wrapper is a sh script.
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+// Installs the fake gh (FEAT-031 T1) for one test. The gh-intercept preload serves it, so it
+// resolves identically on Linux, macOS and Windows and needs no wrapper on PATH (BUG-059).
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 
-const CLI = join(dirname(fileURLToPath(import.meta.url)), 'fake-gh-cli.mjs');
+// A file URL, not a path: --import rejects a Windows path (BUG-058 cause 2).
+export const GH_HOOK = `--import=${new URL('./gh-intercept.mjs', import.meta.url).href}`;
 
 export const issue = (repo, number, over = {}) => ({
   number, title: `Issue ${number}`, body: `Requirements for ${number}.\n`, state: 'open',
@@ -15,16 +15,15 @@ export const pull = (repo, number) => ({
   ...issue(repo, number), html_url: `https://github.com/${repo}/pull/${number}`, pull_request: { url: 'x' },
 });
 
+const withHook = (options = '') => (options.includes(GH_HOOK) ? options : `${options} ${GH_HOOK}`.trim());
+
 export function fakeGh(state) {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), 'cc-fake-gh-')));
-  const bin = join(dir, 'bin');
-  mkdirSync(bin);
-  writeFileSync(join(bin, 'gh'), `#!/bin/sh\nexec "${process.execPath}" "${CLI}" "$@"\n`, { mode: 0o755 });
   const statePath = join(dir, 'state.json');
   const logPath = join(dir, 'log.jsonl');
   writeFileSync(statePath, JSON.stringify({ cwdRepo: 'acme/widgets', login: 'owner', issues: {}, comments: {}, ...state }));
   return {
-    env: (base = process.env) => ({ ...base, PATH: `${bin}${delimiter}${base.PATH}`, FAKE_GH_STATE: statePath, FAKE_GH_LOG: logPath }),
+    env: (base = process.env) => ({ ...base, NODE_OPTIONS: withHook(base.NODE_OPTIONS), FAKE_GH_STATE: statePath, FAKE_GH_LOG: logPath }),
     calls: () => (existsSync(logPath) ? readFileSync(logPath, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []),
     state: () => JSON.parse(readFileSync(statePath, 'utf8')),
     update: (patch) => writeFileSync(statePath, JSON.stringify({ ...JSON.parse(readFileSync(statePath, 'utf8')), ...patch })),

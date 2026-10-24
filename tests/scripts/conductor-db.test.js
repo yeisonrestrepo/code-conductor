@@ -240,7 +240,8 @@ describe.skipIf(!HAS_SQLITE)('conductor-db plan_file normalization', () => {
     // An absolute plan arg in symlink form would not be realpath'd by path.resolve,
     // producing a cross-namespace key that never dedups. The real hook passes
     // repo-relative paths (always physical via cwd), so this only affects the test.
-    const plan = join(realpathSync(repo), 'docs', 'plan.md');
+    // The native realpath also expands a Windows 8.3 tmpdir (RUNNER~1) [BUG-058].
+    const plan = join(realpathSync.native(repo), 'docs', 'plan.md');
 
     // Absolute path from repo root, then the same plan referenced from a deep CWD.
     runDb(['record', plan, 'T-001', '>'], { cwd: repo });
@@ -323,7 +324,7 @@ describe.skipIf(!HAS_SQLITE)('conductor-db root resolution fallbacks', () => {
 });
 
 describe.skipIf(!HAS_SQLITE)('conductor-db node:sqlite unavailable', () => {
-  const BLOCK = fileURLToPath(new URL('./fixtures/block-sqlite.mjs', import.meta.url));
+  const BLOCK = new URL('./fixtures/block-sqlite.mjs', import.meta.url).href;
 
   it('exits 0 with exactly one CONDUCTOR_DB stderr line, nothing on stdout, no db', () => {
     const r = spawnSync(process.execPath,
@@ -370,9 +371,10 @@ describe.skipIf(!HAS_SQLITE)('conductor-db corrupt-db recovery', () => {
     expect(rows[0].state).toBe('X');
   });
 
-  it('degrades to exit 0 without throwing when the db dir is read-only', () => {
+  it.skipIf(process.platform === 'win32')('degrades to exit 0 without throwing when the db dir is read-only', () => {
     // Force every recovery hop (rename/unlink/create) to fail; the script must
-    // still exit 0 and never throw. (Skipped where chmod is a no-op, e.g. Windows.)
+    // still exit 0 and never throw. (Skipped on win32: chmod there, Git's included, does
+    // not make a directory read-only, so the guard below would not fire.)
     mkdirSync(conductorDir(), { recursive: true });
     writeFileSync(dbPath(), 'not a database');
     let readonly = false;
@@ -700,7 +702,7 @@ describe.skipIf(!HAS_SQLITE)('conductor-db history', () => {
 });
 
 describe.skipIf(!HAS_SQLITE)('conductor-db query degradation + isolation', () => {
-  const BLOCK = fileURLToPath(new URL('./fixtures/block-sqlite.mjs', import.meta.url));
+  const BLOCK = new URL('./fixtures/block-sqlite.mjs', import.meta.url).href;
 
   it('a query with node:sqlite absent writes zero bytes + one stderr line, exit 0', () => {
     // Seed a real session first (with sqlite present), then query with sqlite blocked.

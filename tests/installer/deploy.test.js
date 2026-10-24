@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { CAN_SYMLINK } from '../helpers/can-symlink.js';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync, readFileSync, readdirSync, lstatSync, symlinkSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -241,7 +242,7 @@ describe('deployProject — merges instead of clobbering', () => {
     mkdirSync(join(home, '.gitignore'));
     expect(() => deployProject(asset, home)).not.toThrow();
   });
-  it('merges a symlinked CLAUDE.md through realpath and keeps the link', () => {
+  it.skipIf(!CAN_SYMLINK)('merges a symlinked CLAUDE.md through realpath and keeps the link', () => {
     const real = join(asset, 'dotfiles-CLAUDE.md');
     writeFileSync(real, '# Acme\n\n## Deployment\n\nkubectl\n');
     symlinkSync(real, join(home, 'CLAUDE.md'));
@@ -249,7 +250,7 @@ describe('deployProject — merges instead of clobbering', () => {
     expect(lstatSync(join(home, 'CLAUDE.md')).isSymbolicLink()).toBe(true);
     expect(readFileSync(real, 'utf8')).toContain('## Agent Identity');
   });
-  it('merges a symlinked .gitignore through realpath and keeps the link', () => {
+  it.skipIf(!CAN_SYMLINK)('merges a symlinked .gitignore through realpath and keeps the link', () => {
     const real = join(asset, 'dotfiles-gitignore');
     writeFileSync(real, 'dist\n');
     symlinkSync(real, join(home, '.gitignore'));
@@ -542,7 +543,7 @@ describe('backup report (BUG-049)', () => {
     const backup = readdirSync(dir).find(n => n.includes('.installer-backup.'));
     expect(c.said).toEqual([`code-conductor: backed up ~/.claude/CLAUDE.md to ~/.claude/${backup} before merging`]);
   });
-  it('[Review Focus 4, R2] reports a symlinked target\'s backup by its absolute path, without the ignore claim', () => {
+  it.skipIf(!CAN_SYMLINK)('[Review Focus 4, R2] reports a symlinked target\'s backup by its absolute path, without the ignore claim', () => {
     const real = join(asset, 'dotfiles-CLAUDE.md');
     writeFileSync(real, '# Acme\n');
     symlinkSync(real, join(home, 'CLAUDE.md'));

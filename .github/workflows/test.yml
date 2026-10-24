@@ -8,16 +8,25 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     # Each leg is a coverage decision, not a version preference [BUG-048]. Node 20 is
     # engines.node's floor and the only leg on which the node:sqlite-absent degradation
     # paths run for real; Node 24 executes the persistence suites that Node 20 skips.
+    # Windows runs Node 24 only: the most coverage per minute, since the Node 20 paths
+    # are platform-independent [BUG-058]. `env` is the leg's key in tools/skip-baseline.json.
     # fail-fast is off so one leg's red never hides the other's result.
     strategy:
       fail-fast: false
       matrix:
-        node: ['20', '24']
+        include:
+          - { os: ubuntu-latest, node: '20', env: ci-node20 }
+          - { os: ubuntu-latest, node: '24', env: ci-node24 }
+          - { os: windows-latest, node: '24', env: ci-windows-node24 }
+    # Git Bash on Windows, so `bash` on PATH is Git's and not the WSL launcher [BUG-058].
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - uses: actions/checkout@v7
@@ -43,4 +52,4 @@ jobs:
         run: npm test -- --reporter=default --reporter=json --outputFile.json=vitest-report.json
 
       - name: Assert the skipped set against the measured baseline
-        run: node tools/skip-baseline.mjs --env ci-node${{ matrix.node }} --report vitest-report.json
+        run: node tools/skip-baseline.mjs --env ${{ matrix.env }} --report vitest-report.json

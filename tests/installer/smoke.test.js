@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { mkdtempSync, rmSync, mkdirSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -13,10 +13,12 @@ beforeAll(() => {
   // Pack, then extract the tarball into work/package. `npm pack` can interleave
   // lifecycle/notice/deprecation lines with the filename, so select the single
   // line that actually ends in `.tgz` rather than blindly taking the last line.
-  const packOut = execFileSync('npm', ['pack', '--silent', '--pack-destination', work], { cwd: root }).toString();
+  // A shell string resolves npm.cmd on win32 without DEP0190's args-with-shell warning.
+  const packOut = execSync(`npm pack --silent --pack-destination "${work}"`, { cwd: root }).toString();
   const tarball = packOut.split('\n').map(l => l.trim()).filter(l => l.endsWith('.tgz')).pop();
   if (!tarball) throw new Error(`npm pack produced no .tgz filename:\n${packOut}`);
-  execFileSync('tar', ['-xzf', join(work, tarball), '-C', work]);
+  // A relative name, because GNU tar (Git Bash's) reads an absolute `C:\...` as a remote host.
+  execFileSync('tar', ['-xzf', tarball], { cwd: work });
   pkgDir = join(work, 'package');
 }, 120000);
 // Cleanup runs regardless of pass/fail: `work` holds BOTH the packed .tgz and the
