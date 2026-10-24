@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { CAN_SYMLINK } from '../helpers/can-symlink.js';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, readdirSync, existsSync, lstatSync, mkdirSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -58,7 +59,7 @@ describe('mergeSettingsFile: fresh and degenerate targets', () => {
     mkdirSync(sp);
     expect(mergeSettingsFile(tpl, sp, FPS)).toBe('skipped-dir');
   });
-  it('skips a dangling symlink rather than replacing it with a file', () => {
+  it.skipIf(!CAN_SYMLINK)('skips a dangling symlink rather than replacing it with a file', () => {
     symlinkSync(join(dir, 'gone.json'), sp);
     expect(mergeSettingsFile(tpl, sp, FPS)).toBe('skipped-dangling');
     expect(lstatSync(sp).isSymbolicLink()).toBe(true);
@@ -180,7 +181,7 @@ describe('mergeSettingsFile: malformed', () => {
 });
 
 describe('mergeSettingsFile: symlink', () => {
-  it('writes through the link and leaves it a link', () => {
+  it.skipIf(!CAN_SYMLINK)('writes through the link and leaves it a link', () => {
     const real = join(dir, 'real-settings.json');
     write(real, { hooks: { PreToolUse: [HOST_ENTRY] } });
     symlinkSync(real, sp);
