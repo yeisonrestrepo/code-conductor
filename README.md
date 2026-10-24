@@ -9,7 +9,7 @@
 
 code-conductor is a drop-in governance layer for [Claude Code](https://www.anthropic.com/claude-code): slash commands, hooks, guardrails, and a persistent memory system that turn free-form AI coding sessions into a disciplined, repeatable engineering workflow. What an agent may run is checked before it runs, what it decided is written where the next session will read it, and what shipped is asserted against the record by instruments that run in CI. It cuts token usage along the way.
 
-One command to install. No code changes to your project. Works with any stack. And every claim below is checkable against a commit in this repository.
+One command to install: `npx @yeison.restrepo.r/code-conductor@latest --project`. No code changes to your project. Works with any stack. And every claim below is checkable against a commit in this repository.
 
 ---
 
