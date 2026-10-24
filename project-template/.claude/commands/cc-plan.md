@@ -52,10 +52,10 @@ Skill({ skill: "critical-review" })
 
 ---
 
-Require an approved spec before starting. If no spec is in `.claude/memory/project.md` or in the recent conversation, stop and say:
+Require an approved spec before starting. If no spec is in `.claude/memory/project.md` (its `Active spec:` line, or with no `## Current State` section its last `## Spec:` entry) or in the recent conversation, stop and say:
 "No approved spec found. Run `/cc-spec [name]` first."
 
-Read `.claude/memory/project.md` and this project's `CLAUDE.md` before doing anything else.
+Read this project's `CLAUDE.md` and project memory before doing anything else. Read `.claude/memory/project.md` with `limit: 60` and stop at its `<!-- end current state -->` line: that `## Current State` digest is the bounded summary. For detail, Grep `project.md` with `-n` for the heading its `Active spec:` or `Last checkpoint:` line names, then Read that entry with `offset` and `limit: 60`. If the file has no `## Current State` section, Read it with `limit: 40` instead, then Grep `^## (Spec|Checkpoint)` with `-n` and Read the last match of each with `offset` and `limit: 60`. Never read the whole file: its history is append-only and grows with the project.
 
 **Map the codebase structure** before reading any file content:
 - List directories

@@ -43,6 +43,8 @@ Writes to both memory files. Run it:
 
 Every decision captured once is a conversation the team never has again.
 
+`project.md` history is append-only, so it grows with the project. Phase commands therefore never read it whole. A bounded `## Current State` digest at the top of the file holds the active spec, the last checkpoint, and at most 12 conventions and 12 debt items, within 40 lines. `/cc-implement`, `/cc-plan` and `/cc-resume` read it with `limit: 60` and Grep the history below for detail. `/cc-spec` and `/cc-checkpoint` update it one line per Edit. A file without the section gets it on its next `/cc-checkpoint`, and nothing in the history is moved or deleted.
+
 ## Local State Cache
 
 On top of markdown memory, `/cc-implement` Step 6 records task state to SQLite:
