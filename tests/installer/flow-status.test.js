@@ -213,7 +213,15 @@ describe('--project deploys the flow status line (AC5)', () => {
     writeJson(projectSettings(), obj);
     deploy();
     expect(JSON.parse(readFileSync(projectSettings(), 'utf8')).statusLine).toEqual(CANONICAL);
-    expect(said.filter((m) => m.includes('updated the flow status line'))).toHaveLength(1);
+    const updated = said.filter((m) => m.includes('updated the flow status line'));
+    expect(updated).toHaveLength(1);
+    expect(updated[0]).toContain('replaced {"type":"command","command":"node ./old/flow-status.mjs --legacy"}');
+  });
+
+  it('returns the overwritten entry alongside the replaced status', () => {
+    const stale = { type: 'command', command: 'node .claude/flow-status.mjs', padding: 1 };
+    writeJson(projectSettings(), { statusLine: stale });
+    expect(mergeFlowStatusLine(projectSettings(), null)).toEqual({ status: 'replaced', previous: stale });
   });
 
   it('leaves a host statusLine in the project settings byte-identical and prints one skip line', () => {
@@ -246,7 +254,7 @@ describe('--project deploys the flow status line (AC5)', () => {
   it('backs up a malformed project settings.json and leaves it untouched', () => {
     mkdirSync(join(proj, '.claude'), { recursive: true });
     writeFileSync(projectSettings(), '{ not json');
-    expect(mergeFlowStatusLine(projectSettings(), userSettings())).toBe('malformed-skipped');
+    expect(mergeFlowStatusLine(projectSettings(), userSettings())).toEqual({ status: 'malformed-skipped' });
     expect(readFileSync(projectSettings(), 'utf8')).toBe('{ not json');
     const backups = readdirSync(join(proj, '.claude')).filter((n) => n.startsWith('settings.json.malformed-backup.'));
     expect(backups.map((n) => readFileSync(join(proj, '.claude', n), 'utf8'))).toEqual(['{ not json']);
@@ -256,7 +264,7 @@ describe('--project deploys the flow status line (AC5)', () => {
     writeJson(projectSettings(), {});
     mkdirSync(join(home, '.claude'), { recursive: true });
     writeFileSync(userSettings(), '{ not json');
-    expect(mergeFlowStatusLine(projectSettings(), userSettings())).toBe('host-skipped');
+    expect(mergeFlowStatusLine(projectSettings(), userSettings())).toEqual({ status: 'host-skipped' });
     expect(readFileSync(projectSettings(), 'utf8')).toBe('{}\n');
   });
 });
