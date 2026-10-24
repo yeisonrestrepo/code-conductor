@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  createTotals, listLogFiles, parseLine, readLog, recommend, resolveLogDir, run, slugOf,
+  addRecord, createTotals, estimateTokens, listLogFiles, parseArgs, parseLine, readLog, recommend, resolveLogDir, run, slugOf,
 } from '../../scripts/session-metrics.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -111,6 +111,75 @@ describe('groupings [D4]', () => {
     for (const g of ['command', 'phase', 'branch', 'session']) expect(sum(t.groups[g])).toBe(43508);
     expect(t.activeMs['sess-aaa']).toBe(120000);
     expect(t.compactions).toBe(1);
+  });
+});
+
+const usageRecord = (requestId, branch, tokens, extra = {}) => ({
+  type: 'assistant', requestId, sessionId: 'sess-host', gitBranch: branch, timestamp: '2026-01-02T10:00:00.000Z',
+  message: { content: [], usage: { input_tokens: tokens, output_tokens: 0 } }, ...extra,
+});
+
+describe('hostile keys [D6, AC6]', () => {
+  it('__proto__, constructor and toString are ordinary rows that sum to the total', () => {
+    const t = createTotals();
+    const keys = ['__proto__', 'constructor', 'toString'];
+    keys.forEach((k, i) => {
+      addRecord(t, { type: 'user', message: { content: `<command-name>/${k}</command-name>` } });
+      addRecord(t, usageRecord(`req-${i}`, k, 100 * (i + 1), { sessionId: k }));
+      addRecord(t, { type: 'assistant', timestamp: '2026-01-02T10:00:00.000Z', message: { content: [{ type: 'tool_use', id: `t${i}`, name: k, input: { file_path: k } }] } });
+      addRecord(t, { type: 'user', timestamp: '2026-01-02T10:00:01.000Z', message: { content: [{ type: 'tool_result', tool_use_id: `t${i}`, content: 'x' }] } });
+    });
+    addRecord(t, { type: 'assistant', timestamp: '2026-01-02T10:00:00.000Z', message: { content: [{ type: 'tool_use', id: 'r1', name: 'Read', input: { file_path: '__proto__' } }] } });
+    addRecord(t, { type: 'user', timestamp: '2026-01-02T10:00:01.000Z', message: { content: [{ type: 'tool_result', tool_use_id: 'r1', content: 'x' }] } });
+    expect(t.reads.__proto__).toEqual({ count: 1, estTokens: 0 });
+    for (const g of ['command', 'phase', 'branch', 'session']) expect(sum(t.groups[g])).toBe(600);
+    for (const g of ['command', 'branch']) expect(Object.keys(t.groups[g]).sort()).toEqual([...keys].sort());
+    expect(Object.keys(t.groups.tool).sort()).toEqual(['Read', ...keys].sort());
+    expect(t.groups.phase['(none)'].tokens).toBe(600);
+    expect(({}).tokens).toBeUndefined();
+    expect(({}).calls).toBeUndefined();
+    expect(Object.prototype.hasOwnProperty.call(Object.prototype, 'tokens')).toBe(false);
+  });
+});
+
+describe('tool time and text estimates [D4]', () => {
+  const callAndResult = (t, resultTs, content = 'x') => {
+    addRecord(t, { type: 'assistant', timestamp: '2026-01-02T10:00:05.000Z', message: { content: [{ type: 'tool_use', id: 'c1', name: 'Bash', input: {} }] } });
+    addRecord(t, { type: 'user', timestamp: resultTs, message: { content: [{ type: 'tool_result', tool_use_id: 'c1', content }] } });
+  };
+
+  it('a result stamped before its call is not measured, never a negative wall time', () => {
+    const t = createTotals();
+    callAndResult(t, '2026-01-02T10:00:00.000Z');
+    expect(t.groups.tool.Bash).toMatchObject({ calls: 1, wallMs: 0 });
+    expect(t.notMeasured).toBe(2);
+  });
+
+  it('a text block without text counts zero characters, not "undefined"', () => {
+    expect(estimateTokens([{ type: 'text' }, { type: 'text', text: 'abcdefgh' }])).toBe(2);
+    expect(estimateTokens([{ type: 'text', text: 42 }])).toBe(0);
+  });
+});
+
+describe('--dir with spaces [D3]', () => {
+  it('parseArgs takes everything after --dir, from one quoted word or several argv entries', () => {
+    expect(parseArgs([])).toEqual({ dir: undefined });
+    expect(parseArgs([''])).toEqual({ dir: undefined });
+    expect(parseArgs(['--dir C:\\My Logs\\x'])).toEqual({ dir: 'C:\\My Logs\\x' });
+    expect(parseArgs(['--dir', '/a b/c'])).toEqual({ dir: '/a b/c' });
+    expect(parseArgs(['--dir "/a b/c"'])).toEqual({ dir: '/a b/c' });
+    expect(parseArgs(['--dir /a', 'b'])).toEqual({ dir: '/a b' });
+  });
+
+  it('the command line, with $ARGUMENTS pasted in, reaches a log directory whose path has spaces', () => {
+    const md = readFileSync(join(ROOT, '.claude', 'commands', 'cc-metrics.md'), 'utf8');
+    const line = md.split(/\r?\n/).find((l) => l.startsWith('M=.claude/scripts/session-metrics.mjs'));
+    const spaced = join(tmp, 'my logs');
+    mkdirSync(spaced);
+    writeFileSync(join(spaced, 's.jsonl'), `${JSON.stringify(usageRecord('req-s', 'main', 7))}\n`);
+    const shell = spawnSync('bash', ['-c', line.replace('$ARGUMENTS', `--dir ${spaced}`)], { encoding: 'utf8', cwd: ROOT });
+    expect(shell.error).toBeUndefined();
+    expect(shell.stdout).toContain('cc-metrics: 1 logs (0 subagent)');
   });
 });
 

@@ -10,7 +10,7 @@ Read-only. This command reads Claude Code's local session logs for this project 
 Resolve the reader by presence, the deployed copy first, and run it once:
 
 ```bash
-M=.claude/scripts/session-metrics.mjs; [ -f "$M" ] || M=scripts/session-metrics.mjs; node "$M" $ARGUMENTS
+M=.claude/scripts/session-metrics.mjs; [ -f "$M" ] || M=scripts/session-metrics.mjs; node "$M" '$ARGUMENTS'
 ```
 
 If neither file exists, output `"cc-metrics: reader not found. Run the installer with --project."` and stop.

@@ -12,11 +12,13 @@ import { fileURLToPath } from 'node:url';
 export const THRESHOLDS = { repeatReads: 5, unboundedReadTokens: 2000, contextPeak: 150000, cacheHitPct: 80 };
 const TOP = 5;
 const NONE = '(none)';
-const PHASES = {
+// Every map keyed by log text has no prototype, so a key like __proto__ is an ordinary row.
+const table = (entries = {}) => Object.assign(Object.create(null), entries);
+const PHASES = table({
   'cc-spec': 'Define', 'cc-plan': 'Define',
   'cc-implement': 'Build', 'cc-refactor': 'Build', 'cc-debug': 'Build',
   'cc-review': 'Verify', 'cc-test': 'Verify',
-};
+});
 const COMMAND_TAG = /<command-name>\/?([^<\s]+)<\/command-name>/;
 const ITEM_IN_BRANCH = /(feat|bug|arch)[-_]?(\d{3})/i;
 
@@ -58,9 +60,9 @@ export function createTotals() {
   return {
     files: 0, subagentFiles: 0, bytes: 0, requests: 0, unparsable: 0, notMeasured: 0, compactions: 0,
     tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    groups: { tool: {}, command: {}, phase: {}, branch: {}, session: {} },
+    groups: { tool: table(), command: table(), phase: table(), branch: table(), session: table() },
     seen: new Set(), pending: new Map(), command: NONE,
-    reads: {}, unboundedReads: [], peaks: {}, sessionCompactions: {}, activeMs: {},
+    reads: table(), unboundedReads: [], peaks: table(), sessionCompactions: table(), activeMs: table(),
   };
 }
 
@@ -89,7 +91,7 @@ function sessionKey(record) {
 export function estimateTokens(content) {
   if (typeof content === 'string') return Math.round(content.length / 4);
   if (!Array.isArray(content)) return 0;
-  const chars = content.filter((b) => b.type === 'text').reduce((sum, b) => sum + String(b.text).length, 0);
+  const chars = content.filter((b) => b.type === 'text').reduce((sum, b) => sum + (typeof b.text === 'string' ? b.text.length : 0), 0);
   return Math.round(chars / 4);
 }
 
@@ -147,7 +149,8 @@ function closeTool(totals, record, block) {
   const ms = Date.parse(record.timestamp) - call.ts;
   bump(tool, call.name, 'calls', 1);
   bump(tool, call.name, 'estTokens', est);
-  if (Number.isFinite(ms)) bump(tool, call.name, 'wallMs', ms);
+  // A result stamped before its call is a clock or log fault, so its time is unknown, not negative.
+  if (Number.isFinite(ms) && ms >= 0) bump(tool, call.name, 'wallMs', ms);
   else totals.notMeasured++;
   if (call.name === 'Read') trackRead(totals, call.input, est);
 }
@@ -200,7 +203,7 @@ export function itemOf(branch) {
 }
 
 export function pillarMap(backlogText) {
-  const map = {};
+  const map = table();
   let pillar = null;
   for (const line of backlogText.split(/\r?\n/)) {
     const heading = line.match(/^## PILLAR (\d+)/i);
@@ -212,7 +215,7 @@ export function pillarMap(backlogText) {
 }
 
 export function pillarTotals(branchGroup, pillars) {
-  const out = {};
+  const out = table();
   for (const [branch, v] of Object.entries(branchGroup)) {
     const key = pillars[itemOf(branch)] ?? '(unattributed)';
     out[key] = (out[key] ?? 0) + v.tokens;
@@ -364,9 +367,12 @@ function projectRoot() {
   return process.cwd();
 }
 
+// The command passes $ARGUMENTS as one quoted word so a path with spaces survives the shell,
+// so everything after --dir is the path, whether it arrives as one argv entry or several.
 export function parseArgs(argv) {
-  const i = argv.indexOf('--dir');
-  return { dir: i >= 0 ? argv[i + 1] : undefined };
+  const m = argv.join(' ').match(/(?:^|\s)--dir\s+(.+)$/);
+  if (!m) return { dir: undefined };
+  return { dir: m[1].trim().replace(/^(["'])(.*)\1$/, '$2') };
 }
 
 async function main() {

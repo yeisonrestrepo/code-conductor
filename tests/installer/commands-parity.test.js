@@ -276,6 +276,11 @@ describe('cc-metrics mirrors [FEAT-046]', () => {
   it.each(METRICS_MIRRORS)('%s probes the deployed reader before the source one', (rel) => {
     expect(read(rel)).toContain('M=.claude/scripts/session-metrics.mjs; [ -f "$M" ] || M=scripts/session-metrics.mjs');
   });
+
+  // $ARGUMENTS is pasted as text, so unquoted it word-splits a --dir path with spaces.
+  it.each(METRICS_MIRRORS)('%s passes $ARGUMENTS as one single-quoted word', (rel) => {
+    expect(read(rel)).toContain(`node "$M" '$ARGUMENTS'`);
+  });
 });
 
 // BUG-051 AC3: a shipped command must name the detector where deployProject really puts it,
