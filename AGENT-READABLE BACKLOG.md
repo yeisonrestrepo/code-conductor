@@ -1046,6 +1046,21 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   cwd on Windows, WSL and POSIX, and a test runs it from a
   subdirectory.
 
+### [ ] `[BUG-062]` Bash suites run under the WSL launcher when it is first on PATH
+
+- Symptom: four suites probe bash with `bash --version`
+  (context-guard.test.js:16, guard3.test.js:21,
+  hook-project-root.test.js:14, verbosity-remind.test.js:22). On
+  Windows with WSL, `bash` on the default PATH is the WSL launcher; it
+  passes the probe, then `bash C:\...\hook.sh` exits 127 because WSL
+  drops the backslashes. ~227 failures locally, against 16 with Git
+  Bash first.
+- CI is unaffected (`shell: bash` selects Git Bash); local runs are.
+- Acceptance: the suites run under a bash that opens a script by its
+  native path (Git for Windows' bash when the PATH one cannot), or skip
+  with a named reason when none can.
+- Filed from issue #92.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
