@@ -10,7 +10,7 @@ import { CAPS, V3_CAPS } from '../../scripts/snap-contract.mjs';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SCRIPT = join(ROOT, '.github/wiki/wiki-gen.mjs');
 const EXPECTED_PAGES = [
-  'Architecture-Overview', 'Band-Roles-and-Agents', 'Commands-Reference', 'Contributing', 'FAQ',
+  'Architecture-Overview', 'Band-Roles-and-Agents', 'C4-Components', 'Commands-Reference', 'Contributing', 'FAQ',
   'Getting-Started', 'Guards-Reference', 'Home', 'Memory-Architecture', 'Orchestrator-Guide',
   'SNAP-Protocol', 'Skills', '_Sidebar',
 ];
@@ -34,7 +34,7 @@ function fixture(pages = {}) {
 }
 
 describe('generateWiki on this repository', () => {
-  it('[AC-6] writes the 12 pages and the sidebar', async () => {
+  it('[AC-6] writes the 13 pages and the sidebar', async () => {
     const out = join(tmp, 'out');
     expect(await generateWiki({ outDir: out, projectRoot: ROOT })).toEqual(EXPECTED_PAGES);
     expect(mdNames(out)).toEqual(EXPECTED_PAGES);

@@ -45,15 +45,17 @@ Plan tasks use a 4-state checkbox:
 npm test          # run the full test suite
 ```
 
-Tests use Node's built-in test runner. The test suite covers guards, installer, orchestrator, instruments, and unit tests.
+Tests use [vitest](https://vitest.dev/) (`"test": "vitest run"` in `package.json`). The suite covers guards, hooks, installer, orchestrator, scripts, instruments, the wiki generator and unit tests. CI (`.github/workflows/test.yml`) runs it on Node 20 and Node 24 on Ubuntu and on Node 24 on Windows, for every pull request and push to `main`.
 
 ## Release Instruments
 
-Release integrity is checked by instruments in `tools/`:
+Release integrity is checked by four repository-only instruments in `tools/`; none ships in the npm package:
 
-| Instrument | What it checks |
-|------------|---------------|
-| `id-ceiling.mjs` | No ID exceeds the backlog ceiling; no duplicates |
-| `record-parity.mjs` | Every shipped claim matches its spec and plan |
+| Instrument | What it checks | Run by |
+|------------|---------------|--------|
+| `id-ceiling.mjs` | The highest filed id over the working tree and `origin/main`, so a new id never collides | A person or agent, by hand, before minting an id |
+| `version-gate.mjs` | `VERSION` agrees with every other location that carries the version | `tests/tools/repo-invariants.test.js` in CI, and by hand at closeout |
+| `record-parity.mjs` | Every item the `CHANGELOG` claims has a closed backlog entry naming its version | `tests/tools/repo-invariants.test.js` in CI, and by hand at closeout |
+| `skip-baseline.mjs` | Each CI leg's exact skipped-test set matches `tools/skip-baseline.json` | `test.yml` directly, after the suite, on every leg |
 
-These run as part of the release process and CI.
+`tools/README.md` also keeps the registry of retired instruments. Where these sit in the system is on [Architecture Overview](Architecture-Overview#level-2-containers).

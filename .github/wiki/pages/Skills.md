@@ -57,6 +57,8 @@ Keeps the main context clean:
 
 Earlier releases described this as installed from GitHub for frontend stacks. No shipped code does either. Filed as `[FEAT-037]` for replacement.
 
+The shipped `CLAUDE.md` templates still name it: `global/CLAUDE.md` lists it under Active Skills, and `project-template/CLAUDE.md` names it in its specialization and delegation tables. Until `[FEAT-037]` lands, treat those lines as retired guidance; no skill by that name is installed.
+
 ## Skill Files
 
 Each skill lives in `skills/<name>/SKILL.md` with its full ruleset and activation conditions.

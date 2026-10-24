@@ -7,6 +7,7 @@
 
 **Core Concepts**
 - [Architecture Overview](Architecture-Overview)
+- [C4 Components](C4-Components)
 - [Guards Reference](Guards-Reference)
 - [SNAP Protocol](SNAP-Protocol)
 - [Memory Architecture](Memory-Architecture)
