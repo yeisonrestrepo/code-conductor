@@ -797,14 +797,27 @@ const FLOW_KEEP_LINES = 250;
 // file would grow forever.
 const FLOW_LOCK_STALE_MS = 10000;
 const SHELL_ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
+const SHELL_SUBSTITUTION = /\$\(|\$\{|`/;
 
 // Full command text is never written: commands carry inline tokens often enough. Leading
 // VAR=value words are skipped so `TOKEN=sk-... curl` records `curl`, never the token (D5).
-function flowTarget(name, input, cwd) {
-  if (name === 'Bash') {
-    const words = (typeof input.command === 'string' ? input.command : '').split(IFS_SPLIT);
-    return words.find((w) => w && !SHELL_ASSIGNMENT.test(w)) ?? '';
+// Words are found on Guard 3's mask, where quoted text is all 'x', so `P='a b' psql` is two
+// words, not three. An unclosed quote or a substitution makes the word boundary a guess, and
+// a wrong guess records a secret fragment, so either one records nothing.
+function flowCommandWord(command) {
+  const { result, malformed } = g3Scan('mask', command);
+  if (malformed) return '';
+  // The mask keeps an unquoted escape as written; folding it in keeps `a\ b` one word.
+  const mask = result.replace(/\\[\s\S]/g, 'xx');
+  for (const m of mask.matchAll(/[^ \t\n]+/g)) {
+    if (SHELL_SUBSTITUTION.test(m[0])) return '';
+    if (!SHELL_ASSIGNMENT.test(m[0])) return command.slice(m.index, m.index + m[0].length);
   }
+  return '';
+}
+
+function flowTarget(name, input, cwd) {
+  if (name === 'Bash') return flowCommandWord(typeof input.command === 'string' ? input.command : '');
   if (ORCH_DISPATCH_TOOLS.includes(name)) return String(input.subagent_type ?? input.to ?? '');
   const path = targetPath(input);
   return (isAbsolute(path) ? relative(cwd, path) : path).split(sep).join('/');

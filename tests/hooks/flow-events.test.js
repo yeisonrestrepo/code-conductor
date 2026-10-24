@@ -249,6 +249,32 @@ describe('what a target may hold (AC9)', () => {
     expect(text).not.toContain('push');
   });
 
+  // A quoted value holding a space split as plain words left a fragment as the target:
+  // `PASSWORD='hunter two' psql` recorded `two'` (review of PR #89).
+  it.each([
+    ["PASSWORD='hunter PROBE' psql -c x", 'psql'],
+    ['TOKEN="sk-abc PROBE" curl x', 'curl'],
+    ["A=1 KEY=$'PROBE one' git push", 'git'],
+    ['K="$(get PROBE)" curl x', 'curl'],
+    ['"/my dir/PROBE tool" run', '"/my dir/PROBE tool"'],
+    ['a\\ PROBE run', 'a\\ PROBE'],
+  ])('%s records the whole command word and no value fragment', (command, target) => {
+    fire(bash(command));
+    expect(last().target).toBe(target);
+    if (!target.includes('PROBE')) expect(readFileSync(events, 'utf8')).not.toContain('PROBE');
+  });
+
+  it.each([
+    ['an unquoted substitution', 'K=$(get PROBE) curl x'],
+    ['a backtick substitution', 'K=`get PROBE` curl x'],
+    ['a braced expansion', 'K=${V:- PROBE} curl x'],
+    ['an unclosed quote', "PASSWORD='hunter PROBE psql"],
+  ])('%s records an empty target', (_, command) => {
+    fire(bash(command));
+    expect(last().target).toBe('');
+    expect(readFileSync(events, 'utf8')).not.toContain('PROBE');
+  });
+
   it('a target holding a quote and a newline is one line that parses back to the same string', () => {
     const nasty = 'a"b\nc</x>';
     fire(call('Agent', { subagent_type: nasty, prompt: 'x' }));
