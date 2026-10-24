@@ -3220,3 +3220,9 @@ The spec is `docs/superpowers/specs/2026-10-07-bug055-non-string-manifest-fields
 Key `turn-count.txt` to the hook stdin `session_id` (`<id> <count>`); a missing or different stored id restarts the count at 1, so a fresh session never opens on a stale WARNING/CRITICAL. Shared extraction pattern `[{,]\s*"session_id"\s*:\s*"([A-Za-z0-9_-]+)"` in `.sh` and `.ps1`; no stdin id keeps the old increment. All four copies change; settings, installer and post-compact do not. Context-size metric deferred.
 - Spec: `docs/superpowers/specs/2026-10-23-bug056-context-guard-session-reset-design.md`
 - Plan: `docs/superpowers/plans/2026-10-23-bug056-context-guard-session-reset.md`
+
+## Spec: BUG-063 Guard 1 binary reads 2026-10-24
+
+Guard 1 skips a file with a NUL byte in its first 8,000 bytes (git's binary heuristic): a binary has no lines and Claude Code renders an image Read as an image, so counting its 0x0A bytes denied PNG reads for nothing. Content sniff over an extension list, so no list to maintain. Text files keep the 150-line limit. Both hook copies change.
+- Spec: `docs/superpowers/specs/2026-10-24-bug063-guard1-binary-reads-design.md`
+- Plan: `docs/superpowers/plans/2026-10-24-bug063-guard1-binary-reads.md`

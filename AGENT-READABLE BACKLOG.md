@@ -1046,6 +1046,20 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   cwd on Windows, WSL and POSIX, and a test runs it from a
   subdirectory.
 
+### [ ] `[BUG-063]` Guard 1 counts newlines in binary files, so a Read of a PNG is denied
+
+- Symptom: guard1LargeRead (.claude/hooks/pre-tool-use.mjs:82-96)
+  reads every regular file as UTF-8 and countLines counts 0x0A bytes,
+  so a no-limit Read of a binary with more than 150 of them (a 60 KB
+  PNG with 199) is denied with LARGE FILE READ BLOCKED. Claude Code
+  renders an image Read as an image, so the denial saves no tokens and
+  forces a meaningless limit: 1.
+- Fix: skip binaries by a NUL-byte sniff of the first 8,000 bytes
+  (git's heuristic), in both hook copies. Text files keep the limit.
+- Spec: `docs/superpowers/specs/2026-10-24-bug063-guard1-binary-reads-design.md`;
+  plan: `docs/superpowers/plans/2026-10-24-bug063-guard1-binary-reads.md`.
+- Filed from issue #93.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
