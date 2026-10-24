@@ -52,6 +52,7 @@
 - [X] [T-002-A] Rewrite the stub to intro plus five headings with placeholders.
 - [X] [T-002-B] Add `LEGACY_PROJECT_MEMORY_STUB_SHA256` and the digest comparison in `warnIfProjectMemoryIsStub`; message says "a bundled stub".
 - [X] [T-002-C] Run both files. Expected: all pass.
+- [X] [T-002-E] Found by the full suite: `repo-invariants.test.js` requires every open backlog defect in README Known limits, so add the `[BUG-064]` bullet there; the release closeout removes it with the backlog flip.
 - [X] [T-002-D] Commit `fix: ship a neutral project.md stub and keep the legacy overwrite warning [BUG-064]`.
 
 ### Task 3: Verify and evidence (PR only, never committed)

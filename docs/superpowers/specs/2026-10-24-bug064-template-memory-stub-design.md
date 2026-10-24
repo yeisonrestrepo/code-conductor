@@ -50,6 +50,7 @@ Rejected: shipping the legacy stub as a file in `lib/` to compare against. That 
 - `tests/unit/bounded-project-memory.test.js` (AC7 retargeted from the template to the fixture)
 - `tests/installer/deploy.test.js` (legacy-stub case, real-tree fresh-install case)
 - `tests/fixtures/legacy-project-memory-stub.md` (new)
+- `README.md` Known limits: `[BUG-064]` bullet while the backlog item is open (`repo-invariants.test.js`)
 
 ## Complexity Estimate
 
