@@ -25,6 +25,7 @@
 - [X] [T-000-A] Write the spec and this plan.
 - [X] [T-000-B] Add both `.gitignore` leaves in sorted position (BUG-042 toll).
 - [X] [T-000-C] Add the `[BUG-066]` backlog entry after `[BUG-061]`.
+- [X] [T-000-E] Found by the full suite: `repo-invariants.test.js` requires every open backlog item in README's Known limits, so `[BUG-066]` gets a Known-limits line; release closeout removes it.
 - [X] [T-000-D] Commit `docs: spec and plan for the CRLF settings merge [BUG-066]`.
 
 ### Task 1: Failing tests
