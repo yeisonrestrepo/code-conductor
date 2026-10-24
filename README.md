@@ -81,7 +81,7 @@ code-conductor assumes these are already in place; the installer does not set th
 | Dependency | Required for | How to get it |
 |---|---|---|
 | Node.js `>= 20` | Running the `code-conductor` CLI itself | Any current Node LTS |
-| Claude Code | The environment every command, skill and hook here runs inside | See Anthropic's Claude Code docs |
+| Claude Code | The environment every command, skill and hook here runs inside | See [Anthropic's Claude Code docs](https://code.claude.com/docs) |
 | **superpowers plugin** | `/cc-spec` (`brainstorming`), `/cc-plan` (`writing-plans`), and `/cc-debug`, `/cc-refactor`, `/cc-review`, `/cc-test` (all four via `subagent-driven-development`) | Install from Claude Code's `/plugin` marketplace, then run `/reload-plugins`, **before** using these commands; without it, their `Skill(...)` calls fail |
 | GitHub CLI (`gh`), authenticated | Only `/cc-orchestrate --ticket` and `ticket.mjs writeback`. code-conductor holds no credential; `gh` owns authentication | Install GitHub CLI, then run `gh auth login` |
 | ui-ux-pro-max skill | Nothing: retired guidance | No shipped code downloads, installs, or activates it. Its replacement is filed as `[FEAT-037]` |
@@ -563,7 +563,7 @@ Claude Code registers personal skills only at `~/.claude/skills/<name>/SKILL.md`
 
 Hook removal (`rm ~/.claude/hooks/verbosity-remind.sh`) and `settings.json` cleanup work identically in every environment; no git is required.
 
-Uninstall steps that use `git checkout <tag>` or `git revert <sha>` need a git working tree. In CI/CD pipelines, Docker containers, or directories that are not git repositories, they fail with `fatal: not a git repository`. That is expected and non-fatal: in those environments, manually delete or restore `skills/verbosity/SKILL.md` and remove the `verbosity-remind` entry from `~/.claude/settings.json`.
+No uninstall step needs a git working tree. In CI/CD pipelines, Docker containers, or directories that are not git repositories, uninstall the same way as anywhere else: delete `~/.claude/skills/verbosity/SKILL.md` (and any other skill directories you want gone) and remove the `verbosity-remind` entry from `~/.claude/settings.json`.
 
 ---
 
