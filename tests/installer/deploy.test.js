@@ -567,3 +567,37 @@ describe('backup report (BUG-049)', () => {
     expect(c.warned.filter(m => m.includes('left the existing Code Conductor entries'))).toHaveLength(1);
   });
 });
+
+// FEAT-044 T-009. The rule itself is covered end to end in flow-status.test.js; these pin
+// the deploy wiring: the merge runs only when the template ships the script it points at.
+describe('deployProject: flow status line (FEAT-044)', () => {
+  const settings = () => JSON.parse(readFileSync(join(home, '.claude', 'settings.json'), 'utf8'));
+  beforeEach(() => {
+    writeFileSync(join(asset, 'project-template', '.claude', 'settings.json'), '{\n  "hooks": {}\n}\n');
+  });
+
+  it('adds nothing and says nothing when the template ships no flow-status.mjs', () => {
+    const c = capture();
+    deployProject(asset, home, c.opts);
+    expect(settings().statusLine).toBeUndefined();
+    expect(c.said).toEqual([]);
+  });
+
+  it('adds the entry and reports it once when the template ships the script', () => {
+    writeFileSync(join(asset, 'project-template', '.claude', 'flow-status.mjs'), '// status\n');
+    const c = capture();
+    deployProject(asset, home, c.opts);
+    expect(settings().statusLine).toEqual({ type: 'command', command: 'node .claude/flow-status.mjs' });
+    expect(c.said).toEqual(['code-conductor: added the flow status line to .claude/settings.json (node .claude/flow-status.mjs)']);
+  });
+
+  it('consults the user settings only through the home option', () => {
+    writeFileSync(join(asset, 'project-template', '.claude', 'flow-status.mjs'), '// status\n');
+    const user = mkdtempSync(join(tmpdir(), 'cc-user-'));
+    mkdirSync(join(user, '.claude'));
+    writeFileSync(join(user, '.claude', 'settings.json'), '{"statusLine":{"type":"command","command":"mine"}}\n');
+    deployProject(asset, home, { ...capture().opts, home: user });
+    expect(settings().statusLine).toBeUndefined();
+    rmSync(user, { recursive: true, force: true });
+  });
+});
