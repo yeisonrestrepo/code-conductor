@@ -101,13 +101,13 @@ G1 alone meets criterion 2. G2 is the belt-and-suspenders layer: it covers what 
 
 ## Acceptance Criteria Mapping
 
-- [ ] AC1 (criterion 1): on Windows, `ticket.test.js` and `orchestrate.test.js` pass with every gh call served by the fake: `fakeGh().calls()` records them and no real gh runs. Measured POC: 168 of 169 on Windows; the remaining failure is outside this item.
-- [ ] AC2 (criterion 2, child): a node child that spawns `gh` without `fakeGh().env()` exits 97 with stderr starting `CC_REAL_GH_BLOCKED: `, and writes nothing to stdout.
-- [ ] AC3 (criterion 2, depth): the same through a node → node hop.
-- [ ] AC4 (criterion 2, in process): `spawnSync('gh')` and `execFileSync('<dir>/gh.exe')` in the test worker throw before spawning.
-- [ ] AC5 (fake still routes): the AC2 call under `fakeGh().env()` reaches the fake with argv intact and no `CC_REAL_GH_BLOCKED`.
-- [ ] AC6 (suspenders): in the worker, the four token variables are unset and `GH_CONFIG_DIR` is an empty directory.
-- [ ] AC7: the full suite passes on the Linux CI matrix (`node: ['20', '24']`), with no new skip (`tools/skip-baseline.json` unchanged).
+- [X] AC1 (criterion 1): on Windows, `ticket.test.js` and `orchestrate.test.js` pass with every gh call served by the fake: `fakeGh().calls()` records them and no real gh runs. Measured POC: 168 of 169 on Windows; the remaining failure is outside this item.
+- [X] AC2 (criterion 2, child): a node child that spawns `gh` without `fakeGh().env()` exits 97 with stderr starting `CC_REAL_GH_BLOCKED: `, and writes nothing to stdout.
+- [X] AC3 (criterion 2, depth): the same through a node → node hop.
+- [X] AC4 (criterion 2, in process): `spawnSync('gh')` and `execFileSync('<dir>/gh.exe')` in the test worker throw before spawning.
+- [X] AC5 (fake still routes): the AC2 call under `fakeGh().env()` reaches the fake with argv intact and no `CC_REAL_GH_BLOCKED`.
+- [X] AC6 (suspenders): in the worker, the four token variables are unset and `GH_CONFIG_DIR` is an empty directory.
+- [X] AC7: the full suite passes on the Linux CI matrix (`node: ['20', '24']`), with no new skip (`tools/skip-baseline.json` unchanged).
 
 AC2-AC6 run on every platform; none skips on win32 or POSIX. Their gh argv is `--version`, so a red run, before the guard exists, reaches nothing that writes.
 
