@@ -8,6 +8,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { posix, join, resolve, dirname, relative, isAbsolute, sep } from 'node:path';
 
 const LINE_LIMIT = 150;
+const BINARY_SNIFF_BYTES = 8000;
 const BLOCKED_COMPONENTS = new Set(['node_modules']);
 
 let emitted = false;
@@ -77,15 +78,23 @@ function guard4BlockedRead(input) {
   );
 }
 
+// git's binary heuristic (buffer_is_binary): a NUL in the first 8,000 bytes. A binary has
+// no lines, and Claude Code renders an image Read rather than reading it as text (BUG-063).
+function isBinary(buffer) {
+  return buffer.subarray(0, BINARY_SNIFF_BYTES).indexOf(0) !== -1;
+}
+
 // Guard 1: a large-file Read with no limit. A path that cannot be stat'd has no size to
 // exceed the threshold, so it allows.
 function guard1LargeRead(input) {
   if (input.limit !== undefined) return null;
   const path = targetPath(input);
   if (!path || !isRegularFile(path)) return null;
-  let lines;
-  try { lines = countLines(readFileSync(path, 'utf8')); }
+  let buffer;
+  try { buffer = readFileSync(path); }
   catch (e) { debug(`guard 1 could not read ${path}: ${e.message}`); return null; }
+  if (isBinary(buffer)) return null;
+  const lines = countLines(buffer.toString('utf8'));
   if (lines <= LINE_LIMIT) return null;
   return deny(
     `Guard 1: LARGE FILE READ BLOCKED. File: ${path}. Lines: ${lines} ` +
