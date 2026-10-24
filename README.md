@@ -370,9 +370,8 @@ By default, only the global core files are installed. Flags extend that:
 
 | Flag | Description |
 |---|---|
-| `--project` / `-Project` | Also install the project template into the current directory |
-| `--no-deps` / `-NoDeps` | Skip dependency installation (Node tooling, Playwright MCP, plugins); copy agent files only |
-| `--verbosity MIN\|INFO\|VERBOSE` / `-Verbosity` | Default response verbosity (default `MIN`). `MIN` = one sentence per response, `INFO` = bullet list, `VERBOSE` = full explanation. Re-run the installer to change it. |
+| `--project` | Also install the project template into the current directory |
+| `--verbosity MIN\|INFO\|VERBOSE` | Default response verbosity (default `MIN`). `MIN` = one sentence per response, `INFO` = bullet list, `VERBOSE` = full explanation. Re-run the installer to change it. |
 
 **Updating:** re-run the same install command. User-configured files are never overwritten; agent-managed files are always updated.
 
