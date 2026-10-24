@@ -27,26 +27,26 @@
 
 ### Task 0: Spec, plan and their ignore leaves
 
-- [ ] [T-000-A] Write the spec and this plan.
-- [ ] [T-000-B] Add both `.gitignore` leaves in sorted position (BUG-042 toll).
-- [ ] [T-000-C] Add the `[BUG-062]` backlog entry after `[BUG-061]`.
-- [ ] [T-000-D] Commit `docs: spec and plan for the WSL bash probe [BUG-062]`.
+- [X] [T-000-A] Write the spec and this plan.
+- [X] [T-000-B] Add both `.gitignore` leaves in sorted position (BUG-042 toll).
+- [X] [T-000-C] Add the `[BUG-062]` backlog entry after `[BUG-061]`.
+- [X] [T-000-D] Commit `docs: spec and plan for the WSL bash probe [BUG-062]`.
 
 ### Task 1: Failing helper test
 
 **Files:** Create `tests/unit/bash-helper.test.js`
 
-- [ ] [T-001-A] Cases: `findBash` returns `null` for a missing binary and for `process.execPath` (exits non-zero on the probe script); `BASH`, when non-null, runs a script by native path; on win32 with Git's `bin/bash.exe` present, `BASH` is non-null.
-- [ ] [T-001-B] Run it on `main`. Expected: fails (helper absent).
+- [X] [T-001-A] Cases: `findBash` returns `null` for a missing binary and for `process.execPath` (exits non-zero on the probe script); `BASH`, when non-null, runs a script by native path; on win32 with Git's `bin/bash.exe` present, `BASH` is non-null.
+- [X] [T-001-B] Run it on `main`. Expected: fails (helper absent).
 
 ### Task 2: Helper and suite swap
 
-**Files:** Create `tests/helpers/bash.js`; modify `tests/hooks/{context-guard,guard3,hook-project-root,verbosity-remind}.test.js`
+**Files:** Create `tests/helpers/bash.js`; modify `tests/hooks/{context-guard,guard3,hook-project-root,verbosity-remind}.test.js`, `README.md` (Known limits bullet, required by `repo-invariants` for an open backlog defect)
 
-- [ ] [T-002-A] Write `findBash(candidates)` and `BASH`.
-- [ ] [T-002-B] Replace each local probe and each literal `'bash'` spawn with `BASH`.
-- [ ] [T-002-C] Run the helper test and the four suites with the WSL launcher first on PATH. Expected: all pass.
+- [X] [T-002-A] Write `findBash(candidates)` and `BASH`.
+- [X] [T-002-B] Replace each local probe and each literal `'bash'` spawn with `BASH`.
+- [X] [T-002-C] Run the helper test and the four suites with the WSL launcher first on PATH. Expected: all pass.
 
 ### Task 3: Verification
 
-- [ ] [T-003-A] Full suite on the branch and on `origin/main`, same PATH (WSL first), gh neutralized. Record counts in the PR.
+- [X] [T-003-A] Full suite on the branch and on `origin/main`, same PATH (WSL first), gh neutralized. Record counts in the PR.
