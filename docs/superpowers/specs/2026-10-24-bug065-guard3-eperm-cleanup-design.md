@@ -16,10 +16,16 @@ The child really has exited: `spawnSync` returns only after the process is reape
 One helper, `removeTempDir(dir)`, used by `runRow` and by the `afterAll` sweep:
 
 ```js
-fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+for (let attempt = 1; attempt <= 10; attempt++) {
+  try { fs.rmSync(dir, { recursive: true, force: true }); return }
+  catch (e) {
+    if (!RETRYABLE_RM_CODES.includes(e.code)) return
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50 * attempt)
+  }
+}
 ```
 
-wrapped in `try { … } catch {}`. Node's `maxRetries` retries exactly `EBUSY`, `EMFILE`, `ENFILE`, `ENOTEMPTY` and `EPERM` with a linear backoff (50, 100, … ms, up to about 2.75 s in total), which covers the release window. A dir that still will not go does not fail the row: the verdict is what the row asserts, and the `afterAll` sweep retries every leftover `cc-guard3-*` dir at the end of the file. This is the shape `tests/scripts/conductor-db.test.js:49-58` already uses for the same Windows behavior.
+It retries `EBUSY`, `EPERM` and `ENOTEMPTY` with a linear backoff (50, 100, … ms, up to about 2.75 s in total), which covers the release window, and never throws. The retry is hand-rolled because Node's own `maxRetries`/`retryDelay` was measured not to retry on Node 24.16.0 / win32: with the dir held open by a child process's cwd, `rmSync` with `maxRetries: 10` threw `EPERM` after 1 ms and left the dir, while this loop removed it after 532 ms, once the holder exited. A dir that still will not go does not fail the row: the verdict is what the row asserts, and the `afterAll` sweep retries every leftover `cc-guard3-*` dir at the end of the file. `tests/scripts/conductor-db.test.js:49-58` uses the `maxRetries` shape for the same Windows behavior and is likely affected by the same Node 24 gap; that is out of scope here.
 
 Rejected alternatives:
 
@@ -29,7 +35,7 @@ Rejected alternatives:
 
 ## Acceptance Criteria
 
-- [ ] `runRow` and the `afterAll` sweep remove dirs through one helper with `maxRetries: 10, retryDelay: 50`.
+- [ ] `runRow` and the `afterAll` sweep remove dirs through one helper that retries `EBUSY`/`EPERM`/`ENOTEMPTY` up to 10 times with a 50 ms linear backoff.
 - [ ] A cleanup error never fails a row; the row's assertion is about the hook's exit status only.
 - [ ] Every corpus, dialect and termination case, and their count (176), are unchanged.
 - [ ] Repeated runs of `guard3.test.js` on Windows show zero EPERM/EBUSY failures on the branch, measured against the same runs on `main`.

@@ -3223,6 +3223,6 @@ Key `turn-count.txt` to the hook stdin `session_id` (`<id> <count>`); a missing 
 
 ## Spec: BUG-065 guard3 temp-dir cleanup on Windows 2026-10-24
 
-Windows releases a just-exited bash's cwd handle asynchronously, so guard3.test.js's bare `rmSync` in `runRow`'s `finally` raced it and an EPERM replaced a correct verdict. Fix: one `removeTempDir` (`maxRetries: 10, retryDelay: 50`, never throws) for `runRow` and the `afterAll` sweep, as in conductor-db.test.js. Test-only change.
+Windows releases a just-exited bash's cwd handle asynchronously, so guard3.test.js's bare `rmSync` in `runRow`'s `finally` raced it and an EPERM replaced a correct verdict. Fix: one `removeTempDir` (hand-rolled 10-try retry with 50 ms linear backoff, never throws) for `runRow` and the `afterAll` sweep; Node 24.16 `rmSync` `maxRetries` was measured not to retry a held dir. Test-only change.
 - Spec: `docs/superpowers/specs/2026-10-24-bug065-guard3-eperm-cleanup-design.md`
 - Plan: `docs/superpowers/plans/2026-10-24-bug065-guard3-eperm-cleanup.md`

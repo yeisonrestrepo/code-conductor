@@ -1055,9 +1055,9 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Cause: Windows releases a just-exited bash's cwd handle (and any
   antivirus hold on the allowlist file) asynchronously, and the
   cleanup is fatal with no retry.
-- Fix shape: one retrying, non-throwing `removeTempDir` (Node
-  `maxRetries`/`retryDelay`) for runRow and the afterAll sweep, as in
-  tests/scripts/conductor-db.test.js:49-58.
+- Fix shape: one retrying, non-throwing `removeTempDir` (hand-rolled
+  loop; Node 24's `maxRetries` was measured not to retry) for runRow
+  and the afterAll sweep.
 - Spec: `docs/superpowers/specs/2026-10-24-bug065-guard3-eperm-cleanup-design.md`;
   plan: `docs/superpowers/plans/2026-10-24-bug065-guard3-eperm-cleanup.md`.
 - Filed from issue #95.

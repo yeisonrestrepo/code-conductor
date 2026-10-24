@@ -4,7 +4,7 @@
 
 **Goal:** A Windows handle that outlives `bash` for a moment never turns a correct Guard 3 verdict into a failed row.
 
-**Architecture:** `tests/hooks/guard3.test.js` gains `removeTempDir(dir)`: `fs.rmSync` with `maxRetries: 10, retryDelay: 50`, inside a `try/catch`. `runRow`'s `finally` and the `afterAll` sweep both call it. No hook, corpus or shipped file changes.
+**Architecture:** `tests/hooks/guard3.test.js` gains `removeTempDir(dir)`: `fs.rmSync` in a hand-rolled retry loop (10 attempts, 50 ms linear backoff, `EBUSY`/`EPERM`/`ENOTEMPTY` only) that never throws, because Node 24 `maxRetries` was measured not to retry. `runRow`'s `finally` and the `afterAll` sweep both call it. No hook, corpus or shipped file changes.
 
 **Tech Stack:** Node `fs`, vitest, Git Bash on Windows.
 

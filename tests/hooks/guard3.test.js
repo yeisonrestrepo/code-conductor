@@ -65,13 +65,21 @@ function runRow(row) {
 
 // On Windows the just-exited bash (or an antivirus scan of the allowlist file) can
 // hold a handle on the dir for a moment after spawnSync returns, so a bare rmSync
-// races it and throws EPERM/EBUSY. Node's own retry backs off for exactly those
-// codes. Teardown stays best-effort: the hook's verdict is what a row asserts, and a
-// dir that still will not go is reaped by the afterAll sweep below. [BUG-065]
+// races it and throws EPERM/EBUSY. The retry is hand-rolled because Node 24's rmSync
+// did not honour maxRetries for a held dir (measured: it threw at once). Teardown
+// stays best-effort: the hook's verdict is what a row asserts, and a dir that still
+// will not go is reaped by the afterAll sweep below. [BUG-065]
+const RETRYABLE_RM_CODES = ['EBUSY', 'EPERM', 'ENOTEMPTY']
 function removeTempDir(dir) {
-  try {
-    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
-  } catch { /* left for the afterAll sweep */ }
+  for (let attempt = 1; attempt <= 10; attempt++) {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true })
+      return
+    } catch (e) {
+      if (!RETRYABLE_RM_CODES.includes(e.code)) return
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50 * attempt)
+    }
+  }
 }
 
 // Safety sweep: remove any cc-guard3-* temp dirs leaked if a test crashed before finally.
