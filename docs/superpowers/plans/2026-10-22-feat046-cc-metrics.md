@@ -14,31 +14,31 @@ Implementation starts only when both hold:
 - the spec is approved, D1 to D8, against `[FEAT-046]`;
 - the `main` test baseline is measured on the day implementation starts (T-001).
 
-The PR that carries this plan contains the spec, the plan and two `.gitignore` leaf lines. It contains no code.
+The PR that carries this plan (#88) also carries its implementation: the spec, the plan, `scripts/session-metrics.mjs`, its synthetic fixtures and tests, the mirrored `/cc-metrics` command, three `.gitignore` leaf lines and the README and wiki rows.
 
 ## Tasks
 
-- [ ] [T-000] Intake. Confirm the branch `feat/feat046-cc-metrics` is rebased on `main`, and record the approval reference in the spec and plan headers.
-- [ ] [T-001] Measure the baseline. Run the full suite on `main` with `GH_TOKEN=invalid-test-token`, `GH_ENTERPRISE_TOKEN=` and `GH_CONFIG_DIR=<empty temp dir>`. Record passed and skipped counts here.
-- [ ] [T-002] Write the predicted red table from the spec's "Predicted test impact", by suite and count, before any run.
-- [ ] [T-003] Fixtures under `tests/scripts/fixtures/session-metrics/`, synthetic only (spec, "Fixture strategy").
-    - [ ] [T-003-A] `clean/`: one main transcript (two `requestId`s, one spread over three `assistant` records; a `Skill` call to `cc-implement`; a typed `<command-name>/cc-spec`; Read, Bash and Grep tool calls with matching results; one `compact_boundary`; one `turn_duration`) and `clean/sess-aaaa/subagents/agent-x1.jsonl` with `isSidechain` and `agentId`.
-    - [ ] [T-003-B] `partial/`: a transcript whose last line is cut mid-JSON.
-    - [ ] [T-003-C] `noisy/`: unknown record types, an `assistant` record without `usage`, a `tool_use` with no result.
-    - [ ] [T-003-D] `trip/`: one file Read 5 times, one unbounded Read above 2k estimated tokens, one request above 150k context, a cache-read share below 80%.
-    - [ ] [T-003-E] `BACKLOG.md` with two `## PILLAR N` headings and one `### [ ] \`[BUG-999]\`` line under each pillar's first.
-- [ ] [T-004] `tests/scripts/session-metrics.test.js`, red first. See the test list.
-- [ ] [T-005] `scripts/session-metrics.mjs`, functions of at most 30 lines, guard clauses, `node:` imports only.
-    - [ ] [T-005-A] `resolveLogDir({ dir, env, root })` and `listLogFiles(dir)` (D3).
-    - [ ] [T-005-B] `parseLine(line)` returning a record or `null`, and `readLog(file, onRecord)` over `readline` (D6).
-    - [ ] [T-005-C] `createTotals()` and `addRecord(totals, record)`: `requestId` dedupe, tool pairing, command window, phase map, compaction and turn time (D4).
-    - [ ] [T-005-D] `itemOf(branch)` and `pillarMap(backlogText)` (D4).
-    - [ ] [T-005-E] `recommend(totals)` with the four D5 thresholds as named constants.
-    - [ ] [T-005-F] `formatReport(totals, notes)` with the D7 bounds, and `main()` wrapped in one `try`/`catch` that prints `cc-metrics: failed: <message>` and exits 0.
-- [ ] [T-006] `project-template/.claude/commands/cc-metrics.md`: frontmatter description, the D8 probe line, "relay stdout verbatim, do not re-read the logs". Copy it to `.claude/commands/cc-metrics.md` and compare with `git hash-object`.
-- [ ] [T-007] `.gitignore`: add `!/.claude/commands/cc-metrics.md` in sorted position in the `/.claude/*` block. Stage with `git add -f`. Run `tests/unit/gitignore-block-parity.test.js`.
-- [ ] [T-008] `tests/installer/commands-parity.test.js`: a `cc-metrics mirrors [FEAT-046]` block asserting byte identity and the probe line in each copy.
-- [ ] [T-009] Docs: one row in `.github/wiki/pages/Commands-Reference.md` and one in README's "Project" command table. Not "Known limits", not `CHANGELOG.md`.
+- [x] [T-000] Intake. Confirm the branch `feat/feat046-cc-metrics` is rebased on `main`, and record the approval reference in the spec and plan headers.
+- [x] [T-001] Measure the baseline. Run the full suite on `main` with `GH_TOKEN=invalid-test-token`, `GH_ENTERPRISE_TOKEN=` and `GH_CONFIG_DIR=<empty temp dir>`. Record passed and skipped counts here. Measured on `main` at `17f70fe` (Windows 11, Node 24, gh tokens unset, empty `GH_CONFIG_DIR`): 1121 passed, 12 skipped, 16 failed (the known Windows causes of `[BUG-058]`), 1149 total.
+- [x] [T-002] Write the predicted red table from the spec's "Predicted test impact", by suite and count, before any run. Red: `tests/scripts/session-metrics.test.js` 16 (new file), `tests/installer/commands-parity.test.js` +3, no other suite. Measured on the branch: 1140 passed, 12 skipped, 16 failed, 1168 total; the 19 new tests all pass and the 16 failures match the baseline.
+- [x] [T-003] Fixtures under `tests/scripts/fixtures/session-metrics/`, synthetic only (spec, "Fixture strategy").
+    - [x] [T-003-A] `clean/`: one main transcript (two `requestId`s, one spread over three `assistant` records; a `Skill` call to `cc-implement`; a typed `<command-name>/cc-spec`; Read, Bash and Grep tool calls with matching results; one `compact_boundary`; one `turn_duration`) and `clean/sess-aaaa/subagents/agent-x1.jsonl` with `isSidechain` and `agentId`.
+    - [x] [T-003-B] `partial/`: a transcript whose last line is cut mid-JSON.
+    - [x] [T-003-C] `noisy/`: unknown record types, an `assistant` record without `usage`, a `tool_use` with no result.
+    - [x] [T-003-D] `trip/`: one file Read 5 times, one unbounded Read above 2k estimated tokens, one request above 150k context, a cache-read share below 80%.
+    - [x] [T-003-E] `BACKLOG.md` with two `## PILLAR N` headings and one `### [ ] \`[BUG-999]\`` line under each pillar's first.
+- [x] [T-004] `tests/scripts/session-metrics.test.js`, red first. See the test list.
+- [x] [T-005] `scripts/session-metrics.mjs`, functions of at most 30 lines, guard clauses, `node:` imports only.
+    - [x] [T-005-A] `resolveLogDir({ dir, env, root })` and `listLogFiles(dir)` (D3).
+    - [x] [T-005-B] `parseLine(line)` returning a record or `null`, and `readLog(file, onRecord)` over `readline` (D6).
+    - [x] [T-005-C] `createTotals()` and `addRecord(totals, record)`: `requestId` dedupe, tool pairing, command window, phase map, compaction and turn time (D4).
+    - [x] [T-005-D] `itemOf(branch)` and `pillarMap(backlogText)` (D4).
+    - [x] [T-005-E] `recommend(totals)` with the four D5 thresholds as named constants.
+    - [x] [T-005-F] `formatReport(totals, notes)` with the D7 bounds, and `main()` wrapped in one `try`/`catch` that prints `cc-metrics: failed: <message>` and exits 0.
+- [x] [T-006] `project-template/.claude/commands/cc-metrics.md`: frontmatter description, the D8 probe line, "relay stdout verbatim, do not re-read the logs". Copy it to `.claude/commands/cc-metrics.md` and compare with `git hash-object`.
+- [x] [T-007] `.gitignore`: add `!/.claude/commands/cc-metrics.md` in sorted position in the `/.claude/*` block. Stage with `git add -f`. Run `tests/unit/gitignore-block-parity.test.js`.
+- [x] [T-008] `tests/installer/commands-parity.test.js`: a `cc-metrics mirrors [FEAT-046]` block asserting byte identity and the probe line in each copy.
+- [x] [T-009] Docs: one row in `.github/wiki/pages/Commands-Reference.md` and one in README's "Project" command table. Not "Known limits", not `CHANGELOG.md`.
 - [ ] [T-010] Full suite under the T-001 environment. Compare against T-002. Run the manual protocol. State the counts in the PR description.
 
 ## Test list
