@@ -809,7 +809,8 @@ function flowCommandWord(command) {
   const { result, malformed } = g3Scan('mask', command);
   if (malformed) return '';
   // The mask keeps an unquoted escape as written; folding it in keeps `a\ b` one word.
-  const mask = result.replace(/\\[\s\S]/g, 'xx');
+  // [^] is any character, newline included, without the shorthands this block forbids.
+  const mask = result.replace(/\\[^]/g, 'xx');
   for (const m of mask.matchAll(/[^ \t\n]+/g)) {
     if (SHELL_SUBSTITUTION.test(m[0])) return '';
     if (!SHELL_ASSIGNMENT.test(m[0])) return command.slice(m.index, m.index + m[0].length);
