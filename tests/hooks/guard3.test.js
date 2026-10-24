@@ -59,8 +59,19 @@ function runRow(row) {
     if (result.error) throw new Error(`bash spawn failed (${result.error.code}): ${result.error.message}`)
     return result.status ?? -1
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true })
+    removeTempDir(dir)
   }
+}
+
+// On Windows the just-exited bash (or an antivirus scan of the allowlist file) can
+// hold a handle on the dir for a moment after spawnSync returns, so a bare rmSync
+// races it and throws EPERM/EBUSY. Node's own retry backs off for exactly those
+// codes. Teardown stays best-effort: the hook's verdict is what a row asserts, and a
+// dir that still will not go is reaped by the afterAll sweep below. [BUG-065]
+function removeTempDir(dir) {
+  try {
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+  } catch { /* left for the afterAll sweep */ }
 }
 
 // Safety sweep: remove any cc-guard3-* temp dirs leaked if a test crashed before finally.
@@ -70,7 +81,7 @@ afterAll(() => {
   try {
     fs.readdirSync(TESTS_TMP)
       .filter(n => n.startsWith('cc-guard3-'))
-      .forEach(n => fs.rmSync(join(TESTS_TMP, n), { recursive: true, force: true }))
+      .forEach(n => removeTempDir(join(TESTS_TMP, n)))
   } catch { /* best-effort */ }
 })
 
