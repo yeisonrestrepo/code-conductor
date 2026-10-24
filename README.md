@@ -320,6 +320,7 @@ After each decision is written, the pre-tool-use hook appends one JSON line to `
 
 - **Status line.** `--project` sets `"statusLine": {"type": "command", "command": "node .claude/flow-status.mjs"}` in `.claude/settings.json`. It shows one line below the prompt for the current session, for example `⛔ G3 P9 · 12 calls · 3 deny` after a denial or `✓ 12 calls · 3 deny` after an allow. Claude Code refreshes it when a new assistant message arrives, not on every tool call.
 - **`/cc-flow`.** Prints one lane per tool family with each guard's pass, deny and ask counts, then the newest 20 events.
+- **What Guard 4 covers.** It denies the `Read` tool on `.claude/.flow-events.jsonl` and on rotation's `.flow-events.jsonl.tmp`. A plain `cat .claude/.flow-events.jsonl` through Bash is not caught: Guard 3 looks for mass-dump shapes, not this file's name.
 - **`CC_FLOW_OFF=1`** stops the hook from writing events; the status line goes blank and `/cc-flow` says the log is off.
 - **An existing status line wins.** If your project or user `settings.json` already has a `statusLine`, the installer leaves both files untouched and prints a line saying the flow status line was skipped; `/cc-flow` still works, and you can set the entry above by hand. An entry whose command names `flow-status.mjs` is treated as the installer's own and kept current.
 

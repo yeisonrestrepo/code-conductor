@@ -289,7 +289,9 @@ describe('what a target may hold (AC9)', () => {
 });
 
 describe('Guard 4 covers the event file (AC10)', () => {
-  it.each(['.claude/.flow-events.jsonl', '.claude\\.flow-events.jsonl'])('denies Read of %s', (file_path) => {
+  it.each([
+    '.claude/.flow-events.jsonl', '.claude\\.flow-events.jsonl', '.claude/.flow-events.jsonl.tmp',
+  ])('denies Read of %s', (file_path) => {
     const r = fire(call('Read', { file_path }));
     const out = JSON.parse(r.stdout).hookSpecificOutput;
     expect(out.permissionDecision).toBe('deny');

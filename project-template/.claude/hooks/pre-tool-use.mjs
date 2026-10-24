@@ -92,7 +92,8 @@ const FLOW_EVENTS_DENIAL =
 
 function isFlowEventsPath(parts) {
   const [dir, file] = parts.slice(-2).map(p => p.toLowerCase());
-  return dir === '.claude' && file === '.flow-events.jsonl';
+  // The .tmp is rotation's snapshot of the same lines, alive for one write and rename.
+  return dir === '.claude' && (file === '.flow-events.jsonl' || file === '.flow-events.jsonl.tmp');
 }
 
 // Guard 1: a large-file Read with no limit. A path that cannot be stat'd has no size to
