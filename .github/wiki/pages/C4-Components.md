@@ -70,20 +70,20 @@ The main session is the orchestrator. It is the only thing that dispatches agent
 
 ```mermaid
 flowchart TD
-  start["orchestrate.mjs start<br/>resolves the test command, writes the run file<br/>gate: boundary_routed"]
+  start["orchestrate.mjs start<br/>resolves the test command,<br/>writes the run file<br/>gate: boundary_routed"]
 
   subgraph define["Define band"]
     spec["spec role, tk RW<br/>writes the spec"]
-    rv1["define-review loop<br/>at most 3 passes and 2 revisions, advisory"]
-    ap1{"Owner approves the spec<br/>hash shown, re-hashed before approve"}
+    rv1["define-review loop<br/>at most 3 passes,<br/>2 revisions, advisory"]
+    ap1(["Owner approves the spec<br/>hash shown, re-hashed"])
     plan["plan role, tk RW<br/>writes the plan"]
     rv2["define-review loop"]
-    ap2{"Owner approves the plan<br/>gate: define_approved"}
+    ap2(["Owner approves the plan<br/>gate: define_approved"])
     spec --> rv1 --> ap1 --> plan --> rv2 --> ap2
   end
 
   subgraph build["Build band"]
-    code["code role, tk RW<br/>one dispatch per plan task, in order<br/>hands back build_executed"]
+    code["code role, tk RW<br/>one dispatch per plan task<br/>hands back build_executed"]
   end
 
   subgraph verify["Verify band"]
@@ -111,7 +111,7 @@ flowchart TD
 Each role dispatch is the same SNAP v3 handoff:
 
 ```mermaid
-flowchart LR
+flowchart TB
   inst["orchestrate.mjs install ROLE"]
   build["snap-build<br/>SNAP v3 envelope: sys.role, sys.tk,<br/>ops.scope, ops.gate"]
   val["snap-validate --to ROLE<br/>ops.gate must be the previous band's exit"]
