@@ -1046,6 +1046,22 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   cwd on Windows, WSL and POSIX, and a test runs it from a
   subdirectory.
 
+### [ ] `[BUG-065]` guard3 tests fail intermittently on Windows with EPERM during temp-dir cleanup
+
+- Symptom: under full-suite load on Windows, some
+  tests/hooks/guard3.test.js rows fail with EPERM from the bare
+  `fs.rmSync` in runRow's `finally` (guard3.test.js:62), though the
+  hook's verdict was correct; never reproduced in isolation.
+- Cause: Windows releases a just-exited bash's cwd handle (and any
+  antivirus hold on the allowlist file) asynchronously, and the
+  cleanup is fatal with no retry.
+- Fix shape: one retrying, non-throwing `removeTempDir` (Node
+  `maxRetries`/`retryDelay`) for runRow and the afterAll sweep, as in
+  tests/scripts/conductor-db.test.js:49-58.
+- Spec: `docs/superpowers/specs/2026-10-24-bug065-guard3-eperm-cleanup-design.md`;
+  plan: `docs/superpowers/plans/2026-10-24-bug065-guard3-eperm-cleanup.md`.
+- Filed from issue #95.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.

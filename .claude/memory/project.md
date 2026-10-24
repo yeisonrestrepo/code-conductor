@@ -3220,3 +3220,9 @@ The spec is `docs/superpowers/specs/2026-10-07-bug055-non-string-manifest-fields
 Key `turn-count.txt` to the hook stdin `session_id` (`<id> <count>`); a missing or different stored id restarts the count at 1, so a fresh session never opens on a stale WARNING/CRITICAL. Shared extraction pattern `[{,]\s*"session_id"\s*:\s*"([A-Za-z0-9_-]+)"` in `.sh` and `.ps1`; no stdin id keeps the old increment. All four copies change; settings, installer and post-compact do not. Context-size metric deferred.
 - Spec: `docs/superpowers/specs/2026-10-23-bug056-context-guard-session-reset-design.md`
 - Plan: `docs/superpowers/plans/2026-10-23-bug056-context-guard-session-reset.md`
+
+## Spec: BUG-065 guard3 temp-dir cleanup on Windows 2026-10-24
+
+Windows releases a just-exited bash's cwd handle asynchronously, so guard3.test.js's bare `rmSync` in `runRow`'s `finally` raced it and an EPERM replaced a correct verdict. Fix: one `removeTempDir` (`maxRetries: 10, retryDelay: 50`, never throws) for `runRow` and the `afterAll` sweep, as in conductor-db.test.js. Test-only change.
+- Spec: `docs/superpowers/specs/2026-10-24-bug065-guard3-eperm-cleanup-design.md`
+- Plan: `docs/superpowers/plans/2026-10-24-bug065-guard3-eperm-cleanup.md`
