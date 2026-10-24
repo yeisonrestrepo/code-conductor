@@ -39,7 +39,7 @@ Branch on `resume_rc` - **only `0` and `4` are meaningful; every other code proc
 
 ---
 
-Read `.claude/memory/project.md` before starting any task.
+Before starting any task, Read `.claude/memory/project.md` with `limit: 60` and stop at its `<!-- end current state -->` line: that `## Current State` digest is the bounded summary. For detail, Grep `project.md` with `-n` for the heading its `Active spec:` or `Last checkpoint:` line names, then Read that entry with `offset` and `limit: 60`. If the file has no `## Current State` section, Read it with `limit: 40` instead, then Grep `^## (Spec|Checkpoint)` with `-n` and Read the last match of each with `offset` and `limit: 60`. Never read the whole file: its history is append-only and grows with the project.
 
 ## Surgical Plan State Ritual
 

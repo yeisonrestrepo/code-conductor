@@ -37,14 +37,16 @@ Re-read the updated CLAUDE.md fields after this step so the session resume repor
 
 ## Step 3 — Read project memory
 
-Read `.claude/memory/project.md`.
+Read `.claude/memory/project.md` with `limit: 60` and stop at its `<!-- end current state -->` line: that `## Current State` digest is the bounded summary. Never read the whole file: its history is append-only and grows with the project.
 
 Extract:
-- The content of the most recent `## Checkpoint [...]` block (3 bullets max)
-- Any entries under `## Active Conventions`
-- Any entries under `## Technical Debt`
+- The `Last checkpoint:` line, then up to 3 bullets of the entry it names: Grep that heading with `-n` and Read the entry with `offset` and `limit: 60`
+- The bullets under `### Conventions` in `## Current State`
+- The bullets under `### Debt` in `## Current State`
 
-If the file is absent or has no `## Checkpoint` block, note `"No checkpoints yet"`.
+If the file has no `## Current State` section, Read it with `limit: 40` instead, then Grep `^## (Spec|Checkpoint)` with `-n`, Read the last `## Checkpoint` match with `offset` and `limit: 60` for its 3 bullets, and note `"No Current State yet: run /cc-checkpoint"` for conventions and debt.
+
+If the file is absent or has no `## Checkpoint` entry, note `"No checkpoints yet"`.
 
 ## Step 4 — Read personal preferences
 
