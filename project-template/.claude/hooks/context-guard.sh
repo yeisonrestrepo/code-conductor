@@ -1,5 +1,29 @@
 #!/usr/bin/env bash
 set +e
+
+# Prints the session_id from the UserPromptSubmit stdin JSON, or nothing.
+# The key must follow { or , so an escaped "session_id" inside the prompt text never matches.
+read_session_id() {
+  [ -t 0 ] && return 0
+  local _in _re
+  _in=$(cat 2>/dev/null)
+  _re='[{,][[:space:]]*"session_id"[[:space:]]*:[[:space:]]*"([A-Za-z0-9_-]+)"'
+  [[ "$_in" =~ $_re ]] && printf '%s' "${BASH_REMATCH[1]}"
+}
+
+# Sets stored_id and count from "<id> <count>" or a legacy bare "<count>".
+read_state() {
+  local _f1="" _f2=""
+  IFS=' ' read -r _f1 _f2 _ < "$1" 2>/dev/null
+  _f1="${_f1%$'\r'}"; _f1="${_f1#$'\xef\xbb\xbf'}"; _f2="${_f2%$'\r'}"
+  stored_id=""; count=0
+  if [ -z "$_f2" ]; then
+    [[ "$_f1" =~ ^[0-9]+$ ]] && count=$_f1
+    return 0
+  fi
+  [[ "$_f1" =~ ^[A-Za-z0-9_-]+$ ]] && [[ "$_f2" =~ ^[0-9]+$ ]] && { stored_id=$_f1; count=$_f2; }
+}
+
 main() {
   _mem="${CC_PROJECT_ROOT:-.}/.claude/memory"
   if [ -e "$_mem" ] && [ ! -d "$_mem" ]; then exit 0; fi
@@ -14,23 +38,21 @@ main() {
   critical=$_thresh
   warning=$(( (critical * 80) / 100 ))
 
-  # Read count
-  _c=""
-  IFS= read -r _c < "${_mem}/turn-count.txt" 2>/dev/null || _c=""
-  _c="${_c%$'\r'}"
-  _c="${_c#$'\xef\xbb\xbf'}"
-  [[ "$_c" =~ ^[0-9]+$ ]] || _c=0
-  count=$_c
+  # A count left by another session says nothing about this session's context (BUG-056).
+  session_id=$(read_session_id)
+  read_state "${_mem}/turn-count.txt"
+  if [ -n "$session_id" ] && [ "$session_id" != "$stored_id" ]; then count=0; fi
+  [ -n "$session_id" ] || session_id=$stored_id
 
   new_count=$(( count < 99999 ? count + 1 : 99999 ))
 
   _target="${_mem}/turn-count.txt"
   _tmp="${_mem}/turn-count.txt.tmp"
-  printf '%d\n' "$new_count" > "$_tmp" && mv -f "$_tmp" "$_target" \
+  printf '%s%d\n' "${session_id:+$session_id }" "$new_count" > "$_tmp" && mv -f "$_tmp" "$_target" \
     || { rm -f "$_tmp" 2>/dev/null; exit 0; }
 
-  [ -n "${CC_GUARD_DEBUG:-}" ] && printf '[context-guard] root=%s count=%d critical=%d warning=%d\n' \
-    "${CC_PROJECT_ROOT:-.}" "$new_count" "$critical" "$warning" >&2
+  [ -n "${CC_GUARD_DEBUG:-}" ] && printf '[context-guard] root=%s session=%s count=%d critical=%d warning=%d\n' \
+    "${CC_PROJECT_ROOT:-.}" "$session_id" "$new_count" "$critical" "$warning" >&2
 
   if [ "$new_count" -ge 99999 ]; then
     printf '🚨 CONTEXT CRITICAL: Turn 99999/%d (counter saturated) — run /cc-compact NOW.\n' "$critical"

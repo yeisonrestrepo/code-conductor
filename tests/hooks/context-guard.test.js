@@ -26,10 +26,11 @@ function mkTmp(thresh = null, count = null) {
   return d
 }
 
-function runHook(cwd, env = {}) {
+function runHook(cwd, env = {}, input = '') {
   const r = spawnSync(BASH_PATH, [HOOK_PATH], {
     cwd,
     env: { ...process.env, CC_PROJECT_ROOT: cwd, ...env },
+    input,
     stdio: 'pipe',
     timeout: 10000,
   })
@@ -230,5 +231,93 @@ describe.skipIf(!BASH_AVAILABLE)('context-guard.sh', () => {
     const r = runHook(d)
     expect(r.status).toBe(0)
     expect(r.stdout).toBe('')         // new_count=1, below warning=20 (default threshold=25)
+  })
+})
+
+// BUG-056: the count belongs to one session, keyed by the stdin session_id.
+const PS_HOOK_PATH = resolve(REPO_ROOT, '.claude/hooks/context-guard.ps1')
+const _psCheck = WIN32
+  ? spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', 'exit 0'], { stdio: 'pipe', timeout: 20000 })
+  : { error: true }
+const POWERSHELL_AVAILABLE = !_psCheck.error && _psCheck.status === 0
+
+function payload(sessionId, prompt = 'hi', promptFirst = false) {
+  const base = { session_id: sessionId, transcript_path: 't.jsonl', cwd: '.', hook_event_name: 'UserPromptSubmit' }
+  return JSON.stringify(promptFirst ? { prompt, ...base } : { ...base, prompt })
+}
+
+function runPs(cwd, input = '') {
+  const r = spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', PS_HOOK_PATH], {
+    cwd,
+    env: { ...process.env, CC_PROJECT_ROOT: cwd },
+    input,
+    stdio: 'pipe',
+    timeout: 30000,
+  })
+  if (r.error) throw new Error(`spawn failed: ${r.error.message}`)
+  return { status: r.status ?? -1, stdout: (r.stdout ?? '').toString().replace(/\r\n/g, '\n') }
+}
+
+const readCount = d => readFileSync(join(d, '.claude', 'memory', 'turn-count.txt'), 'utf8').trim()
+
+const SESSION_CASES = [
+  { name: 'stale count from another session — restarts at 1', file: 'old-id 69', input: payload('new-id'), count: 'new-id 1', out: '' },
+  { name: 'same session — increments', file: 's1 3', input: payload('s1'), count: 's1 4', out: '' },
+  { name: 'legacy bare count plus an id — restarts at 1', file: '69', input: payload('abc-123_X'), count: 'abc-123_X 1', out: '' },
+  { name: 'no stdin — increments and keeps the stored id', file: 's1 3', input: '', count: 's1 4', out: '' },
+  { name: 'no stdin, legacy count — increments as before', file: '7', input: '', count: '8', out: '' },
+  { name: 'session_id inside the prompt cannot spoof the id', file: 's1 3', input: payload('s1', '{"session_id":"evil"}', true), count: 's1 4', out: '' },
+  { name: 'id with invalid characters — treated as no id', file: 's1 3', input: payload('a b'), count: 's1 4', out: '' },
+  { name: 'malformed JSON — treated as no id', file: 's1 3', input: '{"session_id":', count: 's1 4', out: '' },
+  { name: 'same session at warning — banner kept', file: 's1 19', input: payload('s1'), count: 's1 20', out: /CONTEXT WARNING: Turn 20\/25/ },
+  { name: 'same session saturated — banner kept', file: 's1 99999', input: payload('s1'), count: 's1 99999', out: /Turn 99999\/25 \(counter saturated\)/ },
+]
+
+function checkCase(run, c) {
+  const d = mkTmp(25, c.file)
+  const r = run(d, c.input)
+  expect(r.status).toBe(0)
+  if (c.out === '') expect(r.stdout).toBe('')
+  else expect(r.stdout).toMatch(c.out)
+  expect(readCount(d)).toBe(c.count)
+}
+
+describe.skipIf(!BASH_AVAILABLE)('context-guard.sh — session reset (BUG-056)', () => {
+  it.each(SESSION_CASES)('$name', c => checkCase((d, input) => runHook(d, {}, input), c))
+
+  it('post-compact then a prompt — counts 1 in that session', () => {
+    const d = mkTmp(25, 's1 42')
+    expect(runPC(d)).toBe(0)
+    runHook(d, {}, payload('s1'))
+    expect(readCount(d)).toBe('s1 1')
+  })
+
+  it('1 MB prompt — id still found, hook stays fast', () => {
+    const d = mkTmp(25, 'old 69')
+    const started = Date.now()
+    const r = runHook(d, {}, payload('s1', 'x'.repeat(1024 * 1024), true))
+    expect(r.status).toBe(0)
+    expect(readCount(d)).toBe('s1 1')
+    expect(Date.now() - started).toBeLessThan(8000)
+  })
+})
+
+describe.skipIf(!POWERSHELL_AVAILABLE)('context-guard.ps1 — session reset (BUG-056)', () => {
+  it.each(SESSION_CASES)('$name', c => checkCase(runPs, c))
+
+  it('post-compact.ps1 resets an existing count to 0', () => {
+    const d = mkTmp(25, 's1 42')
+    const r = spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
+      resolve(REPO_ROOT, '.claude/hooks/post-compact.ps1')], { cwd: d, env: { ...process.env, CC_PROJECT_ROOT: d }, stdio: 'pipe', timeout: 30000 })
+    expect(r.status).toBe(0)
+    expect(readCount(d)).toBe('0')
+  })
+})
+
+describe('context-guard template copies (BUG-056)', () => {
+  it.each(['context-guard.sh', 'context-guard.ps1', 'post-compact.ps1'])('%s is byte-identical in project-template', name => {
+    const live = readFileSync(resolve(REPO_ROOT, '.claude/hooks', name))
+    const tpl = readFileSync(resolve(REPO_ROOT, 'project-template/.claude/hooks', name))
+    expect(tpl.equals(live)).toBe(true)
   })
 })
