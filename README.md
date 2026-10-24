@@ -154,7 +154,7 @@ Before each define approval, `/cc-orchestrate` runs a review loop (`[FEAT-041]`)
 |---|---|
 | Auto mode with the shipped exception: `claude --permission-mode auto --settings .claude/review-loop.settings.json` | 0 owner wakes, 0 prompts |
 | Default (ask) permission mode | 0 wakes; one approval per revision write, plus the orchestrator's `review` calls and report writes |
-| Plain auto mode | the auto mode classifier denies the first revision request; the loop closes `skipped:denied`, and you get round 1's findings, unrevised |
+| Plain auto mode | The auto mode classifier denies the first revision request; the loop closes `skipped:denied`, and you get round 1's findings, unrevised |
 
 `.claude/review-loop.settings.json` holds one auto mode allow rule that names this protocol. The installer never writes `autoMode` into `~/.claude/settings.json`, and Claude Code ignores `autoMode` in project settings, so the rule applies only when you pass the file yourself. Read it before you pass it: a cloned repository could ship a different file under the same name.
 
@@ -184,7 +184,7 @@ Claude Code is priced in tokens, and unstructured sessions waste them in predict
 
 | Mechanism | What it does |
 |---|---|
-| **memory-first lookup chain** | Before reading any file, the agent checks project and personal memory, then grep/glob, and only then does a targeted read, always bounded, max 150 lines. |
+| **memory-first lookup chain** | Before reading any file, the agent checks project and personal memory, then Grep/Glob, and only then does a targeted read, always bounded, max 150 lines. |
 | **Guard 1: large-file reads** | A `Read` of a file over 150 lines with no `limit` is **denied before it runs**, with a redirect to the lookup chain. |
 | **Guard 3: mass content dumps** | Every Bash command is scanned against twelve dump patterns (`cat *.ts`, unbounded `find`, recursive match-all greps, shell read-loops, and more) and denied with a targeted alternative. In one measured real-world session it caught **47 denial events across 43 unique commands**. |
 | **Guard 4: node_modules** | Reads into `node_modules` are denied outright. Your context window is not for vendored code. |
@@ -209,7 +209,7 @@ The interesting part is what it got wrong, because that is what the record docum
 
 Every figure here is cited, and none of them is rounded in the project's favor.
 
-| measurement | value | source |
+| Measurement | Value | Source |
 |---|---|---|
 | Guard 3 denials recovered from one real working session | **47 events, 43 unique commands** | `.claude/memory/project.md:991` |
 | ...of which flipped `deny` to `allow` after the `1.31.x` fixes | **36 of 43** | same table |
@@ -244,7 +244,7 @@ All commands are tagged `(Conductor)` in the Claude Code command palette, so the
 |---|---|
 | `/cc-checkpoint` | Read the current session, extract decisions, conventions, and debt, and write them to `project.md` and `personal.md` with a timestamp. Run before `/compact`, after completing a feature, and after key architectural decisions. |
 | `/cc-stack` | Run the dynamic detector and write the detected commands and a generated ruleset into your project `CLAUDE.md` (the `- Stack:` line and the `## Active Stack Profiles` block). On later sessions it asks whether anything changed before re-detecting. |
-| `/cc-lang [code]` | Switch response language for this session (`en` `es` `pt` `fr` `de` `it` `zh` `ja` `ko`). Code identifiers, filenames and commit messages stay English. |
+| `/cc-lang [code]` | Switch response language for this session (`en` `es` `pt` `fr` `de` `it` `zh` `ja` `ko`). Code identifiers, file names, and commit messages stay English. |
 | `/cc-compact` | Phase-boundary command. Serializes the current phase's essential state (decisions, pending steps, files touched, constraints) into a single-line SNAP JSON snapshot at `.claude/memory/session-snapshot.json` and, on Node `>= 22.5`, a git-hash-keyed row in the local `.conductor/cache.db`, then prompts you to run `/compact`. Run it at the end of every phase. |
 
 ### Project (requires `--project` install)
@@ -279,7 +279,7 @@ Skills extend agent behavior for cross-cutting concerns that apply regardless of
   | `INFO` | Bullet list of what changed and why, at most 5 bullets. `[CHANGES]` + `[REASON]`. |
   | `VERBOSE` | Full explanation, prose allowed. All response tags. |
 
-- **memory-first (always active).** Before reading any file, Claude walks a lookup chain and stops at the first step that answers: (1) memory, both `.claude/memory/project.md` and `~/.claude/memory/personal.md`; (2) Grep / Glob; (3) a targeted read, last resort, always with `offset` + `limit`, at most 150 lines.
+- **memory-first (always active).** Before reading any file, Claude walks a lookup chain and stops at the first step that answers: (1) memory, both `.claude/memory/project.md` and `~/.claude/memory/personal.md`; (2) Grep/Glob; (3) a targeted read, last resort, always with `offset` + `limit`, at most 150 lines.
 - **agent-delegation (always active).** Keeps the main context clean. Sub-agents handle exploration and parallel work and return a summary of at most 200 words; raw file contents and intermediate data never enter the main context.
 - **ui-ux-pro-max (retired guidance, pending `[FEAT-037]`).** Earlier releases described this skill as installed from GitHub and switched on when `/cc-stack` detects a frontend stack. No shipped code does either. The `CLAUDE.md` templates still name it; `[FEAT-037]` replaces it with a frontend design skill stack, and this entry changes when that ships.
 
@@ -305,11 +305,11 @@ Permanent exceptions live in `.claude/memory/bash-scan-allowlist.txt`, one entry
 
 Hit a block you believe is wrong? Re-run the command with `CC_GUARD3_WARN=1` and the guard asks instead of denying, carrying the same pattern ids. That is a triage aid for reporting a false positive while you keep working, not a configuration mode: the allowlist is the sanctioned permanent exception. The variable affects Guard 3 alone.
 
-**Guard 5 in detail.** A `Write`, `Edit`, `create_file` or `write_file` from a subagent whose `agent_type` names a band role (`spec`, `plan`, `code`, `audit`, `qa`) is checked against the nearest `.claude/memory/band-envelope.json` above its working directory, a SNAP v3 envelope. A malformed envelope, an agent that is not the envelope's role, a role not holding `RW`, or a path outside the envelope's `scope` globs (anchored at the band root, the directory whose `.claude/` holds the envelope) is denied with a named reason. The main session, any other agent, and any project without an envelope are untouched. It assumes cooperative agents: `agent_type` is a name taken on trust, and `Bash`, `NotebookEdit`, MCP write tools, and symlinked paths are not covered.
+**Guard 5 in detail.** A `Write`, `Edit`, `create_file` or `write_file` from a sub-agent whose `agent_type` names a band role (`spec`, `plan`, `code`, `audit`, `qa`) is checked against the nearest `.claude/memory/band-envelope.json` above its working directory, a SNAP v3 envelope. A malformed envelope, an agent that is not the envelope's role, a role not holding `RW`, or a path outside the envelope's `scope` globs (anchored at the band root, the directory whose `.claude/` holds the envelope) is denied with a named reason. The main session, any other agent, and any project without an envelope are untouched. It assumes cooperative agents: `agent_type` is a name taken on trust, and `Bash`, `NotebookEdit`, MCP write tools, and symlinked paths are not covered.
 
-**Guard 6 in detail.** While a `/cc-orchestrate` run is live, its run file `.claude/memory/orchestrator-run.json` binds it to one session by `session_id`. In that session, a `Write`, `Edit`, `create_file` or `write_file` from anything but a band role (the main session, a payload carrying only `agent_id`, any other agent) is denied with `ORCH_WRITE_DENIED` unless its target lies inside the orchestrator's write surface, anchored at the run root: `.claude/memory/orchestrator-run.json`, `.claude/memory/band-envelope.json`, `.claude/memory/session-snapshot.json` and `.conductor/**`. Band roles stay under Guard 5. A run file from another session is stale and an unreadable one is invalid: both warn (`ORCH_RUN_STALE`, `ORCH_RUN_INVALID`) with the cleanup command and never block. While the run is live, a subagent's `Agent` or `SendMessage` call is denied with `ORCH_NESTED_DISPATCH`, so only the orchestrator dispatches or messages agents (R7; the hook's matcher names both tools). Outside a live run there is no Guard 6. Its limits are listed under [Known limits](#known-limits).
+**Guard 6 in detail.** While a `/cc-orchestrate` run is live, its run file `.claude/memory/orchestrator-run.json` binds it to one session by `session_id`. In that session, a `Write`, `Edit`, `create_file` or `write_file` from anything but a band role (the main session, a payload carrying only `agent_id`, any other agent) is denied with `ORCH_WRITE_DENIED` unless its target lies inside the orchestrator's write surface, anchored at the run root: `.claude/memory/orchestrator-run.json`, `.claude/memory/band-envelope.json`, `.claude/memory/session-snapshot.json` and `.conductor/**`. Band roles stay under Guard 5. A run file from another session is stale and an unreadable one is invalid: both warn (`ORCH_RUN_STALE`, `ORCH_RUN_INVALID`) with the cleanup command and never block. While the run is live, a sub-agent's `Agent` or `SendMessage` call is denied with `ORCH_NESTED_DISPATCH`, so only the orchestrator dispatches or messages agents (R7; the hook's matcher names both tools). Outside a live run there is no Guard 6. Its limits are listed under [Known limits](#known-limits).
 
-**Guard 7 in detail.** A `Bash` call from a subagent whose `agent_type` names a band role is decided before Guard 3, so Guard 3's `CC_GUARD3_WARN` ask can never outrank it. `spec`, `plan` and `audit` have no shell (`ROLE_SHELL_DENIED`). `code` and `qa` may run exactly one command, byte for byte: the `test_command` that `orchestrate.mjs start` recorded in the run file of a run live in their session. A command carrying `;`, `&`, `|`, a backtick, `$(`, `<`, `>`, or a line break is denied first (`ROLE_SHELL_CHAINING`). No run file, a run of another session, or no recorded command is denied (`ROLE_SHELL_UNRESOLVED`), and any other command is denied naming the allowed one (`ROLE_SHELL_NOT_ALLOWED`). An error inside the guard denies too, and `CC_HOOK_ALLOW` does not reach it. The main session and every other agent are untouched.
+**Guard 7 in detail.** A `Bash` call from a sub-agent whose `agent_type` names a band role is decided before Guard 3, so Guard 3's `CC_GUARD3_WARN` ask can never outrank it. `spec`, `plan` and `audit` have no shell (`ROLE_SHELL_DENIED`). `code` and `qa` may run exactly one command, byte for byte: the `test_command` that `orchestrate.mjs start` recorded in the run file of a run live in their session. A command carrying `;`, `&`, `|`, a backtick, `$(`, `<`, `>`, or a line break is denied first (`ROLE_SHELL_CHAINING`). No run file, a run of another session, or no recorded command is denied (`ROLE_SHELL_UNRESOLVED`), and any other command is denied naming the allowed one (`ROLE_SHELL_NOT_ALLOWED`). An error inside the guard denies too, and `CC_HOOK_ALLOW` does not reach it. The main session and every other agent are untouched.
 
 **Unparseable input fails closed.** It is denied with one stderr line naming `CC_HOOK_ALLOW=1`, which overrides that denial alone and leaves every guard fully active on every payload the hook can read. Set `CC_HOOK_DEBUG=1` to see the diagnostic lines it otherwise swallows.
 
@@ -426,6 +426,8 @@ The backup and temp rules keep the installer's own backups and crash-stranded te
 - **Not a model.** It is configuration, hooks, and scripts around Claude Code.
 - **Not finished.** See the limits below.
 
+---
+
 ## Known limits
 
 - **The orchestrator (`1.36.0`) assumes cooperative agents.**
@@ -491,7 +493,7 @@ Four checks live in `tools/` as tracked repository infrastructure. Three of them
 
 **Supported codes:** `en` `es` `pt` `fr` `de` `it` `zh` `ja` `ko`
 
-Code identifiers, file names and commit messages are always English.
+Code identifiers, file names, and commit messages are always English.
 
 ---
 
@@ -570,6 +572,8 @@ Uninstall steps that use `git checkout <tag>` or `git revert <sha>` need a git w
 
 GitHub Issues are the inbox: an issue or PR is a candidate until the owner mints it an id. Nothing merges without a minted id and owner review, one item per PR. Versions, release branches, tags and GitHub Releases are owner-only. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR; its hard constraints bind AI agents working on a contributor's behalf as well.
 
+---
+
 ## License
 
-See [LICENSE](https://github.com/yeisonrestrepo/code-conductor/blob/main/LICENSE).
+See [LICENSE](LICENSE).
