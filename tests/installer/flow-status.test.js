@@ -72,7 +72,7 @@ describe('the D2 state table (AC3)', () => {
 
   it('falls back to the process directory when stdin carries none', () => {
     seed(denies(1));
-    expect(run([], { stdin: '' }).stdout).toBe('⛔ G3 P9 · 1 calls · 1 deny\n');
+    expect(run([], { stdin: '' }).stdout).toBe('⛔ G3 P9 · 1 call · 1 deny\n');
   });
 
   it('CC_FLOW_OFF blanks the line', () => {
@@ -93,7 +93,7 @@ describe('failure stays silent', () => {
 
   it('a control character in a code cannot break the line', () => {
     seed([ev({ verdict: 'deny', guard: 3, code: 'P9\nRM' })]);
-    expect(run().stdout).toBe('⛔ G3 P9 RM · 1 calls · 1 deny\n');
+    expect(run().stdout).toBe('⛔ G3 P9 RM · 1 call · 1 deny\n');
   });
 });
 
@@ -109,7 +109,7 @@ describe('the tail read', () => {
 
   it('drops the partial first line of a tail, so a large file is not reported unreadable', () => {
     writeFileSync(events, `${JSON.stringify(ev({ target: 'x'.repeat(40000) }))}\n${JSON.stringify(ev({}))}\n`);
-    expect(run().stdout).toBe('✓ 1 calls · 0 deny\n');
+    expect(run().stdout).toBe('✓ 1 call · 0 deny\n');
   });
 });
 
@@ -141,7 +141,14 @@ describe('/cc-flow --detail', () => {
 
   it.each(['0', 'true', ''])('keeps the log on under CC_FLOW_OFF=%j', (value) => {
     seed(denies(1));
-    expect(run([], { env: { CC_FLOW_OFF: value } }).stdout).toMatch(/^⛔ G3 P9 · 1 call/);
+    expect(run([], { env: { CC_FLOW_OFF: value } }).stdout).toBe('⛔ G3 P9 · 1 call · 1 deny\n');
+  });
+
+  it('says "1 call" on a lane with one event and keeps the columns aligned', () => {
+    seed([ev({}), ev({ tool: 'Read', passed: [4, 1] })]);
+    const out = run(['--detail']).stdout;
+    expect(out).toMatch(/^Bash\s+1 call {3}G7 1 pass 0 deny/m);
+    expect(out).toMatch(/^Write\s+0 calls {2}G/m);
   });
 });
 

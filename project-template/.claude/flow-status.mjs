@@ -60,13 +60,14 @@ export function parseEvents(text) {
 // Control characters would break the one-line display; replace them, never interpret them.
 const clean = (s) => String(s ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ');
 const decidedBy = (ev) => `G${clean(ev.guard)}${ev.code ? ` ${clean(ev.code)}` : ''}`;
+const callWord = (n) => (n === 1 ? 'call' : 'calls');
 
 // The spec D2 state table, one line.
 export function statusLine(events, lastBroken) {
   if (lastBroken) return 'flow: unreadable, retrying';
   if (events.length === 0) return '';
   const count = (verdict) => events.filter((e) => e.verdict === verdict).length;
-  const calls = `${events.length} calls`;
+  const calls = `${events.length} ${callWord(events.length)}`;
   const last = events.at(-1);
   if (last.verdict === 'deny') return `⛔ ${decidedBy(last)} · ${calls} · ${count('deny')} deny`;
   if (last.verdict === 'ask') return `? ${decidedBy(last)} · ${calls} · ${count('ask')} ask`;
@@ -89,7 +90,7 @@ function laneRow(lane, events) {
     const ask = mine.filter((e) => e.guard === g && e.verdict === 'ask').length;
     return `G${g} ${pass} pass ${deny} deny${ask ? ` ${ask} ask` : ''}`;
   });
-  return `${lane.name.padEnd(6)} ${String(mine.length).padStart(4)} calls  ${cells.join(' · ')}`;
+  return `${lane.name.padEnd(6)} ${String(mine.length).padStart(4)} ${callWord(mine.length).padEnd(5)}  ${cells.join(' · ')}`;
 }
 
 function eventRow(ev) {
