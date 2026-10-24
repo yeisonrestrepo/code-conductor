@@ -1046,6 +1046,19 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   cwd on Windows, WSL and POSIX, and a test runs it from a
   subdirectory.
 
+### [ ] `[BUG-066]` Settings merge is not idempotent for a CRLF template: the second run rewrites settings.json once
+
+- Symptom: mergeSettingsFile (lib/installer/settings-merge.mjs:115)
+  skips a write only on a byte-equal match, and its serializer emits
+  LF. A fresh install copies a CRLF template verbatim (:82), so the
+  second unchanged run reports `merged` and rewrites the file to LF
+  with a new hash and mtime; the third run settles. Any host file an
+  editor saved as CRLF takes the same spurious rewrite.
+- Fix shape: normalize the host's CRLF to LF before the comparison,
+  so an EOL-only difference is `unchanged` and left untouched.
+- Spec: docs/superpowers/specs/2026-10-24-bug066-settings-merge-crlf-design.md.
+- Filed from issue #96.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
