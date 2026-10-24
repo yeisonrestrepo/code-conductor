@@ -136,7 +136,12 @@ describe('/cc-flow --detail', () => {
   });
 
   it('says the log is off under CC_FLOW_OFF', () => {
-    expect(run(['--detail'], { env: { CC_FLOW_OFF: '1' } }).stdout).toBe('flow log is off (CC_FLOW_OFF is set)\n');
+    expect(run(['--detail'], { env: { CC_FLOW_OFF: '1' } }).stdout).toBe('flow log is off (CC_FLOW_OFF=1)\n');
+  });
+
+  it.each(['0', 'true', ''])('keeps the log on under CC_FLOW_OFF=%j', (value) => {
+    seed(denies(1));
+    expect(run([], { env: { CC_FLOW_OFF: value } }).stdout).toMatch(/^⛔ G3 P9 · 1 call/);
   });
 });
 

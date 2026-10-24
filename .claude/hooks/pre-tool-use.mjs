@@ -878,7 +878,7 @@ function rotateFlowEvents(path) {
 // catch swallows, so a missing directory costs no separate existence check per call.
 function recordFlowEvent(payload, input, decision, passed, guard) {
   try {
-    if (process.env.CC_FLOW_OFF || typeof payload.cwd !== 'string' || !payload.cwd) return;
+    if (process.env.CC_FLOW_OFF === '1' || typeof payload.cwd !== 'string' || !payload.cwd) return;
     const path = join(payload.cwd, '.claude', '.flow-events.jsonl');
     const size = statSync(path, { throwIfNoEntry: false })?.size ?? 0;
     if (size > FLOW_MAX_BYTES) rotateFlowEvents(path);

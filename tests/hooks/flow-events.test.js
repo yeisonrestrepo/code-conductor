@@ -160,6 +160,11 @@ describe('fail-open (AC2)', () => {
     expect(readdirSync(join(cwd, '.claude'))).toEqual([]);
   });
 
+  it.each(['0', 'true'])('CC_FLOW_OFF=%s still records, because only 1 turns the log off', (value) => {
+    fire(bash('git status'), { CC_FLOW_OFF: value });
+    expect(last().target).toBe('git');
+  });
+
   it('no .claude/ directory creates no file and no directory', () => {
     const bare = join(work, 'bare');
     mkdirSync(bare);

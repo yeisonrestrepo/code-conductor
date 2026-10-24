@@ -128,7 +128,8 @@ function workingDir(session) {
 // --detail never reads stdin: run from a shell tool, stdin may be a pipe nobody closes.
 export function render(argv, env = process.env) {
   const detail = argv.includes('--detail');
-  if (env.CC_FLOW_OFF) return detail ? 'flow log is off (CC_FLOW_OFF is set)' : '';
+  // Exactly '1', as the README documents and the hook checks: CC_FLOW_OFF=0 leaves it on.
+  if (env.CC_FLOW_OFF === '1') return detail ? 'flow log is off (CC_FLOW_OFF=1)' : '';
   const session = detail ? {} : readSession();
   const text = readTail(join(workingDir(session), ...EVENTS_REL));
   const { events, lastBroken } = parseEvents(text ?? '');
