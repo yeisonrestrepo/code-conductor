@@ -34,25 +34,25 @@
 - [X] [T-000-A] Write the spec and this plan.
 - [X] [T-000-B] Add both `.gitignore` leaves in sorted position after the BUG-056 leaves.
 - [X] [T-000-C] Add the `[BUG-064]` entry after `[BUG-061]` in the backlog.
-- [ ] [T-000-D] Commit `docs: spec and plan for the neutral template memory stub [BUG-064]`.
+- [X] [T-000-D] Commit `docs: spec and plan for the neutral template memory stub [BUG-064]`.
 
 ### Task 1: Failing tests
 
 **Files:** Create `tests/fixtures/legacy-project-memory-stub.md`; modify `tests/unit/bounded-project-memory.test.js`, `tests/installer/deploy.test.js`
 
-- [ ] [T-001-A] Copy the current template stub to the fixture byte for byte.
-- [ ] [T-001-B] Retarget AC7 to the fixture's digest; add a case that the template stub has no BUG/FEAT/ARCH id, no `### Checkpoint`, no code-conductor path, and keeps the five headings.
-- [ ] [T-001-C] In `deploy.test.js`: a host holding the fixture bytes gets one recovery warning and is unchanged; a fresh `deployProject` from the real repo tree is silent and its `project.md` carries no BUG/FEAT id.
-- [ ] [T-001-D] Run both files. Expected: neutral-stub case, legacy-warning case and real-tree case fail on the current code.
+- [X] [T-001-A] Copy the current template stub to the fixture byte for byte.
+- [X] [T-001-B] Retarget AC7 to the fixture's digest; add a case that the template stub has no BUG/FEAT/ARCH id, no `### Checkpoint`, no code-conductor path, and keeps the five headings.
+- [X] [T-001-C] In `deploy.test.js`: a host holding the fixture bytes gets one recovery warning and is unchanged; a fresh `deployProject` from the real repo tree is silent and its `project.md` carries no BUG/FEAT id.
+- [X] [T-001-D] Run both files. Expected: neutral-stub case, legacy-warning case and real-tree case fail on the current code.
 
 ### Task 2: Fix
 
 **Files:** Modify `project-template/.claude/memory/project.md`, `lib/installer/deploy.mjs`
 
-- [ ] [T-002-A] Rewrite the stub to intro plus five headings with placeholders.
-- [ ] [T-002-B] Add `LEGACY_PROJECT_MEMORY_STUB_SHA256` and the digest comparison in `warnIfProjectMemoryIsStub`; message says "a bundled stub".
-- [ ] [T-002-C] Run both files. Expected: all pass.
-- [ ] [T-002-D] Commit `fix: ship a neutral project.md stub and keep the legacy overwrite warning [BUG-064]`.
+- [X] [T-002-A] Rewrite the stub to intro plus five headings with placeholders.
+- [X] [T-002-B] Add `LEGACY_PROJECT_MEMORY_STUB_SHA256` and the digest comparison in `warnIfProjectMemoryIsStub`; message says "a bundled stub".
+- [X] [T-002-C] Run both files. Expected: all pass.
+- [X] [T-002-D] Commit `fix: ship a neutral project.md stub and keep the legacy overwrite warning [BUG-064]`.
 
 ### Task 3: Verify and evidence (PR only, never committed)
 
