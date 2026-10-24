@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync, rmSync 
 import { tmpdir } from 'os'
 import { join, resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
+import { BASH } from '../helpers/bash.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT  = resolve(__dirname, '../..')
@@ -11,10 +12,8 @@ const HOOK_PATH  = resolve(REPO_ROOT, '.claude/hooks/context-guard.sh')
 const PC_PATH    = resolve(REPO_ROOT, '.claude/hooks/post-compact.sh')
 
 const WIN32 = process.platform === 'win32'
-const _whichBash = WIN32 ? null : spawnSync('which', ['bash'], { stdio: 'pipe', timeout: 5000 })
-const BASH_PATH  = (_whichBash?.status === 0) ? _whichBash.stdout.toString().trim() : 'bash'
-const _bashCheck = spawnSync('bash', ['--version'], { stdio: 'pipe', timeout: 5000 })
-const BASH_AVAILABLE = !_bashCheck.error && _bashCheck.status === 0
+const BASH_PATH  = BASH
+const BASH_AVAILABLE = BASH !== null
 
 const dirs = []
 function mkTmp(thresh = null, count = null) {
