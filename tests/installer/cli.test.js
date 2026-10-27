@@ -157,6 +157,45 @@ describe('run', () => {
     run(['--verbosity', 'MIN', '--verbosity', 'VERBOSE'], { HOME: home }, { cwd, log });
     expect(readFileSync(join(home, '.claude', 'memory', 'verbosity.md'), 'utf8')).toMatch(/VERBOSITY: VERBOSE/);
   });
+  it('treats -Verbosity LEVEL exactly like --verbosity LEVEL (issue #109)', () => {
+    const rc = run(['-Verbosity', 'INFO'], { HOME: home }, { cwd, log });
+    expect(rc).toBe(0);
+    expect(readFileSync(join(home, '.claude', 'memory', 'verbosity.md'), 'utf8')).toMatch(/VERBOSITY: INFO/);
+    expect(logs.some(l => l.startsWith('stderr:'))).toBe(false);
+  });
+  it('accepts the inline -Verbosity=LEVEL form (issue #109)', () => {
+    run(['-Verbosity=VERBOSE'], { HOME: home }, { cwd, log });
+    expect(readFileSync(join(home, '.claude', 'memory', 'verbosity.md'), 'utf8')).toMatch(/VERBOSITY: VERBOSE/);
+  });
+  it('resolves --verbosity and -Verbosity last-wins across spellings (issue #109)', () => {
+    run(['--verbosity', 'MIN', '-Verbosity', 'VERBOSE'], { HOME: home }, { cwd, log });
+    expect(readFileSync(join(home, '.claude', 'memory', 'verbosity.md'), 'utf8')).toMatch(/VERBOSITY: VERBOSE/);
+  });
+  it('treats a trailing -Verbosity with no value as MIN plus a warning (issue #109)', () => {
+    const rc = run(['-Verbosity'], { HOME: home }, { cwd, log });
+    expect(rc).toBe(0);
+    expect(readFileSync(join(home, '.claude', 'memory', 'verbosity.md'), 'utf8')).toMatch(/VERBOSITY: MIN/);
+    expect(logs.some(l => l.startsWith('stderr:') && /invalid/i.test(l))).toBe(true);
+  });
+  it('warns on an invalid -Verbosity value like --verbosity does (issue #109)', () => {
+    run(['-Verbosity', 'loud'], { HOME: home }, { cwd, log });
+    expect(logs.some(l => l.startsWith('stderr:') && /invalid/i.test(l))).toBe(true);
+    expect(readFileSync(join(home, '.claude', 'memory', 'verbosity.md'), 'utf8')).toMatch(/VERBOSITY: MIN/);
+  });
+  it('does not take a single-dash token as the -Verbosity value (issue #109)', () => {
+    run(['-Verbosity', '-x'], { HOME: home }, { cwd, log });
+    expect(readFileSync(join(home, '.claude', 'memory', 'verbosity.md'), 'utf8')).toMatch(/VERBOSITY: MIN/);
+    expect(logs.some(l => l.startsWith('stderr:') && /unrecognized/.test(l) && /-x/.test(l))).toBe(true);
+  });
+  it('keeps -verbosity (lowercase) unrecognized (issue #109)', () => {
+    run(['-verbosity', 'INFO'], { HOME: home }, { cwd, log });
+    expect(readFileSync(join(home, '.claude', 'memory', 'verbosity.md'), 'utf8')).toMatch(/VERBOSITY: MIN/);
+    expect(logs.some(l => /unrecognized/.test(l) && /-verbosity/.test(l))).toBe(true);
+  });
+  it('lists -Verbosity in --help (issue #109)', () => {
+    run(['--help'], { HOME: home }, { cwd, log });
+    expect(logs.some(l => l.startsWith('stdout:') && l.includes('[--verbosity|-Verbosity MIN|INFO|VERBOSE]'))).toBe(true);
+  });
   it('prints the version and exits 0 for --version', () => {
     const rc = run(['--version'], { HOME: home }, { cwd, log });
     expect(rc).toBe(0);

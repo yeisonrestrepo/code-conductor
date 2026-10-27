@@ -31,7 +31,7 @@ npx @yeison.restrepo.r/code-conductor@latest --project
 |---|---|
 | `--project` | Also scaffold `.claude/` in the current directory |
 | `--no-deps` | Skip dependency installation; copy agent files only |
-| `--verbosity MIN\|INFO\|VERBOSE` | Response verbosity (default `MIN`) |
+| `--verbosity MIN\|INFO\|VERBOSE` / `-Verbosity` | Response verbosity (default `MIN`) |
 
 ## Your First Session
 

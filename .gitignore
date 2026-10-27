@@ -124,6 +124,7 @@ tests/.tmp/
 !/docs/superpowers/plans/2026-10-22-bug058-windows-suite.md
 !/docs/superpowers/plans/2026-10-22-bug059-fake-gh-win32.md
 !/docs/superpowers/plans/2026-10-23-bug056-context-guard-session-reset.md
+!/docs/superpowers/plans/2026-10-27-issue109-verbosity-alias.md
 !/docs/superpowers/specs/2026-06-09-bug001-cc-compact-design.md
 !/docs/superpowers/specs/2026-06-09-bug002-spec-read-budget-design.md
 !/docs/superpowers/specs/2026-06-11-bug006-feat018-bash-scan-guard-design.md
@@ -170,6 +171,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-10-22-bug058-windows-suite-design.md
 !/docs/superpowers/specs/2026-10-22-bug059-fake-gh-win32-design.md
 !/docs/superpowers/specs/2026-10-23-bug056-context-guard-session-reset-design.md
+!/docs/superpowers/specs/2026-10-27-issue109-verbosity-alias-design.md
 # --- END tracked-surface block (BUG-042) ---
 
 # Kept for external writers. Both lines are redundant against the block above; each is

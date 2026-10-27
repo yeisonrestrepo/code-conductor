@@ -8,7 +8,12 @@ import { verbosityHookCommand, mergeVerbosityHook } from '../lib/installer/setti
 import { healGraphifyHook } from '../lib/installer/heal.mjs';
 import { writeVerbosity, writeVersionFile } from '../lib/installer/config.mjs';
 
-const USAGE = `Usage: code-conductor [--project] [--verbosity MIN|INFO|VERBOSE] [--version] [--help]`;
+const USAGE = `Usage: code-conductor [--project] [--verbosity|-Verbosity MIN|INFO|VERBOSE] [--version] [--help]`;
+
+// -Verbosity is the spelling the retired install.ps1 documented. Both spellings share
+// every form (space-separated, inline `=`, missing value) and last-wins across them.
+const VERBOSITY_FLAGS = ['--verbosity', '-Verbosity'];
+const isVerbosityFlag = (a) => VERBOSITY_FLAGS.some((f) => a === f || a.startsWith(`${f}=`));
 
 // Hand-rolled parser (four flags only). Deliberately NOT node:util's parseArgs —
 // the CLI honors the zero-runtime-dependency rule and node:util adds no value for
@@ -22,20 +27,22 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--project') opts.project = true;
-    else if (a === '--verbosity' || a.startsWith('--verbosity=')) {
+    else if (isVerbosityFlag(a)) {
       opts.verbosityGiven = true;
-      if (a.startsWith('--verbosity=')) {
+      if (a.includes('=')) {
         // Inline form: --verbosity=INFO. Empty (`--verbosity=`) leaves value ''.
         // Surrounding whitespace (e.g. a quoted `--verbosity= VERBOSE `) is NOT
         // stripped here — normalizeVerbosity() trims before matching, so whitespace
         // is tolerated and a whitespace-only/`=`-only value normalizes to null → MIN+warn.
-        opts.verbosity = a.slice('--verbosity='.length);
+        opts.verbosity = a.slice(a.indexOf('=') + 1);
       } else {
         // Space-separated form: consume the next token only if it is a real value,
         // not another flag or the end of argv (`--verbosity` passed last). A missing
         // value stays undefined and falls back to MIN + warning in writeVerbosity.
+        // Any `-` prefix marks a flag, so single-dash aliases are never eaten as the
+        // level; no valid level starts with `-`.
         const next = argv[i + 1];
-        if (next !== undefined && !next.startsWith('--')) { opts.verbosity = next; i++; }
+        if (next !== undefined && !next.startsWith('-')) { opts.verbosity = next; i++; }
       }
     }
     else if (a === '--version' || a === '-v') opts.version = true;
