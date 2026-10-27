@@ -11,7 +11,7 @@
 - Zero runtime dependencies; exact-case matching; no `-Verbosity:LEVEL` form.
 - No release records (`VERSION`, `package.json` version, `CHANGELOG.md`, backlog).
 - The installer is exercised only through `tests/installer/cli.test.js`, which uses temp directories.
-- The verbosity value guard change (`--` to `-`) is byte-identical to #107 and #108, so the three merge cleanly in any order.
+- The verbosity value guard change (`--` to `-`) is byte-identical to #107 and #108. The sibling PRs still conflict textually on `USAGE` and adjacent lines, so the second to land needs a trivial rebase.
 
 ## Tasks
 
