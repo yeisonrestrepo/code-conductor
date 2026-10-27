@@ -36,8 +36,8 @@ function parseArgs(argv) {
         // Space-separated form: consume the next token only if it is a real value,
         // not another flag or the end of argv (`--verbosity` passed last). A missing
         // value stays undefined and falls back to MIN + warning in writeVerbosity.
-        // Any `-` prefix marks a flag, so single-dash aliases like -Project are never
-        // eaten as the level; no valid level starts with `-`.
+        // Any `-` prefix marks a flag, so single-dash aliases are never eaten as the
+        // level; no valid level starts with `-`.
         const next = argv[i + 1];
         if (next !== undefined && !next.startsWith('-')) { opts.verbosity = next; i++; }
       }
