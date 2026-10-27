@@ -29,7 +29,7 @@ npx @yeison.restrepo.r/code-conductor@latest --project
 
 | Flag | Description |
 |---|---|
-| `--project` | Also scaffold `.claude/` in the current directory |
+| `--project` / `-Project` | Also scaffold `.claude/` in the current directory |
 | `--no-deps` | Skip dependency installation; copy agent files only |
 | `--verbosity MIN\|INFO\|VERBOSE` | Response verbosity (default `MIN`) |
 
