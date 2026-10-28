@@ -1054,21 +1054,6 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   cwd on Windows, WSL and POSIX, and a test runs it from a
   subdirectory.
 
-### [ ] `[BUG-064]` Template project.md stub seeds every host with code-conductor's own history
-* Issue #94. Spec: `docs/superpowers/specs/2026-10-24-bug064-template-memory-stub-design.md`; plan: `docs/superpowers/plans/2026-10-24-bug064-template-memory-stub.md`.
-
-- Symptom: a fresh `--project` install seeds `.claude/memory/project.md`
-  byte-identical to `project-template/.claude/memory/project.md`, which
-  carries this repo's BUG-001 checkpoint (v1.7.0) and FEAT-007 /
-  FEAT-005 debt notes since `b018793`. Memory-first and `/cc-resume`
-  read them as the host's own.
-- Constraint: `warnIfProjectMemoryIsStub` compares byte for byte
-  against the stub, and 1.28/1.29 re-runs wrote the old bytes.
-- Fix shape: neutral stub; the check also matches the legacy stub's
-  sha256, so 1.28/1.29 victims are still warned.
-- Acceptance: a fresh install seeds no BUG-/FEAT- history; a host
-  holding the legacy stub still gets the recovery warning.
-
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.

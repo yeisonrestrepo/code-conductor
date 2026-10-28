@@ -1,7 +1,7 @@
-# BUG-064 Template Memory Stub — Design
+# Issue #94 Template Memory Stub — Design
 
 **Status:** APPROVED 2026-10-24 (owner reviews in the PR)
-**Backlog:** `[BUG-064]` · **Issue:** #94
+**Issue:** #94 (backlog id assigned owner-side)
 
 ## Problem
 
@@ -33,6 +33,7 @@ Rejected: shipping the legacy stub as a file in `lib/` to compare against. That 
 - [ ] The template stub contains no `BUG-`, `FEAT-`, `ARCH-` id, no `### Checkpoint`, and no code-conductor file path (`project-template/`, `global/commands/`).
 - [ ] The stub keeps the five section headings: Stack, Architecture Decisions, Active Conventions, Technical Debt, Workarounds.
 - [ ] A host file byte-identical to the legacy stub fixture gets exactly one recovery warning on `deployProject`, and is not modified.
+- [ ] The same holds when that host file has CRLF line endings (an `autocrlf=true` clone): the digest is taken over the LF-normalized text.
 - [ ] The legacy fixture's sha256 equals the digest the installer holds.
 - [ ] Every existing `deploy.test.js` stub-detection test passes unchanged.
 - [ ] A fresh `deployProject` from the real asset tree is silent and seeds the neutral stub.
@@ -41,7 +42,7 @@ Rejected: shipping the legacy stub as a file in `lib/` to compare against. That 
 
 - This repository's own `.claude/memory/project.md` (it is code-conductor's real memory).
 - The "seeded and untouched" false positive (accepted residual, BUG-039 spec `:129`).
-- Release records (VERSION, CHANGELOG, backlog flip).
+- Release and owner-side records (VERSION, CHANGELOG, backlog entry, README Known limits).
 
 ## System Impact
 
@@ -50,7 +51,7 @@ Rejected: shipping the legacy stub as a file in `lib/` to compare against. That 
 - `tests/unit/bounded-project-memory.test.js` (AC7 retargeted from the template to the fixture)
 - `tests/installer/deploy.test.js` (legacy-stub case, real-tree fresh-install case)
 - `tests/fixtures/legacy-project-memory-stub.md` (new)
-- `README.md` Known limits: `[BUG-064]` bullet while the backlog item is open (`repo-invariants.test.js`)
+- Records (backlog entry, README Known limits) are owner-side and not touched here.
 
 ## Complexity Estimate
 

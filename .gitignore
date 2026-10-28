@@ -126,7 +126,7 @@ tests/.tmp/
 !/docs/superpowers/plans/2026-10-22-bug059-fake-gh-win32.md
 !/docs/superpowers/plans/2026-10-22-feat046-cc-metrics.md
 !/docs/superpowers/plans/2026-10-23-bug056-context-guard-session-reset.md
-!/docs/superpowers/plans/2026-10-24-bug064-template-memory-stub.md
+!/docs/superpowers/plans/2026-10-24-issue94-template-memory-stub.md
 !/docs/superpowers/plans/2026-10-27-issue106-no-deps-flag.md
 !/docs/superpowers/plans/2026-10-27-issue108-nodeps-alias.md
 !/docs/superpowers/specs/2026-06-09-bug001-cc-compact-design.md
@@ -176,7 +176,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-10-22-bug059-fake-gh-win32-design.md
 !/docs/superpowers/specs/2026-10-22-feat046-cc-metrics-design.md
 !/docs/superpowers/specs/2026-10-23-bug056-context-guard-session-reset-design.md
-!/docs/superpowers/specs/2026-10-24-bug064-template-memory-stub-design.md
+!/docs/superpowers/specs/2026-10-24-issue94-template-memory-stub-design.md
 !/docs/superpowers/specs/2026-10-27-issue106-no-deps-flag-design.md
 !/docs/superpowers/specs/2026-10-27-issue108-nodeps-alias-design.md
 # --- END tracked-surface block (BUG-042) ---

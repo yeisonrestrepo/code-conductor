@@ -1,4 +1,4 @@
-# BUG-064 Template Memory Stub Implementation Plan
+# Issue #94 Template Memory Stub Implementation Plan
 
 > **For agentic workers:** Steps use checkbox (`- [ ]`) syntax for tracking. Update one checkbox per edit (BUG-003 invariant).
 
@@ -8,7 +8,7 @@
 
 **Tech Stack:** Node 20 ESM, vitest.
 
-**Spec:** `docs/superpowers/specs/2026-10-24-bug064-template-memory-stub-design.md`, APPROVED 2026-10-24.
+**Spec:** `docs/superpowers/specs/2026-10-24-issue94-template-memory-stub-design.md`, APPROVED 2026-10-24.
 
 ## Global Constraints
 
@@ -27,14 +27,14 @@
 
 ---
 
-### Task 0: Spec, plan, backlog, ignore leaves
+### Task 0: Spec, plan, ignore leaves
 
-**Files:** Create spec and plan; modify `.gitignore`, `AGENT-READABLE BACKLOG.md`
+**Files:** Create spec and plan; modify `.gitignore`
 
 - [X] [T-000-A] Write the spec and this plan.
 - [X] [T-000-B] Add both `.gitignore` leaves in sorted position after the BUG-056 leaves.
-- [X] [T-000-C] Add the `[BUG-064]` entry after `[BUG-061]` in the backlog.
-- [X] [T-000-D] Commit `docs: spec and plan for the neutral template memory stub [BUG-064]`.
+- [X] [T-000-C] Withdrawn in review: the backlog entry is owner-side (CONTRIBUTING "Records are owner-side"); the id is assigned by the owner.
+- [X] [T-000-D] Commit `docs: spec and plan for the neutral template memory stub`.
 
 ### Task 1: Failing tests
 
@@ -52,10 +52,18 @@
 - [X] [T-002-A] Rewrite the stub to intro plus five headings with placeholders.
 - [X] [T-002-B] Add `LEGACY_PROJECT_MEMORY_STUB_SHA256` and the digest comparison in `warnIfProjectMemoryIsStub`; message says "a bundled stub".
 - [X] [T-002-C] Run both files. Expected: all pass.
-- [X] [T-002-E] Found by the full suite: `repo-invariants.test.js` requires every open backlog defect in README Known limits, so add the `[BUG-064]` bullet there; the release closeout removes it with the backlog flip.
-- [X] [T-002-D] Commit `fix: ship a neutral project.md stub and keep the legacy overwrite warning [BUG-064]`.
+- [X] [T-002-E] Withdrawn in review: the README Known limits line is owner-side and was removed with the backlog entry.
+- [X] [T-002-D] Commit `fix: ship a neutral project.md stub and keep the legacy overwrite warning`.
 
 ### Task 3: Verify and evidence (PR only, never committed)
 
 - [ ] [T-003-A] `npx vitest run` on the branch and on `origin/main` under identical conditions; record counts.
 - [ ] [T-003-B] Fresh `--project` install from `main` and from the branch into temp hosts with a temp HOME; render the seeded `project.md` and the vitest summaries to PNG with headless Edge.
+
+### Task 4: Review round 1 (PR #101)
+
+**Files:** Rename spec and plan; modify `.gitignore`, `lib/installer/deploy.mjs`, `tests/installer/deploy.test.js`, `tests/unit/bounded-project-memory.test.js`; revert `AGENT-READABLE BACKLOG.md`, `README.md`
+
+- [X] [T-004-A] Drop the self-minted id: rename spec and plan to `issue94`, follow with both `.gitignore` leaves, retitle headings and test labels.
+- [X] [T-004-B] Revert the owner-side records: the backlog entry and the README Known limits line.
+- [X] [T-004-C] Hash the LF-normalized host text in `warnIfProjectMemoryIsStub`; add a CRLF legacy-stub case to `deploy.test.js`.
