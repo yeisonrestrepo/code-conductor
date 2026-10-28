@@ -29,9 +29,13 @@ npx @yeison.restrepo.r/code-conductor@latest --project
 
 | Flag | Description |
 |---|---|
-| `--project` | Also scaffold `.claude/` in the current directory |
-| `--no-deps` / `-NoDeps` | Accepted for compatibility; a no-op, since the npm CLI installs no dependencies |
-| `--verbosity MIN\|INFO\|VERBOSE` | Response verbosity (default `MIN`) |
+| `--project` | Also scaffold `.claude/` in the current directory. Refused, before anything is written, in a clone of code-conductor itself |
+| `--no-deps` / `-NoDeps` | Accepted for compatibility with the retired shell installers; a no-op, since the npm CLI installs no dependencies |
+| `--verbosity MIN\|INFO\|VERBOSE` | Response verbosity (default `MIN`; also `--verbosity=INFO`). An invalid value warns and falls back to `MIN` |
+| `--version`, `-v` | Print the version and exit |
+| `--help`, `-h` | Print usage and exit |
+
+Any other argument is reported as unrecognized on stderr and ignored; the install continues. The installer installs no dependencies: Claude Code, the Superpowers plugin and `gh` are yours to set up (see Prerequisites).
 
 ## Your First Session
 
@@ -57,26 +61,34 @@ git add .claude/ && git commit -m "chore: add code-conductor scaffold"
 
 ```
 ~/.claude/                        # Global core (all projects)
+  CLAUDE.md                       # Managed block merged; your content kept
+  settings.json                   # verbosity-remind hook entry merged in
   commands/cc-checkpoint.md
   commands/cc-stack.md
   commands/cc-lang.md
   commands/cc-compact.md
-  hooks/verbosity-remind.sh
-  hooks/context-guard.sh
-  memory/personal.md
-  memory/verbosity.md
-  CLAUDE.md
+  hooks/verbosity-remind.sh       # The only global hook
+  skills/<name>/SKILL.md          # The five skills
+  memory/personal.md              # Seeded once, never overwritten
+  memory/verbosity.md             # Level from --verbosity
+  memory/conductor-version.md     # Installed version
 
-<project>/.claude/                # Project template
-  commands/cc-*.md                # 10 project commands
-  hooks/pre-tool-use.mjs          # Guards 1–7
-  hooks/context-guard.*           # Turn counter
-  hooks/verbosity-remind.*        # Verbosity re-injection
-  agents/                         # 6 role agent definitions
-  memory/project.md               # Shared team memory
-  scripts/detect-stack.mjs        # Stack auto-detection
-  settings.json                   # Hook matcher config
+<project>/                        # With --project
+  CLAUDE.md                       # Managed block merged
+  .gitignore                      # One labelled Code Conductor block
+  .claude/commands/cc-*.md        # 11 project commands
+  .claude/agents/                 # 6 agents: spec, plan, code, audit, qa, define-review
+  .claude/hooks/pre-tool-use.mjs  # Guards 1–7
+  .claude/hooks/context-guard.sh  # Turn counter (+ .ps1)
+  .claude/hooks/post-compact.sh   # Counter reset after /compact (+ .ps1)
+  .claude/hooks/verbosity-remind.sh  # Project-level verbosity re-injection
+  .claude/memory/                 # project.md, bash-scan-allowlist.txt, context-threshold.txt
+  .claude/scripts/*.mjs           # All 11 script CLIs (detect-stack, orchestrate, snap-*, ...)
+  .claude/settings.json           # Hook matchers (hooks merged into an existing file)
+  .claude/review-loop.settings.json  # Auto-mode exception for the review loop
 ```
+
+Both the `.sh` and `.ps1` hooks are copied on every platform, and `settings.json` registers both. [Architecture Overview](Architecture-Overview#level-2-containers) shows how these payloads fit together.
 
 ## Verify it works
 

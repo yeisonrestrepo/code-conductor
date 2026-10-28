@@ -8,7 +8,7 @@ A governance layer for Claude Code that installs slash commands, hooks, guardrai
 
 ### Does it modify my project's code?
 
-No. It only creates/manages files inside `.claude/` and optionally `.conductor/` (gitignored). Your source code is untouched.
+No. It creates and manages files inside `.claude/` and `.conductor/` (gitignored), and merges one marked block into `CLAUDE.md` and one labelled block into `.gitignore`, backing each file up first. Your source code is untouched.
 
 ### What stacks does it support?
 
@@ -28,7 +28,13 @@ Install `@latest` (minimum `1.34.4`). Older versions could strip or damage exist
 
 ### The installer prints nothing — is that normal?
 
-Yes. Silent exit 0 is by design and is asserted by a test.
+Yes, when there is nothing to report: a fresh install, and a re-run that changes nothing, exit 0 silently. It prints a line when it has something to say:
+
+- each backup it takes before merging a file, for example `code-conductor: backed up CLAUDE.md to CLAUDE.md.installer-backup.<UTC timestamp> before merging`;
+- the removal of the retired graphify hook from `~/.claude/settings.json`, with a backup beside it;
+- warnings on stderr: an invalid `--verbosity`, an unrecognized argument, damaged `cc:managed` markers, or a `project.md` that still matches the shipped stub.
+
+Exit 1 means a pre-flight or environment failure (Node below 20, `--project` in a clone of code-conductor, an unwritable target); exit 2 means a partial write.
 
 ### How do I update?
 
@@ -71,13 +77,14 @@ Don't. If a specific guard is wrong, report it as an issue. The guards are the v
 
 ### The orchestrator halted — how do I recover?
 
-```bash
-# End the current run
-node .claude/scripts/orchestrate.mjs end
+A halted run cannot be resumed, only ended and restarted:
 
-# Start fresh
-node .claude/scripts/orchestrate.mjs start
+```bash
+# End the current run (removes the run file and the band envelope)
+node .claude/scripts/orchestrate.mjs end
 ```
+
+Then start fresh with `/cc-orchestrate <ITEM>`, which runs `orchestrate.mjs start <ITEM>` for you.
 
 ### Do I still need to approve things in `--auto` mode?
 
