@@ -6,8 +6,8 @@ import { join } from 'node:path';
 import { BASH, findBash, gitForWindowsBash } from '../helpers/bash.js';
 
 // The property the bash suites need is running a script by its native path, which the
-// WSL launcher fails (exit 127) while still passing `bash --version`. [BUG-062]
-describe('[BUG-062] bash helper', () => {
+// WSL launcher fails (exit 127) while still passing `bash --version` (#92).
+describe('bash helper', () => {
   it('rejects a candidate that does not exist', () => {
     expect(findBash(['cc-no-such-bash-062'])).toBeNull();
   });
@@ -30,7 +30,10 @@ describe('[BUG-062] bash helper', () => {
   });
 
   const gitBash = gitForWindowsBash();
+  // The first candidate stands in for the WSL launcher: it exists and runs, but cannot
+  // run the probe script. The fallback must be the one chosen, not merely some bash.
   it.skipIf(!gitBash || !existsSync(gitBash))('falls back to Git for Windows bash rather than skipping', () => {
+    expect(findBash([process.execPath, gitBash])).toBe(gitBash);
     expect(BASH).not.toBeNull();
   });
 });

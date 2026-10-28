@@ -6,6 +6,7 @@ export default defineConfig({
     pool: 'threads',
     include: ['tests/**/*.test.js'],
     setupFiles: ['tests/helpers/gh-guard.js'],
+    globalSetup: ['tests/helpers/bash-setup.js'],
     testTimeout: 30000,
     coverage: {
       provider: 'v8',
