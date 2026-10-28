@@ -1,4 +1,4 @@
-# BUG-065 Guard 3 Test Temp-Dir Cleanup Implementation Plan
+# Issue #95 Guard 3 Test Temp-Dir Cleanup Implementation Plan
 
 > **For agentic workers:** Steps use checkbox (`- [ ]`) syntax for tracking. Update one checkbox per edit (BUG-003 invariant).
 
@@ -8,7 +8,7 @@
 
 **Tech Stack:** Node `fs`, vitest, Git Bash on Windows.
 
-**Spec:** `docs/superpowers/specs/2026-10-24-bug065-guard3-eperm-cleanup-design.md`, reviewed by the owner in the PR.
+**Spec:** `docs/superpowers/specs/2026-10-24-issue95-guard3-eperm-cleanup-design.md`, reviewed by the owner in the PR.
 
 ## Global Constraints
 
@@ -29,8 +29,8 @@
 - [X] [T-000-0] Worktree `fix/bug-065-guard3-eperm-cleanup` from `origin/main`.
 - [X] [T-000-A] Write the spec and this plan.
 - [ ] [T-000-B] Add both `.gitignore` leaves in sorted position (BUG-042 toll).
-- [ ] [T-000-C] Add the `[BUG-065]` backlog entry after `[BUG-061]`; append a `## Spec: BUG-065` entry to `.claude/memory/project.md`.
-- [ ] [T-000-D] Commit `docs: spec and plan for the guard3 temp-dir cleanup [BUG-065]`.
+- [X] [T-000-C] Withdrawn in review: the backlog entry, the README Known limits line and the `.claude/memory/project.md` entry are owner-side (CONTRIBUTING "Records are owner-side"); the id is assigned by the owner.
+- [ ] [T-000-D] Commit `docs: spec and plan for the guard3 temp-dir cleanup`.
 
 ### Task 1: Before measurement
 
@@ -42,7 +42,7 @@
 
 - [ ] [T-002-A] Add `removeTempDir(dir)`; call it from `runRow`'s `finally` and from the `afterAll` sweep.
 - [ ] [T-002-B] Run the 20-run tally on the branch, concurrently with Task 1. Expected: zero EPERM/EBUSY failures.
-- [ ] [T-002-C] Commit `fix: retry and tolerate guard3 temp-dir cleanup on Windows [BUG-065]`.
+- [ ] [T-002-C] Commit `fix: retry and tolerate guard3 temp-dir cleanup on Windows`.
 
 ### Task 3: Verify
 
@@ -52,3 +52,11 @@
 
 - [ ] [T-004-A] Render the vitest summaries and both tallies to PNG with headless Edge in the scratchpad.
 - [ ] [T-004-B] Open the PR with `Closes #95`, counts, tally and the PNGs attached.
+
+### Task 5: Review round 1 (PR #111)
+
+**Files:** Rename spec and plan; modify `.gitignore`, `tests/hooks/guard3.test.js`; revert `AGENT-READABLE BACKLOG.md`, `README.md`, `.claude/memory/project.md`
+
+- [X] [T-005-A] Drop the self-minted id: rename spec and plan to `issue95`, follow with both `.gitignore` leaves, retitle headings and the test comment.
+- [X] [T-005-B] Revert the owner-side records: the backlog entry, the README Known limits line and the project memory entry.
+- [X] [T-005-C] `removeTempDir` warns once when it gives up (non-retryable error or the 10th try), naming the code and the dir.

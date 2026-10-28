@@ -1,7 +1,7 @@
-# BUG-065 Guard 3 Test Temp-Dir Cleanup on Windows — Design
+# Issue #95 Guard 3 Test Temp-Dir Cleanup on Windows — Design
 
 **Status:** DRAFT 2026-10-24, owner reviews in the PR
-**Backlog:** `[BUG-065]` · **Issue:** #95
+**Issue:** #95 (backlog id assigned owner-side)
 
 ## Problem
 
@@ -16,16 +16,19 @@ The child really has exited: `spawnSync` returns only after the process is reape
 One helper, `removeTempDir(dir)`, used by `runRow` and by the `afterAll` sweep:
 
 ```js
+let lastError
 for (let attempt = 1; attempt <= 10; attempt++) {
   try { fs.rmSync(dir, { recursive: true, force: true }); return }
   catch (e) {
-    if (!RETRYABLE_RM_CODES.includes(e.code)) return
+    lastError = e
+    if (!RETRYABLE_RM_CODES.includes(e.code)) break
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50 * attempt)
   }
 }
+console.warn(`[guard3] temp dir not removed (${lastError.code}), left in tests/.tmp: ${dir}`)
 ```
 
-It retries `EBUSY`, `EPERM` and `ENOTEMPTY` with a linear backoff (50, 100, … ms, up to about 2.75 s in total), which covers the release window, and never throws. The retry is hand-rolled because Node's own `maxRetries`/`retryDelay` was measured not to retry on Node 24.16.0 / win32: with the dir held open by a child process's cwd, `rmSync` with `maxRetries: 10` threw `EPERM` after 1 ms and left the dir, while this loop removed it after 532 ms, once the holder exited. A dir that still will not go does not fail the row: the verdict is what the row asserts, and the `afterAll` sweep retries every leftover `cc-guard3-*` dir at the end of the file. `tests/scripts/conductor-db.test.js:49-58` uses the `maxRetries` shape for the same Windows behavior and is likely affected by the same Node 24 gap; that is out of scope here.
+It retries `EBUSY`, `EPERM` and `ENOTEMPTY` with a linear backoff (50, 100, … ms, up to about 2.75 s in total), which covers the release window, and never throws. When it gives up, after a non-retryable error or the 10th try, it prints one `console.warn` naming the code and the dir, so leftovers in `tests/.tmp` do not pile up unnoticed. The retry is hand-rolled because Node's own `maxRetries`/`retryDelay` was measured not to retry on Node 24.16.0 / win32: with the dir held open by a child process's cwd, `rmSync` with `maxRetries: 10` threw `EPERM` after 1 ms and left the dir, while this loop removed it after 532 ms, once the holder exited. A dir that still will not go does not fail the row: the verdict is what the row asserts, and the `afterAll` sweep retries every leftover `cc-guard3-*` dir at the end of the file. `tests/scripts/conductor-db.test.js:49-58` uses the `maxRetries` shape for the same Windows behavior and is likely affected by the same Node 24 gap; that is out of scope here.
 
 Rejected alternatives:
 
@@ -37,6 +40,7 @@ Rejected alternatives:
 
 - [ ] `runRow` and the `afterAll` sweep remove dirs through one helper that retries `EBUSY`/`EPERM`/`ENOTEMPTY` up to 10 times with a 50 ms linear backoff.
 - [ ] A cleanup error never fails a row; the row's assertion is about the hook's exit status only.
+- [ ] A dir the helper gives up on is reported with one `console.warn` naming the error code and the dir.
 - [ ] Every corpus, dialect and termination case, and their count (176), are unchanged.
 - [ ] Repeated runs of `guard3.test.js` on Windows show zero EPERM/EBUSY failures on the branch, measured against the same runs on `main`.
 - [ ] Full suite on the branch shows no new failures against `main` under identical conditions.
