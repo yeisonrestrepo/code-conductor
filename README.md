@@ -373,7 +373,7 @@ By default, only the global core files are installed. Flags extend that:
 |---|---|
 | `--project` | Also install the project template into the current directory |
 | `--no-deps` / `-NoDeps` | Accepted for compatibility with the retired shell installers; a no-op, since the npm CLI installs no dependencies and copies agent files only |
-| `--verbosity MIN\|INFO\|VERBOSE` | Default response verbosity (default `MIN`). `MIN` = one sentence per response, `INFO` = bullet list, `VERBOSE` = full explanation. Re-run the installer to change it. |
+| `--verbosity MIN\|INFO\|VERBOSE` / `-Verbosity LEVEL` | Default response verbosity (default `MIN`). `MIN` = one sentence per response, `INFO` = bullet list, `VERBOSE` = full explanation. Re-run the installer to change it. PowerShell's `-Verbosity:INFO` form is not supported; it warns and the level stays `MIN`. |
 
 **Updating:** re-run the same install command. User-configured files are never overwritten; agent-managed files are always updated.
 

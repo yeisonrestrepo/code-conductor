@@ -8,7 +8,12 @@ import { verbosityHookCommand, mergeVerbosityHook } from '../lib/installer/setti
 import { healGraphifyHook } from '../lib/installer/heal.mjs';
 import { writeVerbosity, writeVersionFile } from '../lib/installer/config.mjs';
 
-const USAGE = `Usage: code-conductor [--project] [--no-deps|-NoDeps] [--verbosity MIN|INFO|VERBOSE] [--version] [--help]`;
+const USAGE = `Usage: code-conductor [--project] [--no-deps|-NoDeps] [--verbosity|-Verbosity MIN|INFO|VERBOSE] [--version] [--help]`;
+
+// -Verbosity is the spelling the retired install.ps1 documented. Both spellings share
+// every form (space-separated, inline `=`, missing value) and last-wins across them.
+const VERBOSITY_FLAGS = ['--verbosity', '-Verbosity'];
+const isVerbosityFlag = (a) => VERBOSITY_FLAGS.some((f) => a === f || a.startsWith(`${f}=`));
 
 // Hand-rolled parser (five flags only). Deliberately NOT node:util's parseArgs —
 // the CLI honors the zero-runtime-dependency rule and node:util adds no value for
@@ -26,14 +31,14 @@ function parseArgs(argv) {
     // shell installers, so there is nothing to skip. Recognized so callers carried over
     // from install.sh get no misleading "unrecognized" warning.
     else if (a === '--no-deps' || a === '-NoDeps') opts.noDeps = true;
-    else if (a === '--verbosity' || a.startsWith('--verbosity=')) {
+    else if (isVerbosityFlag(a)) {
       opts.verbosityGiven = true;
-      if (a.startsWith('--verbosity=')) {
+      if (a.includes('=')) {
         // Inline form: --verbosity=INFO. Empty (`--verbosity=`) leaves value ''.
         // Surrounding whitespace (e.g. a quoted `--verbosity= VERBOSE `) is NOT
         // stripped here — normalizeVerbosity() trims before matching, so whitespace
         // is tolerated and a whitespace-only/`=`-only value normalizes to null → MIN+warn.
-        opts.verbosity = a.slice('--verbosity='.length);
+        opts.verbosity = a.slice(a.indexOf('=') + 1);
       } else {
         // Space-separated form: consume the next token only if it is a real value,
         // not another flag or the end of argv (`--verbosity` passed last). A missing
