@@ -1,0 +1,5 @@
+{"type":"some-future-record","payload":{"x":1},"sessionId":"sess-cccc3333"}
+{"type":"permission-mode","permissionMode":"default","sessionId":"sess-cccc3333"}
+{"type":"assistant","requestId":"req-n1","message":{"model":"fixture-model","role":"assistant","content":[{"type":"text","text":"no usage here"}]},"timestamp":"2026-01-03T10:00:00.000Z","sessionId":"sess-cccc3333","gitBranch":"main","isSidechain":false,"uuid":"n1"}
+{"type":"assistant","requestId":"req-n2","message":{"model":"fixture-model","role":"assistant","content":[{"type":"tool_use","id":"t-orphan","name":"Bash","input":{"command":"sleep"}}],"usage":{"input_tokens":4,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":6}},"timestamp":"2026-01-03T10:00:01.000Z","sessionId":"sess-cccc3333","gitBranch":"main","isSidechain":false,"uuid":"n2"}
+["not","an","object"]

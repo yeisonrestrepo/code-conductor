@@ -8,9 +8,9 @@ import { verbosityHookCommand, mergeVerbosityHook } from '../lib/installer/setti
 import { healGraphifyHook } from '../lib/installer/heal.mjs';
 import { writeVerbosity, writeVersionFile } from '../lib/installer/config.mjs';
 
-const USAGE = `Usage: code-conductor [--project|-Project] [--verbosity MIN|INFO|VERBOSE] [--version] [--help]`;
+const USAGE = `Usage: code-conductor [--project|-Project] [--no-deps|-NoDeps] [--verbosity MIN|INFO|VERBOSE] [--version] [--help]`;
 
-// Hand-rolled parser (four flags only). Deliberately NOT node:util's parseArgs —
+// Hand-rolled parser (five flags only). Deliberately NOT node:util's parseArgs —
 // the CLI honors the zero-runtime-dependency rule and node:util adds no value for
 // this tiny surface, so nothing is imported for argument handling.
 // Conflict policy: flags are LAST-WINS. `--verbosity MIN --verbosity VERBOSE`
@@ -18,12 +18,16 @@ const USAGE = `Usage: code-conductor [--project|-Project] [--verbosity MIN|INFO|
 // is idempotent. No "conflicting flags" error is raised — last-wins is the least
 // surprising CLI convention and keeps the parser branchless.
 function parseArgs(argv) {
-  const opts = { project: false, verbosity: undefined, verbosityGiven: false, version: false, help: false, unknown: [] };
+  const opts = { project: false, noDeps: false, verbosity: undefined, verbosityGiven: false, version: false, help: false, unknown: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     // -Project is the spelling the retired install.ps1 documented; matched exact-case
     // like every other flag here.
     if (a === '--project' || a === '-Project') opts.project = true;
+    // Accepted no-op: the npm CLI installs no dependencies since FEAT-023 removed the
+    // shell installers, so there is nothing to skip. Recognized so callers carried over
+    // from install.sh get no misleading "unrecognized" warning.
+    else if (a === '--no-deps' || a === '-NoDeps') opts.noDeps = true;
     else if (a === '--verbosity' || a.startsWith('--verbosity=')) {
       opts.verbosityGiven = true;
       if (a.startsWith('--verbosity=')) {

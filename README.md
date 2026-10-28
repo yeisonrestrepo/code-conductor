@@ -262,6 +262,7 @@ All commands are tagged `(Conductor)` in the Claude Code command palette, so the
 | `/cc-refactor [file\|module]` | Diagnose complexity, plan ordered changes, apply one step at a time, and verify tests pass after each step. |
 | `/cc-test [scope]` | Find coverage gaps, write AAA-pattern tests (plus Playwright E2E where applicable), run after confirmation, and report results. |
 | `/cc-docs [scope]` | Audit documentation, write inline docs in your stack's format (JSDoc / docstrings / Javadoc / GoDoc), and preview before writing. |
+| `/cc-metrics [--dir <path>]` | Read-only report of token and time spend from Claude Code's local session logs, grouped by tool, command, phase, branch, pillar and session, with recommendations that quote the numbers they rest on. Registers no hook and writes no file. |
 
 ---
 
@@ -371,6 +372,7 @@ By default, only the global core files are installed. Flags extend that:
 | Flag | Description |
 |---|---|
 | `--project` / `-Project` | Also install the project template into the current directory |
+| `--no-deps` / `-NoDeps` | Accepted for compatibility with the retired shell installers; a no-op, since the npm CLI installs no dependencies and copies agent files only |
 | `--verbosity MIN\|INFO\|VERBOSE` | Default response verbosity (default `MIN`). `MIN` = one sentence per response, `INFO` = bullet list, `VERBOSE` = full explanation. Re-run the installer to change it. |
 
 **Updating:** re-run the same install command. User-configured files are never overwritten; agent-managed files are always updated.

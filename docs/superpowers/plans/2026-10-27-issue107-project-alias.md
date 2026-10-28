@@ -11,7 +11,7 @@
 - Zero runtime dependencies; the parser stays hand-rolled; exact-case matching.
 - No release records (`VERSION`, `package.json` version, `CHANGELOG.md`, backlog).
 - The installer is exercised only through `tests/installer/cli.test.js`, which uses temp directories.
-- The verbosity value guard change (`--` to `-`) is shared with #108 and #109; whichever PR lands first carries it, and the others rebase to a no-op hunk.
+- The verbosity value guard change (`--` to `-`) is shared with #108 and #109. #112 and #114 have landed; this branch merged `main`. `USAGE` is `[--project|-Project] [--no-deps|-NoDeps] [--verbosity MIN|INFO|VERBOSE]`. #115 has not landed, so that string does not add `|-Verbosity`.
 
 ## Tasks
 
