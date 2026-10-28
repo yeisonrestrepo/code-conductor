@@ -1,0 +1,57 @@
+# Issue #93 Guard 1 Binary Reads Implementation Plan
+
+> **For agentic workers:** Steps use checkbox (`- [ ]`) syntax for tracking. Update one checkbox per edit (BUG-003 invariant).
+
+**Goal:** A no-limit Read of a binary file (an image) is never denied by Guard 1, while text files keep the 150-line limit.
+
+**Architecture:** `guard1LargeRead` reads the file as a Buffer; a NUL byte in the first 8,000 bytes marks it binary and the guard allows. Otherwise the Buffer is decoded as UTF-8 and counted as today.
+
+**Tech Stack:** Node (zero-dependency ESM hook), vitest.
+
+**Spec:** `docs/superpowers/specs/2026-10-24-issue93-guard1-binary-reads-design.md`, APPROVED 2026-10-24.
+
+## Global Constraints
+
+- Sniff window 8,000 bytes (git's `FIRST_FEW_BYTES`); no extension list.
+- Text behavior unchanged: every existing Guard 1 test passes.
+- `project-template/.claude/hooks/pre-tool-use.mjs` stays byte-identical to `.claude/hooks/pre-tool-use.mjs`.
+- No release records. Staging by explicit path; never bare `git add -u`; never bypass the pre-commit hook.
+
+---
+
+### Task 0: Spec, plan and their ignore leaves
+
+- [X] [T-000-A] Write the spec and this plan.
+- [X] [T-000-B] Add both `.gitignore` leaves in sorted position (BUG-042 toll).
+- [X] [T-000-C] Withdrawn in review: the backlog entry and the `.claude/memory/project.md` entry are owner-side (CONTRIBUTING "Records are owner-side"); the id is assigned by the owner.
+- [X] [T-000-D] Commit `docs: spec and plan for the Guard 1 binary skip`.
+
+### Task 1: Failing test
+
+**Files:** Modify `tests/hooks/pre-tool-use-contract.test.js`
+
+- [X] [T-001-A] Add: a PNG (signature + NUL-bearing IHDR length + 200 `0x0A`) Read with no limit allows; a text file with 200 newlines and its first NUL past byte 8,000 is denied.
+- [X] [T-001-B] Run the file. Expected: the PNG case fails on the current hook; the rest pass.
+
+### Task 2: Fix
+
+**Files:** Modify `.claude/hooks/pre-tool-use.mjs`, `project-template/.claude/hooks/pre-tool-use.mjs`
+
+- [X] [T-002-A] Add `isBinary(buffer)` (`buffer.subarray(0, 8000).indexOf(0) !== -1`); in `guard1LargeRead` read a Buffer, return `null` when binary, else count `buffer.toString('utf8')`.
+- [X] [T-002-B] Copy to the template twin; run the contract and parity tests. Expected: all pass.
+- [X] [T-002-C] Commit `fix: skip binary files in Guard 1`.
+
+### Task 3: Verify and evidence (PR only, never committed)
+
+- [X] [T-003-A] Full `npx vitest run` on the branch and on `main` under identical conditions; record both counts.
+- [X] [T-003-B] Feed a Read of a real PNG to `main`'s hook and the branch hook; render the captures and the suite summaries to PNG with headless Edge.
+- [X] [T-003-C] Open the PR with `Closes #93` and the PNGs attached.
+
+### Task 4: Review round 1 (PR #102)
+
+**Files:** Rename spec and plan; modify `.gitignore`, both hook copies, `tests/hooks/pre-tool-use-contract.test.js`; revert `AGENT-READABLE BACKLOG.md`, `README.md`, `.claude/memory/project.md`
+
+- [X] [T-004-A] Drop the self-minted id: rename spec and plan to `issue93`, follow with both `.gitignore` leaves, retitle headings and comments.
+- [X] [T-004-B] Revert the owner-side records: the backlog entry, the README Known limits line and the project memory entry.
+- [X] [T-004-C] A UTF-16 BOM rules binary out in `isBinary`; pin 200-line UTF-16LE and UTF-16BE files as denied.
+- [X] [T-004-D] Spec out of scope: a binary Claude Code would render as text now passes Guard 1.
