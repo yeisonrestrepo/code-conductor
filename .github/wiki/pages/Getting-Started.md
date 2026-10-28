@@ -30,8 +30,8 @@ npx @yeison.restrepo.r/code-conductor@latest --project
 | Flag | Description |
 |---|---|
 | `--project` | Also scaffold `.claude/` in the current directory |
-| `--no-deps` | Skip dependency installation; copy agent files only |
-| `--verbosity MIN\|INFO\|VERBOSE` / `-Verbosity` | Response verbosity (default `MIN`) |
+| `--no-deps` / `-NoDeps` | Accepted for compatibility; a no-op, since the npm CLI installs no dependencies |
+| `--verbosity MIN\|INFO\|VERBOSE` / `-Verbosity LEVEL` | Response verbosity (default `MIN`). PowerShell's `-Verbosity:INFO` is not supported; it warns and stays `MIN`. |
 
 ## Your First Session
 

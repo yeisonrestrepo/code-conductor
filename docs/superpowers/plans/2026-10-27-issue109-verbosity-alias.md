@@ -11,12 +11,12 @@
 - Zero runtime dependencies; exact-case matching; no `-Verbosity:LEVEL` form.
 - No release records (`VERSION`, `package.json` version, `CHANGELOG.md`, backlog).
 - The installer is exercised only through `tests/installer/cli.test.js`, which uses temp directories.
-- The verbosity value guard change (`--` to `-`) is byte-identical to #107 and #108. The sibling PRs still conflict textually on `USAGE` and adjacent lines, so the second to land needs a trivial rebase.
+- The verbosity value guard change (`--` to `-`) is byte-identical to #107 and #108. #112 and #114 have landed; this branch merged `main` and kept both sides. `USAGE` is `[--project] [--no-deps|-NoDeps] [--verbosity|-Verbosity MIN|INFO|VERBOSE]`. #113 had not landed, so `|-Project` is not in that string.
 
 ## Tasks
 
 - [x] 1. `bin/code-conductor.mjs`: `VERBOSITY_FLAGS` and `isVerbosityFlag`, inline value sliced after the first `=`, value guard `startsWith('-')`, `USAGE` shows `[--verbosity|-Verbosity MIN|INFO|VERBOSE]`.
 - [x] 2. `tests/installer/cli.test.js`: space and inline forms, last-wins across spellings, trailing flag, invalid value, single-dash token not consumed, lowercase unrecognized, `--help` listing.
-- [x] 3. `README.md` and `.github/wiki/pages/Getting-Started.md`: `--verbosity` / `-Verbosity`.
+- [x] 3. `README.md` and `.github/wiki/pages/Getting-Started.md`: `--verbosity` / `-Verbosity LEVEL`. The PowerShell colon form is documented as unsupported.
 - [x] 4. `.gitignore`: spec and plan leaves in sorted position.
 - [x] 5. Run the full suite with `npx vitest run`.

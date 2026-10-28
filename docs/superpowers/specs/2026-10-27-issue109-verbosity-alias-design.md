@@ -35,7 +35,7 @@ Candidate id: pending owner intake (no FEAT id minted). Produced by an AI agent 
 - [ ] `run(['--verbosity', 'MIN', '-Verbosity', 'VERBOSE'])` resolves to VERBOSE.
 - [ ] `run(['-Verbosity'])` resolves to MIN plus the existing warning, with no crash.
 - [ ] `run(['-Verbosity', '-x'])` does not take `-x` as the level.
-- [ ] `USAGE` and the README flags table show `--verbosity` / `-Verbosity`.
+- [ ] `USAGE` shows `[--verbosity|-Verbosity MIN|INFO|VERBOSE]`. The README flags table shows `-Verbosity LEVEL`, and says `-Verbosity:INFO` is unsupported.
 
 ## Out of Scope
 - `-Verbosity:INFO`, and case-insensitive matching.
