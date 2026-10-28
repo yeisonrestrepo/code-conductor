@@ -53,7 +53,7 @@ Release integrity is checked by four repository-only instruments in `tools/`; no
 
 | Instrument | What it checks | Run by |
 |------------|---------------|--------|
-| `id-ceiling.mjs` | The highest filed id over the working tree and `origin/main`, so a new id never collides | A person or agent, by hand, before minting an id |
+| `id-ceiling.mjs` | The highest filed id over the working tree and `origin/main`, so a new id never collides; and that the backlog files no id twice | The ceiling query: a person or agent, by hand, before minting an id (its remote leg needs history the CI checkout does not fetch). The duplicate check: `tests/tools/repo-invariants.test.js` in CI, on every PR |
 | `version-gate.mjs` | `VERSION` agrees with every other location that carries the version | `tests/tools/repo-invariants.test.js` in CI, and by hand at closeout |
 | `record-parity.mjs` | Every item the `CHANGELOG` claims has a closed backlog entry naming its version | `tests/tools/repo-invariants.test.js` in CI, and by hand at closeout |
 | `skip-baseline.mjs` | Each CI leg's exact skipped-test set matches `tools/skip-baseline.json` | `test.yml` directly, after the suite, on every leg |
