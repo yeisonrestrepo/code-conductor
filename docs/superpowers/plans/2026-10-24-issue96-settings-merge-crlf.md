@@ -1,4 +1,4 @@
-# BUG-066 Settings Merge CRLF Idempotence Implementation Plan
+# Issue #96 Settings Merge CRLF Idempotence Implementation Plan
 
 > **For agentic workers:** Steps use checkbox (`- [ ]`) syntax for tracking. Update one checkbox per edit (BUG-003 invariant).
 
@@ -8,7 +8,7 @@
 
 **Tech Stack:** Node ESM, vitest.
 
-**Spec:** `docs/superpowers/specs/2026-10-24-bug066-settings-merge-crlf-design.md`, owner reviews in the PR.
+**Spec:** `docs/superpowers/specs/2026-10-24-issue96-settings-merge-crlf-design.md`, owner reviews in the PR.
 
 ## Global Constraints
 
@@ -24,9 +24,9 @@
 - [X] [T-000-0] Worktree on `fix/bug-066-settings-merge-crlf` from `origin/main`.
 - [X] [T-000-A] Write the spec and this plan.
 - [X] [T-000-B] Add both `.gitignore` leaves in sorted position (BUG-042 toll).
-- [X] [T-000-C] Add the `[BUG-066]` backlog entry after `[BUG-061]`.
-- [X] [T-000-E] Found by the full suite: `repo-invariants.test.js` requires every open backlog item in README's Known limits, so `[BUG-066]` gets a Known-limits line; release closeout removes it.
-- [X] [T-000-D] Commit `docs: spec and plan for the CRLF settings merge [BUG-066]`.
+- [X] [T-000-C] Withdrawn in review: the backlog entry is owner-side (CONTRIBUTING "Records are owner-side"); the id is assigned by the owner.
+- [X] [T-000-E] Withdrawn in review: the README Known limits line is owner-side and was removed with the backlog entry.
+- [X] [T-000-D] Commit `docs: spec and plan for the CRLF settings merge`.
 
 ### Task 1: Failing tests
 
@@ -42,10 +42,18 @@
 
 - [X] [T-002-A] Compare against `raw.replace(/\r\n/g, '\n')`.
 - [X] [T-002-B] Run `tests/installer/`. Expected: all pass.
-- [X] [T-002-C] Commit `fix: compare settings merges with host line endings normalized [BUG-066]`.
+- [X] [T-002-C] Commit `fix: compare settings merges with host line endings normalized`.
 
 ### Task 3: Verify and evidence (PR only, never committed)
 
 - [X] [T-003-A] Full `npx vitest run` on the branch and on `main` under identical conditions.
 - [X] [T-003-B] Install twice into a temp host with a CRLF template on `main` and on the branch; record `settings.json` sha256, mtime and status per run.
 - [X] [T-003-C] Render the suite summaries and both install captures to PNG with headless Edge; attach to the PR under `Closes #96`.
+
+### Task 4: Review round 1 (PR #103)
+
+**Files:** Rename spec and plan; modify `.gitignore`, `tests/installer/settings-merge.test.js`; revert `AGENT-READABLE BACKLOG.md`, `README.md`
+
+- [X] [T-004-A] Drop the self-minted id: rename spec and plan to `issue96`, follow with both `.gitignore` leaves, retitle headings and test labels.
+- [X] [T-004-B] Revert the owner-side records: the backlog entry and the README Known limits line.
+- [X] [T-004-C] Spec out of scope: a real merge writes LF, so a user's CRLF is not kept; not a regression.

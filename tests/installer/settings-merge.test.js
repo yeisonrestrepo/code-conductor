@@ -156,7 +156,7 @@ describe('mergeSettingsFile: owned entries', () => {
     expect(mergeSettingsFile(tpl, sp, FPS)).toBe('unchanged');
     expect(readFileSync(sp, 'utf8')).toBe(first);
   });
-  // [BUG-066] A CRLF checkout of the template must not cost one spurious rewrite.
+  // (#96) A CRLF checkout of the template must not cost one spurious rewrite.
   it('is byte-identical on a second run of a CRLF template', () => {
     writeFileSync(tpl, `${JSON.stringify(TPL, null, 2)}\n`.replace(/\n/g, '\r\n'), 'utf8');
     expect(mergeSettingsFile(tpl, sp, FPS)).toBe('created');
@@ -164,7 +164,7 @@ describe('mergeSettingsFile: owned entries', () => {
     expect(mergeSettingsFile(tpl, sp, FPS)).toBe('unchanged');
     expect(readFileSync(sp, 'utf8')).toBe(first);
   });
-  it('[BUG-066] leaves a CRLF host alone when the merge changes nothing', () => {
+  it('leaves a CRLF host alone when the merge changes nothing', () => {
     const host = `${JSON.stringify({ ...TPL, permissions: { allow: ['Bash(ls:*)'] } }, null, 2)}\n`.replace(/\n/g, '\r\n');
     writeFileSync(sp, host, 'utf8');
     expect(mergeSettingsFile(tpl, sp, FPS)).toBe('unchanged');

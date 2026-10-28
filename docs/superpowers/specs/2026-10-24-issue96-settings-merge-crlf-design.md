@@ -1,7 +1,7 @@
-# BUG-066 Settings Merge CRLF Idempotence — Design
+# Issue #96 Settings Merge CRLF Idempotence — Design
 
 **Status:** PROPOSED 2026-10-24 (owner reviews in the PR)
-**Backlog:** `[BUG-066]` · **Issue:** #96
+**Issue:** #96 (backlog id assigned owner-side)
 
 ## Problem
 
@@ -29,7 +29,7 @@ Rejected alternative: write LF on the fresh-install branch. It fixes only the in
 
 ## Out of Scope
 
-- Preserving CRLF when a real merge rewrites the file.
+- Preserving CRLF when a real merge rewrites the file (`settings-merge.mjs:118`). When the merge changes content, the file is written with LF, so a user's CRLF is not kept. This is not a regression: `main` writes LF on every merge too, and this fix only stops the rewrite when nothing but line endings differ.
 - Other formatting differences (indent, key order) that already cause a one-time rewrite.
 - Release records (VERSION, CHANGELOG, backlog flip).
 
