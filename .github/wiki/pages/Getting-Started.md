@@ -30,6 +30,7 @@ npx @yeison.restrepo.r/code-conductor@latest --project
 | Flag | Description |
 |---|---|
 | `--project` | Also scaffold `.claude/` in the current directory. Refused, before anything is written, in a clone of code-conductor itself |
+| `--no-deps` / `-NoDeps` | Accepted for compatibility with the retired shell installers; a no-op, since the npm CLI installs no dependencies |
 | `--verbosity MIN\|INFO\|VERBOSE` | Response verbosity (default `MIN`; also `--verbosity=INFO`). An invalid value warns and falls back to `MIN` |
 | `--version`, `-v` | Print the version and exit |
 | `--help`, `-h` | Print usage and exit |
