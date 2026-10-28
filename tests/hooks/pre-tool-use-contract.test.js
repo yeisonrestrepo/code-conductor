@@ -105,7 +105,7 @@ describe('pre-tool-use contract harness', () => {
     expect(r.decision).toBeNull();
   });
 
-  // [BUG-063] A binary has no lines: Claude Code renders an image rather than reading it
+  // (#93) A binary has no lines: Claude Code renders an image rather than reading it
   // as text, so its 0x0A bytes must not count. Every PNG carries NUL in its IHDR length.
   it('allows a no-limit Read of a binary PNG with more than 150 newline bytes', () => {
     const p = join(dir, 'shot.png');
@@ -115,6 +115,21 @@ describe('pre-tool-use contract harness', () => {
     const r = fire(readPayload(p));
     expect(r.status).toBe(0);
     expect(r.decision).toBeNull();
+  });
+
+  // PowerShell 5.1's `cmd > out.txt` writes UTF-16LE with a BOM. Every ASCII character
+  // carries a NUL byte, yet Claude Code reads the file as text (review round 1 of PR #102).
+  it.each([
+    ['UTF-16LE', Buffer.from([0xff, 0xfe]), 'utf16le'],
+    ['UTF-16BE', Buffer.from([0xfe, 0xff]), 'utf16be'],
+  ])('still denies a 200-line %s text file with a BOM', (_, bom, encoding) => {
+    const p = join(dir, `${encoding}.txt`);
+    const le = Buffer.from('line\n'.repeat(200), 'utf16le');
+    const body = encoding === 'utf16le' ? le : Buffer.from(le).swap16();
+    writeFileSync(p, Buffer.concat([bom, body]));
+    const r = fire(readPayload(p));
+    expect(r.decision.permissionDecision).toBe('deny');
+    expect(r.decision.permissionDecisionReason).toMatch(/Guard 1.*Lines: 200 /);
   });
 
   it('still denies a 200-line text file whose first NUL sits past the sniff window', () => {

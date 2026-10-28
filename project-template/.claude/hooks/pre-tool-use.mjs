@@ -79,9 +79,17 @@ function guard4BlockedRead(input) {
 }
 
 // git's binary heuristic (buffer_is_binary): a NUL in the first 8,000 bytes. A binary has
-// no lines, and Claude Code renders an image Read rather than reading it as text (BUG-063).
+// no lines, and Claude Code renders an image Read rather than reading it as text (#93).
+// UTF-16 text is full of NULs but is read as text, so a UTF-16 BOM rules binary out. Its
+// newline is still a single 0x0A byte, so the UTF-8 line count stays right.
 function isBinary(buffer) {
+  if (hasUtf16Bom(buffer)) return false;
   return buffer.subarray(0, BINARY_SNIFF_BYTES).indexOf(0) !== -1;
+}
+
+function hasUtf16Bom(buffer) {
+  const [a, b] = buffer;
+  return (a === 0xff && b === 0xfe) || (a === 0xfe && b === 0xff);
 }
 
 // Guard 1: a large-file Read with no limit. A path that cannot be stat'd has no size to
