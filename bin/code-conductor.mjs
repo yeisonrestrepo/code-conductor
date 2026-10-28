@@ -8,7 +8,7 @@ import { verbosityHookCommand, mergeVerbosityHook } from '../lib/installer/setti
 import { healGraphifyHook } from '../lib/installer/heal.mjs';
 import { writeVerbosity, writeVersionFile } from '../lib/installer/config.mjs';
 
-const USAGE = `Usage: code-conductor [--project] [--no-deps] [--verbosity MIN|INFO|VERBOSE] [--version] [--help]`;
+const USAGE = `Usage: code-conductor [--project] [--no-deps|-NoDeps] [--verbosity MIN|INFO|VERBOSE] [--version] [--help]`;
 
 // Hand-rolled parser (five flags only). Deliberately NOT node:util's parseArgs —
 // the CLI honors the zero-runtime-dependency rule and node:util adds no value for
@@ -25,7 +25,7 @@ function parseArgs(argv) {
     // Accepted no-op: the npm CLI installs no dependencies since FEAT-023 removed the
     // shell installers, so there is nothing to skip. Recognized so callers carried over
     // from install.sh get no misleading "unrecognized" warning.
-    else if (a === '--no-deps') opts.noDeps = true;
+    else if (a === '--no-deps' || a === '-NoDeps') opts.noDeps = true;
     else if (a === '--verbosity' || a.startsWith('--verbosity=')) {
       opts.verbosityGiven = true;
       if (a.startsWith('--verbosity=')) {
@@ -38,8 +38,10 @@ function parseArgs(argv) {
         // Space-separated form: consume the next token only if it is a real value,
         // not another flag or the end of argv (`--verbosity` passed last). A missing
         // value stays undefined and falls back to MIN + warning in writeVerbosity.
+        // Any `-` prefix marks a flag, so single-dash aliases are never eaten as the
+        // level; no valid level starts with `-`.
         const next = argv[i + 1];
-        if (next !== undefined && !next.startsWith('--')) { opts.verbosity = next; i++; }
+        if (next !== undefined && !next.startsWith('-')) { opts.verbosity = next; i++; }
       }
     }
     else if (a === '--version' || a === '-v') opts.version = true;
