@@ -30,7 +30,7 @@ npx @yeison.restrepo.r/code-conductor@latest --project
 | Flag | Description |
 |---|---|
 | `--project` | Also scaffold `.claude/` in the current directory |
-| `--no-deps` | Skip dependency installation; copy agent files only |
+| `--no-deps` / `-NoDeps` | Accepted for compatibility; a no-op, since the npm CLI installs no dependencies |
 | `--verbosity MIN\|INFO\|VERBOSE` | Response verbosity (default `MIN`) |
 
 ## Your First Session
