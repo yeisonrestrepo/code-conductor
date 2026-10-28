@@ -108,7 +108,7 @@ describe('bounded project memory [BUG-057]', () => {
     expect(section.some((l) => /^- [^:]+: ## /.test(l))).toBe(false);
   });
 
-  // [BUG-064] The stub 1.28/1.29 shipped now lives only in a fixture; the installer
+  // (#94) The stub 1.28/1.29 shipped now lives only in a fixture; the installer
   // keeps its digest so the overwrite warning still recognizes the bytes they wrote.
   it('AC7: the legacy stub fixture matches the digest the installer recognizes', () => {
     const stub = read('tests/fixtures/legacy-project-memory-stub.md');
@@ -118,7 +118,7 @@ describe('bounded project memory [BUG-057]', () => {
     expect(digest).toBe(LEGACY_PROJECT_MEMORY_STUB_SHA256);
   });
 
-  it('[BUG-064] the template stub is neutral: headings only, no code-conductor history', () => {
+  it('(#94) the template stub is neutral: headings only, no code-conductor history', () => {
     const stub = read('project-template/.claude/memory/project.md');
     expect(stub).not.toMatch(/\b(BUG|FEAT|ARCH)-\d+/);
     expect(stub).not.toContain('### Checkpoint');

@@ -508,7 +508,7 @@ describe('deployProject: overwritten project.md detection', () => {
     expect(warned).toEqual([]);
   });
 
-  // [BUG-064] 1.28/1.29 re-runs wrote the old history-laden stub, not today's.
+  // (#94) 1.28/1.29 re-runs wrote the old history-laden stub, not today's.
   it('warns once, and writes nothing, when the host copy is the stub 1.28/1.29 shipped', () => {
     const p = join(home, '.claude', 'memory', 'project.md');
     mkdirSync(dirname(p), { recursive: true });
@@ -518,9 +518,21 @@ describe('deployProject: overwritten project.md detection', () => {
     expect(warned[0]).toContain('may have been overwritten');
     expect(readFileSync(p, 'utf8')).toBe(LEGACY_STUB);
   });
+
+  // An autocrlf=true clone on Windows wrote that stub with CRLF endings.
+  it('warns once, and writes nothing, when the 1.28/1.29 stub was written with CRLF', () => {
+    const p = join(home, '.claude', 'memory', 'project.md');
+    const crlf = LEGACY_STUB.replace(/\r?\n/g, '\r\n');
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, crlf);
+    deployProject(asset, home, { warn });
+    expect(warned).toHaveLength(1);
+    expect(warned[0]).toContain('may have been overwritten');
+    expect(readFileSync(p, 'utf8')).toBe(crlf);
+  });
 });
 
-describe('deployProject: real template memory stub [BUG-064]', () => {
+describe('deployProject: real template memory stub (#94)', () => {
   it('a fresh scaffold is silent and seeds a stub with no code-conductor history', () => {
     const warned = [];
     deployProject(ROOT, home, { warn: (m) => warned.push(m), report: (m) => warned.push(m) });
