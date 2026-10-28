@@ -43,6 +43,7 @@ All commands are tagged `(Conductor)` in the Claude Code command palette.
 | `/cc-refactor [file\|module]` | Diagnose complexity, plan changes, apply one step at a time, verify tests after each. |
 | `/cc-test [scope]` | Find coverage gaps, write AAA-pattern tests, run after confirmation, report results. |
 | `/cc-docs [scope]` | Audit documentation, write inline docs (JSDoc / docstrings / JavaDoc / GoDoc), preview before writing. |
+| `/cc-metrics [--dir <path>]` | Read-only report of token and time spend from local session logs, by tool, command, phase, branch, pillar and session, with recommendations that quote their numbers. |
 | `/cc-flow` | Print the guard lanes with per-guard pass, deny and ask counts, then the newest 20 hook decisions. The same log drives the flow status line. |
 
 ## The Ideal Workflow

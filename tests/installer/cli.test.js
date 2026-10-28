@@ -157,6 +157,56 @@ describe('run', () => {
     run(['--verbosity', 'MIN', '--verbosity', 'VERBOSE'], { HOME: home }, { cwd, log });
     expect(readFileSync(join(home, '.claude', 'memory', 'verbosity.md'), 'utf8')).toMatch(/VERBOSITY: VERBOSE/);
   });
+  it('accepts --no-deps without an unrecognized warning (issue #106)', () => {
+    const rc = run(['--no-deps'], { HOME: home }, { cwd, log });
+    expect(rc).toBe(0);
+    expect(logs.some(l => /unrecognized/.test(l))).toBe(false);
+    expect(existsSync(join(home, '.claude', 'CLAUDE.md'))).toBe(true);
+  });
+  it('installs the same file set with and without --no-deps (issue #106)', () => {
+    const plainHome = mkdtempSync(join(tmpdir(), 'cc-run-plain-'));
+    try {
+      run(['--no-deps'], { HOME: home }, { cwd, log });
+      run([], { HOME: plainHome }, { cwd, log });
+      const list = (root) => readdirSync(join(root, '.claude'), { recursive: true }).map(String).sort();
+      expect(list(home)).toEqual(list(plainHome));
+    } finally { rmSync(plainHome, { recursive: true, force: true }); }
+  });
+  it('does not consume --no-deps as the --verbosity value (issue #106)', () => {
+    run(['--verbosity', '--no-deps'], { HOME: home }, { cwd, log });
+    expect(readFileSync(join(home, '.claude', 'memory', 'verbosity.md'), 'utf8')).toMatch(/VERBOSITY: MIN/);
+    expect(logs.some(l => /unrecognized/.test(l))).toBe(false);
+  });
+  it('combines --no-deps with --project in either order (issue #106)', () => {
+    expect(run(['--no-deps', '--project'], { HOME: home }, { cwd, log })).toBe(0);
+    expect(run(['--project', '--no-deps'], { HOME: home }, { cwd, log })).toBe(0);
+    expect(existsSync(join(cwd, 'CLAUDE.md'))).toBe(true);
+    expect(logs.some(l => /unrecognized/.test(l))).toBe(false);
+  });
+  it('lists --no-deps and -NoDeps in --help (issues #106, #108)', () => {
+    run(['--help'], { HOME: home }, { cwd, log });
+    expect(logs.some(l => l.startsWith('stdout:') && l.includes('[--no-deps|-NoDeps]'))).toBe(true);
+  });
+  it('treats -NoDeps exactly like --no-deps (issue #108)', () => {
+    const rc = run(['-NoDeps'], { HOME: home }, { cwd, log });
+    expect(rc).toBe(0);
+    expect(logs.some(l => /unrecognized/.test(l))).toBe(false);
+    expect(existsSync(join(home, '.claude', 'CLAUDE.md'))).toBe(true);
+  });
+  it('keeps -nodeps (lowercase) unrecognized (issue #108)', () => {
+    run(['-nodeps'], { HOME: home }, { cwd, log });
+    expect(logs.some(l => l.startsWith('stderr:') && /unrecognized/.test(l) && /-nodeps/.test(l))).toBe(true);
+  });
+  it('does not consume -NoDeps as the --verbosity value (issue #108)', () => {
+    run(['--verbosity', '-NoDeps'], { HOME: home }, { cwd, log });
+    expect(readFileSync(join(home, '.claude', 'memory', 'verbosity.md'), 'utf8')).toMatch(/VERBOSITY: MIN/);
+    expect(logs.some(l => /unrecognized/.test(l))).toBe(false);
+  });
+  it('combines -NoDeps with --project and with --no-deps (issue #108)', () => {
+    expect(run(['-NoDeps', '--project', '--no-deps'], { HOME: home }, { cwd, log })).toBe(0);
+    expect(existsSync(join(cwd, 'CLAUDE.md'))).toBe(true);
+    expect(logs.some(l => /unrecognized/.test(l))).toBe(false);
+  });
   it('prints the version and exits 0 for --version', () => {
     const rc = run(['--version'], { HOME: home }, { cwd, log });
     expect(rc).toBe(0);

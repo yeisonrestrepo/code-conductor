@@ -40,7 +40,7 @@ None of these are model problems. They are *process* problems, and process is ex
 
 Three commands, from nothing to a guarded session. The output below is **real**, captured by running exactly these commands in a scratch directory.
 
-**Minimum safe version: `1.34.4`.** Older versions can strip or damage an existing `CLAUDE.md`: every release before `1.24` overwrote it with no backup, `1.24` through `1.34.3` silently removed your sections whose headings matched the managed block's, and an older pre-sentinel version left at least one field file with damaged lines. Always install `code-conductor@latest`, as below.
+**Minimum safe version: `1.34.4`.** Older versions can strip or damage an existing `CLAUDE.md`: every release before `1.24` overwrote it with no backup, `1.24` through `1.34.3` silently removed your sections whose headings matched the managed block's, and an older pre-sentinel version left at least one field file (a `CLAUDE.md` whose installer-managed field lines, `- Stack:` and friends, it fills in) with damaged lines. Always install `code-conductor@latest`, as below.
 
 ```bash
 mkdir demo && cd demo && git init -q && npm init -y >/dev/null
@@ -81,7 +81,7 @@ code-conductor assumes these are already in place; the installer does not set th
 | Dependency | Required for | How to get it |
 |---|---|---|
 | Node.js `>= 20` | Running the `code-conductor` CLI itself | Any current Node LTS |
-| Claude Code | The environment every command, skill and hook here runs inside | See Anthropic's Claude Code docs |
+| Claude Code | The environment every command, skill and hook here runs inside | See [Anthropic's Claude Code docs](https://code.claude.com/docs) |
 | **superpowers plugin** | `/cc-spec` (`brainstorming`), `/cc-plan` (`writing-plans`), and `/cc-debug`, `/cc-refactor`, `/cc-review`, `/cc-test` (all four via `subagent-driven-development`) | Install from Claude Code's `/plugin` marketplace, then run `/reload-plugins`, **before** using these commands; without it, their `Skill(...)` calls fail |
 | GitHub CLI (`gh`), authenticated | Only `/cc-orchestrate --ticket` and `ticket.mjs writeback`. code-conductor holds no credential; `gh` owns authentication | Install GitHub CLI, then run `gh auth login` |
 | ui-ux-pro-max skill | Nothing: retired guidance | No shipped code downloads, installs, or activates it. Its replacement is filed as `[FEAT-037]` |
@@ -262,6 +262,7 @@ All commands are tagged `(Conductor)` in the Claude Code command palette, so the
 | `/cc-refactor [file\|module]` | Diagnose complexity, plan ordered changes, apply one step at a time, and verify tests pass after each step. |
 | `/cc-test [scope]` | Find coverage gaps, write AAA-pattern tests (plus Playwright E2E where applicable), run after confirmation, and report results. |
 | `/cc-docs [scope]` | Audit documentation, write inline docs in your stack's format (JSDoc / docstrings / Javadoc / GoDoc), and preview before writing. |
+| `/cc-metrics [--dir <path>]` | Read-only report of token and time spend from Claude Code's local session logs, grouped by tool, command, phase, branch, pillar and session, with recommendations that quote the numbers they rest on. Registers no hook and writes no file. |
 | `/cc-flow` | Print the guard lanes with per-guard pass, deny and ask counts, then the newest 20 hook decisions. See [Flow status](#flow-status). |
 
 ---
@@ -300,7 +301,7 @@ Hooks run automatically at specific points in a Claude Code session and need no 
 | **6: Orchestrator writes** | live orchestrate runs | The orchestrator session can only write its own run-state surface; nested agent dispatch is denied. |
 | **7: Role shell** | role-agent `Bash` | `spec`, `plan` and `audit` get no shell; `code` and `qa` may run exactly one command, the recorded test command, byte for byte, no chaining. |
 
-**Guard 3 in detail.** The twelve patterns are: deep `find` without `-maxdepth 1`, `find -exec` with readers or shells, `xargs` with readers, `cat` or a pager followed by an unquoted glob, command substitution as a reader's argument, `grep -r` with a match-all pattern, `ls -R`, shell loops, `mapfile` and `readarray`, `eval`, `source` and the dot operator, alias remapping to a reader, and obfuscation sequences.
+**Guard 3 in detail.** The twelve patterns are: deep `find` without `-maxdepth 1`, `find -exec` with readers or shells, `xargs` with readers, `cat` followed by an unquoted glob, a pager followed by an unquoted glob, command substitution as a reader's argument, `grep -r` with a match-all pattern, `ls -R`, shell loops, `mapfile` and `readarray`, dynamic execution (`eval`, `source`, and the dot operator, one pattern), and alias remapping to a reader. A separate thirteenth check catches obfuscation sequences.
 
 Permanent exceptions live in `.claude/memory/bash-scan-allowlist.txt`, one entry per line, blank lines and `#` comments ignored and whitespace trimmed. An entry ending in `/` covers paths under that prefix, rejecting any suffix that walks up the tree with `..`; any other entry matches a whole command token. **Entries match literally: regex metacharacters carry no special meaning, so `file.ts` matches `file.ts` and nothing else.** The installer ships this file once as a commented template and creates it only when it is absent; it never overwrites an existing one. Every line in it disarms patterns for matching commands, so give each entry a comment saying why it exists; an uncommented entry is a review smell. An agent may *propose* an entry but must never add one to clear its own denial.
 
@@ -308,7 +309,7 @@ Hit a block you believe is wrong? Re-run the command with `CC_GUARD3_WARN=1` and
 
 **Guard 5 in detail.** A `Write`, `Edit`, `create_file` or `write_file` from a sub-agent whose `agent_type` names a band role (`spec`, `plan`, `code`, `audit`, `qa`) is checked against the nearest `.claude/memory/band-envelope.json` above its working directory, a SNAP v3 envelope. A malformed envelope, an agent that is not the envelope's role, a role not holding `RW`, or a path outside the envelope's `scope` globs (anchored at the band root, the directory whose `.claude/` holds the envelope) is denied with a named reason. The main session, any other agent, and any project without an envelope are untouched. It assumes cooperative agents: `agent_type` is a name taken on trust, and `Bash`, `NotebookEdit`, MCP write tools, and symlinked paths are not covered.
 
-**Guard 6 in detail.** While a `/cc-orchestrate` run is live, its run file `.claude/memory/orchestrator-run.json` binds it to one session by `session_id`. In that session, a `Write`, `Edit`, `create_file` or `write_file` from anything but a band role (the main session, a payload carrying only `agent_id`, any other agent) is denied with `ORCH_WRITE_DENIED` unless its target lies inside the orchestrator's write surface, anchored at the run root: `.claude/memory/orchestrator-run.json`, `.claude/memory/band-envelope.json`, `.claude/memory/session-snapshot.json` and `.conductor/**`. Band roles stay under Guard 5. A run file from another session is stale and an unreadable one is invalid: both warn (`ORCH_RUN_STALE`, `ORCH_RUN_INVALID`) with the cleanup command and never block. While the run is live, a sub-agent's `Agent` or `SendMessage` call is denied with `ORCH_NESTED_DISPATCH`, so only the orchestrator dispatches or messages agents (R7; the hook's matcher names both tools). Outside a live run there is no Guard 6. Its limits are listed under [Known limits](#known-limits).
+**Guard 6 in detail.** While a `/cc-orchestrate` run is live, its run file `.claude/memory/orchestrator-run.json` binds it to one session by `session_id`. In that session, a `Write`, `Edit`, `create_file` or `write_file` from anything but a band role (the main session, a payload carrying only `agent_id`, any other agent) is denied with `ORCH_WRITE_DENIED` unless its target lies inside the orchestrator's write surface, anchored at the run root: `.claude/memory/orchestrator-run.json`, `.claude/memory/band-envelope.json`, `.claude/memory/session-snapshot.json` and `.conductor/**`. Band roles stay under Guard 5. A run file from another session is stale and an unreadable one is invalid: both warn (`ORCH_RUN_STALE`, `ORCH_RUN_INVALID`) with the cleanup command and never block. While the run is live, a sub-agent's `Agent` or `SendMessage` call is denied with `ORCH_NESTED_DISPATCH`, so only the orchestrator dispatches or messages agents (R7, `[FEAT-011]`'s nested-dispatch requirement; the hook's matcher names both tools). Outside a live run there is no Guard 6. Its limits are listed under [Known limits](#known-limits).
 
 **Guard 7 in detail.** A `Bash` call from a sub-agent whose `agent_type` names a band role is decided before Guard 3, so Guard 3's `CC_GUARD3_WARN` ask can never outrank it. `spec`, `plan` and `audit` have no shell (`ROLE_SHELL_DENIED`). `code` and `qa` may run exactly one command, byte for byte: the `test_command` that `orchestrate.mjs start` recorded in the run file of a run live in their session. A command carrying `;`, `&`, `|`, a backtick, `$(`, `<`, `>`, or a line break is denied first (`ROLE_SHELL_CHAINING`). No run file, a run of another session, or no recorded command is denied (`ROLE_SHELL_UNRESOLVED`), and any other command is denied naming the allowed one (`ROLE_SHELL_NOT_ALLOWED`). An error inside the guard denies too, and `CC_HOOK_ALLOW` does not reach it. The main session and every other agent are untouched.
 
@@ -326,7 +327,7 @@ After each decision is written, the pre-tool-use hook appends one JSON line to `
 
 ### The other hooks
 
-- **context-guard** (global + project). Fires on every `UserPromptSubmit` and atomically increments a turn counter in `.claude/memory/turn-count.txt`. At 80% of the threshold it emits a CONTEXT WARNING; at or above the threshold, CONTEXT CRITICAL. The threshold is read from `.claude/memory/context-threshold.txt` (default 25). Ships for Unix (`context-guard.sh`) and Windows (`context-guard.ps1`). `CC_GUARD_DEBUG=1` prints debug info to stderr; `CC_PROJECT_ROOT` overrides the project root used for the memory directory.
+- **context-guard** (project). Fires on every `UserPromptSubmit` and atomically increments a turn counter in `.claude/memory/turn-count.txt`. At 80% of the threshold it emits a CONTEXT WARNING; at or above the threshold, CONTEXT CRITICAL. The threshold is read from `.claude/memory/context-threshold.txt` (default 25). Ships for Unix (`context-guard.sh`) and Windows (`context-guard.ps1`). `CC_GUARD_DEBUG=1` prints debug info to stderr; `CC_PROJECT_ROOT` overrides the project root used for the memory directory.
 - **post-compact.** Fires after `/compact`. Resets the turn counter to 0, reads `project.md`, shows the timestamp of the last `/cc-checkpoint`, and reminds you to checkpoint if this session's context has not been saved. Ships for Unix and Windows.
 - **verbosity-remind** (global + project). Fires on every `UserPromptSubmit` and re-injects the active MIN/INFO/VERBOSE constraint, so the level does not drift as the window fills (BUG-014). The global hook defers to a project-level hook if one exists (upward traversal from `$PWD`), and the level is read from the nearest `.claude/memory/verbosity.md` ancestor file. Set `CC_VERBOSITY_SKIP=1` to disable it in CI/CD.
 
@@ -363,7 +364,7 @@ On top of the markdown memory, `/cc-implement`'s Step 6 hook records each task's
 
 ## Install
 
-**Minimum safe version: `1.34.4`.** Older versions can strip or damage an existing `CLAUDE.md`: every release before `1.24` overwrote it with no backup, `1.24` through `1.34.3` silently removed your sections whose headings matched the managed block's, and an older pre-sentinel version left at least one field file with damaged lines. Install `code-conductor@latest`, as below.
+**Minimum safe version: `1.34.4`.** Older versions can strip or damage an existing `CLAUDE.md`: every release before `1.24` overwrote it with no backup, `1.24` through `1.34.3` silently removed your sections whose headings matched the managed block's, and an older pre-sentinel version left at least one field file (a `CLAUDE.md` whose installer-managed field lines, `- Stack:` and friends, it fills in) with damaged lines. Always install `code-conductor@latest`, as below.
 
 ```bash
 npx @yeison.restrepo.r/code-conductor@latest             # one-shot global setup
@@ -381,9 +382,9 @@ By default, only the global core files are installed. Flags extend that:
 
 | Flag | Description |
 |---|---|
-| `--project` / `-Project` | Also install the project template into the current directory |
-| `--no-deps` / `-NoDeps` | Skip dependency installation (Node tooling, Playwright MCP, plugins); copy agent files only |
-| `--verbosity MIN\|INFO\|VERBOSE` / `-Verbosity` | Default response verbosity (default `MIN`). `MIN` = one sentence per response, `INFO` = bullet list, `VERBOSE` = full explanation. Re-run the installer to change it. |
+| `--project` | Also install the project template into the current directory |
+| `--no-deps` / `-NoDeps` | Accepted for compatibility with the retired shell installers; a no-op, since the npm CLI installs no dependencies and copies agent files only |
+| `--verbosity MIN\|INFO\|VERBOSE` | Default response verbosity (default `MIN`). `MIN` = one sentence per response, `INFO` = bullet list, `VERBOSE` = full explanation. Re-run the installer to change it. |
 
 **Updating:** re-run the same install command. User-configured files are never overwritten; agent-managed files are always updated.
 
@@ -444,10 +445,10 @@ The backup and temp rules keep the installer's own backups and crash-stranded te
 - **The orchestrator (`1.36.0`) assumes cooperative agents.**
   - Guard 6 does not cover `Bash` writes, `claude -p` children included.
   - Inside a live run, a non-role agent the main session dispatched may write the orchestrator's write surface, the band envelope included.
-  - R7 protects live runs only.
+  - The nested-dispatch rule (R7) protects live runs only.
   - An agent writing after its hand-back is bounded only by the envelope in force, so a same-role next task inherits it.
   - Under auto permission mode no human stands behind a Bash write or a hook `ask`.
-  - A Guard 6 warning reaches you, never the model's tool result, and not in every case. Measured on `claude` 2.1.287:
+  - A Guard 6 warning reaches you, never the model's tool result, and not in every case. Measured on `claude` 2.1.292:
 
     | Channel | Permission mode | A prompting decision rides along | You see the warning |
     |---|---|---|---|
@@ -480,7 +481,7 @@ The backup and temp rules keep the installer's own backups and crash-stranded te
 
 ## Instruments: releases that verify their own record
 
-Four checks live in `tools/` as tracked repository infrastructure. Three of them run on every pull request, so a divergence blocks the merge rather than waiting for someone to remember, and the fourth is a query run by hand:
+Four checks live in `tools/` as tracked repository infrastructure. Three of them run in full on every pull request, so a divergence blocks the merge rather than waiting for someone to remember; the fourth, `id-ceiling.mjs`, runs its duplicate-free half on every pull request too, and its ceiling query by hand before each mint:
 
 - **`version-gate.mjs`** takes `VERSION` as the authority and checks four other locations against it, five in all. Agreement reports as agreement, which sounds trivial until you learn that its predecessor reported `FAIL` on five locations that agreed, because it compared against a literal frozen two releases earlier. It runs at the merge gate through `tests/tools/repo-invariants.test.js`, and by hand at closeout.
 - **`record-parity.mjs`** asserts that every item the `CHANGELOG` claims has a closed backlog entry naming the version it shipped in. It exists because `[BUG-044]` shipped, was closed out in memory, and left its backlog entry reading `[ ]` for an entire release with no instrument comparing the two documents. It runs at the merge gate through `tests/tools/repo-invariants.test.js`, and by hand at closeout.
@@ -514,7 +515,7 @@ Code identifiers, file names, and commit messages are always English.
 code-conductor/
 +-- README.md
 +-- VERSION
-+-- bin/code-conductor.mjs         npm CLI entry (npx code-conductor)
++-- bin/code-conductor.mjs         npm CLI entry (npx @yeison.restrepo.r/code-conductor)
 +-- lib/installer/                 CLI modules (env, deploy, settings, merges, heal)
 +-- global/
 |   +-- CLAUDE.md                  Global agent behavior (all projects)
@@ -575,7 +576,7 @@ Claude Code registers personal skills only at `~/.claude/skills/<name>/SKILL.md`
 
 Hook removal (`rm ~/.claude/hooks/verbosity-remind.sh`) and `settings.json` cleanup work identically in every environment; no git is required.
 
-Uninstall steps that use `git checkout <tag>` or `git revert <sha>` need a git working tree. In CI/CD pipelines, Docker containers, or directories that are not git repositories, they fail with `fatal: not a git repository`. That is expected and non-fatal: in those environments, manually delete or restore `skills/verbosity/SKILL.md` and remove the `verbosity-remind` entry from `~/.claude/settings.json`.
+No uninstall step needs a git working tree. In CI/CD pipelines, Docker containers, or directories that are not git repositories, uninstall the same way as anywhere else: delete `~/.claude/skills/verbosity/SKILL.md` (and any other skill directories you want gone) and remove the `verbosity-remind` entry from `~/.claude/settings.json`.
 
 ---
 
