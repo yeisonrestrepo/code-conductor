@@ -1,4 +1,4 @@
-# BUG-063 Guard 1 Binary Reads Implementation Plan
+# Issue #93 Guard 1 Binary Reads Implementation Plan
 
 > **For agentic workers:** Steps use checkbox (`- [ ]`) syntax for tracking. Update one checkbox per edit (BUG-003 invariant).
 
@@ -8,7 +8,7 @@
 
 **Tech Stack:** Node (zero-dependency ESM hook), vitest.
 
-**Spec:** `docs/superpowers/specs/2026-10-24-bug063-guard1-binary-reads-design.md`, APPROVED 2026-10-24.
+**Spec:** `docs/superpowers/specs/2026-10-24-issue93-guard1-binary-reads-design.md`, APPROVED 2026-10-24.
 
 ## Global Constraints
 
@@ -23,8 +23,8 @@
 
 - [X] [T-000-A] Write the spec and this plan.
 - [X] [T-000-B] Add both `.gitignore` leaves in sorted position (BUG-042 toll).
-- [X] [T-000-C] Append the `[BUG-063]` backlog entry after `[BUG-061]` and the `## Spec: BUG-063` entry to `.claude/memory/project.md`.
-- [X] [T-000-D] Commit `docs: spec and plan for the Guard 1 binary skip [BUG-063]`.
+- [X] [T-000-C] Withdrawn in review: the backlog entry and the `.claude/memory/project.md` entry are owner-side (CONTRIBUTING "Records are owner-side"); the id is assigned by the owner.
+- [X] [T-000-D] Commit `docs: spec and plan for the Guard 1 binary skip`.
 
 ### Task 1: Failing test
 
@@ -39,10 +39,19 @@
 
 - [X] [T-002-A] Add `isBinary(buffer)` (`buffer.subarray(0, 8000).indexOf(0) !== -1`); in `guard1LargeRead` read a Buffer, return `null` when binary, else count `buffer.toString('utf8')`.
 - [X] [T-002-B] Copy to the template twin; run the contract and parity tests. Expected: all pass.
-- [X] [T-002-C] Commit `fix: skip binary files in Guard 1 [BUG-063]`.
+- [X] [T-002-C] Commit `fix: skip binary files in Guard 1`.
 
 ### Task 3: Verify and evidence (PR only, never committed)
 
 - [X] [T-003-A] Full `npx vitest run` on the branch and on `main` under identical conditions; record both counts.
 - [X] [T-003-B] Feed a Read of a real PNG to `main`'s hook and the branch hook; render the captures and the suite summaries to PNG with headless Edge.
-- [ ] [T-003-C] Open the PR with `Closes #93` and the PNGs attached.
+- [X] [T-003-C] Open the PR with `Closes #93` and the PNGs attached.
+
+### Task 4: Review round 1 (PR #102)
+
+**Files:** Rename spec and plan; modify `.gitignore`, both hook copies, `tests/hooks/pre-tool-use-contract.test.js`; revert `AGENT-READABLE BACKLOG.md`, `README.md`, `.claude/memory/project.md`
+
+- [X] [T-004-A] Drop the self-minted id: rename spec and plan to `issue93`, follow with both `.gitignore` leaves, retitle headings and comments.
+- [X] [T-004-B] Revert the owner-side records: the backlog entry, the README Known limits line and the project memory entry.
+- [X] [T-004-C] A UTF-16 BOM rules binary out in `isBinary`; pin 200-line UTF-16LE and UTF-16BE files as denied.
+- [X] [T-004-D] Spec out of scope: a binary Claude Code would render as text now passes Guard 1.

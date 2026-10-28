@@ -1,7 +1,7 @@
-# BUG-063 Guard 1 Binary Reads — Design
+# Issue #93 Guard 1 Binary Reads — Design
 
 **Status:** APPROVED 2026-10-24 (owner reviews in the PR)
-**Backlog:** `[BUG-063]` · **Issue:** #93
+**Issue:** #93 (backlog id assigned owner-side)
 
 ## Problem
 
@@ -18,13 +18,14 @@ Rejected alternative: an extension allowlist (`.png`, `.jpg`, …). It needs a l
 ### Main path
 
 1. Read with no `limit` on a regular file: the hook reads it as a Buffer.
-2. A NUL byte in the first 8,000 bytes: binary, allow (no decision written).
+2. A NUL byte in the first 8,000 bytes, and no UTF-16 BOM (`FF FE` or `FE FF`) at the start: binary, allow (no decision written).
 3. Otherwise: decode as UTF-8, count `\n`, deny above 150 as today.
 
 ### Alternative paths
 
 - `limit` present, non-regular path, unreadable file: unchanged (allow).
 - Text file with a NUL only past byte 8,000: still text, still denied above 150 lines.
+- UTF-16 text with a BOM (PowerShell 5.1's `cmd > out.txt`): NULs throughout, but Claude Code reads it as text, so it is text here too and is denied above 150 lines. Its newline is still one `0x0A` byte, so the UTF-8 count is right.
 
 ### Error cases
 
@@ -34,20 +35,22 @@ Rejected alternative: an extension allowlist (`.png`, `.jpg`, …). It needs a l
 
 - [ ] A no-limit Read of a PNG with more than 150 `0x0A` bytes is allowed (fails on `main`).
 - [ ] A 200-line text file is still denied, including one whose first NUL sits past the sniff window.
+- [ ] A 200-line UTF-16LE or UTF-16BE text file with a BOM is still denied.
 - [ ] Every existing Guard 1 case passes unchanged.
 - [ ] Both hook copies stay byte-identical.
 
 ## Out of Scope
 
 - Guard 2's line count of a binary in its "FILE ALREADY EXISTS" prompt (an `ask`, never a denial; shows a meaningless number only).
-- UTF-16 text files: they contain NUL bytes and are treated as binary, as git treats them. Claude Code does not read them as UTF-8 text either.
+- UTF-16 text with no BOM: it has NULs and nothing marks it as text, so it is treated as binary, as git treats it.
+- A binary with an unknown extension that Claude Code would render as text now passes Guard 1 too. The sniff can't tell which binaries Claude Code renders; only the 150-line limit is lost for them.
 - PDF handling via the Read `pages` parameter: a PDF without NUL in its first 8,000 bytes keeps today's behavior.
 - Release records (VERSION, CHANGELOG, backlog flip).
 
 ## System Impact
 
 - `.claude/hooks/pre-tool-use.mjs`, `project-template/.claude/hooks/pre-tool-use.mjs`
-- `tests/hooks/pre-tool-use-contract.test.js` (two new cases)
+- `tests/hooks/pre-tool-use-contract.test.js` (four new cases)
 
 ## Complexity Estimate
 
