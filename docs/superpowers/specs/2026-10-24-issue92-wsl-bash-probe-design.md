@@ -1,7 +1,7 @@
-# BUG-062 WSL Bash Probe — Design
+# Issue #92 WSL Bash Probe — Design
 
 **Status:** APPROVED 2026-10-24 (owner reviews in the PR)
-**Backlog:** `[BUG-062]` · **Issue:** #92
+**Issue:** #92 (backlog id assigned owner-side)
 
 ## Problem
 
@@ -14,6 +14,7 @@ One shared helper, `tests/helpers/bash.js`, exports `BASH`: the first candidate 
 - Candidates: `bash` from PATH; on win32 only, also Git for Windows' `bin/bash.exe`, located from `git --exec-path` (`<git>/mingw64/libexec/git-core` → `<git>/bin/bash.exe`).
 - `null` prints one named warning and the suites skip, as today's "bash not found" branch does.
 - The four suites import `BASH` and spawn it in place of the literal `'bash'`; their local probes are deleted.
+- The probe runs once per test run, not once per importing file: vitest loads the helper again in each file's worker, and each probe can wait up to 10 s on a slow WSL start. A vitest `globalSetup` (`tests/helpers/bash-setup.js`) probes once and `provide`s the result; `bash.js` reads it with `inject`, and probes itself only when no setup provided one. The probe functions live in `tests/helpers/bash-probe.js`, which imports nothing from vitest, so the setup can load it in the main process.
 
 Chosen over the issue's other directions:
 
@@ -32,6 +33,8 @@ Chosen over the issue's other directions:
 - [ ] With the WSL launcher first on PATH, `tests/hooks/context-guard.test.js` passes (main: 18 failed).
 - [ ] `findBash` rejects a candidate that exits non-zero on the probe script and a candidate that does not exist.
 - [ ] When `BASH` is non-null it runs a script by its native absolute path; on win32 with Git for Windows installed it is non-null.
+- [ ] On win32 with Git for Windows installed, when the first candidate runs but cannot run the probe script (as the WSL launcher does), `findBash` returns Git's `bin/bash.exe`.
+- [ ] One test run probes once, however many files import the helper.
 - [ ] No suite spawns the literal `'bash'` for a script path any more.
 - [ ] Full suite with WSL first on PATH: the bash-suite failures (227 on the issue host) are gone; the remaining count matches Git-Bash-first.
 
@@ -43,8 +46,8 @@ Chosen over the issue's other directions:
 
 ## System Impact
 
-- New: `tests/helpers/bash.js`, `tests/unit/bash-helper.test.js`.
-- Modified: the four suites above (probe and spawn only).
+- New: `tests/helpers/bash.js`, `tests/helpers/bash-probe.js`, `tests/helpers/bash-setup.js`, `tests/unit/bash-helper.test.js`.
+- Modified: the four suites above (probe and spawn only); `vitest.config.js` (`globalSetup`); `tools/skip-baseline.json` (the Windows-only fallback test, skipped on the Linux legs).
 
 ## Complexity Estimate
 
