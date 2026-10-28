@@ -68,18 +68,22 @@ function runRow(row) {
 // races it and throws EPERM/EBUSY. The retry is hand-rolled because Node 24's rmSync
 // did not honour maxRetries for a held dir (measured: it threw at once). Teardown
 // stays best-effort: the hook's verdict is what a row asserts, and a dir that still
-// will not go is reaped by the afterAll sweep below. [BUG-065]
+// will not go is reaped by the afterAll sweep below (#95). A dir left behind is
+// still reported, so leftovers in tests/.tmp do not pile up unnoticed.
 const RETRYABLE_RM_CODES = ['EBUSY', 'EPERM', 'ENOTEMPTY']
 function removeTempDir(dir) {
+  let lastError
   for (let attempt = 1; attempt <= 10; attempt++) {
     try {
       fs.rmSync(dir, { recursive: true, force: true })
       return
     } catch (e) {
-      if (!RETRYABLE_RM_CODES.includes(e.code)) return
+      lastError = e
+      if (!RETRYABLE_RM_CODES.includes(e.code)) break
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50 * attempt)
     }
   }
+  console.warn(`[guard3] temp dir not removed (${lastError.code}), left in tests/.tmp: ${dir}`)
 }
 
 // Safety sweep: remove any cc-guard3-* temp dirs leaked if a test crashed before finally.
