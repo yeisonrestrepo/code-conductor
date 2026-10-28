@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url'
 import { dirname, join, resolve } from 'path'
 import fs from 'fs'
 import os from 'os'
+import { BASH } from '../helpers/bash.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -17,15 +18,7 @@ const PROJECT_HOOK = join(REPO_ROOT, 'project-template/.claude/hooks/verbosity-r
 // project's own .claude/hooks/ and find a real hook, breaking test isolation.
 // os.tmpdir() is outside the repo so traversal stops before reaching any repo path.
 
-// Detect bash availability (Windows without Git for Windows in PATH).
-const BASH_AVAILABLE = (() => {
-  const r = spawnSync('bash', ['--version'], { stdio: 'pipe', timeout: 5000 })
-  if (r.error) {
-    console.warn('[verbosity] bash not found in PATH - all tests will be skipped. Ensure Git for Windows bin/ is in PATH.')
-    return false
-  }
-  return true
-})()
+const BASH_AVAILABLE = BASH !== null
 
 let tmpDir
 const createdTmpDirs = []
@@ -51,7 +44,7 @@ afterAll(() => {
 const stripAnsi = s => s.replace(/\r\n|\r/g, '\n').replace(/\x1b\[[0-9;]*m/g, '')
 
 function runGlobal(home, cwd, skip = '0') {
-  const result = spawnSync('bash', [GLOBAL_HOOK], {
+  const result = spawnSync(BASH, [GLOBAL_HOOK], {
     stdio: 'pipe',
     cwd,
     timeout: 10000,
@@ -61,7 +54,7 @@ function runGlobal(home, cwd, skip = '0') {
 }
 
 function runProject(home, cwd, skip = '0') {
-  const result = spawnSync('bash', [PROJECT_HOOK], {
+  const result = spawnSync(BASH, [PROJECT_HOOK], {
     stdio: 'pipe',
     cwd,
     timeout: 10000,
@@ -226,7 +219,7 @@ describe.skipIf(!BASH_AVAILABLE)('verbosity-remind hooks', () => {
   })
 
   it('hook exits 0 with empty HOME', { timeout: 5000 }, () => {
-    const result = spawnSync('bash', [GLOBAL_HOOK], {
+    const result = spawnSync(BASH, [GLOBAL_HOOK], {
       stdio: 'pipe',
       timeout: 10000,
       env: { ...process.env, HOME: '', PWD: '', CC_VERBOSITY_SKIP: '0' },

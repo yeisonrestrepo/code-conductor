@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, copyFileSync, readFileSync, rmSy
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { BASH } from '../helpers/bash.js';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const TEMPLATE_HOOK = join(REPO_ROOT, 'project-template/.claude/hooks/pre-tool-use.mjs');
@@ -11,7 +12,7 @@ const COMMAND = JSON.parse(readFileSync(join(REPO_ROOT, 'project-template/.claud
   .hooks.PreToolUse[0].hooks[0].command;
 const ROOTED = 'process.env.CLAUDE_PROJECT_DIR || process.cwd()';
 const INLINE = /^node --input-type=commonjs -e "([^"]+)"$/;
-const HAS_BASH = !spawnSync('bash', ['--version'], { stdio: 'pipe', timeout: 5000 }).error;
+const HAS_BASH = BASH !== null;
 
 // The registered command is run the way Claude Code runs it, through a shell, and its
 // inline script is also run with no shell at all, which is what cmd or PowerShell amount
@@ -39,7 +40,7 @@ function runHook({ cwd, projectDir, command = 'cat docs/*.md', viaShell = true, 
   for (const k of ['CLAUDE_PROJECT_DIR', 'CC_HOOK_ALLOW', 'CC_GUARD3_WARN']) delete env[k];
   if (projectDir !== undefined) env.CLAUDE_PROJECT_DIR = projectDir;
   Object.assign(env, extraEnv);
-  const [file, args] = viaShell ? ['bash', ['-c', COMMAND]] : [process.execPath, ['--input-type=commonjs', '-e', COMMAND.match(INLINE)[1]]];
+  const [file, args] = viaShell ? [BASH, ['-c', COMMAND]] : [process.execPath, ['--input-type=commonjs', '-e', COMMAND.match(INLINE)[1]]];
   const r = spawnSync(file, args, {
     cwd, env, encoding: 'utf8', timeout: 15000,
     input: JSON.stringify({ tool_name: 'Bash', tool_input: { command } }),

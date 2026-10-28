@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url'
 import { dirname, join, resolve } from 'path'
 import fs from 'fs'
 import { CORPUS, DIALECT } from '../fixtures/guard3-corpus.js'
+import { BASH } from '../helpers/bash.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -13,18 +14,6 @@ const REPO_ROOT = resolve(__dirname, '../..')
 // the behavioral authority that port is verified against, so not one of them moves.
 const HOOK = join(REPO_ROOT, 'tests/fixtures/guard3-reference.sh')
 const TESTS_TMP = join(REPO_ROOT, 'tests', '.tmp')
-
-// Detect bash availability. On Windows without Git for Windows in PATH, all tests are skipped
-// rather than failing with an undiagnosable ENOENT error. Install Git for Windows and ensure
-// its bin/ directory is in PATH if you need to run these tests on Windows.
-const BASH = (() => {
-  const r = spawnSync('bash', ['--version'], { stdio: 'pipe', timeout: 5000 })
-  if (r.error) {
-    console.warn('[guard3] bash not found in PATH - all tests will be skipped. On Windows, ensure Git for Windows bin/ is in PATH.')
-    return null
-  }
-  return 'bash'
-})()
 
 beforeAll(() => { fs.mkdirSync(TESTS_TMP, { recursive: true }) })
 
