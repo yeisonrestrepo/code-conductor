@@ -110,7 +110,7 @@ export function run(argv, env = process.env, { cwd = process.cwd(), log, nodeVer
     if (heal.status === 'removed') emit('stdout', 'code-conductor: removed the retired graphify-ast-refresh hook from settings.json (backup written beside it)');
     for (const line of heal.lines) emit('stderr', `code-conductor: ${line}`);
     writeVersionFile(home, pkgVersion(assetRoot));
-    if (opts.project) deployProject(assetRoot, cwd, { warn: (m) => emit('stderr', m), report: (m) => emit('stdout', m) });
+    if (opts.project) deployProject(assetRoot, cwd, { warn: (m) => emit('stderr', m), report: (m) => emit('stdout', m), home });
     return 0;
   } catch (err) {
     // Pre-flight failures (nothing written yet) → exit 1.

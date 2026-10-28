@@ -85,8 +85,13 @@ describe('project-template/gitignore', () => {
     const lines = readFileSync(join(root, 'project-template/gitignore'), 'utf8').split('\n').map(l => l.trim());
     expect(lines.filter(l => l && !l.startsWith('#'))).toEqual([
       '.claude/memory/turn-count.txt', '*.installer-backup.*', '*.installer-tmp.*', '.claude/memory/band-envelope.json',
-      '.claude/memory/orchestrator-run.json', '.conductor/',
+      '.claude/memory/orchestrator-run.json', '.conductor/', '.claude/.flow-events.*',
     ]);
+  });
+  // FEAT-044 AC6: one pattern covers the event file, its lock and its rotation temporary.
+  it('[FEAT-044 AC6] ignores the flow event file, its lock and its temporary', () => {
+    const lines = readFileSync(join(root, 'project-template/gitignore'), 'utf8').split('\n').map(l => l.trim());
+    expect(lines).toContain('.claude/.flow-events.*');
   });
 });
 
