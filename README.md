@@ -371,7 +371,7 @@ By default, only the global core files are installed. Flags extend that:
 
 | Flag | Description |
 |---|---|
-| `--project` | Also install the project template into the current directory |
+| `--project` / `-Project` | Also install the project template into the current directory |
 | `--no-deps` / `-NoDeps` | Accepted for compatibility with the retired shell installers; a no-op, since the npm CLI installs no dependencies and copies agent files only |
 | `--verbosity MIN\|INFO\|VERBOSE` | Default response verbosity (default `MIN`). `MIN` = one sentence per response, `INFO` = bullet list, `VERBOSE` = full explanation. Re-run the installer to change it. |
 
