@@ -260,7 +260,6 @@ describe('what a target may hold (AC9)', () => {
     ["PASSWORD='hunter PROBE' psql -c x", 'psql'],
     ['TOKEN="sk-abc PROBE" curl x', 'curl'],
     ["A=1 KEY=$'PROBE one' git push", 'git'],
-    ['K="$(get PROBE)" curl x', 'curl'],
     ['"/my dir/PROBE tool" run', '"/my dir/PROBE tool"'],
     ['a\\ PROBE run', 'a\\ PROBE'],
   ])('%s records the whole command word and no value fragment', (command, target) => {
@@ -274,6 +273,11 @@ describe('what a target may hold (AC9)', () => {
     ['a backtick substitution', 'K=`get PROBE` curl x'],
     ['a braced expansion', 'K=${V:- PROBE} curl x'],
     ['an unclosed quote', "PASSWORD='hunter PROBE psql"],
+    // Review round 2 of PR #89: the mask hid a quoted substitution, and nested quotes made
+    // `PROBE")"` the second word; an array assignment made `PROBE)` the second word.
+    ['a double-quoted substitution', 'K="$(get PROBE)" curl x'],
+    ['a substitution with nested quotes', 'TOKEN="$(echo "sk-abc PROBE")" curl x'],
+    ['an array assignment', 'KEYS=(ghp_aaa PROBE) cmd'],
   ])('%s records an empty target', (_, command) => {
     fire(bash(command));
     expect(last().target).toBe('');

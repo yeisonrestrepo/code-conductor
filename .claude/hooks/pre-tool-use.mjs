@@ -804,7 +804,8 @@ const SHELL_SUBSTITUTION = /\$\(|\$\{|`/;
 // VAR=value words are skipped so `TOKEN=sk-... curl` records `curl`, never the token (D5).
 // Words are found on Guard 3's mask, where quoted text is all 'x', so `P='a b' psql` is two
 // words, not three. An unclosed quote or a substitution makes the word boundary a guess, and
-// a wrong guess records a secret fragment, so either one records nothing.
+// a wrong guess records a secret fragment, so either one records nothing. So does an array
+// assignment: `K=(a b)` spans words, and the word after `K=(a` is a value, not the command.
 function flowCommandWord(command) {
   const { result, malformed } = g3Scan('mask', command);
   if (malformed) return '';
@@ -812,8 +813,12 @@ function flowCommandWord(command) {
   // [^] is any character, newline included, without the shorthands this block forbids.
   const mask = result.replace(/\\[^]/g, 'xx');
   for (const m of mask.matchAll(/[^ \t\n]+/g)) {
-    if (SHELL_SUBSTITUTION.test(m[0])) return '';
-    if (!SHELL_ASSIGNMENT.test(m[0])) return command.slice(m.index, m.index + m[0].length);
+    const word = command.slice(m.index, m.index + m[0].length);
+    // Tested on the original, because the mask turns a quoted `"$(…)"` into x's, and quotes
+    // nested inside it shift the word boundaries (review round 2 of PR #89).
+    if (SHELL_SUBSTITUTION.test(word)) return '';
+    if (m[0].includes('=(')) return '';
+    if (!SHELL_ASSIGNMENT.test(m[0])) return word;
   }
   return '';
 }
