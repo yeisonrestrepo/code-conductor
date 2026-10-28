@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.42.0] - 2026-10-27
+
+### Added
+- **[FEAT-046]** `/cc-metrics` reports token and wall-time spend from Claude Code's local session logs, grouped by tool, command, branch, pillar, phase and session, with recommendations that cite the measured numbers. It is read-only (no hook, no writes), fails open with a named note on absent or partial logs, and `scripts/session-metrics.mjs` is unit-tested over fixture logs. Landed from PR #88 (Luis).
+- **[FEAT-049]** The installer accepts `--no-deps` and its PowerShell alias `-NoDeps` as a no-op, so older command lines run without an unrecognized-flag warning. `--verbosity` no longer takes a `-`-prefixed word as its value. Landed from PRs #112 and #114 (Luis).
+
 ## [1.41.0] - 2026-10-21
 
 ### Added

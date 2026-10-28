@@ -3221,8 +3221,12 @@ Key `turn-count.txt` to the hook stdin `session_id` (`<id> <count>`); a missing 
 - Spec: `docs/superpowers/specs/2026-10-23-bug056-context-guard-session-reset-design.md`
 - Plan: `docs/superpowers/plans/2026-10-23-bug056-context-guard-session-reset.md`
 
-## Spec: BUG-063 Guard 1 binary reads 2026-10-24
+## Closeout: 1.42.0, /cc-metrics and the --no-deps flags (FEAT-046, FEAT-049) [2026-10-27]
 
-Guard 1 skips a file with a NUL byte in its first 8,000 bytes (git's binary heuristic): a binary has no lines and Claude Code renders an image Read as an image, so counting its 0x0A bytes denied PNG reads for nothing. Content sniff over an extension list, so no list to maintain. Text files keep the 150-line limit. Both hook copies change.
-- Spec: `docs/superpowers/specs/2026-10-24-bug063-guard1-binary-reads-design.md`
-- Plan: `docs/superpowers/plans/2026-10-24-bug063-guard1-binary-reads.md`
+- **Landed:** PRs #88 (`b811060`, FEAT-046 `/cc-metrics`), #112 (`9643f39`) and #114 (`61c3170`), all by Luis, all merge commits. The release PR #116 merged as `cddc830`; records commit `b62b1fa`.
+- **Mint:** FEAT-049 was minted at landing for issues #106 and #108 (`--no-deps` no-op and its `-NoDeps` alias), one id for both PRs by owner ruling. PR #104 had self-assigned the same number; that claim is void and its review asks for the id to be dropped.
+- **Instruments on `main` at `cddc830`:** `VERSION_GATE_OK 1.42.0`; `RECORD_PARITY_OK`; `UNION ceiling {"BUG":61,"FEAT":49,"ARCH":10}`, next mintable BUG-062. Local suite on the release branch: 56 files, 1607 passed | 11 skipped (1618).
+- **CI:** Test on PR #116 run 40607691191 success; Test on push to main run 40607930981 success; Publish release v1.42.0 run 40608227521 success; npm `@yeison.restrepo.r/code-conductor` reads 1.42.0.
+- **Sync:** local `main` was 0 ahead / 62 behind `origin/main` before the fast-forward.
+- **Process gap, found here:** #114 was stacked on #112's branch. Merging #112 with `--delete-branch` closed #114 instead of retargeting it, because the repository does not delete branches on merge. Fix used: recreate the base ref at #112's head, reopen, retarget to `main`, delete the ref. No CI ever ran on #114; it merged on a local suite run of its head (1581 passed | 11 skipped). Rule: retarget a stacked PR to `main` before deleting its base branch.
+- **Open after this release:** #89 (two D5 leak shapes left; macOS AC11 probe and live protocol are owner-run), #113 and #115 (content OK, need a merge of `main`), #101, #102, #103, #104, #105, #111 (self-minted ids and owner-side records; #102 also has a UTF-16 Guard 1 bypass). The project CLAUDE.md "Setup: bash install.sh" line is stale since FEAT-023.

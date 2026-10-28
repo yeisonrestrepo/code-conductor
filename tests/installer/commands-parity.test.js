@@ -265,6 +265,24 @@ describe('cc-resume mirrors [BUG-051]', () => {
   });
 });
 
+const METRICS_MIRRORS = ['.claude/commands/cc-metrics.md', 'project-template/.claude/commands/cc-metrics.md'];
+
+// FEAT-046: like cc-resume, both copies probe by presence, so they stay byte-identical.
+describe('cc-metrics mirrors [FEAT-046]', () => {
+  it('are byte-identical', () => {
+    expect(read(METRICS_MIRRORS[1])).toBe(read(METRICS_MIRRORS[0]));
+  });
+
+  it.each(METRICS_MIRRORS)('%s probes the deployed reader before the source one', (rel) => {
+    expect(read(rel)).toContain('M=.claude/scripts/session-metrics.mjs; [ -f "$M" ] || M=scripts/session-metrics.mjs');
+  });
+
+  // $ARGUMENTS is pasted as text, so unquoted it word-splits a --dir path with spaces.
+  it.each(METRICS_MIRRORS)('%s passes $ARGUMENTS as one single-quoted word', (rel) => {
+    expect(read(rel)).toContain(`node "$M" '$ARGUMENTS'`);
+  });
+});
+
 // BUG-051 AC3: a shipped command must name the detector where deployProject really puts it,
 // so the target is measured from a scaffold in a temp dir, never assumed.
 const DETECTOR = '.claude/scripts/detect-stack.mjs';

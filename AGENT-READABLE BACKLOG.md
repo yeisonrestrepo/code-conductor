@@ -729,7 +729,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 * **Components Affected:** `.github/workflows/test.yml` (or a sibling workflow), possibly a `tools/` checker script so the rule is testable offline, CONTRIBUTING.md (one line naming the check).
 * **Acceptance Criteria:** An external PR whose diff touches any listed record fails with a message naming the file and the CONTRIBUTING section; owner commits and release PRs pass; the check never blocks a PR that merely has textual proximity to the records (a README edit near a Known-limits line is clean); the rule logic lives in a unit-testable script, not inline YAML; no third-party actions.
 
-### [ ] `[FEAT-046]` /cc-metrics: Offline Token and Time Metrics with Recommendations
+### [X] `[FEAT-046]` /cc-metrics: Offline Token and Time Metrics with Recommendations
+* **DONE, shipped as `1.42.0` on 2026-10-27.** `/cc-metrics` (both mirrors) runs `scripts/session-metrics.mjs` over the local session logs and reports tokens and wall time by tool, command, branch, pillar, phase and session, with recommendations citing the measured numbers. It registers no hook and writes nothing, fails open with a named note on absent or partial logs, and backs every grouping table with a null-prototype map, so a hostile key such as `__proto__` stays an ordinary row. Landed from PR #88 (author Luis). Spec: `docs/superpowers/specs/2026-10-22-feat046-cc-metrics-design.md`. Plan: `docs/superpowers/plans/2026-10-22-feat046-cc-metrics.md`.
 * **Description:** An on-demand, read-only command that parses Claude Code's local session logs under `~/.claude/projects/<project>/` and reports token and wall-time spend grouped by tool, command, branch/item, pillar, phase and session, with evidence-backed recommendations (intake of issue #82). It adds no hooks, writes nothing, and runs only when invoked.
 * **Impact:** The project's pitch is token efficiency, and today that claim is unmeasurable from inside a session. Offline metrics make the efficiency rules' effect visible and give regressions (like `[BUG-057]`'s growing read cost) a number instead of an anecdote.
 * **Components Affected:** A new `/cc-metrics` command (both mirrors), a `scripts/` reader for the session-log format, docs. No installer or hook changes.
@@ -740,6 +741,13 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 * **Impact:** The workflow and guards are not tied to one model vendor, so teams on Codex, Antigravity or OpenCode can adopt the project. Today every one of those users is outside its reach.
 * **Components Affected:** The installer (choosing a harness and where its files go), per-harness adapters next to `pre-tool-use.mjs`, a translator from the `.claude/` sources to each harness's layout, README and wiki install pages, tests.
 * **Acceptance Criteria:** Claude Code installs do not change byte for byte. Each supported harness has a measured verdict on whether it enforces the guards, and a harness that cannot block a tool call is documented as "workflow only, no enforcement", never claimed as guarded. The adapter passes the same guard fixtures as the Claude Code hook. The translated files are generated from the `.claude/` sources and checked for drift by a test, so they are never hand-maintained copies. Zero new runtime dependencies.
+
+### [X] `[FEAT-049]` Installer Accepts `--no-deps` and Its PowerShell Alias `-NoDeps`
+* **DONE, shipped as `1.42.0` on 2026-10-27.** `bin/code-conductor.mjs` accepts `--no-deps` and `-NoDeps` as an exact-match no-op, since the installer has no dependencies to skip, and the `--verbosity` value check now rejects any `-`-prefixed word, so `--verbosity -h` acts as the flag. README and the Getting-Started wiki page no longer claim the flag skips dependency installation. Landed from PRs #112 and #114 (author Luis), intake of issues #106 and #108; the id is owner-minted at landing. Specs: `docs/superpowers/specs/2026-10-27-issue106-no-deps-flag-design.md`, `docs/superpowers/specs/2026-10-27-issue108-nodeps-alias-design.md`. Plans: `docs/superpowers/plans/2026-10-27-issue106-no-deps-flag.md`, `docs/superpowers/plans/2026-10-27-issue108-nodeps-alias.md`.
+* **Description:** Users following older install docs pass `--no-deps` (or `-NoDeps` from PowerShell) and got an unrecognized-flag warning.
+* **Impact:** Old command lines keep working without a warning.
+* **Components Affected:** `bin/code-conductor.mjs`, `tests/installer/cli.test.js`, README, wiki Getting-Started.
+* **Acceptance Criteria:** Both spellings are accepted with no warning and change nothing; any other spelling still warns as unrecognized; the usage line names both.
 
 ### [X] `[BUG-048]` CI's Green Was Never a Measured Baseline, and Its Runtime Is Deprecated
 * **DONE, shipped as `1.34.1` on 2026-09-29.** Actions moved to their node24 majors in both workflows (checkout `v7`, setup-node `v7`, cache `v6`); `test.yml` runs a `{20, 24}` matrix with a per-version cache key; each leg asserts its exact skipped set with `tools/skip-baseline.mjs` against `tools/skip-baseline.json`, measured from the PR's own CI run and armed by the branch's last commit; `publish.yml` tests on Node 24 and states why it runs no skip-baseline step. Spec: `docs/superpowers/specs/2026-09-29-bug048-ci-measured-baseline-design.md`. Plan: `docs/superpowers/plans/2026-09-29-bug048-ci-measured-baseline.md`.
@@ -1045,20 +1053,6 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Acceptance: the hook resolves from the project root regardless of
   cwd on Windows, WSL and POSIX, and a test runs it from a
   subdirectory.
-
-### [ ] `[BUG-063]` Guard 1 counts newlines in binary files, so a Read of a PNG is denied
-
-- Symptom: guard1LargeRead (.claude/hooks/pre-tool-use.mjs:82-96)
-  reads every regular file as UTF-8 and countLines counts 0x0A bytes,
-  so a no-limit Read of a binary with more than 150 of them (a 60 KB
-  PNG with 199) is denied with LARGE FILE READ BLOCKED. Claude Code
-  renders an image Read as an image, so the denial saves no tokens and
-  forces a meaningless limit: 1.
-- Fix: skip binaries by a NUL-byte sniff of the first 8,000 bytes
-  (git's heuristic), in both hook copies. Text files keep the limit.
-- Spec: `docs/superpowers/specs/2026-10-24-bug063-guard1-binary-reads-design.md`;
-  plan: `docs/superpowers/plans/2026-10-24-bug063-guard1-binary-reads.md`.
-- Filed from issue #93.
 
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
