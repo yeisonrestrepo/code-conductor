@@ -1,7 +1,7 @@
-# FEAT-049: Wiki Architecture in the C4 Model, and a Stale-Fact Sweep
+# Wiki Architecture in the C4 Model, and a Stale-Fact Sweep
 
 **Date:** 2026-10-24
-**Status:** The owner approved that this spec and its plan ship inside the PR and are reviewed there. Answers the `[FEAT-049]` entry.
+**Status:** The owner approved that this spec and its plan ship inside the PR and are reviewed there. No backlog id: the owner mints one when the work is accepted.
 
 ---
 
@@ -32,11 +32,10 @@ Mermaid fenced blocks. `wiki-sync.yml` copies only `*.md` and deletes every wiki
 - New `C4-Components.md`: Level 3 for the pre-tool-use guard chain, the `/cc-orchestrate` bands, the installer phases and the context-guard counter; Level 4 as one guard-dispatch sequence.
 - `Home.md` and `_Sidebar.md` link the new page; `tests/wiki/wiki-gen.test.js` adds it to `EXPECTED_PAGES` and its page-count test name.
 - The stale facts below, each verified against the code before changing.
-- A `[FEAT-049]` backlog entry.
 
 **Out of scope (reported in the PR, not changed):**
 - `global/CLAUDE.md:88`, `project-template/CLAUDE.md:49,75` and this repo's `CLAUDE.md` still name `ui-ux-pro-max`; left to `[FEAT-037]` as `.claude/memory/project.md` already records.
-- README drift found in the review: it lists a `--no-deps` / `-NoDeps` flag (`README.md:374`) the CLI does not accept; calls context-guard "global + project" (`README.md:318`) though `global/hooks/` holds only `verbosity-remind.sh`; its hook lead sentence omits `Agent` and `SendMessage` (`README.md:290`); and its Known limits still list `[BUG-056]` to `[BUG-059]` as open. README records are owner-side per CONTRIBUTING.
+- README drift found in the review: it listed a `--no-deps` / `-NoDeps` flag (`README.md:374`) the CLI did not accept at the time (`main` has since added it as a no-op, and Getting-Started now lists it); calls context-guard "global + project" (`README.md:318`) though `global/hooks/` holds only `verbosity-remind.sh`; its hook lead sentence omits `Agent` and `SendMessage` (`README.md:290`); and its Known limits still list `[BUG-056]` to `[BUG-059]` as open. README records are owner-side per CONTRIBUTING.
 - `CONTRIBUTING.md:150` describes a pre-commit test gate "installed by `code-conductor --project`"; no shipped code installs a git hook.
 - `project-template/.claude/hooks/post-compact.sh:27` tells the user to run `/checkpoint`; the command is `/cc-checkpoint`.
 
