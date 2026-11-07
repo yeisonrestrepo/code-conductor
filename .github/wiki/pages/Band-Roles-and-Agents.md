@@ -9,8 +9,8 @@ During orchestrated runs, five role agents handle specific phases. Each is defin
 | `spec.md` | spec | define | RW | No (Guard 7) | Spec files only |
 | `plan.md` | plan | define | RW | No (Guard 7) | Plan files only |
 | `code.md` | code | build | RW | Test command only | Task scope from envelope |
-| `audit.md` | audit | verify | R | No (Guard 7) | Nothing |
-| `qa.md` | qa | verify | X | Test command only | Nothing (Guard 5) |
+| `audit.md` | audit | verify | R | No (Guard 7) | Nothing (no write tools; Guard 5 denies `tk: R`) |
+| `qa.md` | qa | verify | X | Test command only | Nothing (no write tools; Guard 5 denies `tk: X`) |
 
 A sixth agent, `define-review.md`, is a non-band advisory reviewer for the review loop.
 

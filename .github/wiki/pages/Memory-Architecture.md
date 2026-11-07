@@ -76,6 +76,6 @@ This means work survives branch switches, rollbacks, and multi-day gaps.
 | `session-snapshot.json` | SNAP JSON written by `/cc-compact` | No |
 | `orchestrator-run.json` | Active orchestrate run state | Yes |
 | `band-envelope.json` | Current role's SNAP envelope | Yes |
-| `turn-count.txt` | Context turn counter | Yes |
+| `turn-count.txt` | Context turn counter, stored as `<session_id> <count>` and reset when the session changes ([C4 Components](C4-Components#context-guard)) | Yes |
 | `context-threshold.txt` | Configurable turn threshold (default 25) | No |
 | `bash-scan-allowlist.txt` | Guard 3 permanent exceptions | No |
