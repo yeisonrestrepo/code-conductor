@@ -533,10 +533,13 @@ describe('deployProject: overwritten project.md detection', () => {
 });
 
 describe('deployProject: real template memory stub (#94)', () => {
-  it('a fresh scaffold is silent and seeds a stub with no code-conductor history', () => {
+  it('a fresh scaffold warns nothing beyond the one FEAT-044 flow report and seeds a stub with no code-conductor history', () => {
     const warned = [];
     deployProject(ROOT, home, { warn: (m) => warned.push(m), report: (m) => warned.push(m) });
-    expect(warned).toEqual([]);
+    // Baseline moved by FEAT-044 landing beside #94: a fresh scaffold now legitimately
+    // reports the flow status line it adds, exactly once. Anything else (the legacy
+    // overwrite warning this test exists to rule out included) still fails.
+    expect(warned).toEqual(['code-conductor: added the flow status line to .claude/settings.json (node .claude/flow-status.mjs)']);
     const seeded = readFileSync(join(home, '.claude', 'memory', 'project.md'), 'utf8');
     expect(seeded).not.toMatch(/\b(BUG|FEAT)-\d+/);
   });
