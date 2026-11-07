@@ -11,7 +11,8 @@ code-conductor is a drop-in governance layer for [Claude Code](https://www.anthr
 | Page | Description |
 |------|-------------|
 | [Getting Started](Getting-Started) | Installation and first session |
-| [Architecture Overview](Architecture-Overview) | How the three layers fit together |
+| [Architecture Overview](Architecture-Overview) | C4 Levels 1 and 2: system context and containers |
+| [C4 Components](C4-Components) | C4 Levels 3 and 4: guard chain, orchestrator bands, installer, context guard |
 | [Guards Reference](Guards-Reference) | Guards 1–7: what each one enforces |
 | [Commands Reference](Commands-Reference) | All `/cc-*` slash commands |
 | [Orchestrator Guide](Orchestrator-Guide) | Hands-off delivery with `/cc-orchestrate` |

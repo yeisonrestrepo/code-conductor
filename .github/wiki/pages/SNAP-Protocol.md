@@ -1,6 +1,6 @@
 # SNAP Protocol
 
-**SNAP** (Session Notification and Pointer) is the minified single-line JSON handoff format used between phases and role agents. It replaces markdown snapshots and is at least 15% smaller.
+**SNAP** is the minified single-line JSON handoff format used between phases and role agents. It replaces markdown snapshots and is at least 15% smaller.
 
 ## Why SNAP
 
@@ -8,28 +8,34 @@ Markdown handoffs consume context tokens. A spec summary, a plan status, and a l
 
 ## Structure
 
+The wire names are short on purpose. A v3 envelope, pretty-printed here (on disk it is one line):
+
 ```json
 {
-  "sys": {
-    "phase": "define|build|verify|ship",
-    "context": "...",
-    "status": "...",
-    "role": "spec|plan|code|audit|qa",
-    "tool_kind": "R|RW|X"
-  },
-  "ops": {
-    "notes": ["..."],
-    "files": ["..."],
-    "scope": ["glob patterns"],
-    "gate": "boundary_routed|define_approved|build_executed|verify_pass|ship_released"
-  },
-  "mem": {
-    "decisions": ["..."],
-    "exceptions": ["..."],
-    "pointers": ["..."]
-  }
+  "v": 3,
+  "sys": { "ph": "...", "c": "...", "s": "...", "role": "spec|plan|code|audit|qa", "tk": "R|RW|X" },
+  "ops": { "n": ["..."], "f": ["..."], "scope": ["glob patterns"], "gate": "boundary_routed|define_approved|build_executed|verify_pass|ship_released" },
+  "mem": { "d": ["..."], "x": ["..."], "p": {} },
+  "pr": "..."
 }
 ```
+
+| Field | Meaning |
+|---|---|
+| `v` | Version, 1 to 3 (`MAX_VERSION` in `snap-contract.mjs`) |
+| `sys.ph` | The phase, for example `spec`, `plan`, `impl`, `rev` from `/cc-compact` |
+| `sys.c` | The git commit hash the snapshot is keyed to |
+| `sys.s` | The active spec's slug, or `none` |
+| `sys.role`, `sys.tk` | v3: the band role and its tool kind (`R` read, `RW` read-write, `X` execute) |
+| `ops.n` | Pending next steps |
+| `ops.f` | Files touched, each `<path>:C\|M\|D` |
+| `ops.scope` | v3: the globs a role may write; required when `tk` is `RW` |
+| `ops.gate` | v3: the gate the envelope carries |
+| `mem.d`, `mem.x` | Decisions and constraints |
+| `mem.p` | v3: pointers, for example the bound ticket on the spec envelope |
+| `pr` | v2 and later: free prose, for example the checkpoint body `/cc-checkpoint` appended to `project.md` |
+
+v1 and v2 have only `sys.ph/c/s`, `ops.n/f` and `mem.d/x`; v1 has no `pr`. `snap-contract.mjs` is the authority for every field set.
 
 ## Versions
 
@@ -59,7 +65,7 @@ boundary_routed → define_approved → build_executed → verify_pass → ship_
 node .claude/scripts/snap-validate.mjs --to <role>
 ```
 
-A failed validation halts the orchestrated run.
+`--to <role>` also requires `ops.gate` to be the exit gate of the band before that role's band: `spec` and `plan` receive `boundary_routed`, `code` receives `define_approved`, `audit` and `qa` receive `build_executed`. A mismatch is `SNAP_GATE_MISMATCH`. A failed validation halts the orchestrated run. Where this sits in a dispatch is drawn on [C4 Components](C4-Components#cc-orchestrate-bands).
 
 ## Key Files
 
