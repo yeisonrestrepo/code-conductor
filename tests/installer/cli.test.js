@@ -207,6 +207,45 @@ describe('run', () => {
     expect(existsSync(join(cwd, 'CLAUDE.md'))).toBe(true);
     expect(logs.some(l => /unrecognized/.test(l))).toBe(false);
   });
+  it('treats -Verbosity LEVEL exactly like --verbosity LEVEL (issue #109)', () => {
+    const rc = run(['-Verbosity', 'INFO'], { HOME: home }, { cwd, log });
+    expect(rc).toBe(0);
+    expect(readFileSync(join(home, '.claude', 'memory', 'verbosity.md'), 'utf8')).toMatch(/VERBOSITY: INFO/);
+    expect(logs.some(l => l.startsWith('stderr:'))).toBe(false);
+  });
+  it('accepts the inline -Verbosity=LEVEL form (issue #109)', () => {
+    run(['-Verbosity=VERBOSE'], { HOME: home }, { cwd, log });
+    expect(readFileSync(join(home, '.claude', 'memory', 'verbosity.md'), 'utf8')).toMatch(/VERBOSITY: VERBOSE/);
+  });
+  it('resolves --verbosity and -Verbosity last-wins across spellings (issue #109)', () => {
+    run(['--verbosity', 'MIN', '-Verbosity', 'VERBOSE'], { HOME: home }, { cwd, log });
+    expect(readFileSync(join(home, '.claude', 'memory', 'verbosity.md'), 'utf8')).toMatch(/VERBOSITY: VERBOSE/);
+  });
+  it('treats a trailing -Verbosity with no value as MIN plus a warning (issue #109)', () => {
+    const rc = run(['-Verbosity'], { HOME: home }, { cwd, log });
+    expect(rc).toBe(0);
+    expect(readFileSync(join(home, '.claude', 'memory', 'verbosity.md'), 'utf8')).toMatch(/VERBOSITY: MIN/);
+    expect(logs.some(l => l.startsWith('stderr:') && /invalid/i.test(l))).toBe(true);
+  });
+  it('warns on an invalid -Verbosity value like --verbosity does (issue #109)', () => {
+    run(['-Verbosity', 'loud'], { HOME: home }, { cwd, log });
+    expect(logs.some(l => l.startsWith('stderr:') && /invalid/i.test(l))).toBe(true);
+    expect(readFileSync(join(home, '.claude', 'memory', 'verbosity.md'), 'utf8')).toMatch(/VERBOSITY: MIN/);
+  });
+  it('does not take a single-dash token as the -Verbosity value (issue #109)', () => {
+    run(['-Verbosity', '-x'], { HOME: home }, { cwd, log });
+    expect(readFileSync(join(home, '.claude', 'memory', 'verbosity.md'), 'utf8')).toMatch(/VERBOSITY: MIN/);
+    expect(logs.some(l => l.startsWith('stderr:') && /unrecognized/.test(l) && /-x/.test(l))).toBe(true);
+  });
+  it('keeps -verbosity (lowercase) unrecognized (issue #109)', () => {
+    run(['-verbosity', 'INFO'], { HOME: home }, { cwd, log });
+    expect(readFileSync(join(home, '.claude', 'memory', 'verbosity.md'), 'utf8')).toMatch(/VERBOSITY: MIN/);
+    expect(logs.some(l => /unrecognized/.test(l) && /-verbosity/.test(l))).toBe(true);
+  });
+  it('lists -Verbosity in --help (issue #109)', () => {
+    run(['--help'], { HOME: home }, { cwd, log });
+    expect(logs.some(l => l.startsWith('stdout:') && l.includes('[--verbosity|-Verbosity MIN|INFO|VERBOSE]'))).toBe(true);
+  });
   it('prints the version and exits 0 for --version', () => {
     const rc = run(['--version'], { HOME: home }, { cwd, log });
     expect(rc).toBe(0);
@@ -251,6 +290,36 @@ describe('run', () => {
     expect(existsSync(join(home, '.claude'))).toBe(false);
     expect(existsSync(join(cwd, '.claude'))).toBe(false);
     expect(readdirSync(join(cwd, 'scripts')).sort()).toEqual([...bundled].sort());
+  });
+  it('treats -Project exactly like --project (issue #107)', () => {
+    const rc = run(['-Project'], { HOME: home }, { cwd, log });
+    expect(rc).toBe(0);
+    expect(existsSync(join(cwd, 'CLAUDE.md'))).toBe(true);
+    expect(logs.some(l => /unrecognized/.test(l))).toBe(false);
+  });
+  it('keeps -project (lowercase) unrecognized and installs the global half only (issue #107)', () => {
+    const rc = run(['-project'], { HOME: home }, { cwd, log });
+    expect(rc).toBe(0);
+    expect(existsSync(join(cwd, 'CLAUDE.md'))).toBe(false);
+    expect(logs.some(l => l.startsWith('stderr:') && /unrecognized/.test(l) && /-project/.test(l))).toBe(true);
+  });
+  it('does not consume -Project as the --verbosity value (issue #107)', () => {
+    run(['--verbosity', '-Project'], { HOME: home }, { cwd, log });
+    expect(existsSync(join(cwd, 'CLAUDE.md'))).toBe(true);
+    expect(readFileSync(join(home, '.claude', 'memory', 'verbosity.md'), 'utf8')).toMatch(/VERBOSITY: MIN/);
+    expect(logs.some(l => /unrecognized/.test(l))).toBe(false);
+  });
+  it('[BUG-052] -Project also refuses to install inside its own source tree (issue #107)', () => {
+    const root = join(dirname(binPath), '..');
+    writeFileSync(join(cwd, 'package.json'), readFileSync(join(root, 'package.json')));
+    mkdirSync(join(cwd, 'scripts'));
+    for (const f of readdirSync(join(root, 'scripts'))) writeFileSync(join(cwd, 'scripts', f), 'tracked source');
+    expect(run(['-Project'], { HOME: home }, { cwd, log })).toBe(1);
+    expect(existsSync(join(home, '.claude'))).toBe(false);
+  });
+  it('lists -Project in --help (issue #107)', () => {
+    run(['--help'], { HOME: home }, { cwd, log });
+    expect(logs.some(l => l.startsWith('stdout:') && l.includes('[--project|-Project]'))).toBe(true);
   });
   it('exits 1 when --project is passed and the project CLAUDE.md is a directory', () => {
     mkdirSync(join(cwd, 'CLAUDE.md'), { recursive: true });
