@@ -32,10 +32,10 @@ The orchestrator resolves your project's test command and records it in the run 
 |------|-------------|
 | Spec | `spec` agent writes the specification |
 | Review | `define-review` agent checks against checklist (up to 3 passes, 2 revisions) |
-| Approve | **You approve** — shown with SHA-256 hash, re-hashed before approval |
+| Approve | **You approve** — the document is shown with its SHA-256 hash and re-hashed before `orchestrate.mjs approve spec` records `{at, by}` |
 | Plan | `plan` agent writes the plan |
 | Review | Same review loop |
-| Approve | **You approve again** |
+| Approve | **You approve again** — `approve plan` moves the gate to `define_approved` |
 
 ### 3. Build
 
@@ -52,7 +52,7 @@ The orchestrator resolves your project's test command and records it in the run 
 | Agent | What it does |
 |-------|-------------|
 | `audit` | Static code review (read-only, no shell) |
-| `qa` | Runs the recorded test command (cannot write files — Guard 5) |
+| `qa` | Runs the recorded test command. It cannot write files: its tool mask holds no `Write` or `Edit`, and its envelope holds `tk: X`, so Guard 5 would deny a write as `BAND_READ_ONLY` |
 
 ### 5. Report
 
@@ -75,12 +75,14 @@ You receive every hand-back, both approvals, and each review-loop outcome. **Rel
 
 ## Recovery
 
-A failed validation halts the run terminally. Recover with:
+A failed validation halts the run terminally: `orchestrate.mjs` exits 1 and records the halt in the run file. A refusal (exit 2) writes nothing and the run continues. Recover from a halt with:
 
 ```
-orchestrate.mjs end    # then
-orchestrate.mjs start  # fresh start
+node .claude/scripts/orchestrate.mjs end   # then
+/cc-orchestrate <ITEM>                     # fresh start
 ```
+
+The band flow and the SNAP handoff are drawn on [C4 Components](C4-Components#cc-orchestrate-bands).
 
 ## Guards Active During Orchestration
 
