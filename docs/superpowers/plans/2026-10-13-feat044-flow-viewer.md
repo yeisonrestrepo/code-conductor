@@ -3,7 +3,7 @@
 **Issue:** #57
 **Spec:** `docs/superpowers/specs/2026-10-13-feat044-flow-viewer-design.md`
 **Date:** 2026-10-13, revised 2026-10-18 (status line as the primary display) and 2026-10-21 (owner decisions)
-**Status:** Spec approved by the owner on 2026-10-19 (https://github.com/yeisonrestrepo/code-conductor/pull/81#issuecomment-6257678335), against `[FEAT-044]`. Not started.
+**Status:** Spec approved by the owner on 2026-10-19 (https://github.com/yeisonrestrepo/code-conductor/pull/81#issuecomment-6257678335), against `[FEAT-044]`. Implemented on branch `feat/feat044-flow-viewer-impl` on 2026-10-22 (T-001 to T-009, T-011); T-012's manual protocol and the macOS run are open for the operator.
 
 ---
 
@@ -110,3 +110,26 @@ Added by the plan:
 - **Test baselines move with every merge ahead of this one.** The counts in T-002 are taken from `main` on the day implementation starts, not from today.
 - **PR #80 adds wiki drift tests.** If it merges first, `/cc-flow` may need a row in the commands wiki page template. Check at T-002.
 - **Keepers from #83.** The probe code in #83 is evidence, not shipped code. The parts that become real tests are cherry-picked into T-001 and T-004 and rewritten under `tests/**/*.test.js`.
+
+## Implementation record
+
+Taken 2026-10-22 on Windows 11 Pro 10.0.26300, Node v24, from `main` at `17f70fe`.
+
+**T-001-A.** `tests/hooks/flow-append-race.test.js` re-runs M7 and M9 as assertions. M7 (16 × 500 capped lines, and 4 × 50 lines of 64 KiB): 0 torn, 0 failed appends, every line present. M9 (16 continuous writers, rotation at 16 KiB under the `wx` lock): 0 torn, 0 failed appends, no lock or temporary file left. One finding the #83 run did not show: under continuous writers the rotation's `rename` can still fail with `EPERM` on Windows, because another process holds the file open for append. The emitter swallows it and the next call retries, so the test asserts the invariants a reader depends on rather than zero rename errors. Linux is proven by CI; macOS has no recorded run yet and is open for the operator.
+
+**T-001-B.** From the Claude Code status line documentation (https://code.claude.com/docs/en/statusline, read 2026-10-22): the command runs at session start and again when a new assistant message arrives, after `/compact`, on a permission or vim mode change, and on an optional `refreshInterval` timer, debounced at 300 ms. It does not run per tool call. The working directory arrives as `workspace.current_dir` (same value as `cwd`). Output shows only after exit 0; a non-zero exit or no output blanks the line. Not measured live: the manual protocol records it.
+
+**T-001-C.** No torn line, and a per-message cadence is the R2 case the spec already accepts for a summary line. The spec does not return to the owner.
+
+**Operator decision, 2026-10-22 (latency).** The per-call read of the last byte (D7's torn-tail check) is replaced by a newline that leads each line instead of ending it: a single `O_APPEND` write cannot tear (M7), so a tail torn by a crash or hand edit is fenced off by the next event and dropped at the next rotation. Departs from D1's "followed by `\n`"; readers skip blank lines. Emitter cost on Windows 11, 600 interleaved calls: p50 2.1 to 2.3 ms → 0.9 ms, p95 3.1 to 3.6 ms → 1.5 to 1.6 ms.
+
+**T-002, predicted red** (existing suites only, before any run):
+
+| Suite | Predicted | Why |
+|---|---|---|
+| `tests/installer/templates.test.js` | 1 | The FEAT-011 AC10 full list gains `.claude/.flow-events.*`; the AC13 first-four slice is unaffected because the line is appended last |
+| `tests/installer/deploy.test.js` | 0 | Its fixture template ships no `flow-status.mjs`, and the `statusLine` merge runs only when the template ships the script it points at |
+| `tests/unit/host-owned-ignore-xor.test.js` | 0 | `PROJECT_HOST_OWNED` is not changed |
+| `tests/hooks/pre-tool-use-contract.test.js` | 0 | Its payloads carry no `cwd`, so the emitter writes nothing |
+| `tests/hooks/guard4.test.js` | 0 | Guard 4 gains one path; no existing case reads it |
+| `tests/wiki/wiki-gen.test.js` | 1 if missed | `/cc-flow` must be named in the Commands-Reference page template |

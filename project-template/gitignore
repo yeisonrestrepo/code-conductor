@@ -5,3 +5,4 @@
 .claude/memory/band-envelope.json
 .claude/memory/orchestrator-run.json
 .conductor/
+.claude/.flow-events.*
