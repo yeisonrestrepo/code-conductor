@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { LEGACY_PROJECT_MEMORY_STUB_SHA256 } from '../../lib/installer/deploy.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (rel) => readFileSync(join(root, rel), 'utf8').replace(/\r\n/g, '\n');
@@ -107,10 +108,22 @@ describe('bounded project memory [BUG-057]', () => {
     expect(section.some((l) => /^- [^:]+: ## /.test(l))).toBe(false);
   });
 
-  it('AC7: the template stub is unchanged, so the 1.28/1.29 overwrite warning still matches', () => {
-    const stub = read('project-template/.claude/memory/project.md');
+  // (#94) The stub 1.28/1.29 shipped now lives only in a fixture; the installer
+  // keeps its digest so the overwrite warning still recognizes the bytes they wrote.
+  it('AC7: the legacy stub fixture matches the digest the installer recognizes', () => {
+    const stub = read('tests/fixtures/legacy-project-memory-stub.md');
     const digest = createHash('sha256').update(stub).digest('hex');
     // sha256 of the stub as committed in b018793, LF-normalized.
     expect(digest).toBe('01e65fdecfd0a842dc1269cb0a5ff59718978830c94d5815b09c3a0454f261f9');
+    expect(digest).toBe(LEGACY_PROJECT_MEMORY_STUB_SHA256);
+  });
+
+  it('(#94) the template stub is neutral: headings only, no code-conductor history', () => {
+    const stub = read('project-template/.claude/memory/project.md');
+    expect(stub).not.toMatch(/\b(BUG|FEAT|ARCH)-\d+/);
+    expect(stub).not.toContain('### Checkpoint');
+    expect(stub).not.toMatch(/project-template\/|global\/commands\//);
+    const headings = stub.split('\n').filter((l) => l.startsWith('## '));
+    expect(headings).toEqual(['## Stack', '## Architecture Decisions', '## Active Conventions', '## Technical Debt', '## Workarounds']);
   });
 });

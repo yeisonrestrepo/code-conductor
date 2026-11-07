@@ -8,6 +8,7 @@ import { assertAssets, deployGlobal, deployProject, chmodHooks, assertMergeTarge
 import { SENTINEL_START, SENTINEL_END, GITIGNORE_HEADER } from '../../lib/installer/merge-md.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const LEGACY_STUB = readFileSync(join(ROOT, 'tests', 'fixtures', 'legacy-project-memory-stub.md'), 'utf8');
 const GLOBAL_BLOCK = [SENTINEL_START, '## Workflow', '', 'Spec, then plan, then implement.', '', '## Safety', '', 'Confirm before writes.', SENTINEL_END, ''].join('\n');
 const TPL_GLOBAL = ['# Global Claude Configuration', '', GLOBAL_BLOCK].join('\n');
 const PROJECT_BLOCK = [SENTINEL_START, '## Agent Identity', '', 'You are an orchestrator.', '', '## Hard Constraints', '', '- Never hardcode secrets.', SENTINEL_END, ''].join('\n');
@@ -505,6 +506,39 @@ describe('deployProject: overwritten project.md detection', () => {
     warned.length = 0;
     deployProject(asset, home, { warn });
     expect(warned).toEqual([]);
+  });
+
+  // (#94) 1.28/1.29 re-runs wrote the old history-laden stub, not today's.
+  it('warns once, and writes nothing, when the host copy is the stub 1.28/1.29 shipped', () => {
+    const p = join(home, '.claude', 'memory', 'project.md');
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, LEGACY_STUB);
+    deployProject(asset, home, { warn });
+    expect(warned).toHaveLength(1);
+    expect(warned[0]).toContain('may have been overwritten');
+    expect(readFileSync(p, 'utf8')).toBe(LEGACY_STUB);
+  });
+
+  // An autocrlf=true clone on Windows wrote that stub with CRLF endings.
+  it('warns once, and writes nothing, when the 1.28/1.29 stub was written with CRLF', () => {
+    const p = join(home, '.claude', 'memory', 'project.md');
+    const crlf = LEGACY_STUB.replace(/\r?\n/g, '\r\n');
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, crlf);
+    deployProject(asset, home, { warn });
+    expect(warned).toHaveLength(1);
+    expect(warned[0]).toContain('may have been overwritten');
+    expect(readFileSync(p, 'utf8')).toBe(crlf);
+  });
+});
+
+describe('deployProject: real template memory stub (#94)', () => {
+  it('a fresh scaffold is silent and seeds a stub with no code-conductor history', () => {
+    const warned = [];
+    deployProject(ROOT, home, { warn: (m) => warned.push(m), report: (m) => warned.push(m) });
+    expect(warned).toEqual([]);
+    const seeded = readFileSync(join(home, '.claude', 'memory', 'project.md'), 'utf8');
+    expect(seeded).not.toMatch(/\b(BUG|FEAT)-\d+/);
   });
 });
 
