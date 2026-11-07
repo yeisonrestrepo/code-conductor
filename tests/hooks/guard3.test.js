@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url'
 import { dirname, join, resolve } from 'path'
 import fs from 'fs'
 import { CORPUS, DIALECT } from '../fixtures/guard3-corpus.js'
+import { BASH } from '../helpers/bash.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -13,18 +14,6 @@ const REPO_ROOT = resolve(__dirname, '../..')
 // the behavioral authority that port is verified against, so not one of them moves.
 const HOOK = join(REPO_ROOT, 'tests/fixtures/guard3-reference.sh')
 const TESTS_TMP = join(REPO_ROOT, 'tests', '.tmp')
-
-// Detect bash availability. On Windows without Git for Windows in PATH, all tests are skipped
-// rather than failing with an undiagnosable ENOENT error. Install Git for Windows and ensure
-// its bin/ directory is in PATH if you need to run these tests on Windows.
-const BASH = (() => {
-  const r = spawnSync('bash', ['--version'], { stdio: 'pipe', timeout: 5000 })
-  if (r.error) {
-    console.warn('[guard3] bash not found in PATH - all tests will be skipped. On Windows, ensure Git for Windows bin/ is in PATH.')
-    return null
-  }
-  return 'bash'
-})()
 
 beforeAll(() => { fs.mkdirSync(TESTS_TMP, { recursive: true }) })
 
@@ -59,8 +48,31 @@ function runRow(row) {
     if (result.error) throw new Error(`bash spawn failed (${result.error.code}): ${result.error.message}`)
     return result.status ?? -1
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true })
+    removeTempDir(dir)
   }
+}
+
+// On Windows the just-exited bash (or an antivirus scan of the allowlist file) can
+// hold a handle on the dir for a moment after spawnSync returns, so a bare rmSync
+// races it and throws EPERM/EBUSY. The retry is hand-rolled because Node 24's rmSync
+// did not honour maxRetries for a held dir (measured: it threw at once). Teardown
+// stays best-effort: the hook's verdict is what a row asserts, and a dir that still
+// will not go is reaped by the afterAll sweep below (#95). A dir left behind is
+// still reported, so leftovers in tests/.tmp do not pile up unnoticed.
+const RETRYABLE_RM_CODES = ['EBUSY', 'EPERM', 'ENOTEMPTY']
+function removeTempDir(dir) {
+  let lastError
+  for (let attempt = 1; attempt <= 10; attempt++) {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true })
+      return
+    } catch (e) {
+      lastError = e
+      if (!RETRYABLE_RM_CODES.includes(e.code)) break
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50 * attempt)
+    }
+  }
+  console.warn(`[guard3] temp dir not removed (${lastError.code}), left in tests/.tmp: ${dir}`)
 }
 
 // Safety sweep: remove any cc-guard3-* temp dirs leaked if a test crashed before finally.
@@ -70,7 +82,7 @@ afterAll(() => {
   try {
     fs.readdirSync(TESTS_TMP)
       .filter(n => n.startsWith('cc-guard3-'))
-      .forEach(n => fs.rmSync(join(TESTS_TMP, n), { recursive: true, force: true }))
+      .forEach(n => removeTempDir(join(TESTS_TMP, n)))
   } catch { /* best-effort */ }
 })
 

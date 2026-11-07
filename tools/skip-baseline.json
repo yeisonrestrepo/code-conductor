@@ -106,7 +106,8 @@
     "tests/scripts/resume-read.test.js > resume-read.mjs DB branch an oversize v1 blob degrades LOUDLY: reason, size, cap, exit 3",
     "tests/scripts/resume-read.test.js > resume-read.mjs DB branch branch-switch isolation: context stored at A is restored at A, absent at B",
     "tests/scripts/resume-read.test.js > resume-read.mjs DB branch names the reason for a schema-invalid DB blob",
-    "tests/scripts/resume-read.test.js > resume-read.mjs DB branch non-destructive: two successive reads at the same commit both hit"
+    "tests/scripts/resume-read.test.js > resume-read.mjs DB branch non-destructive: two successive reads at the same commit both hit",
+    "tests/unit/bash-helper.test.js > bash helper falls back to Git for Windows bash rather than skipping"
   ],
   "ci-node24": [
     "tests/hooks/context-guard.test.js > context-guard.ps1 — session reset (BUG-056) 'id with invalid characters — treated …'",
@@ -132,7 +133,8 @@
     "tests/plugin/code-conductor-plugin.test.js > code-conductor personal skills SKILL.md for verbosity exists and is non-empty",
     "tests/plugin/code-conductor-plugin.test.js > code-conductor personal skills SKILL.md for verbosity has name and description frontmatter",
     "tests/plugin/code-conductor-plugin.test.js > code-conductor personal skills dead enabledPlugins key is removed from settings.json",
-    "tests/plugin/code-conductor-plugin.test.js > code-conductor personal skills old plugin cache dir is cleaned up"
+    "tests/plugin/code-conductor-plugin.test.js > code-conductor personal skills old plugin cache dir is cleaned up",
+    "tests/unit/bash-helper.test.js > bash helper falls back to Git for Windows bash rather than skipping"
   ],
   "ci-windows-node24": [
     "tests/hooks/context-guard.test.js > context-guard.sh unreadable threshold file — fallback 25",
