@@ -131,6 +131,7 @@ tests/.tmp/
 !/docs/superpowers/plans/2026-10-24-issue95-guard3-eperm-cleanup.md
 !/docs/superpowers/plans/2026-10-24-issue96-settings-merge-crlf.md
 !/docs/superpowers/plans/2026-10-27-issue106-no-deps-flag.md
+!/docs/superpowers/plans/2026-10-27-issue107-project-alias.md
 !/docs/superpowers/plans/2026-10-27-issue108-nodeps-alias.md
 !/docs/superpowers/specs/2026-06-09-bug001-cc-compact-design.md
 !/docs/superpowers/specs/2026-06-09-bug002-spec-read-budget-design.md
@@ -184,6 +185,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-10-24-issue95-guard3-eperm-cleanup-design.md
 !/docs/superpowers/specs/2026-10-24-issue96-settings-merge-crlf-design.md
 !/docs/superpowers/specs/2026-10-27-issue106-no-deps-flag-design.md
+!/docs/superpowers/specs/2026-10-27-issue107-project-alias-design.md
 !/docs/superpowers/specs/2026-10-27-issue108-nodeps-alias-design.md
 # --- END tracked-surface block (BUG-042) ---
 

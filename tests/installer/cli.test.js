@@ -252,6 +252,36 @@ describe('run', () => {
     expect(existsSync(join(cwd, '.claude'))).toBe(false);
     expect(readdirSync(join(cwd, 'scripts')).sort()).toEqual([...bundled].sort());
   });
+  it('treats -Project exactly like --project (issue #107)', () => {
+    const rc = run(['-Project'], { HOME: home }, { cwd, log });
+    expect(rc).toBe(0);
+    expect(existsSync(join(cwd, 'CLAUDE.md'))).toBe(true);
+    expect(logs.some(l => /unrecognized/.test(l))).toBe(false);
+  });
+  it('keeps -project (lowercase) unrecognized and installs the global half only (issue #107)', () => {
+    const rc = run(['-project'], { HOME: home }, { cwd, log });
+    expect(rc).toBe(0);
+    expect(existsSync(join(cwd, 'CLAUDE.md'))).toBe(false);
+    expect(logs.some(l => l.startsWith('stderr:') && /unrecognized/.test(l) && /-project/.test(l))).toBe(true);
+  });
+  it('does not consume -Project as the --verbosity value (issue #107)', () => {
+    run(['--verbosity', '-Project'], { HOME: home }, { cwd, log });
+    expect(existsSync(join(cwd, 'CLAUDE.md'))).toBe(true);
+    expect(readFileSync(join(home, '.claude', 'memory', 'verbosity.md'), 'utf8')).toMatch(/VERBOSITY: MIN/);
+    expect(logs.some(l => /unrecognized/.test(l))).toBe(false);
+  });
+  it('[BUG-052] -Project also refuses to install inside its own source tree (issue #107)', () => {
+    const root = join(dirname(binPath), '..');
+    writeFileSync(join(cwd, 'package.json'), readFileSync(join(root, 'package.json')));
+    mkdirSync(join(cwd, 'scripts'));
+    for (const f of readdirSync(join(root, 'scripts'))) writeFileSync(join(cwd, 'scripts', f), 'tracked source');
+    expect(run(['-Project'], { HOME: home }, { cwd, log })).toBe(1);
+    expect(existsSync(join(home, '.claude'))).toBe(false);
+  });
+  it('lists -Project in --help (issue #107)', () => {
+    run(['--help'], { HOME: home }, { cwd, log });
+    expect(logs.some(l => l.startsWith('stdout:') && l.includes('[--project|-Project]'))).toBe(true);
+  });
   it('exits 1 when --project is passed and the project CLAUDE.md is a directory', () => {
     mkdirSync(join(cwd, 'CLAUDE.md'), { recursive: true });
     expect(run(['--project'], { HOME: home }, { cwd, log })).toBe(1);

@@ -8,7 +8,7 @@ import { verbosityHookCommand, mergeVerbosityHook } from '../lib/installer/setti
 import { healGraphifyHook } from '../lib/installer/heal.mjs';
 import { writeVerbosity, writeVersionFile } from '../lib/installer/config.mjs';
 
-const USAGE = `Usage: code-conductor [--project] [--no-deps|-NoDeps] [--verbosity MIN|INFO|VERBOSE] [--version] [--help]`;
+const USAGE = `Usage: code-conductor [--project|-Project] [--no-deps|-NoDeps] [--verbosity MIN|INFO|VERBOSE] [--version] [--help]`;
 
 // Hand-rolled parser (five flags only). Deliberately NOT node:util's parseArgs —
 // the CLI honors the zero-runtime-dependency rule and node:util adds no value for
@@ -21,7 +21,9 @@ function parseArgs(argv) {
   const opts = { project: false, noDeps: false, verbosity: undefined, verbosityGiven: false, version: false, help: false, unknown: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === '--project') opts.project = true;
+    // -Project is the spelling the retired install.ps1 documented; matched exact-case
+    // like every other flag here.
+    if (a === '--project' || a === '-Project') opts.project = true;
     // Accepted no-op: the npm CLI installs no dependencies since FEAT-023 removed the
     // shell installers, so there is nothing to skip. Recognized so callers carried over
     // from install.sh get no misleading "unrecognized" warning.
