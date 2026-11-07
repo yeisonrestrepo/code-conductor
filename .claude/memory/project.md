@@ -3230,3 +3230,7 @@ Key `turn-count.txt` to the hook stdin `session_id` (`<id> <count>`); a missing 
 - **Sync:** local `main` was 0 ahead / 62 behind `origin/main` before the fast-forward.
 - **Process gap, found here:** #114 was stacked on #112's branch. Merging #112 with `--delete-branch` closed #114 instead of retargeting it, because the repository does not delete branches on merge. Fix used: recreate the base ref at #112's head, reopen, retarget to `main`, delete the ref. No CI ever ran on #114; it merged on a local suite run of its head (1581 passed | 11 skipped). Rule: retarget a stacked PR to `main` before deleting its base branch.
 - **Open after this release:** #89 (two D5 leak shapes left; macOS AC11 probe and live protocol are owner-run), #113 and #115 (content OK, need a merge of `main`), #101, #102, #103, #104, #105, #111 (self-minted ids and owner-side records; #102 also has a UTF-16 Guard 1 bypass). The project CLAUDE.md "Setup: bash install.sh" line is stale since FEAT-023.
+
+## Release: 1.43.0 batch landing 2026-11-07
+
+Nine community PRs (author Luis) landed in one night; ids owner-minted at landing: FEAT-044 (#89, flow status line, three review rounds), FEAT-050 (#113+#115, -Project/-Verbosity aliases), FEAT-051 (#104, C4 wiki), BUG-062 (#105), BUG-063 (#102), BUG-064 (#101), BUG-065 (#111), BUG-066 (#103). Merge order resolved the shared anchors (.gitignore leaves, bin USAGE, both hook copies, deploy.mjs); the #94 fresh-scaffold baseline moved to pin FEAT-044's single flow report.

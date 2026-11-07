@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.43.0] - 2026-11-07
+
+### Added
+- **[FEAT-044]** A real-time flow status line. Both pre-tool-use hook mirrors append one structured JSON event per guard decision and Bash command word to a rotated, gitignored `.claude/.flow-events.jsonl` (160 KiB cap keeping 250 lines, stale-lock cutoff, fail-open, race-tested across processes); `flow-status.mjs` renders the status line and `/cc-flow` prints the summary. The recorded Bash target is found on Guard 3's mask and sliced from the original text, so a quoted value, a substitution (quoted or not) or an array assignment records nothing rather than a secret fragment (D5). Guard 4 denies reading the event file and its rotation snapshot into context. The installer merges the `statusLine` entry under the verbosity-remind fingerprint discipline, reports once, and keeps an existing entry with a notice. Landed from PR #89 (Luis), intake of issue #57 per the owner's D2(b) ruling on #81.
+- **[FEAT-050]** The installer accepts the PowerShell aliases `-Project` and `-Verbosity LEVEL`, exact-case, sharing every form with last-one-wins across spellings; `-Verbosity:INFO` warns and stays `MIN`, and the own-source refusal (BUG-052) covers the alias. Landed from PRs #113 and #115 (Luis), intake of issues #107 and #109.
+- **[FEAT-051]** The wiki is restructured on the C4 model: Architecture-Overview carries context and containers, the new C4-Components page the component level, and the remaining pages align their cross-references; the documented surfaces were spot-checked against the code at review. Landed from PR #104 (Luis).
+
+### Fixed
+- **[BUG-062]** Test suites resolve a bash that opens native paths: a probe passes over WSL's launcher for Git for Windows' bash on Windows, macOS/Linux keep the same bash as before, and `skip-baseline.json` adds only the Windows-only fallback row. Landed from PR #105 (Luis), intake of issue #92.
+- **[BUG-063]** Guard 1 skips binaries via git's NUL-sniff heuristic, so a no-limit Read of a PNG is allowed; a UTF-16 BOM rules binary out so UTF-16 text keeps its limit, and a late-NUL text file stays denied — pinned for all four shapes, both hook copies identical. Landed from PR #102 (Luis), intake of issue #93.
+- **[BUG-064]** The shipped project.md template is a neutral stub with no code-conductor history, and the legacy-overwrite warning keys on a CRLF-normalized hash so `autocrlf=true` installs from 1.28/1.29 still warn; a fresh scaffold reports nothing beyond FEAT-044's single flow line. Landed from PR #101 (Luis), intake of issue #94.
+- **[BUG-065]** guard3's test temp-dir cleanup retries bounded on Windows EPERM handle races (10 attempts, ~2.75 s), and a cleanup failure cannot mask a row's verdict. Landed from PR #111 (Luis), intake of issue #95.
+- **[BUG-066]** The settings merge normalizes CRLF before comparing, so repeat runs over a CRLF `settings.json` are idempotent and an unchanged CRLF file is left byte-for-byte. Landed from PR #103 (Luis), intake of issue #96.
+
 ## [1.42.0] - 2026-10-27
 
 ### Added
