@@ -10,13 +10,14 @@ import { parseSnapshotHeader } from '../../scripts/ticket.mjs';
 import { cleanGitEnv } from '../helpers/git-env.js';
 import {
   ENVELOPE_FILE, HANDBACK_DIR, MAY_HAND_BACK, ROLE_ARTIFACTS, REVIEW_CAP, REVIEW_DIR, RUN_FILE, SHELL_METACHARACTERS, WRITE_SURFACE,
-  checkTestCommand, extractTasks, findAgent, forwardGate, isValidRun, nextStep, taskScope,
+  Halt, checkTestCommand, docScopes, extractTasks, findAgent, forwardGate, isValidRun, nextStep, taskScope,
 } from '../../scripts/orchestrate.mjs';
+import { CANDIDATE_PAIRS, DEFAULT_PAIR } from '../../scripts/doc-locations.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const SCRIPT = join(REPO_ROOT, 'scripts/orchestrate.mjs');
 const ROLES = ['spec', 'plan', 'code', 'audit', 'qa'];
-const PLAN = 'docs/superpowers/plans/demo.md';
+const PLAN = 'docs/plans/demo.md';
 // Every root gets a test script with no lockfile, so start records `npm test` (FEAT-012 D6).
 const PKG = '{"scripts":{"test":"vitest run"}}';
 
@@ -51,7 +52,7 @@ function agents(roles = ROLES, dir = join(root, '.claude', 'agents')) {
   for (const r of roles) writeFileSync(join(dir, `${r}.md`), `---\nname: ${r}\ndescription: fixture\n---\nfixture\n`);
 }
 function plan(body) {
-  mkdirSync(join(root, 'docs', 'superpowers', 'plans'), { recursive: true });
+  mkdirSync(dirname(join(root, PLAN)), { recursive: true });
   writeFileSync(join(root, PLAN), body);
 }
 const task = (n, files) => `### Task ${n}: thing ${n}\n\n**Files:**\n${files.map((f) => `- Modify: \`${f}\``).join('\n')}\n\n- [ ] **Step 1: do it**\n`;
@@ -102,8 +103,8 @@ describe('router [FEAT-011 AC7]', () => {
 
   it('gives each role the reviewed tool kind and scope (D5)', () => {
     expect(ROLE_ARTIFACTS).toEqual({
-      spec: { tk: 'RW', scope: ['docs/superpowers/specs/**'] },
-      plan: { tk: 'RW', scope: ['docs/superpowers/plans/**'] },
+      spec: { tk: 'RW', scope: null },
+      plan: { tk: 'RW', scope: null },
       code: { tk: 'RW', scope: null },
       audit: { tk: 'R', scope: null },
       qa: { tk: 'X', scope: null },
@@ -235,7 +236,7 @@ describe('run file [FEAT-011 AC9]', () => {
     writeFileSync(join(root, HANDBACK_DIR, 'spec.txt'), 'stale\n');
     const r = orch(['start', 'FEAT-012']);
     expect(r.status).toBe(0);
-    expect(r.out).toBe(`replaced the stale run FEAT-011 started ${started}; test command: npm test`);
+    expect(r.out).toBe(`replaced the stale run FEAT-011 started ${started}; docs: specs docs/specs, plans docs/plans (default); test command: npm test`);
     expect(runFile()).toMatchObject({ item: 'FEAT-012', session_id: 'sess-1' });
     expect(existsSync(join(root, ENVELOPE_FILE))).toBe(false);
     expect(existsSync(join(root, HANDBACK_DIR))).toBe(false);
@@ -439,12 +440,12 @@ describe('test command [FEAT-012 AC8, AC9]', () => {
     files({ [lock]: '' });
     const r = start();
     expect(r.status).toBe(0);
-    expect(r.out).toBe(`run FEAT-012 started; test command: ${expected}`);
+    expect(r.out).toBe(`run FEAT-012 started; docs: specs docs/specs, plans docs/plans (default); test command: ${expected}`);
     expect(runFile().test_command).toBe(expected);
   });
 
   it('[AC8] records npm test with no lockfile, the stated default', () => {
-    expect(start().out).toBe('run FEAT-012 started; test command: npm test');
+    expect(start().out).toBe('run FEAT-012 started; docs: specs docs/specs, plans docs/plans (default); test command: npm test');
     expect(runFile().test_command).toBe('npm test');
   });
 
@@ -551,7 +552,7 @@ describe('ticket intake [FEAT-031 AC1-AC5, AC12]', () => {
     gh = withIssues(iss);
     const r = orchGh(['start', 'FEAT-031', '--ticket', '5']);
     const hash = sha(iss.body);
-    expect(r.out).toBe(`run FEAT-031 started; ticket ${REPO}#5 "Add widgets"; snapshot ${SNAP} sha256 ${hash}; test command: npm test`);
+    expect(r.out).toBe(`run FEAT-031 started; ticket ${REPO}#5 "Add widgets"; snapshot ${SNAP} sha256 ${hash}; docs: specs docs/specs, plans docs/plans (default); test command: npm test`);
     expect(gh.calls()).toEqual([['api', 'repos/{owner}/{repo}/issues/5']]);
     const url = `https://github.com/${REPO}/issues/5`;
     expect(runFile().ticket).toEqual({ repo: REPO, number: 5, url, sha256: hash, snapshot: SNAP });
@@ -785,5 +786,144 @@ describe('review loop round counter [FEAT-041 AC2-AC4]', () => {
 
   it('names review in the usage line', () => {
     expect(orch(['nope']).err).toBe('orchestrate: usage: orchestrate.mjs start|install|handback|approve|review|end');
+  });
+});
+
+describe('doc locations [FEAT-047]', () => {
+  const put = (rel, text = '# x\n') => {
+    mkdirSync(dirname(join(root, rel)), { recursive: true });
+    writeFileSync(join(root, rel), text);
+  };
+  const scopeOf = (role) => {
+    const r = orch(['install', role, '--check']);
+    expect(r.status).toBe(0);
+    return JSON.parse(r.out).ops.scope;
+  };
+  // Spec through approval without plan(), so no other candidate pair exists at start.
+  const approveSpec = () => {
+    expect(orch(['install', 'spec']).status).toBe(0);
+    expect(orch(['handback', 'spec'], { input: say('spec', 'boundary_routed') }).status).toBe(0);
+    expect(orch(['approve', 'spec']).status).toBe(0);
+  };
+  const recorded = (specs, plans) => put('CLAUDE.md', `# P\n\n${specs ? `- Specs: ${specs}\n` : ''}${plans ? `- Plans: ${plans}\n` : ''}`);
+  const halts = (code) => {
+    const r = orch(['start', 'FEAT-012']);
+    expect(r.status).toBe(1);
+    expect(r.err.startsWith(`${code}: `)).toBe(true);
+    return r;
+  };
+
+  it('[AC4] names no literal spec or plan folder', () => {
+    expect(ROLE_ARTIFACTS.spec.scope).toBeNull();
+    expect(ROLE_ARTIFACTS.plan.scope).toBeNull();
+    expect(readFileSync(SCRIPT, 'utf8')).not.toContain('docs/superpowers');
+  });
+
+  it('pins the discovered pair at start and derives both envelope scopes from it', () => {
+    agents();
+    put('.claude/specs/a.md');
+    expect(orch(['start', 'FEAT-011']).status).toBe(0);
+    expect(runFile().docs).toEqual({
+      specs: '.claude/specs', plans: '.claude/plans', group: null, source: 'discovered',
+      scopes: { spec: ['.claude/specs/**'], plan: ['.claude/plans/**'] },
+    });
+    expect(scopeOf('spec')).toEqual(['.claude/specs/**']);
+    approveSpec();
+    expect(scopeOf('plan')).toEqual(['.claude/plans/**']);
+  });
+
+  it('[AC7] groups both scopes under the backlog group', () => {
+    agents();
+    put('.claude/specs/a.md');
+    put('.claude/plans/b.md');
+    put('BACKLOG.md', '# Backlog\n\n## Pillar 3: X\n\n### [ ] `[FEAT-011]` y\n');
+    const r = orch(['start', 'FEAT-011']);
+    expect(r.status).toBe(0);
+    expect(runFile().docs).toEqual({
+      specs: '.claude/specs', plans: '.claude/plans', group: 'pillar-3', source: 'discovered',
+      scopes: { spec: ['.claude/specs/pillar-3/**'], plan: ['.claude/plans/pillar-3/**'] },
+    });
+    expect(r.out.endsWith('docs: specs .claude/specs, plans .claude/plans (discovered); group pillar-3; test command: npm test')).toBe(true);
+    expect(scopeOf('spec')).toEqual(['.claude/specs/pillar-3/**']);
+    approveSpec();
+    expect(scopeOf('plan')).toEqual(['.claude/plans/pillar-3/**']);
+  });
+
+  it('[AC10] never writes CLAUDE.md and keeps the write surface', () => {
+    const calls = /(writeFileSync|writeAtomic|appendFileSync|renameSync|rmSync)\(/;
+    for (const line of readFileSync(SCRIPT, 'utf8').split(/\r?\n/)) {
+      expect(line).not.toMatch(/(writeFileSync|writeAtomic|appendFileSync|renameSync|rmSync)\([^)]*CLAUDE\.md/);
+      if (line.includes('CLAUDE.md')) expect(line).not.toMatch(calls);
+    }
+    expect(WRITE_SURFACE).toEqual(['.claude/memory/orchestrator-run.json', '.claude/memory/band-envelope.json', '.claude/memory/session-snapshot.json', '.conductor/**']);
+  });
+
+  it('[AC6] keeps the pair pinned at start when CLAUDE.md changes mid-run', () => {
+    agents();
+    expect(orch(['start', 'FEAT-011']).status).toBe(0);
+    const before = runFile().docs;
+    recorded('other/specs', 'other/plans');
+    expect(scopeOf('spec')).toEqual(['docs/specs/**']);
+    expect(runFile().docs).toEqual(before);
+  });
+
+  it('[AC6] a recorded pair wins over a busier discovered one at start', () => {
+    recorded('rec/specs', 'rec/plans');
+    put('docs/superpowers/specs/a.md');
+    put('docs/superpowers/specs/b.md');
+    expect(orch(['start', 'FEAT-011']).status).toBe(0);
+    expect(runFile().docs).toMatchObject({ specs: 'rec/specs', plans: 'rec/plans', source: 'claude-md' });
+  });
+
+  it.each([
+    ['half-recorded', ['rec/specs', null]],
+    ['an invalid value', ['../x', 'rec/plans']],
+    ['an overlapping pair', ['docs/a', 'docs/a/b']],
+  ])('[AC9] halts start on %s and records no run', (_, [specs, plans]) => {
+    recorded(specs, plans);
+    halts('ORCH_DOC_LOCATION_INVALID');
+    expect(existsSync(join(root, RUN_FILE))).toBe(false);
+  });
+
+  it('[AC9] leaves a stale run in place when start halts on the doc location', () => {
+    expect(orch(['start', 'FEAT-011'], { sid: 'old-session' }).status).toBe(0);
+    recorded('rec/specs', null);
+    halts('ORCH_DOC_LOCATION_INVALID');
+    expect(runFile().item).toBe('FEAT-011');
+  });
+
+  it('[AC9] docScopes halts over the element cap, and every known pair fits the longest group', () => {
+    let thrown;
+    try { docScopes({ specs: 'a'.repeat(300), plans: 'p', group: null }); } catch (e) { thrown = e; }
+    expect(thrown).toBeInstanceOf(Halt);
+    expect(thrown.code).toBe('ORCH_SCOPE_OVER_CAP');
+    for (const pair of [...CANDIDATE_PAIRS, DEFAULT_PAIR]) {
+      expect(() => docScopes({ ...pair, group: 'x'.repeat(47) })).not.toThrow();
+    }
+  });
+
+  // snap-build truncates an over-long element to the cap (snap-build.mjs normArray), so the
+  // validator never sees it; this pins only that the router itself does not re-check.
+  it('[AC9] install does not re-check the cap', () => {
+    agents();
+    expect(orch(['start', 'FEAT-011']).status).toBe(0);
+    const run = runFile();
+    runFileText(JSON.stringify({ ...run, docs: { ...run.docs, scopes: { ...run.docs.scopes, spec: ['x'.repeat(301)] } } }));
+    const r = orch(['install', 'spec', '--check']);
+    expect(r.err).not.toContain('ORCH_SCOPE_OVER_CAP');
+  });
+
+  it('halts install on a run started before FEAT-047, and end still clears it', () => {
+    agents();
+    expect(orch(['start', 'FEAT-011']).status).toBe(0);
+    const { docs, ...old } = runFile();
+    expect(docs).toBeDefined();
+    runFileText(JSON.stringify(old));
+    expect(isValidRun(old)).toBe(true);
+    const r = orch(['install', 'spec']);
+    expect(r.status).toBe(1);
+    expect(r.err).toMatch(/^ORCH_DOC_LOCATION_UNRESOLVED: .*\bend\b.*\bstart\b/);
+    expect(orch(['end']).status).toBe(0);
+    expect(existsSync(join(root, RUN_FILE))).toBe(false);
   });
 });

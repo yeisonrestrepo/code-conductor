@@ -178,6 +178,16 @@ describe('Guard 5: band scope for role agents [ARCH-010]', () => {
       .toBe("Guard 5: BAND_ROLE_MISMATCH: agent code is not the envelope's role qa.");
   });
 
+  // A regression pin, not a red-first case: Guard 5 already reads whatever scope the router
+  // derived, so a resolved spec folder needs no hook change (FEAT-047 AC5).
+  it('[FEAT-047 AC5] holds a spec agent to the resolved spec folder', () => {
+    envelope({ sys: { role: 'spec', ph: 'spec', tk: 'RW' }, ops: { scope: ['.claude/specs/**'], gate: 'boundary_routed' } });
+    const asSpec = (file) => fire(payload('Write', file, { cwd: root, agent: 'spec' }));
+    expect(asSpec(join(root, '.claude', 'specs', 'x.md'))).toBeNull();
+    const outside = join(root, 'docs', 'superpowers', 'specs', 'x.md');
+    expect(asSpec(outside).permissionDecisionReason).toBe(violation(outside, '.claude/specs/**'));
+  });
+
   it('[AC10] carries band constants equal to scripts/snap-contract.mjs (D7)', () => {
     const text = readFileSync(HOOK, 'utf8');
     const list = (name) => JSON.parse(text.match(new RegExp(`const ${name} = (\\[[^\\]]*\\]);`))[1].replace(/'/g, '"'));

@@ -37,8 +37,8 @@ const SHELL = 'Run exactly the command named in the run file';
 const NO_SHELL = 'You have no shell';
 // Each role's Gate semantics row, by the sentence that states its claim.
 const CLAIM = {
-  spec: 'a spec file was written under `docs/superpowers/specs/` that answers the item',
-  plan: 'a plan file was written under `docs/superpowers/plans/` from the approved spec, and each task names its files',
+  spec: 'a spec file that answers the item was written under the folder your envelope\'s `ops.scope` names',
+  plan: 'a plan file was written under the folder your envelope\'s `ops.scope` names, from the approved spec, and each task names its files',
   code: 'after your last edit you ran the test command, and your report states its exact exit status and summary line',
   audit: 'a static review of the changes against the spec and plan was completed, and its findings are listed',
   qa: 'you ran the test command yourself and the suite passed',
@@ -80,6 +80,10 @@ describe('role agent profiles [FEAT-012]', () => {
     for (const gate of GATES.filter((g) => !MAY_HAND_BACK[role].includes(g))) expect(text).not.toContain(gate);
   });
 
+  it.each(['spec', 'plan'])('[FEAT-047 AC13] %s names no hardcoded docs/superpowers folder', (role) => {
+    expect(profile(role)).not.toContain('docs/superpowers');
+  });
+
   it.each(ROLES)('findAgent resolves %s to its mirror, so ORCH_AGENT_MISSING cannot fire here', (role) => {
     const home = mkdtempSync(join(tmpdir(), 'cc-profiles-home-'));
     try { expect(findAgent(role, ROOT, home)).toBe(join(ROOT, MIRROR, `${role}.md`)); }
@@ -93,9 +97,10 @@ describe('role agent profiles [FEAT-012]', () => {
 const PROFILE_SHA256_1_37_0 = {
   audit: '5bfeff19ef086a21d9a6df82dfe570540c55adb7fa5b08f4dbf34003230ad809',
   code: '21b7697ef9317a7aca89dd3e99623208d6541cf7c794712ff2a76e4d0bb0c604',
-  plan: '3f1c61b66519fce290821d79d3691f2883ca2d2d93c924b1e87dec8768f96913',
+  // FEAT-047 changed plan and spec on purpose: the folder now comes from the envelope's scope.
+  plan: '0d9ed0d78da46ea8717ad6d8dc324b33d7e18435f7821a15401e1937c58b4eb1',
   qa: '19194c34cfc43b7886ef0a63a30e07cd8f633330bf298265eb55a4be4b224644',
-  spec: '819553795a7b65a438a2911a4326baa2a19efa372ac2ff387eb11f6cef3b2096',
+  spec: '68c13a86c583ed0320dc23bd659dd7a6dc0cfc9246f940093ee211fe508c67b2',
 };
 
 describe('profiles unchanged since 1.37.0 [FEAT-031 AC13]', () => {
