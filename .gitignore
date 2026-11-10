@@ -139,6 +139,10 @@ tests/.tmp/
 !/docs/superpowers/plans/2026-11-08-bug055-non-string-manifest-fields.md
 !/docs/superpowers/plans/2026-11-08-feat045-ci-records-guard.md
 !/docs/superpowers/plans/2026-11-10-issue118-contract-test-isolation.md
+!/docs/superpowers/plans/2026-11-10-issue119-snap-scope-no-truncation.md
+!/docs/superpowers/plans/2026-11-10-issue128-scope-cap-single-measure.md
+!/docs/superpowers/plans/2026-11-10-issue132-history-truncation-single-measure.md
+!/docs/superpowers/plans/2026-11-10-issue136-ops-f-keep-action-code.md
 !/docs/superpowers/specs/2026-06-09-bug001-cc-compact-design.md
 !/docs/superpowers/specs/2026-06-09-bug002-spec-read-budget-design.md
 !/docs/superpowers/specs/2026-06-11-bug006-feat018-bash-scan-guard-design.md
@@ -199,6 +203,10 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-11-08-bug055-detect-stack-non-string-scripts-design.md
 !/docs/superpowers/specs/2026-11-08-feat045-ci-records-guard-design.md
 !/docs/superpowers/specs/2026-11-10-issue118-contract-test-isolation-design.md
+!/docs/superpowers/specs/2026-11-10-issue119-snap-scope-no-truncation-design.md
+!/docs/superpowers/specs/2026-11-10-issue128-scope-cap-single-measure-design.md
+!/docs/superpowers/specs/2026-11-10-issue132-history-truncation-single-measure-design.md
+!/docs/superpowers/specs/2026-11-10-issue136-ops-f-keep-action-code-design.md
 # --- END tracked-surface block (BUG-042) ---
 
 # Kept for external writers. Both lines are redundant against the block above; each is

@@ -32,6 +32,9 @@ export const CAPS = {
 };
 // Same scheme, v3 only: ops.scope exists in no earlier version, so it cannot join CAPS.
 export const V3_CAPS = { 'ops.scope': [20, 300] };
+// The one measure every element cap is checked in (FEAT-010 spec): the element's JSON-escaped
+// length without its quotes. Router, builder and validator all call this (issue #128).
+export const elementLength = (el) => JSON.stringify(el).slice(1, -1).length;
 
 // Field sets, both per version. v1 and v2 share one block map, unchanged since v1;
 // v3 adds the band fields reserved by FEAT-010 (ARCH-010).
