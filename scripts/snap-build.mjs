@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { CAPS, PRE_PARSE_MAX_BYTES as MAX_SNAP_BYTES, V1_MAX_CHARS, V3_CAPS } from './snap-contract.mjs';
+import { CAPS, PRE_PARSE_MAX_BYTES as MAX_SNAP_BYTES, V1_MAX_CHARS, V3_CAPS, elementLength } from './snap-contract.mjs';
 
 const die = (msg) => { process.stderr.write(`SNAP_BUILD_ERROR: ${msg}\n`); process.exit(1); };
 const byteLen = (s) => Buffer.byteLength(s, 'utf8');
@@ -9,16 +9,40 @@ const byteLen = (s) => Buffer.byteLength(s, 'utf8');
 // after an async write truncates the un-flushed tail; the drain callback avoids both.
 function writeOut(s) { process.stdout.write(s + '\n', () => process.exit(0)); }
 
+// Issue #132: cut to the validator's measure, one code point at a time, so the cut never
+// splits a surrogate pair or an escape. JSON escapes each code point on its own, so the
+// per-code-point sum equals elementLength of the prefix and the result always validates.
+function truncateToCap(str, elemCap) {
+  if (elementLength(str) <= elemCap) return str;
+  let used = 0; let end = 0;
+  for (const ch of str) {
+    used += elementLength(ch);
+    if (used > elemCap) break;
+    end += ch.length;
+  }
+  return str.slice(0, end);
+}
+
+// Issue #136: an ops.f entry is `<path>:<C|M|D>` and the validator requires that suffix, so an
+// over-cap entry loses path, never its action code. Without a code there is nothing valid to keep.
+function truncateFileEntry(entry, elemCap, index) {
+  const size = elementLength(entry);
+  if (size <= elemCap) return entry;
+  const code = entry.slice(-2);
+  if (!/^:[CMD]$/.test(code)) die(`SNAP_FILE_NO_ACTION: ops.f[${index}] is ${size} characters, over the cap of ${elemCap}, and has no :C, :M or :D suffix to keep`);
+  return truncateToCap(entry.slice(0, -2), elemCap - code.length) + code;
+}
+
 // filter empties, dedup (first wins), Unicode-safe per-element truncation, head-drop to count cap
-function normArray(raw, [cap, elemCap]) {
+function normArray(raw, [cap, elemCap], truncate = truncateToCap) {
   const arr = Array.isArray(raw) ? raw : [];
   const seen = new Set(); const out = [];
-  for (const item of arr) {
+  for (const [index, item] of arr.entries()) {
     if (typeof item !== 'string') continue;
     const t = item.trim();
     if (!t || seen.has(t)) continue;
     seen.add(t);
-    out.push(Array.from(t).slice(0, elemCap).join(''));
+    out.push(truncate(t, elemCap, index));
   }
   while (out.length > cap) out.shift();
   return out;
@@ -28,7 +52,7 @@ function normArray(raw, [cap, elemCap]) {
 // Blanks and duplicates still drop: they narrow nothing.
 function scopeArray(raw) {
   const [cap, elemCap] = V3_CAPS['ops.scope'];
-  const charLen = (el) => Array.from(el.trim()).length;
+  const charLen = (el) => elementLength(el.trim());
   const long = raw.findIndex((el) => typeof el === 'string' && charLen(el) > elemCap);
   if (long >= 0) die(`SNAP_SCOPE_OVER_CAP: ops.scope[${long}] is ${charLen(raw[long])} characters; the cap is ${elemCap}`);
   const scope = normArray(raw, [Infinity, elemCap]);
@@ -57,7 +81,7 @@ for (const k of ['ph', 'c', 's']) {
 }
 
 const sys = { ph: obj.ph, c: obj.c, s: obj.s };
-const ops = { n: normArray(obj.n, CAPS['ops.n']), f: normArray(obj.f, CAPS['ops.f']) };
+const ops = { n: normArray(obj.n, CAPS['ops.n']), f: normArray(obj.f, CAPS['ops.f'], truncateFileEntry) };
 const mem = { d: normArray(obj.d, CAPS['mem.d']), x: normArray(obj.x, CAPS['mem.x']) };
 const pr = typeof obj.pr === 'string' ? obj.pr : '';
 
