@@ -24,6 +24,18 @@ function normArray(raw, [cap, elemCap]) {
   return out;
 }
 
+// D9 (issue #119): a scope is a Guard 5 envelope, so it is refused at its caps, never truncated.
+// Blanks and duplicates still drop: they narrow nothing.
+function scopeArray(raw) {
+  const [cap, elemCap] = V3_CAPS['ops.scope'];
+  const charLen = (el) => Array.from(el.trim()).length;
+  const long = raw.findIndex((el) => typeof el === 'string' && charLen(el) > elemCap);
+  if (long >= 0) die(`SNAP_SCOPE_OVER_CAP: ops.scope[${long}] is ${charLen(raw[long])} characters; the cap is ${elemCap}`);
+  const scope = normArray(raw, [Infinity, elemCap]);
+  if (scope.length > cap) die(`SNAP_SCOPE_OVER_CAP: ops.scope has ${scope.length} entries; the cap is ${cap}`);
+  return scope;
+}
+
 // back off one unit if the boundary would keep a lone high surrogate
 function surrogateSafe(str, n) {
   if (n > 0 && n <= str.length) {
@@ -59,7 +71,7 @@ if (band) {
   if (obj.p !== undefined && (typeof obj.p !== 'object' || obj.p === null || Array.isArray(obj.p))) die('p must be a plain object');
   // Assignment order is serialization order: BLOCK_FIELDS[3] lists scope before gate.
   Object.assign(sys, { role: obj.role, tk: obj.tk });
-  if (obj.scope !== undefined) ops.scope = normArray(obj.scope, V3_CAPS['ops.scope']);
+  if (obj.scope !== undefined) ops.scope = scopeArray(obj.scope);
   ops.gate = obj.gate;
   if (obj.p !== undefined) mem.p = obj.p;
 }

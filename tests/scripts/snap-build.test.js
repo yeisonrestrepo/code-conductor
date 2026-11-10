@@ -136,4 +136,28 @@ describe('snap-build.mjs', () => {
     expect(r.status).toBe(1);
     expect(r.stderr).toBe('SNAP_BUILD_ERROR: p must be a plain object\n');
   });
+
+  // ---- issue #119: D9, a scope is refused at its cap, never truncated ----
+  it('[#119 AC1] refuses a scope element over 300 characters instead of truncating it', () => {
+    const r = build(JSON.stringify({ ...base, ...band, scope: ['src/**', 'src/' + 'x'.repeat(297)] }));
+    expect(r.status).toBe(1);
+    expect(r.stdout).toBe('');
+    expect(r.stderr).toBe('SNAP_BUILD_ERROR: SNAP_SCOPE_OVER_CAP: ops.scope[1] is 301 characters; the cap is 300\n');
+  });
+
+  it('[#119 AC2] refuses a scope over 20 entries instead of head-dropping it', () => {
+    const scope = Array.from({ length: 21 }, (_, i) => `f${i}.js`);
+    const r = build(JSON.stringify({ ...base, ...band, scope: [...scope, ' ', 'f0.js'] }));
+    expect(r.status).toBe(1);
+    expect(r.stdout).toBe('');
+    expect(r.stderr).toBe('SNAP_BUILD_ERROR: SNAP_SCOPE_OVER_CAP: ops.scope has 21 entries; the cap is 20\n');
+  });
+
+  it('[#119 AC3] builds a scope at both caps unchanged, and it validates', () => {
+    const scope = Array.from({ length: 20 }, (_, i) => String(i).padStart(2, '0') + 'x'.repeat(298));
+    const r = build(JSON.stringify({ ...base, ...band, scope }));
+    expect(r.status).toBe(0);
+    expect(JSON.parse(r.stdout).ops.scope).toEqual(scope);
+    expect(validate(r.stdout.trim()).status).toBe(0);
+  });
 });
