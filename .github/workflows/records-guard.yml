@@ -1,0 +1,28 @@
+name: Records guard
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  records-guard:
+    # Ruling 2: the owner's own PRs (release PRs included) are exempt; collaborators are not.
+    if: github.event.pull_request.user.login != github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The pull_request checkout is the merge commit; depth 2 reaches its first
+          # parent, which is the base tip the PR is being merged into.
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          # engines.node's floor, so the guard proves it needs nothing newer.
+          node-version: '20'
+      - name: Fail if the PR changes owner-side records
+        run: node tools/records-guard.mjs --base HEAD^1 --head HEAD
