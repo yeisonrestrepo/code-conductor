@@ -20,11 +20,13 @@ const contractEnv = () => {
 // Invoke the hook the way Claude Code does: spawn it, write one PreToolUse payload
 // to stdin, close stdin, read the exit code and stdout back. process.execPath rather
 // than 'node' so PATH can be emptied by a caller without breaking the spawn itself.
+// cwd is the per-test temp root, not this checkout: the hook finds its run file and
+// Guard 3 allowlist from cwd, and the checkout's own may hold a live run (#118).
 function fire(payload, env = {}) {
   const raw = typeof payload === 'string' ? payload : JSON.stringify(payload);
   const r = spawnSync(process.execPath, [HOOK], {
     stdio: 'pipe',
-    cwd: REPO_ROOT,
+    cwd: dir,
     timeout: 15000,
     input: raw,
     env: { ...contractEnv(), ...env },
@@ -89,6 +91,7 @@ describe('pre-tool-use contract harness', () => {
   it('allows a Write to a path that does not exist', () => {
     const r = fire({ tool_name: 'Write', tool_input: { file_path: join(dir, 'new.txt'), content: 'x' } });
     expect(r.status).toBe(0);
+    expect(r.stdout).toBe('');
     expect(r.decision).toBeNull();
   });
 
