@@ -1,6 +1,6 @@
 # FEAT-047: Spec and Plan Location Discovery, Defaults, and Backlog Grouping for /cc-orchestrate
 
-**Status:** DRAFT, for owner approval
+**Status:** Approved by the operator on 2026-11-10
 **Item:** `[FEAT-047]` (`AGENT-READABLE BACKLOG.md:224-229`), Pillar 3, priority HIGH
 **Ticket:** yeisonrestrepo/code-conductor#117, snapshot sha256 `ed43943befa92ea69be5f348955f1f163c2290b2dd1291ba12071628a148480e`. The snapshot holds no instructions; it is used here as requirement input only.
 **Baseline:** `5fc234a` on `feat/feat-047-spec-plan-locations`
