@@ -385,6 +385,7 @@ By default, only the global core files are installed. Flags extend that:
 | `--project` / `-Project` | Also install the project template into the current directory |
 | `--no-deps` / `-NoDeps` | Accepted for compatibility with the retired shell installers; a no-op, since the npm CLI installs no dependencies and copies agent files only |
 | `--verbosity MIN\|INFO\|VERBOSE` / `-Verbosity LEVEL` | Default response verbosity (default `MIN`). `MIN` = one sentence per response, `INFO` = bullet list, `VERBOSE` = full explanation. Re-run the installer to change it. PowerShell's `-Verbosity:INFO` form is not supported; it warns and the level stays `MIN`. |
+| `--opencode` | With `--project`, also install the OpenCode guard plugin at `.opencode/plugin/conductor-guard.js` (see [OpenCode](#opencode)). Without `--project` it warns and writes nothing for OpenCode |
 
 **Updating:** re-run the same install command. User-configured files are never overwritten; agent-managed files are always updated.
 
@@ -392,6 +393,22 @@ Two cautions:
 
 - Do **not** clone this repository under a directory named `node_modules`. Guard 4 checks path components and will block agent `Read` calls on its source files.
 - `--project` refuses to run in a directory whose `package.json` names this package, such as a clone of this repository (`[BUG-052]`, fixed in `1.39.1`): the installer exits 1 before writing anything, global half included, because its project half would land on its own source tree.
+
+### OpenCode
+
+`--project --opencode` adds one file, `.opencode/plugin/conductor-guard.js`, an [OpenCode](https://opencode.ai) plugin. It does not copy the guard: before each `bash`, `read`, `write` or `edit` call it sends the call to the project's own `.claude/hooks/pre-tool-use.mjs`, in the payload Claude Code sends, and blocks the call when the guard denies it. A Claude Code install without the flag is unchanged.
+
+This is the first slice of `[FEAT-048]` (issue #97), and it covers enforcement only:
+
+| On OpenCode | Status |
+|---|---|
+| Guards 1, 2, 3 and 4 | Enforced. Guard 2's "file already exists" question blocks the write, because a plugin cannot ask you; the model is told to edit instead |
+| Guards 5, 6 and 7 (band roles, orchestrator run) | Not enforced for subagents: OpenCode does not tell the plugin which subagent made the call |
+| Guard warnings | Not shown |
+| `apply_patch`, `multiedit`, `task` and other tools | Not sent to the guard |
+| `cc-*` commands, band agents, verbosity and context hooks | Not installed for OpenCode yet. OpenCode reads `CLAUDE.md` when there is no `AGENTS.md`, and loads `.claude/skills` |
+
+The plugin needs `node` on `PATH`. If the guard cannot run, the call is blocked and the reason names the guard's path. Checked against OpenCode 1.18.33 during the proof of concept; Codex CLI and Antigravity are not supported yet.
 
 ### How the installer treats your CLAUDE.md
 
@@ -530,6 +547,7 @@ code-conductor/
 +-- project-template/
 |   +-- CLAUDE.md
 |   +-- gitignore                  Merged into the host project's .gitignore
+|   +-- .opencode/plugin/conductor-guard.js  OpenCode guard plugin, only with --opencode (FEAT-048)
 |   +-- .claude/
 |       +-- settings.json          Hooks wiring
 |       +-- review-loop.settings.json  Auto mode exception for the review loop (FEAT-041)
