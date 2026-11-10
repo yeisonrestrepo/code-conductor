@@ -38,6 +38,24 @@ describe('snap-contract.mjs', () => {
     expect(src('scripts/snap-validate.mjs')).not.toMatch(/caps = \{/)
   })
 
+  // ---- issue #128: one measure for the element cap, shared by router, builder and validator ----
+  it('[#128] measures an element as its JSON-escaped length', () => {
+    const BS = String.fromCharCode(92)
+    expect(contract.elementLength('src/a.js')).toBe(8)
+    expect(contract.elementLength('src' + BS + 'a.js')).toBe(9) // a backslash serializes as two
+    expect(contract.elementLength('a"b')).toBe(4) // so does a quote
+    expect(contract.elementLength('\u{1F600}')).toBe(2) // an astral character is two UTF-16 units
+    expect(contract.elementLength('é')).toBe(1) // non-ASCII is never escaped
+  })
+
+  it('[#128] is the one place the element measure is spelled', () => {
+    for (const rel of ['scripts/orchestrate.mjs', 'scripts/snap-build.mjs', 'scripts/snap-validate.mjs']) {
+      const text = src(rel)
+      expect(text).toContain('elementLength(')
+      expect(text).not.toContain('JSON.stringify(el).slice(1, -1)')
+    }
+  })
+
   it('the writer normalizes against the same caps the validator rejects against', () => {
     // 4 pending items with a cap of 3: the writer must head-drop to exactly the
     // count the validator would otherwise reject.
