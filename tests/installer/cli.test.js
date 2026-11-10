@@ -207,6 +207,26 @@ describe('run', () => {
     expect(existsSync(join(cwd, 'CLAUDE.md'))).toBe(true);
     expect(logs.some(l => /unrecognized/.test(l))).toBe(false);
   });
+  it('lists --opencode in --help (FEAT-048)', () => {
+    run(['--help'], { HOME: home }, { cwd, log });
+    expect(logs.some(l => l.startsWith('stdout:') && l.includes('[--opencode]'))).toBe(true);
+  });
+  it('installs the OpenCode plugin with --project --opencode (FEAT-048)', () => {
+    expect(run(['--project', '--opencode'], { HOME: home }, { cwd, log })).toBe(0);
+    expect(existsSync(join(cwd, '.opencode', 'plugin', 'conductor-guard.js'))).toBe(true);
+    expect(existsSync(join(cwd, '.claude', 'hooks', 'pre-tool-use.mjs'))).toBe(true);
+    expect(logs.some(l => /unrecognized/.test(l))).toBe(false);
+  });
+  it('writes no .opencode/ for --project alone (FEAT-048)', () => {
+    expect(run(['--project'], { HOME: home }, { cwd, log })).toBe(0);
+    expect(existsSync(join(cwd, '.opencode'))).toBe(false);
+  });
+  it('warns and writes nothing for OpenCode when --opencode comes without --project (FEAT-048)', () => {
+    expect(run(['--opencode'], { HOME: home }, { cwd, log })).toBe(0);
+    expect(existsSync(join(cwd, '.opencode'))).toBe(false);
+    expect(logs).toContain('stderr:code-conductor: --opencode needs --project; no OpenCode files were written');
+    expect(logs.some(l => /unrecognized/.test(l))).toBe(false);
+  });
   it('treats -Verbosity LEVEL exactly like --verbosity LEVEL (issue #109)', () => {
     const rc = run(['-Verbosity', 'INFO'], { HOME: home }, { cwd, log });
     expect(rc).toBe(0);
