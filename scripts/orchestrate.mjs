@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { GATES, ROLE_BAND, V3_CAPS } from './snap-contract.mjs';
+import { GATES, ROLE_BAND, V3_CAPS, elementLength } from './snap-contract.mjs';
 // Imported, not spawned: ticket.mjs holds the four import-safety conditions (FEAT-031 B1.7, T2).
 import { TicketHalt, intake, writeSnapshot } from './ticket.mjs';
 import { DocLocationError, resolveDocLocations } from './doc-locations.mjs';
@@ -157,8 +157,8 @@ export function taskScope(task, planRel) {
   const scope = [...new Set([...task.files, planRel])];
   const [cap, elemCap] = V3_CAPS['ops.scope'];
   if (scope.length > cap) throw new Halt('ORCH_SCOPE_OVER_CAP', `${task.id} needs ${scope.length} scope entries; the cap is ${cap}`);
-  const long = scope.find((p) => p.length > elemCap);
-  if (long) throw new Halt('ORCH_SCOPE_OVER_CAP', `${task.id} has a ${long.length}-character path; the cap is ${elemCap}`);
+  const long = scope.find((p) => elementLength(p) > elemCap);
+  if (long) throw new Halt('ORCH_SCOPE_OVER_CAP', `${task.id} has a ${elementLength(long)}-character path; the cap is ${elemCap}`);
   return scope;
 }
 
