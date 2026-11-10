@@ -31,6 +31,9 @@ export function stripBOM(s) { return s.replace(/^﻿/, ''); }
 
 export function warn(msg) { process.stderr.write(`WARN: ${msg}\n`); }
 
+// A package.json field counts only when it is a string; anything else reads as a missing key.
+export function stringField(value) { return typeof value === 'string' ? value : undefined; }
+
 export async function readdirSafe(dir) {
   return Promise.race([
     readdir(dir, { withFileTypes: true }),
@@ -51,6 +54,18 @@ export async function readManifest(filepath) {
     if (Object.keys(raw).length === 0) return null;
     return raw;
   } catch { return null; }
+}
+
+const SCRIPT_KEYS = ['build', 'test', 'lint', 'format'];
+
+// One line per ignored field, emitted where a manifest is loaded so two detectors reading it cannot double it.
+export function warnNonStringFields(pkg, filepath) {
+  if (!pkg) return;
+  const scripts = typeof pkg.scripts === 'object' && pkg.scripts !== null ? pkg.scripts : {};
+  const fields = [['name', pkg.name], ['description', pkg.description], ...SCRIPT_KEYS.map(k => [`scripts.${k}`, scripts[k]])];
+  for (const [field, value] of fields) {
+    if (value !== undefined && typeof value !== 'string') warn(`non-string package.json field ignored - ${field}: ${filepath}`);
+  }
 }
 
 export async function readText(filepath, maxLines = Infinity) {
@@ -242,7 +257,7 @@ export async function detectAngular(pkg, workspacePkgs) {
     const major = extractMajorVersion(v);
     if (!major) continue;
     const s = p.scripts ?? {};
-    return { stack: `Angular ${major}`, build: s.build ?? 'ng build', test: s.test ?? 'ng test', lint: s.lint ?? 'ng lint', format: 'prettier --write .', setup: 'npm install' };
+    return { stack: `Angular ${major}`, build: stringField(s.build) ?? 'ng build', test: stringField(s.test) ?? 'ng test', lint: stringField(s.lint) ?? 'ng lint', format: 'prettier --write .', setup: 'npm install' };
   }
   return {};
 }
@@ -250,33 +265,33 @@ export async function detectAngular(pkg, workspacePkgs) {
 export function detectNextjs(pkg) {
   if (!pkg || !pkgDep(pkg, 'next')) return {};
   const s = pkg.scripts ?? {};
-  return { stack: 'typescript', build: s.build ?? 'next build', test: s.test ?? 'jest', lint: s.lint ?? 'next lint', format: 'prettier --write .', setup: 'npm install' };
+  return { stack: 'typescript', build: stringField(s.build) ?? 'next build', test: stringField(s.test) ?? 'jest', lint: stringField(s.lint) ?? 'next lint', format: 'prettier --write .', setup: 'npm install' };
 }
 
 export function detectNestjs(pkg) {
   if (!pkg || !pkgDep(pkg, '@nestjs/core')) return {};
   const s = pkg.scripts ?? {};
-  return { stack: 'typescript', build: s.build ?? 'nest build', test: s.test ?? 'jest', lint: s.lint ?? 'eslint .', format: 'prettier --write .', setup: 'npm install' };
+  return { stack: 'typescript', build: stringField(s.build) ?? 'nest build', test: stringField(s.test) ?? 'jest', lint: stringField(s.lint) ?? 'eslint .', format: 'prettier --write .', setup: 'npm install' };
 }
 
 export function detectReact(pkg) {
   if (!pkg || !pkgProdDep(pkg, 'react')) return {};
   const s = pkg.scripts ?? {};
-  return { stack: 'typescript', build: s.build, test: s.test ?? 'jest', lint: s.lint, format: 'prettier --write .', setup: 'npm install' };
+  return { stack: 'typescript', build: stringField(s.build), test: stringField(s.test) ?? 'jest', lint: stringField(s.lint), format: 'prettier --write .', setup: 'npm install' };
 }
 
 export function detectVue(pkg) {
   if (!pkg || !pkgProdDep(pkg, 'vue')) return {};
   const s = pkg.scripts ?? {};
-  return { stack: 'typescript', build: s.build, test: s.test ?? 'vitest', lint: s.lint, format: 'prettier --write .', setup: 'npm install' };
+  return { stack: 'typescript', build: stringField(s.build), test: stringField(s.test) ?? 'vitest', lint: stringField(s.lint), format: 'prettier --write .', setup: 'npm install' };
 }
 
 export function detectTSNode(pkg) {
   if (!pkg) return {};
   const s = pkg.scripts ?? {};
   const hasDep = pkgDep(pkg, 'typescript') || pkgDep(pkg, 'ts-node');
-  if (!hasDep && !pkg.name) return {};
-  return { stack: 'typescript', build: s.build, test: s.test, lint: s.lint, format: s.format, setup: 'npm install' };
+  if (!hasDep && !stringField(pkg.name)) return {};
+  return { stack: 'typescript', build: stringField(s.build), test: stringField(s.test), lint: stringField(s.lint), format: stringField(s.format), setup: 'npm install' };
 }
 
 export async function detectGo(names, root) {
@@ -500,7 +515,9 @@ async function main() {
 
   const packageManager = detectPackageManager(rootNames);
 
-  const rootPkg = rootNames.has('package.json') ? await readManifest(join(rootReal, 'package.json')) : null;
+  const rootPkgPath = join(rootReal, 'package.json');
+  const rootPkg = rootNames.has('package.json') ? await readManifest(rootPkgPath) : null;
+  warnNonStringFields(rootPkg, rootPkgPath);
 
   let workspaceDirs = [];
   let monorepo = false;
@@ -546,8 +563,11 @@ async function main() {
   for (const dir of workspaceDirs) {
     const entries = await readdirSafe(dir);
     const names   = new Set(entries.map(e => e.name));
-    if (names.has('package.json')) workspacePkgs.push(await readManifest(join(dir, 'package.json')));
-    else workspacePkgs.push(null);
+    if (!names.has('package.json')) { workspacePkgs.push(null); continue; }
+    const pkgPath = join(dir, 'package.json');
+    const pkg = await readManifest(pkgPath);
+    warnNonStringFields(pkg, pkgPath);
+    workspacePkgs.push(pkg);
   }
 
   const allDeps = {};
@@ -594,11 +614,10 @@ async function main() {
   if (langSignals.length > 1) merged.stack = langSignals.join('/');
 
   if (rootPkg?.scripts) {
-    const s = rootPkg.scripts;
-    if (!merged.build && s.build) merged.build = s.build.trim();
-    if (!merged.test  && s.test)  merged.test  = s.test.trim();
-    if (!merged.lint  && s.lint)  merged.lint  = s.lint.trim();
-    if (!merged.format && s.format) merged.format = s.format.trim();
+    for (const key of SCRIPT_KEYS) {
+      const command = stringField(rootPkg.scripts[key]);
+      if (!merged[key] && command) merged[key] = command.trim();
+    }
   }
 
   if (monorepo) {
@@ -611,7 +630,8 @@ async function main() {
   }
 
   if (!merged.name) {
-    if (rootPkg?.name) merged.name = rootPkg.name;
+    const pkgName = stringField(rootPkg?.name);
+    if (pkgName) merged.name = pkgName;
     else if (rootNames.has('go.mod')) {
       const c = await readText(join(rootReal, 'go.mod'), 5);
       const m = c?.match(/^module\s+(\S+)/m);
@@ -620,7 +640,8 @@ async function main() {
     if (!merged.name) merged.name = basename(rootReal);
   }
 
-  if (rootPkg?.description) merged.description = rootPkg.description.trim().replace(/\r?\n/g, ' ');
+  const description = stringField(rootPkg?.description);
+  if (description) merged.description = description.trim().replace(/\r?\n/g, ' ');
 
   const db = await detectDb(rootNames, rootReal, rootPkg, merged.stack);
   const { infra, ci } = await detectInfraCI(rootNames, rootReal);
