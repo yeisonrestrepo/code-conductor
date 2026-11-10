@@ -4,7 +4,7 @@
 // hookSpecificOutput.permissionDecision and EVERY path exits 0. Nothing here exits 2:
 // a deliberate denial must never be indistinguishable from a crashed script.
 // Zero dependencies by design; node: builtins only.
-import { appendFileSync, closeSync, existsSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync, writeSync } from 'node:fs';
 import { posix, join, resolve, dirname, relative, isAbsolute, sep } from 'node:path';
 
 const LINE_LIMIT = 150;
@@ -894,6 +894,25 @@ function rotateFlowEvents(path) {
   }
 }
 
+// A rotation's rename that lands while another hook opens the file can fail that open with
+// EPERM on Windows (#130): measured at 1 open in about 75,000 against a renaming process,
+// with no lock involved. The window is that one instant, so the open is tried again. Only
+// the open: a write that failed is never repeated, so no event can land twice.
+const FLOW_OPEN_TRIES = 3;
+
+function openFlowEvents(path) {
+  for (let tries = 1; ; tries++) {
+    try { return openSync(path, 'a'); } catch (e) {
+      if (e.code !== 'EPERM' || tries >= FLOW_OPEN_TRIES) throw e;
+    }
+  }
+}
+
+function appendFlowLine(path, text) {
+  const fd = openFlowEvents(path);
+  try { writeSync(fd, text); } finally { closeSync(fd); }
+}
+
 
 // Runs after emit(), so it can never delay, change or suppress a decision, and its own
 // catch keeps a full disk from reaching the fail-closed catch around main() (spec, Error
@@ -909,7 +928,7 @@ function recordFlowEvent(payload, input, decision, passed, guard) {
     // parallel appends) can only ever end a line, so a tail torn by a crash or a hand edit is
     // fenced off by the next event instead of fused with it, and no per-call read of the last
     // byte is needed. Readers skip blank lines; rotation drops the torn one.
-    appendFileSync(path, `\n${JSON.stringify(flowEvent(payload, input, decision, passed, guard))}`);
+    appendFlowLine(path, `\n${JSON.stringify(flowEvent(payload, input, decision, passed, guard))}`);
   } catch (e) { debug(`flow event: ${e.message}`); }
 }
 
