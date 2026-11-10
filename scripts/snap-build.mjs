@@ -23,16 +23,26 @@ function truncateToCap(str, elemCap) {
   return str.slice(0, end);
 }
 
+// Issue #136: an ops.f entry is `<path>:<C|M|D>` and the validator requires that suffix, so an
+// over-cap entry loses path, never its action code. Without a code there is nothing valid to keep.
+function truncateFileEntry(entry, elemCap, index) {
+  const size = elementLength(entry);
+  if (size <= elemCap) return entry;
+  const code = entry.slice(-2);
+  if (!/^:[CMD]$/.test(code)) die(`SNAP_FILE_NO_ACTION: ops.f[${index}] is ${size} characters, over the cap of ${elemCap}, and has no :C, :M or :D suffix to keep`);
+  return truncateToCap(entry.slice(0, -2), elemCap - code.length) + code;
+}
+
 // filter empties, dedup (first wins), Unicode-safe per-element truncation, head-drop to count cap
-function normArray(raw, [cap, elemCap]) {
+function normArray(raw, [cap, elemCap], truncate = truncateToCap) {
   const arr = Array.isArray(raw) ? raw : [];
   const seen = new Set(); const out = [];
-  for (const item of arr) {
+  for (const [index, item] of arr.entries()) {
     if (typeof item !== 'string') continue;
     const t = item.trim();
     if (!t || seen.has(t)) continue;
     seen.add(t);
-    out.push(truncateToCap(t, elemCap));
+    out.push(truncate(t, elemCap, index));
   }
   while (out.length > cap) out.shift();
   return out;
@@ -71,7 +81,7 @@ for (const k of ['ph', 'c', 's']) {
 }
 
 const sys = { ph: obj.ph, c: obj.c, s: obj.s };
-const ops = { n: normArray(obj.n, CAPS['ops.n']), f: normArray(obj.f, CAPS['ops.f']) };
+const ops = { n: normArray(obj.n, CAPS['ops.n']), f: normArray(obj.f, CAPS['ops.f'], truncateFileEntry) };
 const mem = { d: normArray(obj.d, CAPS['mem.d']), x: normArray(obj.x, CAPS['mem.x']) };
 const pr = typeof obj.pr === 'string' ? obj.pr : '';
 

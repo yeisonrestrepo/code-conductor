@@ -208,11 +208,11 @@ describe('snap-build.mjs', () => {
     },
   );
 
-  // ops.f is measured the same way; it is not validated here because any truncated ops.f
-  // element loses its :C/:M/:D suffix, a separate defect (#136).
-  it('[#132 AC2] truncates a quoted ops.f entry within its escaped cap', () => {
+  // ops.f is measured the same way; since #136 the cut keeps the action code, so it validates.
+  it('[#132 AC2] truncates a quoted ops.f entry within its escaped cap, and it validates', () => {
     const r = build(JSON.stringify({ ...base, f: ['"'.repeat(200) + ':C'] }));
-    expect(JSON.parse(r.stdout).ops.f).toEqual(['"'.repeat(150)]);
+    expect(JSON.parse(r.stdout).ops.f).toEqual(['"'.repeat(149) + ':C']);
+    expect(validate(r.stdout.trim()).status).toBe(0);
   });
 
   it('[#132 AC3] drops an escape that would cross the cap whole', () => {
@@ -225,5 +225,54 @@ describe('snap-build.mjs', () => {
     const r = build(JSON.stringify({ ...base, d: [entry] }));
     expect(JSON.parse(r.stdout).mem.d).toEqual([entry]);
     expect(validate(r.stdout.trim()).status).toBe(0);
+  });
+
+  // ---- issue #136: an over-cap ops.f entry keeps its :C/:M/:D action code ----
+  const F_CAP = CAPS['ops.f'][1];
+
+  it.each(['C', 'M', 'D'])('[#136 AC1] cuts the path of an over-cap ops.f entry and keeps :%s, and it validates', (code) => {
+    const r = build(JSON.stringify({ ...base, f: ['src/' + 'x'.repeat(400) + '.js:' + code] }));
+    expect(r.status).toBe(0);
+    expect(JSON.parse(r.stdout).ops.f).toEqual(['src/' + 'x'.repeat(F_CAP - 6) + ':' + code]);
+    expect(validate(r.stdout.trim()).status).toBe(0);
+  });
+
+  it('[#136 AC1] keeps the action code of an entry one character over the cap', () => {
+    const r = build(JSON.stringify({ ...base, f: ['x'.repeat(F_CAP - 1) + ':C'] }));
+    expect(JSON.parse(r.stdout).ops.f).toEqual(['x'.repeat(F_CAP - 2) + ':C']);
+    expect(validate(r.stdout.trim()).status).toBe(0);
+  });
+
+  it.each([
+    ['accented and CJK', '\u00e9\u4e2d'],
+    ['astral', '\u{1F600}'],
+  ])('[#136 AC2] cuts an over-cap %s path within the escaped cap, without a lone surrogate, and it validates', (_, unit) => {
+    const r = build(JSON.stringify({ ...base, f: ['docs/' + unit.repeat(200) + '.md:M'] }));
+    expect(r.status).toBe(0);
+    const [el] = JSON.parse(r.stdout).ops.f;
+    expect(el.endsWith(':M')).toBe(true);
+    expect(elementLength(el)).toBeLessThanOrEqual(F_CAP);
+    expect(elementLength(el)).toBeGreaterThan(F_CAP - 2);
+    expect(isLoneHigh(el.slice(0, -2))).toBe(false);
+    expect(validate(r.stdout.trim()).status).toBe(0);
+  });
+
+  it('[#136 AC3] emits an ops.f entry at the cap unchanged', () => {
+    const entry = 'src/' + 'x'.repeat(F_CAP - 9) + '.js:M';
+    const r = build(JSON.stringify({ ...base, f: [entry] }));
+    expect(JSON.parse(r.stdout).ops.f).toEqual([entry]);
+    expect(validate(r.stdout.trim()).status).toBe(0);
+  });
+
+  it('[#136 AC4] refuses an over-cap ops.f entry that has no action code to keep', () => {
+    const r = build(JSON.stringify({ ...base, f: ['a.js:M', 'src/' + 'x'.repeat(400) + '.js'] }));
+    expect(r.status).toBe(1);
+    expect(r.stdout).toBe('');
+    expect(r.stderr).toBe('SNAP_BUILD_ERROR: SNAP_FILE_NO_ACTION: ops.f[1] is 407 characters, over the cap of 300, and has no :C, :M or :D suffix to keep\n');
+  });
+
+  it('[#136 AC5] still cuts the other history arrays from the end', () => {
+    const r = build(JSON.stringify({ ...base, d: ['x'.repeat(400) + ':C'] }));
+    expect(JSON.parse(r.stdout).mem.d).toEqual(['x'.repeat(300)]);
   });
 });
