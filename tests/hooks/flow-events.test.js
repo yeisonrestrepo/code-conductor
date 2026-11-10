@@ -3,7 +3,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 // FEAT-044 T-004: the flow event emitter in the PreToolUse hook. Every case spawns the
 // shipped hook against a temporary project, the way Claude Code does.
@@ -230,6 +230,44 @@ describe('rotation under the lock (AC6)', () => {
     fire(bash('git status'));
     fire(bash('git log'));
     expect(readFileSync(events, 'utf8')).toMatch(/^\n\{[^\n]*\}\n\{[^\n]*\}$/);
+  });
+
+  // #130: on Windows a rotation's rename can fail another hook's open of the event file with
+  // EPERM, measured at 1 open in about 75,000 against a renaming process. Too rare to race
+  // for in a test, so the hook runs with that open failing on purpose.
+  function failEventOpens(times) {
+    const preload = join(work, 'fail-event-opens.mjs');
+    writeFileSync(preload, [
+      "import fs from 'node:fs';",
+      "import { syncBuiltinESMExports } from 'node:module';",
+      `let left = ${times};`,
+      'const eperm = () => Object.assign(new Error("EPERM: operation not permitted, open"), { code: "EPERM", syscall: "open" });',
+      'for (const name of ["openSync", "appendFileSync"]) {',
+      '  const real = fs[name];',
+      '  fs[name] = function (path, ...rest) {',
+      '    if (String(path).endsWith(".flow-events.jsonl") && left > 0) { left--; throw eperm(); }',
+      '    return real.call(this, path, ...rest);',
+      '  };',
+      '}',
+      'syncBuiltinESMExports();',
+    ].join('\n'));
+    return { NODE_OPTIONS: `--import ${pathToFileURL(preload).href}` };
+  }
+
+  it('an open that fails once with EPERM still records the event, once', () => {
+    seed(3);
+    const r = fire(bash('git status'), failEventOpens(1));
+    expect(r.status).toBe(0);
+    expect(lines()).toHaveLength(4);
+    expect(last().tool).toBe('Bash');
+  });
+
+  it('an open that keeps failing with EPERM gives up: no event, and the decision is unchanged', () => {
+    seed(3);
+    const r = fire(bash(LOOP), failEventOpens(1000));
+    expect(r.status).toBe(0);
+    expect(JSON.parse(r.stdout).hookSpecificOutput.permissionDecision).toBe('deny');
+    expect(lines()).toHaveLength(3);
   });
 
   it('64 parallel hook calls past the cap leave every line parseable and nothing stranded', async () => {
