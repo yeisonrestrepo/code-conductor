@@ -2,7 +2,7 @@
 
 > **For agentic workers:** carry out this plan one task at a time, in order. A code role may touch only the files named in its task's **Files:** block. Steps use checkbox (`- [ ]`) syntax for tracking. Code roles can run only `npm test` (Guard 7), and a full run takes about 2-5 minutes, so each red or green step is one full `npm test` run.
 
-**Spec:** `docs/superpowers/specs/2026-11-08-feat045-ci-records-guard-design.md` (approved; sha256 4559c809…e247). Rulings 1-14 there are fixed and this plan does not reopen them.
+**Spec:** `docs/superpowers/specs/2026-11-08-feat045-ci-records-guard-design.md` (approved; sha256 dc472cb5…72b8). Rulings 1-14 there are fixed and this plan does not reopen them.
 
 **Goal:** If a PR not opened by the repository owner changes an owner-side record by value, a check goes red. The records are the `VERSION` content, the `package.json`/`package-lock.json` versions, the `CHANGELOG.md` release headings, and the backlog heading states and DONE lines. Each failure message names the file and the CONTRIBUTING anchor.
 

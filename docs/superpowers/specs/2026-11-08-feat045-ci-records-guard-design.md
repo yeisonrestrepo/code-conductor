@@ -2,7 +2,7 @@
 
 **Item:** `[FEAT-045]` CI Records-Guard: an External PR Touching Owner-Side Records Goes Red by Machine
 **Backlog:** `AGENT-READABLE BACKLOG.md:727-731` (intake of issue #65; ticket #123)
-**Status:** Draft, awaiting owner approval
+**Status:** Approved by the operator on 2026-11-10
 **Date:** 2026-11-08
 
 No earlier FEAT-045 spec exists under `docs/superpowers/specs/` (checked 2026-11-08), so this file is the first one and replaces nothing.
