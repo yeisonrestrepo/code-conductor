@@ -91,6 +91,7 @@ owner in the batch release that lands the PR:
 
 A PR that carries them conflicts with every other open PR as soon as one
 release lands, so they are dropped on landing and written owner-side.
+The `Records guard` workflow (`tools/records-guard.mjs`) fails any PR not opened by the owner that changes one of these records, except the README Known-limits lines, and its message names the file and the rule.
 
 Three more rules bind the work itself:
 

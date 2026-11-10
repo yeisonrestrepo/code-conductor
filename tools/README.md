@@ -10,6 +10,7 @@ Each instrument carries the test that pins its semantics, because an instrument 
 | `version-gate.mjs` | invariant | `tests/tools/repo-invariants.test.js` in CI, and by hand at closeout |
 | `record-parity.mjs` | invariant | `tests/tools/repo-invariants.test.js` in CI, and by hand at closeout |
 | `skip-baseline.mjs` | invariant | `.github/workflows/test.yml` on every matrix leg, after the suite; report-only by hand |
+| `records-guard.mjs` | invariant | `.github/workflows/records-guard.yml` on every non-owner PR; by hand with `--base`/`--head` |
 
 **Read `docs/RELEASE-CLOSEOUT.md` before a release.** Halt semantics come from the merge gate, not from any checklist line: `CONTRIBUTING.md` states the CI gate is unconditional, so a red invariant blocks the merge whether or not anybody remembered to run anything.
 
