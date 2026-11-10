@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { CAPS, PRE_PARSE_MAX_BYTES as MAX_SNAP_BYTES, V1_MAX_CHARS, V3_CAPS } from './snap-contract.mjs';
+import { CAPS, PRE_PARSE_MAX_BYTES as MAX_SNAP_BYTES, V1_MAX_CHARS, V3_CAPS, elementLength } from './snap-contract.mjs';
 
 const die = (msg) => { process.stderr.write(`SNAP_BUILD_ERROR: ${msg}\n`); process.exit(1); };
 const byteLen = (s) => Buffer.byteLength(s, 'utf8');
@@ -28,7 +28,7 @@ function normArray(raw, [cap, elemCap]) {
 // Blanks and duplicates still drop: they narrow nothing.
 function scopeArray(raw) {
   const [cap, elemCap] = V3_CAPS['ops.scope'];
-  const charLen = (el) => Array.from(el.trim()).length;
+  const charLen = (el) => elementLength(el.trim());
   const long = raw.findIndex((el) => typeof el === 'string' && charLen(el) > elemCap);
   if (long >= 0) die(`SNAP_SCOPE_OVER_CAP: ops.scope[${long}] is ${charLen(raw[long])} characters; the cap is ${elemCap}`);
   const scope = normArray(raw, [Infinity, elemCap]);

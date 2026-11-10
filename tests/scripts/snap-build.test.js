@@ -160,4 +160,23 @@ describe('snap-build.mjs', () => {
     expect(JSON.parse(r.stdout).ops.scope).toEqual(scope);
     expect(validate(r.stdout.trim()).status).toBe(0);
   });
+
+  // ---- issue #128: the element cap is measured as the validator measures it ----
+  const BS = String.fromCharCode(92);
+  it.each([
+    ['a backslash', 'src' + BS + 'x'.repeat(296)],
+    ['an astral character', 'src/\u{1F600}' + 'x'.repeat(295)],
+  ])('[#128] refuses a 300-character scope path holding %s, which escapes to 301', (_, path) => {
+    const r = build(JSON.stringify({ ...base, ...band, scope: [path] }));
+    expect(r.status).toBe(1);
+    expect(r.stderr).toBe('SNAP_BUILD_ERROR: SNAP_SCOPE_OVER_CAP: ops.scope[0] is 301 characters; the cap is 300\n');
+  });
+
+  it('[#128] builds a backslash scope path at exactly the escaped cap, and it validates', () => {
+    const path = 'src' + BS + 'x'.repeat(295);
+    const r = build(JSON.stringify({ ...base, ...band, scope: [path] }));
+    expect(r.status).toBe(0);
+    expect(JSON.parse(r.stdout).ops.scope).toEqual([path]);
+    expect(validate(r.stdout.trim()).status).toBe(0);
+  });
 });
