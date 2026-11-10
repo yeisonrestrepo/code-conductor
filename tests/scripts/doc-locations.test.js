@@ -181,9 +181,38 @@ describe('checkDocDir boundary [FEAT-047 AC9]', () => {
 
   it('compares reserved roots segment-wise', () => {
     expect(checkDocDir('.claude/memoryx')).toBe('');
-    expect(checkDocDir('.github/specs')).toBe('');
+    expect(checkDocDir('.github/specs')).not.toBe('');
     expect(checkDocDir('.claude/memory')).not.toBe('');
   });
+});
+
+// The recorded folder becomes the spec and plan agents' Guard 5 write scope, so it must never
+// cover a folder that holds enforcement code, nor a parent of one.
+describe('checkDocDir reserved folders [FEAT-047 AC9, review #120]', () => {
+  it.each([
+    '.claude', '.', '.claude/hooks', '.claude/agents', '.claude/commands', '.claude/scripts',
+    '.github', 'scripts', '.claude/hooks/sub', '.github/specs',
+  ])('rejects %s with a reason', (value) => {
+    expect(checkDocDir(value)).not.toBe('');
+  });
+
+  it.each([
+    './.claude/hooks/', '.claude/./hooks', '.claude//hooks', '.Claude/Hooks', 'SCRIPTS',
+    '.claude\\hooks', './docs/specs', 'docs/./specs', './',
+  ])('rejects the non-canonical or case-variant %s', (value) => {
+    expect(checkDocDir(value)).not.toBe('');
+  });
+
+  it('names the reserved folder a parent covers', () => {
+    expect(checkDocDir('.claude')).toMatch(/\.claude\/memory/);
+    expect(checkDocDir('.claude/hooks')).toMatch(/reserved `\.claude\/hooks`/);
+  });
+
+  it.each(['.claude/specs', '.claude/plans', 'docs/scripts', 'scriptsx', '.githubx', '.claude/hooksx', 'docs/specs/'])(
+    'still accepts %s', (value) => {
+      expect(checkDocDir(value)).toBe('');
+    },
+  );
 });
 
 describe('grouping [FEAT-047 AC7, AC8]', () => {

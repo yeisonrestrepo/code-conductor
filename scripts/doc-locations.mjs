@@ -23,7 +23,9 @@ export const GROUP_MAX = 47;
 export const DIR_MAX = V3_CAPS['ops.scope'][1] - (GROUP_MAX + '/'.length + '/**'.length);
 
 const CODE = 'ORCH_DOC_LOCATION_INVALID';
-const RESERVED = ['.claude/memory', '.conductor', '.git'];
+// A recorded folder becomes the spec and plan agents' Guard 5 write scope, so it may not cover
+// the orchestrator write surface, git internals, or any folder that holds enforcement code.
+const RESERVED = ['.claude/memory', '.claude/hooks', '.claude/agents', '.claude/commands', '.claude/scripts', '.conductor', '.git', '.github', 'scripts'];
 const GROUP_RE = /^(#{1,5})\s+(phase|epic|pillar)\b[\s:#-]*(\d+)?[\s:.-]*(.*)$/i;
 const HEADING_RE = /^(#{1,6})\s/;
 
@@ -40,6 +42,15 @@ const stripSlash = (value) => value.replace(/\/+$/, '');
 const underRoot = (value, base) => value === base || value.startsWith(`${base}/`);
 const overlaps = (a, b) => a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
 
+// Case-folded because Windows and macOS file systems treat `.Claude/Hooks` as `.claude/hooks`.
+function reservedReason(value) {
+  const folded = value.toLowerCase();
+  const base = RESERVED.find((entry) => overlaps(folded, entry));
+  if (!base) return '';
+  if (underRoot(folded, base)) return `sits in the reserved \`${base}\``;
+  return `covers the reserved \`${base}\``;
+}
+
 export function checkDocDir(rel) {
   const value = stripSlash(String(rel ?? ''));
   if (value === '' || value === '<command>') return 'is empty or the template placeholder';
@@ -47,8 +58,10 @@ export function checkDocDir(rel) {
   if (value.split('/').includes('..')) return 'climbs out with a `..` segment';
   if (value.includes('\\')) return 'uses `\\`; separate segments with `/`';
   if (/[*?[\]{}]/.test(value)) return 'carries a glob character';
-  const reserved = RESERVED.find((base) => underRoot(value, base));
-  if (reserved) return `sits in the reserved \`${reserved}\``;
+  if (value === '.') return 'is the repository root, which covers every reserved folder';
+  if (value.split('/').some((seg) => seg === '' || seg === '.')) return 'carries an empty or `.` segment; write the plain path from the repository root';
+  const reserved = reservedReason(value);
+  if (reserved) return reserved;
   if (value.length > DIR_MAX) return `is ${value.length} characters; the cap is ${DIR_MAX}`;
   return '';
 }

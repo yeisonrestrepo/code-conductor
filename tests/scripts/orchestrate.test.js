@@ -885,6 +885,14 @@ describe('doc locations [FEAT-047]', () => {
     expect(existsSync(join(root, RUN_FILE))).toBe(false);
   });
 
+  it('[AC9] halts start on a recorded enforcement folder and records no run (review #120)', () => {
+    recorded('.claude/hooks', 'rec/plans');
+    const r = halts('ORCH_DOC_LOCATION_INVALID');
+    expect(r.err).toContain('`- Specs: .claude/hooks`');
+    expect(r.err).toContain('reserved `.claude/hooks`');
+    expect(existsSync(join(root, RUN_FILE))).toBe(false);
+  });
+
   it('[AC9] leaves a stale run in place when start halts on the doc location', () => {
     expect(orch(['start', 'FEAT-011'], { sid: 'old-session' }).status).toBe(0);
     recorded('rec/specs', null);

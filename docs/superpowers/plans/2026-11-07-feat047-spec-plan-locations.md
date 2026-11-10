@@ -81,7 +81,8 @@
 - [x] **`checkDocDir` boundary (AC9):**
   - `'a'.repeat(249)` passes; `'a'.repeat(250)` fails;
   - `DIR_MAX === V3_CAPS['ops.scope'][1] - 51` (imported from `scripts/snap-contract.mjs`);
-  - each of the four fixed pairs (`CANDIDATE_PAIRS` plus `DEFAULT_PAIR`) passes, and each pair is disjoint.
+  - each of the four fixed pairs (`CANDIDATE_PAIRS` plus `DEFAULT_PAIR`) passes, and each pair is disjoint;
+  - `.claude`, `.`, `.claude/hooks`, `.claude/agents`, `.claude/commands`, `.claude/scripts`, `.github`, `scripts` and `.github/specs` each return a non-empty reason, as do `./.claude/hooks/`, `.claude/./hooks`, `.claude//hooks`, `.Claude/Hooks`, `SCRIPTS` and `.claude\hooks`; `.claude/specs`, `.claude/plans`, `docs/scripts` and `.claude/hooksx` pass (spec Ruling 8).
 - [x] **Grouping (AC7, AC8, POC G1-G6):**
   - G6, fixture: a temp root holding a minimal `AGENT-READABLE BACKLOG.md` (`## PILLAR 3: MULTI-AGENT SOFTWARE FACTORY`, then `### [ ] \`[FEAT-047]\` Spec and Plan Location Discovery`) → `backlogGroup(fixtureRoot, 'FEAT-047') === 'pillar-3'`. No case reads this repository's backlog;
   - `## PILLAR 3: FACTORY` then `### [ ] \`[FEAT-900]\` x` → `pillar-3`;
@@ -128,7 +129,8 @@ Run `npm test`. **Failure point:** every case fails with a module-not-found erro
   - an empty value or `<command>`;
   - `isAbsolute`, `^[A-Za-z]:` or a leading `/`;
   - a `..` segment, `\`, or any of `*?[]{}`;
-  - a value equal to or under `.claude/memory`, `.conductor` or `.git`, compared segment-wise;
+  - the value `.`, or any empty or `.` segment;
+  - a value equal to, under, or a parent of `.claude/memory`, `.claude/hooks`, `.claude/agents`, `.claude/commands`, `.claude/scripts`, `.conductor`, `.git`, `.github` or `scripts`, compared segment-wise and case-folded (spec Ruling 8);
   - a value longer than `DIR_MAX`.
 - [x] **`readRecordedPair(root)`:**
   - Read `CLAUDE.md`. Unreadable means absent, so return `null`.
@@ -205,7 +207,8 @@ Run `npm test`. **Failure point:** every case fails with a module-not-found erro
   - **AC9 error table:** each row halts `start` with status 1 and stderr starting with its code, and `existsSync(join(root, RUN_FILE))` is false:
     - half-recorded → `ORCH_DOC_LOCATION_INVALID`;
     - invalid value `../x` → `ORCH_DOC_LOCATION_INVALID`;
-    - overlap `docs/a` / `docs/a/b` → `ORCH_DOC_LOCATION_INVALID`.
+    - overlap `docs/a` / `docs/a/b` → `ORCH_DOC_LOCATION_INVALID`;
+    - recorded enforcement folder `- Specs: .claude/hooks` → `ORCH_DOC_LOCATION_INVALID`, stderr naming the line and the reserved folder (spec Ruling 8).
 
     Also: a stale run from another session is left in place, not cleared, when `start` halts on one of these. Assert its `item` is unchanged.
   - **AC9 over-cap:** the exported `docScopes({ specs: 'a'.repeat(300), plans: 'p', group: null })` throws a `Halt` with `code === 'ORCH_SCOPE_OVER_CAP'`. For every pair in `[...CANDIDATE_PAIRS, DEFAULT_PAIR]` (imported from `scripts/doc-locations.mjs`) with `group: 'x'.repeat(47)`, `docScopes` does not throw.

@@ -21,4 +21,4 @@ Your success condition is fixed: a plan file was written under the folder your e
 - Never dispatch or message another agent.
 - Deliver exactly one report, ending in exactly one `SNAP_HANDBACK` line, then stop. Claim only the gate `boundary_routed`.
 - Copy `ops.scope` verbatim from your envelope into the hand-back; if your envelope has no scope, leave the key out.
-- List the plan file in the hand-back's `ops.f` as `<path>:C`.
+- List the plan file in the hand-back's `ops.f` as `<path>:C`. The owner approves that path.

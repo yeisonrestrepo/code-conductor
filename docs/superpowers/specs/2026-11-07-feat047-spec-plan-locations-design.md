@@ -148,7 +148,8 @@ To make that hold for the scope cap, `start` computes both role scopes (`<specs>
 - empty, or the template placeholder `<command>`;
 - absolute, or carrying a drive letter;
 - containing a `..` segment, a backslash, or any of `* ? [ ] { }`, since Guard 5's glob would read these as wildcards;
-- inside the orchestrator write surface (`.claude/memory/`, `.conductor/`) or `.git/`;
+- the repository root `.`, or carrying an empty or `.` segment (`./docs/specs`, `docs//specs`), so a reserved folder cannot be reached through a non-canonical spelling;
+- equal to, inside, or a parent of a reserved folder, compared segment-wise and case-folded: the orchestrator write surface (`.claude/memory/`, `.conductor/`), `.git/`, and the enforcement folders `.claude/hooks/`, `.claude/agents/`, `.claude/commands/`, `.claude/scripts/`, `.github/` and `scripts/`. A parent such as `.claude` is rejected because its scope would cover them. `.claude/specs` and `.claude/plans` stay valid (Ruling 8);
 - longer than **249 characters** after the trailing `/` is stripped. That is the V3_CAPS element cap of 300 minus the 51 characters of `/<group>/**` headroom: a group name is at most 47 characters (`pillar-` plus 40), plus `/` and `/**`. The cap is derived in code from `V3_CAPS['ops.scope'][1]`, never hardcoded.
 
 A trailing `/` is stripped before every check. To keep the headroom true, `backlogGroup` treats a group name longer than 47 characters, which only a numbered heading can produce, as flat.
@@ -172,6 +173,7 @@ Other failures:
    - Each row of the error table halts at `start` with its code, and no run file or snapshot is written (assert the absence of `RUN_FILE`).
    - The over-cap row is tested by calling the scope check directly with an over-long pair, since `checkDocDir` rejects such a pair first.
    - `checkDocDir` rejects a 250-character value and accepts a 249-character one.
+   - `checkDocDir` rejects `.claude`, `.`, `.claude/hooks`, `.claude/agents`, `.claude/commands`, `.claude/scripts`, `.github` and `scripts` with a non-empty reason, plus their non-canonical and case variants, and still accepts `.claude/specs` and `.claude/plans`; `start` halts `ORCH_DOC_LOCATION_INVALID` on a recorded `- Specs: .claude/hooks` (Ruling 8).
    - Every exit-0 CLI pair passes `start`'s scope check.
    - `install spec` and `install plan` contain no path to `ORCH_SCOPE_OVER_CAP`.
 10. **AC10 No tracked write by the orchestrator.** `doc-locations.mjs` and `orchestrate.mjs` contain no write to `CLAUDE.md` or any path outside `WRITE_SURFACE`. `WRITE_SURFACE` and Guard 6's pinned copy are unchanged.
@@ -247,6 +249,7 @@ These were ruled 2026-11-07 by the orchestrator, under the owner's delegation fo
 - **Ruling 5 (OQ-5):** Exactly one heading line for the item across all backlog files; anything else is flat. Why: one definition of "unambiguous", with no guessing among duplicates.
 - **Ruling 6 (OQ-6): HALT** with `ORCH_DOC_LOCATION_INVALID` when the recorded specs and plans folders are equal or one is nested in the other. Why: Guard 5 scopes must stay disjoint.
 - **Ruling 7 (OQ-7):** The write scope includes the group subfolder (`<dir>/<group>/**`). Why: it is the tightest Guard 5 envelope.
+- **Ruling 8 (PR #120 review):** `checkDocDir` reserves the enforcement folders listed under Error cases, rejects any parent of a reserved folder (`.claude`, `.`), rejects empty and `.` segments, and compares case-folded. Why: the recorded folder becomes the spec and plan agents' Guard 5 write scope, which on `main` was fixed to `docs/superpowers/*`; a document agent must never gain write access to hooks, agent profiles, commands, scripts or CI workflows. Case folding matches Windows and macOS file systems. The `plan.md` hand-back rule keeps "The owner approves that path."; dropping it was not intended.
 
 Separately, two reviewer notes were folded into the body:
 - `start` now computes and cap-checks both role scopes before writing anything, so every error-table row is a pre-write `start` halt.

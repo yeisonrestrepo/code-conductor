@@ -98,7 +98,7 @@ const PROFILE_SHA256_1_37_0 = {
   audit: '5bfeff19ef086a21d9a6df82dfe570540c55adb7fa5b08f4dbf34003230ad809',
   code: '21b7697ef9317a7aca89dd3e99623208d6541cf7c794712ff2a76e4d0bb0c604',
   // FEAT-047 changed plan and spec on purpose: the folder now comes from the envelope's scope.
-  plan: '0d9ed0d78da46ea8717ad6d8dc324b33d7e18435f7821a15401e1937c58b4eb1',
+  plan: '3de154b4b4cdda5cb256a79a62f99e7f9cf39d472d2a2da953b5c8616392d034',
   qa: '19194c34cfc43b7886ef0a63a30e07cd8f633330bf298265eb55a4be4b224644',
   spec: '68c13a86c583ed0320dc23bd659dd7a6dc0cfc9246f940093ee211fe508c67b2',
 };
