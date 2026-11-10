@@ -54,15 +54,29 @@ Read `.claude/memory/personal.md`. Extract developer preferences (verbosity, sho
 
 If the file is absent, skip silently.
 
+## Step 4a: Resolve the spec and plan folders
+
+If `CLAUDE.md` holds both a `- Specs:` and a `- Plans:` line, use their values as `<specs>` and `<plans>`.
+
+Otherwise resolve the location resolver by presence, the deployed copy first:
+
+```bash
+L=.claude/scripts/doc-locations.mjs; [ -f "$L" ] || L=scripts/doc-locations.mjs
+```
+
+Run `node "$L"` from the repository root and use the `specs` and `plans` strings of its exit-0 JSON.
+
+On any failure (Node unavailable, script missing, non-zero exit, output that is not JSON or lacks either string, or exactly one of the two lines recorded), use `docs/superpowers/specs` and `docs/superpowers/plans`, and append `(location fallback: <cause>)` to the summary line.
+
 ## Step 5 — Find latest spec
 
-List files in `docs/superpowers/specs/`. Select the file with the most recent modification time (`mtime`). Extract its first `#` heading as a one-line summary.
+Search `<specs>` recursively (grouped documents sit in subfolders) for `*.md` files. Select the file with the most recent modification time (`mtime`). Extract its first `#` heading as a one-line summary.
 
 If the directory is absent or empty, use `none`.
 
 ## Step 6 — Find latest plan
 
-List files in `docs/superpowers/plans/`. Select the file with the most recent modification time (`mtime`). Extract its first `#` heading as a one-line summary.
+Search `<plans>` recursively (grouped documents sit in subfolders) for `*.md` files. Select the file with the most recent modification time (`mtime`). Extract its first `#` heading as a one-line summary.
 
 If the directory is absent or empty, use `none`.
 

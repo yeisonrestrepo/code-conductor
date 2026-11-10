@@ -11,6 +11,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { GATES, ROLE_BAND, V3_CAPS, elementLength } from './snap-contract.mjs';
 // Imported, not spawned: ticket.mjs holds the four import-safety conditions (FEAT-031 B1.7, T2).
 import { TicketHalt, intake, writeSnapshot } from './ticket.mjs';
+import { DocLocationError, resolveDocLocations } from './doc-locations.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -29,9 +30,10 @@ const REVIEW_OUTCOME = /^(clean|cap|skipped:[a-z][a-z0-9-]{0,39})$/;
 const REVIEW_USAGE = 'usage: orchestrate.mjs review <spec|plan> --round | --close <clean|cap|skipped:<reason>>';
 
 // D5: the reviewed role-artifact table. Code's scope comes from its plan task instead.
+// Spec and plan scopes come from run.docs, pinned at start, so no folder is named here (FEAT-047).
 export const ROLE_ARTIFACTS = {
-  spec: { tk: 'RW', scope: ['docs/superpowers/specs/**'] },
-  plan: { tk: 'RW', scope: ['docs/superpowers/plans/**'] },
+  spec: { tk: 'RW', scope: null },
+  plan: { tk: 'RW', scope: null },
   code: { tk: 'RW', scope: null },
   audit: { tk: 'R', scope: null },
   qa: { tk: 'X', scope: null },
@@ -160,6 +162,33 @@ export function taskScope(task, planRel) {
   return scope;
 }
 
+// FEAT-047: one glob per role, checked against the element cap once, at start.
+export function docScopes({ specs, plans, group }) {
+  const elemCap = V3_CAPS['ops.scope'][1];
+  const scopes = {};
+  for (const [role, dir] of [['spec', specs], ['plan', plans]]) {
+    const glob = `${dir}${group ? `/${group}` : ''}/**`;
+    if (glob.length > elemCap) {
+      throw new Halt('ORCH_SCOPE_OVER_CAP', `${role} scope is ${glob.length} characters; the cap is ${elemCap}; shorten the folder`);
+    }
+    scopes[role] = [glob];
+  }
+  return scopes;
+}
+
+// The resolver's halts keep its code and become the router's own start halts.
+function resolveDocs(root, item) {
+  try {
+    const docs = resolveDocLocations(root, item);
+    return { ...docs, scopes: docScopes(docs) };
+  } catch (e) {
+    if (e instanceof DocLocationError) throw new Halt(e.code, e.reason);
+    throw e;
+  }
+}
+
+const docsNote = (d) => `docs: specs ${d.specs}, plans ${d.plans} (${d.source})${d.group ? `; group ${d.group}` : ''}; `;
+
 function readPlan(root, planRel) {
   if (!planRel || isAbsolute(planRel) || planRel.split(/[\\/]/).includes('..')) {
     throw new Refusal('usage: orchestrate.mjs approve plan <plan path relative to the run root>');
@@ -253,6 +282,12 @@ function envelopeFields(run, root, step) {
   if (step.role === 'code') {
     const task = extractTasks(readPlan(root, run.plan)).find((t) => t.id === step.task);
     fields.scope = taskScope(task ?? { id: step.task, files: [] }, run.plan);
+  } else if (step.role === 'spec' || step.role === 'plan') {
+    // Read as pinned, never re-checked: the cap was enforced once, at start.
+    if (!isPlainObject(run.docs?.scopes) || !Array.isArray(run.docs.scopes[step.role])) {
+      throw new Halt('ORCH_DOC_LOCATION_UNRESOLVED', `run ${run.item} records no docs location (started before FEAT-047); run end, then start`);
+    }
+    fields.scope = run.docs.scopes[step.role];
   } else if (scope) fields.scope = scope;
   // Ruling 2: ticket identity rides the spec envelope only, never its content.
   if (step.role === 'spec' && run.ticket) {
@@ -394,17 +429,18 @@ function start(root, sessionId, args) {
   if (old && old.session_id === sessionId) throw new Halt('ORCH_RUN_ACTIVE', `run ${old.item} is live in this session; end it first`);
   // Resolved before a stale run is cleared, so a halt here leaves everything as it was.
   const testCommand = checkTestCommand(resolveTestCommand(root));
+  const docs = resolveDocs(root, item);
   const bound = ticket === undefined ? null : ticketIntake(root, item, ticket);
   if (old) clearRunFiles(root);
   if (bound) writeSnapshot(root, bound.path, bound.text);
   saveRun(root, {
     v: 1, session_id: sessionId, item, mode: auto ? 'auto' : 'step', started: new Date().toISOString(),
     band: 'boundary', role: null, gate: 'boundary_routed', approvals: { spec: null, plan: null },
-    plan: null, tasks: { ids: [], done: 0 }, handbacks: [], halt: null, test_command: testCommand,
+    plan: null, tasks: { ids: [], done: 0 }, handbacks: [], halt: null, test_command: testCommand, docs,
     ...(bound ? { ticket: { ...bound.binding, snapshot: bound.path } } : {}),
   });
   const begun = old ? `replaced the stale run ${old.item} started ${old.started}` : `run ${item} started`;
-  return `${begun}; ${bound ? ticketNote(bound) : ''}test command: ${testCommand}`;
+  return `${begun}; ${bound ? ticketNote(bound) : ''}${docsNote(docs)}test command: ${testCommand}`;
 }
 
 function clearRunFiles(root) {
