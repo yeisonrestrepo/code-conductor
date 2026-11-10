@@ -639,3 +639,34 @@ describe('deployProject: flow status line (FEAT-044)', () => {
     rmSync(user, { recursive: true, force: true });
   });
 });
+
+// FEAT-048 slice 1 (#97): the OpenCode plugin ships inside project-template/.opencode/
+// but lands only on request, so a Claude Code install stays byte for byte as it was.
+describe('deployProject: OpenCode plugin (FEAT-048)', () => {
+  const PLUGIN_REL = join('.opencode', 'plugin', 'conductor-guard.js');
+  beforeEach(() => {
+    mkdirSync(join(asset, 'project-template', '.opencode', 'plugin'), { recursive: true });
+    writeFileSync(join(asset, 'project-template', PLUGIN_REL), 'export const ConductorGuard = 1;\n');
+  });
+  it('writes no .opencode/ without the opencode option', () => {
+    const out = capture();
+    deployProject(asset, home, out.opts);
+    expect(existsSync(join(home, '.opencode'))).toBe(false);
+    expect(out.said.some((m) => /OpenCode/.test(m))).toBe(false);
+  });
+  it('installs the plugin byte for byte and reports it with the opencode option', () => {
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, opencode: true });
+    expect(readFileSync(join(home, PLUGIN_REL), 'utf8')).toBe('export const ConductorGuard = 1;\n');
+    expect(out.said).toContain('code-conductor: installed the OpenCode guard plugin at .opencode/plugin/conductor-guard.js');
+  });
+  it('keeps the host project\'s own .opencode/ files', () => {
+    mkdirSync(join(home, '.opencode', 'command'), { recursive: true });
+    writeFileSync(join(home, '.opencode', 'command', 'mine.md'), 'host');
+    deployProject(asset, home, { ...capture().opts, opencode: true });
+    expect(readFileSync(join(home, '.opencode', 'command', 'mine.md'), 'utf8')).toBe('host');
+  });
+  it('ships the real plugin in the template', () => {
+    expect(existsSync(join(ROOT, 'project-template', PLUGIN_REL))).toBe(true);
+  });
+});

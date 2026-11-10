@@ -138,6 +138,7 @@ tests/.tmp/
 !/docs/superpowers/plans/2026-10-27-issue109-verbosity-alias.md
 !/docs/superpowers/plans/2026-11-07-feat047-spec-plan-locations.md
 !/docs/superpowers/plans/2026-11-08-bug055-non-string-manifest-fields.md
+!/docs/superpowers/plans/2026-11-10-feat048-opencode-guard.md
 !/docs/superpowers/plans/2026-11-10-issue118-contract-test-isolation.md
 !/docs/superpowers/plans/2026-11-10-issue119-snap-scope-no-truncation.md
 !/docs/superpowers/plans/2026-11-10-issue128-scope-cap-single-measure.md
@@ -202,6 +203,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-10-27-issue109-verbosity-alias-design.md
 !/docs/superpowers/specs/2026-11-07-feat047-spec-plan-locations-design.md
 !/docs/superpowers/specs/2026-11-08-bug055-detect-stack-non-string-scripts-design.md
+!/docs/superpowers/specs/2026-11-10-feat048-opencode-guard-design.md
 !/docs/superpowers/specs/2026-11-10-issue118-contract-test-isolation-design.md
 !/docs/superpowers/specs/2026-11-10-issue119-snap-scope-no-truncation-design.md
 !/docs/superpowers/specs/2026-11-10-issue128-scope-cap-single-measure-design.md
