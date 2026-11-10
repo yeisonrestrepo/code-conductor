@@ -61,8 +61,9 @@ export function checkChangelog(base, head) {
   return { violations: [...added, ...removed] };
 }
 
-// Same heading shape repo-invariants.test.js matches; the state is any single character.
-const BACKLOG_HEADING = /^### \[(.)\] `\[([A-Z]+-\d+)\]`/gm;
+// The repo-invariants.test.js heading shape, widened to sub-shaped ids (ARCH-008-S1)
+// so their state flips are guarded too; the state is any single character.
+const BACKLOG_HEADING = /^### \[(.)\] `\[([A-Z]+-\d+(?:-[A-Z0-9]+)*)\]`/gm;
 
 function headingStates(text) {
   const states = new Map();

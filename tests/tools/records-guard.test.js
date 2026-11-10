@@ -183,6 +183,19 @@ describe('checkBacklog headings', () => {
     expect(checkBacklog(BACKLOG, head).violations).toHaveLength(1);
   });
 
+  // Sub-shaped ids such as ARCH-008-S1 exist in the real backlog.
+  it('reports a flip on a sub-shaped id', () => {
+    const base = `${BACKLOG}### [X] \`[ARCH-008-S1]\` Schema\n`;
+    const head = `${BACKLOG}### [ ] \`[ARCH-008-S1]\` Schema\n`;
+    const { violations } = checkBacklog(base, head);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toContain('ARCH-008-S1 heading [X] -> [ ]');
+  });
+
+  it('reports a new done sub-shaped item', () => {
+    expect(checkBacklog(BACKLOG, `${BACKLOG}### [X] \`[ARCH-008-B]\` x\n`).violations).toHaveLength(1);
+  });
+
   // An absent id reads as open, and a lower-case x is the same done state.
   it.each([
     ['a new open item', `${BACKLOG}### [ ] \`[FEAT-099]\` x\n`],
