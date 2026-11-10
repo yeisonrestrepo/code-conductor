@@ -17,9 +17,16 @@ import { join } from 'node:path';
 // A line appended between a rotation's read and its rename is dropped with the old file;
 // for a convenience log bounded at 250 lines that is accepted.
 //
+// A rename that SUCCEEDS can fail another writer's open of the file with EPERM in the same
+// instant (#130): measured on Windows 11, 2026-11-10, at 1 open in about 75,000 against a
+// renaming process, and seen once on the windows-latest CI leg as M9's 1 append error. The
+// emitter tries that open again (openFlowEvents), and so does the worker, which keeps M9
+// asserting zero failed appends against the algorithm the emitter actually runs.
+//
 // The worker is CommonJS through `node -e` so the probe needs no fixture file. Its
 // rotation is the D7 algorithm: wx lock, 10 s stale cutoff, last 250 parseable lines to a
-// temporary file, rename over the original.
+// temporary file, rename over the original. Its append is the emitter's: an open tried up to
+// three times on EPERM, then one write.
 const WORKER = `
 const fs = require('node:fs');
 const [file, worker, n, bytes, rotateAt] = process.argv.slice(1);
@@ -39,6 +46,11 @@ function takeLock() {
     return fs.openSync(lock, 'wx');
   } catch { return null; }
 }
+function openAppend() {
+  for (let tries = 1; ; tries++) {
+    try { return fs.openSync(file, 'a'); } catch (e) { if (e.code !== 'EPERM' || tries >= 3) throw e; }
+  }
+}
 const parses = (l) => { try { JSON.parse(l); return true; } catch { return false; } };
 function rotate() {
   const fd = takeLock();
@@ -52,7 +64,7 @@ function rotate() {
 }
 for (let i = 0; i < +n; i++) {
   try { if (+rotateAt && (fs.statSync(file, { throwIfNoEntry: false })?.size || 0) > +rotateAt) rotate(); } catch { rotateErrors++; }
-  try { fs.appendFileSync(file, line(i)); } catch { appendErrors++; }
+  try { const fd = openAppend(); try { fs.writeSync(fd, line(i)); } finally { fs.closeSync(fd); } } catch { appendErrors++; }
 }
 process.stdout.write(JSON.stringify({ appendErrors, rotateErrors }));
 `;
