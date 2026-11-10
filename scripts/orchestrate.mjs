@@ -205,8 +205,8 @@ function hasTestScript(pkgPath) {
 }
 
 // D6: the one command code and qa may run, resolved before anything is recorded. The script
-// is checked before detect-stack runs, because a non-string script makes detect-stack fail
-// whole and the halt would then name the wrong cause.
+// is checked before detect-stack runs, because detect-stack drops a non-string script and may
+// offer its own default runner, which the run must not take in place of the owner's script.
 export function resolveTestCommand(root) {
   const pkgPath = join(root, 'package.json');
   if (existsSync(pkgPath)) {
