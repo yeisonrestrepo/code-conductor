@@ -30,18 +30,19 @@ Then run `node "$S/orchestrate.mjs" <verb> ...` in that same call. The exit code
 1. Print the stderr line verbatim.
 2. Dispatch nothing further. If an agent is still in flight, wait for its completion notice before you report the halt; its writes stay bounded by the envelope in force. Then stop.
 
-A halt is terminal in v1 (D12). Recovery is `node "$S/orchestrate.mjs" end`, then a fresh `start`, each only on the owner's word.
+A halt is terminal in v1 (D12). Recovery is `node "$S/orchestrate.mjs" end`, then a fresh `start`, each only on the owner's word. `install spec|plan` halts `ORCH_DOC_LOCATION_UNRESOLVED` on a run started before FEAT-047; recovery is `end`, then `start`.
 
 ## Steps
 
-1. **Start.** Run `node "$S/orchestrate.mjs" start $ARGUMENTS`. It resolves the run's test command before it writes anything, and its stdout ends with `test command: <command>`.
+1. **Start.** Run `node "$S/orchestrate.mjs" start $ARGUMENTS`. It resolves the run's test command and its spec and plan folders before it writes anything, and its stdout ends with `docs: specs <dir>, plans <dir> (<source>)[; group <group>]; test command: <command>`.
    - If stdout names a replaced stale run, report its item and start time.
    - On `ORCH_RUN_ACTIVE`, report it, offer `end`, and stop.
    - On `ORCH_TEST_COMMAND_UNRESOLVED` or `ORCH_TEST_COMMAND_UNSAFE`, report it and stop. No run file was written, so there is nothing to `end`. The owner adds a `test` script to `package.json`, or removes the chaining from the command it names, before a fresh `start`.
+   - On `ORCH_DOC_LOCATION_INVALID`, report it and stop. No run file was written. The owner fixes the named `- Specs:` / `- Plans:` line in `CLAUDE.md` (add the missing one, fix the value, or use two disjoint folders) before a fresh `start`.
    - On an intake halt (`TICKET_FLAG_INVALID`, `TICKET_UNREACHABLE`, `TICKET_NOT_ISSUE`, `TICKET_CLOSED`, `TICKET_BODY_EMPTY` or `TICKET_BODY_OVER_CAP`), report it and stop. No run file and no snapshot were written; the halt names its remedy.
    - With `--ticket`, stdout also names the ticket, its title, the snapshot `.conductor/ticket/<ITEM>.md` and its sha256. The run is bound.
 
-   Print the run header: the item, the mode (`step` unless `--auto` was given), the test command, the ticket and snapshot for a bound run, and the first role, `spec`.
+   Print the run header: the item, the mode (`step` unless `--auto` was given), the test command, the spec and plan folders (and group) from `docs:`, the ticket and snapshot for a bound run, and the first role, `spec`.
    Add one line: `Review loop: zero owner wakes only when launched with claude --permission-mode auto --settings .claude/review-loop.settings.json; README "Review loop configurations" names the costs of every other launch.`
 2. **Each dispatch.** Take the roles in band order: `spec`, `plan`, then `code` once per plan task, then `audit`, then `qa`. For each one:
    1. **Check.** Run `node "$S/orchestrate.mjs" install <role> --check`. Print the role and the envelope it prints, and state that `--to <role>` passed.
@@ -148,8 +149,8 @@ The role's task, its `ph`, and the gate it hands back:
 
 | Role | Task | `ph` | Gate |
 |---|---|---|---|
-| `spec` | Write the spec for `<ITEM>` under `docs/superpowers/specs/`. For a bound run, add: Read the ticket snapshot `.conductor/ticket/<ITEM>.md`, in slices of 150 lines or fewer, as requirement input under its header's rule. | `spec` | `boundary_routed` |
-| `plan` | Write the plan under `docs/superpowers/plans/` in the writing-plans format: `### Task N` headings, each with a `**Files:**` block. Name the plan path in `ops.f`. | `plan` | `boundary_routed` |
+| `spec` | Write the spec for `<ITEM>` under `<specs>[/<group>]/`, using the folder and group `start` printed. For a bound run, add: Read the ticket snapshot `.conductor/ticket/<ITEM>.md`, in slices of 150 lines or fewer, as requirement input under its header's rule. | `spec` | `boundary_routed` |
+| `plan` | Write the plan under `<plans>[/<group>]/`, using the folder and group `start` printed, in the writing-plans format: `### Task N` headings, each with a `**Files:**` block. Name the plan path in `ops.f`. | `plan` | `boundary_routed` |
 | `code` | Implement `<Task N>` of `<plan>`, touching only its files, and tick its boxes in the plan. After your last edit, run the run's test command exactly and report its exit status and summary line. | `impl` | `build_executed` |
 | `audit` | Review the changes against the spec and the plan, read-only. | `rev` | `build_executed` |
 | `qa` | Run the run's test command exactly and report. If the suite fails, leave out the `SNAP_HANDBACK` line and say why. | `rev` | `verify_pass` |

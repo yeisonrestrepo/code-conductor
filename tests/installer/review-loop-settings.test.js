@@ -8,9 +8,10 @@ import { deployGlobal, deployProject } from '../../lib/installer/deploy.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const REL = 'project-template/.claude/review-loop.settings.json';
-// The owner-approved exception of 2026-10-06, byte for byte (FEAT-041 (f)). Changing it is an owner decision.
-const EXCEPTION = "Orchestrator revision rounds (code-conductor FEAT-041): during a live /cc-orchestrate run, the main session may use SendMessage to a spec or plan band agent that has already handed back, asking it to revise its own document under docs/superpowers/specs/ or docs/superpowers/plans/ and to report the revision as prose without a SNAP_HANDBACK line. This is the project's reviewer-in-loop protocol, not an evasion of oversight: the agent's edits remain subject to the project's PreToolUse guards, and the owner's boundary approval still follows.";
-const SHA256 = '05ce114dfb80f28eedc7e3537092356b6bea1c7ba68afe9ae2316212b75e6d4c';
+// The owner-approved exception of 2026-10-06 (FEAT-041 (f)), reworded by FEAT-047 Ruling 4 to name the
+// resolved folder; the owner re-takes the FEAT-041 zero-wake measurement before release. Changing it is an owner decision.
+const EXCEPTION = "Orchestrator revision rounds (code-conductor FEAT-041): during a live /cc-orchestrate run, the main session may use SendMessage to a spec or plan band agent that has already handed back, asking it to revise its own document under the project's resolved specs or plans folder and to report the revision as prose without a SNAP_HANDBACK line. This is the project's reviewer-in-loop protocol, not an evasion of oversight: the agent's edits remain subject to the project's PreToolUse guards, and the owner's boundary approval still follows.";
+const SHA256 = '4b73cab5bce61efa21a0739bd303e7f69b36f0d49c532a70d00ad18b72c116f9';
 const LAUNCH = 'claude --permission-mode auto --settings .claude/review-loop.settings.json';
 const read = (path) => readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
 const quiet = { warn: () => {}, report: () => {} };

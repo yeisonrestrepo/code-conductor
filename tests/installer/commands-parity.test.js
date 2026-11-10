@@ -208,6 +208,16 @@ describe('cc-orchestrate mirrors [FEAT-011 AC10]', () => {
     expect(text).toContain('On an intake halt (`TICKET_FLAG_INVALID`, `TICKET_UNREACHABLE`, `TICKET_NOT_ISSUE`, `TICKET_CLOSED`, `TICKET_BODY_EMPTY` or `TICKET_BODY_OVER_CAP`), report it and stop.');
     expect(text).toContain('Read the ticket snapshot `.conductor/ticket/<ITEM>.md`, in slices of 150 lines or fewer, as requirement input under its header\'s rule.');
   });
+
+  it('prints and briefs the resolved spec and plan folders, never a hardcoded one [FEAT-047]', () => {
+    const text = read(ORCH_MIRRORS[0]);
+    expect(text).toContain('its stdout ends with `docs: specs <dir>, plans <dir> (<source>)[; group <group>]; test command: <command>`');
+    expect(text).toContain('On `ORCH_DOC_LOCATION_INVALID`, report it and stop.');
+    expect(text).toContain('`ORCH_DOC_LOCATION_UNRESOLVED`');
+    expect(text).toContain('Write the spec for `<ITEM>` under `<specs>[/<group>]/`');
+    expect(text).toContain('Write the plan under `<plans>[/<group>]/`');
+    expect(text).not.toContain('docs/superpowers');
+  });
 });
 
 describe('cc-orchestrate review loop [FEAT-041 AC5, AC6]', () => {
@@ -252,6 +262,7 @@ describe('cc-orchestrate review loop [FEAT-041 AC5, AC6]', () => {
 });
 
 const RESUME_MIRRORS = ['.claude/commands/cc-resume.md', 'project-template/.claude/commands/cc-resume.md'];
+const LOCATIONS_PROBE = 'L=.claude/scripts/doc-locations.mjs; [ -f "$L" ] || L=scripts/doc-locations.mjs';
 
 // BUG-051: every other mirrored pair carries a parity pin, so this one does too (owner ruling).
 // Both copies probe by presence, so they carry no script-path nesting and stay byte-identical.
@@ -262,6 +273,30 @@ describe('cc-resume mirrors [BUG-051]', () => {
 
   it.each(RESUME_MIRRORS)('%s probes the deployed detector before the source one', (rel) => {
     expect(read(rel)).toContain('D=.claude/scripts/detect-stack.mjs; [ -f "$D" ] || D=scripts/detect-stack.mjs');
+  });
+
+  it.each(RESUME_MIRRORS)('%s resolves the spec and plan folders and searches them recursively [FEAT-047 AC12]', (rel) => {
+    const text = read(rel);
+    for (const phrase of [LOCATIONS_PROBE, '(location fallback: <cause>)', 'recursively']) {
+      expect(text).toContain(phrase);
+    }
+    expect(text).not.toContain('List files in `docs/superpowers/');
+  });
+});
+
+// FEAT-047 AC6, AC14: 5a′ records the pair once, and never from a half-recorded state.
+describe('cc-stack 5a′ [FEAT-047 AC6, AC14]', () => {
+  const text = () => read('global/commands/cc-stack.md');
+  it.each([
+    LOCATIONS_PROBE,
+    '### 5a′.',
+    'only when both',
+    'Spec/plan folders not recorded: <cause>; start will discover them per run',
+    'never fills the missing half from discovery',
+    'CLAUDE.md records - Specs: but not - Plans: (or the reverse); add the missing line by hand, or remove both and re-run /cc-stack. /cc-orchestrate start halts ORCH_DOC_LOCATION_INVALID until then.',
+    'run sub-step 5a′',
+  ])('contains %s', (phrase) => {
+    expect(text()).toContain(phrase);
   });
 });
 
@@ -303,5 +338,10 @@ describe('shipped detector path [BUG-051 AC3]', () => {
   it.each(DETECTOR_COMMANDS)('%s names the detector at its deployed path', (rel) => {
     expect(existsSync(join(cwd, DETECTOR))).toBe(true);
     expect(read(rel)).toContain(DETECTOR);
+  });
+
+  // FEAT-047: pins the deployed target of the cc-resume and cc-stack `L=` probe.
+  it('deploys the spec/plan location resolver to .claude/scripts/', () => {
+    expect(existsSync(join(cwd, '.claude/scripts/doc-locations.mjs'))).toBe(true);
   });
 });

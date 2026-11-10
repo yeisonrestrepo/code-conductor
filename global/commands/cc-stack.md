@@ -34,7 +34,7 @@ If the root `CLAUDE.md` does not exist, do not create it: instruct the user to r
 
 Otherwise read `CLAUDE.md` and look for the `- Stack:` line under `## Project Identity`:
 - **Stack line present and non-empty** -> ask: `I see you're using [stack]. Has anything changed?` This is a blocking yes/no prompt with no timeout.
-  - `no` -> acknowledge in one line and stop; make no edits.
+  - `no` -> acknowledge in one line, run sub-step 5a′ (additive: the only edit this path may make, Ruling 1), and stop.
   - `yes`, or free text describing a change -> re-run the detector (step 3) and rewrite the managed sections from the fresh output. Free text is an additive hint only: fold user-named tools the detector missed into the ruleset, but detected facts always win on conflict.
 - **`## Project Identity` missing, or present without a `- Stack:` line** -> treat as "no recorded stack" (not an error). Proceed to the write path; append the `## Project Identity` header if absent, or surgically insert the `- Stack:` line if only that line is missing. Note in one line that a fresh stack identity was recorded.
 
@@ -45,6 +45,23 @@ Detect and preserve `CLAUDE.md`'s dominant EOL style (LF or CRLF); never convert
 ### 5a. Development Commands (per-field surgical edits, BUG-015 pattern)
 
 For each of `Build`, `Test`, `Lint`, `Format`, `Setup`, if the detector JSON has a non-empty string for the matching key (`build`, `test`, `lint`, `format`, `setup`), replace that single line under `## Development Commands` with `- <Label>: <value>`. Edit one field line at a time (BUG-003). If a key is absent, leave the existing placeholder (e.g. `<command>` or `N/A`) unchanged - never fabricate a command. Also set the `- Stack:` line under `## Project Identity` from the `stack` key (or record the stack name derived from detection). If `## Development Commands` is absent, append the header and its five fields at the end of the file.
+
+### 5a′. Spec and plan folders (FEAT-047)
+
+Act only when both `- Specs:` and `- Plans:` are absent under `## Development Commands`. Existing lines are never rewritten.
+
+1. **Neither line present.** Resolve the location resolver by presence, the deployed copy first, and run `node "$L"` from the repo root:
+
+   ```bash
+   L=.claude/scripts/doc-locations.mjs; [ -f "$L" ] || L=scripts/doc-locations.mjs
+   ```
+
+2. **Success.** Accept the output only when the exit code is 0 and stdout parses as a JSON object whose `specs` and `plans` are non-empty strings. Insert `- Specs: <specs>` and then `- Plans: <plans>` after the last field line under `## Development Commands`, one surgical edit per line (BUG-003). If the header is absent, append both lines together with the five fields. Announce the recorded pair and its `source`.
+3. **Failure.** If `L` is missing at both paths, the run exits non-zero, or stdout is empty, not JSON, or lacks either string, write nothing and announce `Spec/plan folders not recorded: <cause>; start will discover them per run`. 5b and 6 continue.
+4. **Exactly one line present.** Write nothing and do not run the CLI; this step never fills the missing half from discovery. Announce: `CLAUDE.md records - Specs: but not - Plans: (or the reverse); add the missing line by hand, or remove both and re-run /cc-stack. /cc-orchestrate start halts ORCH_DOC_LOCATION_INVALID until then.`
+5. **Both lines present.** Do nothing, whatever the values; an invalid recorded value is the owner's to fix, and `start` names it.
+
+The EOL rule of step 5 applies to every edit here.
 
 ### 5b. Active Stack Profiles (whole-block regeneration)
 
