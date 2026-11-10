@@ -194,6 +194,11 @@ describe('scope [FEAT-011 AC8]', () => {
     expect(() => taskScope({ id: 'Task 1', files: ['src/' + 'x'.repeat(300)] }, PLAN)).toThrow(/^ORCH_SCOPE_OVER_CAP: Task 1 has a 304-character path/);
   });
 
+  it('[#128] measures a backslash path as the validator does, so it halts here by name', () => {
+    const path = 'src' + String.fromCharCode(92) + 'x'.repeat(296); // 300 characters, 301 escaped
+    expect(() => taskScope({ id: 'Task 1', files: [path] }, PLAN)).toThrow('ORCH_SCOPE_OVER_CAP: Task 1 has a 301-character path; the cap is 300');
+  });
+
   it('installs a code envelope holding RW and exactly the task scope', () => {
     driveTo('code');
     expect(orch(['install', 'code']).status).toBe(0);

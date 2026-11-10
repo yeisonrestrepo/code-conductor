@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'; import { BLOCK_FIELDS, CAPS, GATES, MAX_VERSION, POST_PARSE_MAX, PRE_PARSE_MAX_BYTES, ROLES, TOOL_KINDS, TOP_FIELDS, V3_CAPS, expectedGate } from './snap-contract.mjs';
+import { readFileSync } from 'node:fs'; import { BLOCK_FIELDS, CAPS, GATES, MAX_VERSION, POST_PARSE_MAX, PRE_PARSE_MAX_BYTES, ROLES, TOOL_KINDS, TOP_FIELDS, V3_CAPS, elementLength, expectedGate } from './snap-contract.mjs';
 const err = (m) => { process.stderr.write(`SNAP_ERROR: ${m}\n`); process.exit(1); };
 const [path, flag, to] = process.argv.slice(2); if (path === undefined) err('no path provided');
 if (flag !== undefined && (flag !== '--to' || !ROLES.includes(to))) err(`usage: snap-validate.mjs <file> [--to ${ROLES.join('|')}]`);
@@ -27,7 +27,7 @@ const p = snap.mem.p; if (p !== undefined && (typeof p !== 'object' || p === nul
 const arrayCaps = { ...CAPS, ...(snap.ops.scope === undefined ? {} : V3_CAPS) };
 for (const [key, [cap, elemCap]] of Object.entries(arrayCaps)) {
   const [blk, sub] = key.split('.'); const arr = snap[blk][sub]; if (!Array.isArray(arr)) err(`${key} must be an array`); if (arr.length > cap) err(`${key} exceeds cap`);
-  arr.forEach((el, i) => { if (typeof el !== 'string' || el.trim() === '') err(`empty element in ${key}[${i}]`); if (JSON.stringify(el).slice(1, -1).length > elemCap) err(`element too long in ${key}[${i}]`); });
+  arr.forEach((el, i) => { if (typeof el !== 'string' || el.trim() === '') err(`empty element in ${key}[${i}]`); if (elementLength(el) > elemCap) err(`element too long in ${key}[${i}]`); });
 }
 snap.ops.f.forEach((el, i) => {
   if (el.includes('\\')) err(`backslash in ops.f[${i}]`);
