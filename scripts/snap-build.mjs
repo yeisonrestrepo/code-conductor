@@ -9,6 +9,20 @@ const byteLen = (s) => Buffer.byteLength(s, 'utf8');
 // after an async write truncates the un-flushed tail; the drain callback avoids both.
 function writeOut(s) { process.stdout.write(s + '\n', () => process.exit(0)); }
 
+// Issue #132: cut to the validator's measure, one code point at a time, so the cut never
+// splits a surrogate pair or an escape. JSON escapes each code point on its own, so the
+// per-code-point sum equals elementLength of the prefix and the result always validates.
+function truncateToCap(str, elemCap) {
+  if (elementLength(str) <= elemCap) return str;
+  let used = 0; let end = 0;
+  for (const ch of str) {
+    used += elementLength(ch);
+    if (used > elemCap) break;
+    end += ch.length;
+  }
+  return str.slice(0, end);
+}
+
 // filter empties, dedup (first wins), Unicode-safe per-element truncation, head-drop to count cap
 function normArray(raw, [cap, elemCap]) {
   const arr = Array.isArray(raw) ? raw : [];
@@ -18,7 +32,7 @@ function normArray(raw, [cap, elemCap]) {
     const t = item.trim();
     if (!t || seen.has(t)) continue;
     seen.add(t);
-    out.push(Array.from(t).slice(0, elemCap).join(''));
+    out.push(truncateToCap(t, elemCap));
   }
   while (out.length > cap) out.shift();
   return out;

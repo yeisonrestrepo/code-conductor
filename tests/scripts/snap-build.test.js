@@ -4,6 +4,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { CAPS, elementLength } from '../../scripts/snap-contract.mjs';
 
 const SCRIPT = fileURLToPath(new URL('../../scripts/snap-build.mjs', import.meta.url));
 const VALIDATOR = fileURLToPath(new URL('../../scripts/snap-validate.mjs', import.meta.url));
@@ -177,6 +178,52 @@ describe('snap-build.mjs', () => {
     const r = build(JSON.stringify({ ...base, ...band, scope: [path] }));
     expect(r.status).toBe(0);
     expect(JSON.parse(r.stdout).ops.scope).toEqual([path]);
+    expect(validate(r.stdout.trim()).status).toBe(0);
+  });
+
+  // ---- issue #132: history elements are truncated by the validator's measure ----
+  const fieldOf = (obj, key) => (key === 'n' ? obj.ops.n : obj.mem[key]);
+  const isLoneHigh = (s) => /[\uD800-\uDBFF]$/.test(s);
+
+  it('[#132 AC1] truncates a quoted mem.d entry to the escaped cap, and it validates', () => {
+    const r = build(JSON.stringify({ ...base, d: ['say "hi" ' + 'x'.repeat(400)] }));
+    expect(r.status).toBe(0);
+    const [el] = JSON.parse(r.stdout).mem.d;
+    expect(el).toBe('say "hi" ' + 'x'.repeat(289));
+    expect(elementLength(el)).toBe(300);
+    expect(validate(r.stdout.trim()).status).toBe(0);
+  });
+
+  it.each([['n', 'ops.n'], ['d', 'mem.d'], ['x', 'mem.x']])(
+    '[#132 AC2] truncates an escape-heavy %s entry within its cap, without a lone surrogate, and it validates',
+    (key, capKey) => {
+      const entry = ('"' + BS + '\u{1F600}').repeat(200);
+      const r = build(JSON.stringify({ ...base, [key]: [entry] }));
+      expect(r.status).toBe(0);
+      const [el] = fieldOf(JSON.parse(r.stdout), key);
+      expect(elementLength(el)).toBeLessThanOrEqual(CAPS[capKey][1]);
+      expect(elementLength(el)).toBeGreaterThan(CAPS[capKey][1] - 2);
+      expect(isLoneHigh(el)).toBe(false);
+      expect(validate(r.stdout.trim()).status).toBe(0);
+    },
+  );
+
+  // ops.f is measured the same way; it is not validated here because any truncated ops.f
+  // element loses its :C/:M/:D suffix, a separate defect (#136).
+  it('[#132 AC2] truncates a quoted ops.f entry within its escaped cap', () => {
+    const r = build(JSON.stringify({ ...base, f: ['"'.repeat(200) + ':C'] }));
+    expect(JSON.parse(r.stdout).ops.f).toEqual(['"'.repeat(150)]);
+  });
+
+  it('[#132 AC3] drops an escape that would cross the cap whole', () => {
+    const r = build(JSON.stringify({ ...base, d: ['x'.repeat(299) + '"'] }));
+    expect(JSON.parse(r.stdout).mem.d).toEqual(['x'.repeat(299)]);
+  });
+
+  it('[#132 AC4] emits an element at the escaped cap unchanged', () => {
+    const entry = 'x'.repeat(296) + '"' + BS;
+    const r = build(JSON.stringify({ ...base, d: [entry] }));
+    expect(JSON.parse(r.stdout).mem.d).toEqual([entry]);
     expect(validate(r.stdout.trim()).status).toBe(0);
   });
 });
