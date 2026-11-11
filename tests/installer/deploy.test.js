@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { CAN_SYMLINK } from '../helpers/can-symlink.js';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync, readFileSync, readdirSync, lstatSync, symlinkSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { spawnSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertAssets, deployGlobal, deployProject, chmodHooks, assertMergeTargets } from '../../lib/installer/deploy.mjs';
@@ -82,6 +83,16 @@ describe('deployProject', () => {
     deployProject(asset, home);
     expect(readFileSync(join(home, '.claude', 'scripts', 'conductor-db.mjs'), 'utf8')).toBe('db-engine');
     expect(existsSync(join(home, 'scripts'))).toBe(false);
+  });
+  it('ships the merge engine so the deployed adopt-claude-md.mjs runs [FEAT-040]', () => {
+    deployProject(ROOT, home);
+    const deployed = join(home, '.claude', 'lib', 'installer', 'merge-md.mjs');
+    expect(readFileSync(deployed)).toEqual(readFileSync(join(ROOT, 'lib', 'installer', 'merge-md.mjs')));
+    const host = join(home, 'HOST.md');
+    writeFileSync(host, '## Team Rules\nbe kind\n');
+    const run = spawnSync('node', [join(home, '.claude', 'scripts', 'adopt-claude-md.mjs'), 'sections', host], { encoding: 'utf8' });
+    expect(run.status).toBe(0);
+    expect(JSON.parse(run.stdout).trigger).toBe(true);
   });
   it('sweeps a stale root-level scripts/ dir left by the 1.23.2 bug', () => {
     mkdirSync(join(home, 'scripts'), { recursive: true });

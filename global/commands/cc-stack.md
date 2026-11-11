@@ -38,6 +38,19 @@ Otherwise read `CLAUDE.md` and look for the `- Stack:` line under `## Project Id
   - `yes`, or free text describing a change -> re-run the detector (step 3) and rewrite the managed sections from the fresh output. Free text is an additive hint only: fold user-named tools the detector missed into the ruleset, but detected facts always win on conflict.
 - **`## Project Identity` missing, or present without a `- Stack:` line** -> treat as "no recorded stack" (not an error). Proceed to the write path; append the `## Project Identity` header if absent, or surgically insert the `- Stack:` line if only that line is missing. Note in one line that a fresh stack identity was recorded.
 
+### 4b. Adopt a host-authored CLAUDE.md (FEAT-040)
+
+Run once, before step 5, and only when the file holds content conductor did not write. Resolve the helper by presence, the deployed copy first: `A=.claude/scripts/adopt-claude-md.mjs; [ -f "$A" ] || A=scripts/adopt-claude-md.mjs`. If neither exists, skip 4b silently.
+
+1. Run `node "$A" sections CLAUDE.md`. If it prints `"trigger": false`, or exits non-zero (unbalanced sentinels, unclosed fence), skip 4b. A scaffold-only file never triggers.
+2. Classify each listed section into exactly one slot: `identity`, `commands`, `architecture`, `conventions`, `out-of-scope` or `keep`. When unsure, use `keep`. Write a plan file `{"<section id>": "<slot>"}`. You classify only; you never edit text.
+3. Run `node "$A" render CLAUDE.md <plan>`. Show the owner the **full resulting file** (stdout) and the approval token (stderr), naming any duplicate headings it reconciles.
+4. Ask: `Adopt this result? (yes/no)`. This is a blocking prompt with no timeout. Only an explicit `yes` to that exact render counts; if the owner wants a change, redo steps 2-3 and show the new render.
+5. On `yes`, run `node "$A" apply CLAUDE.md <plan> <token>` and announce the backup path it prints. The helper refuses a token that does not match the render, so nothing unshown is written.
+6. On `no`, or anything else, write nothing: the file stays exactly as the installer left it. Continue with step 5 either way.
+
+The managed block is copied verbatim and unmapped content is kept byte for byte; adoption only moves host sections.
+
 ## 5. Write path
 
 Detect and preserve `CLAUDE.md`'s dominant EOL style (LF or CRLF); never convert wholesale. If the OS denies the write or the file is locked, abort that write with a single-line error naming the path and cause (e.g. `ERROR: cannot write CLAUDE.md: permission denied - no changes applied`), leave the file byte-for-byte untouched, and still report the detection result.
