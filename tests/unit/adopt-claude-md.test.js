@@ -176,3 +176,34 @@ describe('apply (AC1, AC4, AC5)', () => {
     expect(readFileSync(file, 'utf8')).toBe(shown.stdout);
   });
 });
+
+describe('independent black-box regressions (FEAT-040 test pass)', () => {
+  const plan = (text) => ({ [sectionId(text, 'Team Rules')]: 'conventions' });
+
+  it('refuses a stale token when the file changes between render and apply, leaving it untouched', () => {
+    const text = '## Team Rules\nr\n## Conventions\nc\n';
+    writeFileSync(file, text);
+    const token = tokenOf(render(text, plan(text)));
+    writeFileSync(file, `${text}## Late\nz\n`);
+    expect(() => applyPlan(file, plan(text), token)).toThrow(AdoptError);
+    expect(readFileSync(file, 'utf8')).toBe(`${text}## Late\nz\n`);
+  });
+
+  it('keeps a BOM, CRLF, unicode and a missing trailing newline byte for byte on an empty plan', () => {
+    const text = '﻿# Título\r\n## Reglas 日本語 \u{1F600}\r\ntexto\r\n## Fin\r\nsin salto';
+    writeFileSync(file, text);
+    expect(render(text, {})).toBe(text);
+  });
+
+  // Known bug: two applies within one second share a backup path, so the second
+  // copyFileSync overwrites the first backup and the original is lost.
+  it.fails('a second apply in the same second does not clobber the first backup', () => {
+    const text = '## Team Rules\nr\n## Conventions\nc\n';
+    writeFileSync(file, text);
+    const first = applyPlan(file, plan(text), tokenOf(render(text, plan(text))));
+    const current = readFileSync(file, 'utf8');
+    const second = applyPlan(file, {}, tokenOf(render(current, {})));
+    expect(second).not.toBe(first);
+    expect(readFileSync(first, 'utf8')).toBe(text);
+  });
+});
