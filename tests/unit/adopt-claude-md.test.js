@@ -195,9 +195,8 @@ describe('independent black-box regressions (FEAT-040 test pass)', () => {
     expect(render(text, {})).toBe(text);
   });
 
-  // Known bug: two applies within one second share a backup path, so the second
-  // copyFileSync overwrites the first backup and the original is lost.
-  it.fails('a second apply in the same second does not clobber the first backup', () => {
+  // Two applies within one second share a timestamp; the second must take a new name.
+  it('a second apply in the same second does not clobber the first backup', () => {
     const text = '## Team Rules\nr\n## Conventions\nc\n';
     writeFileSync(file, text);
     const first = applyPlan(file, plan(text), tokenOf(render(text, plan(text))));
@@ -205,5 +204,66 @@ describe('independent black-box regressions (FEAT-040 test pass)', () => {
     const second = applyPlan(file, {}, tokenOf(render(current, {})));
     expect(second).not.toBe(first);
     expect(readFileSync(first, 'utf8')).toBe(text);
+  });
+});
+
+describe('round 2 fixes', () => {
+  const PROFILES_MARK = 'overwritten -->';
+  const hostProfiles = (extra) => TEMPLATE.split(START)[0].replace(PROFILES_MARK, `${PROFILES_MARK}\n${extra}`);
+
+  it('host prose under Active Stack Profiles triggers; generated bullets and subsections do not', () => {
+    expect(hasHostContent(hostProfiles('### TypeScript\n- Use strict mode.'))).toBe(false);
+    expect(hasHostContent(hostProfiles('Our own profile notes.'))).toBe(true);
+  });
+
+  it('lists a host-edited Active Stack Profiles section so it can be kept or moved', () => {
+    const text = withBlock(hostProfiles('Our notes.'));
+    const id = sectionId(text, 'Active Stack Profiles');
+    expect(render(text, { [id]: 'keep' })).toBe(text);
+    expect(violations(text, render(text, { [id]: 'architecture' }))).toEqual([]);
+  });
+
+  it('a third apply in the same second keeps every earlier backup', () => {
+    writeFileSync(file, '## A\n1\n\n## Conventions\nc\n');
+    const backups = new Set();
+    for (let i = 0; i < 3; i++) {
+      const current = readFileSync(file, 'utf8');
+      const plan = i === 0 ? { 1: 'conventions' } : {};
+      backups.add(applyPlan(file, plan, tokenOf(render(current, plan))));
+    }
+    expect(backups.size).toBe(3);
+  });
+
+  it('a failed backup aborts the write', () => {
+    const text = withBlock('## A\n1\n');
+    writeFileSync(file, text);
+    const absent = join(dir, 'nope', 'CLAUDE.md');
+    expect(() => applyPlan(absent, {}, tokenOf(render(text, {})))).toThrow(AdoptError);
+    expect(readFileSync(file, 'utf8')).toBe(text);
+  });
+
+  it('violations catches a duplicated section that substring matching would miss', () => {
+    const original = withBlock('## A\nx\n\n## B\ny\n');
+    const duplicated = original.replace('## B\ny\n', '## B\ny\n\n## B\ny\n');
+    expect(violations(original, duplicated)).toContain('host sections lost, duplicated or altered');
+    expect(violations(original, original)).toEqual([]);
+  });
+
+  it('rejects a slot for the preamble but allows keep', () => {
+    const text = withBlock('# Title\n\n## A\nx\n');
+    expect(() => render(text, { 0: 'identity' })).toThrow(/cannot be moved/);
+    expect(render(text, { 0: 'keep' })).toBe(text);
+  });
+
+  it('turns missing or invalid plan files into exit 2 with no stack trace', () => {
+    writeFileSync(file, withBlock('## A\nx\n'));
+    writeFileSync(join(dir, 'bad.json'), '{nope');
+    writeFileSync(join(dir, 'arr.json'), '[]');
+    for (const planPath of ['missing.json', 'bad.json', 'arr.json']) {
+      const run = spawnSync('node', [SCRIPT, 'render', file, join(dir, planPath)], { encoding: 'utf8' });
+      expect(run.status).toBe(2);
+      expect(run.stderr).toMatch(/^ERROR: /);
+      expect(run.stderr).not.toMatch(/\n\s+at /);
+    }
   });
 });

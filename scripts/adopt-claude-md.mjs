@@ -38,6 +38,9 @@ export const SCAFFOLD_LINES = new Set([
 // Filled-in fields are conductor's own writes (/cc-stack, /cc-init), not host prose.
 const FIELD_LINE = /^- (Name|Description|Stack|Language|Build|Test|Lint|Format|Setup|Specs|Plans):/;
 const GENERATED_SECTION = 'Active Stack Profiles';
+// /cc-stack 5b writes only `### stack` subsections and `- ` bullets there (prose is
+// disallowed), so any other line in that section is the host's own.
+const GENERATED_LINE = /^(- |### )/;
 
 export class AdoptError extends Error {}
 
@@ -75,8 +78,9 @@ export function hasHostContent(text) {
     const line = raw.replace(/\r$/, '').trim();
     if (line.startsWith('## ')) generated = line.slice(3).trim() === GENERATED_SECTION;
     const scaffold = line === '' || SCAFFOLD_LINES.has(line) || FIELD_LINE.test(line)
-      || SCAFFOLD_HEADINGS.some((h) => line === `## ${h}`);
-    if (!scaffold && !generated) return true;
+      || SCAFFOLD_HEADINGS.some((h) => line === `## ${h}`)
+      || (generated && GENERATED_LINE.test(line));
+    if (!scaffold) return true;
   }
   return false;
 }
@@ -105,9 +109,12 @@ function slotRank(plan, id) {
   return SLOTS.indexOf(slot);
 }
 
+// The preamble anchors the file's title and intro; a slot for it is a mistake to surface.
 function checkPlan(plan, sections) {
   for (const id of Object.keys(plan)) {
-    if (!sections.some((s) => String(s.id) === id)) throw new AdoptError(`plan names unknown section ${id}`);
+    const section = sections.find((s) => String(s.id) === id);
+    if (!section) throw new AdoptError(`plan names unknown section ${id}`);
+    if (section.heading === null && plan[id] !== 'keep') throw new AdoptError(`section ${id} has no heading and cannot be moved`);
   }
 }
 
@@ -129,16 +136,20 @@ export function render(text, plan) {
 export const tokenOf = (rendered) => crypto.createHash('sha256').update(rendered).digest('hex');
 
 // Acceptance criteria 2 and 3 as an independent check on the render, not on the plan.
+// Host sections must survive as the same multiset, so a lost, duplicated or altered
+// section is caught; substring matching would miss a duplicate. The preamble must
+// still lead the file. Slot moves reorder sections by design, so order is otherwise free.
 export function violations(original, rendered) {
   const o = splitManaged(original);
   const r = splitManaged(rendered);
   const found = [];
   if (o.block.join('\n') !== r.block.join('\n')) found.push('managed block changed');
-  const outside = [...r.before, ...r.after].join('\n');
-  for (const s of [...sectionsOf(o.before), ...sectionsOf(o.after)]) {
-    const bytes = s.lines.join('\n').replace(/\n+$/, '');
-    if (bytes.trim() && !outside.includes(bytes)) found.push(`host bytes lost near "${bytes.slice(0, 40)}"`);
-  }
+  const bytesOf = (parts) => [...sectionsOf(parts.before), ...sectionsOf(parts.after)].map((s) => s.lines.join('\n'));
+  const expected = bytesOf(o).sort();
+  const actual = bytesOf(r).sort();
+  if (expected.length !== actual.length || expected.some((s, i) => s !== actual[i])) found.push('host sections lost, duplicated or altered');
+  const lead = (parts) => sectionsOf(parts.before)[0];
+  if (lead(o)?.heading === null && lead(o).lines.join('\n') !== lead(r)?.lines.join('\n')) found.push('leading preamble moved');
   return found;
 }
 
@@ -149,15 +160,32 @@ export function backupPath(file, now = new Date()) {
 }
 
 export function applyPlan(file, plan, approvedToken) {
-  const text = fs.readFileSync(file, 'utf8');
+  const text = readText(file, 'file');
   const rendered = render(text, plan);
   if (approvedToken !== tokenOf(rendered)) throw new AdoptError('token does not match the shown result; nothing written');
   const bad = violations(text, rendered);
   if (bad.length) throw new AdoptError(`refused: ${bad.join('; ')}`);
-  const backup = backupPath(file);
-  fs.copyFileSync(file, backup);
+  const backup = copyToFreshBackup(file);
   fs.writeFileSync(file, rendered);
   return backup;
+}
+
+const MAX_BACKUP_ATTEMPTS = 100;
+
+// EXCL so a second apply in the same second can never overwrite the first backup, the
+// only copy of the original. Any other failure aborts before the file is touched.
+function copyToFreshBackup(file) {
+  const base = backupPath(file);
+  for (let n = 0; n < MAX_BACKUP_ATTEMPTS; n++) {
+    const candidate = n === 0 ? base : `${base}.${n}`;
+    try {
+      fs.copyFileSync(file, candidate, fs.constants.COPYFILE_EXCL);
+      return candidate;
+    } catch (err) {
+      if (err.code !== 'EEXIST') throw new AdoptError(`backup failed (${err.code ?? err.message}); nothing written`);
+    }
+  }
+  throw new AdoptError('backup failed (no free backup name); nothing written');
 }
 
 function describeSections(text) {
@@ -166,15 +194,29 @@ function describeSections(text) {
   return { trigger: true, slots: SLOTS, sections };
 }
 
+function readText(path, what) {
+  if (!path) throw new AdoptError(`missing ${what} argument`);
+  try { return fs.readFileSync(path, 'utf8'); } catch (err) { throw new AdoptError(`cannot read ${what} ${path}: ${err.code ?? err.message}`); }
+}
+
+function readPlan(planFile) {
+  let plan;
+  try { plan = JSON.parse(readText(planFile, 'plan')); } catch (err) {
+    if (err instanceof AdoptError) throw err;
+    throw new AdoptError(`plan ${planFile} is not valid JSON`);
+  }
+  if (plan === null || typeof plan !== 'object' || Array.isArray(plan)) throw new AdoptError('plan must be a JSON object of section id to slot');
+  return plan;
+}
+
 function main([command, file, planFile, token]) {
-  const readPlan = () => JSON.parse(fs.readFileSync(planFile, 'utf8'));
-  if (command === 'sections') return console.log(JSON.stringify(describeSections(fs.readFileSync(file, 'utf8')), null, 1));
+  if (command === 'sections') return console.log(JSON.stringify(describeSections(readText(file, 'file')), null, 1));
   if (command === 'render') {
-    const rendered = render(fs.readFileSync(file, 'utf8'), readPlan());
+    const rendered = render(readText(file, 'file'), readPlan(planFile));
     process.stdout.write(rendered);
     return console.error(`approval token: ${tokenOf(rendered)}`);
   }
-  if (command === 'apply') return console.log(`backup: ${applyPlan(file, readPlan(), token)}`);
+  if (command === 'apply') return console.log(`backup: ${applyPlan(file, readPlan(planFile), token)}`);
   throw new AdoptError('usage: adopt-claude-md.mjs sections|render|apply <file> [plan.json] [token]');
 }
 

@@ -59,6 +59,8 @@ tests/.tmp/
 /docs/*
 !/docs/149/
 /docs/149/*
+!/docs/feat-040/
+/docs/feat-040/*
 !/docs/launch/
 /docs/launch/*
 !/docs/superpowers/
@@ -70,6 +72,8 @@ tests/.tmp/
 !/docs/149/after.png
 !/docs/149/before.png
 !/docs/RELEASE-CLOSEOUT.md
+!/docs/feat-040/after.png
+!/docs/feat-040/before.png
 !/docs/launch/LAUNCH-CHECKLIST.md
 !/docs/launch/RECORDING-SCRIPT.md
 !/docs/launch/SHOW-HN-DRAFT.md
