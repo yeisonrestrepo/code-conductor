@@ -57,6 +57,8 @@ tests/.tmp/
 !/.claude/memory/project.md
 !/.claude/settings.json
 /docs/*
+!/docs/149/
+/docs/149/*
 !/docs/launch/
 /docs/launch/*
 !/docs/superpowers/
@@ -65,6 +67,8 @@ tests/.tmp/
 /docs/superpowers/plans/*
 !/docs/superpowers/specs/
 /docs/superpowers/specs/*
+!/docs/149/after.png
+!/docs/149/before.png
 !/docs/RELEASE-CLOSEOUT.md
 !/docs/launch/LAUNCH-CHECKLIST.md
 !/docs/launch/RECORDING-SCRIPT.md
