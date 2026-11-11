@@ -213,6 +213,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-11-10-issue130-flow-append-eperm-design.md
 !/docs/superpowers/specs/2026-11-10-issue132-history-truncation-single-measure-design.md
 !/docs/superpowers/specs/2026-11-10-issue136-ops-f-keep-action-code-design.md
+!/docs/superpowers/specs/2026-11-10-pre-1-44-hardening-design.md
 # --- END tracked-surface block (BUG-042) ---
 
 # Kept for external writers. Both lines are redundant against the block above; each is
