@@ -19,7 +19,7 @@ Each task is red, then green, then commit. Tasks 1 to 4 are independent of each 
 
 ### Task 1 — OpenCode guard fails closed (FEAT-048; spec AC1-AC9)
 
-- [ ] [T-001] Plugin classification, argument checks, patch grammar and path confinement
+- [X] [T-001] Plugin classification, argument checks, patch grammar and path confinement
   - [X] [T-001-A] Modify `tests/hooks/opencode-guard.test.js`:
     - Add a `stubProject(policy)` helper. It scaffolds a project whose `.claude/hooks/pre-tool-use.mjs` is a stub that appends each stdin payload as one JSON line to `<dir>/payloads.jsonl`, then answers `deny` with reason `STUB DENY <file_path>` when `file_path` ends with `denied.txt`, and allows otherwise.
     - Add `payloads(dir)`, which reads that file.
@@ -72,23 +72,23 @@ Each task is red, then green, then commit. Tasks 1 to 4 are independent of each 
   - [X] [T-001-F2] Modify `.github/wiki/pages/Getting-Started.md:35`: the `--opencode` row says the plugin sends OpenCode's mapped calls (`bash`, `read`, `write`, `edit`, `multiedit`, the patch tool) to the guard, lets read-only tools through, and blocks every other tool.
   - [X] [T-001-G] Run `npx vitest run tests/tools/repo-invariants.test.js`: expect every test passed (the README-shape invariants).
   - [X] [T-001-H] `git add -u project-template/.opencode/plugin/conductor-guard.js tests/hooks/opencode-guard.test.js README.md .github/wiki/pages/Getting-Started.md docs/superpowers/specs/2026-11-10-feat048-opencode-guard-design.md docs/superpowers/plans/2026-11-10-pre-1-44-hardening.md`
-  - [ ] [T-001-I] `git commit -m "fix: fail the OpenCode guard closed on tools it cannot inspect [FEAT-048]"`
+  - [X] [T-001-I] `git commit -m "fix: fail the OpenCode guard closed on tools it cannot inspect [FEAT-048]"`
 
 ### Task 2 — reserved folders (FEAT-047; spec AC10)
 
 - [ ] [T-002] `checkDocDir` reserves `.claude/` except specs and plans, plus `.opencode`
-  - [ ] [T-002-A] Modify `tests/scripts/doc-locations.test.js`. In `describe('checkDocDir reserved folders …')`, add two tests:
+  - [X] [T-002-A] Modify `tests/scripts/doc-locations.test.js`. In `describe('checkDocDir reserved folders …')`, add two tests:
     - rejects: `.claude/skills`, `.claude/skills/x`, `.Claude/Skills`, `.claude/settings`, `.claude/rules`, `.opencode`, `.opencode/plugin`;
     - accepts: `.claude/specs`, `.claude/plans`, `.claude/specs/pillar-1`, `.Claude/Specs`, `.CLAUDE/plans/x`, `docs/specs`.
-  - [ ] [T-002-B] Run `npx vitest run tests/scripts/doc-locations.test.js`. Expected:
+  - [X] [T-002-B] Run `npx vitest run tests/scripts/doc-locations.test.js`. Expected:
     - red: the new "rejects" test;
     - green: the new "accepts" test and every existing test in the file.
-  - [ ] [T-002-C] Modify `scripts/doc-locations.mjs`:
+  - [X] [T-002-C] Modify `scripts/doc-locations.mjs`:
     - add `.opencode` to `RESERVED`;
     - in `reservedReason`, after the `RESERVED` lookup, return the spec's `.claude` reason when the folded value is at or under `.claude` and is not `.claude/specs`, `.claude/plans` or below them;
     - update the comment above `RESERVED`.
-  - [ ] [T-002-D] Run `npx vitest run tests/scripts/doc-locations.test.js tests/scripts/orchestrate.test.js`: expect every test passed (the orchestrate halts on `.claude/hooks` still hold).
-  - [ ] [T-002-E] `git add -u scripts/doc-locations.mjs tests/scripts/doc-locations.test.js docs/superpowers/plans/2026-11-10-pre-1-44-hardening.md`
+  - [X] [T-002-D] Run `npx vitest run tests/scripts/doc-locations.test.js tests/scripts/orchestrate.test.js`: expect every test passed (the orchestrate halts on `.claude/hooks` still hold).
+  - [X] [T-002-E] `git add -u scripts/doc-locations.mjs tests/scripts/doc-locations.test.js docs/superpowers/plans/2026-11-10-pre-1-44-hardening.md`
   - [ ] [T-002-F] `git commit -m "fix: reserve .claude except specs and plans, and .opencode, for recorded doc folders [FEAT-047]"`
 
 ### Task 3 — records guard from the base branch (FEAT-045; spec AC11)

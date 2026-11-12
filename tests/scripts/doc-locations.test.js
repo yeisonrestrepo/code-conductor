@@ -180,7 +180,10 @@ describe('checkDocDir boundary [FEAT-047 AC9]', () => {
   });
 
   it('compares reserved roots segment-wise', () => {
-    expect(checkDocDir('.claude/memoryx')).toBe('');
+    // .claude/memoryx is now refused by the .claude allowlist (pre-1.44.0 hardening), so the
+    // segment-wise acceptance is pinned on a reserved root outside .claude.
+    expect(checkDocDir('.conductorx')).toBe('');
+    expect(checkDocDir('.claude/memoryx')).not.toBe('');
     expect(checkDocDir('.github/specs')).not.toBe('');
     expect(checkDocDir('.claude/memory')).not.toBe('');
   });
@@ -203,12 +206,31 @@ describe('checkDocDir reserved folders [FEAT-047 AC9, review #120]', () => {
     expect(checkDocDir(value)).not.toBe('');
   });
 
+  // Pre-1.44.0 hardening: inside .claude only specs and plans may hold documents, and
+  // .opencode holds the OpenCode guard.
+  it.each([
+    '.claude/skills', '.claude/skills/x', '.Claude/Skills', '.claude/settings', '.claude/rules',
+    '.opencode', '.opencode/plugin',
+  ])('rejects %s, which holds agent instructions or guard code', (value) => {
+    expect(checkDocDir(value)).not.toBe('');
+  });
+
+  it.each([
+    '.claude/specs', '.claude/plans', '.claude/specs/pillar-1', '.Claude/Specs', '.CLAUDE/plans/x', 'docs/specs',
+  ])('still accepts %s', (value) => {
+    expect(checkDocDir(value)).toBe('');
+  });
+
+  it.each(['.claude/hooksx', '.claude/specsx', '.claude/plans-old'])('compares the .claude allowlist segment-wise: rejects %s', (value) => {
+    expect(checkDocDir(value)).not.toBe('');
+  });
+
   it('names the reserved folder a parent covers', () => {
     expect(checkDocDir('.claude')).toMatch(/\.claude\/memory/);
     expect(checkDocDir('.claude/hooks')).toMatch(/reserved `\.claude\/hooks`/);
   });
 
-  it.each(['.claude/specs', '.claude/plans', 'docs/scripts', 'scriptsx', '.githubx', '.claude/hooksx', 'docs/specs/'])(
+  it.each(['.claude/specs', '.claude/plans', 'docs/scripts', 'scriptsx', '.githubx', '.opencodex', 'docs/specs/'])(
     'still accepts %s', (value) => {
       expect(checkDocDir(value)).toBe('');
     },
