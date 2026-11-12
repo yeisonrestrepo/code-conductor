@@ -13,9 +13,10 @@ permissions:
 
 jobs:
   records-guard:
-    # Exempt: the owner's own PRs, and the release App's PRs on release/* branches (the
-    # release-branches ruleset reserves pushes to release/* for that App). Collaborators are not.
-    if: github.event.pull_request.user.login != github.repository_owner && !(github.event.pull_request.user.login == 'cc-lane-bot[bot]' && startsWith(github.event.pull_request.head.ref, 'release/'))
+    # Exempt: the owner's own PRs, and the release App's PRs on release/* and records/* branches
+    # (the release-branches and records-branches rulesets reserve pushes there for that App).
+    # Collaborators are not.
+    if: github.event.pull_request.user.login != github.repository_owner && !(github.event.pull_request.user.login == 'cc-lane-bot[bot]' && (startsWith(github.event.pull_request.head.ref, 'release/') || startsWith(github.event.pull_request.head.ref, 'records/')))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

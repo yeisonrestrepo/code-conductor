@@ -67,7 +67,9 @@ without review of its content:
   item at a time, from `main`.
 - **Never create release branches, tags, or GitHub Releases.** `release/*`
   branches are created only by the maintainer's release App and are
-  protected by the `release-branches` ruleset. Releases are cut by the
+  protected by the `release-branches` ruleset; `records/*` branches are
+  likewise created only by that App and protected by the
+  `records-branches` ruleset. Releases are cut by the
   owner from `main` after each item merges through review.
 - **Never mint ids.** The id ceiling is derived from the records on both
   CI legs; a self-assigned id collides with it by construction.
@@ -92,7 +94,7 @@ owner in the batch release that lands the PR:
 
 A PR that carries them conflicts with every other open PR as soon as one
 release lands, so they are dropped on landing and written owner-side.
-The `Records guard` workflow (`tools/records-guard.mjs`) fails any PR that changes one of these records, except the README Known-limits lines, and its message names the file and the rule. It skips the owner's PRs and the release App's PRs on `release/*` branches, which the `release-branches` ruleset reserves for that App. It runs from the base branch (`pull_request_target`), so a PR cannot change the check it is judged by.
+The `Records guard` workflow (`tools/records-guard.mjs`) fails any PR that changes one of these records, except the README Known-limits lines, and its message names the file and the rule. It skips the owner's PRs and the release App's PRs on `release/*` and `records/*` branches, which the `release-branches` and `records-branches` rulesets reserve for that App. It runs from the base branch (`pull_request_target`), so a PR cannot change the check it is judged by.
 
 Three more rules bind the work itself:
 
