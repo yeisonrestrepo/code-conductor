@@ -700,7 +700,7 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 * **Acceptance Criteria:** Topics and keywords are set and committed before the first post goes out (this item is a launch checklist prerequisite); `npm view` shows the keywords; the GitHub About line states what the project is in one sentence without a claim the repo cannot back.
 
 ### [ ] `[FEAT-039]` Superpowers Auto-Install via the Claude Code Plugin CLI
-* **Description:** Close the last manual dependency step. The installer runs `claude plugin install superpowers@claude-plugins-official` (the official Anthropic-managed marketplace, so no marketplace registration step is needed) as part of `code-conductor` setup, replacing the README instruction that tells the user to install it by hand from `/plugin` before `/cc-spec`, `/cc-plan`, `/cc-debug`, `/cc-refactor`, `/cc-review` and `/cc-test` can work.
+* **Description:** Intake of issue #148. Close the last manual dependency step. The installer runs `claude plugin install superpowers@claude-plugins-official` (the official Anthropic-managed marketplace, so no marketplace registration step is needed) as part of `code-conductor` setup, replacing the README instruction that tells the user to install it by hand from `/plugin` before `/cc-spec`, `/cc-plan`, `/cc-debug`, `/cc-refactor`, `/cc-review` and `/cc-test` can work.
 * **Impact:** A fresh install goes from "npm install plus a manual plugin step you discover when a Skill() call fails" to one command. This is the dependency whose absence breaks six commands, so automating it removes the single worst first-run failure mode the project has.
 * **Components Affected:** `bin/code-conductor.mjs` (new setup step beside the hook merges), a new `lib/installer/plugins.mjs`, `tests/installer/` (stub `claude` binary on PATH, per the graphify-refresh stub-interpreter precedent), README dependencies table (the superpowers row changes from manual step to installer-handled with a manual fallback line), CHANGELOG.
 * **Acceptance Criteria:** Fail-open end to end, per the `conductor-db.mjs` convention: no `claude` binary on PATH, an older Claude Code whose CLI lacks the `plugin` subcommand, a network failure, or a marketplace schema error each degrade to one visible line printing the manual command (`/plugin install superpowers@claude-plugins-official`) and exit 0; the installer never fails because of this step. The call is bounded by a timeout (the `curl --max-time 5` precedent) and never runs detached input prompts. Idempotent: an already-installed superpowers is treated as success, and two consecutive installer runs produce the same end state. Interactive TTY runs confirm before installing (the `[FEAT-037]` consent rule: third-party code is offered, never silently executed); non-interactive runs install only under an explicit `--with-plugins` style flag and otherwise print the manual command. The exact plugin spec string `superpowers@claude-plugins-official` lives in one exported constant asserted by test, so a marketplace rename is a one-line change caught by CI rather than a silent drift.
@@ -1095,6 +1095,93 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Acceptance: the hook resolves from the project root regardless of
   cwd on Windows, WSL and POSIX, and a test runs it from a
   subdirectory.
+
+### [ ] `[BUG-069]` Installer overwrites an existing OpenCode guard plugin without a backup
+
+- Symptom: with `--opencode`, lib/installer/deploy.mjs copies
+  `.opencode/plugin/conductor-guard.js` into the project (the
+  `.opencode` entry handled around lines 241-263, per the issue). If
+  the file already exists, for example after a user edited it, it is
+  overwritten without a backup, unlike the merged files the installer
+  backs up.
+- Exposed consumers: only users who opted into the OpenCode plugin;
+  the flag is opt-in.
+- Fix shape suggested by the issue: apply the same
+  backup-before-overwrite logic the installer uses for merged files,
+  and report the backup path.
+- Intake of issue #164; reported by the automated security review of
+  the 1.44.0 release candidate (#157).
+
+### [ ] `[BUG-070]` GitHub Actions pinned by tag instead of commit SHA in the CI and publish workflows
+
+- Symptom: .github/workflows/records-guard.yml uses
+  `actions/checkout@v7` (line 22) and `actions/setup-node@v7`
+  (line 29), pinned by tag (per the issue). A tag can be moved; a
+  commit SHA cannot.
+- Risk is low per the issue: the workflow runs on
+  `pull_request_target` with a read-only token and no secrets, and
+  both actions are first-party.
+- Fix shape suggested by the issue: pin both actions to full commit
+  SHAs with the version as a comment, and consider the same for
+  test.yml and publish.yml.
+- Intake of issue #163; reported by the automated security review of
+  the 1.44.0 release candidate (#157).
+
+### [ ] `[BUG-071]` OpenCode guard evaluates bash commands without the tool's working directory
+
+- Symptom: project-template/.opencode/plugin/conductor-guard.js maps
+  OpenCode's `bash` call to Claude's `Bash` payload with `command`
+  only (line 91, per the issue). If OpenCode's `bash` tool accepts a
+  working-directory argument, the guard evaluates the command as if
+  it ran in the project root while it actually runs elsewhere.
+- Impact is limited to Guard 3's patterns (Guard 7 does not apply
+  under OpenCode, where `task` is blocked). OpenCode's exact `bash`
+  schema has not been verified against a running OpenCode.
+- Fix shape suggested by the issue: block a `bash` call that carries
+  a working-directory argument, or forward it as the payload's `cwd`
+  once the argument name is verified.
+- Intake of issue #162; reported by the automated security review of
+  the 1.44.0 release candidate (#157).
+
+### [ ] `[BUG-072]` Spec and plan folder deny list misses root dot-directories and bin, lib and tools
+
+- Symptom: scripts/doc-locations.mjs (`RESERVED`, line 31, per the
+  issue) is a deny list. `.claude/` is an allowlist since the
+  pre-1.44.0 hardening (only `.claude/specs` and `.claude/plans`), but
+  outside `.claude` the list misses folders that hold auto-executed
+  configuration or code: `.husky`, `.vscode`, `.devcontainer`, and
+  `bin`, `lib`, `tools`.
+- A `- Specs:` or `- Plans:` line naming one of them makes it the
+  spec or plan agent's Guard 5 write scope. Exploiting it requires
+  that line in the project CLAUDE.md, which that project's maintainer
+  accepts, so the impact is limited.
+- Fix shape suggested by the issue: reserve every root dot-directory
+  other than `.claude/specs` and `.claude/plans`, plus `bin`, `lib`
+  and `tools`, or move document folders to an explicit allowlist.
+- Intake of issue #161; reported by the automated security review of
+  the 1.44.0 release candidate (#157).
+
+### [ ] `[BUG-073]` Publish job installs and runs dev dependencies in the job holding the npm OIDC credential
+
+- Symptom: .github/workflows/publish.yml runs everything in one job:
+  it requests `id-token: write` (line 12), then runs `npm ci`
+  (line 26) and `npx vitest run` (line 33) before
+  `npm publish --provenance` (line 49), per the issue. Every dev
+  dependency executes in the job that can mint the npm publishing
+  credential and that produces the published tarball.
+- Per the issue, `npm audit --package-lock-only` reports high and
+  critical advisories in the dev dependency tree (the `vitest`
+  chain). Runtime dependencies are empty, so nothing reaches users at
+  install time; the exposure is the publish job itself.
+- Fix shape suggested by the issue: split into a `verify` job
+  (`npm ci`, tests, version checks, no `id-token`) and a `publish`
+  job (`needs: verify`, `id-token: write`, no dependency install,
+  `npm publish --provenance --access public --ignore-scripts`; the
+  package has no build step); upgrade `vitest` to a release line
+  without the current advisories; keep the `npm-publish` environment
+  and the tag-only deployment rule.
+- Intake of issue #160; reported by the automated security review of
+  the 1.44.0 release candidate (#157).
 
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
