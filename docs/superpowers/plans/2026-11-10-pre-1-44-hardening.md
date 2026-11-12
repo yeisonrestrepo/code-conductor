@@ -132,7 +132,7 @@ Each task is red, then green, then commit. Tasks 1 to 4 are independent of each 
 
 ### Task 4 — CODEOWNERS (spec AC12)
 
-- [ ] [T-004] Path pattern, bot only
+- [X] [T-004] Path pattern, bot only
   - [X] [T-004-A] Modify `tests/tools/repo-invariants.test.js`: add "gives CODEOWNERS one path-patterned owner line" to `describe('this repository, at every commit')`. Its non-comment, non-blank lines must equal exactly `['* @cc-reviewer-bot']`, compared after trimming trailing whitespace.
   - [X] [T-004-B] Run `npx vitest run tests/tools/repo-invariants.test.js`. Expected:
     - red: the new test;
@@ -140,13 +140,13 @@ Each task is red, then green, then commit. Tasks 1 to 4 are independent of each 
   - [X] [T-004-C] Modify `.github/CODEOWNERS`: replace the line `@cc-reviewer-bot` with `* @cc-reviewer-bot`, and keep the comment line.
   - [X] [T-004-D] Run `npx vitest run tests/tools/repo-invariants.test.js`: expect every test passed.
   - [X] [T-004-E] `git add -u .github/CODEOWNERS tests/tools/repo-invariants.test.js docs/superpowers/plans/2026-11-10-pre-1-44-hardening.md`
-  - [ ] [T-004-F] `git commit -m "fix: give CODEOWNERS the path pattern that makes it take effect"`
+  - [X] [T-004-F] `git commit -m "fix: give CODEOWNERS the path pattern that makes it take effect"`
 
 ### Task 5 — verify, precondition, PR
 
 - [ ] [T-005] Full suite, rollout precondition, pull request
-  - [ ] [T-005-A] Run `npx vitest run`: expect every file passed, with the same skip count as `main`.
-  - [ ] [T-005-B] Run `node tools/version-gate.mjs` and `node tools/record-parity.mjs`: expect `VERSION_GATE_OK 1.43.0` and `RECORD_PARITY_OK`. This PR changes no version location.
+  - [X] [T-005-A] Run `npx vitest run`: expect every file passed, with the same skip count as `main`.
+  - [X] [T-005-B] Run `node tools/version-gate.mjs` and `node tools/record-parity.mjs`: expect `VERSION_GATE_OK 1.43.0` and `RECORD_PARITY_OK`. This PR changes no version location.
   - [ ] [T-005-C] Owner action, then confirm: the owner creates the `release-branches` ruleset:
     - branch target `release/*`;
     - restrict creations, updates and deletions; block force pushes;
