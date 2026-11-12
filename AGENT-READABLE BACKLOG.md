@@ -1047,6 +1047,113 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   leg.
 - Filed from issue #75.
 
+### [ ] `[BUG-069]` Records Guard Fails Release App Intake PRs on records Branches
+
+- Symptom: the issue triage opens intake PRs as `cc-lane-bot[bot]`
+  from `records/intake-…` branches, but
+  `.github/workflows/records-guard.yml` exempts that App only on
+  `release/*`, so every intake PR shows a red (non-required) Records
+  guard check.
+- Fix shape proposed by the issue: extend the App exemption clause to
+  `records/*` as well as `release/*`, leaving the rest of the workflow
+  unchanged (`pull_request_target`, merge ref as data, `HEAD^2`
+  check, base checker); pin the new clause with both prefixes in
+  `tests/tools/records-guard.test.js`, keeping the `author_association`
+  / `head_ref` absence assertions; name `records/*` and the
+  `records-branches` ruleset in `CONTRIBUTING.md`; add a dated
+  amendment line to Ruling 2 of the FEAT-045 spec.
+- Precondition (repository setting, owner only): a `records-branches`
+  ruleset on `refs/heads/records/*` mirroring `release-branches`
+  (restrict creation, update, deletion; block force pushes; bypass
+  only the `cc-lane-bot` App). Without it a collaborator could push
+  commits onto an App-opened `records/` branch that would skip the
+  guard; as of filing it does not exist, so the fix must not merge
+  before it does.
+- Intake of issue #165.
+
+### [ ] `[BUG-070]` Installer Overwrites an Existing OpenCode Guard Plugin Without a Backup
+
+- Symptom: with `--opencode`, `lib/installer/deploy.mjs` copies
+  `.opencode/plugin/conductor-guard.js` into the project (the
+  `.opencode` entry, around lines 241-263). An existing file, for
+  example one the user edited, is overwritten without a backup,
+  unlike the merged files the installer backs up.
+- Exposure: the flag is opt-in, so only users who chose the OpenCode
+  plugin are affected.
+- Fix shape proposed by the issue: apply the installer's
+  backup-before-overwrite logic for merged files and report the backup
+  path.
+- Reported by the automated security review of the 1.44.0 release
+  candidate (#157). Intake of issue #164.
+
+### [ ] `[BUG-071]` Records Guard Workflow Pins GitHub Actions by Movable Tag Instead of Commit SHA
+
+- Symptom: `.github/workflows/records-guard.yml` uses
+  `actions/checkout@v7` (line 22) and `actions/setup-node@v7` (line
+  29), pinned by tag; a tag can be moved, a commit SHA cannot.
+- Exposure: low per the issue; the workflow runs on
+  `pull_request_target` with a read-only token and no secrets, and both
+  actions are first-party.
+- Fix shape proposed by the issue: pin both actions to full commit
+  SHAs with the version as a comment, and consider the same for
+  `test.yml` and `publish.yml`.
+- Reported by the automated security review of the 1.44.0 release
+  candidate (#157). Intake of issue #163.
+
+### [ ] `[BUG-072]` OpenCode Guard Does Not Forward the Bash Tool Working Directory
+
+- Symptom: `project-template/.opencode/plugin/conductor-guard.js` maps
+  OpenCode's `bash` call to Claude's `Bash` payload with `command` only
+  (line 91). If OpenCode's `bash` tool accepts a working-directory
+  argument, the guard evaluates the command as if it ran in the
+  project root while it actually runs elsewhere.
+- Exposure: limited to Guard 3's patterns (Guard 7 does not apply
+  under OpenCode, where `task` is blocked); OpenCode's exact `bash`
+  schema has not been verified against a running OpenCode.
+- Fix shape proposed by the issue: block a `bash` call that carries a
+  working-directory argument, or forward it as the payload's `cwd`
+  once the argument name is verified.
+- Reported by the automated security review of the 1.44.0 release
+  candidate (#157). Intake of issue #162.
+
+### [ ] `[BUG-073]` Spec and Plan Folder Deny List Misses Root Dot-Directories and bin, lib, tools
+
+- Symptom: `scripts/doc-locations.mjs` (`RESERVED`, line 31) is a deny
+  list. Inside `.claude/` an allowlist applies since the pre-1.44.0
+  hardening (only `.claude/specs` and `.claude/plans`), but outside it
+  the list misses folders holding auto-executed configuration or code:
+  `.husky`, `.vscode`, `.devcontainer`, and `bin`, `lib`, `tools`. A
+  `- Specs:` or `- Plans:` line naming one of them makes it the spec or
+  plan agent's Guard 5 write scope.
+- Exposure: limited; exploiting it requires that line in the project
+  `CLAUDE.md`, which that project's maintainer accepts.
+- Fix shape proposed by the issue: reserve every root dot-directory
+  other than `.claude/specs` and `.claude/plans`, plus `bin`, `lib` and
+  `tools`, or move document folders to an explicit allowlist.
+- Reported by the automated security review of the 1.44.0 release
+  candidate (#157). Intake of issue #161.
+
+### [ ] `[BUG-074]` Publish Job Runs Dev Dependencies in the Job Holding the npm OIDC Credential
+
+- Symptom: `.github/workflows/publish.yml` runs everything in one job:
+  it requests `id-token: write` (line 12), then runs `npm ci` (line 26)
+  and `npx vitest run` (line 33) before `npm publish --provenance`
+  (line 49). Every dev dependency executes in the job that can mint
+  the npm publishing credential and produces the published tarball.
+- Exposure: `npm audit --package-lock-only` reports high and critical
+  advisories in the dev dependency tree (the `vitest` chain). Runtime
+  dependencies are empty, so nothing reaches users at install time;
+  the exposure is the publish job itself.
+- Fix shape proposed by the issue: split into a `verify` job (`npm
+  ci`, tests, version checks, no `id-token`) and a `publish` job
+  (`needs: verify`, `id-token: write`, no dependency install, `npm
+  publish --provenance --access public --ignore-scripts`; the package
+  has no build step); upgrade `vitest` to a release line without the
+  current advisories; keep the `npm-publish` environment and the
+  tag-only deployment rule.
+- Reported by the automated security review of the 1.44.0 release
+  candidate (#157). Intake of issue #160.
+
 ### [X] `[BUG-060]` Installer rejects a supported Node under npx on Windows: env.node aliases npm's NODE path
 * **DONE, shipped as `1.39.2` on 2026-10-20.** `run()` takes the version from its options bag, `nodeVersion = process.versions.node`, beside `cwd` and `log`; the floor check and its message read that value, and `bin/code-conductor.mjs` no longer contains `env.node`. The recorded fix shape (a namespaced env key) was superseded at spec time by the options injection, so no environment key decides the version. Five `[BUG-060]` tests in `tests/installer/cli.test.js` replace the old `env.node` refusal test. Spec: `docs/superpowers/specs/2026-10-20-bug060-node-env-alias-design.md`; plan: `docs/superpowers/plans/2026-10-20-bug060-node-env-alias.md`.
 
