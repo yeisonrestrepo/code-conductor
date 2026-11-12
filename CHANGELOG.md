@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.44.1] - 2026-11-12
+
+### Changed
+- `records-guard.yml` skips the release App's PRs on `records/*` as well as `release/*`, so the issue triage's backlog intake PRs from `records/intake-…` branches no longer show a red Records guard check; the exemption is still granted by author identity and the prefix only narrows it. `tests/tools/records-guard.test.js` pins the new clause and the CONTRIBUTING wording, `CONTRIBUTING.md` names `records/*` and the `records-branches` ruleset, and the FEAT-045 spec carries a dated amendment. CI-only, no id. Landed from PR #166 (Ludocius), intake of issue #165.
+
 ## [1.44.0] - 2026-11-12
 
 ### Added
