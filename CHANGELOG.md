@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.44.1] - 2026-11-12
+
+### Changed
+- `records-guard.yml` also skips the release App's (`cc-lane-bot[bot]`) PRs on `records/*` branches, so the issue triage's backlog intake PRs from `records/intake-…` no longer show a red Records guard check; the exemption is still keyed on the App's identity, with the branch prefix only narrowing it, and the owner clause, merge-ref-as-data checkout and base-branch checker are unchanged. The `the workflow` test pins both prefixes, `CONTRIBUTING.md` names `records/*` and the `records-branches` ruleset that reserves it for the App, and the FEAT-045 spec carries a dated amendment; CI-only, no id. Landed from PR #166 (Ludocius), intake of issue #165.
+
 ## [1.44.0] - 2026-11-12
 
 ### Added
