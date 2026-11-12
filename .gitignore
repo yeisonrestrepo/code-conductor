@@ -57,6 +57,10 @@ tests/.tmp/
 !/.claude/memory/project.md
 !/.claude/settings.json
 /docs/*
+!/docs/149/
+/docs/149/*
+!/docs/feat-040/
+/docs/feat-040/*
 !/docs/launch/
 /docs/launch/*
 !/docs/superpowers/
@@ -65,7 +69,11 @@ tests/.tmp/
 /docs/superpowers/plans/*
 !/docs/superpowers/specs/
 /docs/superpowers/specs/*
+!/docs/149/after.png
+!/docs/149/before.png
 !/docs/RELEASE-CLOSEOUT.md
+!/docs/feat-040/after.png
+!/docs/feat-040/before.png
 !/docs/launch/LAUNCH-CHECKLIST.md
 !/docs/launch/RECORDING-SCRIPT.md
 !/docs/launch/SHOW-HN-DRAFT.md
@@ -147,6 +155,7 @@ tests/.tmp/
 !/docs/superpowers/plans/2026-11-10-issue132-history-truncation-single-measure.md
 !/docs/superpowers/plans/2026-11-10-issue136-ops-f-keep-action-code.md
 !/docs/superpowers/plans/2026-11-10-pre-1-44-hardening.md
+!/docs/superpowers/plans/2026-11-11-feat040-adopt-claude-md.md
 !/docs/superpowers/specs/2026-06-09-bug001-cc-compact-design.md
 !/docs/superpowers/specs/2026-06-09-bug002-spec-read-budget-design.md
 !/docs/superpowers/specs/2026-06-11-bug006-feat018-bash-scan-guard-design.md
@@ -215,6 +224,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-11-10-issue132-history-truncation-single-measure-design.md
 !/docs/superpowers/specs/2026-11-10-issue136-ops-f-keep-action-code-design.md
 !/docs/superpowers/specs/2026-11-10-pre-1-44-hardening-design.md
+!/docs/superpowers/specs/2026-11-11-feat040-adopt-claude-md-design.md
 # --- END tracked-surface block (BUG-042) ---
 
 # Kept for external writers. Both lines are redundant against the block above; each is
