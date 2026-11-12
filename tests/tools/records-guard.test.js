@@ -536,9 +536,11 @@ describe('the workflow', () => {
     for (const l of runLines) expect(l).not.toContain('${{');
   });
 
-  it('names the release-branches ruleset in CONTRIBUTING and drops the no-release-flow claim', () => {
+  it('names the release-branches and records-branches rulesets in CONTRIBUTING and drops the no-release-flow claim', () => {
     const text = readFileSync(join(REPO_ROOT, 'CONTRIBUTING.md'), 'utf8');
     expect(text).toContain('release-branches');
+    expect(text).toContain('records-branches');
+    expect(text).toContain("App's PRs on `release/*` and `records/*` branches");
     expect(text).not.toContain('There is no `release/*` branch flow');
   });
 
