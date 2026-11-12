@@ -24,6 +24,14 @@ const section = (text, heading) => {
 const COUNT_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
 
 describe('this repository, at every commit', () => {
+  // Pre-1.44.0 hardening: a line without a path pattern assigns no owner, so code-owner review
+  // silently stops applying. One line, bot only, by owner decision.
+  it('gives CODEOWNERS one path-patterned owner line', () => {
+    const lines = read('.github/CODEOWNERS').replace(/\r\n/g, '\n').split('\n')
+      .map((l) => l.replace(/\s+$/, '')).filter((l) => l && !l.startsWith('#'));
+    expect(lines).toEqual(['* @cc-reviewer-bot']);
+  });
+
   it('agrees with VERSION at all five version locations', () => {
     const r = compare(readLocations(ROOT));
     expect(r.disagreements).toEqual([]);

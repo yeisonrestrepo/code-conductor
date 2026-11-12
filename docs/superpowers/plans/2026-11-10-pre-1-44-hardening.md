@@ -93,7 +93,7 @@ Each task is red, then green, then commit. Tasks 1 to 4 are independent of each 
 
 ### Task 3 — records guard from the base branch (FEAT-045; spec AC11)
 
-- [ ] [T-003] `pull_request_target`, base checker, current merge ref, release exemption
+- [X] [T-003] `pull_request_target`, base checker, current merge ref, release exemption
   - [X] [T-003-A] Modify `tests/tools/records-guard.test.js`, `describe('the workflow')`:
     - "triggers on pull_request only" becomes "triggers on pull_request_target only, on main", and still forbids `push`, `pull_request:`, `workflow_dispatch`, `schedule` and `workflow_run`.
     - The owner test also asserts:
@@ -128,18 +128,18 @@ Each task is red, then green, then commit. Tasks 1 to 4 are independent of each 
     - add a dated amendment line pointing to the hardening spec.
   - [X] [T-003-F] Run `npx vitest run tests/tools/records-guard.test.js`: expect every test passed.
   - [X] [T-003-G] `git add -u .github/workflows/records-guard.yml tests/tools/records-guard.test.js CONTRIBUTING.md docs/superpowers/specs/2026-11-08-feat045-ci-records-guard-design.md docs/superpowers/plans/2026-11-10-pre-1-44-hardening.md`
-  - [ ] [T-003-H] `git commit -m "fix: run the records guard from the base branch and exempt release-App PRs [FEAT-045]"`
+  - [X] [T-003-H] `git commit -m "fix: run the records guard from the base branch and exempt release-App PRs [FEAT-045]"`
 
 ### Task 4 — CODEOWNERS (spec AC12)
 
 - [ ] [T-004] Path pattern, bot only
-  - [ ] [T-004-A] Modify `tests/tools/repo-invariants.test.js`: add "gives CODEOWNERS one path-patterned owner line" to `describe('this repository, at every commit')`. Its non-comment, non-blank lines must equal exactly `['* @cc-reviewer-bot']`, compared after trimming trailing whitespace.
-  - [ ] [T-004-B] Run `npx vitest run tests/tools/repo-invariants.test.js`. Expected:
+  - [X] [T-004-A] Modify `tests/tools/repo-invariants.test.js`: add "gives CODEOWNERS one path-patterned owner line" to `describe('this repository, at every commit')`. Its non-comment, non-blank lines must equal exactly `['* @cc-reviewer-bot']`, compared after trimming trailing whitespace.
+  - [X] [T-004-B] Run `npx vitest run tests/tools/repo-invariants.test.js`. Expected:
     - red: the new test;
     - green: every existing invariant.
-  - [ ] [T-004-C] Modify `.github/CODEOWNERS`: replace the line `@cc-reviewer-bot` with `* @cc-reviewer-bot`, and keep the comment line.
-  - [ ] [T-004-D] Run `npx vitest run tests/tools/repo-invariants.test.js`: expect every test passed.
-  - [ ] [T-004-E] `git add -u .github/CODEOWNERS tests/tools/repo-invariants.test.js docs/superpowers/plans/2026-11-10-pre-1-44-hardening.md`
+  - [X] [T-004-C] Modify `.github/CODEOWNERS`: replace the line `@cc-reviewer-bot` with `* @cc-reviewer-bot`, and keep the comment line.
+  - [X] [T-004-D] Run `npx vitest run tests/tools/repo-invariants.test.js`: expect every test passed.
+  - [X] [T-004-E] `git add -u .github/CODEOWNERS tests/tools/repo-invariants.test.js docs/superpowers/plans/2026-11-10-pre-1-44-hardening.md`
   - [ ] [T-004-F] `git commit -m "fix: give CODEOWNERS the path pattern that makes it take effect"`
 
 ### Task 5 — verify, precondition, PR
