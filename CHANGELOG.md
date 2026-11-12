@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.44.1] - 2026-11-12
+
+### Fixed
+- **[BUG-069]** Records guard exempts the release App's (`cc-lane-bot[bot]`) PRs on `records/*` branches as well as `release/*`, so the issue triage's backlog intake PRs no longer show a red check. Author identity still grants the exemption and the prefix only narrows it; the `pull_request_target` trigger, merge-ref checkout, `HEAD^2` check and base-copied checker are unchanged. CONTRIBUTING names `records/*` and the `records-branches` ruleset, and FEAT-045's spec carries the dated Ruling 2 amendment. Landed from PR #166 (Ludocius), intake of issue #165.
+
 ## [1.44.0] - 2026-11-12
 
 ### Added
