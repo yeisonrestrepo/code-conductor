@@ -502,10 +502,12 @@ const workflow = (name) =>
 const usesValues = (text) => new Set([...text.matchAll(/^\s*(?:-\s+)?uses:\s*(\S+)\s*$/gm)].map((m) => m[1]));
 
 describe('the workflow', () => {
-  it('triggers on pull_request only', () => {
+  // Pre-1.44.0 hardening: pull_request_target runs the workflow file from the base branch,
+  // so a PR can neither edit the gate nor run its own copy of the checker.
+  it('triggers on pull_request_target only, on main', () => {
     const text = workflow('records-guard.yml');
-    expect(text).toMatch(/^on:\n  pull_request:\n/m);
-    expect(text).not.toMatch(/^\s+(push|pull_request_target|workflow_dispatch|schedule|workflow_run):/m);
+    expect(text).toMatch(/^on:\n  pull_request_target:\n    branches: \[main\]\n/m);
+    expect(text).not.toMatch(/^\s+(push|pull_request|workflow_dispatch|schedule|workflow_run):/m);
   });
 
   it('uses the same action majors as test.yml', () => {
@@ -515,11 +517,29 @@ describe('the workflow', () => {
     for (const value of uses) expect(testUses.has(value)).toBe(true);
   });
 
-  it('fetches depth 2, reads contents only, and exempts the owner', () => {
+  it('checks out the merge ref at depth 2, reads contents only, and exempts the owner and release-App release PRs', () => {
     const text = workflow('records-guard.yml');
+    expect(text).toContain('ref: refs/pull/${{ github.event.pull_request.number }}/merge');
     expect(text).toContain('fetch-depth: 2');
+    expect(text).toContain('persist-credentials: false');
     expect(text).toMatch(/^permissions:\n  contents: read$/m);
-    expect(text).toContain('if: github.event.pull_request.user.login != github.repository_owner');
+    expect(text).toContain('github.event.pull_request.user.login != github.repository_owner');
+    expect(text).toContain("!(github.event.pull_request.user.login == 'cc-lane-bot[bot]' && startsWith(github.event.pull_request.head.ref, 'release/'))");
+  });
+
+  it('fails unless the merge ref is built on the PR head, with the SHA passed through env', () => {
+    const text = workflow('records-guard.yml');
+    expect(text).toMatch(/env:\n\s+HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
+    expect(text).toContain('test "$(git rev-parse HEAD^2)" = "$HEAD_SHA"');
+    const runLines = text.split('\n').filter((l) => /^\s+run:/.test(l));
+    expect(runLines.length).toBeGreaterThan(0);
+    for (const l of runLines) expect(l).not.toContain('${{');
+  });
+
+  it('names the release-branches ruleset in CONTRIBUTING and drops the no-release-flow claim', () => {
+    const text = readFileSync(join(REPO_ROOT, 'CONTRIBUTING.md'), 'utf8');
+    expect(text).toContain('release-branches');
+    expect(text).not.toContain('There is no `release/*` branch flow');
   });
 
   it('does not key on author_association or head_ref', () => {
@@ -528,7 +548,11 @@ describe('the workflow', () => {
     expect(text).not.toContain('head_ref');
   });
 
-  it('runs the guard against the merge commit first parent', () => {
-    expect(workflow('records-guard.yml')).toContain('node tools/records-guard.mjs --base HEAD^1 --head HEAD');
+  it('runs only the base copy of the checker against the merge commit first parent', () => {
+    const text = workflow('records-guard.yml');
+    expect(text).toContain('git show HEAD^1:tools/records-guard.mjs > "$RUNNER_TEMP/records-guard.mjs"');
+    expect(text).toContain('node "$RUNNER_TEMP/records-guard.mjs" --base HEAD^1 --head HEAD');
+    expect(text).not.toContain('node tools/');
+    expect(text).not.toMatch(/\bnpm\b/);
   });
 });

@@ -24,8 +24,12 @@ export const DIR_MAX = V3_CAPS['ops.scope'][1] - (GROUP_MAX + '/'.length + '/**'
 
 const CODE = 'ORCH_DOC_LOCATION_INVALID';
 // A recorded folder becomes the spec and plan agents' Guard 5 write scope, so it may not cover
-// the orchestrator write surface, git internals, or any folder that holds enforcement code.
-const RESERVED = ['.claude/memory', '.claude/hooks', '.claude/agents', '.claude/commands', '.claude/scripts', '.conductor', '.git', '.github', 'scripts'];
+// the orchestrator write surface, git internals, or any folder that holds enforcement code
+// (`.opencode` holds the OpenCode guard). Inside `.claude`, only specs and plans may hold
+// documents: everything else there is agent instructions or configuration (skills, settings,
+// rules), so the rule below it is an allowlist, not this deny list.
+const RESERVED = ['.claude/memory', '.claude/hooks', '.claude/agents', '.claude/commands', '.claude/scripts', '.conductor', '.git', '.github', '.opencode', 'scripts'];
+const CLAUDE_DOCS = ['.claude/specs', '.claude/plans'];
 const GROUP_RE = /^(#{1,5})\s+(phase|epic|pillar)\b[\s:#-]*(\d+)?[\s:.-]*(.*)$/i;
 const HEADING_RE = /^(#{1,6})\s/;
 
@@ -46,9 +50,14 @@ const overlaps = (a, b) => a === b || a.startsWith(`${b}/`) || b.startsWith(`${a
 function reservedReason(value) {
   const folded = value.toLowerCase();
   const base = RESERVED.find((entry) => overlaps(folded, entry));
-  if (!base) return '';
-  if (underRoot(folded, base)) return `sits in the reserved \`${base}\``;
-  return `covers the reserved \`${base}\``;
+  if (base) {
+    if (underRoot(folded, base)) return `sits in the reserved \`${base}\``;
+    return `covers the reserved \`${base}\``;
+  }
+  if (underRoot(folded, '.claude') && !CLAUDE_DOCS.some((ok) => underRoot(folded, ok))) {
+    return 'sits in `.claude`, where only `.claude/specs` and `.claude/plans` may hold documents';
+  }
+  return '';
 }
 
 export function checkDocDir(rel) {

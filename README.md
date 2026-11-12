@@ -396,7 +396,7 @@ Two cautions:
 
 ### OpenCode
 
-`--project --opencode` adds one file, `.opencode/plugin/conductor-guard.js`, an [OpenCode](https://opencode.ai) plugin. It does not copy the guard: before each `bash`, `read`, `write` or `edit` call it sends the call to the project's own `.claude/hooks/pre-tool-use.mjs`, in the payload Claude Code sends, and blocks the call when the guard denies it. A Claude Code install without the flag is unchanged.
+`--project --opencode` adds one file, `.opencode/plugin/conductor-guard.js`, an [OpenCode](https://opencode.ai) plugin. It does not copy the guard: before each `bash`, `read`, `write`, `edit`, `multiedit` or patch call it sends the call to the project's own `.claude/hooks/pre-tool-use.mjs`, in the payload Claude Code sends, and blocks the call when the guard denies it. Read-only tools pass, and every other tool is blocked, because the guard cannot inspect it. A Claude Code install without the flag is unchanged.
 
 This is the first slice of `[FEAT-048]` (issue #97), and it covers enforcement only:
 
@@ -405,7 +405,9 @@ This is the first slice of `[FEAT-048]` (issue #97), and it covers enforcement o
 | Guards 1, 2, 3 and 4 | Enforced. Guard 2's "file already exists" question blocks the write, because a plugin cannot ask you; the model is told to edit instead |
 | Guards 5, 6 and 7 (band roles, orchestrator run) | Not enforced for subagents: OpenCode does not tell the plugin which subagent made the call |
 | Guard warnings | Not shown |
-| `apply_patch`, `multiedit`, `task` and other tools | Not sent to the guard |
+| `patch`/`apply_patch`, `multiedit` | Sent to the guard; a patch is checked file by file, confined to the project, under a strict marker grammar |
+| `task`, `batch`, MCP and any other tool | Blocked: the guard cannot inspect them |
+| `glob`, `grep`, `list`, `webfetch`, `websearch`, `codesearch` and other read-only tools | Allowed, as on Claude Code |
 | `cc-*` commands, band agents, verbosity and context hooks | Not installed for OpenCode yet. OpenCode reads `CLAUDE.md` when there is no `AGENTS.md`, and loads `.claude/skills` |
 
 The plugin needs `node` on `PATH`. If the guard cannot run, the call is blocked and the reason names the guard's path. Checked against OpenCode 1.18.33 during the proof of concept; Codex CLI and Antigravity are not supported yet.

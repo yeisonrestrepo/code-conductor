@@ -3234,3 +3234,22 @@ Key `turn-count.txt` to the hook stdin `session_id` (`<id> <count>`); a missing 
 ## Release: 1.43.0 batch landing 2026-11-07
 
 Nine community PRs (author Luis) landed in one night; ids owner-minted at landing: FEAT-044 (#89, flow status line, three review rounds), FEAT-050 (#113+#115, -Project/-Verbosity aliases), FEAT-051 (#104, C4 wiki), BUG-062 (#105), BUG-063 (#102), BUG-064 (#101), BUG-065 (#111), BUG-066 (#103). Merge order resolved the shared anchors (.gitignore leaves, bin USAGE, both hook copies, deploy.mjs); the #94 fresh-scaffold baseline moved to pin FEAT-044's single flow report.
+
+## Spec: Pre-1.44.0 hardening (FEAT-045, FEAT-047, FEAT-048, CODEOWNERS) [2026-11-11]
+
+- **Spec:** `docs/superpowers/specs/2026-11-10-pre-1-44-hardening-design.md`, APPROVED 2026-11-11 at rev 3 after two owner review rounds.
+- **Origin:** the security review of the 1.44.0 candidate (release PR #151, declined; #155 superseded by this work) escalated four findings in unreleased code. No new id: each fix lands under the item it corrects.
+- **Fix:**
+  - The OpenCode guard fails closed. Mapped tools are `bash`, `read`, `write`, `edit`, `multiedit` and `patch`/`apply_patch`, the patch under a strict grammar with paths confined to `directory`. A fixed read-only list passes. `task`, `batch`, MCP and unknown tools are blocked.
+  - `checkDocDir` reserves `.claude/` except `specs`/`plans`, plus `.opencode`.
+  - records-guard moves to `pull_request_target`, runs only the base checker, checks the merge ref is current, and exempts `cc-lane-bot[bot]` on `release/*`, backed by the `release-branches` ruleset.
+  - CODEOWNERS becomes `* @cc-reviewer-bot`.
+- **Owner decisions:**
+  - Fail-closed covers MCP tools.
+  - `task` is blocked, because subagent hooks are unverifiable.
+  - Only the 1.x argument names are mapped.
+  - The release exemption amends FEAT-045 Ruling 2, and `pull_request_target` amends Ruling 4.
+  - CODEOWNERS is bot-only.
+- **Precondition:** the `release-branches` ruleset is active before merge.
+- **Out of scope:** OpenCode V2 names, re-enabling `task`, splitting `publish.yml` plus the `vitest` upgrade (a separate BUG), and the private `scripts/` fallback finding.
+
