@@ -1,6 +1,6 @@
 # Pre-1.44.0 hardening — design
 
-**Status:** Draft rev 3, awaiting owner approval (revs 1 and 2 amended per the owner's reviews of 2026-11-11)
+**Status:** APPROVED 2026-11-11 at rev 3 (revs 1 and 2 amended per the owner's reviews of 2026-11-11)
 **Items:** amends FEAT-045 (records guard), FEAT-047 (spec and plan locations) and FEAT-048 (OpenCode guard), all merged after `v1.43.0` and not yet released, plus `.github/CODEOWNERS`. No new id: each change lands under the item whose unreleased code it corrects.
 **Origin:** the security review of the 1.44.0 release candidate (everything executable merged since `v1.43.0`) returned ESCALATE with one major and three lower findings. The release was declined until they are fixed.
 
