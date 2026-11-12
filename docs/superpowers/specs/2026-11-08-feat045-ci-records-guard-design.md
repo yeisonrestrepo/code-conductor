@@ -1,6 +1,6 @@
 # FEAT-045: CI Records-Guard — Design
 
-> **Amended 2026-11-11** by `2026-11-10-pre-1-44-hardening-design.md`: the workflow runs on `pull_request_target` from the base branch (Ruling 4), and release-App PRs on `release/*` are exempt (Ruling 2).
+> **Amended 2026-11-11** by `2026-11-10-pre-1-44-hardening-design.md`: the workflow runs on `pull_request_target` from the base branch (Ruling 4), and release-App PRs on `release/*` are exempt (Ruling 2). **Amended 2026-11-12:** the same App's PRs on `records/*` are exempt too (Ruling 2), reserved for it by the `records-branches` ruleset.
 
 **Item:** `[FEAT-045]` CI Records-Guard: an External PR Touching Owner-Side Records Goes Red by Machine
 **Backlog:** `AGENT-READABLE BACKLOG.md:727-731` (intake of issue #65; ticket #123)
@@ -23,7 +23,7 @@ The owner delegated these rulings for this item. The spec implements them and do
    - backlog heading states and `* **DONE` lines (widened by Rulings 8 and 9).
 
    Edits to nearby text and lockfile changes that touch only dependencies must pass. POC reference: `poc-feat045/poc.mjs` in the session scratchpad.
-2. **Owner detection.** The workflow skips the check when `github.event.pull_request.user.login == github.repository_owner`. It never uses `author_association`, because collaborators stay bound by CONTRIBUTING. It never exempts a branch name. *(Amended 2026-11-11: it also skips a PR whose author is exactly `cc-lane-bot[bot]` and whose head branch starts with `release/`. Author identity grants that exemption, the branch prefix only narrows it, and the `release-branches` ruleset reserves pushes to `release/*` for that App, so a branch name alone still exempts nothing.)*
+2. **Owner detection.** The workflow skips the check when `github.event.pull_request.user.login == github.repository_owner`. It never uses `author_association`, because collaborators stay bound by CONTRIBUTING. It never exempts a branch name. *(Amended 2026-11-11: it also skips a PR whose author is exactly `cc-lane-bot[bot]` and whose head branch starts with `release/`. Author identity grants that exemption, the branch prefix only narrows it, and the `release-branches` ruleset reserves pushes to `release/*` for that App, so a branch name alone still exempts nothing.)* *(Amended 2026-11-12: the same App exemption also covers head branches starting with `records/`, the issue-triage intake branches, which the `records-branches` ruleset reserves for that App.)*
 3. **Script.** The logic lives in a zero-dependency Node ESM script under `tools/`, written in the style of `tools/skip-baseline.mjs`. It exports pure functions that have unit tests under `tests/`. The CLI reads base and head contents with `git show <rev>:<path>`, so it works offline. Failure messages name the file and one of two anchors:
    - `CONTRIBUTING.md#what-contributors-must-never-do` for a version or a release heading;
    - `CONTRIBUTING.md#records-are-owner-side` for a backlog flip or a DONE line.
@@ -128,9 +128,10 @@ permissions:
 
 jobs:
   records-guard:
-    # Exempt: the owner's own PRs, and the release App's PRs on release/* branches (the
-    # release-branches ruleset reserves pushes to release/* for that App). Collaborators are not.
-    if: github.event.pull_request.user.login != github.repository_owner && !(github.event.pull_request.user.login == 'cc-lane-bot[bot]' && startsWith(github.event.pull_request.head.ref, 'release/'))
+    # Exempt: the owner's own PRs, and the release App's PRs on release/* and records/* branches
+    # (the release-branches and records-branches rulesets reserve pushes there for that App).
+    # Collaborators are not.
+    if: github.event.pull_request.user.login != github.repository_owner && !(github.event.pull_request.user.login == 'cc-lane-bot[bot]' && (startsWith(github.event.pull_request.head.ref, 'release/') || startsWith(github.event.pull_request.head.ref, 'records/')))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

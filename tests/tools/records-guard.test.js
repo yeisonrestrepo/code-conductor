@@ -517,14 +517,14 @@ describe('the workflow', () => {
     for (const value of uses) expect(testUses.has(value)).toBe(true);
   });
 
-  it('checks out the merge ref at depth 2, reads contents only, and exempts the owner and release-App release PRs', () => {
+  it('checks out the merge ref at depth 2, reads contents only, and exempts the owner and release-App release and records PRs', () => {
     const text = workflow('records-guard.yml');
     expect(text).toContain('ref: refs/pull/${{ github.event.pull_request.number }}/merge');
     expect(text).toContain('fetch-depth: 2');
     expect(text).toContain('persist-credentials: false');
     expect(text).toMatch(/^permissions:\n  contents: read$/m);
     expect(text).toContain('github.event.pull_request.user.login != github.repository_owner');
-    expect(text).toContain("!(github.event.pull_request.user.login == 'cc-lane-bot[bot]' && startsWith(github.event.pull_request.head.ref, 'release/'))");
+    expect(text).toContain("!(github.event.pull_request.user.login == 'cc-lane-bot[bot]' && (startsWith(github.event.pull_request.head.ref, 'release/') || startsWith(github.event.pull_request.head.ref, 'records/')))");
   });
 
   it('fails unless the merge ref is built on the PR head, with the SHA passed through env', () => {
