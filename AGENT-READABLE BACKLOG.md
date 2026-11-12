@@ -72,6 +72,12 @@ This document is the single source of truth for the evolutionary engineering of 
 * **Components Affected:** `.claude/system-prompt` (Removal), `project-template/CLAUDE.md` (Merger)
 * **Acceptance Criteria:** Eradicate the standalone static prompt file and integrate its behavioral core principles into the dynamic compilation templates of `CLAUDE.md`.
 
+### [ ] `[FEAT-052]` Orchestrate Role Subagents Omit Inherited CLAUDE.md Layers
+* **Description:** Intake of issue #176. Role subagents dispatched by `/cc-orchestrate` inherit every CLAUDE.md layer (user, parent folder, project), about 275 non-empty lines under a ~25-line role prompt, and several inherited rules contradict the roles (run `/cc-spec` first, spawn Explore before modifying a file, confirm before writes, tag every response). The issue's headless POC showed a default subagent quoting all three layers verbatim while one with `omitClaudeMd: true` (a real agent setting in Claude Code 2.1.323) found none; `[CHANGES]` appeared in 1/3 default hand-backs and 0/3 with omit, and FEAT-045 code hand-backs show `[CHANGES]`, `[BUG]`, `[VALIDATION]` and the 30-line rule leaking.
+* **Impact:** A role subagent should see only its role prompt and brief, plus the hooks that enforce the rules. Exposure is confirmed; the size of the behavioral effect is not measurable at N=3. Must-hold rules are already enforced by hooks (Guards 5-7), so omitting CLAUDE.md from roles would not drop enforcement.
+* **Components Affected:** The role agent definitions under `.claude/agents/` dispatched by `/cc-orchestrate`. No change to the band flow or the SNAP contract is implied.
+* **Acceptance Criteria:** Role subagents run without the inherited CLAUDE.md layers; it is checked first whether any role relies on project CLAUDE.md content, and any such content reaches it through its brief instead.
+
 ---
 
 ## PILLAR 2: LOCAL PERSISTENCE AND STATE ENGINE
@@ -1182,6 +1188,49 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   and the tag-only deployment rule.
 - Intake of issue #160; reported by the automated security review of
   the 1.44.0 release candidate (#157).
+
+### [ ] `[BUG-074]` Role Definitions Disagree on What Done Means for a Task's Tests
+
+- Symptom: the role definitions give three different gates for the
+  same suite result (per the issue): `.claude/agents/code.md:19`
+  accepts tests that ran and were reported, red suite allowed;
+  `.claude/agents/plan.md:11` requires each task to end green;
+  `.claude/agents/qa.md:19` passes only on exit 0. The brief template
+  in `cc-orchestrate.md` (~L140) also tells every role "Verify your
+  work", including spec, plan and audit, which have no shell.
+- Reproduced by the issue with one deliberately failing test:
+  `npm test` exited 1 (1 failed, 2308 passed); under `code.md` that is
+  still `build_executed` with plan boxes ticked, under `plan.md` the
+  task is not done, and under `qa.md` the run can never reach
+  `verify_pass`. Live runs match: FEAT-045 tasks handed back on red
+  suites, and FEAT-047 ended without qa.
+- Expected per the issue: one definition of done for a task's tests,
+  shared by plan, code and qa, with a way to declare known
+  pre-existing failures (e.g. #118, which made every live run exit 1).
+  No change to the band flow or the SNAP contract is implied.
+- Intake of issue #177.
+
+### [ ] `[BUG-075]` orchestrate.mjs Accepts Hand-Backs and End That Contradict the Work Claimed
+
+- Symptom: scripts/orchestrate.mjs validates only the shape of a
+  hand-back (`parseHandback`/`handback`, ~L324-349, per the issue):
+  one `SNAP_HANDBACK` line, schema v3, the dispatched role, a gate in
+  `MAY_HAND_BACK`. It does not check the work the hand-back claims,
+  so the run record can say a run passed when it did not.
+- Reproduced by the issue in an isolated temp run root: a
+  `build_executed` reporting suite exit 1, with `ops.f` listing
+  out-of-scope and `../` paths and `ops.scope` set to `["**"]`, was
+  accepted at rc 0; `end` succeeded with no audit or qa
+  `verify_pass` (cc-orchestrate.md:65 allows `end` only after it);
+  `approve` stamped the global `git config user.name` (~L356) rather
+  than who actually approved.
+- Guards 5 and 7 still block the out-of-scope writes themselves; the
+  gap is that the run record trusts what the agent claims. Live runs
+  match: FEAT-045 code tasks handed back `build_executed` on
+  `npm test` exit 1, and FEAT-047 ended at `build_executed` with no
+  qa hand-back. No change to the band flow or the SNAP contract is
+  implied.
+- Intake of issue #175.
 
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
