@@ -76,7 +76,7 @@ Each task is red, then green, then commit. Tasks 1 to 4 are independent of each 
 
 ### Task 2 — reserved folders (FEAT-047; spec AC10)
 
-- [ ] [T-002] `checkDocDir` reserves `.claude/` except specs and plans, plus `.opencode`
+- [X] [T-002] `checkDocDir` reserves `.claude/` except specs and plans, plus `.opencode`
   - [X] [T-002-A] Modify `tests/scripts/doc-locations.test.js`. In `describe('checkDocDir reserved folders …')`, add two tests:
     - rejects: `.claude/skills`, `.claude/skills/x`, `.Claude/Skills`, `.claude/settings`, `.claude/rules`, `.opencode`, `.opencode/plugin`;
     - accepts: `.claude/specs`, `.claude/plans`, `.claude/specs/pillar-1`, `.Claude/Specs`, `.CLAUDE/plans/x`, `docs/specs`.
@@ -89,12 +89,12 @@ Each task is red, then green, then commit. Tasks 1 to 4 are independent of each 
     - update the comment above `RESERVED`.
   - [X] [T-002-D] Run `npx vitest run tests/scripts/doc-locations.test.js tests/scripts/orchestrate.test.js`: expect every test passed (the orchestrate halts on `.claude/hooks` still hold).
   - [X] [T-002-E] `git add -u scripts/doc-locations.mjs tests/scripts/doc-locations.test.js docs/superpowers/plans/2026-11-10-pre-1-44-hardening.md`
-  - [ ] [T-002-F] `git commit -m "fix: reserve .claude except specs and plans, and .opencode, for recorded doc folders [FEAT-047]"`
+  - [X] [T-002-F] `git commit -m "fix: reserve .claude except specs and plans, and .opencode, for recorded doc folders [FEAT-047]"`
 
 ### Task 3 — records guard from the base branch (FEAT-045; spec AC11)
 
 - [ ] [T-003] `pull_request_target`, base checker, current merge ref, release exemption
-  - [ ] [T-003-A] Modify `tests/tools/records-guard.test.js`, `describe('the workflow')`:
+  - [X] [T-003-A] Modify `tests/tools/records-guard.test.js`, `describe('the workflow')`:
     - "triggers on pull_request only" becomes "triggers on pull_request_target only, on main", and still forbids `push`, `pull_request:`, `workflow_dispatch`, `schedule` and `workflow_run`.
     - The owner test also asserts:
       - the `cc-lane-bot[bot]` + `startsWith(github.event.pull_request.head.ref, 'release/')` clause;
@@ -107,27 +107,27 @@ Each task is red, then green, then commit. Tasks 1 to 4 are independent of each 
       - and the absence of `node tools/` and of `npm`.
     - The `author_association` / `head_ref` test is unchanged. `head.ref` is not `head_ref`.
     - New test: `CONTRIBUTING.md` names `release-branches` and no longer contains "There is no `release/*` branch flow".
-  - [ ] [T-003-B] Run `npx vitest run tests/tools/records-guard.test.js`. Expected:
+  - [X] [T-003-B] Run `npx vitest run tests/tools/records-guard.test.js`. Expected:
     - red: the trigger, owner/exemption, merge-ref, run-line and CONTRIBUTING tests;
     - green: the action-majors test, the `author_association`/`head_ref` test, and every checker test outside `describe('the workflow')`.
-  - [ ] [T-003-C] Modify `.github/workflows/records-guard.yml`:
+  - [X] [T-003-C] Modify `.github/workflows/records-guard.yml`:
     - `on: pull_request_target: branches: [main]`;
     - the job `if:` becomes the owner clause `&&` the negation of the lane clause, with the comment updated to cite Rulings 2 and 4 as amended;
     - the checkout gets `ref: refs/pull/${{ github.event.pull_request.number }}/merge`, `fetch-depth: 2` and `persist-credentials: false`;
     - new step "Merge ref is current", with `env: HEAD_SHA` and `run: test "$(git rev-parse HEAD^2)" = "$HEAD_SHA"`;
     - the checker step runs the `git show` line, then the `node "$RUNNER_TEMP/…"` line;
     - `permissions: contents: read` and setup-node 20 stay unchanged.
-  - [ ] [T-003-D] Modify `CONTRIBUTING.md`:
+  - [X] [T-003-D] Modify `CONTRIBUTING.md`:
     - line 68-69 constraint: "Never create release branches, tags, or GitHub Releases. `release/*` branches are created only by the maintainer's release App and are protected by the `release-branches` ruleset; releases are cut by the owner";
     - line 94: the guard skips the owner's PRs and the release App's `release/*` PRs, and runs from the base branch.
-  - [ ] [T-003-E] Modify `docs/superpowers/specs/2026-11-08-feat045-ci-records-guard-design.md`:
+  - [X] [T-003-E] Modify `docs/superpowers/specs/2026-11-08-feat045-ci-records-guard-design.md`:
     - Ruling 2: add the author-plus-branch exemption, backed by the ruleset;
     - Ruling 4: `pull_request_target`;
     - the sample YAML (lines 116-131): the new workflow;
     - the "Fork PR" row (line 204): the merge ref is checked out explicitly and its second parent is verified;
     - add a dated amendment line pointing to the hardening spec.
-  - [ ] [T-003-F] Run `npx vitest run tests/tools/records-guard.test.js`: expect every test passed.
-  - [ ] [T-003-G] `git add -u .github/workflows/records-guard.yml tests/tools/records-guard.test.js CONTRIBUTING.md docs/superpowers/specs/2026-11-08-feat045-ci-records-guard-design.md docs/superpowers/plans/2026-11-10-pre-1-44-hardening.md`
+  - [X] [T-003-F] Run `npx vitest run tests/tools/records-guard.test.js`: expect every test passed.
+  - [X] [T-003-G] `git add -u .github/workflows/records-guard.yml tests/tools/records-guard.test.js CONTRIBUTING.md docs/superpowers/specs/2026-11-08-feat045-ci-records-guard-design.md docs/superpowers/plans/2026-11-10-pre-1-44-hardening.md`
   - [ ] [T-003-H] `git commit -m "fix: run the records guard from the base branch and exempt release-App PRs [FEAT-045]"`
 
 ### Task 4 — CODEOWNERS (spec AC12)

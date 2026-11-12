@@ -1,5 +1,7 @@
 # FEAT-045: CI Records-Guard — Design
 
+> **Amended 2026-11-11** by `2026-11-10-pre-1-44-hardening-design.md`: the workflow runs on `pull_request_target` from the base branch (Ruling 4), and release-App PRs on `release/*` are exempt (Ruling 2).
+
 **Item:** `[FEAT-045]` CI Records-Guard: an External PR Touching Owner-Side Records Goes Red by Machine
 **Backlog:** `AGENT-READABLE BACKLOG.md:727-731` (intake of issue #65; ticket #123)
 **Status:** Approved by the operator on 2026-11-10
@@ -21,11 +23,11 @@ The owner delegated these rulings for this item. The spec implements them and do
    - backlog heading states and `* **DONE` lines (widened by Rulings 8 and 9).
 
    Edits to nearby text and lockfile changes that touch only dependencies must pass. POC reference: `poc-feat045/poc.mjs` in the session scratchpad.
-2. **Owner detection.** The workflow skips the check when `github.event.pull_request.user.login == github.repository_owner`. It never uses `author_association`, because collaborators stay bound by CONTRIBUTING. It never exempts a branch name.
+2. **Owner detection.** The workflow skips the check when `github.event.pull_request.user.login == github.repository_owner`. It never uses `author_association`, because collaborators stay bound by CONTRIBUTING. It never exempts a branch name. *(Amended 2026-11-11: it also skips a PR whose author is exactly `cc-lane-bot[bot]` and whose head branch starts with `release/`. Author identity grants that exemption, the branch prefix only narrows it, and the `release-branches` ruleset reserves pushes to `release/*` for that App, so a branch name alone still exempts nothing.)*
 3. **Script.** The logic lives in a zero-dependency Node ESM script under `tools/`, written in the style of `tools/skip-baseline.mjs`. It exports pure functions that have unit tests under `tests/`. The CLI reads base and head contents with `git show <rev>:<path>`, so it works offline. Failure messages name the file and one of two anchors:
    - `CONTRIBUTING.md#what-contributors-must-never-do` for a version or a release heading;
    - `CONTRIBUTING.md#records-are-owner-side` for a backlog flip or a DONE line.
-4. **Workflow (amended by Ruling 11).** The check runs on `pull_request` and uses only first-party actions already used in this repo, at the same majors as `test.yml`: `actions/checkout@v7` and `actions/setup-node@v7`. The checkout needs enough fetch depth to reach the base. It uses no third-party actions. The spec picks the least invasive placement; see Solution §3.
+4. **Workflow (amended by Ruling 11).** The check runs on `pull_request` and uses only first-party actions already used in this repo, at the same majors as `test.yml`: `actions/checkout@v7` and `actions/setup-node@v7`. The checkout needs enough fetch depth to reach the base. It uses no third-party actions. The spec picks the least invasive placement; see Solution §3. *(Amended 2026-11-11: the trigger is `pull_request_target`, so the workflow file and the checker both come from the base branch. The job checks out `refs/pull/<n>/merge`, verifies its second parent is the PR head, and runs only the base copy of `tools/records-guard.mjs` from `$RUNNER_TEMP`.)*
 5. **Docs (amended by Rulings 7 and 13).** `CONTRIBUTING.md` gets one line naming the check. The only other doc edits allowed are the two in Rulings 7 and 13. There are no README Known limits, `VERSION`, `CHANGELOG` or backlog edits.
 6. **Tracked surface.** A new doc needs its leaf line in the `.gitignore` tracked-surface block, because that block is deny-by-default for `/docs/*`. See System Impact.
 7. **README Instruments edit is allowed.** `README.md`'s `## Instruments: releases that verify their own record` section gains one bullet naming `` **`records-guard.mjs`** ``, and its count word changes from "Four" to "Five". The repo invariant `tests/tools/repo-invariants.test.js:130-135` requires this edit. It is not a Known-limits record. The script stays in `tools/`.
@@ -110,10 +112,15 @@ This follows the convention of `tests/tools/skip-baseline.test.js`. It imports t
 - A sibling file leaves `test.yml` byte-identical. It gives the check its own named status ("Records guard"), and it needs no `npm ci` and no cache. It uses `actions/setup-node@v7` without `cache:` (Ruling 11).
 
 ```yaml
+# As amended 2026-11-11 (pre-1.44.0 hardening); the shipped file is the authority.
 name: Records guard
 
+# Rulings 2 and 4 as amended by the pre-1.44.0 hardening (2026-11-11):
+# pull_request_target runs this file from the base branch, so a PR can neither edit the
+# gate nor run its own copy of the checker. The PR's merge commit is checked out as data
+# only: nothing from it is executed, installed or sourced, and no secret is used.
 on:
-  pull_request:
+  pull_request_target:
     branches: [main]
 
 permissions:
@@ -121,23 +128,33 @@ permissions:
 
 jobs:
   records-guard:
-    # Ruling 2: the owner's own PRs (release PRs included) are exempt; collaborators are not.
-    if: github.event.pull_request.user.login != github.repository_owner
+    # Exempt: the owner's own PRs, and the release App's PRs on release/* branches (the
+    # release-branches ruleset reserves pushes to release/* for that App). Collaborators are not.
+    if: github.event.pull_request.user.login != github.repository_owner && !(github.event.pull_request.user.login == 'cc-lane-bot[bot]' && startsWith(github.event.pull_request.head.ref, 'release/'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
         with:
-          # The pull_request checkout is the merge commit; depth 2 reaches its first
-          # parent, which is the base tip the PR is being merged into.
+          # The merge commit; depth 2 reaches its first parent (the base tip the PR is being
+          # merged into) and its second parent (the PR head).
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
           fetch-depth: 2
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           # engines.node's floor, so the guard proves it needs nothing newer.
           node-version: '20'
+      - name: Merge ref is current
+        # A merge ref built before the PR's last push would judge old content. Re-running the
+        # job clears a red here once GitHub rebuilds the ref.
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD^2)" = "$HEAD_SHA"
       - name: Fail if the PR changes owner-side records
-        run: node tools/records-guard.mjs --base HEAD^1 --head HEAD
+        run: |
+          git show HEAD^1:tools/records-guard.mjs > "$RUNNER_TEMP/records-guard.mjs"
+          node "$RUNNER_TEMP/records-guard.mjs" --base HEAD^1 --head HEAD
 ```
 
 `HEAD^1` against the merge commit `HEAD` is the PR's net effect on the current `main`. A PR branch that merged `origin/main` after a release therefore does not read the owner's release as its own change. The job pins Node 20 through `setup-node`, which is `engines.node`'s floor. The owner did not rule on the version. The floor was picked so the guard cannot depend on a newer API; `'24'` would also satisfy Ruling 11.
@@ -201,7 +218,7 @@ One row goes into the table at `tools/README.md:7-12`: `` | `records-guard.mjs` 
 | Base rev not in the clone: a shallow checkout at depth 1, a fork PR without depth, a typo | `RECORDS_GUARD_ABORT: revision "<rev>" is not a commit in this clone; the checkout needs fetch-depth >= 2 (or fetch the base)`, exit 1. This is never read as "file absent". |
 | `git` missing or `git show` failing for any reason other than path absence | `RECORDS_GUARD_ABORT: git <args> failed (<stderr first line>)`, exit 1. |
 | Bad CLI arguments: missing, empty, unknown flag | `RECORDS_GUARD_ABORT: <reason>; usage: node tools/records-guard.mjs --base <rev> --head <rev>`, exit 1. |
-| Fork PR | `pull_request` checks out `refs/pull/N/merge` from the base repository, so depth 2 works the same as for a same-repo PR. The token is read-only and no secrets are used. |
+| Fork PR | *(Amended 2026-11-11.)* `pull_request_target` runs the base branch's workflow; the job checks out `refs/pull/N/merge` explicitly at depth 2 and fails unless its second parent is the PR head SHA. Nothing from the PR is executed. The token is read-only and no secrets are used. |
 | PR with merge conflicts | GitHub creates no merge ref, so the workflow does not run. This matches the existing `test.yml` behavior. |
 
 ### Boundary conditions

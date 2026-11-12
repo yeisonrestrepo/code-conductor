@@ -1,7 +1,11 @@
 name: Records guard
 
+# Rulings 2 and 4 as amended by the pre-1.44.0 hardening (2026-11-11):
+# pull_request_target runs this file from the base branch, so a PR can neither edit the
+# gate nor run its own copy of the checker. The PR's merge commit is checked out as data
+# only: nothing from it is executed, installed or sourced, and no secret is used.
 on:
-  pull_request:
+  pull_request_target:
     branches: [main]
 
 permissions:
@@ -9,20 +13,30 @@ permissions:
 
 jobs:
   records-guard:
-    # Ruling 2: the owner's own PRs (release PRs included) are exempt; collaborators are not.
-    if: github.event.pull_request.user.login != github.repository_owner
+    # Exempt: the owner's own PRs, and the release App's PRs on release/* branches (the
+    # release-branches ruleset reserves pushes to release/* for that App). Collaborators are not.
+    if: github.event.pull_request.user.login != github.repository_owner && !(github.event.pull_request.user.login == 'cc-lane-bot[bot]' && startsWith(github.event.pull_request.head.ref, 'release/'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
         with:
-          # The pull_request checkout is the merge commit; depth 2 reaches its first
-          # parent, which is the base tip the PR is being merged into.
+          # The merge commit; depth 2 reaches its first parent (the base tip the PR is being
+          # merged into) and its second parent (the PR head).
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
           fetch-depth: 2
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           # engines.node's floor, so the guard proves it needs nothing newer.
           node-version: '20'
+      - name: Merge ref is current
+        # A merge ref built before the PR's last push would judge old content. Re-running the
+        # job clears a red here once GitHub rebuilds the ref.
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD^2)" = "$HEAD_SHA"
       - name: Fail if the PR changes owner-side records
-        run: node tools/records-guard.mjs --base HEAD^1 --head HEAD
+        run: |
+          git show HEAD^1:tools/records-guard.mjs > "$RUNNER_TEMP/records-guard.mjs"
+          node "$RUNNER_TEMP/records-guard.mjs" --base HEAD^1 --head HEAD
