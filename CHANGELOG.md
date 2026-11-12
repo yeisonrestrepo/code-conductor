@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.44.1] - 2026-11-12
+
+### Changed
+- The Records guard's release-App exemption now covers `cc-lane-bot[bot]` PRs whose head branch starts with `records/` as well as `release/`, so the issue triage's `records/intake-…` backlog PRs no longer show a red check; the owner clause, `pull_request_target`, merge-ref-as-data, `HEAD^2` check and base-copied checker are unchanged, the author login still grants the exemption and the prefix only narrows it. `tests/tools/records-guard.test.js` pins the clause with both prefixes, and CONTRIBUTING names `records/*` and the `records-branches` ruleset. CI-only, no id. Landed from PR #166 (Ludocius), intake of issue #165.
+
 ## [1.44.0] - 2026-11-12
 
 ### Added
