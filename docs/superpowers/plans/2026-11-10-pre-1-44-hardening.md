@@ -147,7 +147,7 @@ Each task is red, then green, then commit. Tasks 1 to 4 are independent of each 
 - [ ] [T-005] Full suite, rollout precondition, pull request
   - [X] [T-005-A] Run `npx vitest run`: expect every file passed, with the same skip count as `main`.
   - [X] [T-005-B] Run `node tools/version-gate.mjs` and `node tools/record-parity.mjs`: expect `VERSION_GATE_OK 1.43.0` and `RECORD_PARITY_OK`. This PR changes no version location.
-  - [ ] [T-005-C] Owner action, then confirm: the owner creates the `release-branches` ruleset:
+  - [X] [T-005-C] Owner action, then confirm: the owner creates the `release-branches` ruleset:
     - branch target `release/*`;
     - restrict creations, updates and deletions; block force pushes;
     - bypass list: the `cc-lane-bot` App only.
@@ -159,7 +159,7 @@ Each task is red, then green, then commit. Tasks 1 to 4 are independent of each 
     - exactly one entry in `bypass_actors`, of `actor_type: Integration`.
 
     The PR is not opened until this passes (spec rollout order: the reviewer bot merges owner PRs on approval).
-  - [ ] [T-005-D] `git add -u docs/superpowers/plans/2026-11-10-pre-1-44-hardening.md`
+  - [X] [T-005-D] `git add -u docs/superpowers/plans/2026-11-10-pre-1-44-hardening.md`
   - [ ] [T-005-E] `git commit -m "docs: close out the pre-1.44.0 hardening plan [FEAT-045 FEAT-047 FEAT-048]"`
   - [ ] [T-005-F] `git push`, then open the PR to `main`. Its description lists AC1-AC13, the ruleset precondition (confirmed), and the bootstrap note: this PR runs no Records guard job.
 
