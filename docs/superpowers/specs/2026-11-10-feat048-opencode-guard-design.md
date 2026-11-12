@@ -1,5 +1,7 @@
 # FEAT-048 slice 1: the OpenCode guard plugin
 
+> **Amended 2026-11-11** by `2026-11-10-pre-1-44-hardening-design.md`: the plugin fails closed on tools it cannot inspect.
+
 **Status:** Draft, awaiting owner approval
 **Item:** `[FEAT-048]` Multi-Harness Support (Codex, Antigravity, OpenCode), issue #97
 **Scope:** the first vertical slice of FEAT-048 only. The other slices are listed under "Follow-up slices" and are not built here.
@@ -45,7 +47,7 @@ The backlog entry's criteria, and what this slice does with each:
   | `write` | `filePath`, `content` | `Write`, `{ file_path, content }` |
   | `edit` | `filePath`, `oldString`, `newString` | `Edit`, `{ file_path, old_string, new_string }` |
 
-  Any other tool is let through without spawning the guard, the same as a tool the Claude Code matcher does not name.
+  Any other tool is let through without spawning the guard, the same as a tool the Claude Code matcher does not name. *(Amended 2026-11-11: the plugin now fails closed. `multiedit` and the patch tool are mapped, a fixed read-only list passes, and every other tool, `task` included, is blocked. See `2026-11-10-pre-1-44-hardening-design.md`.)*
 - Runs `node <directory>/.claude/hooks/pre-tool-use.mjs` with the payload on stdin and `CLAUDE_PROJECT_DIR` set to the OpenCode `directory`, so the guard finds the same allowlist and run file it uses under Claude Code.
 - A `deny` or an `ask` decision throws `Error(permissionDecisionReason)`, which is how OpenCode blocks a call and shows the reason to the model.
 - If the guard cannot run (spawn error, timeout, non-zero exit, or output that is not JSON), the call is blocked with a reason that names the guard path. This matches the guard's own rule that a call no guard could inspect fails closed.
@@ -73,7 +75,7 @@ Nothing else in the installer changes: the global half, settings merges, `.claud
 | Guards 1, 2, 3, 4 | Enforced through the plugin. Guard 2's `ask` blocks (choice 1) |
 | Guards 5, 6, 7 (band roles, orchestrator run, role shell) | Not enforced for subagents: `tool.execute.before` does not carry the subagent's name, so the guard sees no `agent_type` |
 | Warnings (`systemMessage`) | Not shown: the plugin has no channel for an allowed call's warning |
-| `apply_patch`, `multiedit`, `task` | Not routed to the guard |
+| `apply_patch`, `multiedit`, `task` | Mapped or blocked, see `2026-11-10-pre-1-44-hardening-design.md` (amended 2026-11-11) |
 | UserPromptSubmit context hooks (verbosity, context guard) | Not wired (follow-up slice) |
 | `cc-*` commands and band agents | Not translated (follow-up slice). OpenCode falls back to `CLAUDE.md` when there is no `AGENTS.md`, and loads `.claude/skills` |
 

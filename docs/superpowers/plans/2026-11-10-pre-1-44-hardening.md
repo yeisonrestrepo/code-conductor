@@ -11,16 +11,16 @@ Each task is red, then green, then commit. Tasks 1 to 4 are independent of each 
 
 ### Task 0 — commit this plan
 
-- [ ] [T-000] Commit the plan
+- [X] [T-000] Commit the plan
   - [X] [T-000-A] Modify `.gitignore`: add `!/docs/superpowers/plans/2026-11-10-pre-1-44-hardening.md` to the tracked-surface block, in sorted position among the `plans/` leaves. A new file under `/docs/*` stays ignored until its leaf line lands (BUG-042).
   - [X] [T-000-B] Run `npx vitest run tests/unit/gitignore-block-parity.test.js`: expect 4 passed.
   - [X] [T-000-C] `git add -u .gitignore` and `git add docs/superpowers/plans/2026-11-10-pre-1-44-hardening.md`. The plan file is new, and the leaf line re-includes it.
-  - [ ] [T-000-D] `git commit -m "docs: add the pre-1.44.0 hardening implementation plan [FEAT-045 FEAT-047 FEAT-048]"`
+  - [X] [T-000-D] `git commit -m "docs: add the pre-1.44.0 hardening implementation plan [FEAT-045 FEAT-047 FEAT-048]"`
 
 ### Task 1 — OpenCode guard fails closed (FEAT-048; spec AC1-AC9)
 
 - [ ] [T-001] Plugin classification, argument checks, patch grammar and path confinement
-  - [ ] [T-001-A] Modify `tests/hooks/opencode-guard.test.js`:
+  - [X] [T-001-A] Modify `tests/hooks/opencode-guard.test.js`:
     - Add a `stubProject(policy)` helper. It scaffolds a project whose `.claude/hooks/pre-tool-use.mjs` is a stub that appends each stdin payload as one JSON line to `<dir>/payloads.jsonl`, then answers `deny` with reason `STUB DENY <file_path>` when `file_path` ends with `denied.txt`, and allows otherwise.
     - Add `payloads(dir)`, which reads that file.
     - Add the AC tests:
@@ -37,11 +37,11 @@ Each task is red, then green, then commit. Tasks 1 to 4 are independent of each 
       - AC6 additions: `apply_patch` with no `patchText`, and with a non-string `patchText`, is blocked with a reason naming `patchText`.
       - AC8 additions: any path containing `\` is blocked; a marker that resolves to the project directory itself (`.`) is blocked.
     - Replace "never spawns the guard for a tool it does not map" with the AC4 and AC5 tests. Leave every other existing test unchanged (AC9).
-  - [ ] [T-001-B] Run `npx vitest run tests/hooks/opencode-guard.test.js`. Expected:
+  - [X] [T-001-B] Run `npx vitest run tests/hooks/opencode-guard.test.js`. Expected:
     - red: the new AC1, AC2, AC3, AC4 (`batch`, `some_mcp_tool`), AC6 (with the `patchText` cases), AC7 (except the CRLF case), AC8, AC8b and multi-file tests;
     - green: AC5, the AC7 CRLF case, and every existing test (the module-shape tests, the Guard 3 corpus rows, read/write/edit, hook parity, and "guard could not run");
     - AC5 and the CRLF case already pass, because today's plugin lets every unmapped tool through and so both forms get the same (empty) verdict.
-  - [ ] [T-001-C] Modify `project-template/.opencode/plugin/conductor-guard.js`:
+  - [X] [T-001-C] Modify `project-template/.opencode/plugin/conductor-guard.js`:
     - Replace `TOOL_MAP` with three things:
       - a `MAPPED` table of builders that return `{ payloads }` or `{ block }`;
       - a `READ_ONLY` set: `glob grep list lsp todoread todowrite webfetch websearch codesearch question skill invalid`;
@@ -60,18 +60,18 @@ Each task is red, then green, then commit. Tasks 1 to 4 are independent of each 
       - return the absolute path.
     - Run the guard once per payload, and stop at the first non-allow decision.
     - Keep the export, the hook name, `node` from `PATH`, and the fail-closed spawn handling unchanged.
-  - [ ] [T-001-D] Run `npx vitest run tests/hooks/opencode-guard.test.js`: expect every test passed.
-  - [ ] [T-001-E] Modify `README.md:399`: replace "before each `bash`, `read`, `write` or `edit` call it sends the call…" with the split: mapped calls (`bash`, `read`, `write`, `edit`, `multiedit`, the patch tool) go to the guard, read-only tools pass, and every other tool is blocked. Then modify `README.md:408`. Replace the row "`apply_patch`, `multiedit`, `task` and other tools | Not sent to the guard" with three rows:
+  - [X] [T-001-D] Run `npx vitest run tests/hooks/opencode-guard.test.js`: expect every test passed.
+  - [X] [T-001-E] Modify `README.md:399`: replace "before each `bash`, `read`, `write` or `edit` call it sends the call…" with the split: mapped calls (`bash`, `read`, `write`, `edit`, `multiedit`, the patch tool) go to the guard, read-only tools pass, and every other tool is blocked. Then modify `README.md:408`. Replace the row "`apply_patch`, `multiedit`, `task` and other tools | Not sent to the guard" with three rows:
     - "`patch`/`apply_patch`, `multiedit` | Sent to the guard; a patch is checked file by file, confined to the project, under a strict marker grammar";
     - "`task`, `batch`, MCP and any other tool | Blocked: the guard cannot inspect them";
     - "`glob`, `grep`, `list`, `webfetch`, `websearch`, `codesearch` and other read-only tools | Allowed, as on Claude Code".
-  - [ ] [T-001-F] Modify `docs/superpowers/specs/2026-11-10-feat048-opencode-guard-design.md`:
+  - [X] [T-001-F] Modify `docs/superpowers/specs/2026-11-10-feat048-opencode-guard-design.md`:
     - at line 48, change "Any other tool is let through…" to point to the amendment;
     - at line 76, change the row to "Mapped or blocked, see `2026-11-10-pre-1-44-hardening-design.md`";
     - add a dated amendment line under the title.
-  - [ ] [T-001-F2] Modify `.github/wiki/pages/Getting-Started.md:35`: the `--opencode` row says the plugin sends OpenCode's mapped calls (`bash`, `read`, `write`, `edit`, `multiedit`, the patch tool) to the guard, lets read-only tools through, and blocks every other tool.
-  - [ ] [T-001-G] Run `npx vitest run tests/tools/repo-invariants.test.js`: expect every test passed (the README-shape invariants).
-  - [ ] [T-001-H] `git add -u project-template/.opencode/plugin/conductor-guard.js tests/hooks/opencode-guard.test.js README.md .github/wiki/pages/Getting-Started.md docs/superpowers/specs/2026-11-10-feat048-opencode-guard-design.md docs/superpowers/plans/2026-11-10-pre-1-44-hardening.md`
+  - [X] [T-001-F2] Modify `.github/wiki/pages/Getting-Started.md:35`: the `--opencode` row says the plugin sends OpenCode's mapped calls (`bash`, `read`, `write`, `edit`, `multiedit`, the patch tool) to the guard, lets read-only tools through, and blocks every other tool.
+  - [X] [T-001-G] Run `npx vitest run tests/tools/repo-invariants.test.js`: expect every test passed (the README-shape invariants).
+  - [X] [T-001-H] `git add -u project-template/.opencode/plugin/conductor-guard.js tests/hooks/opencode-guard.test.js README.md .github/wiki/pages/Getting-Started.md docs/superpowers/specs/2026-11-10-feat048-opencode-guard-design.md docs/superpowers/plans/2026-11-10-pre-1-44-hardening.md`
   - [ ] [T-001-I] `git commit -m "fix: fail the OpenCode guard closed on tools it cannot inspect [FEAT-048]"`
 
 ### Task 2 — reserved folders (FEAT-047; spec AC10)

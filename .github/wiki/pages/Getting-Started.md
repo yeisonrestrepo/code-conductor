@@ -32,7 +32,7 @@ npx @yeison.restrepo.r/code-conductor@latest --project
 | `--project` / `-Project` | Also scaffold `.claude/` in the current directory. Refused, before anything is written, in a clone of code-conductor itself |
 | `--no-deps` / `-NoDeps` | Accepted for compatibility with the retired shell installers; a no-op, since the npm CLI installs no dependencies |
 | `--verbosity MIN\|INFO\|VERBOSE` / `-Verbosity LEVEL` | Response verbosity (default `MIN`; also `--verbosity=INFO`). An invalid value warns and falls back to `MIN`. PowerShell's `-Verbosity:INFO` is not supported; it warns and stays `MIN` |
-| `--opencode` | With `--project`, also install the OpenCode guard plugin at `.opencode/plugin/conductor-guard.js`, which sends OpenCode's `bash`, `read`, `write` and `edit` calls to the project's own guard. Without `--project` it warns and writes nothing for OpenCode |
+| `--opencode` | With `--project`, also install the OpenCode guard plugin at `.opencode/plugin/conductor-guard.js`, which sends OpenCode's `bash`, `read`, `write`, `edit`, `multiedit` and patch calls to the project's own guard, lets read-only tools through, and blocks every other tool. Without `--project` it warns and writes nothing for OpenCode |
 | `--version`, `-v` | Print the version and exit |
 | `--help`, `-h` | Print usage and exit |
 
