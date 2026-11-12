@@ -1,6 +1,6 @@
 # Pre-1.44.0 hardening — design
 
-**Status:** Draft rev 2, awaiting owner approval (rev 1 amended per the owner's review of 2026-11-11)
+**Status:** Draft rev 3, awaiting owner approval (revs 1 and 2 amended per the owner's reviews of 2026-11-11)
 **Items:** amends FEAT-045 (records guard), FEAT-047 (spec and plan locations) and FEAT-048 (OpenCode guard), all merged after `v1.43.0` and not yet released, plus `.github/CODEOWNERS`. No new id: each change lands under the item whose unreleased code it corrects.
 **Origin:** the security review of the 1.44.0 release candidate (everything executable merged since `v1.43.0`) returned ESCALATE with one major and three lower findings. The release was declined until they are fixed.
 
@@ -38,7 +38,7 @@ There is also a gap in the release flow. The maintainer's release PRs are opened
      | `write` | `filePath` (string) | `Write { file_path, content }` |
      | `edit` | `filePath` (string) | `Edit { file_path, old_string, new_string }` |
      | `multiedit` | `filePath` (string), `edits` (non-empty array; each entry has string `oldString` and `newString`) | one `Edit { file_path, old_string, new_string }` per entry |
-     | `patch`, `apply_patch` | `patchText` (string, valid under the patch grammar below) | per file: `*** Add File: p` gives `Write { file_path: p, content: <added lines> }`; `*** Update File: p` gives `Edit { file_path: p, old_string: <removed lines>, new_string: <added lines> }`; `*** Delete File: p` gives `Edit { file_path: p, old_string: '', new_string: '' }`; `*** Move to: q` adds `Edit { file_path: q, … }` for the target |
+     | `patch`, `apply_patch` | `patchText` (string, valid under the patch grammar below) | per file: `*** Add File: p` gives `Write { file_path: p, content: <added lines> }`; `*** Update File: p` gives `Edit { file_path: p, old_string: <removed lines>, new_string: <added lines> }`; `*** Delete File: p` gives `Edit { file_path: p, old_string: '', new_string: '' }`; `*** Move to: q` adds `Write { file_path: q, content: <resulting lines> }` for the target, so Guard 2 applies when `q` exists |
 
    - **Read-only tools** pass without spawning the guard. They match Claude Code tools that the hook matcher does not name: `glob`, `grep`, `list`, `lsp`, `todoread`, `todowrite`, `webfetch`, `websearch`, `codesearch`, `question`, `skill`, `invalid`.
    - **`task`** is blocked with the reason `code-conductor guard cannot inspect OpenCode subagents; "task" is blocked`.
@@ -57,7 +57,7 @@ There is also a gap in the release flow. The maintainer's release PRs are opened
    - `*** Delete File: <p>`
    - `*** Move to: <p>`
 
-   Any other `***` line, including an indented one, blocks the whole patch. A patch with no file marker is blocked as "names no file". Paths come only from these markers.
+   Any other `***` line, including an indented one, blocks the whole patch with the reason `the patch has a \`***\` line that is not an exact marker: <line>`. A marker whose path is empty, or starts or ends with whitespace, blocks the patch the same way. A patch with no file marker is blocked as "names no file". Paths come only from these markers.
 5. **Paths.** Patch paths are resolved against the plugin's `directory` and handed to the guard as that absolute path. `write` and `edit` already receive absolute `filePath` values from OpenCode. So a relative path in a patch and the same absolute path through `write` reach the guard identically and produce the same reason.
 
 **doc-locations** (`scripts/doc-locations.mjs`)
@@ -72,11 +72,14 @@ There is also a gap in the release flow. The maintainer's release PRs are opened
    - the PR author is the repository owner (unchanged); or
    - the author is exactly `cc-lane-bot[bot]` and the head branch starts with `release/`.
 3. `actions/checkout@v7` checks out `refs/pull/<n>/merge` with `fetch-depth: 2` and `persist-credentials: false`. The PR tree is data from here on.
-4. The step writes the checker from the merge commit's first parent, which is the base tip, to the runner temp directory. It runs only that copy: `git show HEAD^1:tools/records-guard.mjs > "$RUNNER_TEMP/records-guard.mjs"`, then `node "$RUNNER_TEMP/records-guard.mjs" --base HEAD^1 --head HEAD`.
+4. A step fails the job unless the merge commit is current. `HEAD_SHA` is set under the step's `env:` from `github.event.pull_request.head.sha`, never interpolated inside `run:`. The step runs `[ "$(git rev-parse HEAD^2)" = "$HEAD_SHA" ]`. A stale merge ref, built before the PR's last push, makes the check red instead of judging old content.
+5. The next step writes the checker from the merge commit's first parent, which is the base tip, to the runner temp directory. It runs only that copy: `git show HEAD^1:tools/records-guard.mjs > "$RUNNER_TEMP/records-guard.mjs"`, then `node "$RUNNER_TEMP/records-guard.mjs" --base HEAD^1 --head HEAD`.
    - The checker is self-contained, using `node:` builtins only. It reads both trees through git and executes nothing from them.
    - No PR file is run, sourced or installed. There is no `npm ci` and no cache.
 
-**Repository setting (precondition, documented, not code).** A branch ruleset named **`release-branches`** targets `release/*`. It restricts creations, updates and deletions, and blocks force pushes. Its bypass list holds only the `cc-lane-bot` App. With it, every commit on a `release/*` branch comes from the App, so the author-based exemption cannot carry a collaborator's commits. `CONTRIBUTING.md`'s records-guard line names the ruleset.
+**Repository setting (precondition, documented, not code).** A branch ruleset named **`release-branches`** targets `release/*`. It restricts creations, updates and deletions, and blocks force pushes. Its bypass list holds only the `cc-lane-bot` App. With it, every commit on a `release/*` branch comes from the App, so the author-based exemption cannot carry a collaborator's commits. `CONTRIBUTING.md` names the ruleset in its records-guard line and in the release-branch constraint (lines 68-69, reworded below).
+
+**Rollout order.** The owner creates the `release-branches` ruleset and confirms it is active before the PR that adds the exemption merges. The plan's last task is that check, and the PR description carries it as a merge precondition.
 
 **CODEOWNERS:** `* @cc-reviewer-bot` as the only non-comment line, with the existing comment kept.
 
@@ -86,7 +89,7 @@ There is also a gap in the release flow. The maintainer's release PRs are opened
 - **A read-only tool used to write:** not possible. None of the listed tools writes the working tree. `todowrite` writes OpenCode's todo list.
 - **`batch`:** blocked as an uncovered tool. A maintainer comment on OpenCode issue #5894 reports that tools called through `batch` skip plugin hooks.
 - **A collaborator who pushes a `release/x` branch:** the `release-branches` ruleset rejects the push. A PR from a branch the App did not open is checked as any other PR, since its author is not the App.
-- **A PR whose merge ref cannot be built (conflicts):** the checkout fails and the check is red. A conflicting PR cannot merge anyway.
+- **A merge ref that is missing or stale:** a missing ref (conflicts) fails the checkout, and a stale ref (built before the PR's last push) fails the second-parent check. Either way the check is red. A conflicting PR cannot merge anyway, and a stale one goes green once GitHub rebuilds the ref and the job reruns.
 - **The owner's own PRs:** the owner is a repository admin, and branch protection has `enforce_admins` off (verified 2026-11-11). The owner can merge his own PRs without a code-owner approval. Consequence: if the bot account is unavailable, only an admin merge lands a PR.
 
 ### Error cases
@@ -99,7 +102,7 @@ There is also a gap in the release flow. The maintainer's release PRs are opened
 1. **Fail closed for unknown OpenCode tools, including MCP tools.** A user who wires MCP servers into OpenCode with `--opencode` installed sees those tools blocked, with a reason that names them. The alternative, letting unknown tools through as the Claude Code matcher does, is what made the patch tool a bypass. Claude Code's tool set is known and versioned with the hook; OpenCode's is not.
 2. **`task` is blocked.** Whether `tool.execute.before` fires for tool calls inside an OpenCode subagent could not be verified (Pre-flight). A guard that cannot see a subagent's writes must not let the subagent start. OpenCode users lose subagents until a live run proves the hook sees them.
 3. **Only the documented 1.x argument names are mapped.** Current OpenCode documentation shows renamed tools and arguments (`shell`, `path`, `subagent`). They are not mapped, because nothing has verified them against a running OpenCode, and the FEAT-048 spec leaves the V2 plugin API out of scope. Under the fail-closed rule, a renamed tool is blocked, and a mapped tool with renamed arguments is blocked for the missing argument. Neither passes silently.
-4. **The release exemption keys on author identity, narrowed by branch and backed by a ruleset.** This amends FEAT-045 Ruling 2 ("never exempts a branch name"). A branch name alone exempts nothing.
+4. **The release exemption keys on author identity, narrowed by branch and backed by the `release-branches` ruleset**, whose bypass list holds only the App (verified possible on this user-owned repository; see Pre-flight). This amends FEAT-045 Ruling 2 ("never exempts a branch name"). A branch name alone exempts nothing.
 5. **`pull_request_target` for the records guard.** This amends FEAT-045 Ruling 4 ("runs on `pull_request`"); see Pre-flight.
 6. **CODEOWNERS names only `@cc-reviewer-bot`.** The owner is deliberately not listed.
 
@@ -119,10 +122,13 @@ There is also a gap in the release flow. The maintainer's release PRs are opened
   - a patch with one valid marker plus an indented `  *** Add File: <denied path>`;
   - a patch whose marker is `*** Add File:<p>`, with no space;
   - a patch with an unknown `*** Copy File: p`;
-  - a patch with no file marker.
+  - a patch with no file marker;
+  - a marker with an empty path, `*** Add File: `;
+  - a marker whose path has leading or trailing whitespace.
 
   A CRLF patch whose markers are otherwise valid is parsed like its LF form and gets the same verdict.
-- [ ] **AC8** — `*** Add File: ../x` and `*** Add File: /etc/x` are blocked for leaving `directory` and being absolute, before any guard runs.
+- [ ] **AC8** — `*** Add File: ../x`, `*** Add File: ..\x`, `*** Add File: /etc/x` and `*** Add File: C:\x` are blocked for leaving `directory` or being absolute, before any guard runs.
+- [ ] **AC8b** — A patch with `*** Update File: a.js` and `*** Move to: <existing file>` is blocked with Guard 2's reason for the target.
 - [ ] **AC9** — The existing plugin tests pass: the Guard 3 corpus, Guards 1, 2 and 4, and reason parity. The test "never spawns the guard for a tool it does not map" is replaced by AC4.
 - [ ] **AC10** — `checkDocDir` behavior:
   - rejects with a non-empty reason: `.claude/skills`, `.claude/skills/x`, `.Claude/Skills`, `.claude/settings`, `.claude/rules`, `.opencode`, `.opencode/plugin`;
@@ -133,9 +139,10 @@ There is also a gap in the release flow. The maintainer's release PRs are opened
   - permissions are `contents: read` only;
   - the checkout is `refs/pull/${{ github.event.pull_request.number }}/merge` with `fetch-depth: 2` and `persist-credentials: false`;
   - the `if:` has the owner clause unchanged and the `cc-lane-bot[bot]` + `release/` clause;
+  - `HEAD_SHA` is set under `env:` from `github.event.pull_request.head.sha`, and the job fails when the merge commit's second parent is not that SHA;
   - the step runs the copy written from `HEAD^1`, and nothing runs from the PR tree: no `node tools/`, no `npm`;
   - `author_association` and `head_ref` stay absent;
-  - `CONTRIBUTING.md` names the `release-branches` ruleset.
+  - `CONTRIBUTING.md` names the `release-branches` ruleset, and its release-branch constraint no longer says there is no `release/*` flow.
 - [ ] **AC12** — `.github/CODEOWNERS` matches `^\* @cc-reviewer-bot\s*$` as its only non-comment line, asserted by a repo-invariants test.
 - [ ] **AC13** — The full suite is green on both CI legs. `.gitignore` carries this spec's and its plan's leaf lines in sorted position (`gitignore-block-parity`).
 
@@ -153,10 +160,12 @@ There is also a gap in the release flow. The maintainer's release PRs are opened
 - `project-template/.opencode/plugin/conductor-guard.js`: the classification, argument checks, patch grammar, path resolution and reasons. Same export, same hook.
 - `tests/hooks/opencode-guard.test.js`: AC1 to AC9, including a counting stub guard fixture.
 - `scripts/doc-locations.mjs` (`RESERVED`, `reservedReason`): AC10. Also `tests/scripts/doc-locations.test.js`, and the FEAT-047 orchestrate tests that assert rejections.
-- `.github/workflows/records-guard.yml` and `tests/tools/records-guard.test.js` (`describe('the workflow')`): AC11. `CONTRIBUTING.md` (the records-guard line and the ruleset).
+- `.github/workflows/records-guard.yml` and `tests/tools/records-guard.test.js` (`describe('the workflow')`): AC11.
+- `CONTRIBUTING.md`: the records-guard line names the ruleset. Lines 68-69 ("There is no `release/*` branch flow in this repository") are reworded: contributors never create `release/*` branches; they are created only by the maintainer's release App and protected by the `release-branches` ruleset.
 - `.github/CODEOWNERS` and `tests/tools/repo-invariants.test.js`: AC12.
 - `README.md:408`: the OpenCode row "`apply_patch`, `multiedit`, `task` and other tools | Not sent to the guard" becomes the mapped / read-only / blocked split.
-- `docs/superpowers/specs/2026-11-10-feat048-opencode-guard-design.md:76` ("Not routed to the guard"), plus FEAT-045's spec at Rulings 2 and 4: amended in place, with a line pointing to this spec.
+- `docs/superpowers/specs/2026-11-10-feat048-opencode-guard-design.md:76` ("Not routed to the guard"): amended in place, with a line pointing to this spec.
+- `docs/superpowers/specs/2026-11-08-feat045-ci-records-guard-design.md`: Rulings 2 and 4, the sample YAML (lines 116-131) and the "Fork PR" row (line 204) are amended in place to the `pull_request_target` workflow, with a line pointing to this spec.
 - `.gitignore` tracked-surface block: two leaf lines.
 - Nothing the installer deploys changes except the OpenCode plugin, which only `--opencode` installs.
 
@@ -169,12 +178,15 @@ There is also a gap in the release flow. The maintainer's release PRs are opened
 
 - **Subagent hooks (VERIFY, result: not verifiable here).** OpenCode issue #5894 (on 1.0.182) reports that `tool.execute.before` did not block tool calls made by `task` subagents. A maintainer could not reproduce it, and a commenter attributed the bypass to `bash`. The issue page does not show a fix or a version. The FEAT-048 POC measured 1.18.33 for the primary agent only, and there is no OpenCode binary on the machine that wrote this spec. So `task` is blocked (Choice 2).
 - **Records guard option chosen: A, `pull_request_target`.** Option B, a ruleset that requires the workflow, is an organization-level ruleset feature that this personal repository does not have. Option C, keeping `pull_request` and documenting the residual risk, leaves the gate editable by the PR. Under A, the gate's definition and code both come from the base branch. The known risk of `pull_request_target` is running untrusted code with a privileged token. Here the token is read-only, no secret is used, and the PR tree is only read by git. Git takes no configuration, hooks or filter drivers from a checked-out tree.
+- **Ruleset bypass by an App (VERIFY, result: supported).** On this user-owned repository, the existing `release-tags` ruleset already lists the `cc-lane-bot` App (`actor_type: Integration`) in `bypass_actors`, read from the rulesets API on 2026-11-11. So `release-branches` can do the same.
+- **Bootstrap.** The PR that lands this change runs no Records guard job. The base workflow has no `pull_request_target` trigger, and the PR's workflow has no `pull_request` trigger. Records guard is not a required check today, so nothing blocks the merge. If it ever becomes required, that bootstrap PR needs an admin merge.
+- **Known over-block.** A context line in a patch whose trimmed form starts with `***`, such as a Markdown rule or bold-italic text, blocks the patch. This is accepted, and the reason says a `***` line that is not an exact marker was found, so the model can switch to `edit`.
 - **Content visibility (VERIFY, result: no guard reads it).** No guard in `pre-tool-use.mjs` reads `content`, `old_string` or `new_string`. The only checks that read quoted content are Guard 3's, and those read the Bash command. The plugin still passes added and removed lines, so a future content guard sees patch writes the way it sees `write` and `edit`.
 - **CODEOWNERS (VERIFY, result: valid).** `cc-reviewer-bot` is a GitHub **user** (machine) account, `COLLABORATOR` on the repository, whose approvals already count (PR #122). It is not an App, so it can be a code owner. `enforce_admins` is off.
 - **`codesearch` (VERIFY, result: built-in, experimental).** It is listed among OpenCode's built-in tools as experimental web code search, so it goes on the read-only list.
 - **The patch parser is new attack surface.** Paths come only from exact, column-0 markers. Anything that looks like a marker but is not exact blocks the whole patch. Paths are resolved and confined to `directory`.
 - **Over-blocking is accepted.** Fail-closed blocks MCP tools, `task`, `batch` and any new OpenCode tool, and every reason says which tool and why.
-- **Workflow injection.** The `if:` reads `user.login` and `head.ref` only inside an expression, never in a `run:` script. No `${{ }}` expression appears in `run:`; the checkout `ref` interpolates only the PR number, an integer.
+- **Workflow injection.** The `if:` reads `user.login` and `head.ref` only inside an expression, never in a `run:` script. No `${{ }}` expression appears in `run:`. The checkout `ref` interpolates only the PR number, an integer, and the one new `${{ }}` use, the head SHA, is set under `env:`.
 
 ## Complexity Estimate
 
