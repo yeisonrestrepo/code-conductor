@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.47.0] - 2026-11-13
+
+### Added
+- **[FEAT-057]** Build and Verify have a review loop: an audit `RETURN` with rounds left no longer ends the run. `orchestrate.mjs` records a `fix` on that audit entry (round, the files named by the blocker and major findings with `:line` groups and a leading `./` stripped, the review file `audit-<round>.txt` and its sha256), `install code` prints the envelope plus a `fix round <r> of <N>: review … sha256 …` line, the fix hand-back does not advance `tasks.done`, and the router dispatches `audit` again. `start` takes `--audit-rounds <0-5>` (default 2) and records it as `audit_rounds`; the cap is read from the run file, never from the orchestrator's prompt, and a hand-edited value outside 0-5 makes the run file invalid. The fix scope is the named files plus the approved plan; a finding that names a file outside the plan's task files, or the approved spec or plan, halts with `ORCH_FIX_SCOPE_UNAPPROVED`. At the cap or on `ESCALATE` the run halts with `ORCH_AUDIT_RETURN` / `ORCH_AUDIT_ESCALATE`. Each audit entry carries its `round` and `verdict`, and `qa`'s `verify_pass` is forwarded only over the last audit being `APPROVE`. Both `cc-orchestrate.md` copies and the README describe the loop. Landed from PR #201 (cc-lane-bot), intake of issue #183.
+
 ## [1.46.0] - 2026-11-13
 
 ### Added
