@@ -45,18 +45,26 @@ export const ROLE_ARTIFACTS = {
   code: { tk: 'RW', scope: null },
   audit: { tk: 'R', scope: null },
   qa: { tk: 'X', scope: null },
+  security: { tk: 'X', scope: null },
 };
 // The router table's "may hand back" column.
 export const MAY_HAND_BACK = {
   spec: ['boundary_routed'], plan: ['boundary_routed'], code: ['build_executed'],
-  audit: ['build_executed'], qa: ['verify_pass'],
+  audit: ['build_executed'], qa: ['verify_pass'], security: ['build_executed'],
 };
-const PHASE = { spec: 'spec', plan: 'plan', code: 'impl', audit: 'rev', qa: 'rev' };
+const PHASE = { spec: 'spec', plan: 'plan', code: 'impl', audit: 'rev', qa: 'rev', security: 'rev' };
 // Guard 7's chaining set (FEAT-012 D7). The hook carries a copy pinned to this one (D10).
 export const SHELL_METACHARACTERS = [';', '&', '|', '`', '$(', '<', '>', '\n', '\r'];
 // D6: each package manager's invocation of the owner's `test` script. `bun test` would run
 // Bun's own test runner and ignore the script, so bun goes through `run`.
 export const PM_TEST_COMMAND = { npm: 'npm test', pnpm: 'pnpm test', yarn: 'yarn test', bun: 'bun run test' };
+// FEAT-034 C7: only npm and pnpm ship an audit with a stable --json; every other case is not covered, never guessed.
+export const PM_AUDIT_COMMAND = { npm: 'npm audit --json', pnpm: 'pnpm audit --json' };
+export const SECURITY_LEVELS = ['low', 'moderate', 'high', 'critical'];
+const SECURITY_THRESHOLD_DEFAULT = 'high';
+const DEPENDENCY_STATES = ['audit', 'not-covered', 'disabled'];
+const OBJECT_NAME = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
+export const SECURITY_NOT_CONFIGURED = 'not-configured (run predates FEAT-034)';
 
 // A halt stops the run and is recorded in it (D12). A refusal is a misuse of the CLI:
 // nothing is written and nothing is recorded.
@@ -88,12 +96,23 @@ function writeAtomic(path, text) {
 
 const scriptRef = (root) => relative(root, join(HERE, 'orchestrate.mjs')).split('\\').join('/');
 
+// FEAT-034 C13: an absent key is a run from before the seat; a present one that is malformed is a hand edit.
+function isSecurity(s) {
+  if (!isPlainObject(s) || !SECURITY_LEVELS.includes(s.threshold) || !DEPENDENCY_STATES.includes(s.dependency)) return false;
+  const hasAudit = typeof s.audit_command === 'string' && s.audit_command !== '';
+  if (s.audit_command !== null && !hasAudit) return false;
+  if (hasAudit !== (s.dependency === 'audit')) return false;
+  if (s.base !== null && !OBJECT_NAME.test(s.base ?? '')) return false;
+  return typeof s.scan_command === 'string' && s.scan_command !== '';
+}
+
 // FEAT-057: a present audit_rounds that is not 0-5 would let a hand-edited run buy fix rounds without limit.
 export function isValidRun(run) {
   return isPlainObject(run) && run.v === 1 && typeof run.session_id === 'string' && run.session_id !== ''
     && typeof run.item === 'string' && GATES.includes(run.gate) && isPlainObject(run.approvals)
     && Array.isArray(run.handbacks) && Array.isArray(run.tasks?.ids) && Number.isInteger(run.tasks?.done)
-    && (run.audit_rounds === undefined || isAuditRounds(run.audit_rounds));
+    && (run.audit_rounds === undefined || isAuditRounds(run.audit_rounds))
+    && (run.security === undefined || isSecurity(run.security));
 }
 
 function readRun(root) {
@@ -135,7 +154,9 @@ export function nextStep(run) {
   const fix = fixDue(run);
   if (fix) return { role: 'code', fix: fix.round };
   const last = run.handbacks.at(-1)?.role;
-  if (last === 'audit') return { role: 'qa' };
+  if (last === 'audit') return { role: isPlainObject(run.security) ? 'security' : 'qa' };
+  // A blocked or failed seat never routes to qa: the halt already names end as the recovery (FEAT-034 plan decisions).
+  if (last === 'security') return run.handbacks.at(-1).security?.blocked === false ? { role: 'qa' } : { end: true };
   if (last === 'qa') return { end: true };
   return { role: 'audit' };
 }
@@ -280,24 +301,47 @@ function hasTestScript(pkgPath) {
 // D6: the one command code and qa may run, resolved before anything is recorded. The script
 // is checked before detect-stack runs, because detect-stack drops a non-string script and may
 // offer its own default runner, which the run must not take in place of the owner's script.
-export function resolveTestCommand(root) {
+export function resolveTestCommand(root, detect = () => detectStack(root)) {
   const pkgPath = join(root, 'package.json');
   if (existsSync(pkgPath)) {
     if (!hasTestScript(pkgPath)) {
       throw new Halt('ORCH_TEST_COMMAND_UNRESOLVED', 'package.json has no scripts.test; add a test script, the run does not guess a runner');
     }
-    return PM_TEST_COMMAND[detectStack(root).packageManager] ?? PM_TEST_COMMAND.npm;
+    return PM_TEST_COMMAND[detect().packageManager] ?? PM_TEST_COMMAND.npm;
   }
-  const { test } = detectStack(root);
+  const { test } = detect();
   if (typeof test === 'string' && test.trim() !== '') return test;
   throw new Halt('ORCH_TEST_COMMAND_UNRESOLVED', `detect-stack names no test command for ${root}`);
 }
 
 // D7: no command is recorded that Guard 7 would not pass.
-export function checkTestCommand(command) {
+function checkShellCommand(command, code) {
   const found = SHELL_METACHARACTERS.find((m) => command.includes(m));
   if (found === undefined) return command;
-  throw new Halt('ORCH_TEST_COMMAND_UNSAFE', `${JSON.stringify(command)} contains ${JSON.stringify(found)}, which Guard 7 denies; nothing was recorded`);
+  throw new Halt(code, `${JSON.stringify(command)} contains ${JSON.stringify(found)}, which Guard 7 denies; nothing was recorded`);
+}
+export const checkTestCommand = (command) => checkShellCommand(command, 'ORCH_TEST_COMMAND_UNSAFE');
+export const checkSecurityCommand = (command) => checkShellCommand(command, 'ORCH_SECURITY_COMMAND_UNSAFE');
+
+const scanRef = (root) => relative(root, join(HERE, 'security-scan.mjs')).split('\\').join('/');
+
+// FEAT-034: what the security seat will run, fixed at start so Guard 7 and the router read one record.
+function resolveSecurity(root, stack, { threshold, dependencyAudit }) {
+  const head = gitValue(root, ['rev-parse', 'HEAD'], '');
+  const base = OBJECT_NAME.test(head) ? head : null;
+  const auditCommand = dependencyAudit ? PM_AUDIT_COMMAND[stack.packageManager] ?? null : null;
+  const dependency = !dependencyAudit ? 'disabled' : auditCommand ? 'audit' : 'not-covered';
+  const scanCommand = `node ${scanRef(root)}${base ? ` ${base}` : ''}`;
+  if (auditCommand) checkSecurityCommand(auditCommand);
+  checkSecurityCommand(scanCommand);
+  return { threshold, dependency, base, audit_command: auditCommand, scan_command: scanCommand };
+}
+
+function securityNote(s, root, stack) {
+  const scan = s.audit_command
+    ?? (s.dependency === 'disabled' ? 'disabled (--no-dependency-audit)'
+      : `not covered for ${stack.packageManager ?? (existsSync(join(root, 'package.json')) ? 'no lockfile' : 'this stack')}`);
+  return `; security: threshold ${s.threshold}, dependency scan ${scan}`;
 }
 
 // The validator reads a file, so the candidate goes through a private temp dir. Returns
@@ -389,6 +433,9 @@ function install(root, sessionId, role, check) {
 function withholdUnlessApproved(run) {
   const verdict = run.handbacks.findLast((h) => h.role === 'audit')?.verdict;
   if (verdict !== 'APPROVE') throw new Halt('ORCH_GATE_WITHHELD', `qa may not forward verify_pass: the audit verdict is ${verdict ?? 'absent'}`);
+  if (!isPlainObject(run.security)) return;
+  const seat = run.handbacks.findLast((h) => h.role === 'security');
+  if (seat?.security?.blocked !== false) throw new Halt('ORCH_GATE_WITHHELD', `qa may not forward verify_pass: the security entry is ${seat ? 'blocked' : 'absent'}`);
 }
 
 // FEAT-057: a fix re-enters Build with no task, so it never advances tasks.done; audits carry their round.
@@ -397,13 +444,15 @@ function entryFields(run, role) {
   if (fix) return { fix: fix.round };
   if (role === 'code') return { task: run.tasks.ids[run.tasks.done] };
   if (role === 'audit') return { round: run.handbacks.filter((h) => h.role === 'audit').length + 1 };
+  // FEAT-034 C13: a run from before the seat records that the qa gate was not covered by it.
+  if (role === 'qa' && !isPlainObject(run.security)) return { security: SECURITY_NOT_CONFIGURED };
   return {};
 }
 
-export function recordHandback(run, role, gate, verdict) {
+export function recordHandback(run, role, gate, verdict, extra = {}) {
   if (role === 'qa' && gate === 'verify_pass') withholdUnlessApproved(run);
   const fields = entryFields(run, role);
-  const entry = { role, gate, at: new Date().toISOString(), ...fields, ...(verdict ? { verdict } : {}) };
+  const entry = { role, gate, at: new Date().toISOString(), ...fields, ...(verdict ? { verdict } : {}), ...extra };
   const tasks = role === 'code' && !('fix' in fields) ? { ...run.tasks, done: run.tasks.done + 1 } : run.tasks;
   return { ...run, role: null, gate: forwardGate(run, role, gate), tasks, handbacks: [...run.handbacks, entry] };
 }
@@ -415,7 +464,7 @@ function parseHandback(text) {
   const error = validate(json + '\n');
   if (error) throw new Halt('ORCH_HANDBACK_INVALID', error);
   const env = JSON.parse(json);
-  if (env.v !== 3) throw new Halt('ORCH_HANDBACK_INVALID', `a hand-back must be a v3 envelope, got v${env.v}`);
+  if (env.v !== 3 && env.v !== 4) throw new Halt('ORCH_HANDBACK_INVALID', `a hand-back must be a v3 or v4 envelope, got v${env.v}`);
   return env;
 }
 
@@ -471,7 +520,101 @@ export function parseVerdict(text) {
   return checkConsistent(match[1], severe.length, [...new Set(severe.map((m) => findingPath(m[2])))]);
 }
 
-function handback(root, sessionId, role, bytes) {
+// FEAT-034: the security report. The orchestrator copies what the agent wrote; the script reads it.
+const SCANS_CANDIDATE = /^scans\s*:/i;
+const SCANS_LINE = /^SCANS: dependency=(ran|not-covered|disabled|failed) secrets=(ran|failed) scripts=(ran|failed)$/;
+const SECURITY_FINDING = /^- \[(critical|high|moderate|low)\] (dependency|secret|script) \S(?:.*\S)? — \S/;
+const SECURITY_CANDIDATE = /^- \[/;
+const quote = (line) => JSON.stringify(line.slice(0, QUOTE_CAP));
+const invalid = (reason) => new Halt('ORCH_SECURITY_REPORT_INVALID', reason);
+
+function checkDependency(scans, findings, security) {
+  const wanted = security.dependency === 'audit' ? ['ran', 'failed'] : [security.dependency];
+  if (!wanted.includes(scans.dependency)) throw invalid(`the report says dependency=${scans.dependency}, but the run records dependency ${security.dependency}`);
+  if (findings.some((f) => f.source === 'dependency') && scans.dependency !== 'ran') {
+    throw invalid(`the report lists a dependency finding, but the dependency scan reports ${scans.dependency}`);
+  }
+}
+
+function scansLine(lines) {
+  const candidates = lines.filter((l) => SCANS_CANDIDATE.test(l));
+  if (candidates.length === 0) throw new Halt('ORCH_SECURITY_REPORT_MISSING', 'the security report has no SCANS: line');
+  if (candidates.length > 1) throw invalid(`expected exactly one SCANS line, found ${candidates.length}`);
+  const match = SCANS_LINE.exec(candidates[0]);
+  if (!match) throw invalid(`${quote(candidates[0])} is not SCANS: dependency=<ran|not-covered|disabled|failed> secrets=<ran|failed> scripts=<ran|failed>`);
+  const at = lines.findIndex((l) => l.startsWith('SNAP_HANDBACK '));
+  const before = lines.slice(0, Math.max(at, 0)).filter(Boolean);
+  if (at === -1 || before.at(-1) !== candidates[0]) throw invalid('the SCANS line must immediately precede SNAP_HANDBACK');
+  return { dependency: match[1], secrets: match[2], scripts: match[3] };
+}
+
+export function parseSecurityReport(text, security) {
+  const lines = text.split(/\r?\n/).map((l) => l.trim());
+  const scans = scansLine(lines);
+  const findings = [];
+  for (const line of lines.filter((l) => SECURITY_CANDIDATE.test(l))) {
+    const m = SECURITY_FINDING.exec(line);
+    if (!m) throw invalid(`${quote(line)} is not a finding line: - [<critical|high|moderate|low>] <dependency|secret|script> <location> — <one sentence>`);
+    findings.push({ severity: m[1], source: m[2], line });
+  }
+  checkDependency(scans, findings, security);
+  return { findings, scans };
+}
+
+const scanFailed = (reason) => new Halt('ORCH_SECURITY_SCAN_FAILED', `the local scans cannot be re-run: ${reason}`);
+
+// The diff under scan can change the work-tree scanner, so the re-run loads the base commit's copy (C17).
+async function baseScan(root, security) {
+  if (security.base === null) throw scanFailed('the run recorded no base commit');
+  const path = security.scan_command.replace(/^node /, '').replace(/ [0-9a-f]+$/, '');
+  const shown = spawnSync('git', ['show', `${security.base}:./${path}`], { cwd: root });
+  if (shown.status !== 0) throw scanFailed(`${path} is not committed at the base`);
+  const dir = mkdtempSync(join(tmpdir(), 'cc-security-base-'));
+  try {
+    const file = join(dir, 'security-scan.mjs');
+    writeFileSync(file, shown.stdout);
+    const { scanChanges } = await import(pathToFileURL(file).href);
+    return scanChanges(root, security.base);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
+function checkComplete(report, local) {
+  for (const scan of ['secrets', 'scripts']) {
+    if (report.scans[scan] !== local[scan]) throw new Halt('ORCH_SECURITY_REPORT_INCOMPLETE', `the report says ${scan}=${report.scans[scan]}; the local re-run says ${local[scan]}`);
+  }
+  const reported = new Set(report.findings.map((f) => f.line));
+  const missing = local.findings.find((line) => !reported.has(line));
+  if (missing !== undefined) throw new Halt('ORCH_SECURITY_REPORT_INCOMPLETE', `the report omits the local finding ${quote(missing)}`);
+}
+
+function securitySummary(report, threshold) {
+  const counts = { critical: 0, high: 0, moderate: 0, low: 0 };
+  for (const f of report.findings) counts[f.severity] += 1;
+  const failed = ['dependency', 'secrets', 'scripts'].find((k) => report.scans[k] === 'failed');
+  const blocking = report.findings.filter((f) => SECURITY_LEVELS.indexOf(f.severity) >= SECURITY_LEVELS.indexOf(threshold));
+  const blocked = Boolean(failed) || blocking.length > 0;
+  return { entry: { scans: report.scans, counts, threshold, blocked }, failed, blocking, total: report.findings.length };
+}
+
+function securityStop({ failed, blocking }, threshold) {
+  if (failed) return new Halt('ORCH_SECURITY_SCAN_FAILED', `the ${failed} scan did not complete; scans clean is the Verify exit, see ${HANDBACK_DIR}/security.txt`);
+  if (blocking.length === 0) return null;
+  return new Halt('ORCH_SECURITY_BLOCKED', `security found ${blocking.length} finding(s) at or above ${threshold}; first: ${blocking[0].line.slice(0, QUOTE_CAP)}`);
+}
+
+async function securityHandback(root, run, gate, text) {
+  const report = parseSecurityReport(text, run.security);
+  checkComplete(report, await baseScan(root, run.security));
+  const { threshold } = run.security;
+  const summary = securitySummary(report, threshold);
+  // Saved first, so the halt cli records lands on top of the entry.
+  saveRun(root, recordHandback(run, 'security', gate, null, { security: summary.entry }));
+  const stop = securityStop(summary, threshold);
+  if (stop) throw stop;
+  return `security handed back ${gate}; ${summary.total} finding(s) below ${threshold} recorded; dependency=${report.scans.dependency}`;
+}
+
+async function handback(root, sessionId, role, bytes) {
   const text = bytes.toString('utf8');
   const run = liveRun(root, sessionId);
   // The binary refuses a second SubagentHandback, yet an agent can still report again (V1, F4).
@@ -484,12 +627,14 @@ function handback(root, sessionId, role, bytes) {
   if (!MAY_HAND_BACK[role].includes(env.ops.gate)) {
     throw new Halt('ORCH_GATE_UNEARNED', `${role} may hand back ${MAY_HAND_BACK[role].join('|')}, not ${env.ops.gate}`);
   }
+  if (role === 'security') return securityHandback(root, run, env.ops.gate, text);
   const verdict = role === 'audit' ? parseVerdict(text) : null;
   const recorded = recordHandback(run, role, env.ops.gate, verdict?.verdict);
   saveRun(root, recorded);
   // Saved first, so the halt cli records lands on top of the audit entry (FEAT-060, FEAT-057).
   if (verdict && verdict.verdict !== 'APPROVE') return auditFix(root, recorded, verdict, bytes);
-  return `${role} handed back ${env.ops.gate}`;
+  const note = recorded.handbacks.at(-1).security === SECURITY_NOT_CONFIGURED ? `; security=${SECURITY_NOT_CONFIGURED}` : '';
+  return `${role} handed back ${env.ops.gate}${note}`;
 }
 
 // Two human approvals, one gate write (A4): only an approved plan writes define_approved.
@@ -600,21 +745,25 @@ function parseReview(text, role, round) {
   return rows.length === open ? { open, rows } : null;
 }
 
-const START_USAGE = 'usage: orchestrate.mjs start <ITEM> [--auto] [--ticket <N|issue URL>] [--audit-rounds <0-5>]';
+const START_USAGE = 'usage: orchestrate.mjs start <ITEM> [--auto] [--ticket <N|issue URL>] [--audit-rounds <0-5>] [--security-threshold <low|moderate|high|critical>] [--no-dependency-audit]';
 
-// The item first, then --auto, --ticket <ref> and --audit-rounds <0-5> in any order, each at
+// The item first, then --auto, --ticket <ref>, --audit-rounds <0-5>, --security-threshold <level> and
+// --no-dependency-audit in any order, each at
 // most once. A --ticket with no value reaches intake as '' and halts there (FEAT-031 B1.1).
 function parseStartArgs(args) {
   const [item, ...rest] = args;
-  const opts = { item, auto: false, ticket: undefined, auditRounds: undefined };
+  const opts = { item, auto: false, ticket: undefined, auditRounds: undefined, threshold: undefined, dependencyAudit: true };
   for (let i = 0; i < rest.length; i++) {
     if (rest[i] === '--auto' && !opts.auto) opts.auto = true;
     else if (rest[i] === '--ticket' && opts.ticket === undefined) opts.ticket = rest[++i] ?? '';
     else if (rest[i] === '--audit-rounds' && opts.auditRounds === undefined && /^[0-5]$/.test(rest[i + 1] ?? '')) opts.auditRounds = Number(rest[++i]);
+    else if (rest[i] === '--security-threshold' && opts.threshold === undefined && SECURITY_LEVELS.includes(rest[i + 1])) opts.threshold = rest[++i];
+    else if (rest[i] === '--no-dependency-audit' && opts.dependencyAudit) opts.dependencyAudit = false;
     else throw new Refusal(START_USAGE);
   }
   if (!/^[A-Z]+-\d{3,}$/.test(item ?? '')) throw new Refusal(START_USAGE);
   opts.auditRounds ??= AUDIT_ROUNDS_DEFAULT;
+  opts.threshold ??= SECURITY_THRESHOLD_DEFAULT;
   return opts;
 }
 
@@ -629,24 +778,27 @@ function ticketIntake(root, item, ref) {
 const ticketNote = (t) => `ticket ${t.binding.repo}#${t.binding.number} "${t.title}"; snapshot ${t.path} sha256 ${t.binding.sha256}; `;
 
 function start(root, sessionId, args) {
-  const { item, auto, ticket, auditRounds } = parseStartArgs(args);
+  const { item, auto, ticket, auditRounds, threshold, dependencyAudit } = parseStartArgs(args);
   if (!sessionId) throw new Halt('ORCH_NO_SESSION_ID', 'CLAUDE_CODE_SESSION_ID is absent or empty, so Guard 6 could never bind this run');
   const old = readRun(root);
   if (old && old.session_id === sessionId) throw new Halt('ORCH_RUN_ACTIVE', `run ${old.item} is live in this session; end it first`);
   // Resolved before a stale run is cleared, so a halt here leaves everything as it was.
-  const testCommand = checkTestCommand(resolveTestCommand(root));
+  let detected;
+  const stack = () => (detected ??= detectStack(root));
+  const testCommand = checkTestCommand(resolveTestCommand(root, stack));
   const docs = resolveDocs(root, item);
+  const security = resolveSecurity(root, stack(), { threshold, dependencyAudit });
   const bound = ticket === undefined ? null : ticketIntake(root, item, ticket);
   if (old) clearRunFiles(root);
   if (bound) writeSnapshot(root, bound.path, bound.text);
   saveRun(root, {
     v: 1, session_id: sessionId, item, mode: auto ? 'auto' : 'step', started: new Date().toISOString(),
     band: 'boundary', role: null, gate: 'boundary_routed', approvals: { spec: null, plan: null },
-    plan: null, tasks: { ids: [], done: 0 }, handbacks: [], halt: null, test_command: testCommand, audit_rounds: auditRounds, docs,
+    plan: null, tasks: { ids: [], done: 0 }, handbacks: [], halt: null, test_command: testCommand, audit_rounds: auditRounds, security, docs,
     ...(bound ? { ticket: { ...bound.binding, snapshot: bound.path } } : {}),
   });
   const begun = old ? `replaced the stale run ${old.item} started ${old.started}` : `run ${item} started`;
-  return `${begun}; ${bound ? ticketNote(bound) : ''}${docsNote(docs)}test command: ${testCommand}; audit rounds: ${auditRounds}`;
+  return `${begun}; ${bound ? ticketNote(bound) : ''}${docsNote(docs)}test command: ${testCommand}; audit rounds: ${auditRounds}${securityNote(security, root, stack())}`;
 }
 
 function clearRunFiles(root) {
@@ -671,7 +823,7 @@ function recordHalt(root, halt) {
   } catch { /* an unreadable run file cannot carry its own halt */ }
 }
 
-export function cli(argv, env, cwd = process.cwd()) {
+export async function cli(argv, env, cwd = process.cwd()) {
   const [verb, a, b, c] = argv;
   const root = findRunRoot(cwd);
   const sid = env.CLAUDE_CODE_SESSION_ID;
@@ -686,7 +838,7 @@ export function cli(argv, env, cwd = process.cwd()) {
   };
   try {
     if (!verbs[verb]) throw new Refusal('usage: orchestrate.mjs start|install|handback|approve|hash|review|end');
-    process.stdout.write(verbs[verb]() + '\n');
+    process.stdout.write((await verbs[verb]()) + '\n');
     return 0;
   } catch (e) {
     if (e instanceof Refusal) { process.stderr.write(`orchestrate: ${e.message}\n`); return 2; }
@@ -698,4 +850,4 @@ export function cli(argv, env, cwd = process.cwd()) {
 }
 
 const invoked = process.argv[1] && pathToFileURL(realpathSync(process.argv[1])).href === import.meta.url;
-if (invoked) process.exitCode = cli(process.argv.slice(2), process.env);
+if (invoked) process.exitCode = await cli(process.argv.slice(2), process.env);

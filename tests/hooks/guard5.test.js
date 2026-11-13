@@ -188,6 +188,18 @@ describe('Guard 5: band scope for role agents [ARCH-010]', () => {
     expect(asSpec(outside).permissionDecisionReason).toBe(violation(outside, '.claude/specs/**'));
   });
 
+  it('[FEAT-034] denies a security Write under a v4 tk X envelope BAND_READ_ONLY, not BAND_ENVELOPE_INVALID', () => {
+    writeFileSync(envelopePath(), JSON.stringify({
+      v: 4,
+      sys: { ph: 'rev', c: 'abc1234', s: 'feat034', role: 'security', tk: 'X' },
+      ops: { n: [], f: [], gate: 'build_executed' },
+      mem: { d: [], x: [] },
+    }));
+    const d = fire(payload('Write', join(sub, 'src', 'a.js'), { cwd: sub, agent: 'security' }));
+    expect(d.permissionDecision).toBe('deny');
+    expect(d.permissionDecisionReason).toBe('Guard 5: BAND_READ_ONLY: role security holds tk X, not RW.');
+  });
+
   it('[AC10] carries band constants equal to scripts/snap-contract.mjs (D7)', () => {
     const text = readFileSync(HOOK, 'utf8');
     const list = (name) => JSON.parse(text.match(new RegExp(`const ${name} = (\\[[^\\]]*\\]);`))[1].replace(/'/g, '"'));

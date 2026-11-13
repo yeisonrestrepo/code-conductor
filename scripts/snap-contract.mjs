@@ -14,13 +14,13 @@ export const PRE_PARSE_MAX_BYTES = 10485760; // 10 MiB
 // constraint, kept under its own name.
 export const V1_MAX_CHARS = 4096;
 
-// Post-parse, version-specific caps, applied once snap.v is known. v2 and v3 share the
-// pre-parse ceiling: neither is a context-budget file.
-export const POST_PARSE_MAX = { 1: V1_MAX_CHARS, 2: PRE_PARSE_MAX_BYTES, 3: PRE_PARSE_MAX_BYTES };
+// Post-parse, version-specific caps, applied once snap.v is known. v2, v3 and v4 share the
+// pre-parse ceiling: none is a context-budget file.
+export const POST_PARSE_MAX = { 1: V1_MAX_CHARS, 2: PRE_PARSE_MAX_BYTES, 3: PRE_PARSE_MAX_BYTES, 4: PRE_PARSE_MAX_BYTES };
 
 // Highest v this contract understands. Raising it here moves the
 // SNAP_UNKNOWN_VERSION boundary with no edit anywhere else.
-export const MAX_VERSION = 3;
+export const MAX_VERSION = 4;
 
 // One array-cap table in ONE key scheme: dotted path to [count cap, element cap].
 // Two schemes for one table is how a drift hides from every diff and grep.
@@ -38,26 +38,35 @@ export const elementLength = (el) => JSON.stringify(el).slice(1, -1).length;
 
 // Field sets, both per version. v1 and v2 share one block map, unchanged since v1;
 // v3 adds the band fields reserved by FEAT-010 (ARCH-010).
+const V3_TOP = ['v', 'sys', 'ops', 'mem', 'pr'];
+const V3_BLOCKS = { sys: ['ph', 'c', 's', 'role', 'tk'], ops: ['n', 'f', 'scope', 'gate'], mem: ['d', 'x', 'p'] };
+// v4 adds no field: it widens the role roster only (FEAT-034, the FEAT-012 amendment).
 export const TOP_FIELDS = {
   1: ['v', 'sys', 'ops', 'mem'],
-  2: ['v', 'sys', 'ops', 'mem', 'pr'],
-  3: ['v', 'sys', 'ops', 'mem', 'pr'],
+  2: V3_TOP,
+  3: V3_TOP,
+  4: V3_TOP,
 };
 const V1_BLOCKS = { sys: ['ph', 'c', 's'], ops: ['n', 'f'], mem: ['d', 'x'] };
 export const BLOCK_FIELDS = {
   1: V1_BLOCKS,
   2: V1_BLOCKS,
-  3: { sys: ['ph', 'c', 's', 'role', 'tk'], ops: ['n', 'f', 'scope', 'gate'], mem: ['d', 'x', 'p'] },
+  3: V3_BLOCKS,
+  4: V3_BLOCKS,
 };
 
 // The band contract (ARCH-010). A role names an agent with a mask behind it, so the roster
 // stops at FEAT-012's five and widens only at a new version. A gate names a band's whole
 // exit condition, which the ARCH-009 band table fixes independently of any agent.
-export const ROLES = ['spec', 'plan', 'code', 'audit', 'qa'];
+export const ROLES_BY_VERSION = {
+  3: ['spec', 'plan', 'code', 'audit', 'qa'],
+  4: ['spec', 'plan', 'code', 'audit', 'qa', 'security'],
+};
+export const ROLES = ROLES_BY_VERSION[MAX_VERSION];
 export const TOOL_KINDS = ['R', 'RW', 'X'];
 export const BANDS = ['boundary', 'define', 'build', 'verify', 'ship'];
 export const GATES = ['boundary_routed', 'define_approved', 'build_executed', 'verify_pass', 'ship_released'];
-export const ROLE_BAND = { spec: 'define', plan: 'define', code: 'build', audit: 'verify', qa: 'verify' };
+export const ROLE_BAND = { spec: 'define', plan: 'define', code: 'build', audit: 'verify', qa: 'verify', security: 'verify' };
 // The tools Guard 5 gates. The hook cannot import this module from both of its install
 // locations, so it carries a copy that tests/hooks/guard5.test.js pins to this one (D7).
 export const WRITE_TOOLS = ['Write', 'Edit', 'create_file', 'write_file'];

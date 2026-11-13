@@ -78,12 +78,13 @@ describe('snap-contract.mjs', () => {
     expect(POST_PARSE_MAX[1]).toBe(V1_MAX_CHARS)
     expect(POST_PARSE_MAX[2]).toBe(PRE_PARSE_MAX_BYTES)
     expect(POST_PARSE_MAX[3]).toBe(PRE_PARSE_MAX_BYTES)
-    expect(MAX_VERSION).toBe(3)
-    expect(Object.keys(POST_PARSE_MAX).map(Number)).toEqual([1, 2, MAX_VERSION])
+    expect(POST_PARSE_MAX[4]).toBe(PRE_PARSE_MAX_BYTES)
+    expect(MAX_VERSION).toBe(4)
+    expect(Object.keys(POST_PARSE_MAX).map(Number)).toEqual([1, 2, 3, MAX_VERSION])
   })
 
   it('[AC1] defines v3: the version ceiling, its top-level fields and its post-parse cap', () => {
-    expect(contract.MAX_VERSION).toBe(3)
+    expect(contract.MAX_VERSION).toBe(4)
     expect(contract.TOP_FIELDS[3]).toEqual(['v', 'sys', 'ops', 'mem', 'pr'])
     expect(contract.POST_PARSE_MAX[3]).toBe(contract.PRE_PARSE_MAX_BYTES)
   })
@@ -95,18 +96,37 @@ describe('snap-contract.mjs', () => {
     expect(contract.BLOCK_FIELDS[3]).toEqual({
       sys: ['ph', 'c', 's', 'role', 'tk'], ops: ['n', 'f', 'scope', 'gate'], mem: ['d', 'x', 'p'],
     })
-    expect(Object.keys(contract.BLOCK_FIELDS).map(Number)).toEqual([1, 2, 3])
+    expect(Object.keys(contract.BLOCK_FIELDS).map(Number)).toEqual([1, 2, 3, 4])
   })
 
   it('holds the band enums, the band order and the handoff map [ARCH-010]', () => {
-    expect(contract.ROLES).toEqual(['spec', 'plan', 'code', 'audit', 'qa'])
+    expect(contract.ROLES).toEqual(['spec', 'plan', 'code', 'audit', 'qa', 'security'])
     expect(contract.TOOL_KINDS).toEqual(['R', 'RW', 'X'])
     expect(contract.BANDS).toEqual(['boundary', 'define', 'build', 'verify', 'ship'])
     expect(contract.GATES).toEqual(['boundary_routed', 'define_approved', 'build_executed', 'verify_pass', 'ship_released'])
     expect(contract.WRITE_TOOLS).toEqual(['Write', 'Edit', 'create_file', 'write_file'])
     expect(contract.V3_CAPS).toEqual({ 'ops.scope': [20, 300] })
     expect(Object.fromEntries(contract.ROLES.map(r => [r, contract.expectedGate(r)]))).toEqual({
-      spec: 'boundary_routed', plan: 'boundary_routed', code: 'define_approved', audit: 'build_executed', qa: 'build_executed',
+      spec: 'boundary_routed', plan: 'boundary_routed', code: 'define_approved', audit: 'build_executed', qa: 'build_executed', security: 'build_executed',
     })
+  })
+})
+
+describe('SNAP v4: the security role [FEAT-034]', () => {
+  it('v4 is v3 plus the security role: same top fields, block fields and post-parse cap', () => {
+    expect(contract.TOP_FIELDS[4]).toEqual(contract.TOP_FIELDS[3])
+    expect(contract.BLOCK_FIELDS[4]).toEqual(contract.BLOCK_FIELDS[3])
+    expect(contract.POST_PARSE_MAX[4]).toBe(contract.POST_PARSE_MAX[3])
+  })
+
+  it('ROLES_BY_VERSION keeps five roles at v3, adds security at v4, and ROLES is the MAX_VERSION roster', () => {
+    expect(contract.ROLES_BY_VERSION[3]).toEqual(['spec', 'plan', 'code', 'audit', 'qa'])
+    expect(contract.ROLES_BY_VERSION[4]).toEqual(['spec', 'plan', 'code', 'audit', 'qa', 'security'])
+    expect(contract.ROLES).toEqual(contract.ROLES_BY_VERSION[contract.MAX_VERSION])
+  })
+
+  it('security belongs to verify and expects build_executed', () => {
+    expect(contract.ROLE_BAND.security).toBe('verify')
+    expect(contract.expectedGate('security')).toBe('build_executed')
   })
 })

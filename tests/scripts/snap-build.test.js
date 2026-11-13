@@ -276,3 +276,21 @@ describe('snap-build.mjs', () => {
     expect(JSON.parse(r.stdout).mem.d).toEqual(['x'.repeat(300)]);
   });
 });
+
+describe('snap-build.mjs v4 [FEAT-034]', () => {
+  const sec = { ph: 'rev', c: 'abc1234', s: 'feat034', n: [], f: [], d: [], x: [], tk: 'X', gate: 'build_executed' };
+
+  it('writes v3 for each of the five foundation roles', () => {
+    for (const role of ['spec', 'plan', 'code', 'audit', 'qa']) {
+      const r = build(JSON.stringify({ ...sec, role }));
+      expect(r.status).toBe(0);
+      expect(JSON.parse(r.stdout).v).toBe(3);
+    }
+  });
+
+  it('writes v4 for security and keeps the v3 key order', () => {
+    const r = build(JSON.stringify({ ...sec, role: 'security' }));
+    expect(r.status).toBe(0);
+    expect(r.stdout.trim()).toBe('{"v":4,"sys":{"ph":"rev","c":"abc1234","s":"feat034","role":"security","tk":"X"},"ops":{"n":[],"f":[],"gate":"build_executed"},"mem":{"d":[],"x":[]},"pr":""}');
+  });
+});

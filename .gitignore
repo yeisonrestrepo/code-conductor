@@ -41,6 +41,7 @@ tests/.tmp/
 !/.claude/agents/define-review.md
 !/.claude/agents/plan.md
 !/.claude/agents/qa.md
+!/.claude/agents/security.md
 !/.claude/agents/spec.md
 !/.claude/commands/cc-implement.md
 !/.claude/commands/cc-init.md

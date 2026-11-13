@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { CAPS, PRE_PARSE_MAX_BYTES as MAX_SNAP_BYTES, V1_MAX_CHARS, V3_CAPS, elementLength } from './snap-contract.mjs';
+import { CAPS, PRE_PARSE_MAX_BYTES as MAX_SNAP_BYTES, V1_MAX_CHARS, V3_CAPS, ROLES_BY_VERSION, elementLength } from './snap-contract.mjs';
 
 const die = (msg) => { process.stderr.write(`SNAP_BUILD_ERROR: ${msg}\n`); process.exit(1); };
 const byteLen = (s) => Buffer.byteLength(s, 'utf8');
@@ -112,7 +112,8 @@ if (pr === '' && !band) {
   writeOut(line);
 } else {
   // ---- v2 and v3: 10 MiB cap, truncate raw pr before serialize ----
-  const v = band ? 3 : 2;
+  // FEAT-034: v4 only where v3 cannot name the role, so every existing envelope stays byte-identical.
+  const v = !band ? 2 : ROLES_BY_VERSION[3].includes(obj.role) ? 3 : 4;
   const skeletonBytes = byteLen(JSON.stringify({ v, sys, ops, mem, pr: '' }));
   if (skeletonBytes > MAX_SNAP_BYTES) die('skeleton exceeds cap even without prose');
 
