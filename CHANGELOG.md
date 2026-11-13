@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.48.0] - 2026-11-13
+
+### Added
+- **[FEAT-034]** `/cc-orchestrate` has a sixth Verify-band role, `security`, between the last `audit` and `qa`; it reports findings and fixes nothing. `start` takes `--security-threshold <low|moderate|high|critical>` (default `high`) and `--no-dependency-audit`, and records the threshold, the base commit, the dependency audit command and the scan command in the run file. The dependency audit is `npm audit --json` or `pnpm audit --json`, chosen from the lockfile via the stack detector; Yarn, Bun, no lockfile and non-JS stacks are recorded as `not covered`, the flag as `disabled`. The new `scripts/security-scan.mjs` (node builtins only) scans the lines added since the base commit, tracked and untracked, for credential formats, and judges each new or changed `package.json` script with the base commit's own Guard 3. `handback security` re-runs that scan from the base commit's scanner and halts with `ORCH_SECURITY_REPORT_INCOMPLETE` when the report omits a local finding, `ORCH_SECURITY_SCAN_FAILED` when a scan did not complete, and `ORCH_SECURITY_BLOCKED` on a finding at or above the threshold, so `qa` is not dispatched and `verify_pass` is withheld; findings below it are counted and the run proceeds. The `security` profile has `Read, Grep, Glob, Bash`: Guard 5 denies its writes and Guard 7 allows only its two recorded commands. The role exists only at SNAP v4, which adds no field, so v1-v3 envelopes are byte-identical; a run file without `security` skips the seat and records `security=not-configured` on the `qa` entry. `dependencies` stays `{}`. Both `cc-orchestrate.md` copies and the README describe the seat. Landed from PR #205 (cc-lane-bot), intake of issue #142.
+
 ## [1.47.0] - 2026-11-13
 
 ### Added
