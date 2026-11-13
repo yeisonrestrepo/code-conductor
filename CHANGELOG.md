@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.46.0] - 2026-11-13
+
+### Added
+- **[FEAT-056]** `orchestrate.mjs approve <spec|plan> <path> <sha256>` binds an approval to the bytes the owner was shown: it hashes the document on disk with the one `documentHash` definition and refuses with `ORCH_DOC_HASH_STALE`, writing nothing, when the hash differs. The plan hash reads every list item's leading box as `[ ]`, so ticking progress keeps the approval while any other edit breaks it. Each approval records `{at, by, path, sha256}`, a new read-only `hash` verb prints the exact value `approve` checks, and every `install` after `define_approved` halts with `ORCH_APPROVED_DOC_CHANGED` when the approved spec or plan changed or can no longer be read (`ORCH_APPROVAL_UNHASHED` for a run approved before this release). Both `cc-orchestrate.md` copies and the wiki describe the hash-bound flow. Landed from PR #192 (cc-lane-bot), intake of issue #184.
+- **[FEAT-058]** The Define-band review loop revises through files instead of `SendMessage`, so it works in every permission mode, headless included. `orchestrate.mjs review <spec|plan> --round <doc>` records the document's sha256 for the round; `--record` reads the verdict from `.conductor/review/<role>-<n>.md` and refuses with `ORCH_REVIEW_UNPARSED` or `ORCH_REVIEW_DOC_MOVED`, writing nothing; `--close` accepts only `skipped:<reason>`. A revision that leaves the hash unchanged closes the loop `unchanged`, the cap stays three reviewer passes, every close deletes `.conductor/review/` and keeps only `{round, outcome, sha256}`, and `approve` refuses with `ORCH_REVIEW_OPEN` until the loop has a recorded outcome, so a skip is never silent. Both `cc-orchestrate.md` copies run the loop as fresh `Agent` dispatches (open, review, record, revise), and the README drops the `skipped:denied` row. Landed from PR #194 (cc-lane-bot), intake of issue #182.
+
 ## [1.45.0] - 2026-11-13
 
 ### Added
