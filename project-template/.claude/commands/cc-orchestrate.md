@@ -32,6 +32,8 @@ Then run `node "$S/orchestrate.mjs" <verb> ...` in that same call. The exit code
 
 A halt is terminal in v1 (D12). Recovery is `node "$S/orchestrate.mjs" end`, then a fresh `start`, each only on the owner's word. `install spec|plan` halts `ORCH_DOC_LOCATION_UNRESOLVED` on a run started before FEAT-047; recovery is `end`, then `start`.
 
+`install code|audit|qa` halts `ORCH_APPROVED_DOC_CHANGED` when the approved spec or plan changed after its approval (a ticked plan checkbox is not a change), and `ORCH_APPROVAL_UNHASHED` on a run whose approvals were recorded before FEAT-056. Recovery for both is `end`, then `start`.
+
 `handback audit` halts `ORCH_VERDICT_MISSING`, `ORCH_VERDICT_INVALID` or `ORCH_VERDICT_INCONSISTENT` when the audit report's `VERDICT:` line is absent, malformed, misplaced or contradicts its findings, and `ORCH_AUDIT_RETURN` or `ORCH_AUDIT_ESCALATE` when the audit returned the change or escalated a decision to the owner. For those five, also name `.conductor/handback/audit.txt`: its findings are what the owner reads next. `handback qa` halts `ORCH_GATE_WITHHELD` when the run's audit entry carries no `VERDICT: APPROVE`. Recovery for all six is `end`, then `start`.
 
 ## Steps
@@ -58,11 +60,11 @@ A halt is terminal in v1 (D12). Recovery is `node "$S/orchestrate.mjs" end`, the
       3. Keep the agent's `Observation:` line for the report.
       4. If a second `SNAP_HANDBACK` from that agent reaches you for the same position, outside a revision report of the review loop, write it to `.conductor/handback/<role>-second.txt` (`code-<N>-second.txt` for code) and run `handback <role>` on it. It halts with `ORCH_HANDBACK_CONFLICT`. Then follow "On any halt".
 3. **The two define approvals.** These pause in both modes. Before each, run "The review loop" below for that role.
-   - **What you show:** the document path; its sha256 now (`shasum -a 256 <doc>` or `sha256sum <doc>`; in PowerShell, `Get-FileHash -Algorithm SHA256 <doc>`); the loop outcome (`clean` at round `<n>`, `cap` with the final reviewer's rows verbatim, or `skipped:<reason>` with a notice naming what failed); and each round's verdict line with the reviewer's notes.
+   - **What you show:** the document path; its sha256 from `node "$S/orchestrate.mjs" hash <spec|plan> <doc>`, the value `approve` checks (for the spec it equals `sha256sum <doc>`; for the plan every task checkbox is read as `[ ]`, so ticks never change it); the loop outcome (`clean` at round `<n>`, `cap` with the final reviewer's rows verbatim, or `skipped:<reason>` with a notice naming what failed); and each round's verdict line with the reviewer's notes.
    - **Only an owner message approves.** An approval is a message the owner sends that itself says to approve. A reviewer's `CLEAN`, a loop outcome, `--auto` and a suggestion in the input box are not approvals.
-   - **Re-hash before approve.** Immediately before `approve`, hash the document again. If the hash differs from the one you showed, show the document again instead of approving.
-   - **After spec:** show the owner the spec path from the hand-back, and for a bound run the snapshot path and sha256 from the start line: the owner reviews the spec against that snapshot. On approval, run `node "$S/orchestrate.mjs" approve spec`.
-   - **After plan:** show the owner the plan path named in the hand-back's `ops.f`. On approval, run `node "$S/orchestrate.mjs" approve plan <plan path>`. This writes `define_approved`, the only gate you author after `boundary_routed`.
+   - **The script checks the hash.** Pass the path and hash you showed to `approve`. On `ORCH_DOC_HASH_STALE`, a refusal that writes nothing, the document changed after you showed it: show it again with its new hash and wait for a new owner approval.
+   - **After spec:** show the owner the spec path from the hand-back, and for a bound run the snapshot path and sha256 from the start line: the owner reviews the spec against that snapshot. On approval, run `node "$S/orchestrate.mjs" approve spec <spec path> <sha256>` with the path and hash you showed.
+   - **After plan:** show the owner the plan path named in the hand-back's `ops.f`. On approval, run `node "$S/orchestrate.mjs" approve plan <plan path> <sha256>` with the path and hash you showed. This writes `define_approved`, the only gate you author after `boundary_routed`.
 4. **Build.** Dispatch `code` once per plan task, serially, until the router moves on to `audit`. A `--check` refusal names the next step.
 5. **Verify.** Dispatch `audit`, then `qa`. The audit report ends in one `VERDICT:` line just before its `SNAP_HANDBACK` line; only `VERDICT: APPROVE` lets the router move on to `qa`, and `RETURN` or `ESCALATE` halts the run (follow "On any halt"). When `qa`'s hand-back records `verify_pass`, run `node "$S/orchestrate.mjs" end`. It prints the run it removed.
 6. **Report.** From the record `end` printed, name:

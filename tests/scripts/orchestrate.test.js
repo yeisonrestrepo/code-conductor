@@ -10,7 +10,7 @@ import { parseSnapshotHeader } from '../../scripts/ticket.mjs';
 import { cleanGitEnv } from '../helpers/git-env.js';
 import {
   ENVELOPE_FILE, HANDBACK_DIR, MAY_HAND_BACK, ROLE_ARTIFACTS, REVIEW_CAP, REVIEW_DIR, RUN_FILE, SHELL_METACHARACTERS, WRITE_SURFACE,
-  Halt, checkTestCommand, docScopes, extractTasks, findAgent, forwardGate, isValidRun, nextStep, parseVerdict, recordHandback, taskScope,
+  Halt, checkTestCommand, docScopes, documentHash, extractTasks, findAgent, forwardGate, isValidRun, nextStep, parseVerdict, recordHandback, taskScope,
 } from '../../scripts/orchestrate.mjs';
 import { CANDIDATE_PAIRS, DEFAULT_PAIR } from '../../scripts/doc-locations.mjs';
 
@@ -18,6 +18,7 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const SCRIPT = join(REPO_ROOT, 'scripts/orchestrate.mjs');
 const ROLES = ['spec', 'plan', 'code', 'audit', 'qa'];
 const PLAN = 'docs/plans/demo.md';
+const SPEC = 'docs/specs/demo-design.md';
 // Every root gets a test script with no lockfile, so start records `npm test` (FEAT-012 D6).
 const PKG = '{"scripts":{"test":"vitest run"}}';
 
@@ -46,6 +47,17 @@ const runFile = () => JSON.parse(readFileSync(join(root, RUN_FILE), 'utf8'));
 const runFileText = (text) => writeFileSync(join(root, RUN_FILE), text);
 const envelopeText = () => readFileSync(join(root, ENVELOPE_FILE), 'utf8');
 const envelope = () => JSON.parse(envelopeText());
+// Raw-byte sha256: the hash approve takes for a spec, and for a plan with no box ticked (FEAT-056).
+const sha = (rel) => createHash('sha256').update(readFileSync(join(root, rel))).digest('hex');
+// The spec fixture is written at approval, after start, so FEAT-047 discovery at start never sees it.
+function approveArgs(kind) {
+  const rel = kind === 'spec' ? SPEC : PLAN;
+  if (kind === 'spec' && !existsSync(join(root, rel))) {
+    mkdirSync(dirname(join(root, rel)), { recursive: true });
+    writeFileSync(join(root, rel), '# Demo spec\n');
+  }
+  return ['approve', kind, rel, sha(rel)];
+}
 
 function agents(roles = ROLES, dir = join(root, '.claude', 'agents')) {
   mkdirSync(dir, { recursive: true });
@@ -69,8 +81,8 @@ function driveTo(role) {
   agents();
   plan(TWO_TASKS);
   const steps = [
-    ['spec', () => { orch(['install', 'spec']); orch(['handback', 'spec'], { input: say('spec', 'boundary_routed') }); orch(['approve', 'spec']); }],
-    ['plan', () => { orch(['install', 'plan']); orch(['handback', 'plan'], { input: say('plan', 'boundary_routed') }); orch(['approve', 'plan', PLAN]); }],
+    ['spec', () => { orch(['install', 'spec']); orch(['handback', 'spec'], { input: say('spec', 'boundary_routed') }); orch(approveArgs('spec')); }],
+    ['plan', () => { orch(['install', 'plan']); orch(['handback', 'plan'], { input: say('plan', 'boundary_routed') }); orch(approveArgs('plan')); }],
     ['code', () => { for (let i = 0; i < 2; i++) { orch(['install', 'code']); orch(['handback', 'code'], { input: say('code', 'build_executed') }); } }],
     ['audit', () => { orch(['install', 'audit']); orch(['handback', 'audit'], { input: say('audit', 'build_executed') }); }],
   ];
@@ -129,9 +141,9 @@ describe('router [FEAT-011 AC7]', () => {
     orch(['install', 'plan']);
     orch(['handback', 'plan'], { input: say('plan', 'boundary_routed') });
     expect(runFile().gate).toBe('boundary_routed');
-    expect(orch(['approve', 'plan', PLAN]).status).toBe(0);
+    expect(orch(approveArgs('plan')).status).toBe(0);
     expect(runFile().gate).toBe('define_approved');
-    const again = orch(['approve', 'plan', PLAN]);
+    const again = orch(approveArgs('plan'));
     expect(again.status).toBe(2);
     expect(again.err).toBe('orchestrate: approve plan: the next step is install code');
   });
@@ -140,7 +152,7 @@ describe('router [FEAT-011 AC7]', () => {
     driveTo('spec');
     orch(['install', 'spec']);
     orch(['handback', 'spec'], { input: say('spec', 'boundary_routed') });
-    expect(orch(['approve', 'spec']).status).toBe(0);
+    expect(orch(approveArgs('spec')).status).toBe(0);
     const run = runFile();
     expect(run.gate).toBe('boundary_routed');
     expect(run.approvals.spec.by).toEqual(expect.any(String));
@@ -178,7 +190,7 @@ describe('scope [FEAT-011 AC8]', () => {
     plan('# Plan\n\nNo tasks here.\n');
     orch(['install', 'plan']);
     orch(['handback', 'plan'], { input: say('plan', 'boundary_routed') });
-    const r = orch(['approve', 'plan', PLAN]);
+    const r = orch(approveArgs('plan'));
     expect(r.status).toBe(1);
     expect(r.err).toMatch(/^ORCH_EMPTY_SCOPE: /);
     expect(runFile().gate).toBe('boundary_routed');
@@ -402,7 +414,7 @@ describe('every handoff is a validated envelope [FEAT-011 AC1, AC2]', () => {
   it('[AC2] SNAP_GATE_MISMATCH halts install as the backstop behind the router', () => {
     const before = dispatched('spec');
     orch(['handback', 'spec'], { input: say('spec', 'boundary_routed') });
-    orch(['approve', 'spec']);
+    orch(approveArgs('spec'));
     writeFileSync(join(root, RUN_FILE), JSON.stringify({ ...runFile(), gate: 'define_approved' }));
     const r = orch(['install', 'plan']);
     expectHalt(r, 'SNAP_GATE_MISMATCH', before);
@@ -602,8 +614,8 @@ describe('ticket intake [FEAT-031 AC1-AC5, AC12]', () => {
     expect(pOf('spec')).toEqual({ ticket: { repo, number, url, sha256 } });
     const seen = [];
     const pass = (role, gate, ...after) => { seen.push(pOf(role)); orch(['install', role]); orch(['handback', role], { input: say(role, gate) }); for (const a of after) orch(a); };
-    pass('spec', 'boundary_routed', ['approve', 'spec']);
-    pass('plan', 'boundary_routed', ['approve', 'plan', PLAN]);
+    pass('spec', 'boundary_routed', approveArgs('spec'));
+    pass('plan', 'boundary_routed', approveArgs('plan'));
     pass('code', 'build_executed');
     pass('code', 'build_executed');
     pass('audit', 'build_executed');
@@ -745,7 +757,7 @@ describe('review loop round counter [FEAT-041 AC2-AC4]', () => {
   it('[AC4] approve ignores an open loop and keeps its record', () => {
     awaiting('spec');
     orch(['review', 'spec', '--round']);
-    expect(orch(['approve', 'spec']).status).toBe(0);
+    expect(orch(approveArgs('spec')).status).toBe(0);
     expect(runFile()).toMatchObject({ approvals: { spec: { by: expect.any(String) } }, review: { spec: { round: 1, outcome: null } } });
   });
 
@@ -791,7 +803,7 @@ describe('review loop round counter [FEAT-041 AC2-AC4]', () => {
   });
 
   it('names review in the usage line', () => {
-    expect(orch(['nope']).err).toBe('orchestrate: usage: orchestrate.mjs start|install|handback|approve|review|end');
+    expect(orch(['nope']).err).toBe('orchestrate: usage: orchestrate.mjs start|install|handback|approve|hash|review|end');
   });
 });
 
@@ -809,7 +821,7 @@ describe('doc locations [FEAT-047]', () => {
   const approveSpec = () => {
     expect(orch(['install', 'spec']).status).toBe(0);
     expect(orch(['handback', 'spec'], { input: say('spec', 'boundary_routed') }).status).toBe(0);
-    expect(orch(['approve', 'spec']).status).toBe(0);
+    expect(orch(approveArgs('spec')).status).toBe(0);
   };
   const recorded = (specs, plans) => put('CLAUDE.md', `# P\n\n${specs ? `- Specs: ${specs}\n` : ''}${plans ? `- Plans: ${plans}\n` : ''}`);
   const halts = (code) => {
@@ -1061,5 +1073,181 @@ describe('audit verdict [FEAT-060]', () => {
     expect(isValidRun(run)).toBe(true);
     delete run.handbacks.find((h) => h.role === 'audit').verdict;
     expect(isValidRun(run)).toBe(true);
+  });
+});
+
+describe('document hash [FEAT-056]', () => {
+  const UNTICKED = '# P\n\n### Task 1: a\n\n**Files:**\n- Modify: `src/a.js`\n\n- [ ] [S-1] step one\n  - [ ] [S-1-A] nested\n1. [ ] ordered\n* [ ] star\n+ [ ] plus\n';
+  const tick = (text, box) => text.replaceAll('[ ]', box);
+  const put = (rel, text) => { mkdirSync(dirname(join(root, rel)), { recursive: true }); writeFileSync(join(root, rel), text); };
+  const edited = () => TWO_TASKS.replace('thing 1', 'thing one');
+  const tickPlan = (box) => plan(TWO_TASKS.replaceAll('- [ ] **Step 1', `- ${box} **Step 1`));
+  const runText = () => readFileSync(join(root, RUN_FILE), 'utf8');
+  const raw = (text) => createHash('sha256').update(text).digest('hex');
+  const HASH_USAGE = 'orchestrate: usage: orchestrate.mjs hash <spec|plan> <path relative to the run root>';
+  const APPROVE_USAGE = 'orchestrate: usage: orchestrate.mjs approve <spec|plan> <path relative to the run root> <sha256>';
+
+  it('D1 hashes a spec over its raw bytes', () => {
+    const bytes = Buffer.from([0x23, 0x20, 0xff, 0xfe, 0x0a]);
+    expect(documentHash('spec', bytes)).toBe(raw(bytes));
+  });
+
+  it.each(['[>]', '[X]', '[x]', '[!]'])('D2 a plan box ticked to %s keeps the plan hash', (box) => {
+    expect(documentHash('plan', tick(UNTICKED, box))).toBe(documentHash('plan', UNTICKED));
+  });
+
+  it('D3 an unticked plan hashes to its raw sha256, and ticks on CRLF lines are normalized', () => {
+    expect(documentHash('plan', UNTICKED)).toBe(raw(UNTICKED));
+    const crlf = UNTICKED.replaceAll('\n', '\r\n');
+    expect(documentHash('plan', tick(UNTICKED, '[X]').replaceAll('\n', '\r\n'))).toBe(documentHash('plan', crlf));
+    expect(documentHash('plan', crlf)).not.toBe(documentHash('plan', UNTICKED));
+  });
+
+  it.each([
+    ['one character of a task line changes', UNTICKED, UNTICKED.replace('step one', 'step One')],
+    ['a box in prose is ticked', 'See [ ] here.\n', 'See [x] here.\n'],
+    ['a box in a table cell is ticked', '| a | [ ] |\n', '| a | [x] |\n'],
+    ['a box after list-item text is ticked', '- item [ ] done\n', '- item [x] done\n'],
+  ])('D4 the plan hash changes when %s', (_name, before, after) => {
+    expect(documentHash('plan', after)).not.toBe(documentHash('plan', before));
+  });
+
+  it('H1 hash spec prints the sha256sum of the raw bytes with no run file, and writes nothing', () => {
+    put(SPEC, '# Spec\r\né\n');
+    expect(orch(['hash', 'spec', SPEC])).toEqual({ status: 0, out: `${sha(SPEC)}  ${SPEC}`, err: '' });
+    expect(existsSync(join(root, RUN_FILE))).toBe(false);
+  });
+
+  it('H2 hash plan prints the normalized hash in a live run and leaves the run file byte-identical', () => {
+    awaiting('plan');
+    tickPlan('[X]');
+    const before = runText();
+    const r = orch(['hash', 'plan', PLAN]);
+    expect(r.status).toBe(0);
+    expect(r.out).toBe(`${documentHash('plan', TWO_TASKS)}  ${PLAN}`);
+    expect(runText()).toBe(before);
+  });
+
+  it.each([
+    ['no path', () => ['hash', 'spec'], HASH_USAGE],
+    ['an absolute path', () => ['hash', 'spec', join(root, SPEC)], HASH_USAGE],
+    ['a path with ..', () => ['hash', 'spec', '../x.md'], HASH_USAGE],
+    ['an unknown kind', () => ['hash', 'ticket', SPEC], HASH_USAGE],
+    ['a missing file', () => ['hash', 'spec', 'docs/none.md'], 'orchestrate: cannot read docs/none.md'],
+  ])('H3 hash refuses %s with exit 2', (_name, args, err) => {
+    put(SPEC, '# Spec\n');
+    expect(orch(args())).toMatchObject({ status: 2, err });
+  });
+
+  it.each(['spec', 'plan'])('A1 approve %s against a stale hash refuses ORCH_DOC_HASH_STALE and writes nothing', (kind) => {
+    awaiting(kind);
+    const [, , rel, shown] = approveArgs(kind);
+    if (kind === 'spec') put(SPEC, '# Demo spec, revised\n'); else plan(edited());
+    const before = runText();
+    const r = orch(['approve', kind, rel, shown]);
+    expect(r.status).toBe(2);
+    expect(r.err).toBe(`orchestrate: ORCH_DOC_HASH_STALE: ${kind} ${rel} hashes ${sha(rel)}, not the ${shown} that was shown; show the document again`);
+    expect(runText()).toBe(before);
+  });
+
+  it.each([
+    ['no path and no hash', () => ['approve', 'spec']],
+    ['no hash', () => ['approve', 'spec', SPEC]],
+    ['a hash that is not 64 hex characters', () => ['approve', 'spec', SPEC, 'abc123']],
+    ['an absolute path', () => ['approve', 'spec', join(root, SPEC), sha(SPEC)]],
+    ['a path with ..', () => ['approve', 'spec', '../demo-design.md', sha(SPEC)]],
+  ])('A2 approve refuses %s with the usage line and writes nothing', (_name, args) => {
+    awaiting('spec');
+    put(SPEC, '# Demo spec\n');
+    const before = runText();
+    expect(orch(args())).toMatchObject({ status: 2, err: APPROVE_USAGE });
+    expect(runText()).toBe(before);
+  });
+
+  it('A3 both approvals record exactly at, by, path and a lower-case sha256, from an upper-case argument', () => {
+    awaiting('spec');
+    const specSha = approveArgs('spec')[3];
+    expect(orch(['approve', 'spec', SPEC, specSha.toUpperCase()])).toMatchObject({ status: 0, out: `spec approved: sha256 ${specSha}` });
+    orch(['install', 'plan']);
+    orch(['handback', 'plan'], { input: say('plan', 'boundary_routed') });
+    expect(orch(approveArgs('plan')).out).toBe(`plan approved: define_approved, 2 task(s); sha256 ${sha(PLAN)}`);
+    for (const [a, rel] of [[runFile().approvals.spec, SPEC], [runFile().approvals.plan, PLAN]]) {
+      expect(Object.keys(a).sort()).toEqual(['at', 'by', 'path', 'sha256']);
+      expect(a).toMatchObject({ path: rel, sha256: sha(rel), by: expect.any(String) });
+      expect(a.sha256).toMatch(/^[0-9a-f]{64}$/);
+    }
+  });
+
+  it('A4 a plan whose boxes were ticked between hash and approve still approves', () => {
+    awaiting('plan');
+    const shown = sha(PLAN);
+    tickPlan('[X]');
+    expect(orch(['approve', 'plan', PLAN, shown]).status).toBe(0);
+    expect(runFile().approvals.plan.sha256).toBe(shown);
+  });
+
+  it('B1 ticking boxes after approval keeps every later install passing', () => {
+    driveTo('code');
+    for (const box of ['[>]', '[X]']) {
+      expect(orch(['install', 'code']).status).toBe(0);
+      tickPlan(box);
+      expect(orch(['handback', 'code'], { input: say('code', 'build_executed') }).status).toBe(0);
+    }
+    tickPlan('[x]');
+    expect(orch(['install', 'audit']).status).toBe(0);
+    expect(orch(['handback', 'audit'], { input: say('audit', 'build_executed') }).status).toBe(0);
+    tickPlan('[!]');
+    expect(orch(['install', 'qa']).status).toBe(0);
+    expect(runFile().halt).toBeNull();
+  });
+
+  it.each(['code', 'audit', 'qa'])('B2 a plan line edited after approval halts install %s with ORCH_APPROVED_DOC_CHANGED', (role) => {
+    driveTo(role);
+    const recorded = runFile().approvals.plan.sha256;
+    plan(edited());
+    const r = orch(['install', role]);
+    expect(r.status).toBe(1);
+    expect(r.err).toBe(`ORCH_APPROVED_DOC_CHANGED: plan ${PLAN} was approved at sha256 ${recorded} and now hashes ${sha(PLAN)}`);
+    expect(runFile().halt.code).toBe('ORCH_APPROVED_DOC_CHANGED');
+  });
+
+  it('B3 a spec edited after approval halts the next install after define_approved', () => {
+    driveTo('code');
+    const recorded = runFile().approvals.spec.sha256;
+    put(SPEC, '# Demo spec, edited after approval\n');
+    const r = orch(['install', 'code']);
+    expect(r.status).toBe(1);
+    expect(r.err).toBe(`ORCH_APPROVED_DOC_CHANGED: spec ${SPEC} was approved at sha256 ${recorded} and now hashes ${sha(SPEC)}`);
+    expect(runFile().halt.code).toBe('ORCH_APPROVED_DOC_CHANGED');
+  });
+
+  it('B4 install --check halts the same way and leaves the envelope as it was', () => {
+    driveTo('code');
+    const before = envelopeText();
+    plan(edited());
+    const r = orch(['install', 'code', '--check']);
+    expect(r.status).toBe(1);
+    expect(r.err).toMatch(/^ORCH_APPROVED_DOC_CHANGED: plan /);
+    expect(envelopeText()).toBe(before);
+  });
+
+  it('B5 an approved plan that can no longer be read halts with ORCH_APPROVED_DOC_CHANGED', () => {
+    driveTo('code');
+    const recorded = runFile().approvals.plan.sha256;
+    rmSync(join(root, PLAN));
+    const r = orch(['install', 'code']);
+    expect(r.status).toBe(1);
+    expect(r.err).toBe(`ORCH_APPROVED_DOC_CHANGED: plan ${PLAN} was approved at sha256 ${recorded} and can no longer be read`);
+  });
+
+  it('B6 approvals without a hash halt the first install after define_approved with ORCH_APPROVAL_UNHASHED', () => {
+    driveTo('code');
+    const run = runFile();
+    const old = { at: run.approvals.spec.at, by: run.approvals.spec.by };
+    runFileText(JSON.stringify({ ...run, approvals: { spec: old, plan: old } }));
+    const r = orch(['install', 'code']);
+    expect(r.status).toBe(1);
+    expect(r.err).toBe('ORCH_APPROVAL_UNHASHED: run FEAT-011 records an approval without a document hash (started before FEAT-056); run end, then start');
+    expect(runFile().halt.code).toBe('ORCH_APPROVAL_UNHASHED');
   });
 });

@@ -45,7 +45,7 @@ Line numbers below are from HEAD dccb66c; locate by the quoted text if they move
 - Modify: `tests/scripts/orchestrate.test.js`
 - Modify: `scripts/orchestrate.mjs`
 
-- [ ] [T-101] `tests/scripts/orchestrate.test.js`, imports and helpers. No dependency.
+- [X] [T-101] `tests/scripts/orchestrate.test.js`, imports and helpers. No dependency.
   - Add `documentHash` to the import list from `../../scripts/orchestrate.mjs` (line 13). `createHash` is already imported (line 7).
   - After `const PLAN = 'docs/plans/demo.md';` (line 20) add:
     ```js
@@ -66,7 +66,7 @@ Line numbers below are from HEAD dccb66c; locate by the quoted text if they move
     }
     ```
     `TWO_TASKS` has no ticked box, so `sha(PLAN)` is its normalized hash too; D3 below pins that equality.
-- [ ] [T-102] `tests/scripts/orchestrate.test.js`, existing `approve` call sites take the path and hash. Depends on T-101.
+- [X] [T-102] `tests/scripts/orchestrate.test.js`, existing `approve` call sites take the path and hash. Depends on T-101.
   - Line 72 (`driveTo` spec step): `orch(['approve', 'spec'])` → `orch(approveArgs('spec'))`.
   - Line 73 (`driveTo` plan step): `orch(['approve', 'plan', PLAN])` → `orch(approveArgs('plan'))`.
   - Lines 132 and 134 (`writes define_approved only through approve plan, and only once`): both `['approve', 'plan', PLAN]` → `approveArgs('plan')`. The expected refusal at line 136 stays: the step check still runs first.
@@ -78,7 +78,7 @@ Line numbers below are from HEAD dccb66c; locate by the quoted text if they move
   - Line 794 (`names review in the usage line`): expected string becomes `'orchestrate: usage: orchestrate.mjs start|install|handback|approve|hash|review|end'`.
   - Line 812 (`approveSpec` in the FEAT-047 describe): `['approve', 'spec']` → `approveArgs('spec')`.
   - Then `grep -n "'approve'" tests/scripts/orchestrate.test.js` prints only the lines inside `approveArgs` and the new describe of T-103.
-- [ ] [T-103] `tests/scripts/orchestrate.test.js`: append `describe('document hash [FEAT-056]', …)` at the end of the file. Depends on T-102. Test names are the filter set predicted in T-104.
+- [X] [T-103] `tests/scripts/orchestrate.test.js`: append `describe('document hash [FEAT-056]', …)` at the end of the file. Depends on T-102. Test names are the filter set predicted in T-104.
   ```js
   describe('document hash [FEAT-056]', () => {
     const UNTICKED = '# P\n\n### Task 1: a\n\n**Files:**\n- Modify: `src/a.js`\n\n- [ ] [S-1] step one\n  - [ ] [S-1-A] nested\n1. [ ] ordered\n* [ ] star\n+ [ ] plus\n';
@@ -129,7 +129,7 @@ Line numbers below are from HEAD dccb66c; locate by the quoted text if they move
   - B4 **"B4 install --check halts the same way and leaves the envelope as it was"**: `driveTo('code')`; `before = envelopeText()`; `plan(edited())`; `orch(['install', 'code', '--check'])` exits 1, `err` matches `/^ORCH_APPROVED_DOC_CHANGED: plan /`; `envelopeText()` is `before`.
   - B5 **"B5 an approved plan that can no longer be read halts with ORCH_APPROVED_DOC_CHANGED"**: `driveTo('code')`; `recorded = runFile().approvals.plan.sha256`; `rmSync(join(root, PLAN))`; `install code` exits 1 with `` `ORCH_APPROVED_DOC_CHANGED: plan ${PLAN} was approved at sha256 ${recorded} and can no longer be read` ``.
   - B6 **"B6 approvals without a hash halt the first install after define_approved with ORCH_APPROVAL_UNHASHED"** (spec AC8): `driveTo('code')`; `run = runFile()`; `old = { at: run.approvals.spec.at, by: run.approvals.spec.by }`; `runFileText(JSON.stringify({ ...run, approvals: { spec: old, plan: old } }))`; `install code` exits 1 with `'ORCH_APPROVAL_UNHASHED: run FEAT-011 records an approval without a document hash (started before FEAT-056); run end, then start'`; `runFile().halt.code` is `ORCH_APPROVAL_UNHASHED`.
-- [ ] [T-104] Red step: `npx vitest run tests/scripts/orchestrate.test.js`. Depends on T-103. Predicted full match set of that filter, 199 tests:
+- [X] [T-104] Red step: `npx vitest run tests/scripts/orchestrate.test.js`. Depends on T-103. Predicted full match set of that filter, 199 tests:
   - 164 of the 165 pre-existing tests: **green**. Today's `approve` ignores the extra hash argument (`cli` destructures only `verb, a, b`), and `approve plan` still reads the plan from `b`;
   - `names review in the usage line` (modified in T-102): **red**, today's usage line has no `hash`;
   - D1, D2 (4), D3, D4 (4) (10): **red**, `documentHash` is `undefined`, so each call throws `TypeError`;
@@ -138,7 +138,7 @@ Line numbers below are from HEAD dccb66c; locate by the quoted text if they move
   - B2 (3), B3, B4, B6 (6): **red**, today's `install` exits 0; B5 (1): **red**, today's `install code` refuses with exit 2 (`cannot read`) rather than halting;
   - B1 (1): **green** on today's code; it pins behavior that must survive.
   - Total: 165 passed, 34 failed.
-- [ ] [T-105] `scripts/orchestrate.mjs`, imports and the hash definition. Depends on T-104.
+- [X] [T-105] `scripts/orchestrate.mjs`, imports and the hash definition. Depends on T-104.
   - After line 7 (`import { spawnSync } from 'node:child_process';`) add `import { createHash } from 'node:crypto';`.
   - Replace `readPlan` (lines 192-197) with the shared definitions and reader:
     ```js
@@ -164,7 +164,7 @@ Line numbers below are from HEAD dccb66c; locate by the quoted text if they move
     The pattern is the spec's, verbatim (spec, The document hash). `String(buffer)` decodes UTF-8, as the spec requires for the plan.
   - `envelopeFields` (line 283): `extractTasks(readPlan(root, run.plan))` → `extractTasks(readDoc(root, run.plan, APPROVE_USAGE).toString('utf8'))`.
   - `grep -n readPlan scripts/orchestrate.mjs` prints nothing afterwards.
-- [ ] [T-106] `scripts/orchestrate.mjs`, the `hash` verb, placed right after `readDoc`. Depends on T-105.
+- [X] [T-106] `scripts/orchestrate.mjs`, the `hash` verb, placed right after `readDoc`. Depends on T-105.
   ```js
   // Read-only and run-free: prints the exact value approve checks, so the hash shown is the script's own.
   function hashDoc(root, kind, rel) {
@@ -172,7 +172,7 @@ Line numbers below are from HEAD dccb66c; locate by the quoted text if they move
     return `${documentHash(kind, readDoc(root, rel, HASH_USAGE))}  ${rel}`;
   }
   ```
-- [ ] [T-107] `scripts/orchestrate.mjs`, `approve` (lines 395-413) replaced by `approve` and `approvePlan`. Depends on T-106.
+- [X] [T-107] `scripts/orchestrate.mjs`, `approve` (lines 395-413) replaced by `approve` and `approvePlan`. Depends on T-106.
   ```js
   // Two human approvals, one gate write (A4): only an approved plan writes define_approved.
   // FEAT-056: each approval binds the bytes the owner was shown; a stale hash writes nothing.
@@ -204,7 +204,7 @@ Line numbers below are from HEAD dccb66c; locate by the quoted text if they move
   }
   ```
   The step check stays first, so `approve plan` on a run past the plan still refuses with the next step (test at line 127). The hash is compared before the plan checks (spec, Main path step 5), so a stale plan never reaches `ORCH_EMPTY_SCOPE`.
-- [ ] [T-108] `scripts/orchestrate.mjs`, the Build check, placed right before `install` (line 300), and its call. Depends on T-107.
+- [X] [T-108] `scripts/orchestrate.mjs`, the Build check, placed right before `install` (line 300), and its call. Depends on T-107.
   ```js
   const currentHash = (root, kind, rel) => { try { return documentHash(kind, readFileSync(join(root, rel))); } catch { return null; } };
 
@@ -222,15 +222,15 @@ Line numbers below are from HEAD dccb66c; locate by the quoted text if they move
   }
   ```
   In `install`, right after the `if (step.role !== role) throw new Refusal(…)` line, add `if (run.approvals.plan) checkApprovedDocs(root, run);`. `nextStep` reaches `code`, `audit` and `qa` only once `approvals.plan` is set, so this is exactly "every install after `define_approved`", for `--check` too (the check runs before the `check` branch). A run at `install plan` is not checked (spec, Main path step 6 names the Build band).
-- [ ] [T-109] `scripts/orchestrate.mjs`, `cli` (line 512). Depends on T-108.
+- [X] [T-109] `scripts/orchestrate.mjs`, `cli` (line 512). Depends on T-108.
   - `const [verb, a, b] = argv;` → `const [verb, a, b, c] = argv;`
   - `approve: () => approve(root, sid, a, b),` → `approve: () => approve(root, sid, a, b, c),`
   - Add `hash: () => hashDoc(root, a, b),` after the `approve` entry.
   - Usage line: `'usage: orchestrate.mjs start|install|handback|approve|review|end'` → `'usage: orchestrate.mjs start|install|handback|approve|hash|review|end'`.
   - `hash` never throws `Halt`, so `recordHalt` never runs for it; it calls neither `liveRun` nor `saveRun`.
-- [ ] [T-110] Green step: `npx vitest run tests/scripts/orchestrate.test.js`. Predicted: 199 passed, 0 failed. Depends on T-109.
-- [ ] [T-111] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-12-feat056-script-enforced-document-hash-verification-on.md` (ticks T-101 to T-110). Depends on T-110.
-- [ ] [T-112] Commit: `feat: orchestrate.mjs approve verifies the shown document hash and Build halts on a changed document [FEAT-056]`. Depends on T-111.
+- [X] [T-110] Green step: `npx vitest run tests/scripts/orchestrate.test.js`. Predicted: 199 passed, 0 failed. Depends on T-109.
+- [X] [T-111] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-12-feat056-script-enforced-document-hash-verification-on.md` (ticks T-101 to T-110). Depends on T-110.
+- [X] [T-112] Commit: `feat: orchestrate.mjs approve verifies the shown document hash and Build halts on a changed document [FEAT-056]`. Depends on T-111.
 
 ---
 
@@ -241,7 +241,7 @@ Line numbers below are from HEAD dccb66c; locate by the quoted text if they move
 - Modify: `.claude/commands/cc-orchestrate.md`
 - Modify: `project-template/.claude/commands/cc-orchestrate.md`
 
-- [ ] [T-201] `tests/installer/commands-parity.test.js`, the test at line 261 inside `describe('cc-orchestrate review loop …')`. Depends on T-112 (ticks ride this group).
+- [X] [T-201] `tests/installer/commands-parity.test.js`, the test at line 261 inside `describe('cc-orchestrate review loop …')`. Depends on T-112 (ticks ride this group).
   - Rename it `approves only on an owner message, with the hash the script checks [FEAT-056]`.
   - Its body becomes:
     ```js
@@ -252,8 +252,8 @@ Line numbers below are from HEAD dccb66c; locate by the quoted text if they move
     expect(text()).not.toContain('Re-hash before approve');
     expect(text()).not.toContain('Get-FileHash');
     ```
-- [ ] [T-202] Red step: `npx vitest run tests/installer/commands-parity.test.js`. Predicted full match set, 67 tests: the renamed test **red** (no new phrase present yet, and `Get-FileHash` still is); the 66 other tests **green**. Depends on T-201.
-- [ ] [T-203] `.claude/commands/cc-orchestrate.md`, then the identical edit to `project-template/.claude/commands/cc-orchestrate.md`. Depends on T-202.
+- [X] [T-202] Red step: `npx vitest run tests/installer/commands-parity.test.js`. Predicted full match set, 67 tests: the renamed test **red** (no new phrase present yet, and `Get-FileHash` still is); the 66 other tests **green**. Depends on T-201.
+- [X] [T-203] `.claude/commands/cc-orchestrate.md`, then the identical edit to `project-template/.claude/commands/cc-orchestrate.md`. Depends on T-202.
   - Step 3, "What you show" (line 61): replace `its sha256 now (\`shasum -a 256 <doc>\` or \`sha256sum <doc>\`; in PowerShell, \`Get-FileHash -Algorithm SHA256 <doc>\`);` with `its sha256 from \`node "$S/orchestrate.mjs" hash <spec|plan> <doc>\`, the value \`approve\` checks (for the spec it equals \`sha256sum <doc>\`; for the plan every task checkbox is read as \`[ ]\`, so ticks never change it);`. The rest of the bullet stays.
   - Step 3, line 63: replace the whole `**Re-hash before approve.**` bullet with:
     > `   - **The script checks the hash.** Pass the path and hash you showed to \`approve\`. On \`ORCH_DOC_HASH_STALE\`, a refusal that writes nothing, the document changed after you showed it: show it again with its new hash and wait for a new owner approval.`
@@ -262,9 +262,9 @@ Line numbers below are from HEAD dccb66c; locate by the quoted text if they move
   - "On any halt": after the `ORCH_DOC_LOCATION_UNRESOLVED` paragraph (line 33) and before the FEAT-060 `handback audit` paragraph, add:
     > `` `install code|audit|qa` halts `ORCH_APPROVED_DOC_CHANGED` when the approved spec or plan changed after its approval (a ticked plan checkbox is not a change), and `ORCH_APPROVAL_UNHASHED` on a run whose approvals were recorded before FEAT-056. Recovery for both is `end`, then `start`. ``
   - The FMT row (line 106) says `approve plan` halts with `ORCH_EMPTY_SCOPE` on a plan without `### Task N` sections. That stays true under T-107 (the hash is checked first, then the same plan checks run), so the row is read and left as it is; the spec lists it only as a place to check.
-- [ ] [T-204] Green step: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: 67 passed (the byte-identical mirror test included). Depends on T-203.
-- [ ] [T-205] Stage: `git add -u .claude/commands/cc-orchestrate.md`, `git add -u project-template/.claude/commands/cc-orchestrate.md`, `git add -u tests/installer/commands-parity.test.js`, `git add -u docs/superpowers/plans/2026-11-12-feat056-script-enforced-document-hash-verification-on.md`. Depends on T-204.
-- [ ] [T-206] Commit: `docs: cc-orchestrate shows the script's document hash and passes it to approve [FEAT-056]`. Depends on T-205.
+- [X] [T-204] Green step: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: 67 passed (the byte-identical mirror test included). Depends on T-203.
+- [X] [T-205] Stage: `git add -u .claude/commands/cc-orchestrate.md`, `git add -u project-template/.claude/commands/cc-orchestrate.md`, `git add -u tests/installer/commands-parity.test.js`, `git add -u docs/superpowers/plans/2026-11-12-feat056-script-enforced-document-hash-verification-on.md`. Depends on T-204.
+- [X] [T-206] Commit: `docs: cc-orchestrate shows the script's document hash and passes it to approve [FEAT-056]`. Depends on T-205.
 
 ---
 
@@ -274,15 +274,15 @@ Line numbers below are from HEAD dccb66c; locate by the quoted text if they move
 - Modify: `.github/wiki/pages/Orchestrator-Guide.md`
 - Modify: `.github/wiki/pages/C4-Components.md`
 
-- [ ] [T-301] `.github/wiki/pages/Orchestrator-Guide.md`. Depends on T-206 (ticks ride this group).
+- [X] [T-301] `.github/wiki/pages/Orchestrator-Guide.md`. Depends on T-206 (ticks ride this group).
   - Line 35 becomes: `| Approve | **You approve** — the document is shown with the hash \`orchestrate.mjs hash spec\` prints; \`approve spec <path> <sha256>\` refuses a stale hash and records \`{at, by, path, sha256}\` |`
   - Line 38 becomes: `| Approve | **You approve again** — \`approve plan <path> <sha256>\` checks the plan's hash (checkboxes read as \`[ ]\`) and moves the gate to \`define_approved\` |`
-- [ ] [T-302] `.github/wiki/pages/C4-Components.md`. No dependency on T-301.
+- [X] [T-302] `.github/wiki/pages/C4-Components.md`. No dependency on T-301.
   - Line 78: `ap1(["Owner approves the spec<br/>hash shown, re-hashed"])` → `ap1(["Owner approves the spec<br/>hash checked by the script"])`.
   - Line 139: replace `Approvals are \`orchestrate.mjs approve spec\` and \`approve plan\`, recorded in the run file as \`{at, by}\`. Only \`approve plan\` moves the gate to \`define_approved\`.` with `Approvals are \`orchestrate.mjs approve spec\` and \`approve plan\`, each given the document path and the sha256 shown to the owner and recorded in the run file as \`{at, by, path, sha256}\`; a stale hash is refused. Only \`approve plan\` moves the gate to \`define_approved\`. Every \`install\` after it re-hashes both documents and halts \`ORCH_APPROVED_DOC_CHANGED\` when either text changed; plan checkbox ticks do not count.`, and `The verbs are \`start\`, \`install\`, \`handback\`, \`approve\`, \`review\` and \`end\`.` with `The verbs are \`start\`, \`install\`, \`handback\`, \`approve\`, \`hash\`, \`review\` and \`end\`.` The rest of the line stays.
-- [ ] [T-303] Run `npx vitest run tests/wiki/wiki-gen.test.js`. Predicted: 22 passed (the edited lines are prose outside every generated block). Depends on T-301, T-302.
-- [ ] [T-304] Stage: `git add -u .github/wiki/pages/Orchestrator-Guide.md`, `git add -u .github/wiki/pages/C4-Components.md`, `git add -u docs/superpowers/plans/2026-11-12-feat056-script-enforced-document-hash-verification-on.md`. Depends on T-303.
-- [ ] [T-305] Commit: `docs: the wiki describes hash-bound approvals and the hash verb [FEAT-056]`. Depends on T-304.
+- [X] [T-303] Run `npx vitest run tests/wiki/wiki-gen.test.js`. Predicted: 22 passed (the edited lines are prose outside every generated block). Depends on T-301, T-302.
+- [X] [T-304] Stage: `git add -u .github/wiki/pages/Orchestrator-Guide.md`, `git add -u .github/wiki/pages/C4-Components.md`, `git add -u docs/superpowers/plans/2026-11-12-feat056-script-enforced-document-hash-verification-on.md`. Depends on T-303.
+- [X] [T-305] Commit: `docs: the wiki describes hash-bound approvals and the hash verb [FEAT-056]`. Depends on T-304.
 
 ---
 
@@ -291,10 +291,10 @@ Line numbers below are from HEAD dccb66c; locate by the quoted text if they move
 **Files:**
 - Modify: `docs/superpowers/plans/2026-11-12-feat056-script-enforced-document-hash-verification-on.md`
 
-- [ ] [T-401] Run `npm test`. Predicted locally: exit 0, every file green, 34 tests more than the pre-change suite (all 34 in `orchestrate.test.js`; the parity test is renamed, not added), no new skip. CI legs: each leg's skipped set equals its `tools/skip-baseline.json` key, unchanged, because no added test is conditional. Depends on T-305.
-- [ ] [T-402] Grep checks: `git grep -n "Re-hash before approve\|Get-FileHash" -- .claude/commands project-template/.claude/commands` prints nothing; `git grep -n "{at, by}" -- .github/wiki` prints nothing; `git grep -n "readPlan" -- scripts` prints nothing. Depends on T-401.
-- [ ] [T-403] Stage: `git add -u docs/superpowers/plans/2026-11-12-feat056-script-enforced-document-hash-verification-on.md` (ticks T-305 to T-402). Depends on T-402.
-- [ ] [T-404] Commit: `docs: close out the FEAT-056 plan [FEAT-056]`. Depends on T-403.
+- [X] [T-401] Run `npm test`. Predicted locally: exit 0, every file green, 34 tests more than the pre-change suite (all 34 in `orchestrate.test.js`; the parity test is renamed, not added), no new skip. CI legs: each leg's skipped set equals its `tools/skip-baseline.json` key, unchanged, because no added test is conditional. Depends on T-305.
+- [X] [T-402] Grep checks: `git grep -n "Re-hash before approve\|Get-FileHash" -- .claude/commands project-template/.claude/commands` prints nothing; `git grep -n "{at, by}" -- .github/wiki` prints nothing; `git grep -n "readPlan" -- scripts` prints nothing. Depends on T-401.
+- [X] [T-403] Stage: `git add -u docs/superpowers/plans/2026-11-12-feat056-script-enforced-document-hash-verification-on.md` (ticks T-305 to T-402). Depends on T-402.
+- [X] [T-404] Commit: `docs: close out the FEAT-056 plan [FEAT-056]`. Depends on T-403.
 
 ---
 

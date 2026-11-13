@@ -258,9 +258,13 @@ describe('cc-orchestrate review loop [FEAT-041 AC5, AC6]', () => {
     for (const reason of ['dispatch', 'unparsed', 'denied', 'blocked', 'snap-in-revision', 'verb']) has(`- \`${reason}\`: `);
   });
 
-  it('approves only on an owner message, after a re-hash', () => {
+  it('approves only on an owner message, with the hash the script checks [FEAT-056]', () => {
     has('**Only an owner message approves.**', 'a suggestion in the input box are not approvals',
-      '**Re-hash before approve.**', 'shasum -a 256 <doc>', 'Get-FileHash -Algorithm SHA256 <doc>');
+      'node "$S/orchestrate.mjs" hash <spec|plan> <doc>', '**The script checks the hash.**', '`ORCH_DOC_HASH_STALE`',
+      'approve spec <spec path> <sha256>', 'approve plan <plan path> <sha256>',
+      '`install code|audit|qa` halts `ORCH_APPROVED_DOC_CHANGED`', '`ORCH_APPROVAL_UNHASHED`');
+    expect(text()).not.toContain('Re-hash before approve');
+    expect(text()).not.toContain('Get-FileHash');
   });
 
   it('amends the brief line and names the zero-wake launch in the run header', () => {
