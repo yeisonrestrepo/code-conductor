@@ -299,7 +299,7 @@ function envelopeFields(run, root, step) {
     n: [], f: [], d: [], x: [], role: step.role, tk, gate: run.gate,
   };
   if (step.role === 'code') {
-    const task = extractTasks(readDoc(root, run.plan, APPROVE_USAGE).toString('utf8')).find((t) => t.id === step.task);
+    const task = extractTasks(readDoc(root, run.plan, `cannot read ${run.plan}`).toString('utf8')).find((t) => t.id === step.task);
     fields.scope = taskScope(task ?? { id: step.task, files: [] }, run.plan);
   } else if (step.role === 'spec' || step.role === 'plan') {
     // Read as pinned, never re-checked: the cap was enforced once, at start.
