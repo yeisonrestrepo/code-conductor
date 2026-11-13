@@ -300,13 +300,13 @@ Line numbers below are from HEAD dccb66c; locate by the quoted text if they move
 
 ## Test List
 
-- [ ] Unit: `documentHash` — spec over raw bytes, including non-UTF-8 (D1); each tick state `[>] [X] [x] [!]` keeps the plan hash over `-`, `*`, `+`, ordered and nested items (D2); an unticked plan equals its raw sha256, ticks on CRLF lines normalize, line endings still count (D3); a text change and a `[x]` in prose, a table cell or after list text change the hash (D4).
-- [ ] Integration (CLI, real argv/stdin/env contract): `hash` prints the `sha256sum` value with no run file and the normalized value in a live run, writing nothing (H1, H2); its five refusals (H3).
-- [ ] Integration: `approve` refuses a stale hash for spec and plan with `ORCH_DOC_HASH_STALE`, run file byte-identical (A1); its five usage refusals (A2); records exactly `{at, by, path, sha256}` lower-case from an upper-case argument (A3); a pre-ticked plan approves (A4).
-- [ ] Integration: the Build check passes through ticks to `qa` (B1); halts `ORCH_APPROVED_DOC_CHANGED` on a plan edit at `code`, `audit` and `qa` (B2), on a spec edit (B3), under `--check` without touching the envelope (B4), on an unreadable plan (B5); halts `ORCH_APPROVAL_UNHASHED` on pre-FEAT-056 approvals (B6).
-- [ ] Regression: every existing `approve` call passes the path and hash through `approveArgs`; the end-to-end `runs start to verify_pass on a two-task plan…` test stays green; the usage-line test names `hash`.
-- [ ] Command pin: `cc-orchestrate.md` names the `hash` verb, the two `approve` forms, `ORCH_DOC_HASH_STALE`, `ORCH_APPROVED_DOC_CHANGED` and `ORCH_APPROVAL_UNHASHED`, and no longer names `Re-hash before approve` or `Get-FileHash`; the mirrors stay byte-identical.
-- [ ] No E2E/UI test: there is no UI.
+- [X] Unit: `documentHash` — spec over raw bytes, including non-UTF-8 (D1); each tick state `[>] [X] [x] [!]` keeps the plan hash over `-`, `*`, `+`, ordered and nested items (D2); an unticked plan equals its raw sha256, ticks on CRLF lines normalize, line endings still count (D3); a text change and a `[x]` in prose, a table cell or after list text change the hash (D4).
+- [X] Integration (CLI, real argv/stdin/env contract): `hash` prints the `sha256sum` value with no run file and the normalized value in a live run, writing nothing (H1, H2); its five refusals (H3).
+- [X] Integration: `approve` refuses a stale hash for spec and plan with `ORCH_DOC_HASH_STALE`, run file byte-identical (A1); its five usage refusals (A2); records exactly `{at, by, path, sha256}` lower-case from an upper-case argument (A3); a pre-ticked plan approves (A4).
+- [X] Integration: the Build check passes through ticks to `qa` (B1); halts `ORCH_APPROVED_DOC_CHANGED` on a plan edit at `code`, `audit` and `qa` (B2), on a spec edit (B3), under `--check` without touching the envelope (B4), on an unreadable plan (B5); halts `ORCH_APPROVAL_UNHASHED` on pre-FEAT-056 approvals (B6).
+- [X] Regression: every existing `approve` call passes the path and hash through `approveArgs`; the end-to-end `runs start to verify_pass on a two-task plan…` test stays green; the usage-line test names `hash`.
+- [X] Command pin: `cc-orchestrate.md` names the `hash` verb, the two `approve` forms, `ORCH_DOC_HASH_STALE`, `ORCH_APPROVED_DOC_CHANGED` and `ORCH_APPROVAL_UNHASHED`, and no longer names `Re-hash before approve` or `Get-FileHash`; the mirrors stay byte-identical.
+- [X] No E2E/UI test: there is no UI.
 
 ## Commit Order
 
