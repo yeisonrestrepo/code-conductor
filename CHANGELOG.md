@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.46.0] - 2026-11-13
+
+### Added
+- **[FEAT-056]** `orchestrate.mjs approve <spec|plan> <path> <sha256>` binds an approval to the bytes the owner was shown: it hashes the document on disk with `documentHash` and refuses a mismatch with `ORCH_DOC_HASH_STALE`, writing nothing. The plan hash reads every list item's leading checkbox as `[ ]`, so ticking progress keeps the approval valid while any other edit invalidates it. Each approval records `{at, by, path, sha256}`, and every role `install` after the plan approval re-hashes both documents and halts with `ORCH_APPROVED_DOC_CHANGED` when either changed or can no longer be read (`ORCH_APPROVAL_UNHASHED` for a run started before this release: `end`, then `start`). A new read-only `hash <spec|plan> <path>` verb prints the exact value `approve` checks. Both `cc-orchestrate.md` copies and the wiki (Orchestrator-Guide, C4-Components) describe the hash-bound flow. Landed from PR #192 (cc-lane-bot), intake of issue #184.
+- **[FEAT-058]** The Define-band review loop revises through files instead of messaging the author: `review <spec|plan> --round <doc>` records the document's sha256 for the round, `review <role> --record` reads the verdict from `.conductor/review/<role>-<n>.md` itself (refusing `ORCH_REVIEW_UNPARSED` or `ORCH_REVIEW_DOC_MOVED`, writing nothing), and a fresh dispatch of the author role revises from the review's path and sha256, so no `SendMessage` is used and the loop runs in every permission mode, headless included. A revision that leaves the hash unchanged closes the loop `unchanged`, a failed round; the cap stays three reviewer passes; `--close` accepts only `skipped:<reason>`; every close deletes `.conductor/review/` and keeps only `{ round, outcome, sha256 }`; and `approve` refuses with `ORCH_REVIEW_OPEN` until the role's loop has a recorded outcome, so a skip is always on the record. Both `cc-orchestrate.md` copies and the README walkthrough and "Review loop configurations" describe it; the `skipped:denied` row is gone and `review-loop.settings.json` still ships, no longer needed by the loop. Landed from PR #194 (cc-lane-bot), intake of issue #182.
+
 ## [1.45.0] - 2026-11-13
 
 ### Added
