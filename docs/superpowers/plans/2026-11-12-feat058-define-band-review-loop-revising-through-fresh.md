@@ -77,7 +77,7 @@ Line numbers below are from HEAD cb56c6e; locate by the quoted text if they move
 
 **Failure point:** the approval precondition breaks every existing test that approves (`driveTo`, the ticket run, FEAT-047, FEAT-056), and a mis-ordered loop check would turn `approve`'s usage refusals into `ORCH_REVIEW_OPEN`. **Verification:** T-102 runs the existing suite against the old script first (all pre-existing tests stay green with `skipLoop` in place), and T-106 runs the whole file green, with A2's five usage refusals unchanged.
 
-- [ ] [T-101] `tests/scripts/orchestrate.test.js`, the review-loop block. No dependency.
+- [X] [T-101] `tests/scripts/orchestrate.test.js`, the review-loop block. No dependency.
   - Replace everything from `const loop = (role) => runFile().review?.[role];` (line 685) through the closing `});` of `describe('review loop round counter [FEAT-041 AC2-AC4]', …)` (line 808), keeping the blank line before `describe('doc locations [FEAT-047]'`, with:
     ```js
     const loop = (role) => runFile().review?.[role];
@@ -388,7 +388,7 @@ Line numbers below are from HEAD cb56c6e; locate by the quoted text if they move
     });
     ```
   - This drops the FEAT-041 tests whose behavior the spec retires (`--round` with no document, `--close clean`, `--close cap`, "`approve` ignores an open loop") and keeps, rewritten to the new forms, the outside-window, cap, malformed-call, plan-window, `isValidRun`, `end`, `start`, halted-run, `[RF2]` and usage-line tests.
-- [ ] [T-102] `tests/scripts/orchestrate.test.js`, existing approvals close the loop first. Depends on T-101.
+- [X] [T-102] `tests/scripts/orchestrate.test.js`, existing approvals close the loop first. Depends on T-101.
   - After `approveArgs` (the `return ['approve', kind, rel, sha(rel)];` line 59 and its closing `}` at line 60) add:
     ```js
     // approve refuses while the role's review loop is open or never ran (FEAT-058); a recorded skip closes it.
@@ -407,8 +407,8 @@ Line numbers below are from HEAD cb56c6e; locate by the quoted text if they move
   - FEAT-056 A4 (line 1183): add `skipLoop('plan');` after `awaiting('plan');`.
   - FEAT-056 A2 is unchanged: its five calls refuse on argument validation, which runs before the loop check (Decision 2).
   - Then `grep -n "approveArgs(" tests/scripts/orchestrate.test.js` lists only calls that a `skipLoop`, a `['review', …, '--close', …]` array, a loop outcome in the new describe, or a deliberate `ORCH_REVIEW_OPEN` expectation (P1, P2) precedes, plus the step-refused second call at line 146.
-- [ ] [T-103] Red: `npx vitest run tests/scripts/orchestrate.test.js`. Depends on T-102. Predicted (measured): 1 file, **45 failed | 184 passed (229)**. Every failure is inside `review loop over review files [FEAT-058]`; every test outside it passes (179), because the old script already accepts `--close skipped:fixture`. Inside the describe, exactly these 5 pass on the old script: `P3 approve spec passes once the loop closed skipped:owner`, `isValidRun accepts a run with and without review, unchanged`, `a start over a stale run clears .conductor/review`, `refuses on a halted run, writing nothing`, `names review in the usage line`. The other 45 fail.
-- [ ] [T-104] `scripts/orchestrate.mjs`, constants (lines 30-31). Depends on T-103. Replace
+- [X] [T-103] Red: `npx vitest run tests/scripts/orchestrate.test.js`. Depends on T-102. Predicted (measured): 1 file, **45 failed | 184 passed (229)**. Every failure is inside `review loop over review files [FEAT-058]`; every test outside it passes (179), because the old script already accepts `--close skipped:fixture`. Inside the describe, exactly these 5 pass on the old script: `P3 approve spec passes once the loop closed skipped:owner`, `isValidRun accepts a run with and without review, unchanged`, `a start over a stale run clears .conductor/review`, `refuses on a halted run, writing nothing`, `names review in the usage line`. The other 45 fail.
+- [X] [T-104] `scripts/orchestrate.mjs`, constants (lines 30-31). Depends on T-103. Replace
   ```js
   const REVIEW_OUTCOME = /^(clean|cap|skipped:[a-z][a-z0-9-]{0,39})$/;
   const REVIEW_USAGE = 'usage: orchestrate.mjs review <spec|plan> --round | --close <clean|cap|skipped:<reason>>';
@@ -421,7 +421,7 @@ Line numbers below are from HEAD cb56c6e; locate by the quoted text if they move
   const REVIEW_ROW = /^- \[(AC|FMT|CR)\]/;
   const REVIEW_USAGE = 'usage: orchestrate.mjs review <spec|plan> --round <doc> | --record | --close skipped:<reason>';
   ```
-- [ ] [T-105] `scripts/orchestrate.mjs`, `approve` and the `review` verb. Depends on T-104.
+- [X] [T-105] `scripts/orchestrate.mjs`, `approve` and the `review` verb. Depends on T-104.
   - In `approve` (line 437), after `const content = readDoc(root, rel, APPROVE_USAGE);` add the line `  checkLoopClosed(run, what);`.
   - Replace everything from the comment `// FEAT-041 (e): the review loop's round counter. Advisory: approve never reads it, and the` (line 459) through the closing `}` of `closeLoop` (line 485), keeping the blank line before `const START_USAGE`, with:
     ```js
@@ -504,9 +504,9 @@ Line numbers below are from HEAD cb56c6e; locate by the quoted text if they move
     }
     ```
   - `readFileSync`, `rmSync`, `createHash`, `join`, `currentHash`, `documentHash`, `readDoc` and `isPlainObject` are already in scope; no import changes. `clearRunFiles` and `isValidRun` are not edited.
-- [ ] [T-106] Green: `npx vitest run tests/scripts/orchestrate.test.js`. Depends on T-105. Predicted (measured): 1 file, **229 passed (229)**.
-- [ ] [T-107] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-12-feat058-define-band-review-loop-revising-through-fresh.md` (ticks T-101 to T-106). Depends on T-106.
-- [ ] [T-108] Commit: `feat: review verb records verdicts from review files and approve waits for the loop [FEAT-058]`. Depends on T-107.
+- [X] [T-106] Green: `npx vitest run tests/scripts/orchestrate.test.js`. Depends on T-105. Predicted (measured): 1 file, **229 passed (229)**.
+- [X] [T-107] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-12-feat058-define-band-review-loop-revising-through-fresh.md` (ticks T-101 to T-106). Depends on T-106.
+- [X] [T-108] Commit: `feat: review verb records verdicts from review files and approve waits for the loop [FEAT-058]`. Depends on T-107.
 
 ---
 
@@ -520,7 +520,7 @@ Line numbers below are from HEAD cb56c6e; locate by the quoted text if they move
 
 **Failure point:** a `SendMessage` left in a loop step, or a mirror edited differently from the other. **Verification:** T-204's E1 pin reads each mirror and accepts exactly one `SendMessage` line, the header; the existing byte-identical test fails on any drift.
 
-- [ ] [T-201] `.claude/commands/cc-orchestrate.md`. Depends on T-108.
+- [X] [T-201] `.claude/commands/cc-orchestrate.md`. Depends on T-108.
   - Line 50, the run header line: `` Add one line: `Review loop: zero owner wakes only when launched with claude --permission-mode auto --settings .claude/review-loop.settings.json; README "Review loop configurations" names the costs of every other launch.` `` → `` Add one line: `Review loop: fresh Agent dispatches over review files, no SendMessage; it needs no launch settings and runs in every permission mode.` ``
   - Line 63, step 3 "What you show": `` `cap` with the final reviewer's rows verbatim, or `skipped:<reason>` `` → `` `cap` with the final reviewer's rows verbatim, `unchanged` at round `<n>` with the last review's rows verbatim, or `skipped:<reason>` ``.
   - Before line 65 (`   - **The script checks the hash.** …`) insert the bullet:
@@ -568,8 +568,8 @@ Line numbers below are from HEAD cb56c6e; locate by the quoted text if they move
     ````
   - The dispatch brief (line 144): `` Your hand-back is the run's only record. After it, the orchestrator may send you revision requests; answer them as prose, without a `SNAP_HANDBACK` line. `` → `Your hand-back is the run's only record.` (the sentence before it, `Verify your work before you hand back.`, stays).
   - Then `grep -n SendMessage .claude/commands/cc-orchestrate.md` prints only line 50.
-- [ ] [T-202] `project-template/.claude/commands/cc-orchestrate.md`: copy the edited `.claude/commands/cc-orchestrate.md` over it byte for byte (`cp .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md`), then `cmp` the two files (exit 0). Depends on T-201.
-- [ ] [T-203] `tests/installer/commands-parity.test.js`: replace the whole `describe('cc-orchestrate review loop [FEAT-041 AC5, AC6]', …)` block (lines 232-275), keeping the blank line before `const RESUME_MIRRORS`, with:
+- [X] [T-202] `project-template/.claude/commands/cc-orchestrate.md`: copy the edited `.claude/commands/cc-orchestrate.md` over it byte for byte (`cp .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md`), then `cmp` the two files (exit 0). Depends on T-201.
+- [X] [T-203] `tests/installer/commands-parity.test.js`: replace the whole `describe('cc-orchestrate review loop [FEAT-041 AC5, AC6]', …)` block (lines 232-275), keeping the blank line before `const RESUME_MIRRORS`, with:
     ```js
     describe('cc-orchestrate review loop [FEAT-041 AC5, AC6, FEAT-058]', () => {
       const text = () => read(ORCH_MIRRORS[0]);
@@ -635,9 +635,9 @@ Line numbers below are from HEAD cb56c6e; locate by the quoted text if they move
     });
     ```
   Depends on T-202.
-- [ ] [T-204] `npx vitest run tests/installer/commands-parity.test.js`. Depends on T-203. Predicted (measured): 1 file, **70 passed (70)** (67 − 6 old review-loop tests + 9 new: 8 `it`s, one of them `it.each` over the two mirrors). Run against the old command text, the same file reads **8 failed | 62 passed (70)**: only the FEAT-056 approval pin inside the describe passes there.
-- [ ] [T-205] Stage: `git add -u .claude/commands/cc-orchestrate.md`, `git add -u project-template/.claude/commands/cc-orchestrate.md`, `git add -u tests/installer/commands-parity.test.js`, `git add -u docs/superpowers/plans/2026-11-12-feat058-define-band-review-loop-revising-through-fresh.md` (ticks T-107 to T-204). Depends on T-204.
-- [ ] [T-206] Commit: `docs: cc-orchestrate revises through fresh author dispatch over review files [FEAT-058]`. Depends on T-205.
+- [X] [T-204] `npx vitest run tests/installer/commands-parity.test.js`. Depends on T-203. Predicted (measured): 1 file, **70 passed (70)** (67 − 6 old review-loop tests + 9 new: 8 `it`s, one of them `it.each` over the two mirrors). Run against the old command text, the same file reads **8 failed | 62 passed (70)**: only the FEAT-056 approval pin inside the describe passes there.
+- [X] [T-205] Stage: `git add -u .claude/commands/cc-orchestrate.md`, `git add -u project-template/.claude/commands/cc-orchestrate.md`, `git add -u tests/installer/commands-parity.test.js`, `git add -u docs/superpowers/plans/2026-11-12-feat058-define-band-review-loop-revising-through-fresh.md` (ticks T-107 to T-204). Depends on T-204.
+- [X] [T-206] Commit: `docs: cc-orchestrate revises through fresh author dispatch over review files [FEAT-058]`. Depends on T-205.
 
 ---
 
@@ -650,7 +650,7 @@ Line numbers below are from HEAD cb56c6e; locate by the quoted text if they move
 
 **Failure point:** an edit that reaches a "Known limits" line, or a README pin dropped together with a file or deploy pin. **Verification:** T-303 runs the settings test with its four file and deploy tests unchanged, and T-304's diff check shows no hunk at or after the `## Known limits` heading.
 
-- [ ] [T-301] `README.md`. Depends on T-206.
+- [X] [T-301] `README.md`. Depends on T-206.
   - Lines 120-124, the launch paragraph and its code block: replace
     ````markdown
     Launch Claude Code with the shipped review-loop exception, so the define review loop runs with zero owner wakes:
@@ -680,7 +680,7 @@ Line numbers below are from HEAD cb56c6e; locate by the quoted text if they move
 
     `.claude/review-loop.settings.json` still ships and holds the one auto mode allow rule `[FEAT-041]` wrote for its revision messages; the loop no longer sends them. The installer never writes `autoMode` into `~/.claude/settings.json`, and Claude Code ignores `autoMode` in project settings, so the rule applies only when you pass the file yourself. Read it before you pass it: a cloned repository could ship a different file under the same name.
     ```
-- [ ] [T-302] `tests/installer/review-loop-settings.test.js`. Depends on T-301.
+- [X] [T-302] `tests/installer/review-loop-settings.test.js`. Depends on T-301.
   - Delete the line `const LAUNCH = 'claude --permission-mode auto --settings .claude/review-loop.settings.json';` (line 15); its only use is the README pin below.
   - Replace the `[AC8] README declares the three configurations and the launch line` test (lines 52-57) with:
     ```js
@@ -693,10 +693,10 @@ Line numbers below are from HEAD cb56c6e; locate by the quoted text if they move
       });
     ```
   - `EXCEPTION`, `SHA256`, `REL` and the `[AC7]`, deploy and `[AC9]` tests are unchanged.
-- [ ] [T-303] `npx vitest run tests/installer/review-loop-settings.test.js`. Depends on T-302. Predicted (measured): 1 file, **5 passed (5)**.
-- [ ] [T-304] `git diff -U0 README.md | grep '^@@'`: every hunk starts before the line of `## Known limits` (line 467). Depends on T-303.
-- [ ] [T-305] Stage: `git add -u README.md`, `git add -u tests/installer/review-loop-settings.test.js`, `git add -u docs/superpowers/plans/2026-11-12-feat058-define-band-review-loop-revising-through-fresh.md` (ticks T-205 to T-304). Depends on T-304.
-- [ ] [T-306] Commit: `docs: README describes the fresh-dispatch review loop [FEAT-058]`. Depends on T-305.
+- [X] [T-303] `npx vitest run tests/installer/review-loop-settings.test.js`. Depends on T-302. Predicted (measured): 1 file, **5 passed (5)**.
+- [X] [T-304] `git diff -U0 README.md | grep '^@@'`: every hunk starts before the line of `## Known limits` (line 467). Depends on T-303.
+- [X] [T-305] Stage: `git add -u README.md`, `git add -u tests/installer/review-loop-settings.test.js`, `git add -u docs/superpowers/plans/2026-11-12-feat058-define-band-review-loop-revising-through-fresh.md` (ticks T-205 to T-304). Depends on T-304.
+- [X] [T-306] Commit: `docs: README describes the fresh-dispatch review loop [FEAT-058]`. Depends on T-305.
 
 ---
 
@@ -707,24 +707,24 @@ Line numbers below are from HEAD cb56c6e; locate by the quoted text if they move
 
 **Failure point:** a pin elsewhere in the suite on the retired loop text. **Verification:** the full `npm test` run and the grep checks below.
 
-- [ ] [T-401] Run `npm test`. Predicted: exit 0, every file green, 33 tests more than the pre-change suite (30 in `orchestrate.test.js`: 199 → 229; 3 in `commands-parity.test.js`: 67 → 70; `review-loop-settings.test.js` stays at 5), no new skip. CI legs: each leg's skipped set equals its `tools/skip-baseline.json` key, unchanged, because no added test is conditional. Depends on T-306.
-- [ ] [T-402] Grep checks: `git grep -n "SendMessage" -- .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md` prints only each file's line 50; `git grep -n -e "-review.txt" -e "-revision.txt" -e "--close clean" -e "--close cap" -e "skipped:denied" -- .claude/commands project-template/.claude/commands scripts README.md` prints nothing; `git grep -n "closeLoop" -- scripts` prints nothing. Depends on T-401.
-- [ ] [T-403] Stage: `git add -u docs/superpowers/plans/2026-11-12-feat058-define-band-review-loop-revising-through-fresh.md` (ticks T-305 to T-402). Depends on T-402.
-- [ ] [T-404] Commit: `docs: close out the FEAT-058 plan [FEAT-058]`. Depends on T-403.
+- [X] [T-401] Run `npm test`. Predicted: exit 0, every file green, 33 tests more than the pre-change suite (30 in `orchestrate.test.js`: 199 → 229; 3 in `commands-parity.test.js`: 67 → 70; `review-loop-settings.test.js` stays at 5), no new skip. CI legs: each leg's skipped set equals its `tools/skip-baseline.json` key, unchanged, because no added test is conditional. Depends on T-306.
+- [X] [T-402] Grep checks: `git grep -n "SendMessage" -- .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md` prints only each file's line 50; `git grep -n -e "-review.txt" -e "-revision.txt" -e "--close clean" -e "--close cap" -e "skipped:denied" -- .claude/commands project-template/.claude/commands scripts README.md` prints nothing; `git grep -n "closeLoop" -- scripts` prints nothing. Depends on T-401.
+- [X] [T-403] Stage: `git add -u docs/superpowers/plans/2026-11-12-feat058-define-band-review-loop-revising-through-fresh.md` (ticks T-305 to T-402). Depends on T-402.
+- [X] [T-404] Commit: `docs: close out the FEAT-058 plan [FEAT-058]`. Depends on T-403.
 
 ---
 
 ## Test List
 
-- [ ] Integration (CLI, real argv/env contract), `--round`: refuses outside the await window (R1); opens round 1 recording `{ round, outcome: null, sha256, doc, await: 'review' }` (R2); refuses while a reviewer pass is unrecorded (R3); refuses an absolute path, a `..` path and a missing document (R18); refuses a fourth round with `ORCH_REVIEW_CAP`, no halt (R17); the plan loop runs in its own window (R19).
-- [ ] Integration, `--record`: refuses with no open pass, at round 0 and after an `OPEN` record (R4); closes `clean` and deletes `.conductor/review/` (R5); prints the document and review paths and hashes on `OPEN` below the cap and keeps the file (R6); closes `cap` at round 3, printing the rows (R10); refuses `ORCH_REVIEW_UNPARSED` on eight malformed files (R11) and `ORCH_REVIEW_DOC_MOVED` (R12), each writing nothing.
-- [ ] Integration, E3: an unchanged spec revision closes `unchanged` at the next round, exit 0, no halt (R7); a ticks-only plan revision closes `unchanged` (R8); a changed document opens the next round with its new hash (R9).
-- [ ] Integration, `--close`: `skipped:<reason>` at round 0 (`sha256: null`) and at an open round deletes `.conductor/review/` (R13); `clean`, `cap`, `unchanged` and malformed reasons refuse with the usage line (R14); malformed calls (R15); a closed loop refuses every form (R16); a pre-FEAT-058 loop closes as an explicit skip and then approves (R20).
-- [ ] Integration, `approve`: refuses `ORCH_REVIEW_OPEN` when the loop never ran (P1) or is open (P2), for spec and plan, run file byte-identical; passes after `clean`, `unchanged` and `skipped:owner` (P3); the main path OPEN → revision → CLEAN → approval of the revised hash (M1).
-- [ ] Regression: every existing approval closes its loop through `skipLoop`; the FEAT-056 A2 usage refusals are unchanged; `isValidRun`, `end`, `start`, halted-run and `[RF2]` tests keep their meaning with the new record shape.
-- [ ] Command pins: both mirrors name `SendMessage` only in the header line, dispatch a fresh `<role>` agent with the revision brief, keep both "never revive" rules, name `.conductor/review/<role>-<n>.md`, `review <role> --record`, `unchanged` at the approval, `ORCH_REVIEW_OPEN`, and the fail-open reasons without `denied`; the mirrors stay byte-identical.
-- [ ] README pin: the configurations section keeps its heading and the plain-auto and default rows, says the loop needs no launch settings, and no longer names `skipped:denied`; the settings file and deploy pins are unchanged.
-- [ ] No E2E/UI test: there is no UI.
+- [X] Integration (CLI, real argv/env contract), `--round`: refuses outside the await window (R1); opens round 1 recording `{ round, outcome: null, sha256, doc, await: 'review' }` (R2); refuses while a reviewer pass is unrecorded (R3); refuses an absolute path, a `..` path and a missing document (R18); refuses a fourth round with `ORCH_REVIEW_CAP`, no halt (R17); the plan loop runs in its own window (R19).
+- [X] Integration, `--record`: refuses with no open pass, at round 0 and after an `OPEN` record (R4); closes `clean` and deletes `.conductor/review/` (R5); prints the document and review paths and hashes on `OPEN` below the cap and keeps the file (R6); closes `cap` at round 3, printing the rows (R10); refuses `ORCH_REVIEW_UNPARSED` on eight malformed files (R11) and `ORCH_REVIEW_DOC_MOVED` (R12), each writing nothing.
+- [X] Integration, E3: an unchanged spec revision closes `unchanged` at the next round, exit 0, no halt (R7); a ticks-only plan revision closes `unchanged` (R8); a changed document opens the next round with its new hash (R9).
+- [X] Integration, `--close`: `skipped:<reason>` at round 0 (`sha256: null`) and at an open round deletes `.conductor/review/` (R13); `clean`, `cap`, `unchanged` and malformed reasons refuse with the usage line (R14); malformed calls (R15); a closed loop refuses every form (R16); a pre-FEAT-058 loop closes as an explicit skip and then approves (R20).
+- [X] Integration, `approve`: refuses `ORCH_REVIEW_OPEN` when the loop never ran (P1) or is open (P2), for spec and plan, run file byte-identical; passes after `clean`, `unchanged` and `skipped:owner` (P3); the main path OPEN → revision → CLEAN → approval of the revised hash (M1).
+- [X] Regression: every existing approval closes its loop through `skipLoop`; the FEAT-056 A2 usage refusals are unchanged; `isValidRun`, `end`, `start`, halted-run and `[RF2]` tests keep their meaning with the new record shape.
+- [X] Command pins: both mirrors name `SendMessage` only in the header line, dispatch a fresh `<role>` agent with the revision brief, keep both "never revive" rules, name `.conductor/review/<role>-<n>.md`, `review <role> --record`, `unchanged` at the approval, `ORCH_REVIEW_OPEN`, and the fail-open reasons without `denied`; the mirrors stay byte-identical.
+- [X] README pin: the configurations section keeps its heading and the plain-auto and default rows, says the loop needs no launch settings, and no longer names `skipped:denied`; the settings file and deploy pins are unchanged.
+- [X] No E2E/UI test: there is no UI.
 
 ## Commit Order
 
