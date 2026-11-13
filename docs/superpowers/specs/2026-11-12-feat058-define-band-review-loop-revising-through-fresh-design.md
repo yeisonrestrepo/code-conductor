@@ -98,7 +98,12 @@ End with exactly one line: REVISION <role> round <n>: done, or REVISION <role> r
 
 ### The shipped classifier exception
 
-`project-template/.claude/review-loop.settings.json` exists only to let the revision `SendMessage` through the auto mode classifier. After this change the loop sends none, so the file is no longer needed. Removing it touches the installer's shipped payload, a protected surface the entry does not list, and narrows what a launch line documented since FEAT-041 does. This spec therefore leaves the file and its installer pin (`tests/installer/review-loop-settings.test.js:38-40`) as they are, and asks the owner whether to retire it in a follow-up item (OWNER_QUESTIONS). The `README.md` text that describes the loop and its configurations is corrected in this item, since it would otherwise state a cost (`skipped:denied`) the loop can no longer produce.
+`project-template/.claude/review-loop.settings.json` exists only to let the revision `SendMessage` through the auto mode classifier. After this change the loop sends none, so the file is no longer needed. Removing it touches the installer's shipped payload, a protected surface the entry does not list, and narrows what a launch line documented since FEAT-041 does. This item therefore leaves the file and its installer pin (`tests/installer/review-loop-settings.test.js:38-40`) in place, and the loop stops depending on it; retiring it is a separate follow-up item (see "Owner decisions"). The `README.md` text that describes the loop and its configurations is corrected in this item, since it would otherwise state a cost (`skipped:denied`) the loop can no longer produce.
+
+## Owner decisions
+
+- **The shipped classifier exception is retired in a separate item.** FEAT-058 leaves `project-template/.claude/review-loop.settings.json`, its installer deploy and its file and deploy test pins in place; the loop simply no longer depends on it. Its removal is recorded under "Out of Scope" as a follow-up.
+- **The rest of the design stands as proposed**, including that `approve <spec|plan>` refuses with `ORCH_REVIEW_OPEN` while the role's loop is still open or has not run.
 
 ## Behavior
 
@@ -152,7 +157,7 @@ End with exactly one line: REVISION <role> round <n>: done, or REVISION <role> r
 
 ## Out of Scope
 
-- Retiring `project-template/.claude/review-loop.settings.json`, its installer deploy and its test pins (owner question).
+- Retiring `project-template/.claude/review-loop.settings.json`, its installer deploy and its test pins: a separate follow-up item. This item leaves the file in place and only stops depending on it.
 - The wiki pages under `.github/wiki/pages/` that describe the FEAT-041 loop (`Orchestrator-Guide.md`, `Getting-Started.md`, `Architecture-Overview.md`): a docs follow-up.
 - Gating Guard 5 on an open loop, or uninstalling the envelope after the loop: the persistent envelope stays the mechanism, with its FEAT-041 residual risk.
 - The manual `/cc-spec` flow, the checklist rows, the reviewer profile `define-review`, the round cap of 3.
