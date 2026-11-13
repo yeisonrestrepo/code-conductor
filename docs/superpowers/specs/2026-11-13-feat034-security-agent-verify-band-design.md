@@ -1,6 +1,6 @@
 # FEAT-034: Security Agent (Verify Band)
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-13 by independent review (round 3)
 
 Source: the `[FEAT-034]` entry in `AGENT-READABLE BACKLOG.md` (PILLAR 3), the intake of issue #142. Its three acceptance criteria are answered in "Acceptance Criteria" below, tagged `[E1]`-`[E3]`. The rows tagged `[D1]`-`[D4]` answer the entry's description: the ecosystem audit command, the secrets scan over the diff, the smuggled-script check, and "reports findings; fixes nothing".
 
