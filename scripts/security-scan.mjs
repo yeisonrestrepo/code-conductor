@@ -287,8 +287,10 @@ export function scanChanges(root, base, threshold) {
     process.stderr.write(`security-scan: ${err.message}\n`);
     return { secrets: 'failed', scripts: 'failed', introduced: [], preExisting: [], lockfile, changed: 'failed' };
   }
-  const diff = git(root, ['diff', '--no-color', '--no-ext-diff', '--unified=0', '--relative', '--src-prefix=a/', '--dst-prefix=b/', base]).toString('utf8');
-  const secrets = runScan('secrets', () => splitSecrets(root, base, scanSecrets([...diffLines(diff), ...untrackedLines(root)], threshold)));
+  const secrets = runScan('secrets', () => {
+    const diff = git(root, ['diff', '--no-color', '--no-ext-diff', '--unified=0', '--relative', '--src-prefix=a/', '--dst-prefix=b/', base]).toString('utf8');
+    return splitSecrets(root, base, scanSecrets([...diffLines(diff), ...untrackedLines(root)], threshold));
+  });
   const scripts = runScan('scripts', () => ({ introduced: scanScripts(root, base, threshold), preExisting: [] }));
   return {
     secrets: secrets.status,

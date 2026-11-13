@@ -2294,6 +2294,15 @@ describe('pre-existing findings never reach the public part [FEAT-059]', () => {
     }
   });
 
+  it('[P1] a pre-existing secret copied into the public part as well halts without quoting it', () => {
+    const r = run({ base: oldKey, change: moveKey, report: () => securityReport([aws()], SCANS_NONE, 'VERDICT: RETURN', [aws()]) });
+    expect(r.status).toBe(1);
+    expect(r.err).toMatch(/^ORCH_SECURITY_REPORT_INCOMPLETE: the local finding at \.conductor\/handback\/security\.txt:\d+ is filed in the wrong part$/);
+    for (const text of [r.err, r.runText]) {
+      for (const marker of ['AWS', 'src/config.js:1']) expect(text).not.toContain(marker);
+    }
+  });
+
   it('[P1] a report that omits a pre-existing local line and one that omits an introduced one halt with the same reason', () => {
     const a = run({ base: oldKey, change: moveKey, report: () => securityReport() });
     const b = run({ change: writeSecret, report: () => securityReport() });

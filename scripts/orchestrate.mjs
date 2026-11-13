@@ -680,6 +680,11 @@ function checkComplete(report, local) {
       throw new Halt('ORCH_SECURITY_REPORT_INCOMPLETE', "the report does not match the base scanner's local findings");
     }
   }
+  // An owner-only line copied into the public part would leak a pre-existing finding.
+  for (const line of local.preExisting) {
+    const leaked = reported.find((f) => f.line === line && f.part === 'public');
+    if (leaked) throw new Halt('ORCH_SECURITY_REPORT_INCOMPLETE', `the local finding at ${reportAt(leaked.n)} is filed in the wrong part`);
+  }
 }
 
 function securitySummary(report, threshold) {
