@@ -43,6 +43,14 @@ const CLAIM = {
   audit: 'a static review of the changes against the spec and plan was completed, and its findings are listed',
   qa: 'you ran the test command yourself and the suite passed',
 };
+// FEAT-060: the verdict format the router parses, pinned in the profile that asks for it.
+const AUDIT_VERDICT = [
+  '`- [<severity>] <path>:<line> — <one sentence>`',
+  '`blocker`, `major` or `minor`',
+  'exactly one verdict line, immediately before your `SNAP_HANDBACK` line',
+  '`VERDICT: APPROVE`', '`VERDICT: RETURN`', '`VERDICT: ESCALATE`',
+  'A `blocker` or `major` finding withholds the Verify gate through your verdict',
+];
 
 describe('role agent profiles [FEAT-012]', () => {
   it('ships exactly the five ROLES plus define-review in both agents directories [FEAT-041]', () => {
@@ -59,6 +67,12 @@ describe('role agent profiles [FEAT-012]', () => {
 
   it.each(ROLES)('[AC2] %s is byte-identical in the .claude/agents mirror', (role) => {
     expect(read(`${MIRROR}/${role}.md`)).toBe(profile(role));
+  });
+
+  it.each([TEMPLATE, MIRROR])('[FEAT-060] %s/audit.md pins the verdict line, the three verdicts, the severities and the finding form', (dir) => {
+    const text = read(`${dir}/audit.md`);
+    for (const phrase of AUDIT_VERDICT) expect(text).toContain(phrase);
+    expect(text).not.toContain('Findings do not withhold the gate');
   });
 
   it.each(ROLES)('[AC3] %s measures at most 999 tokens as ceil(bytes / 4) over the whole file', (role) => {
@@ -95,7 +109,8 @@ describe('role agent profiles [FEAT-012]', () => {
 // `git show v1.37.0:<path>`; CI checks out no tags, so the hashes are pinned here. A later item
 // that changes a profile on purpose updates its row in the same commit.
 const PROFILE_SHA256_1_37_0 = {
-  audit: '5bfeff19ef086a21d9a6df82dfe570540c55adb7fa5b08f4dbf34003230ad809',
+  // FEAT-060 changed audit on purpose: findings carry a severity and the report ends in a VERDICT line.
+  audit: '4900de1fae7485ea57727e1919a398278f1743bd117940e87975b6fd886781e9',
   code: '21b7697ef9317a7aca89dd3e99623208d6541cf7c794712ff2a76e4d0bb0c604',
   // FEAT-047 changed plan and spec on purpose: the folder now comes from the envelope's scope.
   plan: '3de154b4b4cdda5cb256a79a62f99e7f9cf39d472d2a2da953b5c8616392d034',

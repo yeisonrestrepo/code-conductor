@@ -10,7 +10,7 @@ import { parseSnapshotHeader } from '../../scripts/ticket.mjs';
 import { cleanGitEnv } from '../helpers/git-env.js';
 import {
   ENVELOPE_FILE, HANDBACK_DIR, MAY_HAND_BACK, ROLE_ARTIFACTS, REVIEW_CAP, REVIEW_DIR, RUN_FILE, SHELL_METACHARACTERS, WRITE_SURFACE,
-  Halt, checkTestCommand, docScopes, extractTasks, findAgent, forwardGate, isValidRun, nextStep, taskScope,
+  Halt, checkTestCommand, docScopes, extractTasks, findAgent, forwardGate, isValidRun, nextStep, parseVerdict, recordHandback, taskScope,
 } from '../../scripts/orchestrate.mjs';
 import { CANDIDATE_PAIRS, DEFAULT_PAIR } from '../../scripts/doc-locations.mjs';
 
@@ -61,7 +61,8 @@ const handbackLine = (role, gate, extra = {}) => 'SNAP_HANDBACK ' + JSON.stringi
   v: 3, sys: { ph: 'impl', c: '0000000', s: 'FEAT-011', role, tk: 'X', ...extra.sys },
   ops: { n: [], f: [], gate }, mem: { d: [], x: [] }, pr: '',
 });
-const say = (role, gate) => `Done.\nObservation: fine.\n${handbackLine(role, gate)}\n`;
+const say = (role, gate) => `Done.\nObservation: fine.\n${role === 'audit' ? 'VERDICT: APPROVE\n' : ''}${handbackLine(role, gate)}\n`;
+const auditReport = (verdict, findings = []) => ['Done.', ...findings, ...(verdict === null ? [] : [verdict]), handbackLine('audit', 'build_executed'), ''].join('\n');
 
 // Drives a fresh run to the point where `role` is next, recording each step on the way.
 function driveTo(role) {
@@ -938,5 +939,127 @@ describe('doc locations [FEAT-047]', () => {
     expect(r.err).toMatch(/^ORCH_DOC_LOCATION_UNRESOLVED: .*\bend\b.*\bstart\b/);
     expect(orch(['end']).status).toBe(0);
     expect(existsSync(join(root, RUN_FILE))).toBe(false);
+  });
+});
+
+describe('audit verdict [FEAT-060]', () => {
+  const minor = ['- [minor] src/a.js:3 — a nit', '- [minor] src/b.js:4 — another nit'];
+  const severe = ['- [blocker] src/a.js:10 — breaks AC1', '- [major] src/b.js:2 — misses an edge'];
+  const noCode = (code) => (text) => { try { parseVerdict(text); } catch (e) { return e.code === code; } return false; };
+
+  it.each([
+    ['APPROVE with no findings', auditReport('VERDICT: APPROVE'), 'APPROVE', 0],
+    ['APPROVE with only minor findings', auditReport('VERDICT: APPROVE', minor), 'APPROVE', 0],
+    ['RETURN with a blocker and a major', auditReport('VERDICT: RETURN', severe), 'RETURN', 2],
+    ['ESCALATE with no findings', auditReport('VERDICT: ESCALATE'), 'ESCALATE', 0],
+    ['ESCALATE with a major finding', auditReport('VERDICT: ESCALATE', ['- [major] src/a.js:1 — needs a new dependency']), 'ESCALATE', 1],
+    ['a CRLF report', auditReport('VERDICT: APPROVE').replace(/\n/g, '\r\n'), 'APPROVE', 0],
+    ['blank lines between the verdict and SNAP_HANDBACK', ['Done.', 'VERDICT: APPROVE', '', '', handbackLine('audit', 'build_executed'), ''].join('\n'), 'APPROVE', 0],
+    ['prose that names the verdict mid-line', auditReport('VERDICT: APPROVE', ['The verdict depends on the plan.']), 'APPROVE', 0],
+  ])('parseVerdict accepts %s', (_name, text, verdict, blockers) => {
+    expect(parseVerdict(text)).toEqual({ verdict, blockers });
+  });
+
+  const between = ['Done.', 'VERDICT: RETURN', '- [blocker] src/a.js:10 — x', handbackLine('audit', 'build_executed'), ''].join('\n');
+  const after = ['Done.', handbackLine('audit', 'build_executed'), 'VERDICT: APPROVE', ''].join('\n');
+  it.each([
+    ['no verdict line', auditReport(null), 'ORCH_VERDICT_MISSING'],
+    ['only prose naming the verdict mid-line', auditReport(null, ['The verdict depends on the plan.']), 'ORCH_VERDICT_MISSING'],
+    ['two VERDICT lines', auditReport('VERDICT: APPROVE', ['VERDICT: APPROVE']), 'ORCH_VERDICT_INVALID', 'found 2'],
+    ['Verdict: approve', auditReport('Verdict: approve'), 'ORCH_VERDICT_INVALID'],
+    ['VERDICT:APPROVE with a trailing space', auditReport('VERDICT:APPROVE '), 'ORCH_VERDICT_INVALID'],
+    ['VERDICT: APPROVED', auditReport('VERDICT: APPROVED'), 'ORCH_VERDICT_INVALID'],
+    ['the template copied', auditReport('VERDICT: APPROVE | RETURN | ESCALATE'), 'ORCH_VERDICT_INVALID'],
+    ['a finding line between the verdict and SNAP_HANDBACK', between, 'ORCH_VERDICT_INVALID', 'immediately precede'],
+    ['the verdict after SNAP_HANDBACK', after, 'ORCH_VERDICT_INVALID', 'immediately precede'],
+    ['APPROVE with a blocker', auditReport('VERDICT: APPROVE', ['- [blocker] src/a.js:1 — x']), 'ORCH_VERDICT_INCONSISTENT'],
+    ['APPROVE with a major', auditReport('VERDICT: APPROVE', ['- [major] src/a.js:1 — x']), 'ORCH_VERDICT_INCONSISTENT'],
+    ['RETURN with only minor findings', auditReport('VERDICT: RETURN', minor), 'ORCH_VERDICT_INCONSISTENT'],
+    ['RETURN with no findings', auditReport('VERDICT: RETURN'), 'ORCH_VERDICT_INCONSISTENT'],
+    ['RETURN whose only blocker carries no file:line', auditReport('VERDICT: RETURN', ['- [blocker] the whole design — x']), 'ORCH_VERDICT_INCONSISTENT'],
+  ])('parseVerdict halts %s with %s', (_name, text, code, fragment) => {
+    expect(noCode(code)(text)).toBe(true);
+    if (fragment) expect(() => parseVerdict(text)).toThrow(fragment);
+  });
+
+  it('parseVerdict quotes a malformed line capped at 120 characters', () => {
+    const line = `VERDICT: ${'X'.repeat(300)}`;
+    let halt;
+    try { parseVerdict(auditReport(line)); } catch (e) { halt = e; }
+    expect(halt).toBeInstanceOf(Halt);
+    expect(halt.reason).toContain(JSON.stringify(line.slice(0, 120)));
+    expect(halt.reason).not.toContain(line.slice(0, 121));
+  });
+
+  it('APPROVE with minor findings records the verdict and lets qa forward verify_pass', () => {
+    driveTo('audit');
+    expect(orch(['install', 'audit']).status).toBe(0);
+    expect(orch(['handback', 'audit'], { input: auditReport('VERDICT: APPROVE', ['- [minor] src/a.js:3 — nit']) }).status).toBe(0);
+    expect(runFile().handbacks.at(-1)).toMatchObject({ role: 'audit', verdict: 'APPROVE' });
+    expect(orch(['install', 'qa']).status).toBe(0);
+    expect(orch(['handback', 'qa'], { input: say('qa', 'verify_pass') }).status).toBe(0);
+    expect(runFile().gate).toBe('verify_pass');
+  });
+
+  it.each([
+    ['VERDICT: RETURN', ['- [blocker] src/a.js:10 — breaks AC1'], 'ORCH_AUDIT_RETURN'],
+    ['VERDICT: ESCALATE', [], 'ORCH_AUDIT_ESCALATE'],
+  ])('a valid %s halts %s after recording the audit entry, and install qa is refused', (line, findings, code) => {
+    driveTo('audit');
+    orch(['install', 'audit']);
+    const r = orch(['handback', 'audit'], { input: auditReport(line, findings) });
+    expect(r.status).toBe(1);
+    expect(r.err).toMatch(new RegExp(`^${code}: `));
+    expect(r.err).toContain('.conductor/handback/audit.txt');
+    expect(runFile().handbacks.at(-1)).toMatchObject({ role: 'audit', verdict: line.slice('VERDICT: '.length) });
+    expect(runFile().halt.code).toBe(code);
+    expect(orch(['install', 'qa']).status).toBe(2);
+  });
+
+  it.each([
+    ['ORCH_VERDICT_MISSING', auditReport(null)],
+    ['ORCH_VERDICT_INVALID', auditReport('VERDICT: approved')],
+    ['ORCH_VERDICT_INVALID', auditReport('VERDICT: APPROVE', ['VERDICT: APPROVE'])],
+    ['ORCH_VERDICT_INVALID', ['Done.', 'VERDICT: RETURN', '- [blocker] src/a.js:10 — x', handbackLine('audit', 'build_executed'), ''].join('\n')],
+    ['ORCH_VERDICT_INCONSISTENT', auditReport('VERDICT: APPROVE', ['- [major] src/a.js:1 — x'])],
+  ])('handback audit halts %s through the CLI, recording no audit entry', (code, input) => {
+    driveTo('audit');
+    orch(['install', 'audit']);
+    const r = orch(['handback', 'audit'], { input });
+    expect(r.status).toBe(1);
+    expect(r.err.startsWith(code)).toBe(true);
+    expect(runFile().halt.code).toBe(code);
+    expect(runFile().handbacks.some((h) => h.role === 'audit')).toBe(false);
+  });
+
+  it('the existing hand-back checks run first: a wrong gate with no verdict halts ORCH_GATE_UNEARNED', () => {
+    driveTo('audit');
+    orch(['install', 'audit']);
+    const r = orch(['handback', 'audit'], { input: `Done.\n${handbackLine('audit', 'verify_pass')}\n` });
+    expect(r.status).toBe(1);
+    expect(r.err).toContain('ORCH_GATE_UNEARNED');
+  });
+
+  const withAudit = (verdict) => ({ ...blank, gate: 'build_executed', handbacks: [{ role: 'audit', ...(verdict ? { verdict } : {}) }] });
+  it.each(['RETURN', 'ESCALATE', undefined])('recordHandback refuses qa verify_pass after an audit verdict of %s', (v) => {
+    expect(() => recordHandback(withAudit(v), 'qa', 'verify_pass')).toThrow('ORCH_GATE_WITHHELD');
+  });
+
+  it('recordHandback forwards qa verify_pass after APPROVE', () => {
+    expect(recordHandback(withAudit('APPROVE'), 'qa', 'verify_pass').gate).toBe('verify_pass');
+  });
+
+  it('recordHandback writes a verdict on the entry only when given one', () => {
+    const run = { ...blank, gate: 'build_executed' };
+    expect(recordHandback(run, 'audit', 'build_executed', 'RETURN').handbacks.at(-1).verdict).toBe('RETURN');
+    expect(recordHandback(run, 'audit', 'build_executed').handbacks.at(-1)).not.toHaveProperty('verdict');
+  });
+
+  it('isValidRun accepts audit entries with and without a verdict', () => {
+    driveTo('qa');
+    const run = runFile();
+    expect(isValidRun(run)).toBe(true);
+    delete run.handbacks.find((h) => h.role === 'audit').verdict;
+    expect(isValidRun(run)).toBe(true);
   });
 });
