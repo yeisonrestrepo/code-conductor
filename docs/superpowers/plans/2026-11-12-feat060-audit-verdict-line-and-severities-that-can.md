@@ -73,23 +73,23 @@
     - H12 `RETURN with only minor findings` → `ORCH_VERDICT_INCONSISTENT`
     - H13 `RETURN with no findings` → `ORCH_VERDICT_INCONSISTENT`
     - H14 `RETURN whose only blocker carries no file:line` (`- [blocker] the whole design — …`) → `ORCH_VERDICT_INCONSISTENT`
-  - Q1 **"parseVerdict quotes a malformed line capped at 120 characters"**: `VERDICT: ${'X'.repeat(300)}` throws a `Halt` whose `reason` contains the first 120 characters of the line, JSON-quoted, and not the 121st.
+  - Q1 **"parseVerdict quotes a malformed line capped at 120 characters"**: an audit report whose verdict line is `line = \`VERDICT: ${'X'.repeat(300)}\`` throws a `Halt` whose `reason` contains `JSON.stringify(line.slice(0, 120))` and does not contain `line.slice(0, 121)`.
   - C1 **"APPROVE with minor findings records the verdict and lets qa forward verify_pass"**: `driveTo('audit')`, `install audit`, `handback audit` with `auditReport('VERDICT: APPROVE', ['- [minor] src/a.js:3 — nit'])` exits 0; the last hand-back entry is `{ role: 'audit', verdict: 'APPROVE' }` (toMatchObject); `install qa` exits 0; `handback qa` with `say('qa', 'verify_pass')` exits 0 and `runFile().gate` is `verify_pass`.
   - C2 `it.each([['VERDICT: RETURN', ['- [blocker] src/a.js:10 — breaks AC1'], 'ORCH_AUDIT_RETURN'], ['VERDICT: ESCALATE', [], 'ORCH_AUDIT_ESCALATE']])` **"a valid %s halts %s after recording the audit entry, and install qa is refused"**: exit 1; `err` matches `^<code>: ` and contains `.conductor/handback/audit.txt`; `runFile().handbacks.at(-1)` matches `{ role: 'audit', verdict }`; `runFile().halt.code` is the code; `orch(['install', 'qa']).status` is 2.
-  - C3 `it.each` **"handback audit halts %s through the CLI, recording no audit entry"** over `[ORCH_VERDICT_MISSING, auditReport(null)]`, `[ORCH_VERDICT_INVALID, auditReport('VERDICT: approved')]`, `[ORCH_VERDICT_INCONSISTENT, auditReport('VERDICT: APPROVE', ['- [major] src/a.js:1 — x'])]`: exit 1; `err` starts with the code; `runFile().halt.code` is the code; no entry with `role === 'audit'` in `runFile().handbacks`.
+  - C3 `it.each` **"handback audit halts %s through the CLI, recording no audit entry"** over `[ORCH_VERDICT_MISSING, auditReport(null)]`, `[ORCH_VERDICT_INVALID, auditReport('VERDICT: approved')]`, `[ORCH_VERDICT_INVALID, auditReport('VERDICT: APPROVE', ['VERDICT: APPROVE'])]` (two `VERDICT:` lines), `[ORCH_VERDICT_INVALID, ['Done.', 'VERDICT: RETURN', '- [blocker] src/a.js:10 — x', handbackLine('audit', 'build_executed'), ''].join('\n')]` (a finding between the verdict and `SNAP_HANDBACK`), `[ORCH_VERDICT_INCONSISTENT, auditReport('VERDICT: APPROVE', ['- [major] src/a.js:1 — x'])]`: exit 1; `err` starts with the code; `runFile().halt.code` is the code; no entry with `role === 'audit'` in `runFile().handbacks`. The five rows are the five rows of the spec's error table for these codes (spec AC2): no candidate, two or more candidates, malformed line, verdict not immediately before `SNAP_HANDBACK`, contradiction with the findings.
   - C4 **"the existing hand-back checks run first: a wrong gate with no verdict halts ORCH_GATE_UNEARNED"**: `handback audit` with `` `Done.\n${handbackLine('audit', 'verify_pass')}\n` `` (no verdict line, unearned gate) exits 1 with `ORCH_GATE_UNEARNED`, not a verdict code.
   - R1 `it.each(['RETURN', 'ESCALATE', undefined])` **"recordHandback refuses qa verify_pass after an audit verdict of %s"**: a run `{ ...blank, gate: 'build_executed', handbacks: [{ role: 'audit', ...(v ? { verdict: v } : {}) }] }` → `expect(() => recordHandback(run, 'qa', 'verify_pass')).toThrow('ORCH_GATE_WITHHELD')`.
   - R2 **"recordHandback forwards qa verify_pass after APPROVE"**: same run with `verdict: 'APPROVE'` → returned `gate` is `verify_pass`.
   - R3 **"recordHandback writes a verdict on the entry only when given one"**: `recordHandback(run, 'audit', 'build_executed', 'RETURN').handbacks.at(-1).verdict` is `RETURN`; with no fourth argument the entry has no `verdict` key.
   - I1 **"isValidRun accepts audit entries with and without a verdict"**: a valid run file (`driveTo('qa'); runFile()`, whose audit entry carries `APPROVE`) stays valid with the audit entry's `verdict` deleted and with it set.
-- [ ] [T-103] Red step: `npx vitest run tests/scripts/orchestrate.test.js`. Depends on T-102. Predicted full match set of that filter, 163 tests:
+- [ ] [T-103] Red step: `npx vitest run tests/scripts/orchestrate.test.js`. Depends on T-102. Predicted full match set of that filter, 165 tests:
   - the 127 pre-existing tests: **green** (the extra `VERDICT: APPROVE` line in `say` is ignored by today's router);
   - V1-V8, H1-H14, Q1 (23): **red**, `parseVerdict` is `undefined`, so each call throws `TypeError`;
   - C1 (1): **red**, the audit entry has no `verdict`;
-  - C2 (2), C3 (3): **red**, today's `handback audit` exits 0;
+  - C2 (2), C3 (5): **red**, today's `handback audit` exits 0;
   - R1 (3), R3 (1): **red**, today's `recordHandback` neither throws nor writes `verdict`;
   - C4, R2, I1 (3): **green** on today's code; they pin behavior that must survive.
-  - Total: 130 passed, 33 failed.
+  - Total: 130 passed, 35 failed.
 - [ ] [T-104] `scripts/orchestrate.mjs`, after `parseHandback` (line 333): add the pinned format and the parser. Depends on T-103.
   ```js
   // FEAT-060: a candidate is wider than the valid form, so a near-miss halts by name instead of passing unseen.
@@ -152,7 +152,7 @@
   if (verdict && verdict.verdict !== 'APPROVE') throw auditStop(verdict);
   ```
   The return string is unchanged. `isValidRun`, `recordHalt` and `cli` need no change: `isValidRun` does not inspect hand-back entries, and `cli` already calls `recordHalt` for every `Halt` outside `start`.
-- [ ] [T-107] Green step: `npx vitest run tests/scripts/orchestrate.test.js`. Predicted: 163 passed, 0 failed. Depends on T-106.
+- [ ] [T-107] Green step: `npx vitest run tests/scripts/orchestrate.test.js`. Predicted: 165 passed, 0 failed. Depends on T-106.
 - [ ] [T-108] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-12-feat060-audit-verdict-line-and-severities-that-can.md` (ticks T-101 to T-107). Depends on T-107.
 - [ ] [T-109] Commit: `feat: the router parses the audit verdict and withholds verify_pass without an APPROVE [FEAT-060]`. Depends on T-108.
 
@@ -216,6 +216,7 @@
 - [ ] [T-303] `.claude/commands/cc-orchestrate.md`, then the identical edit to `project-template/.claude/commands/cc-orchestrate.md`. Depends on T-302.
   - "On any halt": after the `A halt is terminal in v1 (D12).` paragraph, add:
     > `handback audit` halts `ORCH_VERDICT_MISSING`, `ORCH_VERDICT_INVALID` or `ORCH_VERDICT_INCONSISTENT` when the audit report's `VERDICT:` line is absent, malformed, misplaced or contradicts its findings, and `ORCH_AUDIT_RETURN` or `ORCH_AUDIT_ESCALATE` when the audit returned the change or escalated a decision to the owner. For those five, also name `.conductor/handback/audit.txt`: its findings are what the owner reads next. `handback qa` halts `ORCH_GATE_WITHHELD` when the run's audit entry carries no `VERDICT: APPROVE`. Recovery for all six is `end`, then `start`.
+  - Scope note: the spec's System Impact says "the four new halt codes", but its error table (spec lines 49-56) defines six: `ORCH_VERDICT_MISSING`, `ORCH_VERDICT_INVALID`, `ORCH_VERDICT_INCONSISTENT`, `ORCH_AUDIT_RETURN`, `ORCH_AUDIT_ESCALATE`, `ORCH_GATE_WITHHELD`. This paragraph names exactly that set, so it adds no scope beyond the approved spec.
   - Step 5 becomes:
     > 5. **Verify.** Dispatch `audit`, then `qa`. The audit report ends in one `VERDICT:` line just before its `SNAP_HANDBACK` line; only `VERDICT: APPROVE` lets the router move on to `qa`, and `RETURN` or `ESCALATE` halts the run (follow "On any halt"). When `qa`'s hand-back records `verify_pass`, run `node "$S/orchestrate.mjs" end`. It prints the run it removed.
 - [ ] [T-304] `README.md` line 137, the Verify bullet of the orchestrate walkthrough (not a Known-limits line): replace its first sentence with `An \`audit\` agent reviews the work statically and ends its report in one verdict line; a blocker or major finding (\`VERDICT: RETURN\`) or a decision only you can take (\`VERDICT: ESCALATE\`) halts the run before \`qa\`. Then a \`qa\` agent runs the recorded test command.` The Guard 5 sentence after it stays. No dependency on T-303.
@@ -230,7 +231,7 @@
 **Files:**
 - Modify: `docs/superpowers/plans/2026-11-12-feat060-audit-verdict-line-and-severities-that-can.md`
 
-- [ ] [T-401] Run `npm test`. Predicted locally: exit 0, every file green, 39 tests more than the pre-change suite (36 in `orchestrate.test.js`, 2 in `role-profiles.test.js`, 1 in `commands-parity.test.js`), no new skip. CI legs: each leg's skipped set equals its `tools/skip-baseline.json` key, unchanged, because no added test is conditional. Depends on T-307.
+- [ ] [T-401] Run `npm test`. Predicted locally: exit 0, every file green, 41 tests more than the pre-change suite (38 in `orchestrate.test.js`, 2 in `role-profiles.test.js`, 1 in `commands-parity.test.js`), no new skip. CI legs: each leg's skipped set equals its `tools/skip-baseline.json` key, unchanged, because no added test is conditional. Depends on T-307.
 - [ ] [T-402] Grep check: `git grep -n "Findings do not withhold" -- .claude project-template README.md scripts` prints nothing, and `git grep -n "VERDICT: APPROVE" -- .claude/agents project-template/.claude/agents` names both `audit.md` copies. Depends on T-401.
 - [ ] [T-403] Stage: `git add -u docs/superpowers/plans/2026-11-12-feat060-audit-verdict-line-and-severities-that-can.md` (ticks T-307 to T-402). Depends on T-402.
 - [ ] [T-404] Commit: `docs: close out the FEAT-060 plan [FEAT-060]`. Depends on T-403.
@@ -242,7 +243,7 @@
 - [ ] Unit: `parseVerdict` table — valid forms V1-V8, halts H1-H14, quote cap Q1 (`tests/scripts/orchestrate.test.js`).
 - [ ] Unit: `recordHandback` withholds `verify_pass` for `RETURN`, `ESCALATE` and an absent verdict (R1), forwards it after `APPROVE` (R2), writes `verdict` only when given (R3).
 - [ ] Unit: `isValidRun` accepts audit entries with and without `verdict` (I1).
-- [ ] Integration (CLI, real stdin/argv/env contract): APPROVE path to `verify_pass` (C1); `RETURN`/`ESCALATE` record then halt, `install qa` refused (C2); the three verdict halts record a halt and no audit entry (C3); existing hand-back halts keep precedence (C4); the pre-existing end-to-end test `runs start to verify_pass on a two-task plan…` stays green through the new `say`.
+- [ ] Integration (CLI, real stdin/argv/env contract): APPROVE path to `verify_pass` (C1); `RETURN`/`ESCALATE` record then halt, `install qa` refused (C2); the three verdict halt codes, over all five error-table rows, record a halt and no audit entry (C3); existing hand-back halts keep precedence (C4); the pre-existing end-to-end test `runs start to verify_pass on a two-task plan…` stays green through the new `say`.
 - [ ] Profile pins: both `audit.md` copies carry the verdict format and drop "Findings do not withhold the gate"; `audit` sha256 row updated with a FEAT-060 comment.
 - [ ] Command pin: `cc-orchestrate.md` names the six halt codes, the audit report path and the APPROVE-only move to `qa`.
 - [ ] No E2E/UI test: there is no UI.
