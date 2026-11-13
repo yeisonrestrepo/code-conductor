@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'; import { BLOCK_FIELDS, CAPS, GATES, MAX_VERSION, POST_PARSE_MAX, PRE_PARSE_MAX_BYTES, ROLES, TOOL_KINDS, TOP_FIELDS, V3_CAPS, elementLength, expectedGate } from './snap-contract.mjs';
+import { readFileSync } from 'node:fs'; import { BLOCK_FIELDS, CAPS, GATES, MAX_VERSION, POST_PARSE_MAX, PRE_PARSE_MAX_BYTES, ROLES, ROLES_BY_VERSION, TOOL_KINDS, TOP_FIELDS, V3_CAPS, elementLength, expectedGate } from './snap-contract.mjs';
 const err = (m) => { process.stderr.write(`SNAP_ERROR: ${m}\n`); process.exit(1); };
 const [path, flag, to] = process.argv.slice(2); if (path === undefined) err('no path provided');
 if (flag !== undefined && (flag !== '--to' || !ROLES.includes(to))) err(`usage: snap-validate.mjs <file> [--to ${ROLES.join('|')}]`);
@@ -21,7 +21,7 @@ if (snap.pr !== undefined && typeof snap.pr !== 'string') err('pr must be a stri
 for (const b of ['sys', 'ops', 'mem']) { const extra = Object.keys(snap[b]).find(k => !BLOCK_FIELDS[snap.v][b].includes(k)); if (extra) err(`unexpected key: ${b}.${extra}`); }
 if (raw.length > POST_PARSE_MAX[snap.v]) err(`payload too large: ${raw.length} > ${POST_PARSE_MAX[snap.v]} (v${snap.v} cap)`);
 if (!['spec', 'plan', 'impl', 'rev'].includes(snap.sys.ph)) err('ph must be spec|plan|impl|rev');
-if (band && !ROLES.includes(snap.sys.role)) err(`role must be ${ROLES.join('|')}`); if (band && !TOOL_KINDS.includes(snap.sys.tk)) err(`tk must be ${TOOL_KINDS.join('|')}`);
+if (band && !ROLES_BY_VERSION[snap.v].includes(snap.sys.role)) err(`role must be ${ROLES_BY_VERSION[snap.v].join('|')}`); if (band && !TOOL_KINDS.includes(snap.sys.tk)) err(`tk must be ${TOOL_KINDS.join('|')}`);
 if (band && !GATES.includes(snap.ops.gate)) err(`gate must be ${GATES.join('|')}`); if (band && snap.sys.tk === 'RW' && snap.ops.scope === undefined) err('missing: ops.scope (required when tk is RW)');
 const p = snap.mem.p; if (p !== undefined && (typeof p !== 'object' || p === null || Array.isArray(p))) err('p must be a plain object');
 const arrayCaps = { ...CAPS, ...(snap.ops.scope === undefined ? {} : V3_CAPS) };

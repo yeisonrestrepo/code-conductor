@@ -160,7 +160,7 @@ function guard2DuplicateWrite(input) {
 // Copies of scripts/snap-contract.mjs values (ARCH-010 D7). This file is mirrored to two
 // locations and the contract sits at a different relative path from each, so no import is
 // correct in both; tests/hooks/guard5.test.js pins every copy to the contract instead.
-const BAND_ROLES = ['spec', 'plan', 'code', 'audit', 'qa'];
+const BAND_ROLES = ['spec', 'plan', 'code', 'audit', 'qa', 'security'];
 const BAND_TOOL_KINDS = ['R', 'RW', 'X'];
 const BAND_WRITE_TOOLS = ['Write', 'Edit', 'create_file', 'write_file'];
 const BAND_ENVELOPE_MAX_BYTES = 10485760;
@@ -189,7 +189,8 @@ function readEnvelope(path) {
     if (statSync(path).size > BAND_ENVELOPE_MAX_BYTES) return null;
     env = JSON.parse(readFileSync(path, 'utf8'));
   } catch { return null; }
-  if (!isPlainObject(env) || env.v !== 3 || !isPlainObject(env.sys) || !isPlainObject(env.ops)) return null;
+  // FEAT-034: security exists only at v4; snap-validate already bound each role to its version.
+  if (!isPlainObject(env) || (env.v !== 3 && env.v !== 4) || !isPlainObject(env.sys) || !isPlainObject(env.ops)) return null;
   if (!BAND_ROLES.includes(env.sys.role) || !BAND_TOOL_KINDS.includes(env.sys.tk)) return null;
   const scope = env.ops.scope;
   if (env.sys.tk === 'RW' && !(Array.isArray(scope) && scope.every((g) => typeof g === 'string'))) return null;
@@ -286,17 +287,29 @@ function guard6OrchestratorRun(input, payload) {
 // A copy of scripts/orchestrate.mjs SHELL_METACHARACTERS (FEAT-012 D10), carried for Guard
 // 5's reason: no import resolves from both install locations. tests/hooks/guard7.test.js pins it.
 const ROLE_SHELL_METACHARACTERS = [';', '&', '|', '`', '$(', '<', '>', '\n', '\r'];
-const ROLE_SHELL_ROLES = ['code', 'qa'];
+const ROLE_SHELL_ROLES = ['code', 'qa', 'security'];
 
-// R3: the test command a live run of this session recorded, or null. The run root is found
-// by Guard 5's walk and the file read by Guard 6's reader.
-function liveTestCommand(payload) {
+// R3: the live run of this session, or null. The run root is found by Guard 5's walk and the
+// file read by Guard 6's reader.
+function liveRunOf(payload) {
   const root = findRootHolding(payloadCwd(payload), ORCH_RUN_REL);
   if (!root) return null;
   const run = readRunFile(join(root, ...ORCH_RUN_REL));
-  if (!run || payload.session_id !== run.session_id) return null;
-  return typeof run.test_command === 'string' && run.test_command !== '' ? run.test_command : null;
+  return run && payload.session_id === run.session_id ? run : null;
 }
+
+const nonEmptyString = (x) => typeof x === 'string' && x !== '';
+
+// FEAT-034: the two commands start fixed; the test command is not among them.
+function allowedCommands(role, run) {
+  if (role !== 'security') return nonEmptyString(run.test_command) ? [run.test_command] : null;
+  if (!isPlainObject(run.security) || !nonEmptyString(run.security.scan_command)) return null;
+  return [run.security.audit_command, run.security.scan_command].filter(nonEmptyString);
+}
+
+const unresolvedReason = (role) => (role === 'security'
+  ? 'no live run in this session records the security commands, so security has no shell.'
+  : `no live run in this session records a test command, so ${role} has no shell.`);
 
 // R1-R5, the first match decides. The match is exact: a prefix allowlist is walked around by
 // chaining, which is the T-003 vector.
@@ -305,10 +318,12 @@ function roleShellDecision(role, input, payload) {
   const command = typeof input.command === 'string' ? input.command : '';
   const found = ROLE_SHELL_METACHARACTERS.find((m) => command.includes(m));
   if (found !== undefined) return deny(`Guard 7: ROLE_SHELL_CHAINING: the command contains ${JSON.stringify(found)}; a role runs one command, never a chain.`, 'ROLE_SHELL_CHAINING');
-  const allowed = liveTestCommand(payload);
-  if (allowed === null) return deny(`Guard 7: ROLE_SHELL_UNRESOLVED: no live run in this session records a test command, so ${role} has no shell.`, 'ROLE_SHELL_UNRESOLVED');
-  if (command !== allowed) return deny(`Guard 7: ROLE_SHELL_NOT_ALLOWED: allowed command is ${allowed}`, 'ROLE_SHELL_NOT_ALLOWED');
-  return null;
+  const run = liveRunOf(payload);
+  const allowed = run && allowedCommands(role, run);
+  if (!allowed) return deny(`Guard 7: ROLE_SHELL_UNRESOLVED: ${unresolvedReason(role)}`, 'ROLE_SHELL_UNRESOLVED');
+  if (allowed.includes(command)) return null;
+  const which = role === 'security' ? `allowed commands are ${allowed.join(', ')}` : `allowed command is ${allowed[0]}`;
+  return deny(`Guard 7: ROLE_SHELL_NOT_ALLOWED: ${which}`, 'ROLE_SHELL_NOT_ALLOWED');
 }
 
 // Guard 7: a band role's Bash (FEAT-012). The tool mask is the authority and this is the layer

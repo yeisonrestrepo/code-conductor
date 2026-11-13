@@ -211,7 +211,7 @@ describe('cc-orchestrate mirrors [FEAT-011 AC10]', () => {
 
   it('prints and briefs the resolved spec and plan folders, never a hardcoded one [FEAT-047]', () => {
     const text = read(ORCH_MIRRORS[0]);
-    expect(text).toContain('its stdout ends with `docs: specs <dir>, plans <dir> (<source>)[; group <group>]; test command: <command>; audit rounds: <n>`');
+    expect(text).toContain('its stdout ends with `docs: specs <dir>, plans <dir> (<source>)[; group <group>]; test command: <command>; audit rounds: <n>; security: threshold <level>, dependency scan <command | not covered for <reason> | disabled (--no-dependency-audit)>`');
     expect(text).toContain('On `ORCH_DOC_LOCATION_INVALID`, report it and stop.');
     expect(text).toContain('`ORCH_DOC_LOCATION_UNRESOLVED`');
     expect(text).toContain('Write the spec for `<ITEM>` under `<specs>[/<group>]/`');
@@ -221,9 +221,25 @@ describe('cc-orchestrate mirrors [FEAT-011 AC10]', () => {
 
   it('names the audit verdict halts and gates Verify on VERDICT: APPROVE [FEAT-060]', () => {
     const text = read(ORCH_MIRRORS[0]);
-    expect(text).toContain('only `VERDICT: APPROVE` lets the router move on to `qa`');
+    expect(text).toContain('only `VERDICT: APPROVE` lets the router move on to `security`');
     expect(text).toContain('.conductor/handback/audit-<round>.txt');
     for (const code of ['ORCH_VERDICT_MISSING', 'ORCH_VERDICT_INVALID', 'ORCH_VERDICT_INCONSISTENT', 'ORCH_AUDIT_RETURN', 'ORCH_AUDIT_ESCALATE', 'ORCH_GATE_WITHHELD']) {
+      expect(text).toContain(`\`${code}\``);
+    }
+  });
+
+  it('runs the security seat between audit and qa and reports its scans [FEAT-034]', () => {
+    const text = read(ORCH_MIRRORS[0]);
+    for (const phrase of [
+      'then `audit`; after an audit that the script answers with a fix round, `code` once for that fix and then `audit` again; then `security`; then `qa`',
+      '.conductor/handback/security.txt',
+      '`"v":4`',
+      '| `security` |',
+      'dependency=not-covered',
+      'dependency=disabled',
+      'security=not-configured (run predates FEAT-034)',
+    ]) expect(text).toContain(phrase);
+    for (const code of ['ORCH_SECURITY_BLOCKED', 'ORCH_SECURITY_SCAN_FAILED', 'ORCH_SECURITY_REPORT_INVALID', 'ORCH_SECURITY_REPORT_MISSING', 'ORCH_SECURITY_REPORT_INCOMPLETE', 'ORCH_SECURITY_COMMAND_UNSAFE']) {
       expect(text).toContain(`\`${code}\``);
     }
   });
@@ -231,7 +247,7 @@ describe('cc-orchestrate mirrors [FEAT-011 AC10]', () => {
   it('runs the Build and Verify review loop from the script\'s output [FEAT-057]', () => {
     const text = read(ORCH_MIRRORS[0]);
     for (const phrase of [
-      '# /cc-orchestrate <ITEM> [--auto] [--ticket <N|issue URL>] [--audit-rounds <0-5>]',
+      '# /cc-orchestrate <ITEM> [--auto] [--ticket <N|issue URL>] [--audit-rounds <0-5>] [--security-threshold <low|moderate|high|critical>] [--no-dependency-audit]',
       'after an audit that the script answers with a fix round, `code` once for that fix and then `audit` again',
       '.conductor/handback/audit-<round>.txt',
       '.conductor/handback/code-fix-<r>.txt',

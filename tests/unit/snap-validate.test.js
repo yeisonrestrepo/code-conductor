@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { GATES, ROLES, V3_CAPS, expectedGate } from '../../scripts/snap-contract.mjs'
+import { GATES, V3_CAPS, expectedGate } from '../../scripts/snap-contract.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = resolve(__dirname, '../..')
@@ -410,7 +410,9 @@ describe('snap-validate.mjs', () => {
     const src = readFileSync(VALIDATOR, 'utf8')
     expect(src).toContain('BLOCK_FIELDS')
     const V1 = { sys: ['ph', 'c', 's'], ops: ['n', 'f'], mem: ['d', 'x'] }
-    expect(BLOCK_FIELDS).toEqual({ 1: V1, 2: V1, 3: { sys: ['ph', 'c', 's', 'role', 'tk'], ops: ['n', 'f', 'scope', 'gate'], mem: ['d', 'x', 'p'] } })
+    const V3 = { sys: ['ph', 'c', 's', 'role', 'tk'], ops: ['n', 'f', 'scope', 'gate'], mem: ['d', 'x', 'p'] }
+    // v4 shares the v3 field sets (FEAT-034).
+    expect(BLOCK_FIELDS).toEqual({ 1: V1, 2: V1, 3: V3, 4: V3 })
     const r = run(fixture(j({ ...VALID, sys: { ...VALID.sys, extra: 1 } })))
     expect(r.status).toBe(1)
     expect(r.stderr).toBe('SNAP_ERROR: unexpected key: sys.extra\n')
@@ -451,7 +453,8 @@ function runTo(path, ...args) {
 }
 
 describe('snap-validate.mjs v3 [ARCH-010]', () => {
-  it.each(ROLES)('[AC5] accepts a valid v3 envelope for role %s', (role) => {
+  // The v3 roster is frozen; security exists only at v4 (FEAT-034 C14).
+  it.each(['spec', 'plan', 'code', 'audit', 'qa'])('[AC5] accepts a valid v3 envelope for role %s', (role) => {
     const env = { ...VALID3, sys: { ...VALID3.sys, role, tk: 'X' }, ops: { n: [], f: [], gate: expectedGate(role) } }
     expect(run(fixture(j(env)))).toEqual({ status: 0, stderr: '', stdout: '' })
   })
@@ -534,6 +537,45 @@ describe('snap-validate.mjs v3 [ARCH-010]', () => {
   it('rejects an unknown --to role with the usage line', () => {
     const r = runTo(fixture(j(VALID3)), '--to', 'boss')
     expect(r.status).toBe(1)
-    expect(r.stderr).toBe('SNAP_ERROR: usage: snap-validate.mjs <file> [--to spec|plan|code|audit|qa]\n')
+    expect(r.stderr).toBe('SNAP_ERROR: usage: snap-validate.mjs <file> [--to spec|plan|code|audit|qa|security]\n')
+  })
+})
+
+describe('snap-validate.mjs v4 [FEAT-034]', () => {
+  const VALID4 = { ...VALID3, v: 4, sys: { ...VALID3.sys, role: 'security', tk: 'X' }, ops: { n: [], f: [], gate: 'build_executed' } }
+
+  it('accepts a v4 security envelope --to security on build_executed', () => {
+    expect(runTo(fixture(j(VALID4)), '--to', 'security')).toEqual({ status: 0, stderr: '' })
+  })
+
+  it('accepts a v4 envelope for each of the five v3 roles', () => {
+    for (const role of ['spec', 'plan', 'code', 'audit', 'qa']) {
+      const env = { ...VALID4, sys: { ...VALID4.sys, role }, ops: { n: [], f: [], gate: expectedGate(role) } }
+      expect(run(fixture(j(env)))).toEqual({ status: 0, stderr: '', stdout: '' })
+    }
+  })
+
+  it('rejects a v3 envelope naming security with the v3 role message', () => {
+    const r = run(fixture(j({ ...VALID4, v: 3 })))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: role must be spec|plan|code|audit|qa\n')
+  })
+
+  it('names the v4 roster when a v4 role is outside it', () => {
+    const r = run(fixture(j({ ...VALID4, sys: { ...VALID4.sys, role: 'boss' } })))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: role must be spec|plan|code|audit|qa|security\n')
+  })
+
+  it('--to security halts SNAP_GATE_MISMATCH on define_approved', () => {
+    const r = runTo(fixture(j({ ...VALID4, ops: { ...VALID4.ops, gate: 'define_approved' } })), '--to', 'security')
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: SNAP_GATE_MISMATCH: security expects build_executed, got define_approved\n')
+  })
+
+  it('v4 rejects an unexpected key as v3 does', () => {
+    const r = run(fixture(j({ ...VALID4, sys: { ...VALID4.sys, zz: 1 } })))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: unexpected key: sys.zz\n')
   })
 })

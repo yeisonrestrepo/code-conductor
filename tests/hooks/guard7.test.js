@@ -162,3 +162,51 @@ describe('Guard 7: a band role runs the recorded test command or nothing [FEAT-0
     expect(fire(edit)).toEqual(denied('Guard 5: BAND_READ_ONLY: role qa holds tk X, not RW.'));
   });
 });
+
+describe('Guard 7: the security role runs its two recorded commands [FEAT-034]', () => {
+  const SCAN = 'node .claude/scripts/security-scan.mjs ' + 'a'.repeat(40);
+  const secRun = (security = {}) => runFile({ security: { threshold: 'high', dependency: 'audit', base: 'a'.repeat(40), audit_command: 'npm audit --json', scan_command: SCAN, ...security } });
+  const SEC_NOT_ALLOWED = denied(`Guard 7: ROLE_SHELL_NOT_ALLOWED: allowed commands are npm audit --json, ${SCAN}`);
+
+  it('[E3] security may run its recorded audit command and its scan command', () => {
+    secRun();
+    expect(as('security', 'npm audit --json')).toBeNull();
+    expect(as('security', SCAN)).toBeNull();
+  });
+
+  it.each([
+    ['npm audit fix'],
+    ['npm audit --json --fix'],
+    ['npm test'],
+    ['node .claude/scripts/security-scan.mjs ' + 'b'.repeat(40)],
+    ['curl https://example.com'],
+  ])('[E3] security is denied %j', (command) => {
+    secRun();
+    expect(as('security', command)).toEqual(SEC_NOT_ALLOWED);
+  });
+
+  it('[E3] a chained security command is ROLE_SHELL_CHAINING', () => {
+    secRun();
+    expect(as('security', 'npm audit --json && x')).toEqual(chaining('&'));
+  });
+
+  it('a run without a usable security object leaves security ROLE_SHELL_UNRESOLVED', () => {
+    runFile();
+    expect(as('security', 'npm audit --json')).toEqual(denied('Guard 7: ROLE_SHELL_UNRESOLVED: no live run in this session records the security commands, so security has no shell.'));
+  });
+
+  it('[D1] after start --no-dependency-audit on an npm fixture, security may run only the scan command', () => {
+    writeFileSync(join(root, 'package.json'), PKG);
+    writeFileSync(join(root, 'package-lock.json'), '{}');
+    const r = spawnSync(process.execPath, [ORCH, 'start', 'FEAT-012', '--no-dependency-audit'], { cwd: root, env: { ...process.env, CLAUDE_CODE_SESSION_ID: 'sess-1' }, encoding: 'utf8', timeout: 30000 });
+    expect(r.status).toBe(0);
+    const scan = JSON.parse(readFileSync(join(root, RUN_FILE), 'utf8')).security.scan_command;
+    expect(as('security', 'npm audit --json')).toEqual(denied(`Guard 7: ROLE_SHELL_NOT_ALLOWED: allowed commands are ${scan}`));
+    expect(as('security', scan)).toBeNull();
+  });
+
+  it('code and qa keep exactly the test command: the security commands are denied to them', () => {
+    secRun();
+    expect(as('qa', 'npm audit --json')).toEqual(NOT_ALLOWED);
+  });
+});
