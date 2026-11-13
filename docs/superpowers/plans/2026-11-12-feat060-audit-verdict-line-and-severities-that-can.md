@@ -240,13 +240,13 @@
 
 ## Test List
 
-- [ ] Unit: `parseVerdict` table — valid forms V1-V8, halts H1-H14, quote cap Q1 (`tests/scripts/orchestrate.test.js`).
-- [ ] Unit: `recordHandback` withholds `verify_pass` for `RETURN`, `ESCALATE` and an absent verdict (R1), forwards it after `APPROVE` (R2), writes `verdict` only when given (R3).
-- [ ] Unit: `isValidRun` accepts audit entries with and without `verdict` (I1).
-- [ ] Integration (CLI, real stdin/argv/env contract): APPROVE path to `verify_pass` (C1); `RETURN`/`ESCALATE` record then halt, `install qa` refused (C2); the three verdict halt codes, over all five error-table rows, record a halt and no audit entry (C3); existing hand-back halts keep precedence (C4); the pre-existing end-to-end test `runs start to verify_pass on a two-task plan…` stays green through the new `say`.
-- [ ] Profile pins: both `audit.md` copies carry the verdict format and drop "Findings do not withhold the gate"; `audit` sha256 row updated with a FEAT-060 comment.
-- [ ] Command pin: `cc-orchestrate.md` names the six halt codes, the audit report path and the APPROVE-only move to `qa`.
-- [ ] No E2E/UI test: there is no UI.
+- [X] Unit: `parseVerdict` table — valid forms V1-V8, halts H1-H14, quote cap Q1 (`tests/scripts/orchestrate.test.js`).
+- [X] Unit: `recordHandback` withholds `verify_pass` for `RETURN`, `ESCALATE` and an absent verdict (R1), forwards it after `APPROVE` (R2), writes `verdict` only when given (R3).
+- [X] Unit: `isValidRun` accepts audit entries with and without `verdict` (I1).
+- [X] Integration (CLI, real stdin/argv/env contract): APPROVE path to `verify_pass` (C1); `RETURN`/`ESCALATE` record then halt, `install qa` refused (C2); the three verdict halt codes, over all five error-table rows, record a halt and no audit entry (C3); existing hand-back halts keep precedence (C4); the pre-existing end-to-end test `runs start to verify_pass on a two-task plan…` stays green through the new `say`.
+- [X] Profile pins: both `audit.md` copies carry the verdict format and drop "Findings do not withhold the gate"; `audit` sha256 row updated with a FEAT-060 comment.
+- [X] Command pin: `cc-orchestrate.md` names the six halt codes, the audit report path and the APPROVE-only move to `qa`.
+- [X] No E2E/UI test: there is no UI.
 
 ## Commit Order
 
