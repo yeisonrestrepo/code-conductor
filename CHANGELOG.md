@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.46.0] - 2026-11-13
+
+### Added
+- **[FEAT-056]** `orchestrate.mjs approve <spec|plan> <path> <sha256>` binds each approval to the bytes the owner was shown: it hashes the document on disk (`documentHash`, raw bytes for the spec, every list-item checkbox normalized to `[ ]` for the plan, so ticking progress is not a change) and refuses with `ORCH_DOC_HASH_STALE`, writing nothing, when the hash differs; a match records `{at, by, path, sha256}` on the run's approval. A new read-only `hash <spec|plan> <path>` verb prints the exact value `approve` checks. After `define_approved`, every `install code|audit|qa` (including `--check`) re-hashes both approved documents and halts with `ORCH_APPROVED_DOC_CHANGED` when either changed or can no longer be read, and with `ORCH_APPROVAL_UNHASHED` on a run whose approvals predate the hash; recovery for both is `end`, then `start`. An unreadable recorded plan now reports `cannot read <path>`. Both `cc-orchestrate.md` copies and the wiki's Orchestrator-Guide and C4-Components pages describe the hash-bound flow. Landed from PR #192 (cc-lane-bot), intake of issue #184.
+
 ## [1.45.0] - 2026-11-13
 
 ### Added
