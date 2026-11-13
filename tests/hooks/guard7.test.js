@@ -164,7 +164,7 @@ describe('Guard 7: a band role runs the recorded test command or nothing [FEAT-0
 });
 
 describe('Guard 7: the security role runs its two recorded commands [FEAT-034]', () => {
-  const SCAN = 'node .claude/scripts/security-scan.mjs ' + 'a'.repeat(40);
+  const SCAN = 'node .claude/scripts/security-scan.mjs ' + 'a'.repeat(40) + ' high';
   const secRun = (security = {}) => runFile({ security: { threshold: 'high', dependency: 'audit', base: 'a'.repeat(40), audit_command: 'npm audit --json', scan_command: SCAN, ...security } });
   const SEC_NOT_ALLOWED = denied(`Guard 7: ROLE_SHELL_NOT_ALLOWED: allowed commands are npm audit --json, ${SCAN}`);
 
@@ -178,7 +178,7 @@ describe('Guard 7: the security role runs its two recorded commands [FEAT-034]',
     ['npm audit fix'],
     ['npm audit --json --fix'],
     ['npm test'],
-    ['node .claude/scripts/security-scan.mjs ' + 'b'.repeat(40)],
+    ['node .claude/scripts/security-scan.mjs ' + 'b'.repeat(40) + ' high'],
     ['curl https://example.com'],
   ])('[E3] security is denied %j', (command) => {
     secRun();

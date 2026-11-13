@@ -244,6 +244,24 @@ describe('cc-orchestrate mirrors [FEAT-011 AC10]', () => {
     }
   });
 
+  it('[FEAT-059] names the security verdict, the owner-only file and the upgrade step', () => {
+    const text = read(ORCH_MIRRORS[0]);
+    for (const phrase of [
+      '`ORCH_SECURITY_ESCALATE`',
+      'security handed back build_executed; VERDICT: APPROVE; <n> finding(s) below <threshold> recorded; dependency=<ran|not-covered|disabled>; pre-existing findings, if any, are in .conductor/security-pre-existing.txt (owner only)',
+      'never quote, summarize or count its content',
+      'no longer blocks the run at any level',
+      'commit the updated `.claude/scripts/security-scan.mjs` before the next `start`',
+      'end with the `SCANS:` line and one `VERDICT:` line',
+    ]) expect(text).toContain(phrase);
+    const readme = read('README.md');
+    for (const phrase of [
+      '.conductor/security-pre-existing.txt',
+      'no longer blocks the run at any level',
+      'commit the updated `.claude/scripts/security-scan.mjs` before the next `start`',
+    ]) expect(readme).toContain(phrase);
+  });
+
   it('runs the Build and Verify review loop from the script\'s output [FEAT-057]', () => {
     const text = read(ORCH_MIRRORS[0]);
     for (const phrase of [

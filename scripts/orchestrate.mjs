@@ -23,6 +23,8 @@ export const WRITE_SURFACE = [RUN_FILE, ENVELOPE_FILE, '.claude/memory/session-s
 // Where /cc-orchestrate writes each agent's final message for `handback` to read: inside
 // the surface, and cleared with the run so file names never collide across runs.
 export const HANDBACK_DIR = '.conductor/handback';
+// FEAT-059 C5, C7: owner-only; outside the hand-back directory so it outlives end.
+const OWNER_FILE = '.conductor/security-pre-existing.txt';
 // FEAT-041: the Define review loop's reports, cleared with the run like the hand-backs.
 export const REVIEW_DIR = '.conductor/review';
 // Three reviewer passes, so at most two revisions, each re-reviewed (FEAT-041 (d)).
@@ -103,7 +105,8 @@ function isSecurity(s) {
   if (s.audit_command !== null && !hasAudit) return false;
   if (hasAudit !== (s.dependency === 'audit')) return false;
   if (s.base !== null && !OBJECT_NAME.test(s.base ?? '')) return false;
-  return typeof s.scan_command === 'string' && s.scan_command !== '';
+  // FEAT-059 C16: a scan command without the threshold suffix was written by FEAT-034, whose entries carry no verdict.
+  return typeof s.scan_command === 'string' && s.scan_command.endsWith(` ${s.threshold}`);
 }
 
 // FEAT-057: a present audit_rounds that is not 0-5 would let a hand-edited run buy fix rounds without limit.
@@ -155,8 +158,8 @@ export function nextStep(run) {
   if (fix) return { role: 'code', fix: fix.round };
   const last = run.handbacks.at(-1)?.role;
   if (last === 'audit') return { role: isPlainObject(run.security) ? 'security' : 'qa' };
-  // A blocked or failed seat never routes to qa: the halt already names end as the recovery (FEAT-034 plan decisions).
-  if (last === 'security') return run.handbacks.at(-1).security?.blocked === false ? { role: 'qa' } : { end: true };
+  // Only an approving verdict routes to qa (FEAT-059); a blocked or failed seat never does, and the halt already names end (FEAT-034).
+  if (last === 'security') return run.handbacks.at(-1).security?.verdict === 'APPROVE' ? { role: 'qa' } : { end: true };
   if (last === 'qa') return { end: true };
   return { role: 'audit' };
 }
@@ -331,7 +334,8 @@ function resolveSecurity(root, stack, { threshold, dependencyAudit }) {
   const base = OBJECT_NAME.test(head) ? head : null;
   const auditCommand = dependencyAudit ? PM_AUDIT_COMMAND[stack.packageManager] ?? null : null;
   const dependency = !dependencyAudit ? 'disabled' : auditCommand ? 'audit' : 'not-covered';
-  const scanCommand = `node ${scanRef(root)}${base ? ` ${base}` : ''}`;
+  // C14: the scanner writes complete lines, severity included; 'none' keeps a fixed arity outside git (plan decisions).
+  const scanCommand = `node ${scanRef(root)} ${base ?? 'none'} ${threshold}`;
   if (auditCommand) checkSecurityCommand(auditCommand);
   checkSecurityCommand(scanCommand);
   return { threshold, dependency, base, audit_command: auditCommand, scan_command: scanCommand };
@@ -434,8 +438,8 @@ function withholdUnlessApproved(run) {
   const verdict = run.handbacks.findLast((h) => h.role === 'audit')?.verdict;
   if (verdict !== 'APPROVE') throw new Halt('ORCH_GATE_WITHHELD', `qa may not forward verify_pass: the audit verdict is ${verdict ?? 'absent'}`);
   if (!isPlainObject(run.security)) return;
-  const seat = run.handbacks.findLast((h) => h.role === 'security');
-  if (seat?.security?.blocked !== false) throw new Halt('ORCH_GATE_WITHHELD', `qa may not forward verify_pass: the security entry is ${seat ? 'blocked' : 'absent'}`);
+  const seatVerdict = run.handbacks.findLast((h) => h.role === 'security')?.security?.verdict;
+  if (seatVerdict !== 'APPROVE') throw new Halt('ORCH_GATE_WITHHELD', `qa may not forward verify_pass: the security verdict is ${seatVerdict ?? 'absent'}`);
 }
 
 // FEAT-057: a fix re-enters Build with no task, so it never advances tasks.done; audits carry their round.
@@ -506,10 +510,11 @@ function checkConsistent(verdict, blockers, paths) {
   return { verdict, blockers, paths };
 }
 
-export function parseVerdict(text) {
+// FEAT-059 C10: one parser for both Verify roles; the role only names the report in the missing-line reason.
+export function parseVerdict(text, role = 'audit') {
   const lines = text.split(/\r?\n/).map((l) => l.trim());
   const candidates = lines.filter((l) => VERDICT_CANDIDATE.test(l));
-  if (candidates.length === 0) throw new Halt('ORCH_VERDICT_MISSING', 'the audit report has no VERDICT: APPROVE | RETURN | ESCALATE line');
+  if (candidates.length === 0) throw new Halt('ORCH_VERDICT_MISSING', `the ${role} report has no VERDICT: APPROVE | RETURN | ESCALATE line`);
   if (candidates.length > 1) throw new Halt('ORCH_VERDICT_INVALID', `expected exactly one VERDICT line, found ${candidates.length}`);
   const match = VERDICT_LINE.exec(candidates[0]);
   if (!match) throw new Halt('ORCH_VERDICT_INVALID', `${JSON.stringify(candidates[0].slice(0, QUOTE_CAP))} is not VERDICT: APPROVE | RETURN | ESCALATE`);
@@ -521,12 +526,20 @@ export function parseVerdict(text) {
 }
 
 // FEAT-034: the security report. The orchestrator copies what the agent wrote; the script reads it.
+// FEAT-059: it ends in the audit's verdict line, and findings the change did not introduce sit in an owner-only block.
 const SCANS_CANDIDATE = /^scans\s*:/i;
 const SCANS_LINE = /^SCANS: dependency=(ran|not-covered|disabled|failed) secrets=(ran|failed) scripts=(ran|failed)$/;
-const SECURITY_FINDING = /^- \[(critical|high|moderate|low)\] (dependency|secret|script) \S(?:.*\S)? — \S/;
+const SECURITY_FINDING = /^- \[(blocker|major|minor)\] (\S+:\d+) — (critical|high|moderate|low) (dependency|secret|script): \S/;
+const FINDING_FORM = '- [<blocker|minor>] <path>:<line> — <critical|high|moderate|low> <dependency|secret|script>: <text>';
 const SECURITY_CANDIDATE = /^- \[/;
+const OWNER_OPEN = 'PRE-EXISTING (owner only):';
+const OWNER_CLOSE = 'END PRE-EXISTING';
+const REPORT_FILE = `${HANDBACK_DIR}/security.txt`;
+const reportAt = (n) => `${REPORT_FILE}:${n}`;
 const quote = (line) => JSON.stringify(line.slice(0, QUOTE_CAP));
 const invalid = (reason) => new Halt('ORCH_SECURITY_REPORT_INVALID', reason);
+// C1: recomputed here from the run file, never read from the report.
+const severityFor = (level, threshold) => (SECURITY_LEVELS.indexOf(level) >= SECURITY_LEVELS.indexOf(threshold) ? 'blocker' : 'minor');
 
 function checkDependency(scans, findings, security) {
   const wanted = security.dependency === 'audit' ? ['ran', 'failed'] : [security.dependency];
@@ -544,21 +557,70 @@ function scansLine(lines) {
   if (!match) throw invalid(`${quote(candidates[0])} is not SCANS: dependency=<ran|not-covered|disabled|failed> secrets=<ran|failed> scripts=<ran|failed>`);
   const at = lines.findIndex((l) => l.startsWith('SNAP_HANDBACK '));
   const before = lines.slice(0, Math.max(at, 0)).filter(Boolean);
-  if (at === -1 || before.at(-1) !== candidates[0]) throw invalid('the SCANS line must immediately precede SNAP_HANDBACK');
+  // C11: parseVerdict has already placed the verdict last, so the SCANS line sits just before it.
+  if (at === -1 || before.at(-2) !== candidates[0]) throw invalid('the SCANS line must immediately precede the VERDICT line');
   return { dependency: match[1], secrets: match[2], scripts: match[3] };
 }
 
-export function parseSecurityReport(text, security) {
-  const lines = text.split(/\r?\n/).map((l) => l.trim());
-  const scans = scansLine(lines);
-  const findings = [];
-  for (const line of lines.filter((l) => SECURITY_CANDIDATE.test(l))) {
-    const m = SECURITY_FINDING.exec(line);
-    if (!m) throw invalid(`${quote(line)} is not a finding line: - [<critical|high|moderate|low>] <dependency|secret|script> <location> — <one sentence>`);
-    findings.push({ severity: m[1], source: m[2], line });
+// C12: wide candidates, so a near-miss marker halts by name instead of letting an owner line fall into the public part.
+function ownerMarkers(lines) {
+  const candidates = lines.map(({ line, n }, index) => ({ line, n, index }))
+    .filter(({ line }) => /^(end )?pre-existing/i.test(line));
+  if (candidates.length === 0) return null;
+  const odd = candidates.find(({ line }) => line !== OWNER_OPEN && line !== OWNER_CLOSE);
+  if (odd) throw invalid(`the owner-only marker at ${reportAt(odd.n)} is malformed`);
+  const [open, close] = candidates;
+  if (candidates.length !== 2 || open.line !== OWNER_OPEN || close.line !== OWNER_CLOSE) {
+    throw invalid(`the owner-only block at ${reportAt(candidates[0].n)} is repeated, unclosed or misplaced`);
   }
+  return { open: open.index, close: close.index };
+}
+
+export function splitReport(text) {
+  const lines = text.split(/\r?\n/).map((l, i) => ({ line: l.trim(), n: i + 1 }));
+  const marks = ownerMarkers(lines);
+  if (!marks) return { publicLines: lines, owner: [] };
+  const early = lines.slice(0, marks.open).findIndex(({ line }) => SECURITY_CANDIDATE.test(line));
+  if (early !== -1) throw invalid(`the owner-only block at ${reportAt(marks.open + 1)} must come before the first finding line`);
+  const inside = lines.slice(marks.open + 1, marks.close).filter(({ line }) => line !== '');
+  const prose = inside.find(({ line }) => !SECURITY_CANDIDATE.test(line));
+  if (prose) throw invalid(`the line at ${reportAt(prose.n)} inside the owner-only block is not a finding line`);
+  return { publicLines: [...lines.slice(0, marks.open), ...lines.slice(marks.close + 1)], owner: inside };
+}
+
+function securityFinding({ line, n }, part, threshold) {
+  const m = SECURITY_FINDING.exec(line);
+  const name = part === 'public' ? quote(line) : `the line at ${reportAt(n)}`;
+  if (!m) throw invalid(`${name} is not a security finding line: ${FINDING_FORM}`);
+  const [, bracket, location, level, source] = m;
+  const expected = severityFor(level, threshold);
+  if (bracket !== expected) {
+    throw invalid(part === 'public'
+      ? `${quote(line)} must carry [${expected}]: ${level} against the run's threshold ${threshold}`
+      : `the line at ${reportAt(n)} carries the wrong severity for the run's threshold`);
+  }
+  return { part, n, line, severity: bracket, location, level, source };
+}
+
+// C8: a failed scan can hide findings, so only ESCALATE may follow one.
+function checkFailedEscalates(scans, verdict) {
+  const failed = ['dependency', 'secrets', 'scripts'].find((k) => scans[k] === 'failed');
+  if (failed && verdict !== 'ESCALATE') {
+    throw new Halt('ORCH_VERDICT_INCONSISTENT', `VERDICT: ${verdict} with the ${failed} scan failed; a failed scan requires VERDICT: ESCALATE`);
+  }
+}
+
+export function parseSecurityReport(text, security) {
+  const { publicLines, owner } = splitReport(text);
+  const { verdict } = parseVerdict(publicLines.map((x) => x.line).join('\n'), 'security');
+  const scans = scansLine(publicLines.map((x) => x.line));
+  const findings = [
+    ...publicLines.filter((x) => SECURITY_CANDIDATE.test(x.line)).map((x) => securityFinding(x, 'public', security.threshold)),
+    ...owner.map((x) => securityFinding(x, 'owner', security.threshold)),
+  ];
   checkDependency(scans, findings, security);
-  return { findings, scans };
+  checkFailedEscalates(scans, verdict);
+  return { verdict, scans, findings };
 }
 
 const scanFailed = (reason) => new Halt('ORCH_SECURITY_SCAN_FAILED', `the local scans cannot be re-run: ${reason}`);
@@ -566,52 +628,97 @@ const scanFailed = (reason) => new Halt('ORCH_SECURITY_SCAN_FAILED', `the local 
 // The diff under scan can change the work-tree scanner, so the re-run loads the base commit's copy (C17).
 async function baseScan(root, security) {
   if (security.base === null) throw scanFailed('the run recorded no base commit');
-  const path = security.scan_command.replace(/^node /, '').replace(/ [0-9a-f]+$/, '');
+  const path = security.scan_command.replace(/^node /, '').replace(/ \S+ \S+$/, '');
   const shown = spawnSync('git', ['show', `${security.base}:./${path}`], { cwd: root });
   if (shown.status !== 0) throw scanFailed(`${path} is not committed at the base`);
   const dir = mkdtempSync(join(tmpdir(), 'cc-security-base-'));
   try {
     const file = join(dir, 'security-scan.mjs');
     writeFileSync(file, shown.stdout);
-    const { scanChanges } = await import(pathToFileURL(file).href);
-    return scanChanges(root, security.base);
+    const scanner = await import(pathToFileURL(file).href);
+    // C15: the normal upgrade path of a 1.48.0 project until its update is committed.
+    if (scanner.SCAN_CONTRACT !== 2) throw scanFailed(`the base commit's ${path} predates FEAT-059 (an install or update that is not committed); end this run, commit the updated ${path}, then start again`);
+    return scanner.scanChanges(root, security.base, security.threshold);
   } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
+const DEPENDENCY_PACKAGE = /— (?:critical|high|moderate|low) dependency: ((?:@[^@\s/]+\/)?[^@\s]+)@/;
+
+function lineCount(root, rel) {
+  const file = join(root, rel);
+  if (!existsSync(file)) return 0;
+  const text = readFileSync(file, 'utf8');
+  return text.split('\n').length - (text.endsWith('\n') ? 1 : 0);
+}
+
+// C3-C4, C13: the reason names neither the direction nor the package.
+function checkOrigin(root, findings, local) {
+  const changed = local.changed === 'all' || local.changed === 'failed' ? 'all' : local.changed;
+  for (const f of findings.filter((x) => x.source === 'dependency')) {
+    const path = f.location.replace(/:\d+$/, '');
+    const n = Number(f.location.slice(path.length + 1));
+    if (path !== local.lockfile || n < 1 || n > lineCount(root, path)) {
+      throw invalid(`the dependency finding at ${reportAt(f.n)} does not name a line of the run's lockfile`);
+    }
+    const pkg = DEPENDENCY_PACKAGE.exec(f.line)?.[1];
+    const preExisting = Boolean(pkg) && changed !== 'all' && !changed.includes(pkg);
+    if ((f.part === 'owner') !== preExisting) throw invalid(`the dependency finding at ${reportAt(f.n)} is filed in the wrong part`);
+  }
 }
 
 function checkComplete(report, local) {
   for (const scan of ['secrets', 'scripts']) {
     if (report.scans[scan] !== local[scan]) throw new Halt('ORCH_SECURITY_REPORT_INCOMPLETE', `the report says ${scan}=${report.scans[scan]}; the local re-run says ${local[scan]}`);
   }
-  const reported = new Set(report.findings.map((f) => f.line));
-  const missing = local.findings.find((line) => !reported.has(line));
-  if (missing !== undefined) throw new Halt('ORCH_SECURITY_REPORT_INCOMPLETE', `the report omits the local finding ${quote(missing)}`);
+  const reported = report.findings.filter((f) => f.source !== 'dependency');
+  const partOf = (line) => reported.filter((f) => f.line === line);
+  for (const [lines, part] of [[local.introduced, 'public'], [local.preExisting, 'owner']]) {
+    for (const line of lines) {
+      const found = partOf(line);
+      if (found.some((f) => f.part === part)) continue;
+      if (found.length > 0) throw new Halt('ORCH_SECURITY_REPORT_INCOMPLETE', `the local finding at ${reportAt(found[0].n)} is filed in the wrong part`);
+      throw new Halt('ORCH_SECURITY_REPORT_INCOMPLETE', "the report does not match the base scanner's local findings");
+    }
+  }
 }
 
 function securitySummary(report, threshold) {
+  const publicFindings = report.findings.filter((f) => f.part === 'public');
   const counts = { critical: 0, high: 0, moderate: 0, low: 0 };
-  for (const f of report.findings) counts[f.severity] += 1;
+  for (const f of publicFindings) counts[f.level] += 1;
   const failed = ['dependency', 'secrets', 'scripts'].find((k) => report.scans[k] === 'failed');
-  const blocking = report.findings.filter((f) => SECURITY_LEVELS.indexOf(f.severity) >= SECURITY_LEVELS.indexOf(threshold));
-  const blocked = Boolean(failed) || blocking.length > 0;
-  return { entry: { scans: report.scans, counts, threshold, blocked }, failed, blocking, total: report.findings.length };
+  const blocking = publicFindings.filter((f) => f.severity === 'blocker');
+  // C6: nothing from the owner-only block reaches the run file.
+  const entry = { scans: report.scans, counts, threshold, verdict: report.verdict, blocked: report.verdict !== 'APPROVE' };
+  return { entry, failed, blocking, total: publicFindings.length };
 }
 
-function securityStop({ failed, blocking }, threshold) {
-  if (failed) return new Halt('ORCH_SECURITY_SCAN_FAILED', `the ${failed} scan did not complete; scans clean is the Verify exit, see ${HANDBACK_DIR}/security.txt`);
-  if (blocking.length === 0) return null;
-  return new Halt('ORCH_SECURITY_BLOCKED', `security found ${blocking.length} finding(s) at or above ${threshold}; first: ${blocking[0].line.slice(0, QUOTE_CAP)}`);
+function securityStop({ entry, failed, blocking }, threshold) {
+  if (entry.verdict === 'APPROVE') return null;
+  if (entry.verdict === 'RETURN') return new Halt('ORCH_SECURITY_BLOCKED', `security found ${blocking.length} finding(s) at or above ${threshold}; first: ${blocking[0].line.slice(0, QUOTE_CAP)}`);
+  if (failed) return new Halt('ORCH_SECURITY_SCAN_FAILED', `the ${failed} scan did not complete; scans clean is the Verify exit, see ${REPORT_FILE}`);
+  return new Halt('ORCH_SECURITY_ESCALATE', `security escalated a decision only the owner takes; see ${REPORT_FILE}`);
 }
+
+const ownerText = (report) => {
+  const lines = report.findings.filter((f) => f.part === 'owner').map((f) => f.line);
+  return `${lines.length ? lines.join('\n') : 'none'}\n`;
+};
 
 async function securityHandback(root, run, gate, text) {
   const report = parseSecurityReport(text, run.security);
-  checkComplete(report, await baseScan(root, run.security));
+  const local = await baseScan(root, run.security);
+  checkOrigin(root, report.findings, local);
+  checkComplete(report, local);
+  writeAtomic(join(root, OWNER_FILE), ownerText(report));
   const { threshold } = run.security;
   const summary = securitySummary(report, threshold);
   // Saved first, so the halt cli records lands on top of the entry.
   saveRun(root, recordHandback(run, 'security', gate, null, { security: summary.entry }));
   const stop = securityStop(summary, threshold);
   if (stop) throw stop;
-  return `security handed back ${gate}; ${summary.total} finding(s) below ${threshold} recorded; dependency=${report.scans.dependency}`;
+  // C6: the success text is fixed whatever the owner-only block held.
+  return `security handed back ${gate}; VERDICT: APPROVE; ${summary.total} finding(s) below ${threshold} recorded; dependency=${report.scans.dependency}; pre-existing findings, if any, are in ${OWNER_FILE} (owner only)`;
 }
 
 async function handback(root, sessionId, role, bytes) {
@@ -790,6 +897,8 @@ function start(root, sessionId, args) {
   const security = resolveSecurity(root, stack(), { threshold, dependencyAudit });
   const bound = ticket === undefined ? null : ticketIntake(root, item, ticket);
   if (old) clearRunFiles(root);
+  // C7: a previous run's owner file must not be read as this run's; end keeps it for the closing report.
+  rmSync(join(root, OWNER_FILE), { force: true });
   if (bound) writeSnapshot(root, bound.path, bound.text);
   saveRun(root, {
     v: 1, session_id: sessionId, item, mode: auto ? 'auto' : 'step', started: new Date().toISOString(),
