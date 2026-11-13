@@ -27,8 +27,11 @@ export const HANDBACK_DIR = '.conductor/handback';
 export const REVIEW_DIR = '.conductor/review';
 // Three reviewer passes, so at most two revisions, each re-reviewed (FEAT-041 (d)).
 export const REVIEW_CAP = 3;
-const REVIEW_OUTCOME = /^(clean|cap|skipped:[a-z][a-z0-9-]{0,39})$/;
-const REVIEW_USAGE = 'usage: orchestrate.mjs review <spec|plan> --round | --close <clean|cap|skipped:<reason>>';
+// Every outcome a closed loop can carry; only the skip is the orchestrator's to record (FEAT-058).
+const REVIEW_OUTCOME = /^(clean|cap|unchanged|skipped:[a-z][a-z0-9-]{0,39})$/;
+const SKIP_OUTCOME = /^skipped:[a-z][a-z0-9-]{0,39}$/;
+const REVIEW_ROW = /^- \[(AC|FMT|CR)\]/;
+const REVIEW_USAGE = 'usage: orchestrate.mjs review <spec|plan> --round <doc> | --record | --close skipped:<reason>';
 
 // D5: the reviewed role-artifact table. Code's scope comes from its plan task instead.
 // Spec and plan scopes come from run.docs, pinned at start, so no folder is named here (FEAT-047).
@@ -435,6 +438,7 @@ function approve(root, sessionId, what, rel, shown) {
   if (step.await !== what) throw new Refusal(`approve ${what}: the next step is ${describeStep(step)}`);
   if (!SHA256_HEX.test(shown ?? '')) throw new Refusal(APPROVE_USAGE);
   const content = readDoc(root, rel, APPROVE_USAGE);
+  checkLoopClosed(run, what);
   const sha256 = documentHash(what, content);
   if (sha256 !== shown.toLowerCase()) {
     throw new Refusal(`ORCH_DOC_HASH_STALE: ${what} ${rel} hashes ${sha256}, not the ${shown} that was shown; show the document again`);
@@ -456,32 +460,82 @@ function approvePlan(root, run, text, approval) {
   return `plan approved: define_approved, ${tasks.length} task(s); sha256 ${approval.sha256}`;
 }
 
-// FEAT-041 (e): the review loop's round counter. Advisory: approve never reads it, and the
-// cap is a refusal, never a halt, so the loop can never freeze the run.
-function review(root, sessionId, [role, flag, outcome, extra]) {
+// FEAT-058: a skip stays possible but is never silent, so approve waits for a recorded outcome.
+function checkLoopClosed(run, what) {
+  const loop = isPlainObject(run.review) ? run.review[what] : undefined;
+  if (isPlainObject(loop) && REVIEW_OUTCOME.test(loop.outcome ?? '')) return;
+  const state = isPlainObject(loop) && Number.isInteger(loop.round) ? `open at round ${loop.round}` : 'not run';
+  throw new Refusal(`ORCH_REVIEW_OPEN: review ${what} is ${state}; close it before the approval`);
+}
+
+const reviewWellFormed = (flag, arg, extra) => extra === undefined
+  && (flag === '--round' ? arg !== undefined : flag === '--record' ? arg === undefined : flag === '--close' && SKIP_OUTCOME.test(arg ?? ''));
+
+// FEAT-041 (e), reworked by FEAT-058: the loop revises through files, and its outcomes come
+// from the script's own reads of the review file and the document, never from the orchestrator's word.
+function review(root, sessionId, [role, flag, arg, extra]) {
   const run = liveRun(root, sessionId);
-  const wellFormed = extra === undefined && (flag === '--round' ? outcome === undefined : flag === '--close' && outcome !== undefined);
-  if (!wellFormed) throw new Refusal(REVIEW_USAGE);
+  if (!reviewWellFormed(flag, arg, extra)) throw new Refusal(REVIEW_USAGE);
   const step = nextStep(run);
   if (step.await !== role) throw new Refusal(`review ${role}: the next step is ${describeStep(step)}`);
   const loops = isPlainObject(run.review) ? run.review : {};
   const loop = isPlainObject(loops[role]) && Number.isInteger(loops[role].round) ? loops[role] : { round: 0, outcome: null };
   if (loop.outcome) throw new Refusal(`review ${role}: the loop closed ${loop.outcome}; a closed loop does not reopen`);
-  const next = flag === '--round' ? openRound(role, loop) : closeLoop(role, loop, outcome);
+  const { next, say } = flag === '--round' ? openRound(root, role, loop, arg)
+    : flag === '--record' ? recordRound(root, role, loop)
+      : { next: closedLoop(loop, arg), say: `review ${role} closed ${arg} at round ${loop.round}` };
   saveRun(root, { ...run, review: { ...loops, [role]: next } });
-  return flag === '--round' ? `review ${role} round ${next.round} of ${REVIEW_CAP}` : `review ${role} closed ${next.outcome} at round ${next.round}`;
+  if (next.outcome) clearReviewDir(root);
+  return say;
 }
 
-function openRound(role, loop) {
-  if (loop.round >= REVIEW_CAP) throw new Refusal(`ORCH_REVIEW_CAP: review ${role} has run ${REVIEW_CAP} rounds; close it with --close cap`);
-  return { round: loop.round + 1, outcome: null };
+// Only the outcome stays once the loop closes (FEAT-058 E2); a skip before any round has no hash.
+const closedLoop = (loop, outcome) => ({ round: loop.round, outcome, sha256: loop.sha256 ?? null });
+const clearReviewDir = (root) => rmSync(join(root, REVIEW_DIR), { recursive: true, force: true });
+
+function openRound(root, role, loop, rel) {
+  if (loop.round > 0 && loop.await !== 'revision') throw new Refusal(`review ${role}: round ${loop.round} awaits its review record`);
+  if (loop.round >= REVIEW_CAP) {
+    throw new Refusal(`ORCH_REVIEW_CAP: review ${role} has run ${REVIEW_CAP} rounds; close it with --close skipped:<reason>`);
+  }
+  const sha256 = documentHash(role, readDoc(root, rel, REVIEW_USAGE));
+  const round = loop.round + 1;
+  // E3: a revision that leaves the hash as it was is a failed round, recorded rather than retried.
+  if (loop.round > 0 && sha256 === loop.sha256) {
+    return { next: closedLoop({ ...loop, round }, 'unchanged'), say: `review ${role} closed unchanged at round ${round}: ${rel} still hashes ${sha256}` };
+  }
+  return { next: { round, outcome: null, sha256, doc: rel, await: 'review' }, say: `review ${role} round ${round} of ${REVIEW_CAP}: ${rel} sha256 ${sha256}` };
 }
 
-function closeLoop(role, loop, outcome) {
-  if (!REVIEW_OUTCOME.test(outcome)) throw new Refusal(REVIEW_USAGE);
-  if (outcome === 'clean' && loop.round === 0) throw new Refusal(`review ${role}: clean needs a reviewer pass; none has run`);
-  if (outcome === 'cap' && loop.round < REVIEW_CAP) throw new Refusal(`review ${role}: cap needs round ${REVIEW_CAP}; the loop is at round ${loop.round}`);
-  return { round: loop.round, outcome };
+function recordRound(root, role, loop) {
+  if (loop.await !== 'review') throw new Refusal(`review ${role} --record: no reviewer pass is open`);
+  const path = `${REVIEW_DIR}/${role}-${loop.round}.md`;
+  let bytes = null;
+  try { bytes = readFileSync(join(root, path)); } catch { /* judged as unparsed below */ }
+  const verdict = bytes && parseReview(bytes.toString('utf8'), role, loop.round);
+  if (!verdict) throw new Refusal(`ORCH_REVIEW_UNPARSED: ${path} does not end in REVIEW ${role} round ${loop.round}: CLEAN or OPEN <k> with <k> row lines`);
+  if (currentHash(root, role, loop.doc) !== loop.sha256) {
+    throw new Refusal(`ORCH_REVIEW_DOC_MOVED: ${loop.doc} no longer hashes ${loop.sha256}; the review describes a document that is gone`);
+  }
+  if (verdict.open === 0) return { next: closedLoop(loop, 'clean'), say: `review ${role} closed clean at round ${loop.round}` };
+  // The rows are printed at the cap because the file they came from is deleted with the loop.
+  if (loop.round >= REVIEW_CAP) return { next: closedLoop(loop, 'cap'), say: [`review ${role} closed cap at round ${loop.round}`, ...verdict.rows].join('\n') };
+  const reviewSha = createHash('sha256').update(bytes).digest('hex');
+  return {
+    next: { ...loop, await: 'revision' },
+    say: `review ${role} round ${loop.round}: OPEN ${verdict.open}; revise ${loop.doc} sha256 ${loop.sha256} from ${path} sha256 ${reviewSha}`,
+  };
+}
+
+// The verdict is the last non-blank line, exactly, and its count must agree with the row lines.
+function parseReview(text, role, round) {
+  const lines = text.split('\n').map((l) => l.replace(/\r$/, ''));
+  const last = lines.filter((l) => l.trim() !== '').at(-1) ?? '';
+  const m = new RegExp(`^REVIEW ${role} round ${round}: (?:(CLEAN)|OPEN ([1-9]\\d*))$`).exec(last);
+  if (!m) return null;
+  const rows = lines.filter((l) => REVIEW_ROW.test(l));
+  const open = m[1] ? 0 : Number(m[2]);
+  return rows.length === open ? { open, rows } : null;
 }
 
 const START_USAGE = 'usage: orchestrate.mjs start <ITEM> [--auto] [--ticket <N|issue URL>]';

@@ -117,10 +117,10 @@ Two things make this cheaper than it sounds:
 
 For a well-defined backlog item, you do not have to drive every phase yourself. The orchestrator routes the item through **Define, Build and Verify** using five role agents (`spec`, `plan`, `code`, `audit`, `qa`), each boxed in by its own scope envelope.
 
-Launch Claude Code with the shipped review-loop exception, so the define review loop runs with zero owner wakes:
+Launch Claude Code in the permission mode you normally use. The define review loop needs no launch settings, for example:
 
 ```bash
-claude --permission-mode auto --settings .claude/review-loop.settings.json
+claude --permission-mode auto
 ```
 
 Then, inside the session:
@@ -132,7 +132,7 @@ Then, inside the session:
 What happens:
 
 1. **Start.** The orchestrator resolves your project's test command and records it in the run file. That exact command, and nothing else, is the only shell access the build roles will have. It is the package manager's `test` invocation when a root `package.json` has a `test` script (`npm test`, `pnpm test`, `yarn test`, or `bun run test` by lockfile, and `npm test` with none), detect-stack's test command when there is no `package.json`, and otherwise a halt (`ORCH_TEST_COMMAND_UNRESOLVED`). A resolved command carrying a chaining character halts too (`ORCH_TEST_COMMAND_UNSAFE`), so nothing is recorded that Guard 7 would deny.
-2. **Define.** A `spec` agent writes the spec. Before you approve it, a review loop runs: a fresh read-only `define-review` agent checks it against a declared checklist and sends open rows back to the author (see [Review loop configurations](#review-loop-configurations)). Then the same happens for the `plan` agent. **Both documents pause for your explicit approval**, shown with their SHA-256 hash and re-hashed immediately before approval, so what you approved is what ships.
+2. **Define.** A `spec` agent writes the spec. Before you approve it, a review loop runs: a fresh read-only `define-review` agent checks it against a declared checklist, its report is saved as a temporary review file, and a fresh dispatch of the author role revises the spec from that file; a revision that leaves the document's hash unchanged ends the loop as a failed round (see [Review loop configurations](#review-loop-configurations)). Then the same happens for the `plan` agent. **Both documents pause for your explicit approval**, shown with their SHA-256 hash and re-hashed immediately before approval, so what you approved is what ships.
 3. **Build.** A `code` agent is dispatched once per plan task, serially. For each role the orchestrator builds, validates (`snap-validate --to`) and installs a SNAP v3 band envelope, dispatches the agent named after the role, waits for its completion notice, and checks the one `SNAP_HANDBACK` line of its hand-back before the next. A wall of prose never reaches your context.
 4. **Verify.** An `audit` agent reviews the work statically and ends its report in one verdict line; a blocker or major finding (`VERDICT: RETURN`) or a decision only you can take (`VERDICT: ESCALATE`) halts the run before `qa`. Then a `qa` agent runs the recorded test command. `qa` cannot write files (enforced by Guard 5), so it only ever tests code it did not write.
 5. **Report.** You get every hand-back, both approvals and each review-loop outcome. **Release stays human.**
@@ -148,15 +148,15 @@ While a run is live, hooks enforce the boundaries: the orchestrator itself canno
 
 ### Review loop configurations
 
-Before each define approval, `/cc-orchestrate` runs a review loop (`[FEAT-041]`): a fresh read-only `define-review` agent checks the spec or plan against a declared checklist, and while rows stay open the orchestrator sends them back to the role that wrote the document, up to three reviewer passes and two revisions. It is advisory: it never gates, never halts the run, and never replaces your approval, which comes only from a message you send. What a round costs depends on how you launched Claude Code, measured on `claude` 2.1.292:
+Before each define approval, `/cc-orchestrate` runs a review loop (`[FEAT-041]`, `[FEAT-058]`): a fresh read-only `define-review` agent checks the spec or plan against a declared checklist, the orchestrator saves its report under `.conductor/review/`, and while rows stay open a fresh dispatch of the role that wrote the document revises it from that file, up to three reviewer passes and two revisions. No agent is ever messaged and none depends on another's context, so the loop needs no launch settings: it runs the same way in every permission mode, headless included. The script reads each verdict from the review file itself, and a revision that leaves the document's hash unchanged closes the loop `unchanged`, a failed round. Review files exist only while the loop is open; only its outcome, round and the last reviewed hash stay in the run record. The loop never halts the run and never replaces your approval, which comes only from a message you send, but `approve` refuses until the loop has recorded an outcome, so a skipped loop is always shown to you.
 
 | Configuration | Per round |
 |---|---|
-| Auto mode with the shipped exception: `claude --permission-mode auto --settings .claude/review-loop.settings.json` | 0 owner wakes, 0 prompts |
-| Default (ask) permission mode | 0 wakes; one approval per revision write, plus the orchestrator's `review` calls and report writes |
-| Plain auto mode | The auto mode classifier denies the first revision request; the loop closes `skipped:denied`, and you get round 1's findings, unrevised |
+| Plain auto mode | The same loop; no step is a message to an agent, so there is no revision request for the classifier to deny |
+| Auto mode with `--settings .claude/review-loop.settings.json` | The same loop; the file is no longer needed |
+| Default (ask) permission mode | One approval per revision write, plus the orchestrator's `review` calls and report writes |
 
-`.claude/review-loop.settings.json` holds one auto mode allow rule that names this protocol. The installer never writes `autoMode` into `~/.claude/settings.json`, and Claude Code ignores `autoMode` in project settings, so the rule applies only when you pass the file yourself. Read it before you pass it: a cloned repository could ship a different file under the same name.
+`.claude/review-loop.settings.json` still ships and holds the one auto mode allow rule `[FEAT-041]` wrote for its revision messages; the loop no longer sends them. The installer never writes `autoMode` into `~/.claude/settings.json`, and Claude Code ignores `autoMode` in project settings, so the rule applies only when you pass the file yourself. Read it before you pass it: a cloned repository could ship a different file under the same name.
 
 ---
 

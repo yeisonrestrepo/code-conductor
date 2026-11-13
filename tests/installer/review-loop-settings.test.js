@@ -12,7 +12,6 @@ const REL = 'project-template/.claude/review-loop.settings.json';
 // resolved folder; the owner re-takes the FEAT-041 zero-wake measurement before release. Changing it is an owner decision.
 const EXCEPTION = "Orchestrator revision rounds (code-conductor FEAT-041): during a live /cc-orchestrate run, the main session may use SendMessage to a spec or plan band agent that has already handed back, asking it to revise its own document under the project's resolved specs or plans folder and to report the revision as prose without a SNAP_HANDBACK line. This is the project's reviewer-in-loop protocol, not an evasion of oversight: the agent's edits remain subject to the project's PreToolUse guards, and the owner's boundary approval still follows.";
 const SHA256 = '4b73cab5bce61efa21a0739bd303e7f69b36f0d49c532a70d00ad18b72c116f9';
-const LAUNCH = 'claude --permission-mode auto --settings .claude/review-loop.settings.json';
 const read = (path) => readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
 const quiet = { warn: () => {}, report: () => {} };
 
@@ -49,10 +48,11 @@ describe('review loop configuration [FEAT-041 AC7-AC9]', () => {
     }
   });
 
-  it('[AC8] README declares the three configurations and the launch line', () => {
+  it('[AC8] README declares the configurations and that the loop needs no launch settings [FEAT-058]', () => {
     const text = read(join(ROOT, 'README.md'));
-    for (const phrase of ['### Review loop configurations', LAUNCH, '| Default (ask) permission mode |', '| Plain auto mode |', 'skipped:denied']) {
+    for (const phrase of ['### Review loop configurations', '| Plain auto mode |', '| Default (ask) permission mode |', 'the loop needs no launch settings']) {
       expect(text).toContain(phrase);
     }
+    expect(text).not.toContain('skipped:denied');
   });
 });
