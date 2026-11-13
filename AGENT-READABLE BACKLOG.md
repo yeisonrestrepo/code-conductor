@@ -1312,6 +1312,24 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #195; reported by the automated security review of
   #194.
 
+### [ ] `[BUG-077]` Unbound approve spec path allowing approval hash to protect the wrong file
+
+- Symptom: `approve spec <path> <sha256>` (new in 1.46.0,
+  scripts/orchestrate.mjs:440, per the issue) accepts any file path
+  relative to the run root. Nothing checks that the path is the spec
+  the `spec` role handed back (`ops.f`) or that it sits under the
+  run's pinned `docs.specs` folder.
+- Impact per the issue: if the wrong path is passed and approved, the
+  post-approval hash check in `install` (`checkApprovedDocs`) protects
+  that file instead of the real spec, so later edits to the real spec
+  go undetected. The owner sees and approves the path, so the issue
+  rates this as hardening, not an exploitable flaw.
+- Fix shape suggested by the issue: in `approve`, refuse (writing
+  nothing) when `rel` is outside `run.docs.specs` or differs from the
+  recorded spec hand-back's `ops.f`.
+- Intake of issue #199; reported by the automated security review of
+  the 1.46.0 release candidate (#198).
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
