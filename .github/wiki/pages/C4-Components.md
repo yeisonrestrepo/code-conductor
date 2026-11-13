@@ -75,7 +75,7 @@ flowchart TD
   subgraph define["Define band"]
     spec["spec role, tk RW<br/>writes the spec"]
     rv1["define-review loop<br/>at most 3 passes,<br/>2 revisions, advisory"]
-    ap1(["Owner approves the spec<br/>hash shown, re-hashed"])
+    ap1(["Owner approves the spec<br/>hash checked by the script"])
     plan["plan role, tk RW<br/>writes the plan"]
     rv2["define-review loop"]
     ap2(["Owner approves the plan<br/>gate: define_approved"])
@@ -136,7 +136,7 @@ flowchart TB
 | `qa` | verify | X | Read, Grep, Glob, Bash | `verify_pass` |
 | `define-review` | none (reviewer) | none | Read, Grep, Glob | none: reports open checklist rows |
 
-Approvals are `orchestrate.mjs approve spec` and `approve plan`, recorded in the run file as `{at, by}`. Only `approve plan` moves the gate to `define_approved`. `--auto` skips the pause between dispatches, never an approval. The verbs are `start`, `install`, `handback`, `approve`, `review` and `end`. A refusal exits 2 and writes nothing; a halt exits 1 and is recorded in the run file. A halted run cannot resume: end it, then start again.
+Approvals are `orchestrate.mjs approve spec` and `approve plan`, each given the document path and the sha256 shown to the owner and recorded in the run file as `{at, by, path, sha256}`; a stale hash is refused. Only `approve plan` moves the gate to `define_approved`. Every `install` after it re-hashes both documents and halts `ORCH_APPROVED_DOC_CHANGED` when either text changed; plan checkbox ticks do not count. `--auto` skips the pause between dispatches, never an approval. The verbs are `start`, `install`, `handback`, `approve`, `hash`, `review` and `end`. A refusal exits 2 and writes nothing; a halt exits 1 and is recorded in the run file. A halted run cannot resume: end it, then start again.
 
 More: [Orchestrator Guide](Orchestrator-Guide), [Band Roles & Agents](Band-Roles-and-Agents), [SNAP Protocol](SNAP-Protocol).
 

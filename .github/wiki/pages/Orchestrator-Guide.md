@@ -32,10 +32,10 @@ The orchestrator resolves your project's test command and records it in the run 
 |------|-------------|
 | Spec | `spec` agent writes the specification |
 | Review | `define-review` agent checks against checklist (up to 3 passes, 2 revisions) |
-| Approve | **You approve** — the document is shown with its SHA-256 hash and re-hashed before `orchestrate.mjs approve spec` records `{at, by}` |
+| Approve | **You approve** — the document is shown with the hash `orchestrate.mjs hash spec` prints; `approve spec <path> <sha256>` refuses a stale hash and records `{at, by, path, sha256}` |
 | Plan | `plan` agent writes the plan |
 | Review | Same review loop |
-| Approve | **You approve again** — `approve plan` moves the gate to `define_approved` |
+| Approve | **You approve again** — `approve plan <path> <sha256>` checks the plan's hash (checkboxes read as `[ ]`) and moves the gate to `define_approved` |
 
 ### 3. Build
 

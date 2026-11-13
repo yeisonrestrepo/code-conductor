@@ -5,6 +5,7 @@
 // it is the only writer of the run file. Zero dependencies, node: builtins only.
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -189,11 +190,29 @@ function resolveDocs(root, item) {
 
 const docsNote = (d) => `docs: specs ${d.specs}, plans ${d.plans} (${d.source})${d.group ? `; group ${d.group}` : ''}; `;
 
-function readPlan(root, planRel) {
-  if (!planRel || isAbsolute(planRel) || planRel.split(/[\\/]/).includes('..')) {
-    throw new Refusal('usage: orchestrate.mjs approve plan <plan path relative to the run root>');
-  }
-  try { return readFileSync(join(root, planRel), 'utf8'); } catch { throw new Refusal(`cannot read ${planRel}`); }
+const DOC_PATH = '<path relative to the run root>';
+const APPROVE_USAGE = `usage: orchestrate.mjs approve <spec|plan> ${DOC_PATH} <sha256>`;
+const HASH_USAGE = `usage: orchestrate.mjs hash <spec|plan> ${DOC_PATH}`;
+const SHA256_HEX = /^[0-9a-f]{64}$/i;
+// FEAT-056: progress ticks are not text changes, so only a list item's leading box reads as [ ].
+const PLAN_CHECKBOX = /^(\s*(?:[-*+]|\d+[.)])\s+)\[[ xX>!]\](?=\s|$)/;
+
+// One definition for hash, approve and the Build check. Applied per line, so \s never spans two lines.
+export function documentHash(kind, content) {
+  const text = kind === 'plan' ? String(content).split('\n').map((l) => l.replace(PLAN_CHECKBOX, '$1[ ]')).join('\n') : content;
+  return createHash('sha256').update(text).digest('hex');
+}
+
+// Raw bytes, so a spec hashes exactly as sha256sum does.
+function readDoc(root, rel, usage) {
+  if (!rel || isAbsolute(rel) || rel.split(/[\\/]/).includes('..')) throw new Refusal(usage);
+  try { return readFileSync(join(root, rel)); } catch { throw new Refusal(`cannot read ${rel}`); }
+}
+
+// Read-only and run-free: prints the exact value approve checks, so the hash shown is the script's own.
+function hashDoc(root, kind, rel) {
+  if (kind !== 'spec' && kind !== 'plan') throw new Refusal(HASH_USAGE);
+  return `${documentHash(kind, readDoc(root, rel, HASH_USAGE))}  ${rel}`;
 }
 
 // ORCH_AGENT_MISSING's search. Plugin-provided agents are not searched, a stated limit.
@@ -280,7 +299,7 @@ function envelopeFields(run, root, step) {
     n: [], f: [], d: [], x: [], role: step.role, tk, gate: run.gate,
   };
   if (step.role === 'code') {
-    const task = extractTasks(readPlan(root, run.plan)).find((t) => t.id === step.task);
+    const task = extractTasks(readDoc(root, run.plan, `cannot read ${run.plan}`).toString('utf8')).find((t) => t.id === step.task);
     fields.scope = taskScope(task ?? { id: step.task, files: [] }, run.plan);
   } else if (step.role === 'spec' || step.role === 'plan') {
     // Read as pinned, never re-checked: the cap was enforced once, at start.
@@ -297,11 +316,27 @@ function envelopeFields(run, root, step) {
   return fields;
 }
 
+const currentHash = (root, kind, rel) => { try { return documentHash(kind, readFileSync(join(root, rel))); } catch { return null; } };
+
+// FEAT-056: after define_approved, a changed spec or plan means the run would execute text nobody approved.
+function checkApprovedDocs(root, run) {
+  for (const kind of ['spec', 'plan']) {
+    const { path, sha256 } = run.approvals[kind] ?? {};
+    if (typeof path !== 'string' || typeof sha256 !== 'string') {
+      throw new Halt('ORCH_APPROVAL_UNHASHED', `run ${run.item} records an approval without a document hash (started before FEAT-056); run end, then start`);
+    }
+    const now = currentHash(root, kind, path);
+    if (now === sha256) continue;
+    throw new Halt('ORCH_APPROVED_DOC_CHANGED', `${kind} ${path} was approved at sha256 ${sha256} and ${now ? `now hashes ${now}` : 'can no longer be read'}`);
+  }
+}
+
 // Builds and validates the next envelope with --to; installs it unless only checking.
 function install(root, sessionId, role, check) {
   const run = liveRun(root, sessionId);
   const step = nextStep(run);
   if (step.role !== role) throw new Refusal(`install ${role}: the next step is ${describeStep(step)}`);
+  if (run.approvals.plan) checkApprovedDocs(root, run);
   if (!findAgent(role, root)) {
     throw new Halt('ORCH_AGENT_MISSING', `no agent definition named ${role} in .claude/agents/ or ~/.claude/agents/`);
   }
@@ -393,23 +428,32 @@ function handback(root, sessionId, role, text) {
 }
 
 // Two human approvals, one gate write (A4): only an approved plan writes define_approved.
-function approve(root, sessionId, what, planRel) {
+// FEAT-056: each approval binds the bytes the owner was shown; a stale hash writes nothing.
+function approve(root, sessionId, what, rel, shown) {
   const run = liveRun(root, sessionId);
   const step = nextStep(run);
   if (step.await !== what) throw new Refusal(`approve ${what}: the next step is ${describeStep(step)}`);
-  const approval = { at: new Date().toISOString(), by: gitValue(root, ['config', 'user.name'], 'unknown') };
-  if (what === 'spec') {
-    saveRun(root, { ...run, approvals: { ...run.approvals, spec: approval } });
-    return 'spec approved';
+  if (!SHA256_HEX.test(shown ?? '')) throw new Refusal(APPROVE_USAGE);
+  const content = readDoc(root, rel, APPROVE_USAGE);
+  const sha256 = documentHash(what, content);
+  if (sha256 !== shown.toLowerCase()) {
+    throw new Refusal(`ORCH_DOC_HASH_STALE: ${what} ${rel} hashes ${sha256}, not the ${shown} that was shown; show the document again`);
   }
-  const tasks = extractTasks(readPlan(root, planRel));
-  if (tasks.length === 0) throw new Halt('ORCH_EMPTY_SCOPE', `${planRel} holds no "### Task N" section`);
-  for (const t of tasks) taskScope(t, planRel);
+  const approval = { at: new Date().toISOString(), by: gitValue(root, ['config', 'user.name'], 'unknown'), path: rel, sha256 };
+  if (what === 'plan') return approvePlan(root, run, content.toString('utf8'), approval);
+  saveRun(root, { ...run, approvals: { ...run.approvals, spec: approval } });
+  return `spec approved: sha256 ${sha256}`;
+}
+
+function approvePlan(root, run, text, approval) {
+  const tasks = extractTasks(text);
+  if (tasks.length === 0) throw new Halt('ORCH_EMPTY_SCOPE', `${approval.path} holds no "### Task N" section`);
+  for (const t of tasks) taskScope(t, approval.path);
   saveRun(root, {
-    ...run, gate: 'define_approved', plan: planRel, tasks: { ids: tasks.map((t) => t.id), done: 0 },
+    ...run, gate: 'define_approved', plan: approval.path, tasks: { ids: tasks.map((t) => t.id), done: 0 },
     approvals: { ...run.approvals, plan: approval },
   });
-  return `plan approved: define_approved, ${tasks.length} task(s)`;
+  return `plan approved: define_approved, ${tasks.length} task(s); sha256 ${approval.sha256}`;
 }
 
 // FEAT-041 (e): the review loop's round counter. Advisory: approve never reads it, and the
@@ -510,19 +554,20 @@ function recordHalt(root, halt) {
 }
 
 export function cli(argv, env, cwd = process.cwd()) {
-  const [verb, a, b] = argv;
+  const [verb, a, b, c] = argv;
   const root = findRunRoot(cwd);
   const sid = env.CLAUDE_CODE_SESSION_ID;
   const verbs = {
     start: () => start(root, sid, argv.slice(1)),
     install: () => install(root, sid, a, b === '--check'),
     handback: () => handback(root, sid, a, readFileSync(0, 'utf8')),
-    approve: () => approve(root, sid, a, b),
+    approve: () => approve(root, sid, a, b, c),
+    hash: () => hashDoc(root, a, b),
     review: () => review(root, sid, argv.slice(1)),
     end: () => end(root),
   };
   try {
-    if (!verbs[verb]) throw new Refusal('usage: orchestrate.mjs start|install|handback|approve|review|end');
+    if (!verbs[verb]) throw new Refusal('usage: orchestrate.mjs start|install|handback|approve|hash|review|end');
     process.stdout.write(verbs[verb]() + '\n');
     return 0;
   } catch (e) {
