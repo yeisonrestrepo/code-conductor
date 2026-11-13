@@ -1,6 +1,6 @@
 # FEAT-060: Audit verdict line and severities that can withhold the Verify gate
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-12 by independent review (round 1)
 **Item:** FEAT-060 (intake of issue #180)
 **Date:** 2026-11-12
 
