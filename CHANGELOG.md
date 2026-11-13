@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.45.0] - 2026-11-13
+
+### Added
+- **[FEAT-060]** The `audit` role's report ends in exactly one `VERDICT: APPROVE | RETURN | ESCALATE` line, immediately before its `SNAP_HANDBACK` line, and every finding carries a severity (`blocker`, `major`, `minor`) and a `file:line`. `orchestrate.mjs` parses the verdict (`parseVerdict`), records it on the audit hand-back entry and saves the run before halting: `RETURN` halts with `ORCH_AUDIT_RETURN`, `ESCALATE` with `ORCH_AUDIT_ESCALATE`; a missing, duplicated, malformed or misplaced line halts with `ORCH_VERDICT_MISSING`/`ORCH_VERDICT_INVALID` (quoted at 120 characters), and `APPROVE` over a blocker/major or `RETURN` over none with `ORCH_VERDICT_INCONSISTENT`. As a second line, `qa`'s `verify_pass` is withheld (`ORCH_GATE_WITHHELD`) unless the recorded audit verdict is `APPROVE`. Both `audit.md` copies and both `cc-orchestrate.md` copies carry the contract. Landed from PR #190 (cc-lane-bot), intake of issue #180.
+
+### Changed
+- Records guard also exempts the release App's (`cc-lane-bot[bot]`) PRs on `records/*`, not only `release/*`, so backlog intake PRs from the issue triage no longer show a red check; the exemption still keys on the author, and the prefix only narrows it. `CONTRIBUTING.md` and the FEAT-045 spec (dated Ruling 2 amendment) name the `records-branches` ruleset that reserves the prefix. CI-only, no id. Landed from PR #166 (Ludocius), issue #165.
+
 ## [1.44.0] - 2026-11-12
 
 ### Added
