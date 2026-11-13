@@ -1331,6 +1331,28 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #199; reported by the automated security review of
   the 1.46.0 release candidate (#198).
 
+### [ ] `[BUG-078]` Fix-Round Write Scope Includes the Approved Plan
+
+- Symptom: in a fix round, `fixScope` builds the envelope scope with
+  `taskScope()`, which always appends `run.plan`
+  (scripts/orchestrate.mjs:173, reached from `:188`, per the issue).
+  Guard 5 therefore lets the fix-round `code` agent write to the
+  approved plan; only the brief's instruction "do not edit the spec or
+  the plan, and tick no boxes" stops it.
+- Impact per the issue: a fix agent misled by the review text could
+  edit the plan. Any change other than checkboxes is still caught:
+  `checkApprovedDocs` halts with `ORCH_APPROVED_DOC_CHANGED` on the
+  next `install audit` and before another fix round (`auditFix`).
+  Only checkbox ticks get through, and they do not affect
+  `tasks.done`, so the issue rates this as defense in depth, not an
+  exploitable bypass.
+- Fix shape suggested by the issue: build the fix-round scope without
+  `planRel`, since fix rounds tick no boxes, so Guard 5 enforces the
+  rule the brief states only in words; add a test asserting the
+  fix-round `ops.scope` excludes `run.plan`.
+- Intake of issue #203; reported by the automated security review of
+  the 1.47.0 release candidate (#202).
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
