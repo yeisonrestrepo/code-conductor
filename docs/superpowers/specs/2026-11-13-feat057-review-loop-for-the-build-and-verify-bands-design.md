@@ -21,7 +21,7 @@ Turn the audit `RETURN` into a bounded fix loop owned by the script. When `handb
 - **What a round is.** One round is one fix dispatch plus the re-audit that follows it. With the default `N = 2` a run can have up to three audit passes and two fix dispatches; the third `RETURN` halts. This mirrors the Define loop's shape (the last pass is always a review, never an unreviewed fix) and reads the entry literally: a `RETURN` "dispatches `code` … and then audits again, capped at N rounds". `N = 0` disables the loop and reproduces today's behavior exactly.
 - **Where N is configured.** A `start` flag, `--audit-rounds <n>`, an integer from 0 to 5, default 2, recorded in the run file as `audit_rounds` and printed by `start`. A flag is the smallest surface that makes the cap a property of the run: it is fixed before the first dispatch, it is in the record, and the orchestrator's prompt cannot change it mid-run (`[E2]`). The upper bound of 5 keeps a run from looping on a reviewer that never converges; a project setting in `CLAUDE.md` is not added because no second consumer needs it.
 - **Which findings drive the fix.** Only `blocker` and `major` finding lines, the same set FEAT-060 counts for `RETURN` (`countSevere`, `orchestrate.mjs:391`). `minor` findings never withhold the gate, so they neither widen the fix scope nor ask for a fix.
-- **Fix scope stays inside the approved plan.** A finding path is accepted into the fix scope only when it is one of the files the approved plan's tasks declare (`extractTasks` over `run.plan`), and it is never the approved spec or plan path itself. A `RETURN` naming any other path halts `ORCH_FIX_SCOPE_UNAPPROVED`, which is the entry's "the run stops and waits for the owner". The audit's text is not owner-approved; letting it widen a write envelope beyond the plan the owner approved would be a broader installed permission, which is the owner's decision (see "Owner decisions"). Editing an approved document would trip `ORCH_APPROVED_DOC_CHANGED` at the next `install` anyway (FEAT-056).
+- **Fix scope stays inside the approved plan.** A finding path is accepted into the fix scope only when it is one of the files the approved plan's tasks declare (`extractTasks` over `run.plan`), and it is never the approved spec or plan path itself. A `RETURN` naming any other path halts `ORCH_FIX_SCOPE_UNAPPROVED`, which is the entry's "the run stops and waits for the owner". The audit's text is not owner-approved; letting it widen a write envelope beyond the plan the owner approved would be a broader installed permission, and the owner has decided against it (see "Owner decisions"). Editing an approved document would trip `ORCH_APPROVED_DOC_CHANGED` at the next `install` anyway (FEAT-056).
 - **Halt code at the cap.** `ORCH_AUDIT_RETURN`, unchanged, with a reason that names the round and the cap. No new code for "cap": a `RETURN` with no rounds left is exactly what FEAT-060's halt already describes, and its documentation and recovery stay valid.
 - **The re-audit is fresh and full.** Each audit pass is a fresh `audit` dispatch with today's brief, reviewing the whole change against the spec and the plan. It is not given earlier rounds' findings, as the Define loop never passes earlier findings to a fresh reviewer. `.claude/agents/audit.md` is unchanged.
 
@@ -93,7 +93,10 @@ The two files stay byte-identical (`commands-parity.test.js`). Changes:
 
 ## Owner decisions
 
-- **May an audit finding widen the fix scope beyond the approved plan's files?** This spec decides **no** (halt `ORCH_FIX_SCOPE_UNAPPROVED` and wait for the owner), because that is the narrower posture. Allowing it, with or without a per-run flag, would install a write scope no owner approved, and is left to the owner.
+Decided on 2026-11-13; these are settled, not open.
+
+- **May an audit finding widen the fix scope beyond the approved plan's files?** **No.** A `blocker` or `major` finding that names a file outside the approved plan's task files, or that names the approved spec or plan, halts the run with `ORCH_FIX_SCOPE_UNAPPROVED` and waits for the owner. There is no per-run flag to widen the scope.
+- **The rest of the design stands as proposed.** This includes the per-round hand-back file `.conductor/handback/audit-<round>.txt` and the change to the `qa` gate so that it reads the last audit entry of the run record (see "The `qa` gate reads the last audit").
 
 ## Behavior
 
@@ -148,7 +151,7 @@ All FEAT-060 verdict halts (`ORCH_VERDICT_MISSING`, `_INVALID`, `_INCONSISTENT`)
 ## Out of Scope
 
 - Resuming a halted run from its last valid gate (FEAT-055): the cap and `ESCALATE` still halt, terminally.
-- Letting findings widen the scope beyond the approved plan (see "Owner decisions").
+- Letting findings widen the scope beyond the approved plan, which the owner declined (see "Owner decisions").
 - Fixing `minor` findings in the loop, or a loop on `qa` failures.
 - Any change to `.claude/agents/audit.md`, `code.md`, the verdict format, the SNAP v3 envelope or `scripts/snap-contract.mjs`.
 - The Define review loop (FEAT-058), the hooks and guards, the installer and settings.
