@@ -1,6 +1,6 @@
 # FEAT-056 — Script-Enforced Document Hash Verification on orchestrate.mjs Approve
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-12 by independent review (round 1)
 
 **Item:** FEAT-056 (intake of issue #184). **Date:** 2026-11-12.
 
