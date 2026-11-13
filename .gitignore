@@ -231,6 +231,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-11-12-feat056-script-enforced-document-hash-verification-on-design.md
 !/docs/superpowers/specs/2026-11-12-feat058-define-band-review-loop-revising-through-fresh-design.md
 !/docs/superpowers/specs/2026-11-12-feat060-audit-verdict-line-and-severities-that-can-design.md
+!/docs/superpowers/specs/2026-11-13-feat057-review-loop-for-the-build-and-verify-bands-design.md
 # --- END tracked-surface block (BUG-042) ---
 
 # Kept for external writers. Both lines are redundant against the block above; each is
