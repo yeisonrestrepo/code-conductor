@@ -97,10 +97,11 @@ Both `cc-orchestrate.md` copies: the Verify step names the security `VERDICT:` l
 
 ## Owner decisions
 
-The question this spec left open was decided by the project owner as follows; the design above reflects it.
+The questions this spec left open were decided by the project owner as follows; the design above reflects them.
 
 - **Q1. A pre-existing finding at or above the threshold never blocks: option (a).** It never changes the verdict and never halts the run; it is written to `.conductor/security-pre-existing.txt` only. There is no `ORCH_SECURITY_PRE_EXISTING` halt. A constant halt (option (b)) was rejected because the halt itself is public and tells a reader that the released version has a vulnerability at or above the threshold, which is the disclosure this item exists to prevent, and because it would reduce `[P1]` from a byte equality to one that holds only below the threshold. This changes released 1.48.0 behavior, which blocks on pre-existing dependency advisories at or above the threshold; the Documentation section makes the README and both `cc-orchestrate.md` copies say so.
 - **The spec is written against released 1.48.0.** FEAT-034 is released, so an installed 1.48.0 project meets C15's halt as its normal upgrade path and C16's `ORCH_RUN_INVALID` for a run file it wrote; both are kept, with the rationale and the reason text stated for an installed project. The line numbers this spec cites were read on branch base `4f64542` and hold on the 1.48.0 release tree `d21c418`: `git diff --stat 4f64542 d21c418` touches only `VERSION`, `package.json`, `package-lock.json`, `CHANGELOG.md`, `AGENT-READABLE BACKLOG.md`, `.claude/memory/project.md` and one README line (`:490`, the shipped agent list), none of which this spec cites by line, and no file under `scripts/`, `.claude/`, `project-template/` or `tests/` other than that memory file.
+- **Q2. Bringing released 1.48.0 into the branch: option (a).** `origin/main` (`d21c418`) is merged into the feature branch as a separate merge commit before the next phase; the spec text needs no change for it. Option (b), accepting the spec on the old base, was not taken. After the merge, `git merge-base --is-ancestor d21c418 HEAD` holds and `git diff --stat 4f64542 HEAD` still touches no file under `scripts/` or `tests/`, so every `scripts/orchestrate.mjs` and test line this spec cites (for example `:492`, `:526`, `:551`, `:590`, `:602`) was re-checked on the merged tree and is unchanged.
 
 ## Behavior
 
