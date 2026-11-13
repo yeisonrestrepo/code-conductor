@@ -1,6 +1,6 @@
 # FEAT-059: Security agent verdict contract with introduced versus pre-existing finding split
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-13 by independent review (round 1)
 
 Source: the `[FEAT-059]` entry in `AGENT-READABLE BACKLOG.md` (PILLAR 3), the intake of issue #181. The entry's acceptance criteria are "`[FEAT-034]`'s own criteria, plus: the security verdict is read by the shared verdict parser; a test shows that a pre-existing finding never reaches the public part of the report". They are answered in "Acceptance Criteria" below: `[E1]`-`[E3]` restate FEAT-034's three criteria against the new contract, `[V1]` answers the shared parser, `[P1]` answers the public-part test, and `[S1]`-`[S3]` answer the description's "same severities", "`file:line` findings" and the split.
 
