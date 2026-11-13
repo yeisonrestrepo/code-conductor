@@ -1,6 +1,6 @@
 # FEAT-058: Define-Band Review Loop Revising Through Fresh Dispatch over Review Files
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-12 by independent review (round 1)
 
 Source: the `[FEAT-058]` entry in `AGENT-READABLE BACKLOG.md` (PILLAR 3), the intake of issue #182. Its three acceptance criteria are answered in "Acceptance Criteria" below, each tagged `[E1]`-`[E3]`.
 
