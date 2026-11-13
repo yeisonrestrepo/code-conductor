@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { cleanGitEnv } from '../helpers/git-env.js';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -63,7 +63,7 @@ describe('scripts/security-scan.mjs [FEAT-034]', () => {
   });
 
   it('is import-safe: importing it prints nothing and exports scanChanges and SECRET_PATTERNS', async () => {
-    const r = spawnSync(process.execPath, ['-e', `import(${JSON.stringify(SCANNER)}).then(m => process.stdout.write(typeof m.scanChanges + ' ' + Array.isArray(m.SECRET_PATTERNS)))`], { encoding: 'utf8' });
+    const r = spawnSync(process.execPath, ['-e', `import(${JSON.stringify(pathToFileURL(SCANNER).href)}).then(m => process.stdout.write(typeof m.scanChanges + ' ' + Array.isArray(m.SECRET_PATTERNS)))`], { encoding: 'utf8' });
     expect(r.stdout).toBe('function true');
     expect(r.stderr).toBe('');
   });
