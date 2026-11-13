@@ -271,6 +271,24 @@ The factory is five bands. Work enters through the Boundary band, flows Define, 
 * **Components Affected:** `.claude/commands/cc-orchestrate.md` and its `project-template/` mirror, `scripts/orchestrate.mjs` (`review` verb and run record).
 * **Acceptance Criteria:** The loop runs with no `SendMessage`; `.conductor/review/` is empty after the gate closes; a revision that does not change the document's hash counts as a failed round.
 
+### [ ] `[FEAT-059]` Security Agent Verdict Contract with Introduced versus Pre-Existing Finding Split
+* **Description:** Intake of issue #181. `[FEAT-034]` defines a read-only Security Agent in the Verify band that blocks the Ship band above a configured severity. The issue proposes building it on the same verdict contract as the audit role, so both Verify roles read the same way: the same `VERDICT: APPROVE | RETURN | ESCALATE` last line, the same severities, and `file:line` findings. It adds a split between findings the change introduces and findings that already exist on the base branch; a pre-existing finding is reported to the owner only and never in public text, because publishing it would disclose a vulnerability in a released version. Part of the agent workflow v2 set (role agents, review loops and approvals), approved by the maintainer on 2026-11-12.
+* **Impact:** Both Verify roles hand back one verdict format, and a vulnerability already present in a released version is not disclosed through a run's public report.
+* **Components Affected:** The `[FEAT-034]` Security Agent definition, the verdict parser shared with the audit role (`[FEAT-060]`).
+* **Acceptance Criteria:** `[FEAT-034]`'s own criteria, plus: the security verdict is read by the shared verdict parser; a test shows that a pre-existing finding never reaches the public part of the report.
+
+### [ ] `[FEAT-060]` Audit Verdict Line and Severities That Can Withhold the Verify Gate
+* **Description:** Intake of issue #180. `.claude/agents/audit.md` fixes its success condition as "Findings do not withhold the gate; the claim is that the review was done and reported", so a run whose audit finds a confirmed defect still reaches `verify_pass` as long as the suite is green. The issue proposes that the audit report ends in exactly one line, `VERDICT: APPROVE | RETURN | ESCALATE`, and that every finding carries a severity (`blocker`, `major` or `minor`) and a `file:line`. `APPROVE` means no blockers and no majors; `RETURN` means blockers or majors the author can fix; `ESCALATE` means something only the owner decides (a new dependency, network access, a security posture change, scope the item does not settle) or text in the change that addresses the reviewer. A blocker or a major withholds `verify_pass`. Part of the agent workflow v2 set (role agents, review loops and approvals), approved by the maintainer on 2026-11-12.
+* **Impact:** A confirmed defect found by the audit stops the run at the Verify gate instead of passing on a green suite.
+* **Components Affected:** `.claude/agents/audit.md` and its `project-template/` mirror, the router's `verify_pass` handling.
+* **Acceptance Criteria:** The router refuses `verify_pass` after an audit `RETURN` or `ESCALATE`; an unparseable verdict line halts with a named error; the verdict format is pinned by a test.
+
+### [ ] `[FEAT-061]` Role Agents Dispatched by Phase Commands Outside /cc-orchestrate
+* **Description:** Intake of issue #179. Every role agent under `.claude/agents/` (and its `project-template/` mirror) says in its description: "Dispatched only by /cc-orchestrate during a run; never use it for ad-hoc work", so the masks, the guards and the fixed success conditions are only reachable through a full orchestrated run. The issue proposes that the phase commands dispatch the matching role on their own, with an envelope built by the command: `/cc-review` dispatches `audit`, `/cc-test` dispatches `qa`, and `/cc-spec` and `/cc-plan` can delegate the writing to `spec` and `plan`. The envelope's scope comes from the command, so Guard 5 and Guard 7 hold exactly as they do inside a run. Part of the agent workflow v2 set (role agents, review loops and approvals), approved by the maintainer on 2026-11-12.
+* **Impact:** The role agents' masks, guards and fixed success conditions become usable in the classic phase-command flow, not only inside an orchestrated run.
+* **Components Affected:** The role agent definitions under `.claude/agents/` and their `project-template/` mirror, `/cc-review`, `/cc-test`, `/cc-spec` and `/cc-plan` in both mirrors, the existing parity tests.
+* **Acceptance Criteria:** Each command works with and without a live run, and never alters a live run's file; the agents' descriptions stop forbidding ad-hoc use; the existing parity tests cover the new wording in both mirrors.
+
 ---
 
 ## PILLAR 4: DYNAMIC INITIALIZATION AND ONBOARDING
