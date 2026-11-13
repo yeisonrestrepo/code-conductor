@@ -1287,6 +1287,29 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   implied.
 - Intake of issue #175.
 
+### [ ] `[BUG-076]` Review-Loop Outcome Not Bound to the Document Being Approved
+
+- Symptom: `approve` refuses with `ORCH_REVIEW_OPEN` until the role's
+  review loop records an outcome (`checkLoopClosed`,
+  scripts/orchestrate.mjs:441, per the issue), but the check only
+  looks at whether an outcome exists. It does not compare the loop's
+  recorded `sha256` (or `doc`) with the document passed to `approve`.
+  `review <role> --round <doc>` also accepts any relative path
+  `readDoc` can open, not only paths under the role's
+  `run.docs.scopes` folder.
+- Impact per the issue: a loop can close `clean` over one document
+  while a different document of the same role is approved, so the run
+  record shows a clean review for a document no reviewer read. The
+  owner's approval is still bound to the hash it was shown
+  (`[FEAT-056]`), so the human gate is not bypassed; it is a
+  record-integrity gap.
+- Fix shape suggested by the issue: in `checkLoopClosed`, when the
+  outcome is `clean`, `cap` or `unchanged`, require `loop.sha256` to
+  equal the hash being approved, or refuse with a clear code; in
+  `openRound`, restrict `rel` to the role's recorded docs scope.
+- Intake of issue #195; reported by the automated security review of
+  #194.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
