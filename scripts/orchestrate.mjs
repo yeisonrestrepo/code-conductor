@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { GATES, ROLE_BAND, V3_CAPS, elementLength } from './snap-contract.mjs';
+import { GATES, ROLE_BAND, V3_CAPS, elementLength, expectedGate } from './snap-contract.mjs';
 // Imported, not spawned: ticket.mjs holds the four import-safety conditions (FEAT-031 B1.7, T2).
 import { TicketHalt, intake, writeSnapshot } from './ticket.mjs';
 import { DocLocationError, resolveDocLocations } from './doc-locations.mjs';
@@ -27,6 +27,10 @@ export const HANDBACK_DIR = '.conductor/handback';
 export const REVIEW_DIR = '.conductor/review';
 // Three reviewer passes, so at most two revisions, each re-reviewed (FEAT-041 (d)).
 export const REVIEW_CAP = 3;
+// FEAT-057: fix rounds per run, fixed at start so the orchestrator's prompt cannot change the cap.
+export const AUDIT_ROUNDS_DEFAULT = 2;
+const AUDIT_ROUNDS_MAX = 5;
+const isAuditRounds = (n) => Number.isInteger(n) && n >= 0 && n <= AUDIT_ROUNDS_MAX;
 // Every outcome a closed loop can carry; only the skip is the orchestrator's to record (FEAT-058).
 const REVIEW_OUTCOME = /^(clean|cap|unchanged|skipped:[a-z][a-z0-9-]{0,39})$/;
 const SKIP_OUTCOME = /^skipped:[a-z][a-z0-9-]{0,39}$/;
@@ -84,10 +88,12 @@ function writeAtomic(path, text) {
 
 const scriptRef = (root) => relative(root, join(HERE, 'orchestrate.mjs')).split('\\').join('/');
 
+// FEAT-057: a present audit_rounds that is not 0-5 would let a hand-edited run buy fix rounds without limit.
 export function isValidRun(run) {
   return isPlainObject(run) && run.v === 1 && typeof run.session_id === 'string' && run.session_id !== ''
     && typeof run.item === 'string' && GATES.includes(run.gate) && isPlainObject(run.approvals)
-    && Array.isArray(run.handbacks) && Array.isArray(run.tasks?.ids) && Number.isInteger(run.tasks?.done);
+    && Array.isArray(run.handbacks) && Array.isArray(run.tasks?.ids) && Number.isInteger(run.tasks?.done)
+    && (run.audit_rounds === undefined || isAuditRounds(run.audit_rounds));
 }
 
 function readRun(root) {
@@ -116,6 +122,9 @@ function liveRun(root, sessionId) {
 
 const handedBack = (run, role) => run.handbacks.some((h) => h.role === role);
 
+// FEAT-057: a fix is due exactly when the last hand-back is an audit the script granted one.
+const fixDue = (run) => { const last = run.handbacks.at(-1); return last?.role === 'audit' && isPlainObject(last.fix) ? last.fix : null; };
+
 // The band sequence, read off the run's record.
 export function nextStep(run) {
   if (!handedBack(run, 'spec')) return { role: 'spec' };
@@ -123,9 +132,12 @@ export function nextStep(run) {
   if (!handedBack(run, 'plan')) return { role: 'plan' };
   if (!run.approvals.plan) return { await: 'plan' };
   if (run.tasks.done < run.tasks.ids.length) return { role: 'code', task: run.tasks.ids[run.tasks.done] };
-  if (!handedBack(run, 'audit')) return { role: 'audit' };
-  if (!handedBack(run, 'qa')) return { role: 'qa' };
-  return { end: true };
+  const fix = fixDue(run);
+  if (fix) return { role: 'code', fix: fix.round };
+  const last = run.handbacks.at(-1)?.role;
+  if (last === 'audit') return { role: 'qa' };
+  if (last === 'qa') return { end: true };
+  return { role: 'audit' };
 }
 
 const describeStep = (s) => (s.role ? `install ${s.role}` : s.await ? `approve ${s.await}` : 'end');
@@ -164,6 +176,16 @@ export function taskScope(task, planRel) {
   const long = scope.find((p) => elementLength(p) > elemCap);
   if (long) throw new Halt('ORCH_SCOPE_OVER_CAP', `${task.id} has a ${elementLength(long)}-character path; the cap is ${elemCap}`);
   return scope;
+}
+
+// FEAT-057: the audit text is not owner-approved, so it may name only files the approved plan's tasks
+// declare, never the approved documents themselves (owner decision, 2026-11-13).
+function fixScope(root, run, files, round) {
+  const planned = new Set(extractTasks(readDoc(root, run.plan, `cannot read ${run.plan}`).toString('utf8')).flatMap((t) => t.files));
+  const approved = [run.plan, run.approvals.spec?.path];
+  const outside = files.find((p) => typeof p !== 'string' || !planned.has(p) || approved.includes(p));
+  if (outside !== undefined) throw new Halt('ORCH_FIX_SCOPE_UNAPPROVED', `${outside} is not a file the approved plan declares; the fix scope stays inside the plan`);
+  return taskScope({ id: `fix round ${round}`, files }, run.plan);
 }
 
 // FEAT-047: one glob per role, checked against the element cap once, at start.
@@ -294,17 +316,23 @@ function gitValue(root, args, fallback) {
   return (r.status === 0 && r.stdout.trim()) || fallback;
 }
 
+// A fix step's files come from the record, re-checked against the plan because the run file is writable.
+function codeScope(root, run, step) {
+  if (step.fix !== undefined) { const { files } = fixDue(run); return fixScope(root, run, Array.isArray(files) ? files : [], step.fix); }
+  const task = extractTasks(readDoc(root, run.plan, `cannot read ${run.plan}`).toString('utf8')).find((t) => t.id === step.task);
+  return taskScope(task ?? { id: step.task, files: [] }, run.plan);
+}
+
 function envelopeFields(run, root, step) {
   const head = gitValue(root, ['rev-parse', 'HEAD'], '0000000').toLowerCase();
   const { tk, scope } = ROLE_ARTIFACTS[step.role];
   const fields = {
     ph: PHASE[step.role], c: /^[0-9a-f]{7,40}$/.test(head) ? head : '0000000', s: run.item,
-    n: [], f: [], d: [], x: [], role: step.role, tk, gate: run.gate,
+    // A fix re-enters Build, so it carries Build's entry gate, the one --to code checks (D6).
+    n: [], f: [], d: [], x: [], role: step.role, tk, gate: step.fix === undefined ? run.gate : expectedGate('code'),
   };
-  if (step.role === 'code') {
-    const task = extractTasks(readDoc(root, run.plan, `cannot read ${run.plan}`).toString('utf8')).find((t) => t.id === step.task);
-    fields.scope = taskScope(task ?? { id: step.task, files: [] }, run.plan);
-  } else if (step.role === 'spec' || step.role === 'plan') {
+  if (step.role === 'code') fields.scope = codeScope(root, run, step);
+  else if (step.role === 'spec' || step.role === 'plan') {
     // Read as pinned, never re-checked: the cap was enforced once, at start.
     if (!isPlainObject(run.docs?.scopes) || !Array.isArray(run.docs.scopes[step.role])) {
       throw new Halt('ORCH_DOC_LOCATION_UNRESOLVED', `run ${run.item} records no docs location (started before FEAT-047); run end, then start`);
@@ -334,6 +362,8 @@ function checkApprovedDocs(root, run) {
   }
 }
 
+const fixNote = (run) => { const f = fixDue(run); return `fix round ${f.round} of ${run.audit_rounds ?? 0}: review ${f.review} sha256 ${f.sha256}`; };
+
 // Builds and validates the next envelope with --to; installs it unless only checking.
 function install(root, sessionId, role, check) {
   const run = liveRun(root, sessionId);
@@ -347,22 +377,34 @@ function install(root, sessionId, role, check) {
   if (built.status !== 0) throw new Halt('SNAP_ERROR', built.err);
   const error = validate(built.out, role);
   if (error) throw new Halt(error.includes('SNAP_GATE_MISMATCH') ? 'SNAP_GATE_MISMATCH' : 'SNAP_ERROR', error);
-  if (check) return built.out.trim();
+  const out = built.out.trim() + (step.fix === undefined ? '' : `\n${fixNote(run)}`);
+  if (check) return out;
   writeAtomic(join(root, ENVELOPE_FILE), built.out);
   saveRun(root, { ...run, band: ROLE_BAND[role], role });
-  return built.out.trim();
+  return out;
 }
 
 // FEAT-060: the second line behind the halt; verify_pass is forwarded only over an approving audit.
+// FEAT-057: the last audit, since an earlier RETURN stays in the record forever.
 function withholdUnlessApproved(run) {
-  const verdict = run.handbacks.find((h) => h.role === 'audit')?.verdict;
+  const verdict = run.handbacks.findLast((h) => h.role === 'audit')?.verdict;
   if (verdict !== 'APPROVE') throw new Halt('ORCH_GATE_WITHHELD', `qa may not forward verify_pass: the audit verdict is ${verdict ?? 'absent'}`);
+}
+
+// FEAT-057: a fix re-enters Build with no task, so it never advances tasks.done; audits carry their round.
+function entryFields(run, role) {
+  const fix = role === 'code' ? fixDue(run) : null;
+  if (fix) return { fix: fix.round };
+  if (role === 'code') return { task: run.tasks.ids[run.tasks.done] };
+  if (role === 'audit') return { round: run.handbacks.filter((h) => h.role === 'audit').length + 1 };
+  return {};
 }
 
 export function recordHandback(run, role, gate, verdict) {
   if (role === 'qa' && gate === 'verify_pass') withholdUnlessApproved(run);
-  const entry = { role, gate, at: new Date().toISOString(), ...(role === 'code' ? { task: run.tasks.ids[run.tasks.done] } : {}), ...(verdict ? { verdict } : {}) };
-  const tasks = role === 'code' ? { ...run.tasks, done: run.tasks.done + 1 } : run.tasks;
+  const fields = entryFields(run, role);
+  const entry = { role, gate, at: new Date().toISOString(), ...fields, ...(verdict ? { verdict } : {}) };
+  const tasks = role === 'code' && !('fix' in fields) ? { ...run.tasks, done: run.tasks.done + 1 } : run.tasks;
   return { ...run, role: null, gate: forwardGate(run, role, gate), tasks, handbacks: [...run.handbacks, entry] };
 }
 
@@ -377,25 +419,42 @@ function parseHandback(text) {
   return env;
 }
 
-function auditStop({ verdict, blockers }) {
-  if (verdict === 'RETURN') return new Halt('ORCH_AUDIT_RETURN', `audit returned the change with ${blockers} blocker/major finding(s); see ${HANDBACK_DIR}/audit.txt`);
-  return new Halt('ORCH_AUDIT_ESCALATE', `audit escalated a decision only the owner takes; see ${HANDBACK_DIR}/audit.txt`);
+function auditStop({ verdict, blockers }, round, cap) {
+  const report = `${HANDBACK_DIR}/audit-${round}.txt`;
+  if (verdict === 'RETURN') return new Halt('ORCH_AUDIT_RETURN', `audit returned the change with ${blockers} blocker/major finding(s) at round ${round}; the cap of ${cap} fix round(s) is spent; see ${report}`);
+  return new Halt('ORCH_AUDIT_ESCALATE', `audit escalated a decision only the owner takes; see ${report}`);
+}
+
+// FEAT-057: the cap is read from the run file, never from the orchestrator, so its prompt cannot buy a round (E2).
+// Every halt here lands on top of the audit entry handback already saved.
+function auditFix(root, run, verdict, bytes) {
+  const entry = run.handbacks.at(-1);
+  const cap = run.audit_rounds ?? 0;
+  const used = run.handbacks.filter((h) => h.role === 'audit' && isPlainObject(h.fix)).length;
+  if (verdict.verdict === 'ESCALATE' || used >= cap) throw auditStop(verdict, entry.round, cap);
+  checkApprovedDocs(root, run);
+  const fix = { round: used + 1, files: verdict.paths, review: `${HANDBACK_DIR}/audit-${entry.round}.txt`, sha256: createHash('sha256').update(bytes).digest('hex') };
+  const scope = fixScope(root, run, fix.files, fix.round);
+  saveRun(root, { ...run, handbacks: [...run.handbacks.slice(0, -1), { ...entry, fix }] });
+  return `audit round ${entry.round}: RETURN with ${verdict.blockers} blocker/major finding(s); fix round ${fix.round} of ${cap}: review ${fix.review} sha256 ${fix.sha256}; scope ${scope.join(', ')}`;
 }
 
 // FEAT-060: a candidate is wider than the valid form, so a near-miss halts by name instead of passing unseen.
 const VERDICT_CANDIDATE = /^verdict\s*:/i;
 const VERDICT_LINE = /^VERDICT: (APPROVE|RETURN|ESCALATE)$/;
-const FINDING_LINE = /^- \[(blocker|major|minor)\] \S+:\d+ /;
+const FINDING_LINE = /^- \[(blocker|major|minor)\] (\S+:\d+) /;
 const QUOTE_CAP = 120;
 
-const countSevere = (lines) => lines.map((l) => FINDING_LINE.exec(l)?.[1]).filter((s) => s === 'blocker' || s === 'major').length;
+const severeFindings = (lines) => lines.map((l) => FINDING_LINE.exec(l)).filter((m) => m && m[1] !== 'minor');
+// FEAT-057: extractTasks' normalization, widened to every trailing :line or :line:col group.
+const findingPath = (field) => field.replace(/(:\d+)+$/, '').replace(/^\.\//, '');
 
 // ESCALATE carries no count rule: its cause can be an owner decision with no code defect.
-function checkConsistent(verdict, blockers) {
+function checkConsistent(verdict, blockers, paths) {
   if ((verdict === 'APPROVE' && blockers > 0) || (verdict === 'RETURN' && blockers === 0)) {
     throw new Halt('ORCH_VERDICT_INCONSISTENT', `VERDICT: ${verdict} with ${blockers} blocker/major finding(s)`);
   }
-  return { verdict, blockers };
+  return { verdict, blockers, paths };
 }
 
 export function parseVerdict(text) {
@@ -408,10 +467,12 @@ export function parseVerdict(text) {
   const at = lines.findIndex((l) => l.startsWith('SNAP_HANDBACK '));
   const report = lines.slice(0, Math.max(at, 0)).filter(Boolean);
   if (at === -1 || report.at(-1) !== candidates[0]) throw new Halt('ORCH_VERDICT_INVALID', 'the VERDICT line must immediately precede SNAP_HANDBACK');
-  return checkConsistent(match[1], countSevere(report));
+  const severe = severeFindings(report);
+  return checkConsistent(match[1], severe.length, [...new Set(severe.map((m) => findingPath(m[2])))]);
 }
 
-function handback(root, sessionId, role, text) {
+function handback(root, sessionId, role, bytes) {
+  const text = bytes.toString('utf8');
   const run = liveRun(root, sessionId);
   // The binary refuses a second SubagentHandback, yet an agent can still report again (V1, F4).
   if (!run.role && run.handbacks.at(-1)?.role === role) {
@@ -424,9 +485,10 @@ function handback(root, sessionId, role, text) {
     throw new Halt('ORCH_GATE_UNEARNED', `${role} may hand back ${MAY_HAND_BACK[role].join('|')}, not ${env.ops.gate}`);
   }
   const verdict = role === 'audit' ? parseVerdict(text) : null;
-  saveRun(root, recordHandback(run, role, env.ops.gate, verdict?.verdict));
-  // Saved first, so the halt cli records lands on top of the audit entry (spec, Alternative paths).
-  if (verdict && verdict.verdict !== 'APPROVE') throw auditStop(verdict);
+  const recorded = recordHandback(run, role, env.ops.gate, verdict?.verdict);
+  saveRun(root, recorded);
+  // Saved first, so the halt cli records lands on top of the audit entry (FEAT-060, FEAT-057).
+  if (verdict && verdict.verdict !== 'APPROVE') return auditFix(root, recorded, verdict, bytes);
   return `${role} handed back ${env.ops.gate}`;
 }
 
@@ -538,19 +600,21 @@ function parseReview(text, role, round) {
   return rows.length === open ? { open, rows } : null;
 }
 
-const START_USAGE = 'usage: orchestrate.mjs start <ITEM> [--auto] [--ticket <N|issue URL>]';
+const START_USAGE = 'usage: orchestrate.mjs start <ITEM> [--auto] [--ticket <N|issue URL>] [--audit-rounds <0-5>]';
 
-// The item first, then --auto and --ticket <ref> in either order, each at most once. A
-// --ticket with no value reaches intake as '' and halts there (FEAT-031 B1.1).
+// The item first, then --auto, --ticket <ref> and --audit-rounds <0-5> in any order, each at
+// most once. A --ticket with no value reaches intake as '' and halts there (FEAT-031 B1.1).
 function parseStartArgs(args) {
   const [item, ...rest] = args;
-  const opts = { item, auto: false, ticket: undefined };
+  const opts = { item, auto: false, ticket: undefined, auditRounds: undefined };
   for (let i = 0; i < rest.length; i++) {
     if (rest[i] === '--auto' && !opts.auto) opts.auto = true;
     else if (rest[i] === '--ticket' && opts.ticket === undefined) opts.ticket = rest[++i] ?? '';
+    else if (rest[i] === '--audit-rounds' && opts.auditRounds === undefined && /^[0-5]$/.test(rest[i + 1] ?? '')) opts.auditRounds = Number(rest[++i]);
     else throw new Refusal(START_USAGE);
   }
   if (!/^[A-Z]+-\d{3,}$/.test(item ?? '')) throw new Refusal(START_USAGE);
+  opts.auditRounds ??= AUDIT_ROUNDS_DEFAULT;
   return opts;
 }
 
@@ -565,7 +629,7 @@ function ticketIntake(root, item, ref) {
 const ticketNote = (t) => `ticket ${t.binding.repo}#${t.binding.number} "${t.title}"; snapshot ${t.path} sha256 ${t.binding.sha256}; `;
 
 function start(root, sessionId, args) {
-  const { item, auto, ticket } = parseStartArgs(args);
+  const { item, auto, ticket, auditRounds } = parseStartArgs(args);
   if (!sessionId) throw new Halt('ORCH_NO_SESSION_ID', 'CLAUDE_CODE_SESSION_ID is absent or empty, so Guard 6 could never bind this run');
   const old = readRun(root);
   if (old && old.session_id === sessionId) throw new Halt('ORCH_RUN_ACTIVE', `run ${old.item} is live in this session; end it first`);
@@ -578,11 +642,11 @@ function start(root, sessionId, args) {
   saveRun(root, {
     v: 1, session_id: sessionId, item, mode: auto ? 'auto' : 'step', started: new Date().toISOString(),
     band: 'boundary', role: null, gate: 'boundary_routed', approvals: { spec: null, plan: null },
-    plan: null, tasks: { ids: [], done: 0 }, handbacks: [], halt: null, test_command: testCommand, docs,
+    plan: null, tasks: { ids: [], done: 0 }, handbacks: [], halt: null, test_command: testCommand, audit_rounds: auditRounds, docs,
     ...(bound ? { ticket: { ...bound.binding, snapshot: bound.path } } : {}),
   });
   const begun = old ? `replaced the stale run ${old.item} started ${old.started}` : `run ${item} started`;
-  return `${begun}; ${bound ? ticketNote(bound) : ''}${docsNote(docs)}test command: ${testCommand}`;
+  return `${begun}; ${bound ? ticketNote(bound) : ''}${docsNote(docs)}test command: ${testCommand}; audit rounds: ${auditRounds}`;
 }
 
 function clearRunFiles(root) {
@@ -614,7 +678,7 @@ export function cli(argv, env, cwd = process.cwd()) {
   const verbs = {
     start: () => start(root, sid, argv.slice(1)),
     install: () => install(root, sid, a, b === '--check'),
-    handback: () => handback(root, sid, a, readFileSync(0, 'utf8')),
+    handback: () => handback(root, sid, a, readFileSync(0)),
     approve: () => approve(root, sid, a, b, c),
     hash: () => hashDoc(root, a, b),
     review: () => review(root, sid, argv.slice(1)),

@@ -79,16 +79,16 @@ const say = (role, gate) => `Done.\nObservation: fine.\n${role === 'audit' ? 'VE
 const auditReport = (verdict, findings = []) => ['Done.', ...findings, ...(verdict === null ? [] : [verdict]), handbackLine('audit', 'build_executed'), ''].join('\n');
 
 // Drives a fresh run to the point where `role` is next, recording each step on the way.
-function driveTo(role) {
+function driveTo(role, { start = [], planText = TWO_TASKS } = {}) {
   agents();
-  plan(TWO_TASKS);
+  plan(planText);
   const steps = [
     ['spec', () => { orch(['install', 'spec']); orch(['handback', 'spec'], { input: say('spec', 'boundary_routed') }); skipLoop('spec'); orch(approveArgs('spec')); }],
     ['plan', () => { orch(['install', 'plan']); orch(['handback', 'plan'], { input: say('plan', 'boundary_routed') }); skipLoop('plan'); orch(approveArgs('plan')); }],
     ['code', () => { for (let i = 0; i < 2; i++) { orch(['install', 'code']); orch(['handback', 'code'], { input: say('code', 'build_executed') }); } }],
     ['audit', () => { orch(['install', 'audit']); orch(['handback', 'audit'], { input: say('audit', 'build_executed') }); }],
   ];
-  expect(orch(['start', 'FEAT-011']).status).toBe(0);
+  expect(orch(['start', 'FEAT-011', ...start]).status).toBe(0);
   for (const [name, step] of steps) { if (name === role) return; step(); }
 }
 
@@ -259,7 +259,7 @@ describe('run file [FEAT-011 AC9]', () => {
     writeFileSync(join(root, HANDBACK_DIR, 'spec.txt'), 'stale\n');
     const r = orch(['start', 'FEAT-012']);
     expect(r.status).toBe(0);
-    expect(r.out).toBe(`replaced the stale run FEAT-011 started ${started}; docs: specs docs/specs, plans docs/plans (default); test command: npm test`);
+    expect(r.out).toBe(`replaced the stale run FEAT-011 started ${started}; docs: specs docs/specs, plans docs/plans (default); test command: npm test; audit rounds: 2`);
     expect(runFile()).toMatchObject({ item: 'FEAT-012', session_id: 'sess-1' });
     expect(existsSync(join(root, ENVELOPE_FILE))).toBe(false);
     expect(existsSync(join(root, HANDBACK_DIR))).toBe(false);
@@ -464,12 +464,12 @@ describe('test command [FEAT-012 AC8, AC9]', () => {
     files({ [lock]: '' });
     const r = start();
     expect(r.status).toBe(0);
-    expect(r.out).toBe(`run FEAT-012 started; docs: specs docs/specs, plans docs/plans (default); test command: ${expected}`);
+    expect(r.out).toBe(`run FEAT-012 started; docs: specs docs/specs, plans docs/plans (default); test command: ${expected}; audit rounds: 2`);
     expect(runFile().test_command).toBe(expected);
   });
 
   it('[AC8] records npm test with no lockfile, the stated default', () => {
-    expect(start().out).toBe('run FEAT-012 started; docs: specs docs/specs, plans docs/plans (default); test command: npm test');
+    expect(start().out).toBe('run FEAT-012 started; docs: specs docs/specs, plans docs/plans (default); test command: npm test; audit rounds: 2');
     expect(runFile().test_command).toBe('npm test');
   });
 
@@ -576,7 +576,7 @@ describe('ticket intake [FEAT-031 AC1-AC5, AC12]', () => {
     gh = withIssues(iss);
     const r = orchGh(['start', 'FEAT-031', '--ticket', '5']);
     const hash = sha(iss.body);
-    expect(r.out).toBe(`run FEAT-031 started; ticket ${REPO}#5 "Add widgets"; snapshot ${SNAP} sha256 ${hash}; docs: specs docs/specs, plans docs/plans (default); test command: npm test`);
+    expect(r.out).toBe(`run FEAT-031 started; ticket ${REPO}#5 "Add widgets"; snapshot ${SNAP} sha256 ${hash}; docs: specs docs/specs, plans docs/plans (default); test command: npm test; audit rounds: 2`);
     expect(gh.calls()).toEqual([['api', 'repos/{owner}/{repo}/issues/5']]);
     const url = `https://github.com/${REPO}/issues/5`;
     expect(runFile().ticket).toEqual({ repo: REPO, number: 5, url, sha256: hash, snapshot: SNAP });
@@ -654,7 +654,7 @@ describe('ticket intake [FEAT-031 AC1-AC5, AC12]', () => {
     gh = withIssues(issue(REPO, 5), issue(REPO, 6));
     const r = orchGh(['start', 'FEAT-031', ...extra]);
     expect(r.status).toBe(2);
-    expect(r.err).toBe('orchestrate: usage: orchestrate.mjs start <ITEM> [--auto] [--ticket <N|issue URL>]');
+    expect(r.err).toBe('orchestrate: usage: orchestrate.mjs start <ITEM> [--auto] [--ticket <N|issue URL>] [--audit-rounds <0-5>]');
     expect(existsSync(join(root, RUN_FILE))).toBe(false);
     expect(gh.calls()).toEqual([]);
   });
@@ -1050,7 +1050,7 @@ describe('doc locations [FEAT-047]', () => {
       specs: '.claude/specs', plans: '.claude/plans', group: 'pillar-3', source: 'discovered',
       scopes: { spec: ['.claude/specs/pillar-3/**'], plan: ['.claude/plans/pillar-3/**'] },
     });
-    expect(r.out.endsWith('docs: specs .claude/specs, plans .claude/plans (discovered); group pillar-3; test command: npm test')).toBe(true);
+    expect(r.out.endsWith('docs: specs .claude/specs, plans .claude/plans (discovered); group pillar-3; test command: npm test; audit rounds: 2')).toBe(true);
     expect(scopeOf('spec')).toEqual(['.claude/specs/pillar-3/**']);
     approveSpec();
     expect(scopeOf('plan')).toEqual(['.claude/plans/pillar-3/**']);
@@ -1149,16 +1149,16 @@ describe('audit verdict [FEAT-060]', () => {
   const noCode = (code) => (text) => { try { parseVerdict(text); } catch (e) { return e.code === code; } return false; };
 
   it.each([
-    ['APPROVE with no findings', auditReport('VERDICT: APPROVE'), 'APPROVE', 0],
-    ['APPROVE with only minor findings', auditReport('VERDICT: APPROVE', minor), 'APPROVE', 0],
-    ['RETURN with a blocker and a major', auditReport('VERDICT: RETURN', severe), 'RETURN', 2],
-    ['ESCALATE with no findings', auditReport('VERDICT: ESCALATE'), 'ESCALATE', 0],
-    ['ESCALATE with a major finding', auditReport('VERDICT: ESCALATE', ['- [major] src/a.js:1 — needs a new dependency']), 'ESCALATE', 1],
-    ['a CRLF report', auditReport('VERDICT: APPROVE').replace(/\n/g, '\r\n'), 'APPROVE', 0],
-    ['blank lines between the verdict and SNAP_HANDBACK', ['Done.', 'VERDICT: APPROVE', '', '', handbackLine('audit', 'build_executed'), ''].join('\n'), 'APPROVE', 0],
-    ['prose that names the verdict mid-line', auditReport('VERDICT: APPROVE', ['The verdict depends on the plan.']), 'APPROVE', 0],
-  ])('parseVerdict accepts %s', (_name, text, verdict, blockers) => {
-    expect(parseVerdict(text)).toEqual({ verdict, blockers });
+    ['APPROVE with no findings', auditReport('VERDICT: APPROVE'), 'APPROVE', 0, []],
+    ['APPROVE with only minor findings', auditReport('VERDICT: APPROVE', minor), 'APPROVE', 0, []],
+    ['RETURN with a blocker and a major', auditReport('VERDICT: RETURN', severe), 'RETURN', 2, ['src/a.js', 'src/b.js']],
+    ['ESCALATE with no findings', auditReport('VERDICT: ESCALATE'), 'ESCALATE', 0, []],
+    ['ESCALATE with a major finding', auditReport('VERDICT: ESCALATE', ['- [major] src/a.js:1 — needs a new dependency']), 'ESCALATE', 1, ['src/a.js']],
+    ['a CRLF report', auditReport('VERDICT: APPROVE').replace(/\n/g, '\r\n'), 'APPROVE', 0, []],
+    ['blank lines between the verdict and SNAP_HANDBACK', ['Done.', 'VERDICT: APPROVE', '', '', handbackLine('audit', 'build_executed'), ''].join('\n'), 'APPROVE', 0, []],
+    ['prose that names the verdict mid-line', auditReport('VERDICT: APPROVE', ['The verdict depends on the plan.']), 'APPROVE', 0, []],
+  ])('parseVerdict accepts %s', (_name, text, verdict, blockers, paths) => {
+    expect(parseVerdict(text)).toEqual({ verdict, blockers, paths });
   });
 
   const between = ['Done.', 'VERDICT: RETURN', '- [blocker] src/a.js:10 — x', handbackLine('audit', 'build_executed'), ''].join('\n');
@@ -1203,15 +1203,15 @@ describe('audit verdict [FEAT-060]', () => {
   });
 
   it.each([
-    ['VERDICT: RETURN', ['- [blocker] src/a.js:10 — breaks AC1'], 'ORCH_AUDIT_RETURN'],
-    ['VERDICT: ESCALATE', [], 'ORCH_AUDIT_ESCALATE'],
-  ])('a valid %s halts %s after recording the audit entry, and install qa is refused', (line, findings, code) => {
-    driveTo('audit');
+    ['VERDICT: RETURN', ['- [blocker] src/a.js:10 — breaks AC1'], 'ORCH_AUDIT_RETURN', ['--audit-rounds', '0']],
+    ['VERDICT: ESCALATE', [], 'ORCH_AUDIT_ESCALATE', []],
+  ])('a valid %s halts %s after recording the audit entry, and install qa is refused', (line, findings, code, start) => {
+    driveTo('audit', { start });
     orch(['install', 'audit']);
     const r = orch(['handback', 'audit'], { input: auditReport(line, findings) });
     expect(r.status).toBe(1);
     expect(r.err).toMatch(new RegExp(`^${code}: `));
-    expect(r.err).toContain('.conductor/handback/audit.txt');
+    expect(r.err).toContain('.conductor/handback/audit-1.txt');
     expect(runFile().handbacks.at(-1)).toMatchObject({ role: 'audit', verdict: line.slice('VERDICT: '.length) });
     expect(runFile().halt.code).toBe(code);
     expect(orch(['install', 'qa']).status).toBe(2);
@@ -1442,5 +1442,250 @@ describe('document hash [FEAT-056]', () => {
     expect(r.status).toBe(1);
     expect(r.err).toBe('ORCH_APPROVAL_UNHASHED: run FEAT-011 records an approval without a document hash (started before FEAT-056); run end, then start');
     expect(runFile().halt.code).toBe('ORCH_APPROVAL_UNHASHED');
+  });
+});
+
+describe('Build and Verify review loop [FEAT-057]', () => {
+  const START_USAGE_057 = 'orchestrate: usage: orchestrate.mjs start <ITEM> [--auto] [--ticket <N|issue URL>] [--audit-rounds <0-5>]';
+  const returned = (...findings) => auditReport('VERDICT: RETURN', findings);
+  const VALID_RUN = { v: 1, session_id: 's', item: 'FEAT-011', gate: 'boundary_routed', approvals: { spec: null, plan: null }, handbacks: [], tasks: { ids: [], done: 0 } };
+
+  it('start records audit_rounds 2 by default and prints it', () => {
+    const r = orch(['start', 'FEAT-011']);
+    expect(r.status).toBe(0);
+    expect(r.out.endsWith('; test command: npm test; audit rounds: 2')).toBe(true);
+    expect(runFile().audit_rounds).toBe(2);
+  });
+
+  it.each([
+    [['--audit-rounds', '0'], 0],
+    [['--auto', '--audit-rounds', '5'], 5],
+    [['--audit-rounds', '3', '--auto'], 3],
+  ])('start %j records audit_rounds %i', (flags, n) => {
+    const r = orch(['start', 'FEAT-011', ...flags]);
+    expect(r.status).toBe(0);
+    expect(runFile().audit_rounds).toBe(n);
+    expect(r.out.endsWith(`; audit rounds: ${n}`)).toBe(true);
+  });
+
+  it.each([
+    [['--audit-rounds']],
+    [['--audit-rounds', '6']],
+    [['--audit-rounds', '-1']],
+    [['--audit-rounds', '02']],
+    [['--audit-rounds', 'x']],
+    [['--audit-rounds', '1', '--audit-rounds', '1']],
+  ])('start FEAT-011 %j refuses with the usage line and writes nothing', (flags) => {
+    const r = orch(['start', 'FEAT-011', ...flags]);
+    expect(r.status).toBe(2);
+    expect(r.err).toBe(START_USAGE_057);
+    expect(existsSync(join(root, RUN_FILE))).toBe(false);
+  });
+
+  it('isValidRun accepts a run without audit_rounds and with each value from 0 to 5', () => {
+    expect(isValidRun(VALID_RUN)).toBe(true);
+    for (let n = 0; n <= 5; n++) expect(isValidRun({ ...VALID_RUN, audit_rounds: n })).toBe(true);
+  });
+
+  it.each(['2', 'abc', 6, -1, 1.5, null])('isValidRun rejects audit_rounds %j', (v) => {
+    expect(isValidRun({ ...VALID_RUN, audit_rounds: v })).toBe(false);
+  });
+
+  it('handback audit on a run file edited to audit_rounds "abc" halts ORCH_RUN_INVALID and grants no fix, and end still clears it', () => {
+    driveTo('audit');
+    orch(['install', 'audit']);
+    runFileText(JSON.stringify({ ...runFile(), audit_rounds: 'abc' }));
+    const r = orch(['handback', 'audit'], { input: returned('- [blocker] src/a.js:10 — breaks AC1') });
+    expect(r.status).toBe(1);
+    expect(r.err).toMatch(/^ORCH_RUN_INVALID: /);
+    const run = runFile();
+    expect(run.handbacks.some((h) => h.role === 'audit')).toBe(false);
+    expect(JSON.stringify(run)).not.toContain('"fix"');
+    expect(orch(['end']).status).toBe(0);
+    expect(existsSync(join(root, RUN_FILE))).toBe(false);
+  });
+
+  const shaOf = (text) => createHash('sha256').update(text).digest('hex');
+  const done1 = { ...blank, gate: 'build_executed', approvals: { spec: {}, plan: {} }, tasks: { ids: ['Task 1'], done: 1 } };
+  const granted = { role: 'audit', verdict: 'RETURN', round: 1, fix: { round: 1, files: ['src/a.js'], review: '.conductor/handback/audit-1.txt', sha256: 'a'.repeat(64) } };
+  const pass = (input) => { orch(['install', 'audit']); return orch(['handback', 'audit'], { input }); };
+  const fixPass = () => { orch(['install', 'code']); return orch(['handback', 'code'], { input: say('code', 'build_executed') }); };
+  const BLOCKER_A = '- [blocker] src/a.js:10 — breaks AC1';
+
+  it.each([
+    ['a fix hand-back dispatches audit', [granted, { role: 'code', fix: 1 }], { role: 'audit' }],
+    ['an audit carrying a fix dispatches code for that fix', [granted], { role: 'code', fix: 1 }],
+    ['an APPROVE after a fix dispatches qa', [granted, { role: 'code', fix: 1 }, { role: 'audit', verdict: 'APPROVE', round: 2 }], { role: 'qa' }],
+    ['an audit entry from before FEAT-060 dispatches qa', [{ role: 'audit' }], { role: 'qa' }],
+    ['a qa hand-back after a fix round ends the run', [granted, { role: 'code', fix: 1 }, { role: 'audit', verdict: 'APPROVE', round: 2 }, { role: 'qa' }], { end: true }],
+  ])('nextStep: %s', (_name, extra, expected) => {
+    expect(nextStep({ ...done1, handbacks: [...hb('spec', 'plan', 'code'), ...extra] })).toEqual(expected);
+  });
+
+  it('recordHandback numbers each audit entry by its round', () => {
+    const next = recordHandback({ ...done1, handbacks: [granted, { role: 'code', fix: 1 }] }, 'audit', 'build_executed', 'APPROVE');
+    expect(next.handbacks.at(-1)).toMatchObject({ role: 'audit', round: 2, verdict: 'APPROVE' });
+  });
+
+  it('a fix hand-back records its fix round, no task, and leaves tasks.done', () => {
+    const next = recordHandback({ ...done1, handbacks: [granted] }, 'code', 'build_executed');
+    expect(next.handbacks.at(-1)).toMatchObject({ role: 'code', gate: 'build_executed', fix: 1 });
+    expect(next.handbacks.at(-1)).not.toHaveProperty('task');
+    expect(next.tasks.done).toBe(1);
+    expect(next.gate).toBe('build_executed');
+  });
+
+  it('recordHandback forwards verify_pass after RETURN, a fix and APPROVE', () => {
+    const handbacks = [granted, { role: 'code', fix: 1 }, { role: 'audit', verdict: 'APPROVE', round: 2 }];
+    expect(recordHandback({ ...done1, handbacks }, 'qa', 'verify_pass').gate).toBe('verify_pass');
+  });
+
+  it('recordHandback withholds verify_pass when the last audit entry is not APPROVE', () => {
+    const handbacks = [{ role: 'audit', verdict: 'APPROVE', round: 1 }, { role: 'code', fix: 1 }, { role: 'audit', verdict: 'RETURN', round: 2 }];
+    expect(() => recordHandback({ ...done1, handbacks }, 'qa', 'verify_pass')).toThrow(expect.objectContaining({ code: 'ORCH_GATE_WITHHELD' }));
+  });
+
+  const SELF_PLAN = `# Demo Plan\n\n${task(1, ['src/a.js'])}\n${task(2, ['src/b.js', PLAN, SPEC])}\n## Test List\n`;
+
+  it('[E1] a returned audit dispatches a fix scoped to the blocker and major files plus the plan', () => {
+    driveTo('audit');
+    const input = returned(BLOCKER_A, '- [major] src/b.js:2 — misses an edge', '- [major] src/a.js:30 — same file again', '- [minor] tests/a.test.js:1 — nit', '- [minor] src/outside.js:1 — nit outside the plan');
+    const h = shaOf(input);
+    const review = '.conductor/handback/audit-1.txt';
+    const r = pass(input);
+    expect(r.status).toBe(0);
+    expect(r.out).toBe(`audit round 1: RETURN with 3 blocker/major finding(s); fix round 1 of 2: review ${review} sha256 ${h}; scope src/a.js, src/b.js, ${PLAN}`);
+    expect(runFile().handbacks.at(-1)).toMatchObject({ role: 'audit', gate: 'build_executed', verdict: 'RETURN', round: 1, fix: { round: 1, files: ['src/a.js', 'src/b.js'], review, sha256: h } });
+    for (const role of ['audit', 'qa']) {
+      const wrong = orch(['install', role, '--check']);
+      expect(wrong.status).toBe(2);
+      expect(wrong.err).toContain('the next step is install code');
+    }
+    const check = orch(['install', 'code', '--check']);
+    expect(check.status).toBe(0);
+    const [json, note] = check.out.split('\n');
+    expect(JSON.parse(json).ops.scope).toEqual(['src/a.js', 'src/b.js', PLAN]);
+    expect(JSON.parse(json).ops.gate).toBe('define_approved');
+    expect(note).toBe(`fix round 1 of 2: review ${review} sha256 ${h}`);
+    const installed = orch(['install', 'code']);
+    expect(installed.status).toBe(0);
+    expect(installed.out.split('\n')).toEqual([json, note]);
+    expect(envelope().ops.scope).toEqual(['src/a.js', 'src/b.js', PLAN]);
+    expect(orch(['handback', 'code'], { input: say('code', 'build_executed') }).status).toBe(0);
+    expect(runFile().tasks.done).toBe(2);
+    expect(runFile().handbacks.at(-1)).toMatchObject({ role: 'code', fix: 1 });
+    expect(runFile().handbacks.at(-1)).not.toHaveProperty('task');
+    expect(runFile().gate).toBe('build_executed');
+    const after = orch(['install', 'code', '--check']);
+    expect(after.status).toBe(2);
+    expect(after.err).toContain('the next step is install audit');
+  });
+
+  it.each([
+    ['a file outside the plan', TWO_TASKS, 'src/c.js'],
+    ['a different spelling of a plan file', TWO_TASKS, 'src/../src/a.js'],
+    ['the approved plan', SELF_PLAN, PLAN],
+    ['the approved spec', SELF_PLAN, SPEC],
+  ])('[E1] a RETURN naming %s halts ORCH_FIX_SCOPE_UNAPPROVED with the audit entry recorded', (_name, planText, path) => {
+    driveTo('audit', { planText });
+    const r = pass(returned(BLOCKER_A, `- [major] ${path}:4 — x`));
+    expect(r.status).toBe(1);
+    expect(r.err).toBe(`ORCH_FIX_SCOPE_UNAPPROVED: ${path} is not a file the approved plan declares; the fix scope stays inside the plan`);
+    expect(runFile().handbacks.at(-1)).toMatchObject({ role: 'audit', verdict: 'RETURN', round: 1 });
+    expect(runFile().handbacks.at(-1)).not.toHaveProperty('fix');
+    expect(runFile().halt.code).toBe('ORCH_FIX_SCOPE_UNAPPROVED');
+  });
+
+  it.each(['./src/a.js:10', 'src/a.js:10:5'])('a blocker written as %s enters the fix scope as src/a.js', (ref) => {
+    driveTo('audit');
+    expect(pass(returned(`- [blocker] ${ref} — x`)).status).toBe(0);
+    expect(runFile().handbacks.at(-1).fix.files).toEqual(['src/a.js']);
+  });
+
+  it('a fix scope over the scope cap halts ORCH_SCOPE_OVER_CAP with the audit entry recorded', () => {
+    const files = (p) => Array.from({ length: 10 }, (_, i) => `src/${p}${i}.js`);
+    driveTo('audit', { planText: `# Demo Plan\n\n${task(1, files('f'))}\n${task(2, files('g'))}\n## Test List\n` });
+    const r = pass(returned(...[...files('f'), ...files('g')].map((f) => `- [major] ${f}:1 — x`)));
+    expect(r.status).toBe(1);
+    expect(r.err).toBe('ORCH_SCOPE_OVER_CAP: fix round 1 needs 21 scope entries; the cap is 20');
+    expect(runFile().handbacks.at(-1)).toMatchObject({ role: 'audit', verdict: 'RETURN', round: 1 });
+    expect(runFile().handbacks.at(-1)).not.toHaveProperty('fix');
+  });
+
+  it('an approved plan changed before the fix is derived halts ORCH_APPROVED_DOC_CHANGED with the audit entry recorded', () => {
+    driveTo('audit');
+    orch(['install', 'audit']);
+    plan(TWO_TASKS.replace('thing 1', 'thing one'));
+    const r = orch(['handback', 'audit'], { input: returned(BLOCKER_A) });
+    expect(r.status).toBe(1);
+    expect(r.err).toMatch(/^ORCH_APPROVED_DOC_CHANGED: plan /);
+    expect(runFile().handbacks.at(-1)).toMatchObject({ role: 'audit', verdict: 'RETURN', round: 1 });
+    expect(runFile().handbacks.at(-1)).not.toHaveProperty('fix');
+  });
+
+  it.each(['audit', 'code'])('a second report for the same %s position halts ORCH_HANDBACK_CONFLICT', (role) => {
+    driveTo('audit');
+    expect(pass(returned(BLOCKER_A)).status).toBe(0);
+    if (role === 'code') expect(fixPass().status).toBe(0);
+    const r = orch(['handback', role], { input: role === 'audit' ? returned(BLOCKER_A) : say('code', 'build_executed') });
+    expect(r.status).toBe(1);
+    expect(r.err.startsWith('ORCH_HANDBACK_CONFLICT: ')).toBe(true);
+  });
+
+  it.each([
+    [[], 3, 2],
+    [['--audit-rounds', '0'], 1, 0],
+    [['--audit-rounds', '1'], 2, 1],
+  ])('[E2] with %j the RETURN at audit round %i halts ORCH_AUDIT_RETURN at the cap of %i', (start, n, cap) => {
+    driveTo('audit', { start });
+    for (let i = 1; i < n; i++) {
+      expect(pass(returned(BLOCKER_A)).status).toBe(0);
+      expect(fixPass().status).toBe(0);
+    }
+    const r = pass(returned(BLOCKER_A));
+    expect(r.status).toBe(1);
+    expect(r.err).toBe(`ORCH_AUDIT_RETURN: audit returned the change with 1 blocker/major finding(s) at round ${n}; the cap of ${cap} fix round(s) is spent; see .conductor/handback/audit-${n}.txt`);
+    const run = runFile();
+    expect(run.handbacks.at(-1)).toMatchObject({ role: 'audit', verdict: 'RETURN', round: n });
+    expect(run.handbacks.at(-1)).not.toHaveProperty('fix');
+    expect(run.handbacks.filter((h) => h.role === 'audit')).toHaveLength(n);
+    expect(run.handbacks.filter((h) => h.role === 'code' && 'fix' in h)).toHaveLength(cap);
+    expect(run.halt.code).toBe('ORCH_AUDIT_RETURN');
+  });
+
+  it('[E2] ESCALATE after a fix round halts ORCH_AUDIT_ESCALATE', () => {
+    driveTo('audit');
+    expect(pass(returned(BLOCKER_A)).status).toBe(0);
+    expect(fixPass().status).toBe(0);
+    const r = pass(auditReport('VERDICT: ESCALATE'));
+    expect(r.status).toBe(1);
+    expect(r.err).toBe('ORCH_AUDIT_ESCALATE: audit escalated a decision only the owner takes; see .conductor/handback/audit-2.txt');
+    expect(runFile().handbacks.at(-1)).toMatchObject({ role: 'audit', verdict: 'ESCALATE', round: 2 });
+  });
+
+  it('a run file without audit_rounds halts on its first RETURN, as before FEAT-057', () => {
+    driveTo('audit');
+    const old = runFile();
+    delete old.audit_rounds;
+    runFileText(JSON.stringify(old));
+    const r = pass(returned(BLOCKER_A));
+    expect(r.status).toBe(1);
+    expect(r.err).toContain('at round 1; the cap of 0 fix round(s) is spent');
+  });
+
+  it('[E3] RETURN, a fix and APPROVE: the record lists each round\'s verdict, qa forwards verify_pass and end prints the rounds', () => {
+    driveTo('audit');
+    expect(pass(returned(BLOCKER_A)).status).toBe(0);
+    expect(fixPass().status).toBe(0);
+    const approved = pass(say('audit', 'build_executed'));
+    expect(approved.status).toBe(0);
+    expect(approved.out).toBe('audit handed back build_executed');
+    const audits = (run) => run.handbacks.filter((h) => h.role === 'audit').map(({ round, verdict, fix }) => ({ round, verdict, fix: Boolean(fix) }));
+    const expected = [{ round: 1, verdict: 'RETURN', fix: true }, { round: 2, verdict: 'APPROVE', fix: false }];
+    expect(audits(runFile())).toEqual(expected);
+    expect(orch(['install', 'qa']).status).toBe(0);
+    expect(orch(['handback', 'qa'], { input: say('qa', 'verify_pass') }).status).toBe(0);
+    expect(runFile().gate).toBe('verify_pass');
+    expect(audits(JSON.parse(orch(['end']).out))).toEqual(expected);
   });
 });

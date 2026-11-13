@@ -211,7 +211,7 @@ describe('cc-orchestrate mirrors [FEAT-011 AC10]', () => {
 
   it('prints and briefs the resolved spec and plan folders, never a hardcoded one [FEAT-047]', () => {
     const text = read(ORCH_MIRRORS[0]);
-    expect(text).toContain('its stdout ends with `docs: specs <dir>, plans <dir> (<source>)[; group <group>]; test command: <command>`');
+    expect(text).toContain('its stdout ends with `docs: specs <dir>, plans <dir> (<source>)[; group <group>]; test command: <command>; audit rounds: <n>`');
     expect(text).toContain('On `ORCH_DOC_LOCATION_INVALID`, report it and stop.');
     expect(text).toContain('`ORCH_DOC_LOCATION_UNRESOLVED`');
     expect(text).toContain('Write the spec for `<ITEM>` under `<specs>[/<group>]/`');
@@ -222,10 +222,26 @@ describe('cc-orchestrate mirrors [FEAT-011 AC10]', () => {
   it('names the audit verdict halts and gates Verify on VERDICT: APPROVE [FEAT-060]', () => {
     const text = read(ORCH_MIRRORS[0]);
     expect(text).toContain('only `VERDICT: APPROVE` lets the router move on to `qa`');
-    expect(text).toContain('.conductor/handback/audit.txt');
+    expect(text).toContain('.conductor/handback/audit-<round>.txt');
     for (const code of ['ORCH_VERDICT_MISSING', 'ORCH_VERDICT_INVALID', 'ORCH_VERDICT_INCONSISTENT', 'ORCH_AUDIT_RETURN', 'ORCH_AUDIT_ESCALATE', 'ORCH_GATE_WITHHELD']) {
       expect(text).toContain(`\`${code}\``);
     }
+  });
+
+  it('runs the Build and Verify review loop from the script\'s output [FEAT-057]', () => {
+    const text = read(ORCH_MIRRORS[0]);
+    for (const phrase of [
+      '# /cc-orchestrate <ITEM> [--auto] [--ticket <N|issue URL>] [--audit-rounds <0-5>]',
+      'after an audit that the script answers with a fix round, `code` once for that fix and then `audit` again',
+      '.conductor/handback/audit-<round>.txt',
+      '.conductor/handback/code-fix-<r>.txt',
+      'fix round <r> of <N>: review <review> sha256 <sha256>',
+      'The orchestrator never decides whether another round runs: the script\'s output does.',
+      '| `code` (fix round) | Fix the blocker and major findings of <review> (sha256 <sha256>), fix round <r> of <N>.',
+      '`ORCH_FIX_SCOPE_UNAPPROVED`',
+      'each audit round\'s verdict',
+    ]) expect(text).toContain(phrase);
+    expect(text).not.toContain('.conductor/handback/audit.txt');
   });
 });
 
