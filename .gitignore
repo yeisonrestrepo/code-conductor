@@ -156,6 +156,7 @@ tests/.tmp/
 !/docs/superpowers/plans/2026-11-10-issue136-ops-f-keep-action-code.md
 !/docs/superpowers/plans/2026-11-10-pre-1-44-hardening.md
 !/docs/superpowers/plans/2026-11-11-feat040-adopt-claude-md.md
+!/docs/superpowers/plans/2026-11-12-feat056-script-enforced-document-hash-verification-on.md
 !/docs/superpowers/plans/2026-11-12-feat060-audit-verdict-line-and-severities-that-can.md
 !/docs/superpowers/specs/2026-06-09-bug001-cc-compact-design.md
 !/docs/superpowers/specs/2026-06-09-bug002-spec-read-budget-design.md
