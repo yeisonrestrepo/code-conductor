@@ -315,8 +315,15 @@ function install(root, sessionId, role, check) {
   return built.out.trim();
 }
 
-export function recordHandback(run, role, gate) {
-  const entry = { role, gate, at: new Date().toISOString(), ...(role === 'code' ? { task: run.tasks.ids[run.tasks.done] } : {}) };
+// FEAT-060: the second line behind the halt; verify_pass is forwarded only over an approving audit.
+function withholdUnlessApproved(run) {
+  const verdict = run.handbacks.find((h) => h.role === 'audit')?.verdict;
+  if (verdict !== 'APPROVE') throw new Halt('ORCH_GATE_WITHHELD', `qa may not forward verify_pass: the audit verdict is ${verdict ?? 'absent'}`);
+}
+
+export function recordHandback(run, role, gate, verdict) {
+  if (role === 'qa' && gate === 'verify_pass') withholdUnlessApproved(run);
+  const entry = { role, gate, at: new Date().toISOString(), ...(role === 'code' ? { task: run.tasks.ids[run.tasks.done] } : {}), ...(verdict ? { verdict } : {}) };
   const tasks = role === 'code' ? { ...run.tasks, done: run.tasks.done + 1 } : run.tasks;
   return { ...run, role: null, gate: forwardGate(run, role, gate), tasks, handbacks: [...run.handbacks, entry] };
 }
@@ -332,6 +339,40 @@ function parseHandback(text) {
   return env;
 }
 
+function auditStop({ verdict, blockers }) {
+  if (verdict === 'RETURN') return new Halt('ORCH_AUDIT_RETURN', `audit returned the change with ${blockers} blocker/major finding(s); see ${HANDBACK_DIR}/audit.txt`);
+  return new Halt('ORCH_AUDIT_ESCALATE', `audit escalated a decision only the owner takes; see ${HANDBACK_DIR}/audit.txt`);
+}
+
+// FEAT-060: a candidate is wider than the valid form, so a near-miss halts by name instead of passing unseen.
+const VERDICT_CANDIDATE = /^verdict\s*:/i;
+const VERDICT_LINE = /^VERDICT: (APPROVE|RETURN|ESCALATE)$/;
+const FINDING_LINE = /^- \[(blocker|major|minor)\] \S+:\d+ /;
+const QUOTE_CAP = 120;
+
+const countSevere = (lines) => lines.map((l) => FINDING_LINE.exec(l)?.[1]).filter((s) => s === 'blocker' || s === 'major').length;
+
+// ESCALATE carries no count rule: its cause can be an owner decision with no code defect.
+function checkConsistent(verdict, blockers) {
+  if ((verdict === 'APPROVE' && blockers > 0) || (verdict === 'RETURN' && blockers === 0)) {
+    throw new Halt('ORCH_VERDICT_INCONSISTENT', `VERDICT: ${verdict} with ${blockers} blocker/major finding(s)`);
+  }
+  return { verdict, blockers };
+}
+
+export function parseVerdict(text) {
+  const lines = text.split(/\r?\n/).map((l) => l.trim());
+  const candidates = lines.filter((l) => VERDICT_CANDIDATE.test(l));
+  if (candidates.length === 0) throw new Halt('ORCH_VERDICT_MISSING', 'the audit report has no VERDICT: APPROVE | RETURN | ESCALATE line');
+  if (candidates.length > 1) throw new Halt('ORCH_VERDICT_INVALID', `expected exactly one VERDICT line, found ${candidates.length}`);
+  const match = VERDICT_LINE.exec(candidates[0]);
+  if (!match) throw new Halt('ORCH_VERDICT_INVALID', `${JSON.stringify(candidates[0].slice(0, QUOTE_CAP))} is not VERDICT: APPROVE | RETURN | ESCALATE`);
+  const at = lines.findIndex((l) => l.startsWith('SNAP_HANDBACK '));
+  const report = lines.slice(0, Math.max(at, 0)).filter(Boolean);
+  if (at === -1 || report.at(-1) !== candidates[0]) throw new Halt('ORCH_VERDICT_INVALID', 'the VERDICT line must immediately precede SNAP_HANDBACK');
+  return checkConsistent(match[1], countSevere(report));
+}
+
 function handback(root, sessionId, role, text) {
   const run = liveRun(root, sessionId);
   // The binary refuses a second SubagentHandback, yet an agent can still report again (V1, F4).
@@ -344,7 +385,10 @@ function handback(root, sessionId, role, text) {
   if (!MAY_HAND_BACK[role].includes(env.ops.gate)) {
     throw new Halt('ORCH_GATE_UNEARNED', `${role} may hand back ${MAY_HAND_BACK[role].join('|')}, not ${env.ops.gate}`);
   }
-  saveRun(root, recordHandback(run, role, env.ops.gate));
+  const verdict = role === 'audit' ? parseVerdict(text) : null;
+  saveRun(root, recordHandback(run, role, env.ops.gate, verdict?.verdict));
+  // Saved first, so the halt cli records lands on top of the audit entry (spec, Alternative paths).
+  if (verdict && verdict.verdict !== 'APPROVE') throw auditStop(verdict);
   return `${role} handed back ${env.ops.gate}`;
 }
 

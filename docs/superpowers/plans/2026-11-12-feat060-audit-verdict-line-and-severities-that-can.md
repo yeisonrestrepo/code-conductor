@@ -43,12 +43,12 @@
 - Modify: `tests/scripts/orchestrate.test.js`
 - Modify: `scripts/orchestrate.mjs`
 
-- [ ] [T-101] `tests/scripts/orchestrate.test.js`, helpers and imports. No dependency.
+- [X] [T-101] `tests/scripts/orchestrate.test.js`, helpers and imports. No dependency.
   - Add `parseVerdict` and `recordHandback` to the import list from `../../scripts/orchestrate.mjs`.
   - Change `say` (line 64) so an audit report carries the approving verdict, which keeps every existing audit hand-back (line 74 in `driveTo`, line 608 through `pass`) valid under the new router:
     `const say = (role, gate) => \`Done.\nObservation: fine.\n${role === 'audit' ? 'VERDICT: APPROVE\n' : ''}${handbackLine(role, gate)}\n\`;`
   - Add `const auditReport = (verdict, findings = []) => ['Done.', ...findings, ...(verdict === null ? [] : [verdict]), handbackLine('audit', 'build_executed'), ''].join('\n');`
-- [ ] [T-102] `tests/scripts/orchestrate.test.js`: append `describe('audit verdict [FEAT-060]', …)` with these tests (names are the filter set predicted in T-103). Depends on T-101.
+- [X] [T-102] `tests/scripts/orchestrate.test.js`: append `describe('audit verdict [FEAT-060]', …)` with these tests (names are the filter set predicted in T-103). Depends on T-101.
   - `it.each` **"parseVerdict accepts %s"**, each `expect(parseVerdict(text)).toEqual({ verdict, blockers })`:
     - V1 `APPROVE with no findings` → `auditReport('VERDICT: APPROVE')`, `{ APPROVE, 0 }`
     - V2 `APPROVE with only minor findings` → two `- [minor] src/a.js:3 — …` lines, `{ APPROVE, 0 }`
@@ -82,7 +82,7 @@
   - R2 **"recordHandback forwards qa verify_pass after APPROVE"**: same run with `verdict: 'APPROVE'` → returned `gate` is `verify_pass`.
   - R3 **"recordHandback writes a verdict on the entry only when given one"**: `recordHandback(run, 'audit', 'build_executed', 'RETURN').handbacks.at(-1).verdict` is `RETURN`; with no fourth argument the entry has no `verdict` key.
   - I1 **"isValidRun accepts audit entries with and without a verdict"**: a valid run file (`driveTo('qa'); runFile()`, whose audit entry carries `APPROVE`) stays valid with the audit entry's `verdict` deleted and with it set.
-- [ ] [T-103] Red step: `npx vitest run tests/scripts/orchestrate.test.js`. Depends on T-102. Predicted full match set of that filter, 165 tests:
+- [X] [T-103] Red step: `npx vitest run tests/scripts/orchestrate.test.js`. Depends on T-102. Predicted full match set of that filter, 165 tests:
   - the 127 pre-existing tests: **green** (the extra `VERDICT: APPROVE` line in `say` is ignored by today's router);
   - V1-V8, H1-H14, Q1 (23): **red**, `parseVerdict` is `undefined`, so each call throws `TypeError`;
   - C1 (1): **red**, the audit entry has no `verdict`;
@@ -90,7 +90,7 @@
   - R1 (3), R3 (1): **red**, today's `recordHandback` neither throws nor writes `verdict`;
   - C4, R2, I1 (3): **green** on today's code; they pin behavior that must survive.
   - Total: 130 passed, 35 failed.
-- [ ] [T-104] `scripts/orchestrate.mjs`, after `parseHandback` (line 333): add the pinned format and the parser. Depends on T-103.
+- [X] [T-104] `scripts/orchestrate.mjs`, after `parseHandback` (line 333): add the pinned format and the parser. Depends on T-103.
   ```js
   // FEAT-060: a candidate is wider than the valid form, so a near-miss halts by name instead of passing unseen.
   const VERDICT_CANDIDATE = /^verdict\s*:/i;
@@ -122,7 +122,7 @@
   }
   ```
   The 120-character quote cap matches the one the start line already applies to a ticket title (FEAT-031 AC5); the module had no reason-length cap of its own.
-- [ ] [T-105] `scripts/orchestrate.mjs`, `recordHandback` (line 318): take an optional verdict and withhold the gate. Depends on T-104.
+- [X] [T-105] `scripts/orchestrate.mjs`, `recordHandback` (line 318): take an optional verdict and withhold the gate. Depends on T-104.
   ```js
   // FEAT-060: the second line behind the halt; verify_pass is forwarded only over an approving audit.
   function withholdUnlessApproved(run) {
@@ -137,7 +137,7 @@
   }
   ```
   `forwardGate` is not touched: it stays the D6 table its tests pin.
-- [ ] [T-106] `scripts/orchestrate.mjs`, `handback` (line 335): parse the verdict after every existing check, record it, then halt on a non-approving verdict. Depends on T-105.
+- [X] [T-106] `scripts/orchestrate.mjs`, `handback` (line 335): parse the verdict after every existing check, record it, then halt on a non-approving verdict. Depends on T-105.
   ```js
   function auditStop({ verdict, blockers }) {
     if (verdict === 'RETURN') return new Halt('ORCH_AUDIT_RETURN', `audit returned the change with ${blockers} blocker/major finding(s); see ${HANDBACK_DIR}/audit.txt`);
@@ -152,9 +152,9 @@
   if (verdict && verdict.verdict !== 'APPROVE') throw auditStop(verdict);
   ```
   The return string is unchanged. `isValidRun`, `recordHalt` and `cli` need no change: `isValidRun` does not inspect hand-back entries, and `cli` already calls `recordHalt` for every `Halt` outside `start`.
-- [ ] [T-107] Green step: `npx vitest run tests/scripts/orchestrate.test.js`. Predicted: 165 passed, 0 failed. Depends on T-106.
-- [ ] [T-108] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-12-feat060-audit-verdict-line-and-severities-that-can.md` (ticks T-101 to T-107). Depends on T-107.
-- [ ] [T-109] Commit: `feat: the router parses the audit verdict and withholds verify_pass without an APPROVE [FEAT-060]`. Depends on T-108.
+- [X] [T-107] Green step: `npx vitest run tests/scripts/orchestrate.test.js`. Predicted: 165 passed, 0 failed. Depends on T-106.
+- [X] [T-108] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-12-feat060-audit-verdict-line-and-severities-that-can.md` (ticks T-101 to T-107). Depends on T-107.
+- [X] [T-109] Commit: `feat: the router parses the audit verdict and withholds verify_pass without an APPROVE [FEAT-060]`. Depends on T-108.
 
 ---
 
@@ -165,7 +165,7 @@
 - Modify: `project-template/.claude/agents/audit.md`
 - Modify: `.claude/agents/audit.md`
 
-- [ ] [T-201] `tests/unit/role-profiles.test.js`: after the `CLAIM` table (line 44) add the pin list, and inside `describe('role agent profiles [FEAT-012]')` add one `it.each([TEMPLATE, MIRROR])` test, **"[FEAT-060] %s/audit.md pins the verdict line, the three verdicts, the severities and the finding form"**, which asserts every phrase below is contained in `read(\`${dir}/audit.md\`)` and that `Findings do not withhold the gate` is not. Depends on T-109 (ticks ride this group).
+- [X] [T-201] `tests/unit/role-profiles.test.js`: after the `CLAIM` table (line 44) add the pin list, and inside `describe('role agent profiles [FEAT-012]')` add one `it.each([TEMPLATE, MIRROR])` test, **"[FEAT-060] %s/audit.md pins the verdict line, the three verdicts, the severities and the finding form"**, which asserts every phrase below is contained in `read(\`${dir}/audit.md\`)` and that `Findings do not withhold the gate` is not. Depends on T-109 (ticks ride this group).
   ```js
   // FEAT-060: the verdict format the router parses, pinned in the profile that asks for it.
   const AUDIT_VERDICT = [
@@ -177,8 +177,8 @@
   ];
   ```
   The `CLAIM.audit` phrase at line 43 is kept as it is: the new success condition still contains it verbatim (T-203).
-- [ ] [T-202] Red step: `npx vitest run tests/unit/role-profiles.test.js`. Predicted full match set, 49 tests: the 2 new FEAT-060 rows **red** (no phrase present yet); the 47 pre-existing tests **green**. Depends on T-201.
-- [ ] [T-203] `project-template/.claude/agents/audit.md`, then the identical edit to `.claude/agents/audit.md`. Depends on T-202.
+- [X] [T-202] Red step: `npx vitest run tests/unit/role-profiles.test.js`. Predicted full match set, 49 tests: the 2 new FEAT-060 rows **red** (no phrase present yet); the 47 pre-existing tests **green**. Depends on T-201.
+- [X] [T-203] `project-template/.claude/agents/audit.md`, then the identical edit to `.claude/agents/audit.md`. Depends on T-202.
   - Frontmatter `description`: replace `hands back build_executed with its findings.` with `hands back build_executed with its findings and one verdict.`
   - Replace the `## Success condition` paragraph with:
     > Your success condition is fixed: a static review of the changes against the spec and plan was completed, and its findings are listed in your report, each with a severity and a `file:line`, followed by one verdict. A `blocker` or `major` finding withholds the Verify gate through your verdict; a `minor` finding never does. Do not substitute a stricter or different standard of your own.
@@ -195,11 +195,11 @@
     ```
   - In `## Rules`, replace `Claim only the gate \`build_executed\`.` with `Claim only the gate \`build_executed\`, whatever your verdict: the verdict, not the gate, carries your judgment.`
   - No other gate name may appear (AC5 forbids `verify_pass` in this profile; the text says "the Verify gate"). Every D5 phrase stays.
-- [ ] [T-204] Run `npx vitest run tests/unit/role-profiles.test.js`. Predicted: 47 passed, 2 failed — the two `profiles unchanged since 1.37.0` rows for `project-template/.claude/agents/audit.md` and `.claude/agents/audit.md`; the FEAT-060 rows, AC2 parity, AC3 token cap (the profile stays well under 3996 bytes) and AC5 are green. Depends on T-203.
-- [ ] [T-205] `tests/unit/role-profiles.test.js`, `PROFILE_SHA256_1_37_0.audit`: replace the value with the output of `sha256sum project-template/.claude/agents/audit.md` (the test hashes LF-normalized text; the file is LF), and add above it `// FEAT-060 changed audit on purpose: findings carry a severity and the report ends in a VERDICT line.` Depends on T-204.
-- [ ] [T-206] Green step: `npx vitest run tests/unit/role-profiles.test.js`. Predicted: 49 passed. Depends on T-205.
-- [ ] [T-207] Stage: `git add -u project-template/.claude/agents/audit.md`, `git add -u .claude/agents/audit.md`, `git add -u tests/unit/role-profiles.test.js`, `git add -u docs/superpowers/plans/2026-11-12-feat060-audit-verdict-line-and-severities-that-can.md`. Depends on T-206.
-- [ ] [T-208] Commit: `feat: the audit role ends its report in a VERDICT line with severity-tagged findings [FEAT-060]`. Depends on T-207.
+- [X] [T-204] Run `npx vitest run tests/unit/role-profiles.test.js`. Predicted: 47 passed, 2 failed — the two `profiles unchanged since 1.37.0` rows for `project-template/.claude/agents/audit.md` and `.claude/agents/audit.md`; the FEAT-060 rows, AC2 parity, AC3 token cap (the profile stays well under 3996 bytes) and AC5 are green. Depends on T-203.
+- [X] [T-205] `tests/unit/role-profiles.test.js`, `PROFILE_SHA256_1_37_0.audit`: replace the value with the output of `sha256sum project-template/.claude/agents/audit.md` (the test hashes LF-normalized text; the file is LF), and add above it `// FEAT-060 changed audit on purpose: findings carry a severity and the report ends in a VERDICT line.` Depends on T-204.
+- [X] [T-206] Green step: `npx vitest run tests/unit/role-profiles.test.js`. Predicted: 49 passed. Depends on T-205.
+- [X] [T-207] Stage: `git add -u project-template/.claude/agents/audit.md`, `git add -u .claude/agents/audit.md`, `git add -u tests/unit/role-profiles.test.js`, `git add -u docs/superpowers/plans/2026-11-12-feat060-audit-verdict-line-and-severities-that-can.md`. Depends on T-206.
+- [X] [T-208] Commit: `feat: the audit role ends its report in a VERDICT line with severity-tagged findings [FEAT-060]`. Depends on T-207.
 
 ---
 
@@ -211,18 +211,18 @@
 - Modify: `project-template/.claude/commands/cc-orchestrate.md`
 - Modify: `README.md`
 
-- [ ] [T-301] `tests/installer/commands-parity.test.js`, inside `describe('cc-orchestrate mirrors [FEAT-011 AC10]')`: add **"names the audit verdict halts and gates Verify on VERDICT: APPROVE [FEAT-060]"**, asserting `read(ORCH_MIRRORS[0])` contains `only \`VERDICT: APPROVE\` lets the router move on to \`qa\``, `.conductor/handback/audit.txt`, and each of `ORCH_VERDICT_MISSING`, `ORCH_VERDICT_INVALID`, `ORCH_VERDICT_INCONSISTENT`, `ORCH_AUDIT_RETURN`, `ORCH_AUDIT_ESCALATE`, `ORCH_GATE_WITHHELD` in backticks. Depends on T-208.
-- [ ] [T-302] Red step: `npx vitest run tests/installer/commands-parity.test.js`. Predicted full match set, 67 tests: the new test **red**, the 66 pre-existing tests **green**. Depends on T-301.
-- [ ] [T-303] `.claude/commands/cc-orchestrate.md`, then the identical edit to `project-template/.claude/commands/cc-orchestrate.md`. Depends on T-302.
+- [X] [T-301] `tests/installer/commands-parity.test.js`, inside `describe('cc-orchestrate mirrors [FEAT-011 AC10]')`: add **"names the audit verdict halts and gates Verify on VERDICT: APPROVE [FEAT-060]"**, asserting `read(ORCH_MIRRORS[0])` contains `only \`VERDICT: APPROVE\` lets the router move on to \`qa\``, `.conductor/handback/audit.txt`, and each of `ORCH_VERDICT_MISSING`, `ORCH_VERDICT_INVALID`, `ORCH_VERDICT_INCONSISTENT`, `ORCH_AUDIT_RETURN`, `ORCH_AUDIT_ESCALATE`, `ORCH_GATE_WITHHELD` in backticks. Depends on T-208.
+- [X] [T-302] Red step: `npx vitest run tests/installer/commands-parity.test.js`. Predicted full match set, 67 tests: the new test **red**, the 66 pre-existing tests **green**. Depends on T-301.
+- [X] [T-303] `.claude/commands/cc-orchestrate.md`, then the identical edit to `project-template/.claude/commands/cc-orchestrate.md`. Depends on T-302.
   - "On any halt": after the `A halt is terminal in v1 (D12).` paragraph, add:
     > `handback audit` halts `ORCH_VERDICT_MISSING`, `ORCH_VERDICT_INVALID` or `ORCH_VERDICT_INCONSISTENT` when the audit report's `VERDICT:` line is absent, malformed, misplaced or contradicts its findings, and `ORCH_AUDIT_RETURN` or `ORCH_AUDIT_ESCALATE` when the audit returned the change or escalated a decision to the owner. For those five, also name `.conductor/handback/audit.txt`: its findings are what the owner reads next. `handback qa` halts `ORCH_GATE_WITHHELD` when the run's audit entry carries no `VERDICT: APPROVE`. Recovery for all six is `end`, then `start`.
   - Scope note: the spec's System Impact says "the four new halt codes", but its error table (spec lines 49-56) defines six: `ORCH_VERDICT_MISSING`, `ORCH_VERDICT_INVALID`, `ORCH_VERDICT_INCONSISTENT`, `ORCH_AUDIT_RETURN`, `ORCH_AUDIT_ESCALATE`, `ORCH_GATE_WITHHELD`. This paragraph names exactly that set, so it adds no scope beyond the approved spec.
   - Step 5 becomes:
     > 5. **Verify.** Dispatch `audit`, then `qa`. The audit report ends in one `VERDICT:` line just before its `SNAP_HANDBACK` line; only `VERDICT: APPROVE` lets the router move on to `qa`, and `RETURN` or `ESCALATE` halts the run (follow "On any halt"). When `qa`'s hand-back records `verify_pass`, run `node "$S/orchestrate.mjs" end`. It prints the run it removed.
-- [ ] [T-304] `README.md` line 137, the Verify bullet of the orchestrate walkthrough (not a Known-limits line): replace its first sentence with `An \`audit\` agent reviews the work statically and ends its report in one verdict line; a blocker or major finding (\`VERDICT: RETURN\`) or a decision only you can take (\`VERDICT: ESCALATE\`) halts the run before \`qa\`. Then a \`qa\` agent runs the recorded test command.` The Guard 5 sentence after it stays. No dependency on T-303.
-- [ ] [T-305] Green step: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: 67 passed (the byte-identical mirror test included). Depends on T-303, T-304.
-- [ ] [T-306] Stage: `git add -u .claude/commands/cc-orchestrate.md`, `git add -u project-template/.claude/commands/cc-orchestrate.md`, `git add -u tests/installer/commands-parity.test.js`, `git add -u README.md`, `git add -u docs/superpowers/plans/2026-11-12-feat060-audit-verdict-line-and-severities-that-can.md`. Depends on T-305.
-- [ ] [T-307] Commit: `docs: cc-orchestrate and the README name the audit verdict halts [FEAT-060]`. Depends on T-306.
+- [X] [T-304] `README.md` line 137, the Verify bullet of the orchestrate walkthrough (not a Known-limits line): replace its first sentence with `An \`audit\` agent reviews the work statically and ends its report in one verdict line; a blocker or major finding (\`VERDICT: RETURN\`) or a decision only you can take (\`VERDICT: ESCALATE\`) halts the run before \`qa\`. Then a \`qa\` agent runs the recorded test command.` The Guard 5 sentence after it stays. No dependency on T-303.
+- [X] [T-305] Green step: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: 67 passed (the byte-identical mirror test included). Depends on T-303, T-304.
+- [X] [T-306] Stage: `git add -u .claude/commands/cc-orchestrate.md`, `git add -u project-template/.claude/commands/cc-orchestrate.md`, `git add -u tests/installer/commands-parity.test.js`, `git add -u README.md`, `git add -u docs/superpowers/plans/2026-11-12-feat060-audit-verdict-line-and-severities-that-can.md`. Depends on T-305.
+- [X] [T-307] Commit: `docs: cc-orchestrate and the README name the audit verdict halts [FEAT-060]`. Depends on T-306.
 
 ---
 
@@ -231,10 +231,10 @@
 **Files:**
 - Modify: `docs/superpowers/plans/2026-11-12-feat060-audit-verdict-line-and-severities-that-can.md`
 
-- [ ] [T-401] Run `npm test`. Predicted locally: exit 0, every file green, 41 tests more than the pre-change suite (38 in `orchestrate.test.js`, 2 in `role-profiles.test.js`, 1 in `commands-parity.test.js`), no new skip. CI legs: each leg's skipped set equals its `tools/skip-baseline.json` key, unchanged, because no added test is conditional. Depends on T-307.
-- [ ] [T-402] Grep check: `git grep -n "Findings do not withhold" -- .claude project-template README.md scripts` prints nothing, and `git grep -n "VERDICT: APPROVE" -- .claude/agents project-template/.claude/agents` names both `audit.md` copies. Depends on T-401.
-- [ ] [T-403] Stage: `git add -u docs/superpowers/plans/2026-11-12-feat060-audit-verdict-line-and-severities-that-can.md` (ticks T-307 to T-402). Depends on T-402.
-- [ ] [T-404] Commit: `docs: close out the FEAT-060 plan [FEAT-060]`. Depends on T-403.
+- [X] [T-401] Run `npm test`. Predicted locally: exit 0, every file green, 41 tests more than the pre-change suite (38 in `orchestrate.test.js`, 2 in `role-profiles.test.js`, 1 in `commands-parity.test.js`), no new skip. CI legs: each leg's skipped set equals its `tools/skip-baseline.json` key, unchanged, because no added test is conditional. Depends on T-307.
+- [X] [T-402] Grep check: `git grep -n "Findings do not withhold" -- .claude project-template README.md scripts` prints nothing, and `git grep -n "VERDICT: APPROVE" -- .claude/agents project-template/.claude/agents` names both `audit.md` copies. Depends on T-401.
+- [X] [T-403] Stage: `git add -u docs/superpowers/plans/2026-11-12-feat060-audit-verdict-line-and-severities-that-can.md` (ticks T-307 to T-402). Depends on T-402.
+- [X] [T-404] Commit: `docs: close out the FEAT-060 plan [FEAT-060]`. Depends on T-403.
 
 ---
 

@@ -218,6 +218,15 @@ describe('cc-orchestrate mirrors [FEAT-011 AC10]', () => {
     expect(text).toContain('Write the plan under `<plans>[/<group>]/`');
     expect(text).not.toContain('docs/superpowers');
   });
+
+  it('names the audit verdict halts and gates Verify on VERDICT: APPROVE [FEAT-060]', () => {
+    const text = read(ORCH_MIRRORS[0]);
+    expect(text).toContain('only `VERDICT: APPROVE` lets the router move on to `qa`');
+    expect(text).toContain('.conductor/handback/audit.txt');
+    for (const code of ['ORCH_VERDICT_MISSING', 'ORCH_VERDICT_INVALID', 'ORCH_VERDICT_INCONSISTENT', 'ORCH_AUDIT_RETURN', 'ORCH_AUDIT_ESCALATE', 'ORCH_GATE_WITHHELD']) {
+      expect(text).toContain(`\`${code}\``);
+    }
+  });
 });
 
 describe('cc-orchestrate review loop [FEAT-041 AC5, AC6]', () => {
