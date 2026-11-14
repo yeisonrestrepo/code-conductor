@@ -196,7 +196,7 @@ Line numbers below are from HEAD e98b4c9; locate by the quoted text if they move
   - Then `cmp .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md` exits 0.
 - [X] [T-204] Green step: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: 91 passed (89 + 2), the mirror-identity test (line 201) and the fail-open reasons test (lines 378-383) included. Depends on T-203.
 - [X] [T-205] Stage: `git add -u .claude/commands/cc-orchestrate.md`, `git add -u project-template/.claude/commands/cc-orchestrate.md`, `git add -u tests/installer/commands-parity.test.js`, `git add -u docs/superpowers/plans/2026-11-14-bug076-review-loop-outcome-not-bound-to-the-document.md`. Depends on T-204.
-- [ ] [T-206] Commit: `docs: cc-orchestrate names the review mismatch and its recorded recovery [BUG-076]`. Depends on T-205.
+- [X] [T-206] Commit: `docs: cc-orchestrate names the review mismatch and its recorded recovery [BUG-076]`. Depends on T-205.
 
 ---
 
@@ -208,7 +208,7 @@ Line numbers below are from HEAD e98b4c9; locate by the quoted text if they move
 - [X] [T-301] Run `npm test`. Predicted: exit 0, every file green, 26 tests more than the pre-change suite (24 in `orchestrate.test.js`, 2 in `commands-parity.test.js`; no existing test edited), no new skip. Depends on T-206.
 - [X] [T-302] Grep checks: `git grep -n "checkLoopClosed(" -- scripts` shows the definition and exactly two calls, each with four arguments; `cmp .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md` exits 0; `git diff --stat origin/main -- VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md .claude/memory .claude/hooks project-template/.claude/hooks .github/workflows .github/actions` prints nothing. Depends on T-301.
 - [X] [T-303] Stage: `git add -u docs/superpowers/plans/2026-11-14-bug076-review-loop-outcome-not-bound-to-the-document.md` (ticks T-206 to T-302). Depends on T-302.
-- [ ] [T-304] Commit: `docs: close out the BUG-076 plan [BUG-076]`. Depends on T-303.
+- [X] [T-304] Commit: `docs: close out the BUG-076 plan [BUG-076]`. Depends on T-303.
 
 ---
 
