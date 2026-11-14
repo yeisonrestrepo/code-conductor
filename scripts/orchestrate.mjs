@@ -1259,8 +1259,9 @@ function openRound(root, role, loop, rel, folder, model) {
     throw new Refusal(`ORCH_REVIEW_CAP: review ${role} has run ${REVIEW_CAP} rounds; close it with --close skipped:<reason>`);
   }
   const bytes = readDoc(root, rel, REVIEW_USAGE);
-  // BUG-076: after readDoc's own checks, so a bad path keeps its message; an unpinned folder refuses every path (D5).
-  if (folder === '' || !rel.startsWith(folder)) throw new Refusal(`ORCH_REVIEW_OUT_OF_SCOPE: ${rel} is not under the ${role} docs folder ${folder || 'none'}`);
+  // BUG-076: after readDoc's own checks, so a bad path keeps its message; an unpinned folder refuses every path (D5),
+  // and a scope without its trailing slash would let a look-alike sibling folder through.
+  if (!folder.endsWith('/') || !rel.startsWith(folder)) throw new Refusal(`ORCH_REVIEW_OUT_OF_SCOPE: ${rel} is not under the ${role} docs folder ${folder || 'none'}`);
   const sha256 = documentHash(role, bytes);
   const round = loop.round + 1;
   // E3: a revision that leaves the hash as it was is a failed round, recorded rather than retried.

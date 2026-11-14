@@ -1134,6 +1134,14 @@ describe('review binding [BUG-076]', () => {
     expect(loop('spec')).toBeUndefined();
   });
 
+  it('B13 a scope without its trailing slash refuses a look-alike sibling folder', () => {
+    awaiting('spec');
+    putDoc('spec', '# Demo spec\n');
+    seedScopes((s) => ({ ...s, spec: ['docs/spec'] }));
+    expect(orch(['review', 'spec', '--round', SPEC])).toMatchObject({ status: 2, err: outOfScope(SPEC, 'spec', 'docs/spec') });
+    expect(loop('spec')).toBeUndefined();
+  });
+
   it.each(['clean', 'cap', 'unchanged'])('B10 re-closes a %s loop as skipped:doc-changed with its round and hash, then approves the edited document', (outcome) => {
     const closed = closeSpec(outcome);
     putDoc('spec', EDITED);
