@@ -311,6 +311,33 @@ describe('cc-orchestrate mirrors [FEAT-011 AC10]', () => {
     const readme = read('README.md');
     for (const phrase of ['`- Role models: default`', '`default-model:`', 'a second time', 'inherits the session\'s model']) expect(readme).toContain(phrase);
   });
+
+  it('documents the unattended mode, the delegate verb, both briefs and its codes [FEAT-054]', () => {
+    const text = read(ORCH_MIRRORS[0]);
+    for (const phrase of [
+      '[--no-dependency-audit] [--unattended]',
+      '; unattended: delegated review at spec, plan and build',
+      'never add or drop `--unattended` yourself',
+      '`auto (unattended)`',
+      'node "$S/orchestrate.mjs" delegate <spec|plan> --check',
+      'node "$S/orchestrate.mjs" delegate build --check',
+      '.conductor/delegate/<kind>.md',
+      'owner approval required:',
+      'approved by delegated review',
+      'unattended (delegated review at spec, plan and build)',
+      'owner approval',
+      'Known limit: the run file is inside your write surface',
+      '### The delegated review briefs (FEAT-054)',
+      'Your verdict stands in for the owner\'s approval.',
+      'End with exactly two lines: REVIEWED <kind> sha256 <hash>, then VERDICT: APPROVE | RETURN | ESCALATE.',
+      'Read nothing under .conductor/.',
+      'REVIEWED build plan sha256 <plan hash>',
+    ]) expect(text).toContain(phrase);
+    for (const code of ['ORCH_NOT_UNATTENDED', 'ORCH_DELEGATED_ONCE', 'ORCH_DELEGATED_RETURN', 'ORCH_DELEGATED_ESCALATE']) expect(text).toContain(`\`${code}\``);
+    const briefs = text.slice(text.indexOf('### The delegated review briefs (FEAT-054)'));
+    expect(briefs.slice(0, briefs.indexOf('\n## '))).not.toContain('security.txt');
+    expect(text).not.toContain('approve build');
+  });
 });
 
 describe('cc-orchestrate review loop [FEAT-041 AC5, AC6, FEAT-058]', () => {

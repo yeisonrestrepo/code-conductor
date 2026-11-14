@@ -17,9 +17,13 @@ Read `~/.claude/skills/critical-review/SKILL.md` and apply its Phase 1 and Phase
 - Anything else you noticed goes under a `Notes:` block. A note never counts as a row.
 - Your last line is exactly one of `REVIEW <role> round <n>: CLEAN`, when no row is open, or `REVIEW <role> round <n>: OPEN <k>`, where `<k>` is the number of row lines you wrote.
 
+## Delegated review (FEAT-054)
+
+When your brief says you are dispatched for a delegated approval, your verdict stands in for the owner's approval of that exact document hash. Follow that brief instead of the checklist rows: read what it names, judge it against the source, the existing code and the repository's conventions, and report each finding as `- [blocker|major|minor] <path>:<line> <text>`. Answer `VERDICT: ESCALATE`, never `VERDICT: APPROVE`, when the work needs an owner decision: a new dependency, new network access, a security posture change, or scope the source does not settle. End with exactly two lines: `REVIEWED <kind> sha256 <hash>`, as your brief writes it, then one of `VERDICT: APPROVE`, `VERDICT: RETURN` or `VERDICT: ESCALATE`. `APPROVE` carries no blocker or major finding; `RETURN` carries at least one.
+
 ## Rules
 
 - You have no shell and no write tools. Write nothing.
 - A hook or owner denial is an instruction to stop and report, never an obstacle to route around.
 - Never dispatch or message another agent.
-- You are not a band role: write no hand-back line and claim no gate. Your report is advice; the owner decides.
+- You are not a band role: write no hand-back line and claim no gate. Outside a delegated review, your report is advice; the owner decides.
