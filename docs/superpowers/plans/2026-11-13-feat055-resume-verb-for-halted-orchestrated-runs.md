@@ -387,18 +387,18 @@ Line numbers below are from HEAD 027d8b0; locate by the quoted text if they move
 
 ## Test List
 
-- [ ] Unit: `isValidRun` accepts a run file without any FEAT-055 field and one with `resumes`, `snap` and `commit` (RS20).
-- [ ] Integration (CLI, real argv/stdin/env contract, temp git repository): `approve` records `commit` equal to HEAD, and `null` outside git (RS1, RS2, A3); `handback` stores the validated SNAP text verbatim as `snap` (RS3).
-- [ ] Integration, entry AC1: a conflict on task 2 of 3 and a halt with `code` dispatched both keep the approvals byte-for-byte and re-dispatch task 2 (RS4, RS5); a conflict on an approved spec or plan keeps that entry and continues with `install plan` or task 1 (RS6).
-- [ ] Integration, entry AC2: an edited approved spec or plan refuses `ORCH_APPROVED_DOC_CHANGED` with the run file and envelope byte-identical (RS7); a ticked plan box resumes (RS8).
-- [ ] Integration, entry AC3: `start` still refuses `ORCH_RUN_ACTIVE` on its own halted run (RS9); `end` on a resumed, re-halted run prints the record with `resumes` and removes every run file (RS10); no existing `start` or `end` test is edited.
-- [ ] Integration, issue #185: a corrupted or missing `snap` cuts the sequence at that task (RS11); a `sys.c` HEAD does not descend from cuts it (RS12); the envelope's `c` is kept (RS13); HEAD reset past the plan approval's commit refuses `ORCH_RESUME_HISTORY_REWRITTEN` (RS14).
-- [ ] Integration, AC6: a Verify halt keeps every task, drops audits and fix rounds and redoes `audit` (RS15); a Define halt after the spec approval drops the plan entry and `review.plan` and redoes `plan` (RS16).
-- [ ] Integration, AC7: every row of the error table, 13 cases, exits 2 with its prefix, the run file's bytes and the envelope unchanged (RS17).
-- [ ] Integration, AC8: the `resumes` entry, the session binding, the envelope removal and the printed line (RS18); a second resume appends a second entry (RS19).
-- [ ] Regression: the D12 test pins the new `liveRun` text; the usage-line test names `resume`; the FEAT-059 `E2b` test still pins the security entry's keys without `snap`; every FEAT-056 B-test passes on the split `checkApprovedDocs`.
-- [ ] Command pin, AC9: `cc-orchestrate.md` amends D12, describes `resume` with its refusals and its continuation at step 2, and names `resumes` in the report; the mirrors stay byte-identical.
-- [ ] No E2E/UI test: there is no UI.
+- [X] Unit: `isValidRun` accepts a run file without any FEAT-055 field and one with `resumes`, `snap` and `commit` (RS20).
+- [X] Integration (CLI, real argv/stdin/env contract, temp git repository): `approve` records `commit` equal to HEAD, and `null` outside git (RS1, RS2, A3); `handback` stores the validated SNAP text verbatim as `snap` (RS3).
+- [X] Integration, entry AC1: a conflict on task 2 of 3 and a halt with `code` dispatched both keep the approvals byte-for-byte and re-dispatch task 2 (RS4, RS5); a conflict on an approved spec or plan keeps that entry and continues with `install plan` or task 1 (RS6).
+- [X] Integration, entry AC2: an edited approved spec or plan refuses `ORCH_APPROVED_DOC_CHANGED` with the run file and envelope byte-identical (RS7); a ticked plan box resumes (RS8).
+- [X] Integration, entry AC3: `start` still refuses `ORCH_RUN_ACTIVE` on its own halted run (RS9); `end` on a resumed, re-halted run prints the record with `resumes` and removes every run file (RS10); no existing `start` or `end` test is edited.
+- [X] Integration, issue #185: a corrupted or missing `snap` cuts the sequence at that task (RS11); a `sys.c` HEAD does not descend from cuts it (RS12); the envelope's `c` is kept (RS13); HEAD reset past the plan approval's commit refuses `ORCH_RESUME_HISTORY_REWRITTEN` (RS14).
+- [X] Integration, AC6: a Verify halt keeps every task, drops audits and fix rounds and redoes `audit` (RS15); a Define halt after the spec approval drops the plan entry and `review.plan` and redoes `plan` (RS16).
+- [X] Integration, AC7: every row of the error table, 13 cases, exits 2 with its prefix, the run file's bytes and the envelope unchanged (RS17).
+- [X] Integration, AC8: the `resumes` entry, the session binding, the envelope removal and the printed line (RS18); a second resume appends a second entry (RS19).
+- [X] Regression: the D12 test pins the new `liveRun` text; the usage-line test names `resume`; the FEAT-059 `E2b` test still pins the security entry's keys without `snap`; every FEAT-056 B-test passes on the split `checkApprovedDocs`.
+- [X] Command pin, AC9: `cc-orchestrate.md` amends D12, describes `resume` with its refusals and its continuation at step 2, and names `resumes` in the report; the mirrors stay byte-identical.
+- [X] No E2E/UI test: there is no UI.
 
 ## Commit Order
 
