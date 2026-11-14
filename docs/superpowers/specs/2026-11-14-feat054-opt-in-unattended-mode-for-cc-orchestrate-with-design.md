@@ -70,9 +70,9 @@ The entry leaves these choices open. Each is resolved here, with its reason.
    It also writes `delegated.spec = { verdict: "APPROVE", at, review_sha256 }`, and prints `spec approved by delegated review: sha256 <hash>`.
 6. Plan: the same, steps 2–5, with `delegate plan`. The plan hash is the FEAT-056 normalized one. On `APPROVE` the verb goes through `approvePlan`, so `define_approved` and the task list are written exactly as an owner approval writes them.
 7. Build, the audit (with any fix rounds) and security run as today.
-8. After security hands back `APPROVE`, `nextStep` returns `{ await: "build" }` in an unattended run. `delegate build --check` prints `delegate build: spec <path> sha256 <h>; plan <path> sha256 <h>; files <the union of the code entries' ops.f paths>; security <the recorded summary line>[; model <alias>]`. A fresh `define-review` agent gets the build brief. It reads the security report's public part only, ends with `REVIEWED build plan sha256 <plan hash>` and one `VERDICT:` line. The orchestrator writes it to `.conductor/delegate/build.md` and runs `delegate build`.
-9. On `APPROVE`, the run records `delegated.build`, and qa is dispatched. `recordHandback` forwards `verify_pass` only when the audit, the security seat (when configured) and, for an unattended run, `delegated.build` all read `APPROVE`.
-10. `end` and the report: each approval names its approver and basis ("define-review, approved by delegated review" or the owner's name). The report also names each delegated outcome and its report hash. Release stays human.
+8. After security hands back `APPROVE`, `nextStep` returns `{ await: "build" }` in an unattended run. `delegate build --check` prints `delegate build: spec <path> sha256 <h>; plan <path> sha256 <h>; files <the union of the code entries' ops.f paths>; security <the recorded summary line>[; model <alias>]`. A fresh `define-review` agent gets the build brief. It carries only that security summary and reads nothing under `.conductor/`; it ends with `REVIEWED build plan sha256 <plan hash>` and one `VERDICT:` line. The orchestrator writes it to `.conductor/delegate/build.md` and runs `delegate build`.
+9. On `APPROVE`, the run records `delegated.build = { verdict, at, review_sha256 }` (no finding text), and qa is dispatched. `recordHandback` forwards `verify_pass` only when the audit, the security seat (when configured) and, for an unattended run, `delegated.build` all read `APPROVE`.
+10. `end` and the report: the final report names the approval mode in every run, `unattended (delegated review at spec, plan and build)` or `attended`, and the basis of each approval, `approved by delegated review` or `owner approval` (an owner approval inside an unattended run included). The report also names each delegated outcome and its report hash. Script stdout on the no-flag path is unchanged. Release stays human.
 
 ### Alternative paths
 
@@ -82,7 +82,7 @@ The entry leaves these choices open. Each is resolved here, with its reason.
 - **Run without role models.** `--check` prints no `; model` segment, and the dispatch passes no `model`.
 - **Bound run (`--ticket`).** The source for the spec and the build review is the ticket snapshot, by the reviewer brief's existing source rule.
 - **Run without a security seat (pre-FEAT-034 file).** It cannot be unattended: such a file never has `unattended` set. The D7 fallback (after the audit) exists only so the router is total.
-- **`resume`.** It keeps `unattended` and both approvals, delegated or not. They pass the same hash and ancestry checks (`checkApproval`). `delegated.spec` and `delegated.plan` are kept, so a resumed run still cannot re-delegate. `delegated.build` is a Verify record and is dropped and redone, like the audit and security entries.
+- **`resume`.** It keeps `unattended` and both approvals, delegated or not. They pass the same hash and ancestry checks (`checkApproval`). `delegated.spec` and `delegated.plan` are kept, so a resumed run still cannot re-delegate. `delegated.build` is a Verify record and is dropped and redone, like the audit and security entries; `resume` also removes `.conductor/delegate/build.md` with it.
 - **A delegated approval on a document that changes later.** `install code|audit|qa|security` halts `ORCH_APPROVED_DOC_CHANGED`, as for an owner approval: it reads the `sha256` recorded under `approvals`.
 
 ### Error cases
@@ -94,12 +94,16 @@ All of these are refusals: exit 2, nothing written, unless the case says otherwi
 - `delegate <kind>` when `delegated.<kind>` is already recorded: `ORCH_DELEGATED_ONCE: delegated review <kind> already returned <verdict>; only the owner approves now`.
 - `delegate spec|plan` with the loop open: `ORCH_REVIEW_OPEN`, via the same `checkLoopClosed`.
 - `delegate spec|plan` with a stale shown hash: `ORCH_DOC_HASH_STALE`, as for `approve`.
-- Report missing or unreadable at `.conductor/delegate/<kind>.md`: refusal naming the path. The orchestrator then treats it like a define non-approval: it shows the approval and waits for the owner.
+- Report missing or unreadable at `.conductor/delegate/spec.md` or `plan.md`: refusal naming the path. The orchestrator then treats it like a define non-approval: it shows the approval and waits for the owner.
+- Report missing or unreadable at `.conductor/delegate/build.md`: halt `ORCH_VERDICT_MISSING` naming that path, recorded in the run file (exit 1), so `resume` recovers it.
+- `delegate plan` over an `APPROVE` report when any task's `Files` entry lies in the orchestrator write surface (`.claude/memory/orchestrator-run.json`, `.claude/memory/band-envelope.json`, `.claude/memory/session-snapshot.json`, `.conductor/**`): no approval. It records `delegated.plan = { verdict: "ESCALATE", reason: "task <id> declares <path> inside the orchestrator write surface", at, review_sha256 }`, prints `owner approval required: …` and exits 0. An owner `approve plan` is unchanged.
+- `delegate` with no run file, a foreign session or a halted run: refuses through `liveRun` and writes nothing.
 - Report present but unparsable: no verdict line, more than one, not last, a missing or malformed `REVIEWED` line, a hash that does not match the document, or an inconsistent verdict. At Define, the verb records `delegated.<kind> = { verdict: "UNPARSED", reason, at, review_sha256 }` and prints `owner approval required: …`, exit 0. A garbled report is a failed delegation, never an approval, and the single attempt (D4) is spent. At Build, it halts with the audit's codes, `ORCH_VERDICT_MISSING`, `ORCH_VERDICT_INVALID` or `ORCH_VERDICT_INCONSISTENT`, naming `.conductor/delegate/build.md`.
 - `delegate build` `RETURN`: halt `ORCH_DELEGATED_RETURN`. `ESCALATE`: halt `ORCH_DELEGATED_ESCALATE`. Both are recorded in the run file (exit 1) and name the report path.
-- `--unattended` given twice, or to any verb but `start`: `START_USAGE` for `start`; every other verb already refuses unknown arguments with its usage line.
+- `--unattended` given twice to `start`: `START_USAGE`. Only `start` reads the flag. `install`, `approve`, `hash` and `handback` ignore extra tokens today and stay unchanged, so `install <role> --unattended` and `approve <kind> <doc> <sha256> --unattended` leave `unattended` absent. `resume` already refuses any argument.
+- `delegate` with any token outside `delegate <spec|plan> <doc> <sha256>`, `delegate build` (no further token) or `delegate <kind> --check`: refusal with its usage line.
 - `qa` handing back `verify_pass` in an unattended run with `delegated.build` absent or not `APPROVE`: halt `ORCH_GATE_WITHHELD: qa may not forward verify_pass: the delegated build verdict is <v|absent>`.
-- `isValidRun` rejects a run file whose `unattended` is present and not exactly `true`. It also rejects a `delegated` object holding a key other than `spec`, `plan` or `build`, or a verdict outside `APPROVE|RETURN|ESCALATE|UNPARSED`.
+- `isValidRun` rejects a run file whose `unattended` is present and not exactly `true`. It also rejects `unattended: true` with a `mode` other than `"auto"` or with no `security` object, and a `delegated` object holding a key other than `spec`, `plan` or `build`, or a verdict outside `APPROVE|RETURN|ESCALATE|UNPARSED`.
 
 ### AC4: the flag cannot be set by an agent during a run
 
@@ -110,7 +114,7 @@ During a run there is no path that turns an attended run unattended:
 3. `delegate` reads only the value `start` recorded; the command file tells the orchestrator to pass `$ARGUMENTS` to `start` verbatim and never to add or drop `--unattended` itself.
 4. Band roles cannot write the run file: their Guard 5 scope never includes `.claude/memory/`. The `define-review` agent has no write tool.
 
-Residual limit, stated rather than hidden: the orchestrator itself can write the run file (Guard 6 write surface), so a hand edit could set `unattended` just as it could forge an `approvals` entry today. This spec does not change Guard 6 (see Owner decisions).
+Residual limit, stated rather than hidden: the orchestrator itself can write the run file (Guard 6 write surface), so a hand edit could set `unattended` just as it could forge an `approvals` entry today. This is accepted as a known limit and stated in both `cc-orchestrate.md` copies. This spec does not change Guard 6 or any hook (see Owner decisions).
 
 ## The delegated review briefs (added to cc-orchestrate.md)
 
@@ -126,7 +130,7 @@ Report findings as - [blocker|major|minor] <path>:<line> <text>. Write nothing. 
 End with exactly two lines: REVIEWED <kind> sha256 <hash>, then VERDICT: APPROVE | RETURN | ESCALATE.
 ```
 
-Build: the same, with `Document:` replaced by the spec, the plan and the file list from `delegate build --check`, plus: "Check the result against the spec, the plan and the source, together with the security summary `<line>`. Read the security report `.conductor/handback/security.txt` outside its `PRE-EXISTING (owner only):` block only, and never quote that block." It ends with `REVIEWED build plan sha256 <plan hash>`.
+Build: the same, with `Document:` replaced by the spec, the plan and the file list from `delegate build --check`, plus: "Check the result against the spec, the plan and the source, together with the security summary `<line>`. Read nothing under .conductor/." The brief carries only the security summary from `delegate build --check` and no instruction to read the security report. It ends with `REVIEWED build plan sha256 <plan hash>`.
 
 ## Acceptance Criteria
 
@@ -144,10 +148,11 @@ Build: the same, with `Document:` replaced by the spec, the plan and the file li
 - [ ] **AC4b.** `resume` on a halted attended run yields an attended run, and on a halted unattended run an unattended one; `resume --unattended` refuses with its usage line.
 - [ ] **AC4c.** `isValidRun` rejects `unattended` values other than `true` and malformed `delegated` objects.
 - [ ] **AC5.** `.claude/commands/cc-orchestrate.md` and its `project-template/` mirror document the flag, the `delegate` verb, both briefs and the new codes, and stay identical (`tests/installer/commands-parity.test.js`). `define-review.md` gains the delegated section in both mirrors, and `tests/unit/role-profiles.test.js` stays green.
+- [ ] **AC6.** Each decision under Owner decisions has its own pinned test row: a plan task whose `Files` entry is each of the four write-surface paths yields the recorded `ESCALATE`; the build brief text holds `Read nothing under .conductor/` and no `security.txt`, and `delegated.build` holds only `verdict`, `at`, `review_sha256`; the approve refusal and the `resume` line at `{ await: "build" }` say `delegate build`, never `approve build`; a leftover `.conductor/delegate/` report from an earlier run is never read (cleared by `start`, `end` and, for `build.md`, `resume`); a missing `build.md` halts `ORCH_VERDICT_MISSING`; `install <role> --unattended` and `approve … --unattended` leave `unattended` absent, and `delegate` refuses an extra token; `isValidRun` rejects `unattended: true` with `mode: "step"` and with no `security`; `delegate <kind> --check` leaves the run file byte-identical; `delegate` with no run file, a foreign session and a halted run each refuse and write nothing; `ORCH_DELEGATED_ONCE` after `RETURN`, after `ESCALATE` and after `UNPARSED`, and the next-step refusal after `APPROVE`; the final report names the approval mode and each approval's basis.
 
 ## Out of Scope
 
-- Changing Guard 6 or any hook, including removing the run file from the orchestrator's write surface (an owner decision, below).
+- Changing Guard 6 or any hook, including removing the run file from the orchestrator's write surface. `.claude/hooks/pre-tool-use.mjs` and its template copy are not touched; that removal is a separate follow-up item (Owner decisions).
 - A deterministic dependency or network detector at the delegated review. The reviewer judges this against the item text; the security seat's dependency audit is unchanged.
 - Fix rounds driven by the delegated build review, and any change to the FEAT-058 review loop or the FEAT-057 audit loop.
 - A new agent profile or a new key in the role-models grammar.
@@ -156,7 +161,7 @@ Build: the same, with `Document:` replaced by the spec, the plan and the file li
 
 ## System Impact
 
-- `scripts/orchestrate.mjs`: `parseStartArgs` and `start` (flag, run fields, stdout segment), `START_USAGE`, `isValidRun`, `nextStep` (the `await build` step for unattended runs only), `withholdUnlessApproved`, `resume` (carry-over, drop `delegated.build`), a new `delegate` verb with its `--check` form and a report parser that reuses `VERDICT_LINE`, `FINDING_LINE` and `checkConsistent` without the `SNAP_HANDBACK` anchor, the CLI verb table and usage, and the `end` record.
+- `scripts/orchestrate.mjs`: exported constants for the delegated kinds (`spec`, `plan`, `build`) and verdicts (`APPROVE`, `RETURN`, `ESCALATE`, `UNPARSED`) read by `delegate`, the report parser and `isValidRun`; `describeStep` (`{ await: "build" }` reads `delegate build`); `clearRunFiles` (also removes `.conductor/delegate/`); `parseStartArgs` and `start` (flag, run fields, stdout segment), `START_USAGE`, `isValidRun`, `nextStep` (the `await build` step for unattended runs only), `withholdUnlessApproved`, `resume` (carry-over, drop `delegated.build`), a new `delegate` verb with its `--check` form and a report parser that reuses `VERDICT_LINE`, `FINDING_LINE` and `checkConsistent` without the `SNAP_HANDBACK` anchor, the CLI verb table and usage, and the `end` record.
 - `.claude/commands/cc-orchestrate.md` and `project-template/.claude/commands/cc-orchestrate.md`: the usage line, the run header, step 3 (the delegated path after the loop), the Verify step (`delegate build` between security and qa), "On any halt" (the new codes), the report step, and the two briefs.
 - `.claude/agents/define-review.md` and `project-template/.claude/agents/define-review.md`: the delegated review section (D1).
 - Tests: `tests/scripts/orchestrate.test.js` (every AC above), `tests/installer/commands-parity.test.js` and `tests/unit/role-profiles.test.js` (unchanged assertions that must stay green).
@@ -169,7 +174,22 @@ Build: the same, with `Document:` replaced by the spec, the plan and the file li
 
 ## Owner decisions
 
-- **OQ1. Guard 6 and the run file.** AC4 holds at the CLI and against every dispatched agent. The orchestrator itself can still hand-edit `.claude/memory/orchestrator-run.json`, as it can forge an owner approval today. Options: (a) accept and state it as a known limit; (b) a follow-up item that removes the run file from Guard 6's write surface, so that only `orchestrate.mjs` writes it, which is a hook change. Recommendation: (a) here, and (b) as its own item, because it changes a protected surface and affects every run, not just unattended ones.
+These were open in the draft and are now settled. They are normative for the plan and the build.
+
+- **Guard 6 and the run file (was OQ1).** Option (a): the orchestrator's ability to hand-edit `.claude/memory/orchestrator-run.json` is accepted and stated as a known limit, here and in both `cc-orchestrate.md` copies. This change does not touch `.claude/hooks/pre-tool-use.mjs` or its template copy. Removing the run file from Guard 6's write surface is a separate follow-up item.
+- **Plan scope.** In an unattended run, `delegate plan` over an `APPROVE` report records no approval when any task's `Files` entry lies in the orchestrator write surface (`.claude/memory/orchestrator-run.json`, `.claude/memory/band-envelope.json`, `.claude/memory/session-snapshot.json`, `.conductor/**`). It records `delegated.plan = { verdict: "ESCALATE", reason: "task <id> declares <path> inside the orchestrator write surface", at, review_sha256 }`, prints `owner approval required: …` and exits 0. An owner `approve` is unchanged. One test row per path.
+- **Security report.** The build brief carries only the security summary from `delegate build --check`, drops the instruction to read `.conductor/handback/security.txt`, and says "Read nothing under .conductor/." `delegate build` records only `verdict`, `at` and `review_sha256`; its halt reasons name the report path, never a finding line.
+- **Step label.** `describeStep` returns `delegate build` for `{ await: "build" }`, so the `approve` refusal and the line `resume` prints never say `approve build`. One test row each.
+- **Stale reports.** `clearRunFiles` also removes `.conductor/delegate/`, so `start` and `end` clear it, and `resume` removes `.conductor/delegate/build.md` together with `delegated.build`. A test row pins that a leftover report from an earlier run is never read.
+- **Build report missing.** `delegate build` with a missing or unreadable `.conductor/delegate/build.md` halts `ORCH_VERDICT_MISSING` naming that path, recorded in the run file, so `resume` recovers it.
+- **Extra arguments.** `install`, `approve`, `hash` and `handback` ignore extra tokens today and stay unchanged; only `start` reads `--unattended`. `delegate` refuses any token outside `delegate <spec|plan|build> <doc> <sha256>` (`build` takes none) or `delegate <kind> --check`, with its usage line. Test rows pin that `install <role> --unattended` and `approve <kind> <doc> <sha256> --unattended` leave `unattended` absent.
+- **Run validation.** `isValidRun` also rejects `unattended: true` with a `mode` other than `"auto"` or with no `security` object. One test row each.
+- **Check mode.** `delegate <kind> --check` prints and writes no state; a test row pins the run file byte-identical after it. `delegate` with no run file, a foreign session or a halted run refuses through `liveRun` and writes nothing; one test row each.
+- **Delegated once.** `ORCH_DELEGATED_ONCE` is pinned after `RETURN`, after `ESCALATE` and after `UNPARSED`. After `APPROVE` the refusal is the next-step one.
+- **Allowed values.** The kinds `spec`, `plan`, `build` and the verdicts `APPROVE`, `RETURN`, `ESCALATE`, `UNPARSED` live in exported constants that `delegate`, the report parser and `isValidRun` all read.
+- **Unattended state in the report.** The final report names the approval mode in every run, `unattended (delegated review at spec, plan and build)` or `attended`, and the basis of each approval, `approved by delegated review` or `owner approval`, including an owner approval inside an unattended run. Script stdout on the no-flag path stays unchanged.
+- **Reviewer profile.** `define-review.md` has no row in the pinned-hash table, so no hash row changes. It stays under the 999-token ceiling and byte-identical in both mirrors, and "Your report is advice; the owner decides" is lifted for the delegated brief only.
+- **Everything else stands as written**, including `ORCH_NOT_UNATTENDED`, `ORCH_DELEGATED_ONCE`, `ORCH_DELEGATED_RETURN`, `ORCH_DELEGATED_ESCALATE` and `ORCH_GATE_WITHHELD`, the byte-identical path without the flag, and `resume` keeping `unattended`, `delegated.spec` and `delegated.plan`.
 
 ## Complexity Estimate
 
