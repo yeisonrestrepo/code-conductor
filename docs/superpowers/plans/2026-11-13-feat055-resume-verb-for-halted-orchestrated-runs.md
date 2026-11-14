@@ -113,7 +113,7 @@ Line numbers below are from HEAD 027d8b0; locate by the quoted text if they move
   - `grep -n "parseHandback(" scripts/orchestrate.mjs` prints the definition and the one call in `handback`.
 - [X] [T-107] Green step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-055"`. Predicted: the same 4 tests, all **green**. Then `npx vitest run tests/scripts/orchestrate.test.js`: 429 passed (426 + RS1, RS2, RS3), including `E2b` at line 1930 (no `snap` on the security entry). Depends on T-106.
 - [X] [T-108] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-13-feat055-resume-verb-for-halted-orchestrated-runs.md`. Depends on T-107.
-- [ ] [T-109] Commit: `feat: approvals record their commit and hand-backs their SNAP line [FEAT-055]`. Depends on T-108.
+- [X] [T-109] Commit: `feat: approvals record their commit and hand-backs their SNAP line [FEAT-055]`. Depends on T-108.
 
 ---
 
@@ -311,7 +311,7 @@ Line numbers below are from HEAD 027d8b0; locate by the quoted text if they move
   - `grep -n "function resume\|resume: ()" scripts/orchestrate.mjs` prints one definition and one verb entry.
 - [X] [T-210] Green step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-055"`. Predicted: the same 39 tests, all **green**. Then `npx vitest run tests/scripts/orchestrate.test.js`: 462 passed (429 + 33). Depends on T-209.
 - [X] [T-211] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-13-feat055-resume-verb-for-halted-orchestrated-runs.md`. Depends on T-210.
-- [ ] [T-212] Commit: `feat: resume a halted run from its last gate that still validates [FEAT-055]`. Depends on T-211.
+- [X] [T-212] Commit: `feat: resume a halted run from its last gate that still validates [FEAT-055]`. Depends on T-211.
 
 ---
 
@@ -342,7 +342,7 @@ Line numbers below are from HEAD 027d8b0; locate by the quoted text if they move
   - The exit-code section (lines 23-26) is read and left as it is: a failed `resume` is an ordinary exit-2 refusal (spec, System Impact).
 - [X] [T-304] Green step: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: 87 passed (the byte-identical mirror test included). Depends on T-303.
 - [X] [T-305] Stage: `git add -u .claude/commands/cc-orchestrate.md`, `git add -u project-template/.claude/commands/cc-orchestrate.md`, `git add -u tests/installer/commands-parity.test.js`, `git add -u docs/superpowers/plans/2026-11-13-feat055-resume-verb-for-halted-orchestrated-runs.md`. Depends on T-304.
-- [ ] [T-306] Commit: `docs: cc-orchestrate offers resume after a halt [FEAT-055]`. Depends on T-305.
+- [X] [T-306] Commit: `docs: cc-orchestrate offers resume after a halt [FEAT-055]`. Depends on T-305.
 
 ---
 
@@ -369,7 +369,7 @@ Line numbers below are from HEAD 027d8b0; locate by the quoted text if they move
 - [X] [T-403] `.github/wiki/pages/C4-Components.md`, line 139. No dependency on T-402. Replace `` The verbs are `start`, `install`, `handback`, `approve`, `hash`, `review` and `end`. `` with `` The verbs are `start`, `install`, `handback`, `approve`, `hash`, `review`, `resume` and `end`. `` and `A halted run cannot resume: end it, then start again.` with `` A halted run resumes from the last gate whose record still validates (`resume`, FEAT-055), or is ended and started again. `` The rest of the line stays.
 - [X] [T-404] Run `npx vitest run tests/wiki/wiki-gen.test.js`. Predicted: 22 passed (the edited lines are prose outside every generated block). Depends on T-401, T-402, T-403.
 - [X] [T-405] Stage: `git add -u .github/wiki/pages/FAQ.md`, `git add -u .github/wiki/pages/Orchestrator-Guide.md`, `git add -u .github/wiki/pages/C4-Components.md`, `git add -u docs/superpowers/plans/2026-11-13-feat055-resume-verb-for-halted-orchestrated-runs.md`. Depends on T-404.
-- [ ] [T-406] Commit: `docs: the wiki describes resume after a halt [FEAT-055]`. Depends on T-405.
+- [X] [T-406] Commit: `docs: the wiki describes resume after a halt [FEAT-055]`. Depends on T-405.
 
 ---
 
@@ -381,7 +381,7 @@ Line numbers below are from HEAD 027d8b0; locate by the quoted text if they move
 - [X] [T-501] Run `npm test`. Predicted locally: exit 0, every file green, 37 tests more than the pre-change suite (36 in `orchestrate.test.js`, 1 in `commands-parity.test.js`; A3, the D12 test and the usage-line test are renamed, not added), no new skip. CI legs: each leg's skipped set equals its `tools/skip-baseline.json` key, unchanged, because no added test is conditional. Depends on T-406.
 - [X] [T-502] Grep checks: `git grep -n "halt is terminal\|cannot be resumed\|cannot resume" -- .claude/commands project-template/.claude/commands .github/wiki scripts` prints nothing; `git grep -n "recover with end, then start (D12)" -- scripts tests` prints nothing; `cmp .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md` exits 0; `git diff --stat origin/main -- VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md .claude/memory .github/workflows .github/actions` prints nothing. Depends on T-501.
 - [X] [T-503] Stage: `git add -u docs/superpowers/plans/2026-11-13-feat055-resume-verb-for-halted-orchestrated-runs.md` (ticks T-406 to T-502). Depends on T-502.
-- [ ] [T-504] Commit: `docs: close out the FEAT-055 plan [FEAT-055]`. Depends on T-503.
+- [X] [T-504] Commit: `docs: close out the FEAT-055 plan [FEAT-055]`. Depends on T-503.
 
 ---
 
