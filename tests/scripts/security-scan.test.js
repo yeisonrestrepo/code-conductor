@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -12,7 +12,8 @@ const HOOK_SRC = join(REPO_ROOT, '.claude/hooks/pre-tool-use.mjs');
 const ALLOWLIST = '.claude/memory/bash-scan-allowlist.txt';
 // Samples are built at runtime so this file never matches the scanner's own table.
 const AWS = 'AKIA' + 'Q'.repeat(16);
-const AWS_LINE = '- [critical] secret src/config.js:2 — AWS access key id; value withheld';
+const AWS_LINE = '- [blocker] src/config.js:2 — critical secret: AWS access key id; value withheld';
+const LOCK_NONE = 'LOCKFILE none';
 
 let root, priv;
 beforeEach(() => {
@@ -45,7 +46,7 @@ const pkg = (scripts) => JSON.stringify({ name: 'x', scripts }, null, 2) + '\n';
 const initRepo = () => git('init', '-q');
 
 function scan(base, env = {}) {
-  const args = base === undefined ? [] : Array.isArray(base) ? base : [base];
+  const args = base === undefined ? [] : Array.isArray(base) ? base : [base, 'high'];
   const r = spawnSync(process.execPath, [SCANNER, ...args], {
     cwd: root, encoding: 'utf8',
     env: { ...cleanGitEnv(), TMPDIR: priv, TEMP: priv, TMP: priv, ...env },
@@ -68,20 +69,13 @@ describe('scripts/security-scan.mjs [FEAT-034]', () => {
     expect(r.stderr).toBe('');
   });
 
-  it('exits 1 with the usage line on two arguments', () => {
-    initRepo();
-    const r = scan(['a', 'b']);
-    expect(r.status).toBe(1);
-    expect(r.err.trim()).toBe('security-scan: usage: security-scan.mjs <base>');
-  });
-
   it('[D2] a known-format key added to a tracked file yields a critical secret line naming path:line, and the key reaches neither stdout nor stderr', () => {
     initRepo(); put('src/config.js', 'const a = 1;\n');
     const base = commit();
     put('src/config.js', `const a = 1;\nconst k = '${AWS}';\n`);
     const r = scan(base);
     expect(r.status).toBe(0);
-    expect(lines(r.out)).toEqual([AWS_LINE, 'SCAN-RESULT secrets=ran scripts=ran']);
+    expect(lines(r.out)).toEqual([AWS_LINE, LOCK_NONE, 'SCAN-RESULT secrets=ran scripts=ran']);
     expect(r.out + r.err).not.toContain(AWS);
   });
 
@@ -89,7 +83,7 @@ describe('scripts/security-scan.mjs [FEAT-034]', () => {
     initRepo(); put('src/config.js', `const a = 1;\nconst k = '${AWS}';\n`);
     const base = commit();
     put('src/config.js', `const a = 2;\nconst k = '${AWS}';\n`);
-    expect(lines(scan(base).out)).toEqual(['SCAN-RESULT secrets=ran scripts=ran']);
+    expect(lines(scan(base).out)).toEqual([LOCK_NONE, 'SCAN-RESULT secrets=ran scripts=ran']);
   });
 
   it('[D2] an untracked new file is scanned', () => {
@@ -103,7 +97,7 @@ describe('scripts/security-scan.mjs [FEAT-034]', () => {
     initRepo(); put('a.txt', 'x\n');
     const base = commit();
     put('src/settings.js', `const password = '${'p'.repeat(14)}';\n`);
-    expect(lines(scan(base).out)[0]).toBe('- [moderate] secret src/settings.js:1 — generic secret assignment; value withheld');
+    expect(lines(scan(base).out)[0]).toBe('- [minor] src/settings.js:1 — moderate secret: generic secret assignment; value withheld');
   });
 
   it('every pattern in the exported table matches its runtime-built sample and names itself', async () => {
@@ -124,7 +118,7 @@ describe('scripts/security-scan.mjs [FEAT-034]', () => {
     for (const p of SECRET_PATTERNS) {
       put('s.txt', samples[p.name] + '\n');
       const first = lines(scan(base).out)[0];
-      expect(first).toBe(`- [${p.severity}] secret s.txt:1 — ${p.name}; value withheld`);
+      expect(first).toBe(`- [${p.level === 'critical' ? 'blocker' : 'minor'}] s.txt:1 — ${p.level} secret: ${p.name}; value withheld`);
     }
   });
 
@@ -132,7 +126,7 @@ describe('scripts/security-scan.mjs [FEAT-034]', () => {
     initRepo(); put('a.txt', 'x\n');
     const base = commit();
     writeFileSync(join(root, 'bin.dat'), Buffer.concat([Buffer.from([0]), Buffer.from(`${AWS}\n`)]));
-    expect(lines(scan(base).out)).toEqual(['SCAN-RESULT secrets=ran scripts=ran']);
+    expect(lines(scan(base).out)).toEqual([LOCK_NONE, 'SCAN-RESULT secrets=ran scripts=ran']);
   });
 
   it('[D3] a changed script whose text Guard 3 denies yields a high script finding with the hook\'s code', () => {
@@ -140,7 +134,8 @@ describe('scripts/security-scan.mjs [FEAT-034]', () => {
     const base = commit();
     put('package.json', pkg({ build: 'cat src/*.js' }));
     expect(lines(scan(base).out)).toEqual([
-      '- [high] script package.json scripts.build — Guard 3 denies this text as a direct command (P4); base allowlist applied',
+      '- [blocker] package.json:4 — high script: scripts.build; Guard 3 denies this text as a direct command (P4); base allowlist applied',
+      LOCK_NONE,
       'SCAN-RESULT secrets=ran scripts=ran',
     ]);
   });
@@ -149,7 +144,7 @@ describe('scripts/security-scan.mjs [FEAT-034]', () => {
     initRepo(); withHook(); put('package.json', pkg({ build: 'cat src/*.js' }));
     const base = commit();
     put('README.md', 'x\n');
-    expect(lines(scan(base).out)).toEqual(['SCAN-RESULT secrets=ran scripts=ran']);
+    expect(lines(scan(base).out)).toEqual([LOCK_NONE, 'SCAN-RESULT secrets=ran scripts=ran']);
   });
 
   it.each(['pretest', 'test', 'posttest'])('[D3] a changed root scripts.%s yields the moderate line', (name) => {
@@ -157,7 +152,8 @@ describe('scripts/security-scan.mjs [FEAT-034]', () => {
     const base = commit();
     put('package.json', pkg({ [name]: 'vitest run --coverage' }));
     expect(lines(scan(base).out)).toEqual([
-      `- [moderate] script package.json scripts.${name} — npm test runs this changed script`,
+      `- [minor] package.json:4 — moderate script: scripts.${name}; npm test runs this changed script`,
+      LOCK_NONE,
       'SCAN-RESULT secrets=ran scripts=ran',
     ]);
   });
@@ -167,7 +163,7 @@ describe('scripts/security-scan.mjs [FEAT-034]', () => {
     const base = commit();
     put('package.json', pkg({ build: 'cat src/*.js' }));
     const r = scan(base, { CC_GUARD3_WARN: '1', CC_HOOK_ALLOW: '1' });
-    expect(lines(r.out)[0]).toBe('- [high] script package.json scripts.build — Guard 3 denies this text as a direct command (P4); base allowlist applied');
+    expect(lines(r.out)[0]).toBe('- [blocker] package.json:4 — high script: scripts.build; Guard 3 denies this text as a direct command (P4); base allowlist applied');
   });
 
   it.each(['untracked and ignored', 'tracked and changed'])('[D3] a work-tree allowlist entry covering the script (%s) leaves the high finding and the allowlist byte-identical', (mode) => {
@@ -179,7 +175,7 @@ describe('scripts/security-scan.mjs [FEAT-034]', () => {
     put(ALLOWLIST, mode === 'tracked and changed' ? '# none\nsrc/*.js\n' : 'src/*.js\n');
     const before = readFileSync(join(root, ALLOWLIST), 'utf8');
     const r = scan(base);
-    expect(lines(r.out)[0]).toMatch(/^- \[high\] script package\.json scripts\.build /);
+    expect(lines(r.out)[0]).toMatch(/^- \[blocker\] package\.json:4 — high script: scripts\.build; /);
     expect(readFileSync(join(root, ALLOWLIST), 'utf8')).toBe(before);
   });
 
@@ -187,7 +183,7 @@ describe('scripts/security-scan.mjs [FEAT-034]', () => {
     initRepo(); withHook(); put('package.json', pkg({ build: 'tsc' })); put(ALLOWLIST, 'src/*.js\n');
     const base = commit();
     put('package.json', pkg({ build: 'cat src/*.js' }));
-    expect(lines(scan(base).out)).toEqual(['SCAN-RESULT secrets=ran scripts=ran']);
+    expect(lines(scan(base).out)).toEqual([LOCK_NONE, 'SCAN-RESULT secrets=ran scripts=ran']);
   });
 
   it('[D3] a work-tree hook edited so Guard 3 allows the script still yields the high finding', () => {
@@ -198,7 +194,7 @@ describe('scripts/security-scan.mjs [FEAT-034]', () => {
     expect(text).toContain('function guard3BashScan(input) {');
     writeFileSync(hookPath, text.replace('function guard3BashScan(input) {', 'function guard3BashScan(input) { return null;'));
     put('package.json', pkg({ build: 'cat src/*.js' }));
-    expect(lines(scan(base).out)[0]).toMatch(/^- \[high\] script package\.json scripts\.build /);
+    expect(lines(scan(base).out)[0]).toMatch(/^- \[blocker\] package\.json:4 — high script: scripts\.build; /);
   });
 
   it('[D3] a base that does not track the hook yields scripts=failed and no script line', () => {
@@ -207,11 +203,11 @@ describe('scripts/security-scan.mjs [FEAT-034]', () => {
     put('package.json', pkg({ build: 'cat src/*.js' }));
     const r = scan(base);
     expect(r.status).toBe(0);
-    expect(lines(r.out)).toEqual(['SCAN-RESULT secrets=ran scripts=failed']);
+    expect(lines(r.out)).toEqual([LOCK_NONE, 'SCAN-RESULT secrets=ran scripts=failed']);
     expect(r.err).not.toBe('');
   });
 
-  it.each([['no base argument', []], ['a base git cannot resolve', ['f'.repeat(40)]]])('[C12] %s fails both scans', (_, args) => {
+  it.each([['the base none', ['none', 'high']], ['a base git cannot resolve', ['f'.repeat(40), 'high']]])('[C12] %s fails both scans', (_, args) => {
     initRepo(); put('a.txt', 'x\n'); commit();
     const r = scan(args);
     expect(r.status).toBe(0);
@@ -223,7 +219,7 @@ describe('scripts/security-scan.mjs [FEAT-034]', () => {
     initRepo(); withHook(); put('package.json', pkg({ build: 'tsc' }));
     const base = commit();
     put('package.json', '{ not json');
-    expect(lines(scan(base).out)).toEqual(['SCAN-RESULT secrets=ran scripts=failed']);
+    expect(lines(scan(base).out)).toEqual([LOCK_NONE, 'SCAN-RESULT secrets=ran scripts=failed']);
   });
 
   it('[E3] a scan changes nothing: the work tree, the index, .claude/.flow-events.jsonl and the work-tree allowlist are byte-identical, and no temporary directory remains', () => {
@@ -243,5 +239,175 @@ describe('scripts/security-scan.mjs [FEAT-034]', () => {
     expect(snapshot()).toEqual(before);
     expect(readdirSync(priv)).toEqual(tmpBefore);
     expect(existsSync(join(root, '.claude/memory/.flow-events.jsonl'))).toBe(false);
+  });
+});
+
+describe('scripts/security-scan.mjs verdict contract [FEAT-059]', () => {
+  const npmLock = (pkgs) => JSON.stringify({ name: 'x', lockfileVersion: 3, packages: { '': { name: 'x' }, ...pkgs } }, null, 2) + '\n';
+  const pnpmLock = (keys) => ['lockfileVersion: \'9.0\'', '', 'packages:', '', ...keys.flatMap((k) => [`  ${k}:`, '    resolution: {integrity: sha512-x}', '']), ''].join('\n');
+  // An in-process call would inherit any GIT_* variable of the parent (BUG-053), so the export runs in a child.
+  function callExport(expr) {
+    const r = spawnSync(process.execPath, ['--input-type=module', '-e', `import * as m from ${JSON.stringify(pathToFileURL(SCANNER).href)}; process.stdout.write(JSON.stringify(${expr}));`],
+      { cwd: root, env: cleanGitEnv(), encoding: 'utf8' });
+    return JSON.parse(r.stdout);
+  }
+  const changed = (base, lockfile) => callExport(`m.changedPackages(process.cwd(), ${JSON.stringify(base)}, '${lockfile}')`);
+  const lockFixture = () => {
+    initRepo();
+    put('package-lock.json', npmLock({ 'node_modules/a': { version: '1.0.0' }, 'node_modules/b': { version: '1.0.0' }, 'node_modules/x/node_modules/b': { version: '2.0.0' }, 'node_modules/@s/c': { version: '1.0.0' } }));
+    const base = commit();
+    put('package-lock.json', npmLock({ 'node_modules/a': { version: '1.0.0' }, 'node_modules/b': { version: '1.0.0' }, 'node_modules/x/node_modules/b': { version: '2.1.0' }, 'node_modules/@s/c': { version: '1.0.0' } }));
+    return base;
+  };
+  const absentFixture = () => {
+    initRepo(); put('a.txt', 'x\n');
+    const base = commit();
+    put('package-lock.json', npmLock({ 'node_modules/a': { version: '1.0.0' } }));
+    return base;
+  };
+  const brokenFixture = () => {
+    initRepo(); put('package-lock.json', '{ not json');
+    return commit();
+  };
+  const movedFixture = () => {
+    initRepo(); put('old/config.js', `const k = '${AWS}';\n`); put('a.txt', 'x\n');
+    const base = commit();
+    mkdirSync(join(root, 'src'), { recursive: true });
+    renameSync(join(root, 'old/config.js'), join(root, 'src/config.js'));
+    return base;
+  };
+
+  it('[C15] exports SCAN_CONTRACT 2 and changedPackages', () => {
+    const r = spawnSync(process.execPath, ['-e', `import(${JSON.stringify(pathToFileURL(SCANNER).href)}).then(m => process.stdout.write(\`\${m.SCAN_CONTRACT} \${typeof m.changedPackages}\`))`], { encoding: 'utf8' });
+    expect(r.stdout).toBe('2 function');
+    expect(r.stderr).toBe('');
+  });
+
+  it.each([[['a']], [['a', 'high', 'x']], [['a', 'urgent']]])('[S2] exits 1 with the usage line on %j', (args) => {
+    initRepo();
+    const r = scan(args);
+    expect(r.status).toBe(1);
+    expect(r.err.trim()).toBe('security-scan: usage: security-scan.mjs <base> <low|moderate|high|critical>');
+  });
+
+  it('[S2] the same fixture at high and at moderate changes the brackets and keeps the levels', () => {
+    initRepo(); withHook(); put('package.json', pkg({ test: 'vitest run' }));
+    const base = commit();
+    put('package.json', pkg({ test: 'vitest run --coverage' }));
+    put('src/settings.js', `const password = '${'p'.repeat(14)}';\n`);
+    const levelLines = (bracket) => [
+      `- [${bracket}] src/settings.js:1 — moderate secret: generic secret assignment; value withheld`,
+      `- [${bracket}] package.json:4 — moderate script: scripts.test; npm test runs this changed script`,
+      LOCK_NONE, 'SCAN-RESULT secrets=ran scripts=ran',
+    ];
+    expect(lines(scan(base).out)).toEqual(levelLines('minor'));
+    expect(lines(scan([base, 'moderate']).out)).toEqual(levelLines('blocker'));
+  });
+
+  it('[C2] a script finding names package.json and the line of its key', () => {
+    initRepo(); withHook(); put('package.json', pkg({ build: 'tsc', lint: 'eslint .', test: 'vitest run' }));
+    const base = commit();
+    put('package.json', pkg({ build: 'tsc', lint: 'eslint .', test: 'vitest run --coverage' }));
+    expect(lines(scan(base).out)[0]).toBe('- [minor] package.json:6 — moderate script: scripts.test; npm test runs this changed script');
+  });
+
+  it('[S3] a key moved from another path is pre-existing: it prints inside the owner-only block, and the key reaches neither stdout nor stderr', () => {
+    const base = movedFixture();
+    const r = scan(base);
+    expect(r.status).toBe(0);
+    expect(lines(r.out)).toEqual([
+      'PRE-EXISTING (owner only):',
+      '- [blocker] src/config.js:1 — critical secret: AWS access key id; value withheld',
+      'END PRE-EXISTING', LOCK_NONE, 'SCAN-RESULT secrets=ran scripts=ran',
+    ]);
+    expect(r.out + r.err).not.toContain(AWS);
+  });
+
+  it('[S3] a private key block whose header is already at the base is still introduced: the header is a constant, not the key', () => {
+    const header = '-----BEGIN ' + 'RSA ' + 'PRIVATE KEY-----';
+    initRepo(); put('docs/example.pem', `${header}\nexample\n`);
+    const base = commit();
+    put('keys/new.pem', `${header}\n${'M'.repeat(64)}\n`);
+    const r = scan(base);
+    expect(r.status).toBe(0);
+    expect(lines(r.out)).toEqual([
+      '- [blocker] keys/new.pem:1 — critical secret: private key block; value withheld',
+      LOCK_NONE, 'SCAN-RESULT secrets=ran scripts=ran',
+    ]);
+  });
+
+  it('[S3] a line holding a value the base tracks and a new key of another pattern is introduced', () => {
+    const gh = 'gh' + 'p_' + 'b'.repeat(36);
+    initRepo(); put('old/config.js', `const k = '${AWS}';\n`);
+    const base = commit();
+    put('src/config.js', `const k = '${AWS}', t = '${gh}';\n`);
+    expect(lines(scan(base).out)).toEqual([
+      '- [blocker] src/config.js:1 — critical secret: AWS access key id; value withheld',
+      LOCK_NONE, 'SCAN-RESULT secrets=ran scripts=ran',
+    ]);
+  });
+
+  it('[S3] a line holding a value the base tracks and a second new value of the same pattern is introduced', () => {
+    const other = 'AKIA' + 'R'.repeat(16);
+    initRepo(); put('old/config.js', `const k = '${AWS}';\n`);
+    const base = commit();
+    put('src/config.js', `const k = '${AWS}', j = '${other}';\n`);
+    expect(lines(scan(base).out)[0]).toBe('- [blocker] src/config.js:1 — critical secret: AWS access key id; value withheld');
+  });
+
+  it('[S3] a line matching a moderate and a critical pattern carries the critical level', () => {
+    initRepo(); put('README.md', 'x\n');
+    const base = commit();
+    put('src/settings.js', `token = "${'z'.repeat(14)}" + '${AWS}'\n`);
+    expect(lines(scan(base).out)[0]).toBe('- [blocker] src/settings.js:1 — critical secret: AWS access key id; value withheld');
+  });
+
+  it('[S3] changedPackages on an npm lockfile lists a package whose versions changed and omits one whose versions did not', () => {
+    expect(changed(lockFixture(), 'package-lock.json')).toEqual(['b']);
+  });
+
+  it('[S3] changedPackages on a pnpm lockfile lists a package whose versions changed and omits one whose versions did not', () => {
+    initRepo(); put('pnpm-lock.yaml', pnpmLock(['/a@1.0.0', 'b@1.0.0', "'@s/c@1.0.0'", 'd@2.0.0(react@18.0.0)']));
+    const base = commit();
+    put('pnpm-lock.yaml', pnpmLock(['/a@1.0.0', 'b@1.1.0', "'@s/c@1.0.0'", 'd@2.0.0(react@18.0.0)']));
+    expect(changed(base, 'pnpm-lock.yaml')).toEqual(['b']);
+  });
+
+  it('[S3] changedPackages returns all for a lockfile absent at the base', () => {
+    expect(changed(absentFixture(), 'package-lock.json')).toBe('all');
+  });
+
+  it.each([['does not parse', '{ not json'], ['has no packages map', '{}\n']])('[S3] changedPackages returns failed for an npm lockfile that %s', (_, text) => {
+    initRepo(); put('package-lock.json', text);
+    expect(changed(commit(), 'package-lock.json')).toBe('failed');
+  });
+
+  it.each([
+    ['a changed package', lockFixture, 'LOCKFILE package-lock.json changed=b'],
+    ['no change', () => { initRepo(); put('package-lock.json', npmLock({ 'node_modules/a': { version: '1.0.0' } })); return commit(); }, 'LOCKFILE package-lock.json changed=none'],
+    ['absent at the base', absentFixture, 'LOCKFILE package-lock.json changed=all'],
+    ['a lockfile that does not parse', brokenFixture, 'LOCKFILE package-lock.json changed=all'],
+    ['no lockfile', () => { initRepo(); put('a.txt', 'x\n'); const b = commit(); put('a.txt', 'y\n'); return b; }, 'LOCKFILE none'],
+    ['pnpm before npm', () => { initRepo(); put('pnpm-lock.yaml', pnpmLock(['a@1.0.0'])); put('package-lock.json', npmLock({})); return commit(); }, 'LOCKFILE pnpm-lock.yaml changed=none'],
+  ])('[S3] the LOCKFILE line prints changedPackages\' result: %s', (_, setup, expected) => {
+    expect(lines(scan(setup()).out).at(-2)).toBe(expected);
+  });
+
+  it('[S3] a new key is introduced: it prints outside any owner-only block', () => {
+    initRepo(); put('a.txt', 'x\n');
+    const base = commit();
+    put('src/config.js', `const k = '${AWS}';\n`);
+    expect(lines(scan(base).out)).toEqual([
+      '- [blocker] src/config.js:1 — critical secret: AWS access key id; value withheld', LOCK_NONE, 'SCAN-RESULT secrets=ran scripts=ran',
+    ]);
+  });
+
+  it('scanChanges returns the FEAT-059 shape', () => {
+    const base = movedFixture();
+    const got = callExport(`m.scanChanges(process.cwd(), ${JSON.stringify(base)}, 'high')`);
+    expect(Object.keys(got).sort()).toEqual(['changed', 'introduced', 'lockfile', 'preExisting', 'scripts', 'secrets']);
+    expect(got.preExisting).toEqual(['- [blocker] src/config.js:1 — critical secret: AWS access key id; value withheld']);
+    expect(got.introduced).toEqual([]);
+    expect(got.lockfile).toBeNull();
   });
 });

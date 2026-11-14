@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -89,11 +89,16 @@ const say = (role, gate) => `Done.\nObservation: fine.\n${role === 'audit' ? 'VE
 const auditReport = (verdict, findings = []) => ['Done.', ...findings, ...(verdict === null ? [] : [verdict]), handbackLine('audit', 'build_executed'), ''].join('\n');
 
 const SCANS_NONE = 'SCANS: dependency=not-covered secrets=ran scripts=ran';
-const securityReport = (findings = [], scans = SCANS_NONE) => ['Done.', ...findings, scans, handbackLine('security', 'build_executed', { v: 4, sys: { ph: 'rev' } }), ''].join('\n');
+const securityReport = (findings = [], scans = SCANS_NONE, verdict = 'VERDICT: APPROVE', owner = null) => ['Done.',
+  ...(owner ? ['PRE-EXISTING (owner only):', ...owner, 'END PRE-EXISTING'] : []), ...findings, scans, ...(verdict === null ? [] : [verdict]),
+  handbackLine('security', 'build_executed', { v: 4, sys: { ph: 'rev' } }), ''].join('\n');
 const securityPass = (report = securityReport()) => {
   expect(orch(['install', 'security']).status).toBe(0);
   return orch(['handback', 'security'], { input: report });
 };
+const OWNER_FILE = '.conductor/security-pre-existing.txt';
+// Two fixture runs always differ in their timestamps and in the base commit's object name (a different tree).
+const norm = (s) => s.replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z/g, '<at>').replace(/\b[0-9a-f]{40}\b/g, '<object>');
 
 // The seat re-runs the base commit's scanner, so a run that reaches it needs the installed layout
 // committed, as a host project carries it: scripts/ at .claude/scripts/ (FEAT-034 plan decisions).
@@ -1223,6 +1228,11 @@ describe('audit verdict [FEAT-060]', () => {
     expect(halt.reason).not.toContain(line.slice(0, 121));
   });
 
+  it('[FEAT-059] parseVerdict names the role in ORCH_VERDICT_MISSING and keeps the audit text by default', () => {
+    expect(() => parseVerdict(auditReport(null))).toThrow('ORCH_VERDICT_MISSING: the audit report has no VERDICT: APPROVE | RETURN | ESCALATE line');
+    expect(() => parseVerdict(auditReport(null), 'security')).toThrow('ORCH_VERDICT_MISSING: the security report has no VERDICT: APPROVE | RETURN | ESCALATE line');
+  });
+
   it('APPROVE with minor findings records the verdict and lets qa forward verify_pass', () => {
     driveTo('audit', { seat: true });
     expect(orch(['install', 'audit']).status).toBe(0);
@@ -1727,9 +1737,9 @@ describe('security seat at start [FEAT-034]', () => {
   const scanRel = () => relative(root, join(REPO_ROOT, 'scripts/security-scan.mjs')).split('\\').join('/');
   const lock = (name) => writeFileSync(join(root, name), '');
 
-  it('S1 start records threshold high, the not-covered dependency scan, no base outside git, and the scan command without an argument', () => {
+  it('S1 start records threshold high, the not-covered dependency scan, no base outside git, and the scan command with base none and the threshold', () => {
     expect(orch(['start', 'FEAT-011']).status).toBe(0);
-    expect(runFile().security).toEqual({ threshold: 'high', dependency: 'not-covered', base: null, audit_command: null, scan_command: `node ${scanRel()}` });
+    expect(runFile().security).toEqual({ threshold: 'high', dependency: 'not-covered', base: null, audit_command: null, scan_command: `node ${scanRel()} none high` });
   });
 
   it.each([
@@ -1765,6 +1775,7 @@ describe('security seat at start [FEAT-034]', () => {
     const r = orch(['start', 'FEAT-011', '--security-threshold', level]);
     expect(r.status).toBe(0);
     expect(runFile().security.threshold).toBe(level);
+    expect(runFile().security.scan_command.endsWith(` ${level}`)).toBe(true);
     expect(r.out).toContain(`; security: threshold ${level}, `);
   });
 
@@ -1787,11 +1798,11 @@ describe('security seat at start [FEAT-034]', () => {
     const base = fixtureGit('rev-parse', 'HEAD').stdout.trim();
     expect(orch(['start', 'FEAT-011']).status).toBe(0);
     expect(runFile().security.base).toBe(base);
-    expect(runFile().security.scan_command).toBe(`node ${scanRel()} ${base}`);
+    expect(runFile().security.scan_command).toBe(`node ${scanRel()} ${base} high`);
   });
 
   const VALID = { v: 1, session_id: 's', item: 'FEAT-011', gate: 'boundary_routed', approvals: { spec: null, plan: null }, handbacks: [], tasks: { ids: [], done: 0 } };
-  const SEC = { threshold: 'high', dependency: 'audit', base: 'a'.repeat(40), audit_command: 'npm audit --json', scan_command: 'node s.mjs' };
+  const SEC = { threshold: 'high', dependency: 'audit', base: 'a'.repeat(40), audit_command: 'npm audit --json', scan_command: `node s.mjs ${'a'.repeat(40)} high` };
 
   it('I1 isValidRun accepts a run without security and a run with a valid security object', () => {
     expect(isValidRun(VALID)).toBe(true);
@@ -1807,6 +1818,8 @@ describe('security seat at start [FEAT-034]', () => {
     ['a command with dependency not-covered', { ...SEC, dependency: 'not-covered' }],
     ['a malformed base', { ...SEC, base: 'xyz' }],
     ['an empty scan command', { ...SEC, scan_command: '' }],
+    ['a FEAT-034 scan command without the threshold suffix', { ...SEC, scan_command: `node s.mjs ${'a'.repeat(40)}` }],
+    ['a suffix that is not the threshold', { ...SEC, scan_command: `node s.mjs ${'a'.repeat(40)} critical` }],
   ])('I2 isValidRun rejects security %s', (_, security) => {
     expect(isValidRun({ ...VALID, security })).toBe(false);
   });
@@ -1827,32 +1840,37 @@ describe('security seat at start [FEAT-034]', () => {
 describe('security seat [FEAT-034]', () => {
   const lockfile = () => writeFileSync(join(root, 'package-lock.json'), '{}');
   const AWS = 'AKIA' + 'Q'.repeat(16);
-  const DEP_HIGH = '- [high] dependency left-pad@<1.3.0 — prototype pollution';
+  const DEP_HIGH = '- [blocker] package-lock.json:1 — high dependency: left-pad@<1.3.0; prototype pollution';
   const SCANS_RAN = 'SCANS: dependency=ran secrets=ran scripts=ran';
-  const SEC = { threshold: 'high', dependency: 'audit', base: null, audit_command: 'npm audit --json', scan_command: 'node s.mjs' };
+  const SEC = { threshold: 'high', dependency: 'audit', base: null, audit_command: 'npm audit --json', scan_command: 'node s.mjs none high' };
   const base3 = { ...blank, gate: 'build_executed', approvals: { spec: {}, plan: {} }, tasks: { ids: ['Task 1'], done: 1 } };
   const audited = [...hb('spec', 'plan', 'code'), { role: 'audit', verdict: 'APPROVE', round: 1 }];
   const withSec = (...extra) => ({ ...base3, security: SEC, handbacks: [...audited, ...extra] });
   const lastEntry = () => runFile().handbacks.at(-1);
-  const aws = (path = 'src/config.js') => `- [critical] secret ${path}:1 — AWS access key id; value withheld`;
+  const aws = (path = 'src/config.js') => `- [blocker] ${path}:1 — critical secret: AWS access key id; value withheld`;
   const writeSecret = () => { mkdirSync(join(root, 'src'), { recursive: true }); writeFileSync(join(root, 'src/config.js'), `const k = '${AWS}';\n`); };
 
   it.each([
     ['after the last audit a run with a security object dispatches security', withSec().handbacks, SEC, { role: 'security' }],
-    ['an unblocked security entry dispatches qa', withSec({ role: 'security', security: { blocked: false } }).handbacks, SEC, { role: 'qa' }],
-    ['a qa entry after security ends the run', withSec({ role: 'security', security: { blocked: false } }, { role: 'qa' }).handbacks, SEC, { end: true }],
+    ['an unblocked security entry dispatches qa', withSec({ role: 'security', security: { verdict: 'APPROVE', blocked: false } }).handbacks, SEC, { role: 'qa' }],
+    ['a qa entry after security ends the run', withSec({ role: 'security', security: { verdict: 'APPROVE', blocked: false } }, { role: 'qa' }).handbacks, SEC, { end: true }],
+    ['an ESCALATE entry ends the run', withSec({ role: 'security', security: { verdict: 'ESCALATE', blocked: true } }).handbacks, SEC, { end: true }],
+    ['a FEAT-034 entry without a verdict ends the run', withSec({ role: 'security', security: { blocked: false } }).handbacks, SEC, { end: true }],
     ['a granted fix still dispatches code, not security', [...hb('spec', 'plan', 'code'), { role: 'audit', verdict: 'RETURN', round: 1, fix: { round: 1, files: ['src/a.js'], review: 'r', sha256: 'a'.repeat(64) } }], SEC, { role: 'code', fix: 1 }],
   ])('N1 %s', (_, handbacks, security, expected) => {
     expect(nextStep({ ...base3, security, handbacks })).toEqual(expected);
   });
 
-  it.each([['absent', []], ['blocked', [{ role: 'security', security: { blocked: true } }]]])(
-    'R1 recordHandback refuses qa verify_pass ORCH_GATE_WITHHELD when the security entry is %s', (state, extra) => {
-      expect(() => recordHandback(withSec(...extra), 'qa', 'verify_pass')).toThrow(`ORCH_GATE_WITHHELD: qa may not forward verify_pass: the security entry is ${state}`);
-    });
+  it.each([
+    ['absent', 'no security entry', []],
+    ['RETURN', 'a RETURN entry', [{ role: 'security', security: { verdict: 'RETURN', blocked: true } }]],
+    ['absent', 'a FEAT-034 entry without a verdict', [{ role: 'security', security: { blocked: false } }]],
+  ])('R1 recordHandback refuses qa verify_pass ORCH_GATE_WITHHELD on %s (%s)', (state, _, extra) => {
+    expect(() => recordHandback(withSec(...extra), 'qa', 'verify_pass')).toThrow(`ORCH_GATE_WITHHELD: qa may not forward verify_pass: the security verdict is ${state}`);
+  });
 
   it('R2 recordHandback forwards qa verify_pass over an unblocked security entry', () => {
-    expect(recordHandback(withSec({ role: 'security', security: { blocked: false } }), 'qa', 'verify_pass').gate).toBe('verify_pass');
+    expect(recordHandback(withSec({ role: 'security', security: { verdict: 'APPROVE', blocked: false } }), 'qa', 'verify_pass').gate).toBe('verify_pass');
   });
 
   it('R3 [C13] recordHandback on a run without security forwards verify_pass over the audit alone and records not-configured on the qa entry', () => {
@@ -1862,29 +1880,30 @@ describe('security seat [FEAT-034]', () => {
     expect(next.handbacks.at(-1).security).toBe('not-configured (run predates FEAT-034)');
   });
 
-  const findings = ['- [high] dependency left-pad@<1.3.0 — prototype pollution', '- [low] secret a.js:3 — generic secret assignment; value withheld'];
-  const withScans = (scans, lines = []) => ['Done.', ...lines, scans, handbackLine('security', 'build_executed', { v: 4 }), ''].join('\n');
+  const findings = [DEP_HIGH, '- [minor] a.js:3 — low secret: generic secret assignment; value withheld'];
+  const withScans = (scans, lines = [], verdict = 'VERDICT: RETURN') => ['Done.', ...lines, scans, verdict, handbackLine('security', 'build_executed', { v: 4 }), ''].join('\n');
 
   it('P1 parseSecurityReport returns the findings and the scans', () => {
     const got = orchestrateModule.parseSecurityReport(withScans(SCANS_RAN, findings), SEC);
     expect(got.scans).toEqual({ dependency: 'ran', secrets: 'ran', scripts: 'ran' });
+    expect(got.verdict).toBe('RETURN');
     expect(got.findings).toEqual([
-      { severity: 'high', source: 'dependency', line: findings[0] },
-      { severity: 'low', source: 'secret', line: findings[1] },
+      { part: 'public', n: 2, line: findings[0], severity: 'blocker', location: 'package-lock.json:1', level: 'high', source: 'dependency' },
+      { part: 'public', n: 3, line: findings[1], severity: 'minor', location: 'a.js:3', level: 'low', source: 'secret' },
     ]);
   });
 
   const NOT_COVERED = 'SCANS: dependency=not-covered secrets=ran scripts=ran';
   it.each([
-    ['with no SCANS line', 'ORCH_SECURITY_REPORT_MISSING', ['Done.', handbackLine('security', 'build_executed', { v: 4 })].join('\n'), SEC],
-    ['with two SCANS lines', 'ORCH_SECURITY_REPORT_INVALID', ['Done.', SCANS_RAN, SCANS_RAN, handbackLine('security', 'build_executed', { v: 4 })].join('\n'), SEC],
-    ['with a lowercase scans line', 'ORCH_SECURITY_REPORT_INVALID', withScans(SCANS_RAN.replace('SCANS', 'scans')), SEC],
-    ['with the SCANS line not before the hand-back', 'ORCH_SECURITY_REPORT_INVALID', ['Done.', SCANS_RAN, 'trailing text', handbackLine('security', 'build_executed', { v: 4 })].join('\n'), SEC],
-    ['with an unknown severity', 'ORCH_SECURITY_REPORT_INVALID', withScans(SCANS_RAN, ['- [urgent] secret a.js:1 — x']), SEC],
-    ['with an unknown source', 'ORCH_SECURITY_REPORT_INVALID', withScans(SCANS_RAN, ['- [high] license a — x']), SEC],
-    ['when the run is audit and the report says not-covered', 'ORCH_SECURITY_REPORT_INVALID', withScans(NOT_COVERED), SEC],
-    ['when the run is not-covered and the report says ran', 'ORCH_SECURITY_REPORT_INVALID', withScans(SCANS_RAN), { ...SEC, dependency: 'not-covered', audit_command: null }],
-    ['when the run is disabled and the report says not-covered', 'ORCH_SECURITY_REPORT_INVALID', withScans(NOT_COVERED), { ...SEC, dependency: 'disabled', audit_command: null }],
+    ['with no SCANS line', 'ORCH_SECURITY_REPORT_MISSING', ['Done.', 'VERDICT: APPROVE', handbackLine('security', 'build_executed', { v: 4 })].join('\n'), SEC],
+    ['with two SCANS lines', 'ORCH_SECURITY_REPORT_INVALID', ['Done.', SCANS_RAN, SCANS_RAN, 'VERDICT: APPROVE', handbackLine('security', 'build_executed', { v: 4 })].join('\n'), SEC],
+    ['with a lowercase scans line', 'ORCH_SECURITY_REPORT_INVALID', withScans(SCANS_RAN.replace('SCANS', 'scans'), [], 'VERDICT: APPROVE'), SEC],
+    ['with prose between the SCANS and VERDICT lines', 'ORCH_SECURITY_REPORT_INVALID', ['Done.', SCANS_RAN, 'trailing text', 'VERDICT: APPROVE', handbackLine('security', 'build_executed', { v: 4 })].join('\n'), SEC],
+    ['with an unknown severity', 'ORCH_SECURITY_REPORT_INVALID', withScans(SCANS_RAN, ['- [urgent] a.js:1 — low secret: x'], 'VERDICT: APPROVE'), SEC],
+    ['with an unknown source', 'ORCH_SECURITY_REPORT_INVALID', withScans(SCANS_RAN, ['- [minor] a:1 — low license: x'], 'VERDICT: APPROVE'), SEC],
+    ['when the run is audit and the report says not-covered', 'ORCH_SECURITY_REPORT_INVALID', withScans(NOT_COVERED, [], 'VERDICT: APPROVE'), SEC],
+    ['when the run is not-covered and the report says ran', 'ORCH_SECURITY_REPORT_INVALID', withScans(SCANS_RAN, [], 'VERDICT: APPROVE'), { ...SEC, dependency: 'not-covered', audit_command: null }],
+    ['when the run is disabled and the report says not-covered', 'ORCH_SECURITY_REPORT_INVALID', withScans(NOT_COVERED, [], 'VERDICT: APPROVE'), { ...SEC, dependency: 'disabled', audit_command: null }],
     ['with a dependency finding under dependency=not-covered', 'ORCH_SECURITY_REPORT_INVALID', withScans(NOT_COVERED, [DEP_HIGH]), { ...SEC, dependency: 'not-covered', audit_command: null }],
   ])('P2 parseSecurityReport halts %s: %s', (_, code, text, security) => {
     expect(() => orchestrateModule.parseSecurityReport(text, security)).toThrow(new RegExp(`^${code}: `));
@@ -1893,42 +1912,48 @@ describe('security seat [FEAT-034]', () => {
   it('E2a [E2] a finding at the threshold halts ORCH_SECURITY_BLOCKED quoting it; the entry records blocked and nothing routes to qa', () => {
     lockfile();
     driveTo('security');
-    const r = securityPass(securityReport([DEP_HIGH], SCANS_RAN));
+    const r = securityPass(securityReport([DEP_HIGH], SCANS_RAN, 'VERDICT: RETURN'));
     expect(r.status).toBe(1);
     expect(r.err).toBe(`ORCH_SECURITY_BLOCKED: security found 1 finding(s) at or above high; first: ${DEP_HIGH}`);
-    expect(lastEntry().security).toEqual({ scans: { dependency: 'ran', secrets: 'ran', scripts: 'ran' }, counts: { critical: 0, high: 1, moderate: 0, low: 0 }, threshold: 'high', blocked: true });
+    expect(lastEntry().security).toEqual({ scans: { dependency: 'ran', secrets: 'ran', scripts: 'ran' }, counts: { critical: 0, high: 1, moderate: 0, low: 0 }, threshold: 'high', verdict: 'RETURN', blocked: true });
     expect(nextStep(runFile())).toEqual({ end: true });
     expect(orch(['install', 'qa', '--check']).status).toBe(2);
+    expect(() => recordHandback(runFile(), 'qa', 'verify_pass')).toThrow('ORCH_GATE_WITHHELD');
   });
 
   it('E2b [E2] findings below the threshold are counted, blocked is false, qa forwards verify_pass, and end prints the entry', () => {
     lockfile();
     driveTo('security');
-    const r = securityPass(securityReport(['- [moderate] dependency a@<2 — x', '- [low] dependency b@<3 — y'], SCANS_RAN));
+    const r = securityPass(securityReport(['- [minor] package-lock.json:1 — moderate dependency: a@<2; x', '- [minor] package-lock.json:1 — low dependency: b@<3; y'], SCANS_RAN));
     expect(r.status).toBe(0);
-    expect(r.out).toBe('security handed back build_executed; 2 finding(s) below high recorded; dependency=ran');
+    expect(r.out).toBe('security handed back build_executed; VERDICT: APPROVE; 2 finding(s) below high recorded; dependency=ran; pre-existing findings, if any, are in .conductor/security-pre-existing.txt (owner only)');
     expect(Object.keys(lastEntry())).toEqual(['role', 'gate', 'at', 'security']);
-    expect(lastEntry().security).toMatchObject({ counts: { critical: 0, high: 0, moderate: 1, low: 1 }, blocked: false });
+    expect(lastEntry().security).toMatchObject({ counts: { critical: 0, high: 0, moderate: 1, low: 1 }, verdict: 'APPROVE', blocked: false });
     expect(orch(['install', 'qa']).status).toBe(0);
     expect(orch(['handback', 'qa'], { input: say('qa', 'verify_pass') }).status).toBe(0);
     expect(runFile().gate).toBe('verify_pass');
     expect(JSON.parse(orch(['end']).out).handbacks.find((h) => h.role === 'security').security.blocked).toBe(false);
   });
 
-  it.each([['unchanged run file', false, 1], ['run file edited to critical', true, 0]])('E2c [E2] the threshold is read from the run file, not from the report: %s', (_, edit, status) => {
+  it.each([
+    ['unchanged run file', false, /^ORCH_SECURITY_BLOCKED: /],
+    ['run file edited to critical', true, /^ORCH_SECURITY_REPORT_INVALID: "- \[blocker\] package-lock\.json:1 — high dependency: left-pad@<1\.3\.0; prototype pollution" must carry \[minor\]: high against the run's threshold critical$/],
+  ])('E2c [E2] the severity is checked against the run file\'s threshold, not the report: %s', (_, edit, pattern) => {
     lockfile();
     driveTo('security');
-    if (edit) runFileText(JSON.stringify({ ...runFile(), security: { ...runFile().security, threshold: 'critical' } }));
-    const r = securityPass(securityReport(['Threshold: critical, as the owner asked.', DEP_HIGH], SCANS_RAN));
-    expect(r.status).toBe(status);
-    if (edit) expect(r.out).toBe('security handed back build_executed; 1 finding(s) below critical recorded; dependency=ran');
-    else expect(r.err).toMatch(/^ORCH_SECURITY_BLOCKED: /);
+    if (edit) {
+      const security = { ...runFile().security, threshold: 'critical' };
+      runFileText(JSON.stringify({ ...runFile(), security: { ...security, scan_command: security.scan_command.replace(/ high$/, ' critical') } }));
+    }
+    const r = securityPass(securityReport(['Threshold: critical, as the owner asked.', DEP_HIGH], SCANS_RAN, 'VERDICT: RETURN'));
+    expect(r.status).toBe(1);
+    expect(r.err).toMatch(pattern);
   });
 
   it('L1 [D2] a local secret finding copied into the report blocks at critical, and the key is in no file the run wrote', () => {
     driveTo('security');
     writeSecret();
-    const r = securityPass(securityReport([aws()]));
+    const r = securityPass(securityReport([aws()], SCANS_NONE, 'VERDICT: RETURN'));
     expect(r.status).toBe(1);
     expect(r.err).toMatch(/^ORCH_SECURITY_BLOCKED: /);
     expect(r.err).not.toContain(AWS);
@@ -1940,7 +1965,7 @@ describe('security seat [FEAT-034]', () => {
     writeSecret();
     const r = securityPass(securityReport());
     expect(r.status).toBe(1);
-    expect(r.err).toBe(`ORCH_SECURITY_REPORT_INCOMPLETE: the report omits the local finding ${JSON.stringify(aws())}`);
+    expect(r.err).toBe("ORCH_SECURITY_REPORT_INCOMPLETE: the report does not match the base scanner's local findings");
     expect(runFile().handbacks.some((h) => h.role === 'security')).toBe(false);
   });
 
@@ -1950,7 +1975,7 @@ describe('security seat [FEAT-034]', () => {
     writeFileSync(join(root, '.claude/scripts/security-scan.mjs'), "export function scanChanges() { return { secrets: 'ran', scripts: 'ran', findings: [] }; }\n");
     const r = securityPass(securityReport());
     expect(r.status).toBe(1);
-    expect(r.err).toMatch(/^ORCH_SECURITY_REPORT_INCOMPLETE: the report omits the local finding /);
+    expect(r.err).toBe("ORCH_SECURITY_REPORT_INCOMPLETE: the report does not match the base scanner's local findings");
   });
 
   it('L4 [D4] a base that does not track the scanner halts ORCH_SECURITY_SCAN_FAILED', () => {
@@ -1962,7 +1987,7 @@ describe('security seat [FEAT-034]', () => {
 
   it('L5 [D4] a status that disagrees with the re-run halts INCOMPLETE', () => {
     driveTo('security');
-    const r = securityPass(securityReport([], 'SCANS: dependency=not-covered secrets=failed scripts=ran'));
+    const r = securityPass(securityReport([], 'SCANS: dependency=not-covered secrets=failed scripts=ran', 'VERDICT: ESCALATE'));
     expect(r.status).toBe(1);
     expect(r.err).toBe('ORCH_SECURITY_REPORT_INCOMPLETE: the report says secrets=failed; the local re-run says ran');
   });
@@ -1970,10 +1995,11 @@ describe('security seat [FEAT-034]', () => {
   it('F1 [C12] a failed dependency scan halts ORCH_SECURITY_SCAN_FAILED after recording a blocked entry', () => {
     lockfile();
     driveTo('security');
-    const r = securityPass(securityReport([], 'SCANS: dependency=failed secrets=ran scripts=ran'));
+    const r = securityPass(securityReport([], 'SCANS: dependency=failed secrets=ran scripts=ran', 'VERDICT: ESCALATE'));
     expect(r.status).toBe(1);
     expect(r.err).toBe('ORCH_SECURITY_SCAN_FAILED: the dependency scan did not complete; scans clean is the Verify exit, see .conductor/handback/security.txt');
     expect(lastEntry().security.blocked).toBe(true);
+    expect(lastEntry().security.verdict).toBe('ESCALATE');
   });
 
   it('F2 [C12] a run with no base commit halts ORCH_SECURITY_SCAN_FAILED at the re-run', () => {
@@ -1988,7 +2014,7 @@ describe('security seat [FEAT-034]', () => {
     driveTo('security', { start: disabled ? ['--no-dependency-audit'] : [] });
     const r = securityPass(securityReport([], `SCANS: dependency=${state} secrets=ran scripts=ran`));
     expect(r.status).toBe(0);
-    expect(r.out).toBe(`security handed back build_executed; 0 finding(s) below high recorded; dependency=${state}`);
+    expect(r.out).toBe(`security handed back build_executed; VERDICT: APPROVE; 0 finding(s) below high recorded; dependency=${state}; pre-existing findings, if any, are in .conductor/security-pre-existing.txt (owner only)`);
     expect(lastEntry().security.scans.dependency).toBe(state);
   });
 
@@ -2026,5 +2052,305 @@ describe('security seat [FEAT-034]', () => {
     const r = orch(['install', 'security']);
     expect(r.status).toBe(1);
     expect(r.err).toMatch(/^ORCH_AGENT_MISSING: /);
+  });
+});
+
+describe('security verdict contract [FEAT-059]', () => {
+  const SEC = { threshold: 'high', dependency: 'not-covered', base: null, audit_command: null, scan_command: 'node s.mjs none high' };
+  const at = (n) => `.conductor/handback/security.txt:${n}`;
+  const lastEntry = () => runFile().handbacks.at(-1);
+  const AWS = 'AKIA' + 'Q'.repeat(16);
+  const aws = (path = 'src/config.js') => `- [blocker] ${path}:1 — critical secret: AWS access key id; value withheld`;
+  const oldKey = () => { mkdirSync(join(root, 'old'), { recursive: true }); writeFileSync(join(root, 'old/config.js'), `const k = '${AWS}';\n`); };
+  const SEC_HB = handbackLine('security', 'build_executed', { v: 4, sys: { ph: 'rev' } });
+  const OPEN = 'PRE-EXISTING (owner only):';
+  const CLOSE = 'END PRE-EXISTING';
+  const MOD = '- [blocker] a.js:1 — moderate secret: generic secret assignment; value withheld';
+  const FORM = '- [<blocker|minor>] <path>:<line> — <critical|high|moderate|low> <dependency|secret|script>: <text>';
+  const rawReport = (...lines) => ['Done.', ...lines, SEC_HB, ''].join('\n');
+  const verdictCase = (role, verdictLines, findings, trailing) => ['Done.', ...findings, ...(role === 'security' ? [SCANS_NONE] : []), ...verdictLines,
+    handbackLine(role, 'build_executed', role === 'security' ? { v: 4, sys: { ph: 'rev' } } : {}), ...trailing, ''].join('\n');
+
+  it.each([
+    ['with no verdict line', [], [], [], 'ORCH_VERDICT_MISSING'],
+    ['with two verdict lines', ['VERDICT: APPROVE', 'VERDICT: APPROVE'], [], [], 'ORCH_VERDICT_INVALID'],
+    ['with a lowercase verdict', ['Verdict: approve'], [], [], 'ORCH_VERDICT_INVALID'],
+    ['with an unknown verdict word', ['VERDICT: APPROVED'], [], [], 'ORCH_VERDICT_INVALID'],
+    ['with the verdict after the hand-back', [], [], ['VERDICT: APPROVE'], 'ORCH_VERDICT_INVALID'],
+    ['with APPROVE over a blocker', ['VERDICT: APPROVE'], [aws('src/a.js')], [], 'ORCH_VERDICT_INCONSISTENT'],
+    ['with RETURN and no blocker', ['VERDICT: RETURN'], [], [], 'ORCH_VERDICT_INCONSISTENT'],
+  ])('V1 [V1] the shared parser halts %s with the same code for audit and security', (_, verdictLines, findings, trailing, code) => {
+    driveTo('audit', { seat: true });
+    expect(orch(['install', 'audit']).status).toBe(0);
+    const audit = orch(['handback', 'audit'], { input: verdictCase('audit', verdictLines, findings, trailing) });
+    rmSync(root, { recursive: true, force: true });
+    root = realpathSync(mkdtempSync(join(tmpdir(), 'cc-orch-root-')));
+    mkdirSync(join(root, '.claude', 'memory'), { recursive: true });
+    writeFileSync(join(root, 'package.json'), PKG);
+    script = SCRIPT;
+    driveTo('security');
+    const security = securityPass(verdictCase('security', verdictLines, findings, trailing));
+    expect(audit.status).toBe(1);
+    expect(security.status).toBe(1);
+    expect(audit.err.startsWith(code)).toBe(true);
+    expect(security.err.startsWith(code)).toBe(true);
+    expect(security.err).toBe(audit.err.replace('the audit report', 'the security report'));
+  });
+
+  it('V1 [V1] parseSecurityReport calls the exported parseVerdict and orchestrate.mjs holds one verdict regex', () => {
+    const src = readFileSync(SCRIPT, 'utf8');
+    const from = src.indexOf('export function parseSecurityReport(');
+    const body = src.slice(from, src.indexOf('\n}\n', from));
+    expect(body).toContain('parseVerdict(');
+    expect(body).not.toContain('VERDICT');
+    expect(src.match(/\/\^VERDICT: /g)).toHaveLength(1);
+  });
+
+  it('parseSecurityReport returns the verdict, the scans and each finding with its part and its line number', () => {
+    const got = orchestrateModule.parseSecurityReport(securityReport([aws('src/b.js')], SCANS_NONE, 'VERDICT: RETURN', [aws('src/a.js')]), SEC);
+    expect(got.verdict).toBe('RETURN');
+    expect(got.scans).toEqual({ dependency: 'not-covered', secrets: 'ran', scripts: 'ran' });
+    expect(got.findings).toEqual([
+      { part: 'public', n: 5, line: aws('src/b.js'), severity: 'blocker', location: 'src/b.js:1', level: 'critical', source: 'secret' },
+      { part: 'owner', n: 3, line: aws('src/a.js'), severity: 'blocker', location: 'src/a.js:1', level: 'critical', source: 'secret' },
+    ]);
+  });
+
+  it.each([
+    ['a blocker for a below-threshold level', securityReport([MOD], SCANS_NONE, 'VERDICT: RETURN'), `ORCH_SECURITY_REPORT_INVALID: ${JSON.stringify(MOD)} must carry [minor]: moderate against the run's threshold high`],
+    ['a minor for a critical level', securityReport(['- [minor] a.js:1 — critical secret: AWS access key id; value withheld']),
+      `ORCH_SECURITY_REPORT_INVALID: ${JSON.stringify('- [minor] a.js:1 — critical secret: AWS access key id; value withheld')} must carry [blocker]: critical against the run's threshold high`],
+    ['a major, which security never writes', securityReport(['- [major] a.js:1 — high secret: x'], SCANS_NONE, 'VERDICT: RETURN'),
+      `ORCH_SECURITY_REPORT_INVALID: ${JSON.stringify('- [major] a.js:1 — high secret: x')} must carry [blocker]: high against the run's threshold high`],
+    ['a finding without path:line', securityReport(['- [minor] the whole design — low secret: x']),
+      `ORCH_SECURITY_REPORT_INVALID: ${JSON.stringify('- [minor] the whole design — low secret: x')} is not a security finding line: ${FORM}`],
+    ['a failed scan with APPROVE', securityReport([], 'SCANS: dependency=not-covered secrets=failed scripts=ran'),
+      'ORCH_VERDICT_INCONSISTENT: VERDICT: APPROVE with the secrets scan failed; a failed scan requires VERDICT: ESCALATE'],
+    ['a blocker finding placed after SNAP_HANDBACK under APPROVE', ['Done.', SCANS_NONE, 'VERDICT: APPROVE', SEC_HB, aws(), ''].join('\n'),
+      `ORCH_SECURITY_REPORT_INVALID: the finding line at ${at(5)} comes after SNAP_HANDBACK`],
+    ['APPROVE with a public blocker finding', rawReport(aws(), SCANS_NONE, 'VERDICT: APPROVE'), 'ORCH_VERDICT_INCONSISTENT: VERDICT: APPROVE with 1 blocker/major finding(s)'],
+    ['a near-miss owner marker', rawReport('Pre-existing:', aws(), CLOSE, SCANS_NONE, 'VERDICT: APPROVE'), `ORCH_SECURITY_REPORT_INVALID: the owner-only marker at ${at(2)} is malformed`],
+    ['an unclosed block', rawReport(OPEN, aws(), SCANS_NONE, 'VERDICT: APPROVE'), `ORCH_SECURITY_REPORT_INVALID: the owner-only block at ${at(2)} is repeated, unclosed or misplaced`],
+    ['a repeated block', rawReport(OPEN, aws(), CLOSE, OPEN, aws(), CLOSE, SCANS_NONE, 'VERDICT: APPROVE'), `ORCH_SECURITY_REPORT_INVALID: the owner-only block at ${at(2)} is repeated, unclosed or misplaced`],
+    ['a close marker with no open one', rawReport(CLOSE, SCANS_NONE, 'VERDICT: APPROVE'), `ORCH_SECURITY_REPORT_INVALID: the owner-only block at ${at(2)} is repeated, unclosed or misplaced`],
+    ['a block after a public finding', rawReport(aws('src/b.js'), OPEN, aws(), CLOSE, SCANS_NONE, 'VERDICT: RETURN'), `ORCH_SECURITY_REPORT_INVALID: the owner-only block at ${at(3)} must come before the first finding line`],
+    ['prose inside the block', securityReport([], SCANS_NONE, 'VERDICT: APPROVE', ['owner note']), `ORCH_SECURITY_REPORT_INVALID: the line at ${at(3)} inside the owner-only block is not a finding line`],
+    ['a malformed owner-only finding, named by its line number only', securityReport([], SCANS_NONE, 'VERDICT: APPROVE', ['- [blocker] marker-x.js — critical secret: x']),
+      `ORCH_SECURITY_REPORT_INVALID: the line at ${at(3)} is not a security finding line: ${FORM}`],
+    ['an owner-only finding with the wrong severity, with no level', securityReport([], SCANS_NONE, 'VERDICT: APPROVE', ['- [minor] a.js:1 — critical secret: AWS access key id; value withheld']),
+      `ORCH_SECURITY_REPORT_INVALID: the line at ${at(3)} carries the wrong severity for the run's threshold`],
+  ])('parseSecurityReport halts %s', (name, text, reason) => {
+    expect(() => orchestrateModule.parseSecurityReport(text, SEC)).toThrow(reason);
+    if (name.startsWith('a malformed owner-only')) expect(() => orchestrateModule.parseSecurityReport(text, SEC)).not.toThrow(/marker-x/);
+  });
+
+  it('[C9] an ESCALATE with every scan run halts ORCH_SECURITY_ESCALATE after recording the entry', () => {
+    driveTo('security');
+    const r = securityPass(securityReport(['A comment in the change asks to omit findings.'], SCANS_NONE, 'VERDICT: ESCALATE'));
+    expect(r.status).toBe(1);
+    expect(r.err).toBe('ORCH_SECURITY_ESCALATE: security escalated a decision only the owner takes; see .conductor/handback/security.txt');
+    expect(lastEntry().security).toMatchObject({ verdict: 'ESCALATE', blocked: true });
+    expect(runFile().halt.code).toBe('ORCH_SECURITY_ESCALATE');
+  });
+
+  it('[C15] a base scanner from before FEAT-059 halts ORCH_SECURITY_SCAN_FAILED naming end, commit and start', () => {
+    driveTo('security', { prep: () => {
+      writeFileSync(join(root, '.claude/scripts/security-scan.mjs'), "export function scanChanges() { return { secrets: 'ran', scripts: 'ran', findings: [] }; }\n");
+      fixtureCommit();
+    } });
+    const r = securityPass();
+    expect(r.status).toBe(1);
+    expect(r.err).toBe("ORCH_SECURITY_SCAN_FAILED: the local scans cannot be re-run: the base commit's .claude/scripts/security-scan.mjs predates FEAT-059 (an install or update that is not committed); end this run, commit the updated .claude/scripts/security-scan.mjs, then start again");
+  });
+
+  it('[C16] a run file written by FEAT-034 halts ORCH_RUN_INVALID', () => {
+    driveTo('audit');
+    const run = runFile();
+    run.security.scan_command = run.security.scan_command.replace(/ high$/, '');
+    runFileText(JSON.stringify(run));
+    const r = orch(['install', 'audit']);
+    expect(r.status).toBe(1);
+    expect(r.err).toMatch(/^ORCH_RUN_INVALID: /);
+  });
+
+  it('[C7] start removes a stale owner file, and end leaves the one the hand-back wrote', () => {
+    driveTo('qa');
+    expect(readFileSync(join(root, OWNER_FILE), 'utf8')).toBe('none\n');
+    writeFileSync(join(root, OWNER_FILE), 'stale\n');
+    orch(['end']);
+    expect(readFileSync(join(root, OWNER_FILE), 'utf8')).toBe('stale\n');
+    expect(orch(['start', 'FEAT-011']).status).toBe(0);
+    expect(existsSync(join(root, OWNER_FILE))).toBe(false);
+  });
+
+  it.each([['with an owner-only block', true], ['without one', false]])('[C7] the hand-back writes the owner file %s', (_, moved) => {
+    oldKey();
+    driveTo('security');
+    if (moved) {
+      mkdirSync(join(root, 'src'), { recursive: true });
+      renameSync(join(root, 'old/config.js'), join(root, 'src/config.js'));
+    }
+    const r = securityPass(securityReport([], SCANS_NONE, 'VERDICT: APPROVE', moved ? [aws()] : null));
+    expect(r.status).toBe(0);
+    expect(readFileSync(join(root, OWNER_FILE), 'utf8')).toBe(moved ? `${aws()}\n` : 'none\n');
+  });
+});
+
+describe('pre-existing findings never reach the public part [FEAT-059]', () => {
+  const AWS = 'AKIA' + 'Q'.repeat(16);
+  const aws = (path = 'src/config.js') => `- [blocker] ${path}:1 — critical secret: AWS access key id; value withheld`;
+  const oldKey = () => { mkdirSync(join(root, 'old'), { recursive: true }); writeFileSync(join(root, 'old/config.js'), `const k = '${AWS}';\n`); };
+  const writeSecret = () => { mkdirSync(join(root, 'src'), { recursive: true }); writeFileSync(join(root, 'src/config.js'), `const k = '${AWS}';\n`); };
+  const moveKey = () => { mkdirSync(join(root, 'src'), { recursive: true }); renameSync(join(root, 'old/config.js'), join(root, 'src/config.js')); };
+  const MARK = 'zz-marker-pkg';
+  const SCANS_DEP = 'SCANS: dependency=ran secrets=ran scripts=ran';
+  const npmLock = (version) => JSON.stringify({ name: 'x', lockfileVersion: 3, packages: { '': { name: 'x' }, ...(version === null ? {} : { [`node_modules/${MARK}`]: { version } }) } }, null, 2) + '\n';
+  const writeLock = (version) => writeFileSync(join(root, 'package-lock.json'), npmLock(version));
+  const lockLine = () => readFileSync(join(root, 'package-lock.json'), 'utf8').split('\n').findIndex((l) => l.includes(`"node_modules/${MARK}": {`)) + 1;
+  const depLine = () => `- [blocker] package-lock.json:${lockLine()} — critical dependency: ${MARK}@<2.0.0; marker advisory`;
+
+  // A fresh fixture per run: the P1 tests compare two runs that differ only in what the base held.
+  function run({ base = () => {}, change = () => {}, report }) {
+    rmSync(root, { recursive: true, force: true });
+    root = realpathSync(mkdtempSync(join(tmpdir(), 'cc-orch-root-')));
+    mkdirSync(join(root, '.claude', 'memory'), { recursive: true });
+    writeFileSync(join(root, 'package.json'), PKG);
+    script = SCRIPT;
+    base();
+    driveTo('security');
+    change();
+    const marker = existsSync(join(root, 'package-lock.json')) && lockLine() > 0 ? `package-lock.json:${lockLine()}` : null;
+    const r = securityPass(report());
+    return {
+      status: r.status, out: r.out, err: r.err, marker,
+      runText: readFileSync(join(root, RUN_FILE), 'utf8'),
+      owner: existsSync(join(root, OWNER_FILE)) ? readFileSync(join(root, OWNER_FILE), 'utf8') : null,
+      end: orch(['end']).out,
+    };
+  }
+  const fixtures = {
+    dependency: {
+      scans: SCANS_DEP,
+      without: { base: () => writeLock(null) },
+      withIt: { base: () => writeLock('1.0.0') },
+      line: depLine,
+      markers: (r) => [MARK, 'marker advisory', r.marker],
+    },
+    secret: {
+      scans: SCANS_NONE,
+      without: {},
+      withIt: { base: oldKey, change: moveKey },
+      line: () => aws(),
+      markers: () => ['AWS', 'src/config.js:1'],
+    },
+  };
+
+  it.each(['dependency', 'secret'])('[P1] a pre-existing %s finding changes no public byte', (kind) => {
+    const fx = fixtures[kind];
+    const without = run({ ...fx.without, report: () => securityReport([], fx.scans) });
+    let line;
+    const withIt = run({
+      ...fx.withIt,
+      report: () => { line = fx.line(); return securityReport([], fx.scans, 'VERDICT: APPROVE', [line]); },
+    });
+    expect(without.status).toBe(0);
+    expect(withIt.status).toBe(0);
+    expect(withIt.out).toBe(without.out);
+    expect(withIt.err).toBe(without.err);
+    expect(norm(withIt.runText)).toBe(norm(without.runText));
+    expect(norm(withIt.end)).toBe(norm(without.end));
+    for (const marker of fx.markers(withIt).filter(Boolean)) {
+      for (const text of [withIt.out, withIt.err, withIt.runText, withIt.end]) expect(text).not.toContain(marker);
+    }
+    expect(withIt.owner).toBe(`${line}\n`);
+    expect(without.owner).toBe('none\n');
+  });
+
+  const wrongPart = {
+    dependency: {
+      scans: SCANS_DEP,
+      a: { base: () => writeLock('1.0.0') },
+      b: { base: () => writeLock('1.0.0'), change: () => writeLock('1.0.1') },
+      line: depLine,
+      reason: 'ORCH_SECURITY_REPORT_INVALID: the dependency finding at .conductor/handback/security.txt:<n> is filed in the wrong part',
+    },
+    secret: {
+      scans: SCANS_NONE,
+      a: { base: oldKey, change: moveKey },
+      b: { change: writeSecret },
+      line: () => aws(),
+      reason: 'ORCH_SECURITY_REPORT_INCOMPLETE: the local finding at .conductor/handback/security.txt:<n> is filed in the wrong part',
+    },
+  };
+
+  it.each(['dependency', 'secret'])('[P1] a %s finding filed in the wrong part halts with the same reason in both directions', (kind) => {
+    const fx = wrongPart[kind];
+    const a = run({ ...fx.a, report: () => securityReport([fx.line()], fx.scans, 'VERDICT: RETURN') });
+    const b = run({ ...fx.b, report: () => securityReport([], fx.scans, 'VERDICT: APPROVE', [fx.line()]) });
+    const same = (e) => e.replace(/security\.txt:\d+/, 'security.txt:<n>');
+    expect(a.status).toBe(1);
+    expect(b.status).toBe(1);
+    expect(same(a.err)).toBe(same(b.err));
+    expect(same(a.err)).toBe(fx.reason);
+    for (const text of [a.err, b.err, a.runText, b.runText]) {
+      for (const marker of [MARK, 'marker advisory', 'AWS', 'src/config.js:1']) expect(text).not.toContain(marker);
+    }
+  });
+
+  it('[P1] a pre-existing secret copied into the public part as well halts without quoting it', () => {
+    const r = run({ base: oldKey, change: moveKey, report: () => securityReport([aws()], SCANS_NONE, 'VERDICT: RETURN', [aws()]) });
+    expect(r.status).toBe(1);
+    expect(r.err).toMatch(/^ORCH_SECURITY_REPORT_INCOMPLETE: the local finding at \.conductor\/handback\/security\.txt:\d+ is filed in the wrong part$/);
+    for (const text of [r.err, r.runText]) {
+      for (const marker of ['AWS', 'src/config.js:1']) expect(text).not.toContain(marker);
+    }
+  });
+
+  describe('a new private key under a PEM header the base already holds', () => {
+    const HEADER = '-----BEGIN ' + 'RSA ' + 'PRIVATE KEY-----';
+    const KEY_LINE = '- [blocker] keys/new.pem:1 — critical secret: private key block; value withheld';
+    const pemAtBase = () => { mkdirSync(join(root, 'docs'), { recursive: true }); writeFileSync(join(root, 'docs/example.pem'), `${HEADER}\nexample\n`); };
+    const newKey = () => { mkdirSync(join(root, 'keys'), { recursive: true }); writeFileSync(join(root, 'keys/new.pem'), `${HEADER}\n${'M'.repeat(64)}\n`); };
+
+    it('[P1] filed as pre-existing with APPROVE, it halts instead of approving', () => {
+      const r = run({ base: pemAtBase, change: newKey, report: () => securityReport([], SCANS_NONE, 'VERDICT: APPROVE', [KEY_LINE]) });
+      expect(r.status).toBe(1);
+      expect(r.err).toMatch(/^ORCH_SECURITY_REPORT_INCOMPLETE: the local finding at \.conductor\/handback\/security\.txt:\d+ is filed in the wrong part$/);
+    });
+
+    it('[E2] filed as introduced, it halts ORCH_SECURITY_BLOCKED', () => {
+      const r = run({ base: pemAtBase, change: newKey, report: () => securityReport([KEY_LINE], SCANS_NONE, 'VERDICT: RETURN') });
+      expect(r.status).toBe(1);
+      expect(r.err).toBe(`ORCH_SECURITY_BLOCKED: security found 1 finding(s) at or above high; first: ${KEY_LINE}`);
+    });
+  });
+
+  it('[E2] a line holding a value the base tracks and a new key of another pattern is introduced: it halts ORCH_SECURITY_BLOCKED', () => {
+    const gh = 'gh' + 'p_' + 'b'.repeat(36);
+    const mixed = () => { mkdirSync(join(root, 'src'), { recursive: true }); writeFileSync(join(root, 'src/config.js'), `const k = '${AWS}', t = '${gh}';\n`); };
+    const r = run({ base: oldKey, change: mixed, report: () => securityReport([aws()], SCANS_NONE, 'VERDICT: RETURN') });
+    expect(r.status).toBe(1);
+    expect(r.err).toBe(`ORCH_SECURITY_BLOCKED: security found 1 finding(s) at or above high; first: ${aws()}`);
+  });
+
+  it('[P1] a report that omits a pre-existing local line and one that omits an introduced one halt with the same reason', () => {
+    const a = run({ base: oldKey, change: moveKey, report: () => securityReport() });
+    const b = run({ change: writeSecret, report: () => securityReport() });
+    const reason = "ORCH_SECURITY_REPORT_INCOMPLETE: the report does not match the base scanner's local findings";
+    expect(a.status).toBe(1);
+    expect(b.status).toBe(1);
+    expect(a.err).toBe(reason);
+    expect(b.err).toBe(reason);
+  });
+
+  it.each([
+    ['outside the run\'s lockfile', '- [minor] yarn.lock:1 — low dependency: a@<1; x'],
+    ['on a line the lockfile lacks', '- [minor] package-lock.json:999 — low dependency: a@<1; x'],
+  ])('[S3] a dependency finding %s halts with its line number only', (_, line) => {
+    writeFileSync(join(root, 'package-lock.json'), '{}');
+    driveTo('security');
+    const r = securityPass(securityReport([line], SCANS_DEP));
+    expect(r.status).toBe(1);
+    expect(r.err).toBe("ORCH_SECURITY_REPORT_INVALID: the dependency finding at .conductor/handback/security.txt:2 does not name a line of the run's lockfile");
   });
 });
