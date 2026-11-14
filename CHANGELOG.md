@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.51.0] - 2026-11-14
+
+### Added
+- **[FEAT-053]** Role agents can run on a per-role model chosen by the project, with escalation when an audit returns the same task twice. The opt-in is one line in the project `CLAUDE.md`: `- Role models: default` gives each role its profile's `default-model:` (`opus` for `spec`, `plan`, `audit`, `security` and `define-review`, `sonnet` for `code`, `haiku` for `qa`), and `<role>=<opus|sonnet|haiku|inherit>` tokens override single roles or set only some (an explicit token wins over `default` in any order). `orchestrate.mjs start` resolves the line once and stores the map as `models` in the run file; a duplicated or valueless line, an empty or unknown token, an unknown role or model, a role set twice, or a profile with an invalid `default-model:` halts with `ORCH_ROLE_MODELS_INVALID` before anything is written, and the start line notes when `audit` and `code` share a model. `install` prints `model: <alias>` as its last line and records it as `dispatch_model`, the hand-back entry copies it as `model`, and the two review-loop lines that trigger a dispatch end in `; model <alias>`. When an audit `RETURN` names a plan task an earlier audit of the same run already returned, the fix round's `code` dispatch runs on `opus`, and the audit entry records `fix.tasks`, `fix.model` and `fix.escalated`. `isValidRun` rejects a `models`, `dispatch_model` or `fix.model` outside the allow-list. All 14 role profiles (both mirrors) gain a `default-model:` line, deliberately not the `model:` key Claude Code reads, so the defaults take effect only through the opt-in line. Without the line, every role inherits the session's model and the script output and run file are unchanged. Both `cc-orchestrate.md` copies pass the model the script prints and never choose one, and the README describes the opt-in. Landed from PR #216 (cc-lane-bot), intake of issue #187.
+
 ## [1.50.0] - 2026-11-14
 
 ### Added
