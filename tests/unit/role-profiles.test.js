@@ -203,6 +203,16 @@ describe('define-review profile [FEAT-041 AC1]', () => {
     for (const phrase of REVIEWER_PHRASES) expect(text).toContain(phrase);
     for (const gate of GATES) expect(text).not.toContain(gate);
   });
+
+  it('[FEAT-054] carries the delegated review section, and advice binds only outside it', () => {
+    const text = profile(REVIEWER);
+    for (const phrase of [
+      '## Delegated review (FEAT-054)', 'REVIEWED <kind> sha256 <hash>', 'VERDICT: APPROVE', 'VERDICT: RETURN', 'VERDICT: ESCALATE',
+      '- [blocker|major|minor] <path>:<line> <text>', 'Answer `VERDICT: ESCALATE`, never `VERDICT: APPROVE`',
+      'Outside a delegated review, your report is advice; the owner decides.',
+    ]) expect(text).toContain(phrase);
+    expect(text).not.toContain('- You are not a band role: write no hand-back line and claim no gate. Your report is advice; the owner decides.');
+  });
 });
 
 describe('dispatch outside a run [FEAT-061]', () => {
