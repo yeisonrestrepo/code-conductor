@@ -1,6 +1,6 @@
 # BUG-076: Review-loop outcome not bound to the document being approved
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-14 by independent review (round 1)
 **Item:** BUG-076 (intake of issue #195)
 **Date:** 2026-11-14
 
