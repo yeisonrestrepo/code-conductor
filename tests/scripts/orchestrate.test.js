@@ -2537,8 +2537,20 @@ describe('resume verb [FEAT-055]', () => {
     expect(runFile().handbacks[2].snap).toBe(snapOf(handbackLine('code', 'build_executed')));
   });
 
+  it('RS3b an oversized but otherwise valid SNAP halts and is not written into the run file', () => {
+    driveTo('code');
+    orch(['install', 'code']);
+    const big = handbackLine('code', 'build_executed').replace('"pr":""', `"pr":"${'x'.repeat(70 * 1024)}"`);
+    expect(big).toContain('xxxx');
+    const r = orch(['handback', 'code'], { input: `Done.\n${big}\n` });
+    expect(r.err).toMatch(/^ORCH_HANDBACK_INVALID: .*larger than 65536 bytes/);
+    const run = runFile();
+    expect(run.handbacks.some((h) => h.role === 'code' && h.snap)).toBe(false);
+    expect(Buffer.byteLength(JSON.stringify(run))).toBeLessThan(64 * 1024);
+  });
+
   // Entry acceptance criteria.
-  it('RS4 [AC1] a conflict on task 2 of 3 keeps both approvals and re-dispatches task 2', () => {
+  it('RS4[AC1] a conflict on task 2 of 3 keeps both approvals and re-dispatches task 2', () => {
     built(2);
     expect(orch(['handback', 'code'], { input: anchoredSay(head()) }).err).toMatch(/^ORCH_HANDBACK_CONFLICT: /);
     const approvals = JSON.stringify(runFile().approvals);

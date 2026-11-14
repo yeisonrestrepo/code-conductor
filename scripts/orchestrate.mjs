@@ -32,6 +32,7 @@ export const REVIEW_CAP = 3;
 // FEAT-057: fix rounds per run, fixed at start so the orchestrator's prompt cannot change the cap.
 export const AUDIT_ROUNDS_DEFAULT = 2;
 const AUDIT_ROUNDS_MAX = 5;
+const SNAP_STORE_MAX_BYTES = 64 * 1024;
 const isAuditRounds = (n) => Number.isInteger(n) && n >= 0 && n <= AUDIT_ROUNDS_MAX;
 // Every outcome a closed loop can carry; only the skip is the orchestrator's to record (FEAT-058).
 const REVIEW_OUTCOME = /^(clean|cap|unchanged|skipped:[a-z][a-z0-9-]{0,39})$/;
@@ -478,6 +479,10 @@ function parseHandback(text) {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.startsWith('SNAP_HANDBACK '));
   if (lines.length !== 1) throw new Halt('ORCH_HANDBACK_MISSING', `expected exactly one SNAP_HANDBACK line, found ${lines.length}`);
   const json = lines[0].slice('SNAP_HANDBACK '.length).trim();
+  // The SNAP is stored in the run file, which the hooks stop reading past their envelope cap (Guard 6 would go from deny to warn).
+  if (Buffer.byteLength(json) > SNAP_STORE_MAX_BYTES) {
+    throw new Halt('ORCH_HANDBACK_INVALID', `the hand-back SNAP is larger than ${SNAP_STORE_MAX_BYTES} bytes`);
+  }
   const error = validate(json + '\n');
   if (error) throw new Halt('ORCH_HANDBACK_INVALID', error);
   const env = JSON.parse(json);
