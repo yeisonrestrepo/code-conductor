@@ -15,8 +15,10 @@ import { pathToFileURL } from 'node:url';
 export const SCAN_CONTRACT = 2;
 
 // The generic row fires on test fixtures, so it must not block at the default threshold (C8).
+// `marker` rows match a constant header, not the secret itself: a base file holding the same
+// header proves nothing about the key, so their hits are never classified as pre-existing.
 export const SECRET_PATTERNS = [
-  { name: 'private key block', level: 'critical', re: /-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----/ },
+  { name: 'private key block', level: 'critical', marker: true, re: /-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----/ },
   { name: 'AWS access key id', level: 'critical', re: /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/ },
   { name: 'GitHub token', level: 'critical', re: /\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,})\b/ },
   { name: 'Slack token', level: 'critical', re: /\bxox[abprs]-[A-Za-z0-9-]{10,}/ },
@@ -113,7 +115,7 @@ export function scanSecrets(lines, threshold) {
     const hit = SECRET_PATTERNS.find((p) => p.re.test(text));
     if (!hit) continue;
     out.push({
-      value: hit.re.exec(text)[0],
+      value: hit.marker ? null : hit.re.exec(text)[0],
       line: findingLine(hit.level, threshold, `${path}:${line}`, 'secret', `${hit.name}; value withheld`),
     });
   }
@@ -121,7 +123,9 @@ export function scanSecrets(lines, threshold) {
 }
 
 // C3: matched by value, not by line, so a moved or copied credential is pre-existing.
+// A null value (a marker row) fails closed: the hit stays introduced.
 function atBase(root, base, value) {
+  if (value === null) return false;
   const r = spawnSync('git', ['grep', '-F', '-q', '-e', value, base, '--'], { cwd: root });
   if (r.status === 0) return true;
   if (r.status === 1 && !r.error) return false;

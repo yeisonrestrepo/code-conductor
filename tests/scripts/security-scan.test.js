@@ -323,6 +323,19 @@ describe('scripts/security-scan.mjs verdict contract [FEAT-059]', () => {
     expect(r.out + r.err).not.toContain(AWS);
   });
 
+  it('[S3] a private key block whose header is already at the base is still introduced: the header is a constant, not the key', () => {
+    const header = '-----BEGIN ' + 'RSA ' + 'PRIVATE KEY-----';
+    initRepo(); put('docs/example.pem', `${header}\nexample\n`);
+    const base = commit();
+    put('keys/new.pem', `${header}\n${'M'.repeat(64)}\n`);
+    const r = scan(base);
+    expect(r.status).toBe(0);
+    expect(lines(r.out)).toEqual([
+      '- [blocker] keys/new.pem:1 — critical secret: private key block; value withheld',
+      LOCK_NONE, 'SCAN-RESULT secrets=ran scripts=ran',
+    ]);
+  });
+
   it('[S3] changedPackages on an npm lockfile lists a package whose versions changed and omits one whose versions did not', () => {
     expect(changed(lockFixture(), 'package-lock.json')).toEqual(['b']);
   });

@@ -2306,6 +2306,25 @@ describe('pre-existing findings never reach the public part [FEAT-059]', () => {
     }
   });
 
+  describe('a new private key under a PEM header the base already holds', () => {
+    const HEADER = '-----BEGIN ' + 'RSA ' + 'PRIVATE KEY-----';
+    const KEY_LINE = '- [blocker] keys/new.pem:1 — critical secret: private key block; value withheld';
+    const pemAtBase = () => { mkdirSync(join(root, 'docs'), { recursive: true }); writeFileSync(join(root, 'docs/example.pem'), `${HEADER}\nexample\n`); };
+    const newKey = () => { mkdirSync(join(root, 'keys'), { recursive: true }); writeFileSync(join(root, 'keys/new.pem'), `${HEADER}\n${'M'.repeat(64)}\n`); };
+
+    it('[P1] filed as pre-existing with APPROVE, it halts instead of approving', () => {
+      const r = run({ base: pemAtBase, change: newKey, report: () => securityReport([], SCANS_NONE, 'VERDICT: APPROVE', [KEY_LINE]) });
+      expect(r.status).toBe(1);
+      expect(r.err).toMatch(/^ORCH_SECURITY_REPORT_INCOMPLETE: the local finding at \.conductor\/handback\/security\.txt:\d+ is filed in the wrong part$/);
+    });
+
+    it('[E2] filed as introduced, it halts ORCH_SECURITY_BLOCKED', () => {
+      const r = run({ base: pemAtBase, change: newKey, report: () => securityReport([KEY_LINE], SCANS_NONE, 'VERDICT: RETURN') });
+      expect(r.status).toBe(1);
+      expect(r.err).toBe(`ORCH_SECURITY_BLOCKED: security found 1 finding(s) at or above high; first: ${KEY_LINE}`);
+    });
+  });
+
   it('[P1] a report that omits a pre-existing local line and one that omits an introduced one halt with the same reason', () => {
     const a = run({ base: oldKey, change: moveKey, report: () => securityReport() });
     const b = run({ change: writeSecret, report: () => securityReport() });
