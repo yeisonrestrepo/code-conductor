@@ -32,6 +32,7 @@ export const REVIEW_CAP = 3;
 // FEAT-057: fix rounds per run, fixed at start so the orchestrator's prompt cannot change the cap.
 export const AUDIT_ROUNDS_DEFAULT = 2;
 const AUDIT_ROUNDS_MAX = 5;
+const SNAP_STORE_MAX_BYTES = 64 * 1024;
 const isAuditRounds = (n) => Number.isInteger(n) && n >= 0 && n <= AUDIT_ROUNDS_MAX;
 // Every outcome a closed loop can carry; only the skip is the orchestrator's to record (FEAT-058).
 const REVIEW_OUTCOME = /^(clean|cap|unchanged|skipped:[a-z][a-z0-9-]{0,39})$/;
@@ -68,7 +69,7 @@ const DEPENDENCY_STATES = ['audit', 'not-covered', 'disabled'];
 const OBJECT_NAME = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
 export const SECURITY_NOT_CONFIGURED = 'not-configured (run predates FEAT-034)';
 
-// A halt stops the run and is recorded in it (D12). A refusal is a misuse of the CLI:
+// A halt stops the run and is recorded in it (D12); resume clears it from the last gate whose record still validates (FEAT-055). A refusal is a misuse of the CLI:
 // nothing is written and nothing is recorded.
 export class Halt extends Error {
   constructor(code, reason) { super(`${code}: ${reason}`); this.code = code; this.reason = reason; }
@@ -131,14 +132,14 @@ function readRun(root) {
 
 const saveRun = (root, run) => writeAtomic(join(root, RUN_FILE), JSON.stringify(run, null, 2) + '\n');
 
-// Every verb but start and end drives a run that must exist, be this session's, and not be halted.
+// Every verb but start, resume and end drives a run that must exist, be this session's, and not be halted.
 function liveRun(root, sessionId) {
   const run = readRun(root);
   if (!run) throw new Refusal(`no run file at ${join(root, RUN_FILE)}; start one first`);
   if (run.session_id !== sessionId) {
     throw new Refusal(`run ${run.item} belongs to another session; end it, or start to replace it`);
   }
-  if (run.halt) throw new Refusal(`run ${run.item} halted with ${run.halt.code}; recover with end, then start (D12)`);
+  if (run.halt) throw new Refusal(`run ${run.item} halted with ${run.halt.code}; recover with resume, or end then start (D12, FEAT-055)`);
   return run;
 }
 
@@ -330,8 +331,7 @@ const scanRef = (root) => relative(root, join(HERE, 'security-scan.mjs')).split(
 
 // FEAT-034: what the security seat will run, fixed at start so Guard 7 and the router read one record.
 function resolveSecurity(root, stack, { threshold, dependencyAudit }) {
-  const head = gitValue(root, ['rev-parse', 'HEAD'], '');
-  const base = OBJECT_NAME.test(head) ? head : null;
+  const base = headObject(root);
   const auditCommand = dependencyAudit ? PM_AUDIT_COMMAND[stack.packageManager] ?? null : null;
   const dependency = !dependencyAudit ? 'disabled' : auditCommand ? 'audit' : 'not-covered';
   // C14: the scanner writes complete lines, severity included; 'none' keeps a fixed arity outside git (plan decisions).
@@ -369,6 +369,9 @@ const headCommit = (root) => {
   return /^[0-9a-f]{7,40}$/.test(head) ? head : '0000000';
 };
 
+// A full object name or null: what an approval and the security seat anchor to (FEAT-055, FEAT-034).
+const headObject = (root) => { const head = gitValue(root, ['rev-parse', 'HEAD'], ''); return OBJECT_NAME.test(head) ? head : null; };
+
 // A fix step's files come from the record, re-checked against the plan because the run file is writable.
 function codeScope(root, run, step) {
   if (step.fix !== undefined) { const { files } = fixDue(run); return fixScope(root, run, Array.isArray(files) ? files : [], step.fix); }
@@ -402,15 +405,21 @@ function envelopeFields(run, root, step) {
 const currentHash = (root, kind, rel) => { try { return documentHash(kind, readFileSync(join(root, rel))); } catch { return null; } };
 
 // FEAT-056: after define_approved, a changed spec or plan means the run would execute text nobody approved.
+// FEAT-055: returned, not thrown, so resume refuses with the same text where install halts.
+function approvedDocHalt(root, run, kind) {
+  const { path, sha256 } = run.approvals[kind] ?? {};
+  if (typeof path !== 'string' || typeof sha256 !== 'string') {
+    return new Halt('ORCH_APPROVAL_UNHASHED', `run ${run.item} records an approval without a document hash (started before FEAT-056); run end, then start`);
+  }
+  const now = currentHash(root, kind, path);
+  if (now === sha256) return null;
+  return new Halt('ORCH_APPROVED_DOC_CHANGED', `${kind} ${path} was approved at sha256 ${sha256} and ${now ? `now hashes ${now}` : 'can no longer be read'}`);
+}
+
 function checkApprovedDocs(root, run) {
   for (const kind of ['spec', 'plan']) {
-    const { path, sha256 } = run.approvals[kind] ?? {};
-    if (typeof path !== 'string' || typeof sha256 !== 'string') {
-      throw new Halt('ORCH_APPROVAL_UNHASHED', `run ${run.item} records an approval without a document hash (started before FEAT-056); run end, then start`);
-    }
-    const now = currentHash(root, kind, path);
-    if (now === sha256) continue;
-    throw new Halt('ORCH_APPROVED_DOC_CHANGED', `${kind} ${path} was approved at sha256 ${sha256} and ${now ? `now hashes ${now}` : 'can no longer be read'}`);
+    const failure = approvedDocHalt(root, run, kind);
+    if (failure) throw failure;
   }
 }
 
@@ -465,15 +474,20 @@ export function recordHandback(run, role, gate, verdict, extra = {}) {
   return { ...run, role: null, gate: forwardGate(run, role, gate), tasks, handbacks: [...run.handbacks, entry] };
 }
 
+// FEAT-055: the validated text is returned too, so resume can validate the same bytes again.
 function parseHandback(text) {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.startsWith('SNAP_HANDBACK '));
   if (lines.length !== 1) throw new Halt('ORCH_HANDBACK_MISSING', `expected exactly one SNAP_HANDBACK line, found ${lines.length}`);
   const json = lines[0].slice('SNAP_HANDBACK '.length).trim();
+  // The SNAP is stored in the run file, which the hooks stop reading past their envelope cap (Guard 6 would go from deny to warn).
+  if (Buffer.byteLength(json) > SNAP_STORE_MAX_BYTES) {
+    throw new Halt('ORCH_HANDBACK_INVALID', `the hand-back SNAP is larger than ${SNAP_STORE_MAX_BYTES} bytes`);
+  }
   const error = validate(json + '\n');
   if (error) throw new Halt('ORCH_HANDBACK_INVALID', error);
   const env = JSON.parse(json);
   if (env.v !== 3 && env.v !== 4) throw new Halt('ORCH_HANDBACK_INVALID', `a hand-back must be a v3 or v4 envelope, got v${env.v}`);
-  return env;
+  return { env, snap: json };
 }
 
 function auditStop({ verdict, blockers }, round, cap) {
@@ -743,14 +757,14 @@ async function handback(root, sessionId, role, bytes) {
     throw new Halt('ORCH_HANDBACK_CONFLICT', `${role} already handed back for this position; a second report is not routed`);
   }
   if (!run.role || run.role !== role) throw new Refusal(`handback ${role}: the dispatched role is ${run.role ?? 'none'}`);
-  const env = parseHandback(text);
+  const { env, snap } = parseHandback(text);
   if (env.sys.role !== role) throw new Halt('ORCH_HANDBACK_ROLE_MISMATCH', `dispatched ${role}, the hand-back names ${env.sys.role}`);
   if (!MAY_HAND_BACK[role].includes(env.ops.gate)) {
     throw new Halt('ORCH_GATE_UNEARNED', `${role} may hand back ${MAY_HAND_BACK[role].join('|')}, not ${env.ops.gate}`);
   }
   if (role === 'security') return securityHandback(root, run, env.ops.gate, text);
   const verdict = role === 'audit' ? parseVerdict(text) : null;
-  const recorded = recordHandback(run, role, env.ops.gate, verdict?.verdict);
+  const recorded = recordHandback(run, role, env.ops.gate, verdict?.verdict, { snap });
   saveRun(root, recorded);
   // Saved first, so the halt cli records lands on top of the audit entry (FEAT-060, FEAT-057).
   if (verdict && verdict.verdict !== 'APPROVE') return auditFix(root, recorded, verdict, bytes);
@@ -759,6 +773,7 @@ async function handback(root, sessionId, role, bytes) {
 }
 
 // Two human approvals, one gate write (A4): only an approved plan writes define_approved.
+// FEAT-055: and HEAD at that moment, so resume can tell whether history still holds it.
 // FEAT-056: each approval binds the bytes the owner was shown; a stale hash writes nothing.
 function approve(root, sessionId, what, rel, shown) {
   const run = liveRun(root, sessionId);
@@ -771,7 +786,7 @@ function approve(root, sessionId, what, rel, shown) {
   if (sha256 !== shown.toLowerCase()) {
     throw new Refusal(`ORCH_DOC_HASH_STALE: ${what} ${rel} hashes ${sha256}, not the ${shown} that was shown; show the document again`);
   }
-  const approval = { at: new Date().toISOString(), by: gitValue(root, ['config', 'user.name'], 'unknown'), path: rel, sha256 };
+  const approval = { at: new Date().toISOString(), by: gitValue(root, ['config', 'user.name'], 'unknown'), path: rel, sha256, commit: headObject(root) };
   if (what === 'plan') return approvePlan(root, run, content.toString('utf8'), approval);
   saveRun(root, { ...run, approvals: { ...run.approvals, spec: approval } });
   return `spec approved: sha256 ${sha256}`;
@@ -794,6 +809,105 @@ function checkLoopClosed(run, what) {
   if (isPlainObject(loop) && REVIEW_OUTCOME.test(loop.outcome ?? '')) return;
   const state = isPlainObject(loop) && Number.isInteger(loop.round) ? `open at round ${loop.round}` : 'not run';
   throw new Refusal(`ORCH_REVIEW_OPEN: review ${what} is ${state}; close it before the approval`);
+}
+
+const RESUME_USAGE = 'usage: orchestrate.mjs resume';
+const RESTART = 'recover with end, then start';
+const RECORD_KINDS = ['spec', 'plan'];
+
+// FEAT-055: every failure is a refusal, so a failed resume leaves the halt it was asked to clear as it was.
+function haltedRun(root, sessionId, args) {
+  if (args.length > 0) throw new Refusal(RESUME_USAGE);
+  let run = null;
+  try { run = readRun(root); } catch { /* an invalid run file is judged below */ }
+  if (!run) throw new Refusal(`ORCH_RESUME_NO_RUN: no valid run file at ${join(root, RUN_FILE)}`);
+  if (!run.halt) throw new Refusal(`ORCH_RESUME_NOT_HALTED: run ${run.item} is not halted; continue with ${describeStep(nextStep(run))}`);
+  if (!sessionId) throw new Refusal('ORCH_NO_SESSION_ID: CLAUDE_CODE_SESSION_ID is absent or empty, so Guard 6 could never bind this run');
+  if (!run.approvals.spec) throw new Refusal(`ORCH_RESUME_NO_GATE: run ${run.item} records no spec approval, so no gate is left to resume from; ${RESTART}`);
+  return run;
+}
+
+// 0: HEAD descends from commit; 1: it does not; anything else: git cannot answer. A non-hex name never reaches git as an option.
+function ancestry(root, commit) {
+  if (typeof commit !== 'string' || !/^[0-9a-f]{7,64}$/.test(commit)) return null;
+  return spawnSync('git', ['merge-base', '--is-ancestor', commit, 'HEAD'], { cwd: root, encoding: 'utf8' }).status;
+}
+
+const unanchored = (kind, reason) => new Refusal(`ORCH_RESUME_UNANCHORED: the ${kind} approval ${reason}; ${RESTART}`);
+
+// An approval is the owner's act, which the run cannot redo, so a failing one refuses the whole resume.
+function checkApproval(root, run, kind) {
+  const failure = approvedDocHalt(root, run, kind);
+  if (failure?.code === 'ORCH_APPROVAL_UNHASHED') throw new Refusal(failure.message);
+  const { commit } = run.approvals[kind];
+  if (commit === undefined) throw unanchored(kind, 'records no commit (approved before FEAT-055)');
+  if (commit === null) throw unanchored(kind, 'records a null commit (approved outside a git repository or before its first commit)');
+  if (failure) throw new Refusal(`${failure.message}; ${RESTART}`);
+  const answer = ancestry(root, commit);
+  if (answer === 1) {
+    throw new Refusal(`ORCH_RESUME_HISTORY_REWRITTEN: HEAD ${gitValue(root, ['rev-parse', 'HEAD'], 'unknown')} does not descend from the ${kind} approval's commit ${commit}; ${RESTART}`);
+  }
+  if (answer !== 0) throw unanchored(kind, `commit ${String(commit)} cannot be checked against HEAD`);
+}
+
+// The conflict's last entry is ambiguous, except a spec or plan entry whose approval already stands.
+function candidateEntries(run) {
+  const last = run.handbacks.at(-1);
+  if (run.halt.code !== 'ORCH_HANDBACK_CONFLICT' || !last) return run.handbacks;
+  return RECORD_KINDS.includes(last.role) && run.approvals[last.role] ? run.handbacks : run.handbacks.slice(0, -1);
+}
+
+// A task entry still describes the repository: its position, its SNAP and its commit all hold.
+function taskEntryHolds(root, entry, taskId) {
+  if (entry.task !== taskId || typeof entry.snap !== 'string' || validate(`${entry.snap}\n`) !== '') return false;
+  let env = null;
+  try { env = JSON.parse(entry.snap); } catch { return false; }
+  return env?.sys?.role === 'code' && ancestry(root, env.sys.c) === 0;
+}
+
+// Each approved document's entry, then Build's task entries up to the first that fails; Verify is always redone.
+function keptEntries(root, run) {
+  const entries = candidateEntries(run);
+  const approved = RECORD_KINDS.filter((k) => run.approvals[k]).map((k) => entries.find((h) => h.role === k)).filter(Boolean);
+  if (!run.approvals.plan) return { kept: approved, tasks: 0 };
+  const tasks = entries.filter((h) => h.role === 'code' && !('fix' in h));
+  let n = 0;
+  while (n < tasks.length && n < run.tasks.ids.length && taskEntryHolds(root, tasks[n], run.tasks.ids[n])) n += 1;
+  return { kept: [...approved, ...tasks.slice(0, n)], tasks: n };
+}
+
+// Only approvePlan writes define_approved, and only the last task's hand-back forwards build_executed.
+const resumedGate = (run, tasks) => (!run.approvals.plan ? 'boundary_routed' : tasks < run.tasks.ids.length ? 'define_approved' : 'build_executed');
+
+// A dropped document's loop is cleared with it, so the redone document gets a fresh review loop.
+const resumedReview = (run, kept) => (isPlainObject(run.review)
+  ? Object.fromEntries(Object.entries(run.review).filter(([k]) => kept.some((h) => h.role === k))) : run.review);
+
+function nextLine(run) {
+  const step = nextStep(run);
+  return step.task ? `${describeStep(step)} (task ${run.tasks.done + 1} of ${run.tasks.ids.length})` : describeStep(step);
+}
+
+// FEAT-055: back to the last gate whose record still validates; every record after it is dropped and redone.
+function resume(root, sessionId, args) {
+  const run = haltedRun(root, sessionId, args);
+  const approvals = RECORD_KINDS.filter((k) => run.approvals[k]);
+  for (const kind of approvals) checkApproval(root, run, kind);
+  const { kept, tasks } = keptEntries(root, run);
+  const records = kept.length + approvals.length;
+  const dropped = run.handbacks.length - kept.length;
+  const { code, reason, at } = run.halt;
+  const resumes = [...(Array.isArray(run.resumes) ? run.resumes : []), { at: new Date().toISOString(), halt: { code, reason, at }, kept: records, dropped }];
+  const next = {
+    ...run, session_id: sessionId, role: null, halt: null, gate: resumedGate(run, tasks),
+    handbacks: kept, tasks: { ...run.tasks, done: tasks }, review: resumedReview(run, kept), resumes,
+  };
+  // Computed before the write: resume records no halt, so a throw after saveRun would leave a changed run behind a failed exit.
+  const line = `run ${run.item} resumed after ${code} from ${next.gate}: kept ${records} record(s), dropped ${dropped}; next: ${nextLine(next)}`;
+  saveRun(root, next);
+  // The halted agent's envelope; the hand-back and review files stay for the owner and are overwritten on re-dispatch.
+  rmSync(join(root, ENVELOPE_FILE), { force: true });
+  return line;
 }
 
 const reviewWellFormed = (flag, arg, extra) => extra === undefined
@@ -1040,17 +1154,19 @@ export async function cli(argv, env, cwd = process.cwd()) {
     approve: () => approve(root, sid, a, b, c),
     hash: () => hashDoc(root, a, b),
     review: () => review(root, sid, argv.slice(1)),
+    resume: () => resume(root, sid, argv.slice(1)),
     envelope: () => envelopeVerb(root, sid, argv.slice(1)),
     end: () => end(root),
   };
   try {
-    if (!verbs[verb]) throw new Refusal('usage: orchestrate.mjs start|install|handback|approve|hash|review|envelope|end');
+    if (!verbs[verb]) throw new Refusal('usage: orchestrate.mjs start|install|handback|approve|hash|review|resume|envelope|end');
     process.stdout.write((await verbs[verb]()) + '\n');
     return 0;
   } catch (e) {
     if (e instanceof Refusal) { process.stderr.write(`orchestrate: ${e.message}\n`); return 2; }
     if (!(e instanceof Halt)) throw e;
-    if (verb !== 'start' && verb !== 'envelope') recordHalt(root, e);
+    // resume never records a halt: one thrown by a helper it reuses must not overwrite the halt it was resuming (FEAT-055).
+    if (!['start', 'envelope', 'resume'].includes(verb)) recordHalt(root, e);
     process.stderr.write(`${e.code}: ${e.reason}\n`);
     return 1;
   }
