@@ -3384,6 +3384,10 @@ describe('unattended mode [FEAT-054]', () => {
     '.Claude/MEMORY/Session-Snapshot.json',
     '.Conductor/x',
     '.CONDUCTOR',
+    '.claude/memory/orchestrator-run.json::$DATA',
+    '.claude/memory/ORCHES~1.JSO',
+    '.conductor./x',
+    '.claude /memory/band-envelope.json',
   ])('U22 [AC6] delegate plan over an APPROVE report escalates a task that declares %s', (path) => {
     atPlan();
     plan(`# Demo Plan\n\n${task(1, ['src/a.js'])}\n${task(2, [path])}\n## Test List\n`);

@@ -1032,6 +1032,8 @@ function globToRegExp(glob) {
 function inSurface(entry) {
   // Case-insensitive filesystems resolve differently-cased spellings to the same file; every surface path is lower-case.
   const glob = entry.replace(/^\.\//, '').toLowerCase();
+  // NTFS aliases one file under other spellings: a data stream, an 8.3 short name, a trailing dot or space.
+  if (glob.split('/').some((seg) => /[:~]|[. ]$/.test(seg))) return true;
   const first = glob.split('/')[0];
   if (first.startsWith('**') || globToRegExp(first).test('.conductor')) return true;
   return WRITE_SURFACE.some((s) => !s.endsWith('/**') && globToRegExp(glob).test(s));
