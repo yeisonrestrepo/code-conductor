@@ -4,6 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dw/%40yeison.restrepo.r%2Fcode-conductor.svg)](https://www.npmjs.com/package/@yeison.restrepo.r/code-conductor)
 [![License](https://img.shields.io/github/license/yeisonrestrepo/code-conductor.svg)](https://github.com/yeisonrestrepo/code-conductor/blob/main/LICENSE)
 [![GitHub issues](https://img.shields.io/github/issues/yeisonrestrepo/code-conductor.svg)](https://github.com/yeisonrestrepo/code-conductor/issues)
+[![OpenSSF Scorecard](https://img.shields.io/ossf-scorecard/github.com/yeisonrestrepo/code-conductor?label=openssf%20scorecard[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/yeisonrestrepo/code-conductor/badge)](https://scorecard.dev/viewer/?uri=github.com/yeisonrestrepo/code-conductor)logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIuMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNNyA3IDIgMTJsNSA1TTE3IDdsNSA1LTUgNU0xMCAxOS41IDE1LjUgNCIvPjxjaXJjbGUgY3g9IjkuMyIgY3k9IjIxIiByPSIyIiBmaWxsPSIjZmZmIiBzdHJva2U9Im5vbmUiLz48L3N2Zz4=)](https://scorecard.dev/viewer/?uri=github.com/yeisonrestrepo/code-conductor)
 
 **Make Claude Code work like a senior engineer, not an enthusiastic intern.**
 
