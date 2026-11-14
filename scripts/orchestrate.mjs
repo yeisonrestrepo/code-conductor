@@ -49,6 +49,8 @@ const isModel = (m) => MODEL_ALIASES.includes(m);
 // Every outcome a closed loop can carry; only the skip is the orchestrator's to record (FEAT-058).
 const REVIEW_OUTCOME = /^(clean|cap|unchanged|skipped:[a-z][a-z0-9-]{0,39})$/;
 const SKIP_OUTCOME = /^skipped:[a-z][a-z0-9-]{0,39}$/;
+// BUG-076: the outcomes that claim a reviewer read the bytes; only these bind the approval and may close again as a skip.
+const REVIEWED_OUTCOME = /^(clean|cap|unchanged)$/;
 const REVIEW_ROW = /^- \[(AC|FMT|CR)\]/;
 const REVIEW_USAGE = 'usage: orchestrate.mjs review <spec|plan> --round <doc> | --record | --close skipped:<reason>';
 
@@ -929,8 +931,8 @@ function approve(root, sessionId, what, rel, shown) {
   if (!RECORD_KINDS.includes(what)) throw new Refusal(APPROVE_USAGE);
   if (!SHA256_HEX.test(shown ?? '')) throw new Refusal(APPROVE_USAGE);
   const content = readDoc(root, rel, APPROVE_USAGE);
-  checkLoopClosed(run, what);
   const sha256 = documentHash(what, content);
+  checkLoopClosed(run, what, rel, sha256);
   if (sha256 !== shown.toLowerCase()) {
     throw new Refusal(`ORCH_DOC_HASH_STALE: ${what} ${rel} hashes ${sha256}, not the ${shown} that was shown; show the document again`);
   }
@@ -952,11 +954,15 @@ function approvePlan(root, run, text, approval, head = 'plan approved') {
 }
 
 // FEAT-058: a skip stays possible but is never silent, so approve waits for a recorded outcome.
-function checkLoopClosed(run, what) {
+// BUG-076: and a reviewed outcome stands only for the bytes the reviewer read; a skip claims no review (D2).
+function checkLoopClosed(run, what, rel, sha256) {
   const loop = isPlainObject(run.review) ? run.review[what] : undefined;
-  if (isPlainObject(loop) && REVIEW_OUTCOME.test(loop.outcome ?? '')) return;
-  const state = isPlainObject(loop) && Number.isInteger(loop.round) ? `open at round ${loop.round}` : 'not run';
-  throw new Refusal(`ORCH_REVIEW_OPEN: review ${what} is ${state}; close it before the approval`);
+  if (!isPlainObject(loop) || !REVIEW_OUTCOME.test(loop.outcome ?? '')) {
+    const state = isPlainObject(loop) && Number.isInteger(loop.round) ? `open at round ${loop.round}` : 'not run';
+    throw new Refusal(`ORCH_REVIEW_OPEN: review ${what} is ${state}; close it before the approval`);
+  }
+  if (!REVIEWED_OUTCOME.test(loop.outcome) || loop.sha256 === sha256) return;
+  throw new Refusal(`ORCH_REVIEW_DOC_MISMATCH: review ${what} closed ${loop.outcome} over sha256 ${loop.sha256 ?? 'none'}, not ${rel} at ${sha256}; close it with review ${what} --close skipped:<reason>, then show the approval again`);
 }
 
 const DELEGATE_USAGE = `usage: orchestrate.mjs delegate <spec|plan> ${DOC_PATH} <sha256> | delegate build | delegate <spec|plan|build> --check`;
@@ -984,9 +990,12 @@ function delegatedRun(root, sessionId, kind) {
 
 const snapFiles = (entry) => { try { const f = JSON.parse(entry?.snap).ops.f; return Array.isArray(f) ? f.map(String) : []; } catch { return []; } };
 
+// The role's pinned docs folder (FEAT-047): its scope glob without the trailing **, or '' when none was pinned.
+const docsFolder = (run, kind) => String(run.docs?.scopes?.[kind]?.[0] ?? '').replace(/\*\*$/, '');
+
 // The document the Define role named in its hand-back, inside its pinned folder: the brief's, never the orchestrator's pick.
 function handedBackDoc(run, kind) {
-  const folder = String(run.docs?.scopes?.[kind]?.[0] ?? '').replace(/\*\*$/, '');
+  const folder = docsFolder(run, kind);
   const docs = snapFiles(run.handbacks.findLast((h) => h.role === kind)).filter((f) => /:[CM]$/.test(f)).map((f) => f.slice(0, -2))
     .filter((p) => folder !== '' && p.startsWith(folder) && p.endsWith('.md'));
   if (docs.length !== 1) throw new Refusal(`delegate ${kind}: the ${kind} hand-back names ${docs.length} document(s) under ${folder}; show the approval and wait for the owner`);
@@ -1064,8 +1073,8 @@ const ownerRequired = (kind, { verdict, reason }) => `owner approval required: d
 // approve's own checks, in its order, then the report: an APPROVE records the reviewer as approver (D5 on anything else).
 function delegateDefine(root, run, { kind, rel, shown }) {
   const content = readDoc(root, rel, DELEGATE_USAGE);
-  checkLoopClosed(run, kind);
   const sha256 = documentHash(kind, content);
+  checkLoopClosed(run, kind, rel, sha256);
   if (sha256 !== shown.toLowerCase()) throw new Refusal(`ORCH_DOC_HASH_STALE: ${kind} ${rel} hashes ${sha256}, not the ${shown} that was shown; show the document again`);
   const expected = handedBackDoc(run, kind);
   if (rel !== expected) throw new Refusal(`delegate ${kind}: ${rel} is not the document the ${kind} hand-back names (${expected})`);
@@ -1230,8 +1239,9 @@ function review(root, sessionId, [role, flag, arg, extra]) {
   if (!RECORD_KINDS.includes(role)) throw new Refusal(REVIEW_USAGE);
   const loops = isPlainObject(run.review) ? run.review : {};
   const loop = isPlainObject(loops[role]) && Number.isInteger(loops[role].round) ? loops[role] : { round: 0, outcome: null };
-  if (loop.outcome) throw new Refusal(`review ${role}: the loop closed ${loop.outcome}; a closed loop does not reopen`);
-  const { next, say } = flag === '--round' ? openRound(root, role, loop, arg, modelSegment(run, 'define-review'))
+  // BUG-076: a reviewed loop may close once more as a skip, so an edit after it is on the record (D4).
+  if (loop.outcome && !(flag === '--close' && REVIEWED_OUTCOME.test(loop.outcome))) throw new Refusal(`review ${role}: the loop closed ${loop.outcome}; a closed loop does not reopen`);
+  const { next, say } = flag === '--round' ? openRound(root, role, loop, arg, docsFolder(run, role), modelSegment(run, 'define-review'))
     : flag === '--record' ? recordRound(root, role, loop, modelSegment(run, role))
       : { next: closedLoop(loop, arg), say: `review ${role} closed ${arg} at round ${loop.round}` };
   saveRun(root, { ...run, review: { ...loops, [role]: next } });
@@ -1243,12 +1253,16 @@ function review(root, sessionId, [role, flag, arg, extra]) {
 const closedLoop = (loop, outcome) => ({ round: loop.round, outcome, sha256: loop.sha256 ?? null });
 const clearReviewDir = (root) => rmSync(join(root, REVIEW_DIR), { recursive: true, force: true });
 
-function openRound(root, role, loop, rel, model) {
+function openRound(root, role, loop, rel, folder, model) {
   if (loop.round > 0 && loop.await !== 'revision') throw new Refusal(`review ${role}: round ${loop.round} awaits its review record`);
   if (loop.round >= REVIEW_CAP) {
     throw new Refusal(`ORCH_REVIEW_CAP: review ${role} has run ${REVIEW_CAP} rounds; close it with --close skipped:<reason>`);
   }
-  const sha256 = documentHash(role, readDoc(root, rel, REVIEW_USAGE));
+  const bytes = readDoc(root, rel, REVIEW_USAGE);
+  // BUG-076: after readDoc's own checks, so a bad path keeps its message; an unpinned folder refuses every path (D5),
+  // and a scope without its trailing slash would let a look-alike sibling folder through.
+  if (!folder.endsWith('/') || !rel.startsWith(folder)) throw new Refusal(`ORCH_REVIEW_OUT_OF_SCOPE: ${rel} is not under the ${role} docs folder ${folder || 'none'}`);
+  const sha256 = documentHash(role, bytes);
   const round = loop.round + 1;
   // E3: a revision that leaves the hash as it was is a failed round, recorded rather than retried.
   if (loop.round > 0 && sha256 === loop.sha256) {
