@@ -1,6 +1,6 @@
 # FEAT-061: Role agents dispatched by phase commands outside /cc-orchestrate
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-13 by independent review (round 1)
 **Item:** FEAT-061 (intake of issue #179)
 **Date:** 2026-11-13
 
