@@ -483,6 +483,7 @@ The backup and temp rules keep the installer's own backups and crash-stranded te
     | `systemMessage` | `default` | yes, for example Guard 2's overwrite prompt | no: the warning is lost |
   - Agent definitions provided by plugins are not searched.
   - `resume` (`[FEAT-055]`) needs approvals that recorded their commit: a run approved before it is refused `ORCH_RESUME_UNANCHORED` and still needs `end`, then `start`, and a Build task entry without a stored SNAP is redone.
+  - `--unattended` (`[FEAT-054]`) cannot be set by a role agent, but the run file sits inside the orchestrator's own write surface, so a hand edit could set `unattended` just as it could forge an approval; Guard 6 does not stop it.
 
   The five role agent definitions it dispatches ship from `1.37.0`; their limits are the next item.
 - **The role agents (`1.37.0`) are bounded by their tool masks, and Guard 7 bounds one thing beneath them: the shell.**
