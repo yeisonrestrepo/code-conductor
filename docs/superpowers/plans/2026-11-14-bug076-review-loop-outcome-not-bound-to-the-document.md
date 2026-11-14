@@ -57,7 +57,7 @@ Line numbers below are from HEAD e98b4c9; locate by the quoted text if they move
 - Modify: `tests/scripts/orchestrate.test.js`
 - Modify: `scripts/orchestrate.mjs`
 
-- [ ] [T-101] `tests/scripts/orchestrate.test.js`: insert a new `describe('review binding [BUG-076]', …)` right after the closing `});` of `describe('review loop over review files [FEAT-058]', …)` (line 1034) and before `describe('doc locations [FEAT-047]', …)`. It uses the file-level helpers `openFirst`, `reviseTo`, `writeReview`, `putDoc`, `loop`, `runText`, `docOf`, `reviewPath`, `approveArgs`, `awaiting`, `ROW` and `TWO_TASKS`. Depends on T-004.
+- [X] [T-101] `tests/scripts/orchestrate.test.js`: insert a new `describe('review binding [BUG-076]', …)` right after the closing `});` of `describe('review loop over review files [FEAT-058]', …)` (line 1034) and before `describe('doc locations [FEAT-047]', …)`. It uses the file-level helpers `openFirst`, `reviseTo`, `writeReview`, `putDoc`, `loop`, `runText`, `docOf`, `reviewPath`, `approveArgs`, `awaiting`, `ROW` and `TWO_TASKS`. Depends on T-004.
   ```js
   describe('review binding [BUG-076]', () => {
     const EDITED = '# Demo spec, edited\n';
@@ -96,7 +96,7 @@ Line numbers below are from HEAD e98b4c9; locate by the quoted text if they move
   - B10 `it.each(['clean', 'cap', 'unchanged'])` **"B10 re-closes a %s loop as skipped:doc-changed with its round and hash, then approves the edited document"**: `const closed = closeSpec(outcome)`; `putDoc('spec', EDITED)`; `mkdirSync(join(root, REVIEW_DIR), { recursive: true })`; `writeFileSync(join(root, reviewPath('spec', 9)), 'stray\n')`; `orch(['review', 'spec', '--close', 'skipped:doc-changed'])` toMatchObject `{ status: 0, out: `review spec closed skipped:doc-changed at round ${ROUNDS[outcome]}` }`; `loop('spec')` toEqual `{ round: ROUNDS[outcome], outcome: 'skipped:doc-changed', sha256: closed }`; `existsSync(join(root, REVIEW_DIR))` false; `orch(['approve', 'spec', SPEC, sha(SPEC)])` toMatchObject `{ status: 0, out: `spec approved: sha256 ${sha(SPEC)}` }`.
   - B11 **"B11 a re-closed loop refuses every form"**: `closeSpec('clean')`; `orch(['review', 'spec', '--close', 'skipped:doc-changed']).status` 0; for each `args` of `[['--round', SPEC], ['--record'], ['--close', 'skipped:verb']]`, `orch(['review', 'spec', ...args])` toMatchObject `{ status: 2, err: 'orchestrate: review spec: the loop closed skipped:doc-changed; a closed loop does not reopen' }`.
   - B12 **"B12 a reviewed loop still refuses --round and --record"**: `closeSpec('clean')`; for each `args` of `[['--round', SPEC], ['--record']]`, `orch(['review', 'spec', ...args])` toMatchObject `{ status: 2, err: 'orchestrate: review spec: the loop closed clean; a closed loop does not reopen' }`; `loop('spec').outcome` is `'clean'`.
-- [ ] [T-102] `tests/scripts/orchestrate.test.js`: inside `describe('unattended mode [FEAT-054]', …)`, after the last test (`U39 [AC4b] resume keeps an attended run attended`) and before the describe's closing `});`, add the delegate case (it uses that block's `atSpec`, `delegateDoc`, `docSay`, `putReport`, `report` and `runBytes`). Depends on T-101.
+- [X] [T-102] `tests/scripts/orchestrate.test.js`: inside `describe('unattended mode [FEAT-054]', …)`, after the last test (`U39 [AC4b] resume keeps an attended run attended`) and before the describe's closing `});`, add the delegate case (it uses that block's `atSpec`, `delegateDoc`, `docSay`, `putReport`, `report` and `runBytes`). Depends on T-101.
   - U40 `it.each(['spec', 'plan'])` **"U40 [BUG-076] delegate %s refuses ORCH_REVIEW_DOC_MISMATCH over a clean loop of another hash, leaving delegated unset"**:
     ```js
     if (kind === 'spec') atSpec({ loop: false });
@@ -120,13 +120,13 @@ Line numbers below are from HEAD e98b4c9; locate by the quoted text if they move
     expect(runBytes()).toBe(before);
     expect(runFile().delegated?.[kind]).toBeUndefined();
     ```
-- [ ] [T-103] Red step: `npx vitest run tests/scripts/orchestrate.test.js -t "BUG-076"`. No existing test name contains `BUG-076` (measured by `grep -n "BUG-076" tests/scripts/orchestrate.test.js` before T-101: no match), so the predicted full match set is the 24 new tests: B1 ×3, B2, B3 ×3, B4, B5, B6 ×2, B7 ×3, B8 ×2, B9, B10 ×3, B11, B12, U40 ×2. **Red, 17:** B1 ×3, B2 and B5 (the approval succeeds today, exit 0), B7 ×3, B8 ×2 and B9 (the round opens today), B10 ×3 and B11 (the re-close refuses `does not reopen` today), U40 ×2 (the delegated review approves today). **Green, 7:** B3 ×3, B4, B6 ×2 and B12 (behavior this item keeps). Every other test is filtered out. Depends on T-102.
-- [ ] [T-104] `scripts/orchestrate.mjs`, after `const SKIP_OUTCOME = /^skipped:[a-z][a-z0-9-]{0,39}$/;` (line 51) add (plan decision 1): Depends on T-103.
+- [X] [T-103] Red step: `npx vitest run tests/scripts/orchestrate.test.js -t "BUG-076"`. No existing test name contains `BUG-076` (measured by `grep -n "BUG-076" tests/scripts/orchestrate.test.js` before T-101: no match), so the predicted full match set is the 24 new tests: B1 ×3, B2, B3 ×3, B4, B5, B6 ×2, B7 ×3, B8 ×2, B9, B10 ×3, B11, B12, U40 ×2. **Red, 17:** B1 ×3, B2 and B5 (the approval succeeds today, exit 0), B7 ×3, B8 ×2 and B9 (the round opens today), B10 ×3 and B11 (the re-close refuses `does not reopen` today), U40 ×2 (the delegated review approves today). **Green, 7:** B3 ×3, B4, B6 ×2 and B12 (behavior this item keeps). Every other test is filtered out. Depends on T-102.
+- [X] [T-104] `scripts/orchestrate.mjs`, after `const SKIP_OUTCOME = /^skipped:[a-z][a-z0-9-]{0,39}$/;` (line 51) add (plan decision 1): Depends on T-103.
   ```js
   // BUG-076: the outcomes that claim a reviewer read the bytes; only these bind the approval and may close again as a skip.
   const REVIEWED_OUTCOME = /^(clean|cap|unchanged)$/;
   ```
-- [ ] [T-105] `scripts/orchestrate.mjs`, `checkLoopClosed` (line 955) and its two callers (plan decision 2). Depends on T-104.
+- [X] [T-105] `scripts/orchestrate.mjs`, `checkLoopClosed` (line 955) and its two callers (plan decision 2). Depends on T-104.
   - Replace the function, its FEAT-058 comment kept, with:
     ```js
     // FEAT-058: a skip stays possible but is never silent, so approve waits for a recorded outcome.
@@ -143,14 +143,14 @@ Line numbers below are from HEAD e98b4c9; locate by the quoted text if they move
     ```
   - `approve` (lines 932-933): swap the two lines into `const sha256 = documentHash(what, content);` then `checkLoopClosed(run, what, rel, sha256);`.
   - `delegateDefine` (lines 1067-1068): the same swap, `const sha256 = documentHash(kind, content);` then `checkLoopClosed(run, kind, rel, sha256);`.
-- [ ] [T-106] `scripts/orchestrate.mjs`, the docs-folder helper (plan decision 3). Depends on T-105.
+- [X] [T-106] `scripts/orchestrate.mjs`, the docs-folder helper (plan decision 3). Depends on T-105.
   - Above the comment `// The document the Define role named in its hand-back, …` (line 987) add:
     ```js
     // The role's pinned docs folder (FEAT-047): its scope glob without the trailing **, or '' when none was pinned.
     const docsFolder = (run, kind) => String(run.docs?.scopes?.[kind]?.[0] ?? '').replace(/\*\*$/, '');
     ```
   - `handedBackDoc` (line 989): `const folder = String(run.docs?.scopes?.[kind]?.[0] ?? '').replace(/\*\*$/, '');` → `const folder = docsFolder(run, kind);`.
-- [ ] [T-107] `scripts/orchestrate.mjs`, `review` and `openRound` (plan decisions 4 and 5). Depends on T-106.
+- [X] [T-107] `scripts/orchestrate.mjs`, `review` and `openRound` (plan decisions 4 and 5). Depends on T-106.
   - `review` (line 1233): replace `if (loop.outcome) throw new Refusal(…does not reopen…);` with
     ```js
     // BUG-076: a reviewed loop may close once more as a skip, so an edit after it is on the record (D4).
@@ -165,9 +165,9 @@ Line numbers below are from HEAD e98b4c9; locate by the quoted text if they move
     const sha256 = documentHash(role, bytes);
     ```
   - `review` grows from 17 to 18 lines and `openRound` from 13 to 16, both under 30.
-- [ ] [T-108] Green step: `npx vitest run tests/scripts/orchestrate.test.js -t "BUG-076"`. Predicted: the same 24 tests, all **green**. Then `npx vitest run tests/scripts/orchestrate.test.js`: 625 passed (601 + 24), with R16, R18, R20, M1, P1-P3, U27, U29 and every `skipLoop` fixture unchanged and green. Depends on T-107.
-- [ ] [T-109] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-14-bug076-review-loop-outcome-not-bound-to-the-document.md`. Depends on T-108.
-- [ ] [T-110] Commit: `fix: bind the review-loop outcome to the approved document and scope its rounds [BUG-076]`. Depends on T-109.
+- [X] [T-108] Green step: `npx vitest run tests/scripts/orchestrate.test.js -t "BUG-076"`. Predicted: the same 24 tests, all **green**. Then `npx vitest run tests/scripts/orchestrate.test.js`: 625 passed (601 + 24), with R16, R18, R20, M1, P1-P3, U27, U29 and every `skipLoop` fixture unchanged and green. Depends on T-107.
+- [X] [T-109] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-14-bug076-review-loop-outcome-not-bound-to-the-document.md`. Depends on T-108.
+- [X] [T-110] Commit: `fix: bind the review-loop outcome to the approved document and scope its rounds [BUG-076]`. Depends on T-109.
 
 ---
 
@@ -178,7 +178,7 @@ Line numbers below are from HEAD e98b4c9; locate by the quoted text if they move
 - Modify: `.claude/commands/cc-orchestrate.md`
 - Modify: `project-template/.claude/commands/cc-orchestrate.md`
 
-- [ ] [T-201] `tests/installer/commands-parity.test.js`: inside `describe('cc-orchestrate review loop [FEAT-041 AC5, AC6, FEAT-058]', …)`, after the test `fails open with named reasons, never halts, and records every skip before the approval` (lines 378-383), add: Depends on T-110.
+- [X] [T-201] `tests/installer/commands-parity.test.js`: inside `describe('cc-orchestrate review loop [FEAT-041 AC5, AC6, FEAT-058]', …)`, after the test `fails open with named reasons, never halts, and records every skip before the approval` (lines 378-383), add: Depends on T-110.
   ```js
   it.each(ORCH_MIRRORS)('[BUG-076] %s names the document mismatch, its recovery and the out-of-scope round', (rel) => {
     const t = read(rel);
@@ -187,16 +187,16 @@ Line numbers below are from HEAD e98b4c9; locate by the quoted text if they move
       '`ORCH_REVIEW_DOC_MOVED` and `ORCH_REVIEW_OUT_OF_SCOPE` included.']) expect(t).toContain(p);
   });
   ```
-- [ ] [T-202] Red step: `npx vitest run tests/installer/commands-parity.test.js -t "BUG-076"`. Predicted full match set: the 2 new rows, both **red** (neither mirror holds the phrases). Every other test is filtered out. Depends on T-201.
-- [ ] [T-203] `.claude/commands/cc-orchestrate.md` and, identically, `project-template/.claude/commands/cc-orchestrate.md`. Depends on T-202.
+- [X] [T-202] Red step: `npx vitest run tests/installer/commands-parity.test.js -t "BUG-076"`. Predicted full match set: the 2 new rows, both **red** (neither mirror holds the phrases). Every other test is filtered out. Depends on T-201.
+- [X] [T-203] `.claude/commands/cc-orchestrate.md` and, identically, `project-template/.claude/commands/cc-orchestrate.md`. Depends on T-202.
   - After the bullet that starts `   - **The loop must be closed.** On \`ORCH_REVIEW_OPEN\`` (line 74) and before the bullet `   - **The script checks the hash.**` (line 75), insert one bullet with the same three-space indent:
     `   - **The review must cover the document.** On \`ORCH_REVIEW_DOC_MISMATCH\`, a refusal that writes nothing, the loop closed \`clean\`, \`cap\` or \`unchanged\` over other bytes than the document you are approving, usually because it was edited after the loop: run \`review <role> --close skipped:doc-changed\`, then show the approval again with the skip notice and the document's new hash.`
   - The unattended bullet (line 78): `(\`ORCH_NOT_UNATTENDED\`, \`ORCH_REVIEW_OPEN\`, \`ORCH_DOC_HASH_STALE\`,` → `(\`ORCH_NOT_UNATTENDED\`, \`ORCH_REVIEW_OPEN\`, \`ORCH_REVIEW_DOC_MISMATCH\`, \`ORCH_DOC_HASH_STALE\`,`.
   - The fail-open reason (line 109): `` - `verb`: the `review` verb refuses or errors otherwise, `ORCH_REVIEW_DOC_MOVED` included. `` → `` - `verb`: the `review` verb refuses or errors otherwise, `ORCH_REVIEW_DOC_MOVED` and `ORCH_REVIEW_OUT_OF_SCOPE` included. `` (plan decision 6).
   - Then `cmp .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md` exits 0.
-- [ ] [T-204] Green step: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: 91 passed (89 + 2), the mirror-identity test (line 201) and the fail-open reasons test (lines 378-383) included. Depends on T-203.
-- [ ] [T-205] Stage: `git add -u .claude/commands/cc-orchestrate.md`, `git add -u project-template/.claude/commands/cc-orchestrate.md`, `git add -u tests/installer/commands-parity.test.js`, `git add -u docs/superpowers/plans/2026-11-14-bug076-review-loop-outcome-not-bound-to-the-document.md`. Depends on T-204.
-- [ ] [T-206] Commit: `docs: cc-orchestrate names the review mismatch and its recorded recovery [BUG-076]`. Depends on T-205.
+- [X] [T-204] Green step: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: 91 passed (89 + 2), the mirror-identity test (line 201) and the fail-open reasons test (lines 378-383) included. Depends on T-203.
+- [X] [T-205] Stage: `git add -u .claude/commands/cc-orchestrate.md`, `git add -u project-template/.claude/commands/cc-orchestrate.md`, `git add -u tests/installer/commands-parity.test.js`, `git add -u docs/superpowers/plans/2026-11-14-bug076-review-loop-outcome-not-bound-to-the-document.md`. Depends on T-204.
+- [X] [T-206] Commit: `docs: cc-orchestrate names the review mismatch and its recorded recovery [BUG-076]`. Depends on T-205.
 
 ---
 
@@ -205,24 +205,24 @@ Line numbers below are from HEAD e98b4c9; locate by the quoted text if they move
 **Files:**
 - Modify: `docs/superpowers/plans/2026-11-14-bug076-review-loop-outcome-not-bound-to-the-document.md`
 
-- [ ] [T-301] Run `npm test`. Predicted: exit 0, every file green, 26 tests more than the pre-change suite (24 in `orchestrate.test.js`, 2 in `commands-parity.test.js`; no existing test edited), no new skip. Depends on T-206.
-- [ ] [T-302] Grep checks: `git grep -n "checkLoopClosed(" -- scripts` shows the definition and exactly two calls, each with four arguments; `cmp .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md` exits 0; `git diff --stat origin/main -- VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md .claude/memory .claude/hooks project-template/.claude/hooks .github/workflows .github/actions` prints nothing. Depends on T-301.
-- [ ] [T-303] Stage: `git add -u docs/superpowers/plans/2026-11-14-bug076-review-loop-outcome-not-bound-to-the-document.md` (ticks T-206 to T-302). Depends on T-302.
-- [ ] [T-304] Commit: `docs: close out the BUG-076 plan [BUG-076]`. Depends on T-303.
+- [X] [T-301] Run `npm test`. Predicted: exit 0, every file green, 26 tests more than the pre-change suite (24 in `orchestrate.test.js`, 2 in `commands-parity.test.js`; no existing test edited), no new skip. Depends on T-206.
+- [X] [T-302] Grep checks: `git grep -n "checkLoopClosed(" -- scripts` shows the definition and exactly two calls, each with four arguments; `cmp .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md` exits 0; `git diff --stat origin/main -- VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md .claude/memory .claude/hooks project-template/.claude/hooks .github/workflows .github/actions` prints nothing. Depends on T-301.
+- [X] [T-303] Stage: `git add -u docs/superpowers/plans/2026-11-14-bug076-review-loop-outcome-not-bound-to-the-document.md` (ticks T-206 to T-302). Depends on T-302.
+- [X] [T-304] Commit: `docs: close out the BUG-076 plan [BUG-076]`. Depends on T-303.
 
 ---
 
 ## Test List
 
-- [ ] Integration, AC1 (approve binds the hash): B1 (`clean`, `cap`, `unchanged` for spec), B2 (plan), B5 (a `clean` loop with no hash); each leaves the run file byte-identical.
-- [ ] Integration, AC2 (delegate binds the hash): U40 for spec and plan, run file byte-identical and `delegated.<kind>` unset.
-- [ ] Integration, AC3 (a match still passes): B3 (all three outcomes), B4 (ticked plan box), M1 and P3 unchanged.
-- [ ] Integration, AC4 (a skip stays unbound): B6 (before and after a round), P3 `skipped:owner`, R20 and every `skipLoop` fixture unchanged.
-- [ ] Integration, AC5 (scoped round): B7 (outside the folder, a prefix look-alike, the other role's folder), B8 (empty and missing scope), B9 (grouped scope); R18's three messages unchanged.
-- [ ] Integration, AC6 (re-close): B10 (record, `.conductor/review/` removed, approval of the edited document), B11 and R16 (a skipped loop refuses every form), B12 (a reviewed loop still refuses `--round` and `--record`).
-- [ ] Command pin, AC7: the BUG-076 rows in `commands-parity.test.js` for both mirrors, and the existing mirror-identity test.
-- [ ] AC8: `npm test` green (T-301).
-- [ ] No E2E/UI test: there is no UI.
+- [X] Integration, AC1 (approve binds the hash): B1 (`clean`, `cap`, `unchanged` for spec), B2 (plan), B5 (a `clean` loop with no hash); each leaves the run file byte-identical.
+- [X] Integration, AC2 (delegate binds the hash): U40 for spec and plan, run file byte-identical and `delegated.<kind>` unset.
+- [X] Integration, AC3 (a match still passes): B3 (all three outcomes), B4 (ticked plan box), M1 and P3 unchanged.
+- [X] Integration, AC4 (a skip stays unbound): B6 (before and after a round), P3 `skipped:owner`, R20 and every `skipLoop` fixture unchanged.
+- [X] Integration, AC5 (scoped round): B7 (outside the folder, a prefix look-alike, the other role's folder), B8 (empty and missing scope), B9 (grouped scope); R18's three messages unchanged.
+- [X] Integration, AC6 (re-close): B10 (record, `.conductor/review/` removed, approval of the edited document), B11 and R16 (a skipped loop refuses every form), B12 (a reviewed loop still refuses `--round` and `--record`).
+- [X] Command pin, AC7: the BUG-076 rows in `commands-parity.test.js` for both mirrors, and the existing mirror-identity test.
+- [X] AC8: `npm test` green (T-301).
+- [X] No E2E/UI test: there is no UI.
 
 ## Commit Order
 

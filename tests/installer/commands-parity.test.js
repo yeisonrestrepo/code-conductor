@@ -382,6 +382,13 @@ describe('cc-orchestrate review loop [FEAT-041 AC5, AC6, FEAT-058]', () => {
     expect(text()).not.toContain('`denied`');
   });
 
+  it.each(ORCH_MIRRORS)('[BUG-076] %s names the document mismatch, its recovery and the out-of-scope round', (rel) => {
+    const t = read(rel);
+    for (const p of ['On `ORCH_REVIEW_DOC_MISMATCH`, a refusal that writes nothing,', 'run `review <role> --close skipped:doc-changed`',
+      '(`ORCH_NOT_UNATTENDED`, `ORCH_REVIEW_OPEN`, `ORCH_REVIEW_DOC_MISMATCH`, `ORCH_DOC_HASH_STALE`,',
+      '`ORCH_REVIEW_DOC_MOVED` and `ORCH_REVIEW_OUT_OF_SCOPE` included.']) expect(t).toContain(p);
+  });
+
   it('shows the unchanged outcome at the approval', () => {
     has('`unchanged` at round `<n>` with the last review\'s rows verbatim');
   });

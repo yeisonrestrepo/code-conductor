@@ -1033,6 +1033,135 @@ describe('review loop over review files [FEAT-058]', () => {
   });
 });
 
+describe('review binding [BUG-076]', () => {
+  const EDITED = '# Demo spec, edited\n';
+  const MORE_PLAN = `${TWO_TASKS}\nOne more line.\n`;
+  // Closes the spec loop with `outcome` through the verb's own reads; returns the hash it closed over.
+  function closeSpec(outcome) {
+    openFirst('spec');
+    if (outcome === 'clean') { writeReview('spec', 1, 'CLEAN'); orch(['review', 'spec', '--record']); }
+    if (outcome === 'unchanged') reviseTo('spec', 1, '# Demo spec\n');
+    if (outcome === 'cap') {
+      reviseTo('spec', 1, '# Demo spec, v2\n');
+      reviseTo('spec', 2, '# Demo spec, v3\n');
+      writeReview('spec', 3, 'OPEN 1', [ROW]);
+      orch(['review', 'spec', '--record']);
+    }
+    expect(loop('spec').outcome).toBe(outcome);
+    return loop('spec').sha256;
+  }
+  const mismatch = (kind, outcome, closed) => `orchestrate: ORCH_REVIEW_DOC_MISMATCH: review ${kind} closed ${outcome} over sha256 ${closed}, not ${docOf(kind)} at ${sha(docOf(kind))}; close it with review ${kind} --close skipped:<reason>, then show the approval again`;
+  const outOfScope = (rel, role, folder) => `orchestrate: ORCH_REVIEW_OUT_OF_SCOPE: ${rel} is not under the ${role} docs folder ${folder}`;
+  const seedScopes = (edit) => { const run = runFile(); runFileText(JSON.stringify({ ...run, docs: { ...run.docs, scopes: edit(run.docs.scopes) } })); };
+  const ROUNDS = { clean: 1, unchanged: 2, cap: 3 };
+
+  it.each(['clean', 'cap', 'unchanged'])('B1 approve spec refuses ORCH_REVIEW_DOC_MISMATCH after a %s close over another hash, writing nothing', (outcome) => {
+    const closed = closeSpec(outcome);
+    putDoc('spec', EDITED);
+    const before = runText();
+    expect(orch(['approve', 'spec', SPEC, sha(SPEC)])).toMatchObject({ status: 2, err: mismatch('spec', outcome, closed) });
+    expect(runText()).toBe(before);
+  });
+
+  it('B2 approve plan refuses ORCH_REVIEW_DOC_MISMATCH after a clean close over another hash, writing nothing', () => {
+    openFirst('plan');
+    writeReview('plan', 1, 'CLEAN');
+    orch(['review', 'plan', '--record']);
+    const closed = loop('plan').sha256;
+    putDoc('plan', MORE_PLAN);
+    const before = runText();
+    expect(orch(['approve', 'plan', PLAN, sha(PLAN)])).toMatchObject({ status: 2, err: mismatch('plan', 'clean', closed) });
+    expect(runText()).toBe(before);
+    expect(runFile().gate).not.toBe('define_approved');
+  });
+
+  it.each(['clean', 'cap', 'unchanged'])('B3 approve spec passes after a %s close when the document still hashes the loop sha256', (outcome) => {
+    const closed = closeSpec(outcome);
+    expect(orch(['approve', 'spec', SPEC, sha(SPEC)]).status).toBe(0);
+    expect(runFile().approvals.spec.sha256).toBe(closed);
+  });
+
+  it('B4 approve plan passes after a clean close when only a task box was ticked', () => {
+    openFirst('plan');
+    writeReview('plan', 1, 'CLEAN');
+    orch(['review', 'plan', '--record']);
+    const closed = loop('plan').sha256;
+    putDoc('plan', TWO_TASKS.replace('- [ ] **Step 1', '- [X] **Step 1'));
+    expect(sha(PLAN)).not.toBe(closed);
+    expect(orch(['approve', 'plan', PLAN, closed]).status).toBe(0);
+  });
+
+  it('B5 a clean loop with no recorded hash refuses as over sha256 none, writing nothing', () => {
+    awaiting('spec');
+    putDoc('spec', '# Demo spec\n');
+    runFileText(JSON.stringify({ ...runFile(), review: { spec: { round: 1, outcome: 'clean', sha256: null } } }));
+    const before = runText();
+    expect(orch(['approve', 'spec', SPEC, sha(SPEC)])).toMatchObject({ status: 2, err: mismatch('spec', 'clean', 'none') });
+    expect(runText()).toBe(before);
+  });
+
+  it.each([['before any round', () => { awaiting('spec'); }], ['after round 1', () => { openFirst('spec'); }]])('B6 a skip %s never binds the approval', (_name, open) => {
+    open();
+    expect(orch(['review', 'spec', '--close', 'skipped:owner']).status).toBe(0);
+    putDoc('spec', EDITED);
+    expect(orch(['approve', 'spec', SPEC, sha(SPEC)]).status).toBe(0);
+  });
+
+  it.each([['spec', 'docs/notes.md'], ['spec', 'docs/specs-old/demo-design.md'], ['plan', SPEC]])('B7 %s --round refuses %s outside its docs folder, writing no loop', (role, rel) => {
+    awaiting(role);
+    mkdirSync(dirname(join(root, rel)), { recursive: true });
+    writeFileSync(join(root, rel), '# Elsewhere\n');
+    const before = runText();
+    expect(orch(['review', role, '--round', rel])).toMatchObject({ status: 2, err: outOfScope(rel, role, `${dirname(docOf(role))}/`) });
+    expect(runText()).toBe(before);
+    expect(loop(role)).toBeUndefined();
+  });
+
+  it.each([['an empty spec scope', (s) => ({ ...s, spec: [] })], ['no spec scope', ({ spec, ...rest }) => rest]])('B8 --round refuses any path with %s', (_name, edit) => {
+    awaiting('spec');
+    putDoc('spec', '# Demo spec\n');
+    seedScopes(edit);
+    const before = runText();
+    expect(orch(['review', 'spec', '--round', SPEC])).toMatchObject({ status: 2, err: outOfScope(SPEC, 'spec', 'none') });
+    expect(runText()).toBe(before);
+  });
+
+  it('B9 a grouped scope refuses a document of the docs folder outside the group', () => {
+    awaiting('spec');
+    putDoc('spec', '# Demo spec\n');
+    seedScopes((s) => ({ ...s, spec: ['docs/specs/pillar-3/**'] }));
+    expect(orch(['review', 'spec', '--round', SPEC])).toMatchObject({ status: 2, err: outOfScope(SPEC, 'spec', 'docs/specs/pillar-3/') });
+    expect(loop('spec')).toBeUndefined();
+  });
+
+  it.each(['clean', 'cap', 'unchanged'])('B10 re-closes a %s loop as skipped:doc-changed with its round and hash, then approves the edited document', (outcome) => {
+    const closed = closeSpec(outcome);
+    putDoc('spec', EDITED);
+    mkdirSync(join(root, REVIEW_DIR), { recursive: true });
+    writeFileSync(join(root, reviewPath('spec', 9)), 'stray\n');
+    expect(orch(['review', 'spec', '--close', 'skipped:doc-changed'])).toMatchObject({ status: 0, out: `review spec closed skipped:doc-changed at round ${ROUNDS[outcome]}` });
+    expect(loop('spec')).toEqual({ round: ROUNDS[outcome], outcome: 'skipped:doc-changed', sha256: closed });
+    expect(existsSync(join(root, REVIEW_DIR))).toBe(false);
+    expect(orch(['approve', 'spec', SPEC, sha(SPEC)])).toMatchObject({ status: 0, out: `spec approved: sha256 ${sha(SPEC)}` });
+  });
+
+  it('B11 a re-closed loop refuses every form', () => {
+    closeSpec('clean');
+    expect(orch(['review', 'spec', '--close', 'skipped:doc-changed']).status).toBe(0);
+    for (const args of [['--round', SPEC], ['--record'], ['--close', 'skipped:verb']]) {
+      expect(orch(['review', 'spec', ...args])).toMatchObject({ status: 2, err: 'orchestrate: review spec: the loop closed skipped:doc-changed; a closed loop does not reopen' });
+    }
+  });
+
+  it('B12 a reviewed loop still refuses --round and --record', () => {
+    closeSpec('clean');
+    for (const args of [['--round', SPEC], ['--record']]) {
+      expect(orch(['review', 'spec', ...args])).toMatchObject({ status: 2, err: 'orchestrate: review spec: the loop closed clean; a closed loop does not reopen' });
+    }
+    expect(loop('spec').outcome).toBe('clean');
+  });
+});
+
 describe('doc locations [FEAT-047]', () => {
   const put = (rel, text = '# x\n') => {
     mkdirSync(dirname(join(root, rel)), { recursive: true });
@@ -3600,5 +3729,28 @@ describe('unattended mode [FEAT-054]', () => {
     expect('unattended' in runFile()).toBe(false);
     expect('delegated' in runFile()).toBe(false);
     expect(runFile().mode).toBe('step');
+  });
+
+  it.each(['spec', 'plan'])('U40 [BUG-076] delegate %s refuses ORCH_REVIEW_DOC_MISMATCH over a clean loop of another hash, leaving delegated unset', (kind) => {
+    if (kind === 'spec') atSpec({ loop: false });
+    else {
+      atSpec();
+      expect(delegateDoc('spec').status).toBe(0);
+      expect(orch(['install', 'plan']).status).toBe(0);
+      expect(orch(['handback', 'plan'], { input: docSay('plan', PLAN) }).status).toBe(0);
+    }
+    expect(orch(['review', kind, '--round', docOf(kind)]).status).toBe(0);
+    writeReview(kind, 1, 'CLEAN');
+    expect(orch(['review', kind, '--record']).status).toBe(0);
+    const closed = loop(kind).sha256;
+    putDoc(kind, kind === 'spec' ? '# Demo spec, edited\n' : `${TWO_TASKS}\nOne more line.\n`);
+    putReport(kind, report(kind, sha(docOf(kind))));
+    const before = runBytes();
+    expect(orch(['delegate', kind, docOf(kind), sha(docOf(kind))])).toMatchObject({
+      status: 2,
+      err: `orchestrate: ORCH_REVIEW_DOC_MISMATCH: review ${kind} closed clean over sha256 ${closed}, not ${docOf(kind)} at ${sha(docOf(kind))}; close it with review ${kind} --close skipped:<reason>, then show the approval again`,
+    });
+    expect(runBytes()).toBe(before);
+    expect(runFile().delegated?.[kind]).toBeUndefined();
   });
 });
