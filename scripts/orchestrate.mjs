@@ -1000,7 +1000,7 @@ function buildValues(run) {
   const { spec, plan } = run.approvals;
   const files = [...new Set(run.handbacks.filter((h) => h.role === 'code').flatMap((h) => snapFiles(h).map((f) => f.replace(/:[CMD]$/, ''))))];
   const seat = run.handbacks.findLast((h) => h.role === 'security')?.security;
-  return `spec ${spec.path} sha256 ${spec.sha256}; plan ${plan.path} sha256 ${plan.sha256}; files ${files.length ? files.join(', ') : 'none'}; security ${seat ? securityLine(seat) : SECURITY_NOT_CONFIGURED}`;
+  return `spec ${spec.path} sha256 ${spec.sha256}; plan ${plan.path} sha256 ${plan.sha256}; files ${files.length ? files.join(', ') : 'none'}; security ${seat ? securityLine(seat) : SECURITY_NOT_CONFIGURED}; source ${sourceNote(run)}`;
 }
 
 // D8: the script prints what the brief carries, so the orchestrator copies values and never reads them from its own context.
@@ -1018,7 +1018,23 @@ const delegatedEntry = (verdict, bytes, reason) => ({
   verdict, at: new Date().toISOString(), review_sha256: createHash('sha256').update(bytes).digest('hex'), ...(reason ? { reason } : {}),
 });
 const readReport = (root, kind) => { try { return readFileSync(join(root, delegatePath(kind))); } catch { return null; } };
-const inSurface = (p) => WRITE_SURFACE.some((s) => (s.endsWith('/**') ? p === s.slice(0, -3) || p.startsWith(s.slice(0, -2)) : p === s));
+// Same glob semantics as Guard 5 (pre-tool-use.mjs), which reads a task's Files entries as globs.
+function globToRegExp(glob) {
+  const body = glob.split(/(\*\*\/|\*\*|\*)/).map((part) => {
+    if (part === '**/') return '(?:.*/)?';
+    if (part === '**') return '.*';
+    if (part === '*') return '[^/]*';
+    return part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }).join('');
+  return new RegExp(`^${body}$`);
+}
+// A glob reaches the surface when it matches a fixed path, or its first segment can be `.conductor` (everything beneath is surface).
+function inSurface(entry) {
+  const glob = entry.replace(/^\.\//, '');
+  const first = glob.split('/')[0];
+  if (first.startsWith('**') || globToRegExp(first).test('.conductor')) return true;
+  return WRITE_SURFACE.some((s) => !s.endsWith('/**') && globToRegExp(glob).test(s));
+}
 
 // Owner decision (FEAT-054): a plan whose task would write the run's own record never passes on a delegated verdict.
 function surfaceTask(planText) {
@@ -1055,7 +1071,9 @@ function delegateDefine(root, run, { kind, rel, shown }) {
   const outcome = defineOutcome(bytes.toString('utf8'), kind, sha256, content);
   const entry = delegatedEntry(outcome.verdict, bytes, outcome.reason);
   const recorded = { ...run, delegated: { ...run.delegated, [kind]: entry } };
-  if (outcome.verdict !== 'APPROVE') { saveRun(root, recorded); return ownerRequired(kind, outcome); }
+  // Saved before approvePlan can halt, so a resume never delegates the same plan twice (D4).
+  saveRun(root, recorded);
+  if (outcome.verdict !== 'APPROVE') return ownerRequired(kind, outcome);
   const approval = { at: entry.at, by: 'define-review', basis: DELEGATED_BASIS, path: rel, sha256, commit: headObject(root), review_sha256: entry.review_sha256 };
   if (kind === 'plan') return approvePlan(root, recorded, content.toString('utf8'), approval, 'plan approved by delegated review');
   saveRun(root, { ...recorded, approvals: { ...run.approvals, spec: approval } });

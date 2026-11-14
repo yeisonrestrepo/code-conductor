@@ -3374,6 +3374,11 @@ describe('unattended mode [FEAT-054]', () => {
     '.claude/memory/band-envelope.json',
     '.claude/memory/session-snapshot.json',
     '.conductor/notes.md',
+    '.claude/memory/**',
+    '.claude/**',
+    '**/*.json',
+    '.conductor',
+    '.*/notes.md',
   ])('U22 [AC6] delegate plan over an APPROVE report escalates a task that declares %s', (path) => {
     atPlan();
     plan(`# Demo Plan\n\n${task(1, ['src/a.js'])}\n${task(2, [path])}\n## Test List\n`);
@@ -3500,7 +3505,7 @@ describe('unattended mode [FEAT-054]', () => {
     const before = runBytes();
     const { spec, plan: p } = runFile().approvals;
     const r = orch(['delegate', 'build', '--check']);
-    expect(r).toEqual({ status: 0, out: `delegate build: spec ${spec.path} sha256 ${spec.sha256}; plan ${p.path} sha256 ${p.sha256}; files none; security ${SEC_LINE}`, err: '' });
+    expect(r).toEqual({ status: 0, out: `delegate build: spec ${spec.path} sha256 ${spec.sha256}; plan ${p.path} sha256 ${p.sha256}; files none; security ${SEC_LINE}; source backlog entry for ${runFile().item}`, err: '' });
     expect(r.out).not.toContain('security.txt');
     expect(runBytes()).toBe(before);
   });
