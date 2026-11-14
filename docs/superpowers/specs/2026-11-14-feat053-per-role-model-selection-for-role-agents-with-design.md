@@ -1,6 +1,6 @@
 # FEAT-053: Per-role model selection for role agents, with escalation on repeated returns
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-14 by independent review (round 1)
 **Item:** FEAT-053 (intake of issue #187)
 **Date:** 2026-11-14
 
