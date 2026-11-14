@@ -29,6 +29,11 @@ const OWNER_FILE = '.conductor/security-pre-existing.txt';
 export const REVIEW_DIR = '.conductor/review';
 // Three reviewer passes, so at most two revisions, each re-reviewed (FEAT-041 (d)).
 export const REVIEW_CAP = 3;
+// FEAT-054: the delegated review's kinds and the outcomes a run records; delegate, its parser and isValidRun read these.
+export const DELEGATE_KINDS = ['spec', 'plan', 'build'];
+export const DELEGATED_VERDICTS = ['APPROVE', 'RETURN', 'ESCALATE', 'UNPARSED'];
+// Where /cc-orchestrate writes each delegated review report; cleared with the run like the hand-backs.
+export const DELEGATE_DIR = '.conductor/delegate';
 // FEAT-057: fix rounds per run, fixed at start so the orchestrator's prompt cannot change the cap.
 export const AUDIT_ROUNDS_DEFAULT = 2;
 const AUDIT_ROUNDS_MAX = 5;
@@ -126,15 +131,24 @@ function isModelRecord(run) {
   return run.handbacks.every((h) => !isPlainObject(h?.fix) || h.fix.model === undefined || isModel(h.fix.model));
 }
 
+// FEAT-054: only start writes unattended, always with auto and a security seat; a hand edit that breaks either is not a run.
+function isUnattendedRecord(run) {
+  if (run.unattended !== undefined && (run.unattended !== true || run.mode !== 'auto' || !isPlainObject(run.security))) return false;
+  const d = run.delegated;
+  if (d === undefined) return true;
+  return isPlainObject(d) && Object.entries(d).every(([k, v]) => DELEGATE_KINDS.includes(k) && isPlainObject(v) && DELEGATED_VERDICTS.includes(v.verdict));
+}
+
 // FEAT-057: a present audit_rounds that is not 0-5 would let a hand-edited run buy fix rounds without limit.
 // FEAT-053: and models, dispatch_model and fix.model hold only the allow-list.
+// FEAT-054: and unattended and delegated hold only what start and delegate write.
 export function isValidRun(run) {
   return isPlainObject(run) && run.v === 1 && typeof run.session_id === 'string' && run.session_id !== ''
     && typeof run.item === 'string' && GATES.includes(run.gate) && isPlainObject(run.approvals)
     && Array.isArray(run.handbacks) && Array.isArray(run.tasks?.ids) && Number.isInteger(run.tasks?.done)
     && (run.audit_rounds === undefined || isAuditRounds(run.audit_rounds))
     && (run.security === undefined || isSecurity(run.security))
-    && isModelRecord(run);
+    && isModelRecord(run) && isUnattendedRecord(run);
 }
 
 function readRun(root) {
@@ -166,6 +180,14 @@ const handedBack = (run, role) => run.handbacks.some((h) => h.role === role);
 // FEAT-057: a fix is due exactly when the last hand-back is an audit the script granted one.
 const fixDue = (run) => { const last = run.handbacks.at(-1); return last?.role === 'audit' && isPlainObject(last.fix) ? last.fix : null; };
 
+// FEAT-054: an unattended run puts the delegated build review between the approving seat and qa (D7).
+function afterSeat(run) {
+  if (run.unattended !== true) return { role: 'qa' };
+  const verdict = run.delegated?.build?.verdict;
+  if (verdict === undefined) return { await: 'build' };
+  return verdict === 'APPROVE' ? { role: 'qa' } : { end: true };
+}
+
 // The band sequence, read off the run's record.
 export function nextStep(run) {
   if (!handedBack(run, 'spec')) return { role: 'spec' };
@@ -176,14 +198,15 @@ export function nextStep(run) {
   const fix = fixDue(run);
   if (fix) return { role: 'code', fix: fix.round };
   const last = run.handbacks.at(-1)?.role;
-  if (last === 'audit') return { role: isPlainObject(run.security) ? 'security' : 'qa' };
+  if (last === 'audit') return isPlainObject(run.security) ? { role: 'security' } : afterSeat(run);
   // Only an approving verdict routes to qa (FEAT-059); a blocked or failed seat never does, and the halt already names end (FEAT-034).
-  if (last === 'security') return run.handbacks.at(-1).security?.verdict === 'APPROVE' ? { role: 'qa' } : { end: true };
+  if (last === 'security') return run.handbacks.at(-1).security?.verdict === 'APPROVE' ? afterSeat(run) : { end: true };
   if (last === 'qa') return { end: true };
   return { role: 'audit' };
 }
 
-const describeStep = (s) => (s.role ? `install ${s.role}` : s.await ? `approve ${s.await}` : 'end');
+// FEAT-054: the build step is the delegated review's, so no refusal line ever tells the orchestrator to approve the build.
+const describeStep = (s) => (s.role ? `install ${s.role}` : s.await === 'build' ? 'delegate build' : s.await ? `approve ${s.await}` : 'end');
 
 // D6: a gate crosses only a band boundary; inside a band the entry gate is re-issued.
 export function forwardGate(run, role, gate) {
@@ -530,12 +553,16 @@ function install(root, sessionId, role, check) {
 
 // FEAT-060: the second line behind the halt; verify_pass is forwarded only over an approving audit.
 // FEAT-057: the last audit, since an earlier RETURN stays in the record forever.
+// FEAT-054: and, in an unattended run, over an approving delegated build review.
 function withholdUnlessApproved(run) {
   const verdict = run.handbacks.findLast((h) => h.role === 'audit')?.verdict;
   if (verdict !== 'APPROVE') throw new Halt('ORCH_GATE_WITHHELD', `qa may not forward verify_pass: the audit verdict is ${verdict ?? 'absent'}`);
   if (!isPlainObject(run.security)) return;
   const seatVerdict = run.handbacks.findLast((h) => h.role === 'security')?.security?.verdict;
   if (seatVerdict !== 'APPROVE') throw new Halt('ORCH_GATE_WITHHELD', `qa may not forward verify_pass: the security verdict is ${seatVerdict ?? 'absent'}`);
+  if (run.unattended !== true) return;
+  const delegated = run.delegated?.build?.verdict;
+  if (delegated !== 'APPROVE') throw new Halt('ORCH_GATE_WITHHELD', `qa may not forward verify_pass: the delegated build verdict is ${delegated ?? 'absent'}`);
 }
 
 // FEAT-057: a fix re-enters Build with no task, so it never advances tasks.done; audits carry their round.
@@ -641,6 +668,25 @@ export function parseVerdict(text, role = 'audit') {
   if (at === -1 || report.at(-1) !== candidates[0]) throw new Halt('ORCH_VERDICT_INVALID', 'the VERDICT line must immediately precede SNAP_HANDBACK');
   const severe = severeFindings(report);
   return checkConsistent(match[1], severe.length, [...new Set(severe.map((m) => findingPath(m[2])))]);
+}
+
+// FEAT-054: the audit's verdict contract without the SNAP_HANDBACK anchor; the REVIEWED line binds the verdict to one hash.
+// The allowed values are the owner's constants, the same lists delegate and isValidRun read.
+const REPORT_VERDICTS = DELEGATED_VERDICTS.filter((v) => v !== 'UNPARSED');
+const REPORT_VERDICT_TEXT = `VERDICT: ${REPORT_VERDICTS.join(' | ')}`;
+export function parseDelegatedReport(text, label, sha256) {
+  if (!DELEGATE_KINDS.includes(label.split(' ')[0])) throw new Error(`parseDelegatedReport: ${label} is not a delegated kind`);
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const candidates = lines.filter((l) => VERDICT_CANDIDATE.test(l));
+  if (candidates.length === 0) throw new Halt('ORCH_VERDICT_MISSING', `the delegated review report has no ${REPORT_VERDICT_TEXT} line`);
+  if (candidates.length > 1) throw new Halt('ORCH_VERDICT_INVALID', `expected exactly one VERDICT line, found ${candidates.length}`);
+  // Never quoted: the reason lands in the run file, which names the report, never its text.
+  const verdict = candidates[0].startsWith('VERDICT: ') ? candidates[0].slice('VERDICT: '.length) : '';
+  if (!REPORT_VERDICTS.includes(verdict)) throw new Halt('ORCH_VERDICT_INVALID', `the VERDICT line is not ${REPORT_VERDICT_TEXT}`);
+  if (lines.at(-1) !== candidates[0]) throw new Halt('ORCH_VERDICT_INVALID', 'the VERDICT line must be the last non-blank line');
+  const reviewed = `REVIEWED ${label} sha256 ${sha256}`;
+  if (lines.at(-2) !== reviewed) throw new Halt('ORCH_VERDICT_INVALID', `the line before the VERDICT line must be ${reviewed}`);
+  return checkConsistent(verdict, severeFindings(lines).length, []);
 }
 
 // FEAT-034: the security report. The orchestrator copies what the agent wrote; the script reads it.
@@ -879,6 +925,8 @@ function approve(root, sessionId, what, rel, shown) {
   const run = liveRun(root, sessionId);
   const step = nextStep(run);
   if (step.await !== what) throw new Refusal(`approve ${what}: the next step is ${describeStep(step)}`);
+  // FEAT-054: reachable only at the delegated build step, which is delegate's, never the owner's verb.
+  if (!RECORD_KINDS.includes(what)) throw new Refusal(APPROVE_USAGE);
   if (!SHA256_HEX.test(shown ?? '')) throw new Refusal(APPROVE_USAGE);
   const content = readDoc(root, rel, APPROVE_USAGE);
   checkLoopClosed(run, what);
@@ -892,7 +940,7 @@ function approve(root, sessionId, what, rel, shown) {
   return `spec approved: sha256 ${sha256}`;
 }
 
-function approvePlan(root, run, text, approval) {
+function approvePlan(root, run, text, approval, head = 'plan approved') {
   const tasks = extractTasks(text);
   if (tasks.length === 0) throw new Halt('ORCH_EMPTY_SCOPE', `${approval.path} holds no "### Task N" section`);
   for (const t of tasks) taskScope(t, approval.path);
@@ -900,7 +948,7 @@ function approvePlan(root, run, text, approval) {
     ...run, gate: 'define_approved', plan: approval.path, tasks: { ids: tasks.map((t) => t.id), done: 0 },
     approvals: { ...run.approvals, plan: approval },
   });
-  return `plan approved: define_approved, ${tasks.length} task(s); sha256 ${approval.sha256}`;
+  return `${head}: define_approved, ${tasks.length} task(s); sha256 ${approval.sha256}`;
 }
 
 // FEAT-058: a skip stays possible but is never silent, so approve waits for a recorded outcome.
@@ -909,6 +957,133 @@ function checkLoopClosed(run, what) {
   if (isPlainObject(loop) && REVIEW_OUTCOME.test(loop.outcome ?? '')) return;
   const state = isPlainObject(loop) && Number.isInteger(loop.round) ? `open at round ${loop.round}` : 'not run';
   throw new Refusal(`ORCH_REVIEW_OPEN: review ${what} is ${state}; close it before the approval`);
+}
+
+const DELEGATE_USAGE = `usage: orchestrate.mjs delegate <spec|plan> ${DOC_PATH} <sha256> | delegate build | delegate <spec|plan|build> --check`;
+const DELEGATED_BASIS = 'approved by delegated review';
+const delegatePath = (kind) => `${DELEGATE_DIR}/${kind}.md`;
+
+function parseDelegateArgs([kind, ...rest]) {
+  if (!DELEGATE_KINDS.includes(kind)) throw new Refusal(DELEGATE_USAGE);
+  if (rest.length === 1 && rest[0] === '--check') return { kind, check: true };
+  if (kind === 'build' && rest.length === 0) return { kind };
+  if (kind !== 'build' && rest.length === 2 && SHA256_HEX.test(rest[1])) return { kind, rel: rest[0], shown: rest[1] };
+  throw new Refusal(DELEGATE_USAGE);
+}
+
+// FEAT-054: only the value start recorded opens this verb, at its own step, once per kind (D3, D4).
+function delegatedRun(root, sessionId, kind) {
+  const run = liveRun(root, sessionId);
+  if (run.unattended !== true) throw new Refusal(`ORCH_NOT_UNATTENDED: run ${run.item} was not started with --unattended; only an owner message approves`);
+  const step = nextStep(run);
+  if (step.await !== kind) throw new Refusal(`delegate ${kind}: the next step is ${describeStep(step)}`);
+  const earlier = run.delegated?.[kind];
+  if (earlier) throw new Refusal(`ORCH_DELEGATED_ONCE: delegated review ${kind} already returned ${earlier.verdict}; only the owner approves now`);
+  return run;
+}
+
+const snapFiles = (entry) => { try { const f = JSON.parse(entry?.snap).ops.f; return Array.isArray(f) ? f.map(String) : []; } catch { return []; } };
+
+// The document the Define role named in its hand-back, inside its pinned folder: the brief's, never the orchestrator's pick.
+function handedBackDoc(run, kind) {
+  const folder = String(run.docs?.scopes?.[kind]?.[0] ?? '').replace(/\*\*$/, '');
+  const docs = snapFiles(run.handbacks.findLast((h) => h.role === kind)).filter((f) => /:[CM]$/.test(f)).map((f) => f.slice(0, -2))
+    .filter((p) => folder !== '' && p.startsWith(folder) && p.endsWith('.md'));
+  if (docs.length !== 1) throw new Refusal(`delegate ${kind}: the ${kind} hand-back names ${docs.length} document(s) under ${folder}; show the approval and wait for the owner`);
+  return docs[0];
+}
+
+const sourceNote = (run) => (isPlainObject(run.ticket) ? `ticket snapshot ${run.ticket.snapshot}` : `backlog entry for ${run.item}`);
+const securityLine = ({ verdict, threshold, counts: c, scans: s }) => `VERDICT: ${verdict}; threshold ${threshold}; findings critical=${c.critical} high=${c.high} moderate=${c.moderate} low=${c.low}; scans dependency=${s.dependency} secrets=${s.secrets} scripts=${s.scripts}`;
+
+function buildValues(run) {
+  const { spec, plan } = run.approvals;
+  const files = [...new Set(run.handbacks.filter((h) => h.role === 'code').flatMap((h) => snapFiles(h).map((f) => f.replace(/:[CMD]$/, ''))))];
+  const seat = run.handbacks.findLast((h) => h.role === 'security')?.security;
+  return `spec ${spec.path} sha256 ${spec.sha256}; plan ${plan.path} sha256 ${plan.sha256}; files ${files.length ? files.join(', ') : 'none'}; security ${seat ? securityLine(seat) : SECURITY_NOT_CONFIGURED}`;
+}
+
+// D8: the script prints what the brief carries, so the orchestrator copies values and never reads them from its own context.
+function delegateCheck(root, run, kind) {
+  const model = modelSegment(run, 'define-review');
+  if (kind === 'build') return `delegate build: ${buildValues(run)}${model}`;
+  const doc = handedBackDoc(run, kind);
+  const sha256 = documentHash(kind, readDoc(root, doc, DELEGATE_USAGE));
+  const { spec } = run.approvals;
+  const source = kind === 'spec' ? sourceNote(run) : `the approved spec ${spec.path} sha256 ${spec.sha256} and ${sourceNote(run)}`;
+  return `delegate ${kind}: ${doc} sha256 ${sha256}; source ${source}${model}`;
+}
+
+const delegatedEntry = (verdict, bytes, reason) => ({
+  verdict, at: new Date().toISOString(), review_sha256: createHash('sha256').update(bytes).digest('hex'), ...(reason ? { reason } : {}),
+});
+const readReport = (root, kind) => { try { return readFileSync(join(root, delegatePath(kind))); } catch { return null; } };
+const inSurface = (p) => WRITE_SURFACE.some((s) => (s.endsWith('/**') ? p === s.slice(0, -3) || p.startsWith(s.slice(0, -2)) : p === s));
+
+// Owner decision (FEAT-054): a plan whose task would write the run's own record never passes on a delegated verdict.
+function surfaceTask(planText) {
+  for (const t of extractTasks(planText)) {
+    const path = t.files.find(inSurface);
+    if (path !== undefined) return `task ${t.id} declares ${path} inside the orchestrator write surface`;
+  }
+  return null;
+}
+
+// A garbled report is a failed delegation, never an approval, and it spends the one attempt (D4).
+function defineOutcome(text, kind, sha256, content) {
+  let verdict;
+  try { ({ verdict } = parseDelegatedReport(text, kind, sha256)); } catch (e) {
+    if (e instanceof Halt) return { verdict: 'UNPARSED', reason: e.message };
+    throw e;
+  }
+  const reason = verdict === 'APPROVE' && kind === 'plan' ? surfaceTask(content.toString('utf8')) : null;
+  return reason ? { verdict: 'ESCALATE', reason } : { verdict };
+}
+
+const ownerRequired = (kind, { verdict, reason }) => `owner approval required: delegated review ${kind} returned ${verdict}${reason ? ` (${reason})` : ''}; see ${delegatePath(kind)}`;
+
+// approve's own checks, in its order, then the report: an APPROVE records the reviewer as approver (D5 on anything else).
+function delegateDefine(root, run, { kind, rel, shown }) {
+  const content = readDoc(root, rel, DELEGATE_USAGE);
+  checkLoopClosed(run, kind);
+  const sha256 = documentHash(kind, content);
+  if (sha256 !== shown.toLowerCase()) throw new Refusal(`ORCH_DOC_HASH_STALE: ${kind} ${rel} hashes ${sha256}, not the ${shown} that was shown; show the document again`);
+  const expected = handedBackDoc(run, kind);
+  if (rel !== expected) throw new Refusal(`delegate ${kind}: ${rel} is not the document the ${kind} hand-back names (${expected})`);
+  const bytes = readReport(root, kind);
+  if (!bytes) throw new Refusal(`delegate ${kind}: cannot read ${delegatePath(kind)}`);
+  const outcome = defineOutcome(bytes.toString('utf8'), kind, sha256, content);
+  const entry = delegatedEntry(outcome.verdict, bytes, outcome.reason);
+  const recorded = { ...run, delegated: { ...run.delegated, [kind]: entry } };
+  if (outcome.verdict !== 'APPROVE') { saveRun(root, recorded); return ownerRequired(kind, outcome); }
+  const approval = { at: entry.at, by: 'define-review', basis: DELEGATED_BASIS, path: rel, sha256, commit: headObject(root), review_sha256: entry.review_sha256 };
+  if (kind === 'plan') return approvePlan(root, recorded, content.toString('utf8'), approval, 'plan approved by delegated review');
+  saveRun(root, { ...recorded, approvals: { ...run.approvals, spec: approval } });
+  return `spec approved by delegated review: sha256 ${sha256}`;
+}
+
+// FEAT-054: the audit and security contract (D6): RETURN and ESCALATE halt, and a halt names the report, never a finding.
+function delegateBuild(root, run) {
+  const path = delegatePath('build');
+  const bytes = readReport(root, 'build');
+  if (!bytes) throw new Halt('ORCH_VERDICT_MISSING', `cannot read ${path}`);
+  let verdict;
+  try { ({ verdict } = parseDelegatedReport(bytes.toString('utf8'), 'build plan', run.approvals.plan.sha256)); } catch (e) {
+    throw e instanceof Halt ? new Halt(e.code, `${e.reason}; see ${path}`) : e;
+  }
+  // Saved first, so the halt cli records lands on top of the outcome, as handback audit's does.
+  saveRun(root, { ...run, delegated: { ...run.delegated, build: delegatedEntry(verdict, bytes) } });
+  if (verdict === 'RETURN') throw new Halt('ORCH_DELEGATED_RETURN', `the delegated build review returned the change; see ${path}`);
+  if (verdict === 'ESCALATE') throw new Halt('ORCH_DELEGATED_ESCALATE', `the delegated build review escalated a decision only the owner takes; see ${path}`);
+  return `build approved by delegated review: plan sha256 ${run.approvals.plan.sha256}; next: install qa`;
+}
+
+// FEAT-054: the delegated review's verb; approve stays the owner's, byte for byte (D3).
+function delegate(root, sessionId, args) {
+  const parsed = parseDelegateArgs(args);
+  const run = delegatedRun(root, sessionId, parsed.kind);
+  if (parsed.check) return delegateCheck(root, run, parsed.kind);
+  return parsed.kind === 'build' ? delegateBuild(root, run) : delegateDefine(root, run, parsed);
 }
 
 const RESUME_USAGE = 'usage: orchestrate.mjs resume';
@@ -988,6 +1163,10 @@ function nextLine(run) {
   return step.task ? `${describeStep(step)} (task ${run.tasks.done + 1} of ${run.tasks.ids.length})` : describeStep(step);
 }
 
+// FEAT-054: the Define outcomes stay, so a resumed run cannot re-delegate; the build verdict is a Verify record and is redone.
+const keptDelegation = (run) => (isPlainObject(run.delegated)
+  ? { delegated: Object.fromEntries(Object.entries(run.delegated).filter(([k]) => k !== 'build')) } : {});
+
 // FEAT-055: back to the last gate whose record still validates; every record after it is dropped and redone.
 function resume(root, sessionId, args) {
   const run = haltedRun(root, sessionId, args);
@@ -1001,12 +1180,15 @@ function resume(root, sessionId, args) {
   const next = {
     ...run, session_id: sessionId, role: null, halt: null, gate: resumedGate(run, tasks),
     handbacks: kept, tasks: { ...run.tasks, done: tasks }, review: resumedReview(run, kept), resumes,
+    ...keptDelegation(run),
   };
   // Computed before the write: resume records no halt, so a throw after saveRun would leave a changed run behind a failed exit.
   const line = `run ${run.item} resumed after ${code} from ${next.gate}: kept ${records} record(s), dropped ${dropped}; next: ${nextLine(next)}`;
   saveRun(root, next);
   // The halted agent's envelope; the hand-back and review files stay for the owner and are overwritten on re-dispatch.
   rmSync(join(root, ENVELOPE_FILE), { force: true });
+  // FEAT-054: the dropped build verdict's report goes with it, so the redone review never reads it.
+  rmSync(join(root, DELEGATE_DIR, 'build.md'), { force: true });
   return line;
 }
 
@@ -1023,6 +1205,8 @@ function review(root, sessionId, [role, flag, arg, extra]) {
   if (!reviewWellFormed(flag, arg, extra)) throw new Refusal(REVIEW_USAGE);
   const step = nextStep(run);
   if (step.await !== role) throw new Refusal(`review ${role}: the next step is ${describeStep(step)}`);
+  // FEAT-054: only spec and plan have a loop; the build step is reachable only in an unattended run.
+  if (!RECORD_KINDS.includes(role)) throw new Refusal(REVIEW_USAGE);
   const loops = isPlainObject(run.review) ? run.review : {};
   const loop = isPlainObject(loops[role]) && Number.isInteger(loops[role].round) ? loops[role] : { round: 0, outcome: null };
   if (loop.outcome) throw new Refusal(`review ${role}: the loop closed ${loop.outcome}; a closed loop does not reopen`);
@@ -1083,20 +1267,21 @@ function parseReview(text, role, round) {
   return rows.length === open ? { open, rows } : null;
 }
 
-const START_USAGE = 'usage: orchestrate.mjs start <ITEM> [--auto] [--ticket <N|issue URL>] [--audit-rounds <0-5>] [--security-threshold <low|moderate|high|critical>] [--no-dependency-audit]';
+const START_USAGE = 'usage: orchestrate.mjs start <ITEM> [--auto] [--ticket <N|issue URL>] [--audit-rounds <0-5>] [--security-threshold <low|moderate|high|critical>] [--no-dependency-audit] [--unattended]';
 
 // The item first, then --auto, --ticket <ref>, --audit-rounds <0-5>, --security-threshold <level> and
-// --no-dependency-audit in any order, each at
+// --no-dependency-audit and --unattended in any order, each at
 // most once. A --ticket with no value reaches intake as '' and halts there (FEAT-031 B1.1).
 function parseStartArgs(args) {
   const [item, ...rest] = args;
-  const opts = { item, auto: false, ticket: undefined, auditRounds: undefined, threshold: undefined, dependencyAudit: true };
+  const opts = { item, auto: false, ticket: undefined, auditRounds: undefined, threshold: undefined, dependencyAudit: true, unattended: false };
   for (let i = 0; i < rest.length; i++) {
     if (rest[i] === '--auto' && !opts.auto) opts.auto = true;
     else if (rest[i] === '--ticket' && opts.ticket === undefined) opts.ticket = rest[++i] ?? '';
     else if (rest[i] === '--audit-rounds' && opts.auditRounds === undefined && /^[0-5]$/.test(rest[i + 1] ?? '')) opts.auditRounds = Number(rest[++i]);
     else if (rest[i] === '--security-threshold' && opts.threshold === undefined && SECURITY_LEVELS.includes(rest[i + 1])) opts.threshold = rest[++i];
     else if (rest[i] === '--no-dependency-audit' && opts.dependencyAudit) opts.dependencyAudit = false;
+    else if (rest[i] === '--unattended' && !opts.unattended) opts.unattended = true;
     else throw new Refusal(START_USAGE);
   }
   if (!/^[A-Z]+-\d{3,}$/.test(item ?? '')) throw new Refusal(START_USAGE);
@@ -1116,7 +1301,7 @@ function ticketIntake(root, item, ref) {
 const ticketNote = (t) => `ticket ${t.binding.repo}#${t.binding.number} "${t.title}"; snapshot ${t.path} sha256 ${t.binding.sha256}; `;
 
 function start(root, sessionId, args) {
-  const { item, auto, ticket, auditRounds, threshold, dependencyAudit } = parseStartArgs(args);
+  const { item, auto, ticket, auditRounds, threshold, dependencyAudit, unattended } = parseStartArgs(args);
   if (!sessionId) throw new Halt('ORCH_NO_SESSION_ID', 'CLAUDE_CODE_SESSION_ID is absent or empty, so Guard 6 could never bind this run');
   const old = readRun(root);
   if (old && old.session_id === sessionId) throw new Halt('ORCH_RUN_ACTIVE', `run ${old.item} is live in this session; end it first`);
@@ -1130,23 +1315,29 @@ function start(root, sessionId, args) {
   const bound = ticket === undefined ? null : ticketIntake(root, item, ticket);
   if (old) clearRunFiles(root);
   // C7: a previous run's owner file must not be read as this run's; end keeps it for the closing report.
+  // FEAT-054: and no earlier delegated report is read as this run's (plan decision 9).
   rmSync(join(root, OWNER_FILE), { force: true });
+  rmSync(join(root, DELEGATE_DIR), { recursive: true, force: true });
   if (bound) writeSnapshot(root, bound.path, bound.text);
   saveRun(root, {
-    v: 1, session_id: sessionId, item, mode: auto ? 'auto' : 'step', started: new Date().toISOString(),
+    v: 1, session_id: sessionId, item, mode: auto || unattended ? 'auto' : 'step', started: new Date().toISOString(),
     band: 'boundary', role: null, gate: 'boundary_routed', approvals: { spec: null, plan: null },
     plan: null, tasks: { ids: [], done: 0 }, handbacks: [], halt: null, test_command: testCommand, audit_rounds: auditRounds, security, docs,
+    ...(unattended ? { unattended: true } : {}),
     ...(models ? { models } : {}),
     ...(bound ? { ticket: { ...bound.binding, snapshot: bound.path } } : {}),
   });
   const begun = old ? `replaced the stale run ${old.item} started ${old.started}` : `run ${item} started`;
-  return `${begun}; ${bound ? ticketNote(bound) : ''}${docsNote(docs)}test command: ${testCommand}; audit rounds: ${auditRounds}${securityNote(security, root, stack())}${modelsNote(models)}`;
+  return `${begun}; ${bound ? ticketNote(bound) : ''}${docsNote(docs)}test command: ${testCommand}; audit rounds: ${auditRounds}${securityNote(security, root, stack())}${modelsNote(models)}${unattended ? UNATTENDED_NOTE : ''}`;
 }
+
+const UNATTENDED_NOTE = '; unattended: delegated review at spec, plan and build';
 
 function clearRunFiles(root) {
   rmSync(join(root, ENVELOPE_FILE), { force: true });
   rmSync(join(root, HANDBACK_DIR), { recursive: true, force: true });
   rmSync(join(root, REVIEW_DIR), { recursive: true, force: true });
+  rmSync(join(root, DELEGATE_DIR), { recursive: true, force: true });
 }
 
 // Prints the run it removes, so the closing report reads the record rather than memory.
@@ -1259,12 +1450,13 @@ export async function cli(argv, env, cwd = process.cwd()) {
     approve: () => approve(root, sid, a, b, c),
     hash: () => hashDoc(root, a, b),
     review: () => review(root, sid, argv.slice(1)),
+    delegate: () => delegate(root, sid, argv.slice(1)),
     resume: () => resume(root, sid, argv.slice(1)),
     envelope: () => envelopeVerb(root, sid, argv.slice(1)),
     end: () => end(root),
   };
   try {
-    if (!verbs[verb]) throw new Refusal('usage: orchestrate.mjs start|install|handback|approve|hash|review|resume|envelope|end');
+    if (!verbs[verb]) throw new Refusal('usage: orchestrate.mjs start|install|handback|approve|hash|review|delegate|resume|envelope|end');
     process.stdout.write((await verbs[verb]()) + '\n');
     return 0;
   } catch (e) {

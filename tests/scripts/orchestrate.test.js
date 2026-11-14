@@ -16,7 +16,7 @@ import {
 import { CANDIDATE_PAIRS, DEFAULT_PAIR } from '../../scripts/doc-locations.mjs';
 
 const SEC_NONE = '; security: threshold high, dependency scan not covered for no lockfile';
-const START_USAGE = 'orchestrate: usage: orchestrate.mjs start <ITEM> [--auto] [--ticket <N|issue URL>] [--audit-rounds <0-5>] [--security-threshold <low|moderate|high|critical>] [--no-dependency-audit]';
+const START_USAGE = 'orchestrate: usage: orchestrate.mjs start <ITEM> [--auto] [--ticket <N|issue URL>] [--audit-rounds <0-5>] [--security-threshold <low|moderate|high|critical>] [--no-dependency-audit] [--unattended]';
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const SCRIPT = join(REPO_ROOT, 'scripts/orchestrate.mjs');
 const ROLES = ['spec', 'plan', 'code', 'audit', 'qa', 'security'];
@@ -1028,8 +1028,8 @@ describe('review loop over review files [FEAT-058]', () => {
     expect(loop('spec')).toEqual({ round: 1, outcome: null, sha256: sha(SPEC), doc: SPEC, await: 'review' });
   });
 
-  it('[FEAT-061, FEAT-055] names review, resume and envelope in the usage line', () => {
-    expect(orch(['nope']).err).toBe('orchestrate: usage: orchestrate.mjs start|install|handback|approve|hash|review|resume|envelope|end');
+  it('[FEAT-061, FEAT-055, FEAT-054] names review, resume and envelope in the usage line', () => {
+    expect(orch(['nope']).err).toBe('orchestrate: usage: orchestrate.mjs start|install|handback|approve|hash|review|delegate|resume|envelope|end');
   });
 });
 
@@ -3098,5 +3098,493 @@ describe('escalation on repeated returns [FEAT-053]', () => {
     expect(runFile().models).toEqual(models);
     expect(runFile().halt).toBeNull();
     expect(lastLine(orch(['install', 'code', '--check']).out)).toBe('model: sonnet');
+  });
+});
+
+describe('unattended mode [FEAT-054]', () => {
+  const DELEGATE_DIR = '.conductor/delegate';
+  const runBytes = () => (existsSync(join(root, RUN_FILE)) ? readFileSync(join(root, RUN_FILE), 'utf8') : null);
+  // A Define hand-back that names its document in ops.f, as the dispatch table asks of spec and plan.
+  const docSay = (role, doc) => say(role, 'boundary_routed').replace('"f":[]', `"f":[${JSON.stringify(`${doc}:C`)}]`);
+  const putSpec = () => { mkdirSync(dirname(join(root, SPEC)), { recursive: true }); writeFileSync(join(root, SPEC), '# Demo spec\n'); };
+  const report = (label, hash, verdict = 'APPROVE', findings = []) => ['Checked.', ...findings, `REVIEWED ${label} sha256 ${hash}`, `VERDICT: ${verdict}`, ''].join('\n');
+  const putReport = (kind, text) => { mkdirSync(join(root, DELEGATE_DIR), { recursive: true }); writeFileSync(join(root, DELEGATE_DIR, `${kind}.md`), text); };
+  // docOf is the file-level helper: SPEC for spec, PLAN for plan.
+  const delegateDoc = (kind, text) => { putReport(kind, text ?? report(kind, sha(docOf(kind)))); return orch(['delegate', kind, docOf(kind), sha(docOf(kind))]); };
+  // An unattended run at the spec approval: spec handed back naming its document, the loop closed.
+  function atSpec({ start = ['--unattended'], loop = true } = {}) {
+    agents();
+    plan(TWO_TASKS);
+    expect(orch(['start', 'FEAT-011', ...start]).status).toBe(0);
+    putSpec();
+    expect(orch(['install', 'spec']).status).toBe(0);
+    expect(orch(['handback', 'spec'], { input: docSay('spec', SPEC) }).status).toBe(0);
+    if (loop) expect(skipLoop('spec').status).toBe(0);
+  }
+  function atPlan(opts) {
+    atSpec(opts);
+    expect(delegateDoc('spec').status).toBe(0);
+    expect(orch(['install', 'plan']).status).toBe(0);
+    expect(orch(['handback', 'plan'], { input: docSay('plan', PLAN) }).status).toBe(0);
+    expect(skipLoop('plan').status).toBe(0);
+  }
+  // Through an approving security seat with owner approvals: the delegated build review is next.
+  function atBuild() {
+    driveTo('qa', { start: ['--unattended'] });
+    expect(nextStep(runFile())).toEqual({ await: 'build' });
+  }
+  const buildReport = (verdict = 'APPROVE', findings = []) => report('build plan', runFile().approvals.plan.sha256, verdict, findings);
+
+  it('U1 [AC2a] start --unattended records unattended true and mode auto, and its stdout ends with the unattended segment', () => {
+    agents();
+    const r = orch(['start', 'FEAT-011', '--unattended']);
+    expect(r.status).toBe(0);
+    expect(r.out.endsWith('; unattended: delegated review at spec, plan and build')).toBe(true);
+    expect(runFile()).toMatchObject({ unattended: true, mode: 'auto' });
+    expect('delegated' in runFile()).toBe(false);
+  });
+
+  it('U2 [AC2a] --auto --unattended is accepted and --unattended twice refuses START_USAGE', () => {
+    agents();
+    expect(orch(['start', 'FEAT-011', '--auto', '--unattended']).status).toBe(0);
+    expect(runFile().mode).toBe('auto');
+    orch(['end']);
+    const r = orch(['start', 'FEAT-011', '--unattended', '--unattended']);
+    expect(r).toMatchObject({ status: 2, err: START_USAGE });
+    expect(existsSync(join(root, RUN_FILE))).toBe(false);
+  });
+
+  it('U3 [AC1a] start without the flag writes no unattended and no delegated field and no unattended segment', () => {
+    agents();
+    const r = orch(['start', 'FEAT-011']);
+    expect(r.out).not.toContain('unattended');
+    expect('unattended' in runFile()).toBe(false);
+    expect('delegated' in runFile()).toBe(false);
+    expect(runFile().mode).toBe('step');
+  });
+
+  it('U4 [AC4a] start --unattended with a live run in this session refuses ORCH_RUN_ACTIVE and leaves the run file unchanged', () => {
+    agents();
+    expect(orch(['start', 'FEAT-011']).status).toBe(0);
+    const before = runBytes();
+    expect(orch(['start', 'FEAT-011', '--unattended'])).toMatchObject({ status: 1, err: 'ORCH_RUN_ACTIVE: run FEAT-011 is live in this session; end it first' });
+    expect(runBytes()).toBe(before);
+  });
+
+  it.each([
+    ['unattended "yes"', (r) => ({ ...r, unattended: 'yes' })],
+    ['unattended false', (r) => ({ ...r, unattended: false })],
+    ['unattended true with mode step', (r) => ({ ...r, mode: 'step' })],
+    ['unattended true with no security object', (r) => { const { security, ...rest } = r; return rest; }],
+    ['a delegated array', (r) => ({ ...r, delegated: [] })],
+    ['a delegated key outside spec, plan, build', (r) => ({ ...r, delegated: { qa: { verdict: 'APPROVE' } } })],
+    ['a delegated verdict outside the four', (r) => ({ ...r, delegated: { spec: { verdict: 'MAYBE' } } })],
+    ['a delegated outcome that is not an object', (r) => ({ ...r, delegated: { spec: 'APPROVE' } })],
+  ])('U5 [AC4c] isValidRun rejects %s', (_name, edit) => {
+    agents();
+    orch(['start', 'FEAT-011', '--unattended']);
+    expect(isValidRun(edit(runFile()))).toBe(false);
+  });
+
+  it('U6 [AC4c] isValidRun accepts an unattended run, each delegated verdict, and an attended run without either field', () => {
+    agents();
+    orch(['start', 'FEAT-011', '--unattended']);
+    expect(isValidRun(runFile())).toBe(true);
+    for (const v of ['APPROVE', 'RETURN', 'ESCALATE', 'UNPARSED']) expect(isValidRun({ ...runFile(), delegated: { spec: { verdict: v } } })).toBe(true);
+    expect(isValidRun({ ...runFile(), delegated: {} })).toBe(true);
+    orch(['end']);
+    orch(['start', 'FEAT-011']);
+    expect(isValidRun(runFile())).toBe(true);
+  });
+
+  it('U7 [AC6] start, a replacing start and end clear .conductor/delegate/', () => {
+    agents();
+    putReport('spec', 'x\n');
+    expect(orch(['start', 'FEAT-011', '--unattended']).status).toBe(0);
+    expect(existsSync(join(root, DELEGATE_DIR))).toBe(false);
+    putReport('spec', 'x\n');
+    orch(['end']);
+    expect(existsSync(join(root, DELEGATE_DIR))).toBe(false);
+    orch(['start', 'FEAT-011', '--unattended'], { sid: 'sess-2' });
+    putReport('spec', 'x\n');
+    expect(orch(['start', 'FEAT-011', '--unattended']).out.startsWith('replaced the stale run FEAT-011')).toBe(true);
+    expect(existsSync(join(root, DELEGATE_DIR))).toBe(false);
+  });
+
+  it('U8 [AC6] install <role> --unattended and approve <kind> <doc> <sha256> --unattended leave unattended absent', () => {
+    agents();
+    plan(TWO_TASKS);
+    expect(orch(['start', 'FEAT-011']).status).toBe(0);
+    expect(orch(['install', 'spec', '--unattended']).status).toBe(0);
+    expect(orch(['handback', 'spec'], { input: say('spec', 'boundary_routed') }).status).toBe(0);
+    skipLoop('spec');
+    expect(orch([...approveArgs('spec'), '--unattended']).status).toBe(0);
+    expect('unattended' in runFile()).toBe(false);
+    expect(runFile().mode).toBe('step');
+  });
+
+  const SEC = { threshold: 'high', dependency: 'disabled', base: null, audit_command: null, scan_command: 'node s.mjs none high' };
+  const verified = (seat, extra = {}) => ({
+    ...blank, gate: 'build_executed', approvals: { spec: {}, plan: {} }, tasks: { ids: ['Task 1'], done: 1 }, mode: 'auto', security: SEC,
+    handbacks: [...hb('spec', 'plan', 'code'), { role: 'audit', verdict: 'APPROVE', round: 1 }, ...(seat ? [{ role: 'security', security: { verdict: seat } }] : [])],
+    ...extra,
+  });
+
+  it.each([
+    ['an attended run after an approving seat dispatches qa', verified('APPROVE'), { role: 'qa' }],
+    ['an unattended run after an approving seat awaits the delegated build review', verified('APPROVE', { unattended: true }), { await: 'build' }],
+    ['an approving delegated build review dispatches qa', verified('APPROVE', { unattended: true, delegated: { build: { verdict: 'APPROVE' } } }), { role: 'qa' }],
+    ['a returning delegated build review ends the run', verified('APPROVE', { unattended: true, delegated: { build: { verdict: 'RETURN' } } }), { end: true }],
+    ['an unattended run after a blocking seat ends the run', verified('RETURN', { unattended: true }), { end: true }],
+    ['an unattended run without a seat awaits the review after the audit (D7)', verified(null, { unattended: true, security: undefined }), { await: 'build' }],
+    ['an attended run without a seat dispatches qa after the audit', verified(null, { security: undefined }), { role: 'qa' }],
+  ])('U9 [AC1c] nextStep: %s', (_name, run, expected) => {
+    expect(nextStep(run)).toEqual(expected);
+  });
+
+  it.each([
+    ['absent', {}],
+    ['RETURN', { delegated: { build: { verdict: 'RETURN' } } }],
+    ['UNPARSED', { delegated: { build: { verdict: 'UNPARSED' } } }],
+  ])('U10 [AC3b] recordHandback withholds qa verify_pass in an unattended run when the delegated build verdict is %s', (v, extra) => {
+    expect(() => recordHandback(verified('APPROVE', { unattended: true, ...extra }), 'qa', 'verify_pass'))
+      .toThrow(`ORCH_GATE_WITHHELD: qa may not forward verify_pass: the delegated build verdict is ${v}`);
+  });
+
+  it('U11 [AC3b] recordHandback forwards qa verify_pass over an approving delegated build verdict, and an attended run needs none', () => {
+    expect(recordHandback(verified('APPROVE', { unattended: true, delegated: { build: { verdict: 'APPROVE' } } }), 'qa', 'verify_pass').gate).toBe('verify_pass');
+    expect(recordHandback(verified('APPROVE'), 'qa', 'verify_pass').gate).toBe('verify_pass');
+  });
+
+  it('U12 [AC6] at the delegated build step the refusals of approve, install and resume say delegate build, never approve build', () => {
+    atBuild();
+    const before = runBytes();
+    const a = orch(['approve', 'spec', SPEC, sha(SPEC)]);
+    const i = orch(['install', 'qa', '--check']);
+    const r = orch(['resume']);
+    expect(a.err).toBe('orchestrate: approve spec: the next step is delegate build');
+    expect(i.err).toBe('orchestrate: install qa: the next step is delegate build');
+    expect(r.err).toBe('orchestrate: ORCH_RESUME_NOT_HALTED: run FEAT-011 is not halted; continue with delegate build');
+    expect([a.status, i.status, r.status]).toEqual([2, 2, 2]);
+    expect(runBytes()).toBe(before);
+  });
+
+  it('U13 [AC6] approve build and review build refuse with their usage lines at the delegated build step', () => {
+    atBuild();
+    const before = runBytes();
+    expect(orch(['approve', 'build', PLAN, sha(PLAN)])).toMatchObject({ status: 2, err: 'orchestrate: usage: orchestrate.mjs approve <spec|plan> <path relative to the run root> <sha256>' });
+    expect(orch(['review', 'build', '--round', PLAN])).toMatchObject({ status: 2, err: USAGE });
+    expect(runBytes()).toBe(before);
+    expect(runFile().approvals.spec.path).toBe(SPEC);
+  });
+
+  const DELEGATE_USAGE = 'orchestrate: usage: orchestrate.mjs delegate <spec|plan> <path relative to the run root> <sha256> | delegate build | delegate <spec|plan|build> --check';
+  const NOT_UNATTENDED = 'orchestrate: ORCH_NOT_UNATTENDED: run FEAT-011 was not started with --unattended; only an owner message approves';
+
+  it.each(['spec', 'plan', 'build'])('U14 [AC1b] delegate %s on an attended run refuses ORCH_NOT_UNATTENDED and leaves the run file byte-identical', (kind) => {
+    atSpec({ start: [] });
+    const before = runBytes();
+    const args = kind === 'build' ? ['delegate', 'build'] : ['delegate', kind, SPEC, sha(SPEC)];
+    expect(orch(args)).toMatchObject({ status: 2, err: NOT_UNATTENDED });
+    expect(orch(['delegate', kind, '--check']).err).toBe(NOT_UNATTENDED);
+    expect(runBytes()).toBe(before);
+  });
+
+  it('U15 [AC2b] delegate spec over an APPROVE report records the delegated approval with the document and report hashes', () => {
+    atSpec();
+    fixtureGit('init', '-q');
+    fixtureCommit();
+    const text = report('spec', sha(SPEC));
+    const reviewHash = createHash('sha256').update(text).digest('hex');
+    expect(delegateDoc('spec', text)).toEqual({ status: 0, out: `spec approved by delegated review: sha256 ${sha(SPEC)}`, err: '' });
+    expect(runFile().approvals.spec).toEqual({
+      at: expect.any(String), by: 'define-review', basis: 'approved by delegated review', path: SPEC, sha256: sha(SPEC),
+      commit: fixtureGit('rev-parse', 'HEAD').stdout.trim(), review_sha256: reviewHash,
+    });
+    expect(runFile().delegated).toEqual({ spec: { verdict: 'APPROVE', at: runFile().approvals.spec.at, review_sha256: reviewHash } });
+    expect(nextStep(runFile())).toEqual({ role: 'plan' });
+  });
+
+  it('U16 [AC2b] delegate plan over an APPROVE report writes define_approved and the task list, as an owner approval does', () => {
+    atPlan();
+    const r = delegateDoc('plan');
+    expect(r.out).toBe(`plan approved by delegated review: define_approved, 2 task(s); sha256 ${sha(PLAN)}`);
+    expect(runFile()).toMatchObject({
+      gate: 'define_approved', plan: PLAN, tasks: { ids: ['Task 1', 'Task 2'], done: 0 },
+      approvals: { plan: { by: 'define-review', basis: 'approved by delegated review', path: PLAN, sha256: sha(PLAN) } },
+      delegated: { spec: { verdict: 'APPROVE' }, plan: { verdict: 'APPROVE' } },
+    });
+    expect(orch(['install', 'code', '--check']).status).toBe(0);
+  });
+
+  it('U17 [AC2c] a REVIEWED line naming another hash records no approval', () => {
+    atSpec();
+    const r = delegateDoc('spec', report('spec', 'f'.repeat(64)));
+    expect(r.status).toBe(0);
+    expect(r.out.startsWith('owner approval required: delegated review spec returned UNPARSED (ORCH_VERDICT_INVALID: the line before the VERDICT line must be REVIEWED spec sha256 ')).toBe(true);
+    expect(r.out.endsWith('; see .conductor/delegate/spec.md')).toBe(true);
+    expect(runFile().approvals.spec).toBeNull();
+    expect(runFile().delegated.spec.verdict).toBe('UNPARSED');
+    expect(nextStep(runFile())).toEqual({ await: 'spec' });
+  });
+
+  it('U18 [AC2c] a stale shown hash refuses ORCH_DOC_HASH_STALE and writes nothing', () => {
+    atSpec();
+    putReport('spec', report('spec', sha(SPEC)));
+    const before = runBytes();
+    const r = orch(['delegate', 'spec', SPEC, 'a'.repeat(64)]);
+    expect(r.status).toBe(2);
+    expect(r.err.startsWith(`orchestrate: ORCH_DOC_HASH_STALE: spec ${SPEC} hashes ${sha(SPEC)}`)).toBe(true);
+    expect(runBytes()).toBe(before);
+  });
+
+  it.each([
+    ['RETURN', ['- [major] docs/specs/demo-design.md:1 misses AC2']],
+    ['ESCALATE', ['- [minor] docs/specs/demo-design.md:1 needs a new dependency']],
+  ])('U19 [AC3a] a define %s records the outcome, waits at the approval, and the owner\'s approve still succeeds', (verdict, findings) => {
+    atSpec();
+    const r = delegateDoc('spec', report('spec', sha(SPEC), verdict, findings));
+    expect(r).toEqual({ status: 0, out: `owner approval required: delegated review spec returned ${verdict}; see .conductor/delegate/spec.md`, err: '' });
+    expect(Object.keys(runFile().delegated.spec).sort()).toEqual(['at', 'review_sha256', 'verdict']);
+    expect(nextStep(runFile())).toEqual({ await: 'spec' });
+    expect(orch(approveArgs('spec'))).toEqual({ status: 0, out: `spec approved: sha256 ${sha(SPEC)}`, err: '' });
+    expect(runFile().approvals.spec.basis).toBeUndefined();
+  });
+
+  it.each([
+    ['RETURN', (h) => report('spec', h, 'RETURN', ['- [blocker] docs/specs/demo-design.md:1 x'])],
+    ['ESCALATE', (h) => report('spec', h, 'ESCALATE')],
+    ['UNPARSED', () => 'no verdict here\n'],
+  ])('U20 [AC2d] after %s a second delegate spec refuses ORCH_DELEGATED_ONCE and writes nothing', (v, make) => {
+    atSpec();
+    delegateDoc('spec', make(sha(SPEC)));
+    const before = runBytes();
+    expect(delegateDoc('spec')).toMatchObject({ status: 2, err: `orchestrate: ORCH_DELEGATED_ONCE: delegated review spec already returned ${v}; only the owner approves now` });
+    expect(runBytes()).toBe(before);
+  });
+
+  it('U21 [AC2d] after an APPROVE a second delegate spec refuses with the next step', () => {
+    atSpec();
+    delegateDoc('spec');
+    expect(delegateDoc('spec')).toMatchObject({ status: 2, err: 'orchestrate: delegate spec: the next step is install plan' });
+  });
+
+  it.each([
+    '.claude/memory/orchestrator-run.json',
+    '.claude/memory/band-envelope.json',
+    '.claude/memory/session-snapshot.json',
+    '.conductor/notes.md',
+  ])('U22 [AC6] delegate plan over an APPROVE report escalates a task that declares %s', (path) => {
+    atPlan();
+    plan(`# Demo Plan\n\n${task(1, ['src/a.js'])}\n${task(2, [path])}\n## Test List\n`);
+    const reason = `task Task 2 declares ${path} inside the orchestrator write surface`;
+    expect(delegateDoc('plan')).toEqual({ status: 0, out: `owner approval required: delegated review plan returned ESCALATE (${reason}); see .conductor/delegate/plan.md`, err: '' });
+    expect(runFile().approvals.plan).toBeNull();
+    expect(runFile().delegated.plan).toMatchObject({ verdict: 'ESCALATE', reason });
+    expect(orch(approveArgs('plan')).status).toBe(0);
+  });
+
+  it.each([
+    ['no verdict line', (h) => `REVIEWED spec sha256 ${h}\n`, 'ORCH_VERDICT_MISSING'],
+    ['two verdict lines', (h) => `VERDICT: APPROVE\n${report('spec', h)}`, 'ORCH_VERDICT_INVALID'],
+    ['a verdict that is not last', (h) => `${report('spec', h)}trailing\n`, 'ORCH_VERDICT_INVALID'],
+    ['no REVIEWED line', () => 'VERDICT: APPROVE\n', 'ORCH_VERDICT_INVALID'],
+    ['a REVIEWED line for another kind', (h) => report('plan', h), 'ORCH_VERDICT_INVALID'],
+    ['APPROVE with a blocker', (h) => report('spec', h, 'APPROVE', ['- [blocker] docs/specs/demo-design.md:1 x']), 'ORCH_VERDICT_INCONSISTENT'],
+    ['a VERDICT: UNPARSED line', (h) => report('spec', h, 'UNPARSED'), 'ORCH_VERDICT_INVALID'],
+    ['a malformed verdict line', (h) => report('spec', h, 'APPROVE secret-looking'), 'ORCH_VERDICT_INVALID'],
+  ])('U23 [AC6] a garbled define report is UNPARSED with %s', (_name, make, code) => {
+    atSpec();
+    const r = delegateDoc('spec', make(sha(SPEC)));
+    expect(r.status).toBe(0);
+    expect(r.out.startsWith(`owner approval required: delegated review spec returned UNPARSED (${code}: `)).toBe(true);
+    expect(runFile().delegated.spec).toMatchObject({ verdict: 'UNPARSED', reason: expect.stringMatching(new RegExp(`^${code}: `)) });
+    expect(runFile().approvals.spec).toBeNull();
+    expect(runBytes()).not.toContain('secret-looking');
+  });
+
+  it('U24 [AC6] delegate spec --check prints the brief\'s values and leaves the run file byte-identical', () => {
+    writeFileSync(join(root, 'CLAUDE.md'), '# P\n\n- Role models: define-review=sonnet\n');
+    atSpec();
+    const before = runBytes();
+    expect(orch(['delegate', 'spec', '--check'])).toEqual({ status: 0, out: `delegate spec: ${SPEC} sha256 ${sha(SPEC)}; source backlog entry for FEAT-011; model sonnet`, err: '' });
+    expect(runBytes()).toBe(before);
+  });
+
+  it('U25 [AC6] delegate plan --check names the approved spec as its source and has no model segment without role models', () => {
+    atPlan();
+    const before = runBytes();
+    expect(orch(['delegate', 'plan', '--check']).out).toBe(`delegate plan: ${PLAN} sha256 ${sha(PLAN)}; source the approved spec ${SPEC} sha256 ${sha(SPEC)} and backlog entry for FEAT-011`);
+    expect(runBytes()).toBe(before);
+  });
+
+  it.each([
+    ['no run file', () => {}, ['delegate', 'spec', '--check'], {}, () => `orchestrate: no run file at ${join(root, RUN_FILE)}; start one first`],
+    ['a foreign session', () => atSpec(), ['delegate', 'spec', '--check'], { sid: 'sess-2' }, () => 'orchestrate: run FEAT-011 belongs to another session; end it, or start to replace it'],
+    ['a halted run', () => {
+      atSpec();
+      rmSync(join(root, '.claude', 'agents', 'plan.md'));
+      delegateDoc('spec');
+      expect(orch(['install', 'plan']).err).toMatch(/^ORCH_AGENT_MISSING: /);
+    }, ['delegate', 'plan', '--check'], {}, () => 'orchestrate: run FEAT-011 halted with ORCH_AGENT_MISSING; recover with resume, or end then start (D12, FEAT-055)'],
+    ['an unknown kind', () => atSpec(), ['delegate', 'qa', '--check'], {}, () => DELEGATE_USAGE],
+    ['an extra token after --check', () => atSpec(), ['delegate', 'spec', '--check', 'x'], {}, () => DELEGATE_USAGE],
+    ['a token after build', () => atSpec(), ['delegate', 'build', 'x'], {}, () => DELEGATE_USAGE],
+    ['a fourth token', () => atSpec(), ['delegate', 'spec', SPEC, 'a'.repeat(64), '--unattended'], {}, () => DELEGATE_USAGE],
+    ['a malformed hash', () => atSpec(), ['delegate', 'spec', SPEC, 'xyz'], {}, () => DELEGATE_USAGE],
+  ])('U26 [AC6] delegate refuses and writes nothing with %s', (_name, setup, args, opts, expected) => {
+    setup();
+    const before = runBytes();
+    const r = orch(args, opts);
+    expect(r.status).toBe(2);
+    expect(r.err).toBe(expected());
+    expect(runBytes()).toBe(before);
+  });
+
+  it('U27 [AC6] an open review loop refuses ORCH_REVIEW_OPEN', () => {
+    atSpec({ loop: false });
+    putReport('spec', report('spec', sha(SPEC)));
+    const r = orch(['delegate', 'spec', SPEC, sha(SPEC)]);
+    expect(r.status).toBe(2);
+    expect(r.err).toBe('orchestrate: ORCH_REVIEW_OPEN: review spec is not run; close it before the approval');
+  });
+
+  it('U28 [AC6] a missing define report refuses, and a leftover report from an earlier run is never read', () => {
+    putReport('spec', report('spec', createHash('sha256').update('# Demo spec\n').digest('hex')));
+    atSpec();
+    const before = runBytes();
+    expect(orch(['delegate', 'spec', SPEC, sha(SPEC)])).toMatchObject({ status: 2, err: 'orchestrate: delegate spec: cannot read .conductor/delegate/spec.md' });
+    expect(runBytes()).toBe(before);
+  });
+
+  it('U29 [plan decision 1, 2] delegate refuses a document the hand-back does not name, and a hand-back naming none', () => {
+    atSpec();
+    const other = 'docs/specs/other-design.md';
+    writeFileSync(join(root, other), '# Other\n');
+    putReport('spec', report('spec', sha(other)));
+    expect(orch(['delegate', 'spec', other, sha(other)]).err).toBe(`orchestrate: delegate spec: ${other} is not the document the spec hand-back names (${SPEC})`);
+    orch(['end']);
+    expect(orch(['start', 'FEAT-011', '--unattended']).status).toBe(0);
+    putSpec();
+    expect(orch(['install', 'spec']).status).toBe(0);
+    expect(orch(['handback', 'spec'], { input: say('spec', 'boundary_routed') }).status).toBe(0);
+    expect(skipLoop('spec').status).toBe(0);
+    expect(orch(['delegate', 'spec', '--check']).err).toBe('orchestrate: delegate spec: the spec hand-back names 0 document(s) under docs/specs/; show the approval and wait for the owner');
+  });
+
+  it('U30 [AC6] the end record names the unattended mode and each approval\'s basis', () => {
+    atPlan();
+    expect(orch(approveArgs('plan')).status).toBe(0);
+    const rec = JSON.parse(orch(['end']).out);
+    expect(rec.unattended).toBe(true);
+    expect(rec.approvals.spec).toMatchObject({ by: 'define-review', basis: 'approved by delegated review' });
+    expect('basis' in rec.approvals.plan).toBe(false);
+    expect(rec.delegated).toMatchObject({ spec: { verdict: 'APPROVE' } });
+  });
+
+  it('U40 [owner decision: allowed values] parseDelegatedReport reads DELEGATE_KINDS and DELEGATED_VERDICTS', () => {
+    const parse = orchestrateModule.parseDelegatedReport;
+    const h = 'a'.repeat(64);
+    for (const v of orchestrateModule.DELEGATED_VERDICTS.filter((x) => x !== 'UNPARSED')) {
+      expect(parse(report('spec', h, v, v === 'RETURN' ? ['- [major] docs/specs/demo-design.md:1 x'] : []), 'spec', h).verdict).toBe(v);
+    }
+    expect(parse(report('build plan', h), 'build plan', h).verdict).toBe('APPROVE');
+    expect(() => parse(report('spec', h, 'UNPARSED'), 'spec', h)).toThrow(/^ORCH_VERDICT_INVALID: the VERDICT line is not VERDICT: APPROVE \| RETURN \| ESCALATE$/);
+    expect(() => parse(report('qa', h), 'qa', h)).toThrow('parseDelegatedReport: qa is not a delegated kind');
+  });
+
+  const SEC_LINE = 'VERDICT: APPROVE; threshold high; findings critical=0 high=0 moderate=0 low=0; scans dependency=not-covered secrets=ran scripts=ran';
+
+  it('U31 [AC6] delegate build --check prints both approved documents, the code files and the security summary only, byte-identical', () => {
+    atBuild();
+    const before = runBytes();
+    const { spec, plan: p } = runFile().approvals;
+    const r = orch(['delegate', 'build', '--check']);
+    expect(r).toEqual({ status: 0, out: `delegate build: spec ${spec.path} sha256 ${spec.sha256}; plan ${p.path} sha256 ${p.sha256}; files none; security ${SEC_LINE}`, err: '' });
+    expect(r.out).not.toContain('security.txt');
+    expect(runBytes()).toBe(before);
+  });
+
+  it('U32 [AC3b] an approving delegated build review records only verdict, at and review_sha256, and qa forwards verify_pass', () => {
+    atBuild();
+    const text = buildReport();
+    putReport('build', text);
+    expect(orch(['delegate', 'build'])).toEqual({ status: 0, out: `build approved by delegated review: plan sha256 ${runFile().approvals.plan.sha256}; next: install qa`, err: '' });
+    expect(Object.keys(runFile().delegated.build).sort()).toEqual(['at', 'review_sha256', 'verdict']);
+    expect(runFile().delegated.build.review_sha256).toBe(createHash('sha256').update(text).digest('hex'));
+    expect(orch(['install', 'qa']).status).toBe(0);
+    expect(orch(['handback', 'qa'], { input: say('qa', 'verify_pass') })).toMatchObject({ status: 0, out: 'qa handed back verify_pass' });
+  });
+
+  it.each([
+    ['RETURN', 'ORCH_DELEGATED_RETURN', 'the delegated build review returned the change; see .conductor/delegate/build.md', ['- [blocker] src/a.js:1 secret-looking finding text']],
+    ['ESCALATE', 'ORCH_DELEGATED_ESCALATE', 'the delegated build review escalated a decision only the owner takes; see .conductor/delegate/build.md', ['- [minor] src/a.js:1 secret-looking finding text']],
+  ])('U33 [AC3b] a delegated build %s halts %s, recorded, naming the report and never a finding', (verdict, code, reason, findings) => {
+    atBuild();
+    putReport('build', buildReport(verdict, findings));
+    const r = orch(['delegate', 'build']);
+    expect(r).toMatchObject({ status: 1, err: `${code}: ${reason}` });
+    expect(runFile().halt).toMatchObject({ code, reason });
+    expect(runFile().delegated.build.verdict).toBe(verdict);
+    expect(runBytes()).not.toContain('secret-looking');
+  });
+
+  it('U34 [AC6] a missing build report halts ORCH_VERDICT_MISSING naming its path, recorded', () => {
+    atBuild();
+    const r = orch(['delegate', 'build']);
+    expect(r).toMatchObject({ status: 1, err: 'ORCH_VERDICT_MISSING: cannot read .conductor/delegate/build.md' });
+    expect(runFile().halt.code).toBe('ORCH_VERDICT_MISSING');
+    expect('delegated' in runFile()).toBe(false);
+  });
+
+  it.each([
+    ['ORCH_VERDICT_MISSING', () => 'nothing\n'],
+    ['ORCH_VERDICT_INVALID', () => report('build plan', 'f'.repeat(64))],
+    ['ORCH_VERDICT_INCONSISTENT', () => buildReport('RETURN')],
+  ])('U35 [AC6] a garbled build report halts %s naming the report', (code, make) => {
+    atBuild();
+    putReport('build', make());
+    const r = orch(['delegate', 'build']);
+    expect(r.status).toBe(1);
+    expect(r.err.startsWith(`${code}: `)).toBe(true);
+    expect(r.err.endsWith('; see .conductor/delegate/build.md')).toBe(true);
+    expect(runFile().halt.code).toBe(code);
+  });
+
+  it('U36 [AC3c] in an unattended run an audit ESCALATE still halts ORCH_AUDIT_ESCALATE', () => {
+    driveTo('audit', { start: ['--unattended'] });
+    expect(orch(['install', 'audit']).status).toBe(0);
+    expect(orch(['handback', 'audit'], { input: auditReport('VERDICT: ESCALATE') }).err).toMatch(/^ORCH_AUDIT_ESCALATE: /);
+    expect(runFile().unattended).toBe(true);
+  });
+
+  it('U37 [AC3c] in an unattended run a security ESCALATE still halts ORCH_SECURITY_ESCALATE', () => {
+    driveTo('security', { start: ['--unattended'] });
+    expect(securityPass(securityReport([], SCANS_NONE, 'VERDICT: ESCALATE')).err).toMatch(/^ORCH_SECURITY_ESCALATE: /);
+  });
+
+  it('U38 [AC4b] resume keeps an unattended run unattended, keeps the Define outcomes, and drops the build verdict and its report', () => {
+    atBuild();
+    const run = runFile();
+    run.delegated = { spec: { verdict: 'RETURN', at: 'x', review_sha256: 'y' } };
+    runFileText(JSON.stringify(run, null, 2) + '\n');
+    putReport('build', buildReport('RETURN', ['- [blocker] src/a.js:1 x']));
+    expect(orch(['delegate', 'build']).status).toBe(1);
+    expect(orch(['resume', '--unattended'])).toMatchObject({ status: 2, err: 'orchestrate: usage: orchestrate.mjs resume' });
+    expect(orch(['resume']).status).toBe(0);
+    expect(runFile()).toMatchObject({ unattended: true, mode: 'auto', halt: null, delegated: { spec: { verdict: 'RETURN' } } });
+    expect('build' in runFile().delegated).toBe(false);
+    expect(existsSync(join(root, DELEGATE_DIR, 'build.md'))).toBe(false);
+  });
+
+  it('U39 [AC4b] resume keeps an attended run attended', () => {
+    driveTo('code', { prep: () => { fixtureGit('init', '-q'); fixtureCommit(); } });
+    rmSync(join(root, '.claude', 'agents', 'code.md'));
+    expect(orch(['install', 'code']).err).toMatch(/^ORCH_AGENT_MISSING: /);
+    agents();
+    expect(orch(['resume']).status).toBe(0);
+    expect('unattended' in runFile()).toBe(false);
+    expect('delegated' in runFile()).toBe(false);
+    expect(runFile().mode).toBe('step');
   });
 });

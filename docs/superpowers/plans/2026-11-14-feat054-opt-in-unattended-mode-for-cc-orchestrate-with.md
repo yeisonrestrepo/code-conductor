@@ -64,8 +64,8 @@ Line numbers below are from HEAD f1fb50e; locate by the quoted text if they move
 - Modify: `tests/scripts/orchestrate.test.js`
 - Modify: `scripts/orchestrate.mjs`
 
-- [ ] [T-101] `tests/scripts/orchestrate.test.js:19`: the `START_USAGE` constant gains ` [--unattended]` at its end, after `[--no-dependency-audit]` (plan decision 12). Depends on T-004.
-- [ ] [T-102] `tests/scripts/orchestrate.test.js`: append `describe('unattended mode [FEAT-054]', …)` at the end of the file, with its helpers and the start and validation tests. Depends on T-101. Test names are the filter set predicted in T-103.
+- [X] [T-101] `tests/scripts/orchestrate.test.js:19`: the `START_USAGE` constant gains ` [--unattended]` at its end, after `[--no-dependency-audit]` (plan decision 12). Depends on T-004.
+- [X] [T-102] `tests/scripts/orchestrate.test.js`: append `describe('unattended mode [FEAT-054]', …)` at the end of the file, with its helpers and the start and validation tests. Depends on T-101. Test names are the filter set predicted in T-103.
   ```js
   describe('unattended mode [FEAT-054]', () => {
     const DELEGATE_DIR = '.conductor/delegate';
@@ -118,8 +118,8 @@ Line numbers below are from HEAD f1fb50e; locate by the quoted text if they move
   - U6 **"U6 [AC4c] isValidRun accepts an unattended run, each delegated verdict, and an attended run without either field"**: after `orch(['start', 'FEAT-011', '--unattended'])`, `isValidRun(runFile())` true, and true for `{ ...runFile(), delegated: { spec: { verdict: v } } }` for each `v` of `['APPROVE', 'RETURN', 'ESCALATE', 'UNPARSED']` and for `{ ...runFile(), delegated: {} }`; `orch(['end'])`, `orch(['start', 'FEAT-011'])`, `isValidRun(runFile())` true.
   - U7 **"U7 [AC6] start, a replacing start and end clear .conductor/delegate/"**: `putReport('spec', 'x\n')`; `orch(['start', 'FEAT-011', '--unattended']).status` 0; `existsSync(join(root, DELEGATE_DIR))` false; `putReport('spec', 'x\n')`; `orch(['end'])`; false again; `orch(['start', 'FEAT-011', '--unattended'], { sid: 'sess-2' })`; `putReport('spec', 'x\n')`; `orch(['start', 'FEAT-011', '--unattended']).out` starts with `replaced the stale run FEAT-011`; false again.
   - U8 **"U8 [AC6] install <role> --unattended and approve <kind> <doc> <sha256> --unattended leave unattended absent"**: `agents()`; `plan(TWO_TASKS)`; `orch(['start', 'FEAT-011']).status` 0; `orch(['install', 'spec', '--unattended']).status` 0; `orch(['handback', 'spec'], { input: say('spec', 'boundary_routed') }).status` 0; `skipLoop('spec')`; `orch([...approveArgs('spec'), '--unattended']).status` 0; `'unattended' in runFile()` false and `runFile().mode` `'step'`.
-- [ ] [T-103] Red step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-054"`. Predicted full match set, 15 tests (U1-U4, eight U5 rows, U6-U8): **red** U1 (`--unattended` refuses with usage), U2 (same), U4 (the second start refuses with usage, exit 2, not `ORCH_RUN_ACTIVE`), all eight U5 rows (each row's start refuses, so `runFile()` throws; `isValidRun` also ignores both fields today), U6 and U7 (start refuses): 13 red; **green** U3 and U8 (the no-flag path already behaves so). Every other test is filtered out. Depends on T-102.
-- [ ] [T-104] `scripts/orchestrate.mjs`, the constants, after `export const REVIEW_CAP = 3;` (line 31). Depends on T-103.
+- [X] [T-103] Red step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-054"`. Predicted full match set, 15 tests (U1-U4, eight U5 rows, U6-U8): **red** U1 (`--unattended` refuses with usage), U2 (same), U4 (the second start refuses with usage, exit 2, not `ORCH_RUN_ACTIVE`), all eight U5 rows (each row's start refuses, so `runFile()` throws; `isValidRun` also ignores both fields today), U6 and U7 (start refuses): 13 red; **green** U3 and U8 (the no-flag path already behaves so). Every other test is filtered out. Depends on T-102.
+- [X] [T-104] `scripts/orchestrate.mjs`, the constants, after `export const REVIEW_CAP = 3;` (line 31). Depends on T-103.
   ```js
   // FEAT-054: the delegated review's kinds and the outcomes a run records; delegate, its parser and isValidRun read these.
   export const DELEGATE_KINDS = ['spec', 'plan', 'build'];
@@ -127,7 +127,7 @@ Line numbers below are from HEAD f1fb50e; locate by the quoted text if they move
   // Where /cc-orchestrate writes each delegated review report; cleared with the run like the hand-backs.
   export const DELEGATE_DIR = '.conductor/delegate';
   ```
-- [ ] [T-105] `scripts/orchestrate.mjs`, validation. Depends on T-104.
+- [X] [T-105] `scripts/orchestrate.mjs`, validation. Depends on T-104.
   - Before the comment `// FEAT-057: a present audit_rounds that is not 0-5 …` (line 129) add:
     ```js
     // FEAT-054: only start writes unattended, always with auto and a security seat; a hand edit that breaks either is not a run.
@@ -139,11 +139,11 @@ Line numbers below are from HEAD f1fb50e; locate by the quoted text if they move
     }
     ```
   - `isValidRun` (line 137): `&& isModelRecord(run);` → `&& isModelRecord(run) && isUnattendedRecord(run);`, and add `// FEAT-054: and unattended and delegated hold only what start and delegate write.` to the comment above it.
-- [ ] [T-106] `scripts/orchestrate.mjs`, the flag. Depends on T-105.
+- [X] [T-106] `scripts/orchestrate.mjs`, the flag. Depends on T-105.
   - `START_USAGE` (line 1086): append ` [--unattended]` before the closing quote.
   - The comment above `parseStartArgs` (line 1088): `--no-dependency-audit in any order` → `--no-dependency-audit and --unattended in any order`.
   - `parseStartArgs` (line 1093): add `unattended: false` to `opts`; after the `--no-dependency-audit` branch (line 1099) add `else if (rest[i] === '--unattended' && !opts.unattended) opts.unattended = true;`.
-- [ ] [T-107] `scripts/orchestrate.mjs`, `start` and `clearRunFiles`. Depends on T-106.
+- [X] [T-107] `scripts/orchestrate.mjs`, `start` and `clearRunFiles`. Depends on T-106.
   - Before `function clearRunFiles` add `const UNATTENDED_NOTE = '; unattended: delegated review at spec, plan and build';`. (`start` reads it only at runtime, after module evaluation.)
   - `start` (line 1119): destructure `unattended` too.
   - After `rmSync(join(root, OWNER_FILE), { force: true });` (line 1133) add `rmSync(join(root, DELEGATE_DIR), { recursive: true, force: true });` and extend the comment above it: `// FEAT-054: and no earlier delegated report is read as this run's (plan decision 9).`
@@ -151,9 +151,9 @@ Line numbers below are from HEAD f1fb50e; locate by the quoted text if they move
   - The return line (line 1143): append `${unattended ? UNATTENDED_NOTE : ''}` after `${modelsNote(models)}`, so the segment is last (AC2a).
   - `clearRunFiles` (line 1146): add `rmSync(join(root, DELEGATE_DIR), { recursive: true, force: true });` after the `REVIEW_DIR` line.
   - `start` measures 30 lines or fewer after the edit (27 today, two lines added).
-- [ ] [T-108] Green step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-054"`. Predicted: the same 15 tests, all **green**. Then `npx vitest run tests/scripts/orchestrate.test.js`: 522 passed (507 + 15), the three `START_USAGE` assertions (lines 695, 1525, 1793) included. Depends on T-107.
-- [ ] [T-109] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-14-feat054-opt-in-unattended-mode-for-cc-orchestrate-with.md`. Depends on T-108.
-- [ ] [T-110] Commit: `feat: start records an opt-in unattended run [FEAT-054]`. Depends on T-109.
+- [X] [T-108] Green step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-054"`. Predicted: the same 15 tests, all **green**. Then `npx vitest run tests/scripts/orchestrate.test.js`: 522 passed (507 + 15), the three `START_USAGE` assertions (lines 695, 1525, 1793) included. Depends on T-107.
+- [X] [T-109] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-14-feat054-opt-in-unattended-mode-for-cc-orchestrate-with.md`. Depends on T-108.
+- [X] [T-110] Commit: `feat: start records an opt-in unattended run [FEAT-054]`. Depends on T-109.
 
 ---
 
@@ -163,7 +163,7 @@ Line numbers below are from HEAD f1fb50e; locate by the quoted text if they move
 - Modify: `tests/scripts/orchestrate.test.js`
 - Modify: `scripts/orchestrate.mjs`
 
-- [ ] [T-201] `tests/scripts/orchestrate.test.js`: inside `describe('unattended mode [FEAT-054]', …)`, after U8, add the router tests. Depends on T-110 (ticks ride this group). Test names are the filter set predicted in T-202.
+- [X] [T-201] `tests/scripts/orchestrate.test.js`: inside `describe('unattended mode [FEAT-054]', …)`, after U8, add the router tests. Depends on T-110 (ticks ride this group). Test names are the filter set predicted in T-202.
   ```js
     const SEC = { threshold: 'high', dependency: 'disabled', base: null, audit_command: null, scan_command: 'node s.mjs none high' };
     const verified = (seat, extra = {}) => ({
@@ -184,8 +184,8 @@ Line numbers below are from HEAD f1fb50e; locate by the quoted text if they move
   - U11 **"U11 [AC3b] recordHandback forwards qa verify_pass over an approving delegated build verdict, and an attended run needs none"**: `recordHandback(verified('APPROVE', { unattended: true, delegated: { build: { verdict: 'APPROVE' } } }), 'qa', 'verify_pass').gate` is `'verify_pass'`; `recordHandback(verified('APPROVE'), 'qa', 'verify_pass').gate` is `'verify_pass'`.
   - U12 **"U12 [AC6] at the delegated build step the refusals of approve, install and resume say delegate build, never approve build"**: `atBuild()`; `const before = runBytes()`; `orch(['approve', 'spec', SPEC, sha(SPEC)]).err` is `'orchestrate: approve spec: the next step is delegate build'`; `orch(['install', 'qa', '--check']).err` is `'orchestrate: install qa: the next step is delegate build'`; `orch(['resume']).err` is `'orchestrate: ORCH_RESUME_NOT_HALTED: run FEAT-011 is not halted; continue with delegate build'`; each status 2; `runBytes()` is `before`.
   - U13 **"U13 [AC6] approve build and review build refuse with their usage lines at the delegated build step"**: `atBuild()`; `const before = runBytes()`; `orch(['approve', 'build', PLAN, sha(PLAN)])` toMatchObject `{ status: 2, err: 'orchestrate: usage: orchestrate.mjs approve <spec|plan> <path relative to the run root> <sha256>' }`; `orch(['review', 'build', '--round', PLAN])` toMatchObject `{ status: 2, err: USAGE }` (the review usage constant at line 730); `runBytes()` is `before`; `runFile().approvals.spec.path` is `SPEC`.
-- [ ] [T-202] Red step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-054"`. Predicted full match set, 28 tests: the 15 Task 1 tests **green**; U9 rows 1, 3, 5 and 7 **green** (today's router already answers `qa`, `qa`, `end`, `qa`), rows 2, 4 and 6 **red** (`{ role: 'qa' }`); U10's three rows **red** (no throw); U11 **green**; U12 **red** (`atBuild` sees `{ role: 'qa' }`); U13 **red** (same): 8 red, 20 green. Depends on T-201.
-- [ ] [T-203] `scripts/orchestrate.mjs`, the router. Depends on T-202.
+- [X] [T-202] Red step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-054"`. Predicted full match set, 28 tests: the 15 Task 1 tests **green**; U9 rows 1, 3, 5 and 7 **green** (today's router already answers `qa`, `qa`, `end`, `qa`), rows 2, 4 and 6 **red** (`{ role: 'qa' }`); U10's three rows **red** (no throw); U11 **green**; U12 **red** (`atBuild` sees `{ role: 'qa' }`); U13 **red** (same): 8 red, 20 green. Depends on T-201.
+- [X] [T-203] `scripts/orchestrate.mjs`, the router. Depends on T-202.
   - Before `// The band sequence, read off the run's record.` (line 168) add:
     ```js
     // FEAT-054: an unattended run puts the delegated build review between the approving seat and qa (D7).
@@ -199,20 +199,20 @@ Line numbers below are from HEAD f1fb50e; locate by the quoted text if they move
   - `nextStep` (line 179): `if (last === 'audit') return { role: isPlainObject(run.security) ? 'security' : 'qa' };` → `if (last === 'audit') return isPlainObject(run.security) ? { role: 'security' } : afterSeat(run);`.
   - `nextStep` (line 181): `… === 'APPROVE' ? { role: 'qa' } : { end: true };` → `… === 'APPROVE' ? afterSeat(run) : { end: true };`.
   - `describeStep` (line 186) → `const describeStep = (s) => (s.role ? \`install ${s.role}\` : s.await === 'build' ? 'delegate build' : s.await ? \`approve ${s.await}\` : 'end');` with the comment `// FEAT-054: the build step is the delegated review's, so no line ever says approve build.` above it.
-- [ ] [T-204] `scripts/orchestrate.mjs`, the qa gate, `withholdUnlessApproved` (lines 533-539): after its last line add
+- [X] [T-204] `scripts/orchestrate.mjs`, the qa gate, `withholdUnlessApproved` (lines 533-539): after its last line add
   ```js
     if (run.unattended !== true) return;
     const delegated = run.delegated?.build?.verdict;
     if (delegated !== 'APPROVE') throw new Halt('ORCH_GATE_WITHHELD', `qa may not forward verify_pass: the delegated build verdict is ${delegated ?? 'absent'}`);
   ```
   and add `// FEAT-054: and, in an unattended run, over an approving delegated build review.` to its comment. Depends on T-203.
-- [ ] [T-205] `scripts/orchestrate.mjs`, plan decision 8. Depends on T-204.
+- [X] [T-205] `scripts/orchestrate.mjs`, plan decision 8. Depends on T-204.
   - `approve` (line 881), after the step check `if (step.await !== what) throw …;` add `if (!RECORD_KINDS.includes(what)) throw new Refusal(APPROVE_USAGE);` with the comment `// FEAT-054: reachable only at the delegated build step, which is delegate's, never the owner's verb.`
   - `review` (line 1025), after `if (step.await !== role) throw …;` add `if (!RECORD_KINDS.includes(role)) throw new Refusal(REVIEW_USAGE);` with the same comment's reason: `// FEAT-054: only spec and plan have a loop; the build step is reachable only in an unattended run.`
   - `RECORD_KINDS` is a `const` declared at line 916, below `approve`; both verbs read it only at runtime, after module evaluation.
-- [ ] [T-206] Green step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-054"`. Predicted: the same 28 tests, all **green**. Then `npx vitest run tests/scripts/orchestrate.test.js`: 535 passed (507 + 28), the router table at line 135, the FEAT-034 `R1` rows (line 1870) and the FEAT-055 tests included. Depends on T-205.
-- [ ] [T-207] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-14-feat054-opt-in-unattended-mode-for-cc-orchestrate-with.md`. Depends on T-206.
-- [ ] [T-208] Commit: `feat: an unattended run awaits the delegated build review before qa [FEAT-054]`. Depends on T-207.
+- [X] [T-206] Green step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-054"`. Predicted: the same 28 tests, all **green**. Then `npx vitest run tests/scripts/orchestrate.test.js`: 535 passed (507 + 28), the router table at line 135, the FEAT-034 `R1` rows (line 1870) and the FEAT-055 tests included. Depends on T-205.
+- [X] [T-207] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-14-feat054-opt-in-unattended-mode-for-cc-orchestrate-with.md`. Depends on T-206.
+- [X] [T-208] Commit: `feat: an unattended run awaits the delegated build review before qa [FEAT-054]`. Depends on T-207.
 
 ---
 
@@ -222,8 +222,8 @@ Line numbers below are from HEAD f1fb50e; locate by the quoted text if they move
 - Modify: `tests/scripts/orchestrate.test.js`
 - Modify: `scripts/orchestrate.mjs`
 
-- [ ] [T-301] `tests/scripts/orchestrate.test.js:1032`: the verb-list usage test expects `'orchestrate: usage: orchestrate.mjs start|install|handback|approve|hash|review|delegate|resume|envelope|end'`, and its name gains `, FEAT-054` inside its leading bracket (plan decision 12). Depends on T-208 (ticks ride this group).
-- [ ] [T-302] `tests/scripts/orchestrate.test.js`: inside `describe('unattended mode [FEAT-054]', …)`, after U13, add the Define tests. Depends on T-301. Test names are the filter set predicted in T-303. `DELEGATE_USAGE` below is `'orchestrate: usage: orchestrate.mjs delegate <spec|plan> <path relative to the run root> <sha256> | delegate build | delegate <spec|plan|build> --check'`; define it as a `const` at the top of the describe.
+- [X] [T-301] `tests/scripts/orchestrate.test.js:1032`: the verb-list usage test expects `'orchestrate: usage: orchestrate.mjs start|install|handback|approve|hash|review|delegate|resume|envelope|end'`, and its name gains `, FEAT-054` inside its leading bracket (plan decision 12). Depends on T-208 (ticks ride this group).
+- [X] [T-302] `tests/scripts/orchestrate.test.js`: inside `describe('unattended mode [FEAT-054]', …)`, after U13, add the Define tests. Depends on T-301. Test names are the filter set predicted in T-303. `DELEGATE_USAGE` below is `'orchestrate: usage: orchestrate.mjs delegate <spec|plan> <path relative to the run root> <sha256> | delegate build | delegate <spec|plan|build> --check'`; define it as a `const` at the top of the describe.
   - U14 `it.each(['spec', 'plan', 'build'])` **"U14 [AC1b] delegate %s on an attended run refuses ORCH_NOT_UNATTENDED and leaves the run file byte-identical"**: `atSpec({ start: [] })`; `const before = runBytes()`; `const args = kind === 'build' ? ['delegate', 'build'] : ['delegate', kind, SPEC, sha(SPEC)]`; `orch(args)` toMatchObject `{ status: 2, err: 'orchestrate: ORCH_NOT_UNATTENDED: run FEAT-011 was not started with --unattended; only an owner message approves' }`; `orch(['delegate', kind, '--check']).err` is the same; `runBytes()` is `before`.
   - U15 **"U15 [AC2b] delegate spec over an APPROVE report records the delegated approval with the document and report hashes"**: `atSpec()`, then `fixtureGit('init', '-q'); fixtureCommit();` so `commit` is an object name; `const text = report('spec', sha(SPEC))`; `r = delegateDoc('spec', text)`; `r` toEqual `{ status: 0, out: \`spec approved by delegated review: sha256 ${sha(SPEC)}\`, err: '' }`; `runFile().approvals.spec` toEqual `{ at: expect.any(String), by: 'define-review', basis: 'approved by delegated review', path: SPEC, sha256: sha(SPEC), commit: fixtureGit('rev-parse', 'HEAD').stdout.trim(), review_sha256: createHash('sha256').update(text).digest('hex') }`; `runFile().delegated` toEqual `{ spec: { verdict: 'APPROVE', at: runFile().approvals.spec.at, review_sha256: <same> } }`; `nextStep(runFile())` toEqual `{ role: 'plan' }`.
   - U16 **"U16 [AC2b] delegate plan over an APPROVE report writes define_approved and the task list, as an owner approval does"**: `atPlan()`; `r = delegateDoc('plan')`; `r.out` is `\`plan approved by delegated review: define_approved, 2 task(s); sha256 ${sha(PLAN)}\``; `runFile()` toMatchObject `{ gate: 'define_approved', plan: PLAN, tasks: { ids: ['Task 1', 'Task 2'], done: 0 }, approvals: { plan: { by: 'define-review', basis: 'approved by delegated review', path: PLAN, sha256: sha(PLAN) } }, delegated: { spec: { verdict: 'APPROVE' }, plan: { verdict: 'APPROVE' } } }`; `orch(['install', 'code', '--check']).status` 0.
@@ -251,8 +251,8 @@ Line numbers below are from HEAD f1fb50e; locate by the quoted text if they move
   - U29 **"U29 [plan decision 1, 2] delegate refuses a document the hand-back does not name, and a hand-back naming none"**: `atSpec()`; write `docs/specs/other-design.md` (`# Other\n`); `putReport('spec', report('spec', sha('docs/specs/other-design.md')))`; `orch(['delegate', 'spec', 'docs/specs/other-design.md', sha('docs/specs/other-design.md')]).err` is `\`orchestrate: delegate spec: docs/specs/other-design.md is not the document the spec hand-back names (${SPEC})\``; `orch(['end'])`; then a fresh unattended run whose spec hand-back is `say('spec', 'boundary_routed')` (no `ops.f`) with the loop skipped: `orch(['delegate', 'spec', '--check']).err` is `'orchestrate: delegate spec: the spec hand-back names 0 document(s) under docs/specs/; show the approval and wait for the owner'`.
   - U30 **"U30 [AC6] the end record names the unattended mode and each approval's basis"**: `atPlan()`; `orch(approveArgs('plan')).status` 0; `rec = JSON.parse(orch(['end']).out)`; `rec.unattended` true; `rec.approvals.spec` toMatchObject `{ by: 'define-review', basis: 'approved by delegated review' }`; `'basis' in rec.approvals.plan` false; `rec.delegated` toMatchObject `{ spec: { verdict: 'APPROVE' } }`.
   - U40 **"U40 [owner decision: allowed values] parseDelegatedReport reads DELEGATE_KINDS and DELEGATED_VERDICTS"**: `const parse = orchestrateModule.parseDelegatedReport; const h = 'a'.repeat(64);` for each `v` of `orchestrateModule.DELEGATED_VERDICTS` other than `'UNPARSED'`: `parse(report('spec', h, v, v === 'RETURN' ? ['- [major] docs/specs/demo-design.md:1 x'] : []), 'spec', h).verdict` is `v`; `parse(report('build plan', h), 'build plan', h).verdict` is `'APPROVE'`; `expect(() => parse(report('spec', h, 'UNPARSED'), 'spec', h)).toThrow(/^ORCH_VERDICT_INVALID: the VERDICT line is not VERDICT: APPROVE \| RETURN \| ESCALATE$/)`; `expect(() => parse(report('qa', h), 'qa', h)).toThrow('parseDelegatedReport: qa is not a delegated kind')`. The namespace import (`tests/scripts/orchestrate.test.js:11`) keeps the file loading while the export is absent, so this test is red, not the file.
-- [ ] [T-303] Red step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-054"`. Predicted full match set, 69 tests: the 28 earlier tests **green**; the usage test of T-301 (its name now carries `FEAT-054`) **red** (the verb list lacks `delegate`); U14 (three rows) **red** (`delegate` is an unknown verb, so every call answers the verb-list usage line); U15-U30 **red**, 36 tests counting every row (U19 two, U20 three, U22 four, U23 eight, U26 eight), for the same reason; U40 **red** (`orchestrateModule.parseDelegatedReport` is undefined). Total red 41. Depends on T-302.
-- [ ] [T-304] `scripts/orchestrate.mjs`, the parser, after `parseVerdict` (line 643). Depends on T-303.
+- [X] [T-303] Red step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-054"`. Predicted full match set, 69 tests: the 28 earlier tests **green**; the usage test of T-301 (its name now carries `FEAT-054`) **red** (the verb list lacks `delegate`); U14 (three rows) **red** (`delegate` is an unknown verb, so every call answers the verb-list usage line); U15-U30 **red**, 36 tests counting every row (U19 two, U20 three, U22 four, U23 eight, U26 eight), for the same reason; U40 **red** (`orchestrateModule.parseDelegatedReport` is undefined). Total red 41. Depends on T-302.
+- [X] [T-304] `scripts/orchestrate.mjs`, the parser, after `parseVerdict` (line 643). Depends on T-303.
   ```js
   // FEAT-054: the audit's verdict contract without the SNAP_HANDBACK anchor; the REVIEWED line binds the verdict to one hash.
   // The allowed values are the owner's constants, the same lists delegate and isValidRun read.
@@ -273,7 +273,7 @@ Line numbers below are from HEAD f1fb50e; locate by the quoted text if they move
     return checkConsistent(verdict, severeFindings(lines).length, []);
   }
   ```
-- [ ] [T-305] `scripts/orchestrate.mjs`, the verb's arguments and run checks, after `checkLoopClosed` (line 913) and before `const RESUME_USAGE`. Depends on T-304.
+- [X] [T-305] `scripts/orchestrate.mjs`, the verb's arguments and run checks, after `checkLoopClosed` (line 913) and before `const RESUME_USAGE`. Depends on T-304.
   ```js
   const DELEGATE_USAGE = `usage: orchestrate.mjs delegate <spec|plan> ${DOC_PATH} <sha256> | delegate build | delegate <spec|plan|build> --check`;
   const DELEGATED_BASIS = 'approved by delegated review';
@@ -298,7 +298,7 @@ Line numbers below are from HEAD f1fb50e; locate by the quoted text if they move
     return run;
   }
   ```
-- [ ] [T-306] `scripts/orchestrate.mjs`, the values the briefs need (plan decisions 1 and 3), after T-305's block. Depends on T-305.
+- [X] [T-306] `scripts/orchestrate.mjs`, the values the briefs need (plan decisions 1 and 3), after T-305's block. Depends on T-305.
   ```js
   const snapFiles = (entry) => { try { const f = JSON.parse(entry?.snap).ops.f; return Array.isArray(f) ? f.map(String) : []; } catch { return []; } };
 
@@ -333,7 +333,7 @@ Line numbers below are from HEAD f1fb50e; locate by the quoted text if they move
   }
   ```
   `modelSegment` is a `const` declared at line 1019, below this block; it is read only at runtime.
-- [ ] [T-307] `scripts/orchestrate.mjs`, the Define outcome, after T-306's block. Depends on T-306.
+- [X] [T-307] `scripts/orchestrate.mjs`, the Define outcome, after T-306's block. Depends on T-306.
   ```js
   const delegatedEntry = (verdict, bytes, reason) => ({
     verdict, at: new Date().toISOString(), review_sha256: createHash('sha256').update(bytes).digest('hex'), ...(reason ? { reason } : {}),
@@ -363,7 +363,7 @@ Line numbers below are from HEAD f1fb50e; locate by the quoted text if they move
 
   const ownerRequired = (kind, { verdict, reason }) => `owner approval required: delegated review ${kind} returned ${verdict}${reason ? ` (${reason})` : ''}; see ${delegatePath(kind)}`;
   ```
-- [ ] [T-308] `scripts/orchestrate.mjs`, the Define verb and the dispatcher, after T-307's block. Depends on T-307.
+- [X] [T-308] `scripts/orchestrate.mjs`, the Define verb and the dispatcher, after T-307's block. Depends on T-307.
   ```js
   // approve's own checks, in its order, then the report: an APPROVE records the reviewer as approver (D5 on anything else).
   function delegateDefine(root, run, { kind, rel, shown }) {
@@ -395,11 +395,11 @@ Line numbers below are from HEAD f1fb50e; locate by the quoted text if they move
   }
   ```
   The `build` line is a placeholder that Task 4 replaces with the build verb; it keeps this commit's verb total.
-- [ ] [T-309] `scripts/orchestrate.mjs`, `approvePlan` (line 895): signature `function approvePlan(root, run, text, approval)` → `function approvePlan(root, run, text, approval, head = 'plan approved')`, and its return line `\`plan approved: define_approved, …\`` → `\`${head}: define_approved, ${tasks.length} task(s); sha256 ${approval.sha256}\``. The owner's call passes four arguments, so its line is byte-identical (plan decision 4). Depends on T-308.
-- [ ] [T-310] `scripts/orchestrate.mjs`, `cli` (lines 1251-1281): add `delegate: () => delegate(root, sid, argv.slice(1)),` after the `review` entry, and the usage refusal becomes `'usage: orchestrate.mjs start|install|handback|approve|hash|review|delegate|resume|envelope|end'`. A `delegate` halt is recorded like every verb's but `start`, `envelope` and `resume`. Depends on T-309.
-- [ ] [T-311] Green step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-054"`. Predicted: the same 69 tests, all **green**. Then `npx vitest run tests/scripts/orchestrate.test.js`: 575 passed (507 + 68; the usage test is renamed, not added), every FEAT-056 approve test and the FEAT-058 loop tests included. `grep -n "approvePlan(" scripts/orchestrate.mjs` prints the definition and two calls. Depends on T-310.
-- [ ] [T-312] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-14-feat054-opt-in-unattended-mode-for-cc-orchestrate-with.md`. Depends on T-311.
-- [ ] [T-313] Commit: `feat: delegate records the independent reviewer's approval of a spec or plan [FEAT-054]`. Depends on T-312.
+- [X] [T-309] `scripts/orchestrate.mjs`, `approvePlan` (line 895): signature `function approvePlan(root, run, text, approval)` → `function approvePlan(root, run, text, approval, head = 'plan approved')`, and its return line `\`plan approved: define_approved, …\`` → `\`${head}: define_approved, ${tasks.length} task(s); sha256 ${approval.sha256}\``. The owner's call passes four arguments, so its line is byte-identical (plan decision 4). Depends on T-308.
+- [X] [T-310] `scripts/orchestrate.mjs`, `cli` (lines 1251-1281): add `delegate: () => delegate(root, sid, argv.slice(1)),` after the `review` entry, and the usage refusal becomes `'usage: orchestrate.mjs start|install|handback|approve|hash|review|delegate|resume|envelope|end'`. A `delegate` halt is recorded like every verb's but `start`, `envelope` and `resume`. Depends on T-309.
+- [X] [T-311] Green step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-054"`. Predicted: the same 69 tests, all **green**. Then `npx vitest run tests/scripts/orchestrate.test.js`: 575 passed (507 + 68; the usage test is renamed, not added), every FEAT-056 approve test and the FEAT-058 loop tests included. `grep -n "approvePlan(" scripts/orchestrate.mjs` prints the definition and two calls. Depends on T-310.
+- [X] [T-312] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-14-feat054-opt-in-unattended-mode-for-cc-orchestrate-with.md`. Depends on T-311.
+- [X] [T-313] Commit: `feat: delegate records the independent reviewer's approval of a spec or plan [FEAT-054]`. Depends on T-312.
 
 ---
 
@@ -409,7 +409,7 @@ Line numbers below are from HEAD f1fb50e; locate by the quoted text if they move
 - Modify: `tests/scripts/orchestrate.test.js`
 - Modify: `scripts/orchestrate.mjs`
 
-- [ ] [T-401] `tests/scripts/orchestrate.test.js`: inside `describe('unattended mode [FEAT-054]', …)`, after U30, add the build and resume tests. Depends on T-313 (ticks ride this group). Test names are the filter set predicted in T-402. `SEC_LINE` is `'VERDICT: APPROVE; threshold high; findings critical=0 high=0 moderate=0 low=0; scans dependency=not-covered secrets=ran scripts=ran'`.
+- [X] [T-401] `tests/scripts/orchestrate.test.js`: inside `describe('unattended mode [FEAT-054]', …)`, after U30, add the build and resume tests. Depends on T-313 (ticks ride this group). Test names are the filter set predicted in T-402. `SEC_LINE` is `'VERDICT: APPROVE; threshold high; findings critical=0 high=0 moderate=0 low=0; scans dependency=not-covered secrets=ran scripts=ran'`.
   - U31 **"U31 [AC6] delegate build --check prints both approved documents, the code files and the security summary only, byte-identical"**: `atBuild()`; `const before = runBytes()`; `const { spec, plan: p } = runFile().approvals`; `orch(['delegate', 'build', '--check'])` toEqual `{ status: 0, out: \`delegate build: spec ${spec.path} sha256 ${spec.sha256}; plan ${p.path} sha256 ${p.sha256}; files none; security ${SEC_LINE}\`, err: '' }`; the output does not contain `security.txt`; `runBytes()` is `before`.
   - U32 **"U32 [AC3b] an approving delegated build review records only verdict, at and review_sha256, and qa forwards verify_pass"**: `atBuild()`; `const text = buildReport()`; `putReport('build', text)`; `orch(['delegate', 'build'])` toEqual `{ status: 0, out: \`build approved by delegated review: plan sha256 ${runFile().approvals.plan.sha256}; next: install qa\`, err: '' }`; `Object.keys(runFile().delegated.build).sort()` toEqual `['at', 'review_sha256', 'verdict']`; `runFile().delegated.build.review_sha256` is the sha256 of `text`; `orch(['install', 'qa']).status` 0; `orch(['handback', 'qa'], { input: say('qa', 'verify_pass') })` toMatchObject `{ status: 0, out: 'qa handed back verify_pass' }`.
   - U33 `it.each` **"U33 [AC3b] a delegated build %s halts %s, recorded, naming the report and never a finding"**, rows `['RETURN', 'ORCH_DELEGATED_RETURN', 'the delegated build review returned the change; see .conductor/delegate/build.md', ['- [blocker] src/a.js:1 secret-looking finding text']]` and `['ESCALATE', 'ORCH_DELEGATED_ESCALATE', 'the delegated build review escalated a decision only the owner takes; see .conductor/delegate/build.md', ['- [minor] src/a.js:1 secret-looking finding text']]`: `atBuild()`; `putReport('build', buildReport(verdict, findings))`; `r = orch(['delegate', 'build'])`; `r` toMatchObject `{ status: 1, err: \`${code}: ${reason}\` }`; `runFile().halt` toMatchObject `{ code, reason }`; `runFile().delegated.build.verdict` is `verdict`; `runBytes()` does not contain `secret-looking`.
@@ -419,8 +419,8 @@ Line numbers below are from HEAD f1fb50e; locate by the quoted text if they move
   - U37 **"U37 [AC3c] in an unattended run a security ESCALATE still halts ORCH_SECURITY_ESCALATE"**: `driveTo('security', { start: ['--unattended'] })`; `securityPass(securityReport([], SCANS_NONE, 'VERDICT: ESCALATE')).err` matches `/^ORCH_SECURITY_ESCALATE: /`.
   - U38 **"U38 [AC4b] resume keeps an unattended run unattended, keeps the Define outcomes, and drops the build verdict and its report"**: `atBuild()`; `editRun`-style: `const run = runFile(); run.delegated = { spec: { verdict: 'RETURN', at: 'x', review_sha256: 'y' } }; runFileText(JSON.stringify(run, null, 2) + '\n')` (a recorded Define outcome, as an owner-approved spec after a `RETURN` leaves it); `putReport('build', buildReport('RETURN', ['- [blocker] src/a.js:1 x']))`; `orch(['delegate', 'build']).status` 1; `orch(['resume', '--unattended'])` toMatchObject `{ status: 2, err: 'orchestrate: usage: orchestrate.mjs resume' }`; `orch(['resume']).status` 0; `runFile()` toMatchObject `{ unattended: true, mode: 'auto', halt: null, delegated: { spec: { verdict: 'RETURN' } } }`; `'build' in runFile().delegated` false; `existsSync(join(root, DELEGATE_DIR, 'build.md'))` false.
   - U39 **"U39 [AC4b] resume keeps an attended run attended"**: `driveTo('code', { prep: () => { fixtureGit('init', '-q'); fixtureCommit(); } })`; `rmSync(join(root, '.claude', 'agents', 'code.md'))`; `orch(['install', 'code']).err` matches `/^ORCH_AGENT_MISSING: /`; `agents()`; `orch(['resume']).status` 0; `'unattended' in runFile()` false; `'delegated' in runFile()` false; `runFile().mode` `'step'`.
-- [ ] [T-402] Red step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-054"`. Predicted full match set, 81 tests: the 69 earlier tests **green**; U31 **green** (`--check` already works for build); U36, U37 and U39 **green** (today's halts and resume keep the fields); **red** U32 (`delegate build` refuses with the usage line), both U33 rows, U34, the three U35 rows (same), and U38 (its `delegate build` exits 2, not 1). Total red 8, green 73. Depends on T-401.
-- [ ] [T-403] `scripts/orchestrate.mjs`, the build verb, before `function delegate(`. Depends on T-402.
+- [X] [T-402] Red step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-054"`. Predicted full match set, 81 tests: the 69 earlier tests **green**; U31 **green** (`--check` already works for build); U36, U37 and U39 **green** (today's halts and resume keep the fields); **red** U32 (`delegate build` refuses with the usage line), both U33 rows, U34, the three U35 rows (same), and U38 (its `delegate build` exits 2, not 1). Total red 8, green 73. Depends on T-401.
+- [X] [T-403] `scripts/orchestrate.mjs`, the build verb, before `function delegate(`. Depends on T-402.
   ```js
   // FEAT-054: the audit and security contract (D6): RETURN and ESCALATE halt, and a halt names the report, never a finding.
   function delegateBuild(root, run) {
@@ -439,7 +439,7 @@ Line numbers below are from HEAD f1fb50e; locate by the quoted text if they move
   }
   ```
   In `delegate`, replace the placeholder line `if (parsed.kind === 'build') throw new Refusal(DELEGATE_USAGE);` and the return under it with `return parsed.kind === 'build' ? delegateBuild(root, run) : delegateDefine(root, run, parsed);`.
-- [ ] [T-404] `scripts/orchestrate.mjs`, `resume` (lines 992-1011). Depends on T-403.
+- [X] [T-404] `scripts/orchestrate.mjs`, `resume` (lines 992-1011). Depends on T-403.
   - Above `function resume` add:
     ```js
     // FEAT-054: the Define outcomes stay, so a resumed run cannot re-delegate; the build verdict is a Verify record and is redone.
@@ -449,9 +449,9 @@ Line numbers below are from HEAD f1fb50e; locate by the quoted text if they move
   - In the `next` object, after `resumes,` add `...keptDelegation(run),`. A run without `delegated` gets no key, so the attended run file is unchanged.
   - After `rmSync(join(root, ENVELOPE_FILE), { force: true });` add `rmSync(join(root, DELEGATE_DIR, 'build.md'), { force: true });` with the comment `// FEAT-054: the dropped build verdict's report goes with it, so the redone review never reads it.`
   - `resume` measures 30 lines or fewer after the edit (20 today, three lines added). `unattended` rides `...run` unchanged (AC4b).
-- [ ] [T-405] Green step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-054"`. Predicted: the same 81 tests, all **green**. Then `npx vitest run tests/scripts/orchestrate.test.js`: 587 passed (507 + 80), every FEAT-055 resume test included. Depends on T-404.
-- [ ] [T-406] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-14-feat054-opt-in-unattended-mode-for-cc-orchestrate-with.md`. Depends on T-405.
-- [ ] [T-407] Commit: `feat: the delegated build review gates qa in an unattended run [FEAT-054]`. Depends on T-406.
+- [X] [T-405] Green step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-054"`. Predicted: the same 81 tests, all **green**. Then `npx vitest run tests/scripts/orchestrate.test.js`: 587 passed (507 + 80), every FEAT-055 resume test included. Depends on T-404.
+- [X] [T-406] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-14-feat054-opt-in-unattended-mode-for-cc-orchestrate-with.md`. Depends on T-405.
+- [X] [T-407] Commit: `feat: the delegated build review gates qa in an unattended run [FEAT-054]`. Depends on T-406.
 
 ---
 
@@ -462,9 +462,9 @@ Line numbers below are from HEAD f1fb50e; locate by the quoted text if they move
 - Modify: `.claude/agents/define-review.md`
 - Modify: `project-template/.claude/agents/define-review.md`
 
-- [ ] [T-501] `tests/unit/role-profiles.test.js`: inside `describe('define-review profile [FEAT-041 AC1]', …)` (line 185), after its last test, add **"[FEAT-054] carries the delegated review section, and advice binds only outside it"**: `const text = profile(REVIEWER)`; for each phrase of `['## Delegated review (FEAT-054)', 'REVIEWED <kind> sha256 <hash>', 'VERDICT: APPROVE', 'VERDICT: RETURN', 'VERDICT: ESCALATE', '- [blocker|major|minor] <path>:<line> <text>', 'Answer `VERDICT: ESCALATE`, never `VERDICT: APPROVE`', 'Outside a delegated review, your report is advice; the owner decides.']` `expect(text).toContain(phrase)`; `expect(text).not.toContain('- You are not a band role: write no hand-back line and claim no gate. Your report is advice; the owner decides.')`. Depends on T-407 (ticks ride this group).
-- [ ] [T-502] Red step: `npx vitest run tests/unit/role-profiles.test.js`. Predicted full match set, 111 tests: the new test **red** (no section yet); the 110 others **green**. Depends on T-501.
-- [ ] [T-503] `.claude/agents/define-review.md`, then the identical edit to `project-template/.claude/agents/define-review.md`. Depends on T-502.
+- [X] [T-501] `tests/unit/role-profiles.test.js`: inside `describe('define-review profile [FEAT-041 AC1]', …)` (line 185), after its last test, add **"[FEAT-054] carries the delegated review section, and advice binds only outside it"**: `const text = profile(REVIEWER)`; for each phrase of `['## Delegated review (FEAT-054)', 'REVIEWED <kind> sha256 <hash>', 'VERDICT: APPROVE', 'VERDICT: RETURN', 'VERDICT: ESCALATE', '- [blocker|major|minor] <path>:<line> <text>', 'Answer `VERDICT: ESCALATE`, never `VERDICT: APPROVE`', 'Outside a delegated review, your report is advice; the owner decides.']` `expect(text).toContain(phrase)`; `expect(text).not.toContain('- You are not a band role: write no hand-back line and claim no gate. Your report is advice; the owner decides.')`. Depends on T-407 (ticks ride this group).
+- [X] [T-502] Red step: `npx vitest run tests/unit/role-profiles.test.js`. Predicted full match set, 111 tests: the new test **red** (no section yet); the 110 others **green**. Depends on T-501.
+- [X] [T-503] `.claude/agents/define-review.md`, then the identical edit to `project-template/.claude/agents/define-review.md`. Depends on T-502.
   - Before `## Rules` add:
     ```markdown
     ## Delegated review (FEAT-054)
@@ -474,9 +474,9 @@ Line numbers below are from HEAD f1fb50e; locate by the quoted text if they move
     ```
   - The last rule: `- You are not a band role: write no hand-back line and claim no gate. Your report is advice; the owner decides.` → `- You are not a band role: write no hand-back line and claim no gate. Outside a delegated review, your report is advice; the owner decides.`
   - `cmp .claude/agents/define-review.md project-template/.claude/agents/define-review.md` exits 0.
-- [ ] [T-504] Green step: `npx vitest run tests/unit/role-profiles.test.js`. Predicted: 111 passed, the byte-identical mirror test, the 999-token ceiling and `names no gate` included. Depends on T-503.
-- [ ] [T-505] Stage: `git add -u .claude/agents/define-review.md`, `git add -u project-template/.claude/agents/define-review.md`, `git add -u tests/unit/role-profiles.test.js`, `git add -u docs/superpowers/plans/2026-11-14-feat054-opt-in-unattended-mode-for-cc-orchestrate-with.md`. Depends on T-504.
-- [ ] [T-506] Commit: `docs: define-review carries the delegated review brief's report contract [FEAT-054]`. Depends on T-505.
+- [X] [T-504] Green step: `npx vitest run tests/unit/role-profiles.test.js`. Predicted: 111 passed, the byte-identical mirror test, the 999-token ceiling and `names no gate` included. Depends on T-503.
+- [X] [T-505] Stage: `git add -u .claude/agents/define-review.md`, `git add -u project-template/.claude/agents/define-review.md`, `git add -u tests/unit/role-profiles.test.js`, `git add -u docs/superpowers/plans/2026-11-14-feat054-opt-in-unattended-mode-for-cc-orchestrate-with.md`. Depends on T-504.
+- [X] [T-506] Commit: `docs: define-review carries the delegated review brief's report contract [FEAT-054]`. Depends on T-505.
 
 ---
 
@@ -487,7 +487,7 @@ Line numbers below are from HEAD f1fb50e; locate by the quoted text if they move
 - Modify: `.claude/commands/cc-orchestrate.md`
 - Modify: `project-template/.claude/commands/cc-orchestrate.md`
 
-- [ ] [T-601] `tests/installer/commands-parity.test.js`: inside `describe('cc-orchestrate mirrors [FEAT-011 AC10]', …)`, after the FEAT-053 test (line 312), add **"documents the unattended mode, the delegate verb, both briefs and its codes [FEAT-054]"**: Depends on T-506 (ticks ride this group).
+- [X] [T-601] `tests/installer/commands-parity.test.js`: inside `describe('cc-orchestrate mirrors [FEAT-011 AC10]', …)`, after the FEAT-053 test (line 312), add **"documents the unattended mode, the delegate verb, both briefs and its codes [FEAT-054]"**: Depends on T-506 (ticks ride this group).
   ```js
     const text = read(ORCH_MIRRORS[0]);
     for (const phrase of [
@@ -514,8 +514,8 @@ Line numbers below are from HEAD f1fb50e; locate by the quoted text if they move
     expect(briefs.slice(0, briefs.indexOf('\n## '))).not.toContain('security.txt');
     expect(text).not.toContain('approve build');
   ```
-- [ ] [T-602] Red step: `npx vitest run tests/installer/commands-parity.test.js`. Predicted full match set, 89 tests: the new test **red**; the 88 others **green**. Depends on T-601.
-- [ ] [T-603] `.claude/commands/cc-orchestrate.md`, then the identical edit to `project-template/.claude/commands/cc-orchestrate.md`. Depends on T-602.
+- [X] [T-602] Red step: `npx vitest run tests/installer/commands-parity.test.js`. Predicted full match set, 89 tests: the new test **red**; the 88 others **green**. Depends on T-601.
+- [X] [T-603] `.claude/commands/cc-orchestrate.md`, then the identical edit to `project-template/.claude/commands/cc-orchestrate.md`. Depends on T-602.
   - Line 5, the usage heading: append ` [--unattended]` after `[--no-dependency-audit]`.
   - "On any halt", after the `install security` / `handback security` paragraph (line 39) and before `**Resume (FEAT-055).**`, add a paragraph: `` `delegate build` halts `ORCH_DELEGATED_RETURN` when the delegated build review returned the change and `ORCH_DELEGATED_ESCALATE` when it escalated a decision only the owner takes; it halts `ORCH_VERDICT_MISSING`, `ORCH_VERDICT_INVALID` or `ORCH_VERDICT_INCONSISTENT` when `.conductor/delegate/build.md` is missing or its last two lines are not a `REVIEWED build plan sha256 <plan hash>` line and one consistent `VERDICT:` line. For those five, name `.conductor/delegate/build.md`; it is what the owner reads next. `handback qa` halts `ORCH_GATE_WITHHELD` in an unattended run whose delegated build verdict is not `APPROVE`. Recovery is `resume` or `end`, then `start`: `resume` drops the build verdict and its report and redoes Verify. ``
   - Step 1, after the `With \`--ticket\`, …` bullet, add the bullet: `` - With `--unattended` (FEAT-054), stdout ends with `; unattended: delegated review at spec, plan and build`. Pass `$ARGUMENTS` to `start` verbatim: never add or drop `--unattended` yourself. Only `start` reads the flag, and `start` refuses `ORCH_RUN_ACTIVE` while this session has a live run, so no agent of the run can turn it unattended. ``
@@ -547,9 +547,9 @@ Line numbers below are from HEAD f1fb50e; locate by the quoted text if they move
     The define brief is the spec's text verbatim. The build brief is the spec's "the same, with `Document:` replaced …" written out, so the orchestrator never assembles it.
   - The phrase `approve build` appears nowhere in the file (`grep -c "approve build"` prints 0).
   - `cmp .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md` exits 0.
-- [ ] [T-604] Green step: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: 89 passed (the byte-identical mirror test, the FEAT-011 header pins at lines 215 and 276, and the FEAT-058 pin at line 363 included). Depends on T-603.
-- [ ] [T-605] Stage: `git add -u .claude/commands/cc-orchestrate.md`, `git add -u project-template/.claude/commands/cc-orchestrate.md`, `git add -u tests/installer/commands-parity.test.js`, `git add -u docs/superpowers/plans/2026-11-14-feat054-opt-in-unattended-mode-for-cc-orchestrate-with.md`. Depends on T-604.
-- [ ] [T-606] Commit: `docs: cc-orchestrate runs the delegated review in an unattended run [FEAT-054]`. Depends on T-605.
+- [X] [T-604] Green step: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: 89 passed (the byte-identical mirror test, the FEAT-011 header pins at lines 215 and 276, and the FEAT-058 pin at line 363 included). Depends on T-603.
+- [X] [T-605] Stage: `git add -u .claude/commands/cc-orchestrate.md`, `git add -u project-template/.claude/commands/cc-orchestrate.md`, `git add -u tests/installer/commands-parity.test.js`, `git add -u docs/superpowers/plans/2026-11-14-feat054-opt-in-unattended-mode-for-cc-orchestrate-with.md`. Depends on T-604.
+- [X] [T-606] Commit: `docs: cc-orchestrate runs the delegated review in an unattended run [FEAT-054]`. Depends on T-605.
 
 ---
 
@@ -558,22 +558,22 @@ Line numbers below are from HEAD f1fb50e; locate by the quoted text if they move
 **Files:**
 - Modify: `docs/superpowers/plans/2026-11-14-feat054-opt-in-unattended-mode-for-cc-orchestrate-with.md`
 
-- [ ] [T-701] Run `npm test`. Predicted locally: exit 0, every file green, 82 tests more than the pre-change suite (80 in `orchestrate.test.js`, 1 in `role-profiles.test.js`, 1 in `commands-parity.test.js`; the `START_USAGE` constant and the verb-list usage test are edited, not added), no new skip. CI legs: each leg's skipped set equals its `tools/skip-baseline.json` key, unchanged, because no added test is conditional. Depends on T-606.
-- [ ] [T-702] Grep checks: `git grep -n "approve build" -- scripts .claude/commands project-template/.claude/commands` prints nothing; `cmp .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md` and `cmp .claude/agents/define-review.md project-template/.claude/agents/define-review.md` exit 0; `git diff --stat origin/main -- VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md .claude/memory .claude/hooks project-template/.claude/hooks .github/workflows .github/actions` prints nothing. Depends on T-701.
-- [ ] [T-703] Stage: `git add -u docs/superpowers/plans/2026-11-14-feat054-opt-in-unattended-mode-for-cc-orchestrate-with.md` (ticks T-606 to T-702). Depends on T-702.
-- [ ] [T-704] Commit: `docs: close out the FEAT-054 plan [FEAT-054]`. Depends on T-703.
+- [X] [T-701] Run `npm test`. Predicted locally: exit 0, every file green, 82 tests more than the pre-change suite (80 in `orchestrate.test.js`, 1 in `role-profiles.test.js`, 1 in `commands-parity.test.js`; the `START_USAGE` constant and the verb-list usage test are edited, not added), no new skip. CI legs: each leg's skipped set equals its `tools/skip-baseline.json` key, unchanged, because no added test is conditional. Depends on T-606.
+- [X] [T-702] Grep checks: `git grep -n "approve build" -- scripts .claude/commands project-template/.claude/commands` prints nothing; `cmp .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md` and `cmp .claude/agents/define-review.md project-template/.claude/agents/define-review.md` exit 0; `git diff --stat origin/main -- VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md .claude/memory .claude/hooks project-template/.claude/hooks .github/workflows .github/actions` prints nothing. Depends on T-701.
+- [X] [T-703] Stage: `git add -u docs/superpowers/plans/2026-11-14-feat054-opt-in-unattended-mode-for-cc-orchestrate-with.md` (ticks T-606 to T-702). Depends on T-702.
+- [X] [T-704] Commit: `docs: close out the FEAT-054 plan [FEAT-054]`. Depends on T-703.
 
 ---
 
 ## Test List
 
-- [ ] Integration, AC1 (no flag, nothing changes): start writes neither field and no segment (U3); `delegate` on an attended run refuses `ORCH_NOT_UNATTENDED` byte-identically for each kind and `--check` (U14); `nextStep` after an approving seat is `qa` in an attended run, with or without a seat (U9 rows 1 and 7); `resume` keeps an attended run attended (U39); every pre-existing orchestrate test passes with only the two usage pins edited.
-- [ ] Integration, AC2 (approval recorded with reviewer and hash): `start --unattended` (U1, U2); a delegated spec approval with `by`, `basis`, `sha256`, `commit` and `review_sha256` (U15) and a delegated plan approval writing `define_approved` and the tasks (U16); a mismatched `REVIEWED` hash (U17) or a stale shown hash (U18) never approves; one attempt per kind (U20, U21).
-- [ ] Integration, AC3 (`ESCALATE` pauses in both modes): a define `RETURN` or `ESCALATE` waits and the owner's `approve` still works (U19); `delegate build` `RETURN` / `ESCALATE` halt (U33); qa is withheld without an approving build verdict (U10, U11, U32); the audit and security escalations still halt in an unattended run (U36, U37).
-- [ ] Integration, AC4 (flag not settable during a run): `start --unattended` with a live run refuses (U4); `install` and `approve` ignore `--unattended` (U8); `delegate` refuses a fourth token (U26); `resume` carries the field both ways and refuses `--unattended` (U38, U39); `isValidRun` rejects hand-edited values (U5) and accepts the legitimate ones (U6).
-- [ ] Integration, AC6 (owner decisions): the four write-surface paths (U22); the build brief values carry only the security summary and `delegated.build` holds three keys (U31, U32, U33, and the T-601 command pin); `delegate build`, never `approve build`, in every refusal and in the `resume` line (U12, U13, T-601); leftover reports are cleared and never read (U7, U28, U38); a missing `build.md` halts (U34); `--check` is byte-identical (U24, U25, U31); no run file, foreign session, halted run (U26); the once rule after `RETURN`, `ESCALATE`, `UNPARSED`, and the next-step refusal after `APPROVE` (U20, U21); the end record names the mode and each basis (U30); garbled reports, never quoted in the run file (U23, U35); the parser reads the owner's allowed-value constants (U40); an open loop (U27); the hand-back document rule (U29).
-- [ ] Command pin, AC5: `cc-orchestrate.md` documents the flag, `delegate`, both briefs and the new codes, mirrors byte-identical (T-601); `define-review.md` carries the delegated section in both mirrors under the token ceiling (T-501).
-- [ ] No E2E/UI test: there is no UI.
+- [X] Integration, AC1 (no flag, nothing changes): start writes neither field and no segment (U3); `delegate` on an attended run refuses `ORCH_NOT_UNATTENDED` byte-identically for each kind and `--check` (U14); `nextStep` after an approving seat is `qa` in an attended run, with or without a seat (U9 rows 1 and 7); `resume` keeps an attended run attended (U39); every pre-existing orchestrate test passes with only the two usage pins edited.
+- [X] Integration, AC2 (approval recorded with reviewer and hash): `start --unattended` (U1, U2); a delegated spec approval with `by`, `basis`, `sha256`, `commit` and `review_sha256` (U15) and a delegated plan approval writing `define_approved` and the tasks (U16); a mismatched `REVIEWED` hash (U17) or a stale shown hash (U18) never approves; one attempt per kind (U20, U21).
+- [X] Integration, AC3 (`ESCALATE` pauses in both modes): a define `RETURN` or `ESCALATE` waits and the owner's `approve` still works (U19); `delegate build` `RETURN` / `ESCALATE` halt (U33); qa is withheld without an approving build verdict (U10, U11, U32); the audit and security escalations still halt in an unattended run (U36, U37).
+- [X] Integration, AC4 (flag not settable during a run): `start --unattended` with a live run refuses (U4); `install` and `approve` ignore `--unattended` (U8); `delegate` refuses a fourth token (U26); `resume` carries the field both ways and refuses `--unattended` (U38, U39); `isValidRun` rejects hand-edited values (U5) and accepts the legitimate ones (U6).
+- [X] Integration, AC6 (owner decisions): the four write-surface paths (U22); the build brief values carry only the security summary and `delegated.build` holds three keys (U31, U32, U33, and the T-601 command pin); `delegate build`, never `approve build`, in every refusal and in the `resume` line (U12, U13, T-601); leftover reports are cleared and never read (U7, U28, U38); a missing `build.md` halts (U34); `--check` is byte-identical (U24, U25, U31); no run file, foreign session, halted run (U26); the once rule after `RETURN`, `ESCALATE`, `UNPARSED`, and the next-step refusal after `APPROVE` (U20, U21); the end record names the mode and each basis (U30); garbled reports, never quoted in the run file (U23, U35); the parser reads the owner's allowed-value constants (U40); an open loop (U27); the hand-back document rule (U29).
+- [X] Command pin, AC5: `cc-orchestrate.md` documents the flag, `delegate`, both briefs and the new codes, mirrors byte-identical (T-601); `define-review.md` carries the delegated section in both mirrors under the token ceiling (T-501).
+- [X] No E2E/UI test: there is no UI.
 
 ## Commit Order
 
