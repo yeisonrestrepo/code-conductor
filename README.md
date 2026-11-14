@@ -1,3 +1,5 @@
+<p align="center"><img src=".github/assets/logo.svg" width="96" alt="code-conductor logo"></p>
+
 # code-conductor
 
 [![npm version](https://img.shields.io/npm/v/%40yeison.restrepo.r%2Fcode-conductor.svg)](https://www.npmjs.com/package/@yeison.restrepo.r/code-conductor)
