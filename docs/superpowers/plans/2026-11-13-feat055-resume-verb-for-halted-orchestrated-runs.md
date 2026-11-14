@@ -60,10 +60,10 @@ Line numbers below are from HEAD 027d8b0; locate by the quoted text if they move
 - Modify: `tests/scripts/orchestrate.test.js`
 - Modify: `scripts/orchestrate.mjs`
 
-- [ ] [T-101] `tests/scripts/orchestrate.test.js`: rename and widen the A3 test (line 1399). Depends on T-004.
+- [X] [T-101] `tests/scripts/orchestrate.test.js`: rename and widen the A3 test (line 1399). Depends on T-004.
   - Name: `'A3 both approvals record exactly at, by, path and a lower-case sha256, from an upper-case argument'` → `'A3 both approvals record exactly at, by, path, commit and a lower-case sha256, from an upper-case argument [FEAT-055]'`.
   - Line 1409: `expect(Object.keys(a).sort()).toEqual(['at', 'by', 'path', 'sha256']);` → `expect(Object.keys(a).sort()).toEqual(['at', 'by', 'commit', 'path', 'sha256']);`. The rest of the test stays; the fixture root is not a git repository, so `commit` is `null` there (RS2 pins the value).
-- [ ] [T-102] `tests/scripts/orchestrate.test.js`: append `describe('resume verb [FEAT-055]', …)` at the end of the file, with its helpers and the three record tests. Depends on T-101. Test names are the filter set predicted in T-103.
+- [X] [T-102] `tests/scripts/orchestrate.test.js`: append `describe('resume verb [FEAT-055]', …)` at the end of the file, with its helpers and the three record tests. Depends on T-101. Test names are the filter set predicted in T-103.
   ```js
   describe('resume verb [FEAT-055]', () => {
     const THREE_TASKS = `# Demo Plan\n\n${task(1, ['src/a.js'])}\n${task(2, ['src/b.js'])}\n${task(3, ['src/c.js'])}\n## Test List\n`;
@@ -95,25 +95,25 @@ Line numbers below are from HEAD 027d8b0; locate by the quoted text if they move
   - RS1 **"RS1 approve records HEAD as each approval's commit in a git repository"**: `driveTo('code', { prep: gitRoot })`; `runFile().approvals.spec.commit` and `runFile().approvals.plan.commit` both `toBe(head())`, and `head()` matches `/^[0-9a-f]{40}$/`.
   - RS2 **"RS2 approve records a null commit outside a git repository"**: `driveTo('code')`; both `runFile().approvals.<kind>.commit` are `toBeNull()`.
   - RS3 **"RS3 handback stores the validated SNAP line verbatim as snap"**: `driveTo('code')`; `runFile().handbacks[0].snap` is `snapOf(handbackLine('spec', 'boundary_routed'))` and `handbacks[1].snap` is `snapOf(handbackLine('plan', 'boundary_routed'))`; then `orch(['install', 'code'])` and `orch(['handback', 'code'], { input: say('code', 'build_executed') })`; `runFile().handbacks[2].snap` is `snapOf(handbackLine('code', 'build_executed'))`.
-- [ ] [T-103] Red step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-055"`. Predicted full match set, 4 tests, all **red**: A3 (no `commit` key), RS1 and RS2 (`commit` is `undefined`), RS3 (`snap` is `undefined`). Every other test is filtered out. Depends on T-102.
-- [ ] [T-104] `scripts/orchestrate.mjs`: the shared HEAD helper. Depends on T-103.
+- [X] [T-103] Red step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-055"`. Predicted full match set, 4 tests, all **red**: A3 (no `commit` key), RS1 and RS2 (`commit` is `undefined`), RS3 (`snap` is `undefined`). Every other test is filtered out. Depends on T-102.
+- [X] [T-104] `scripts/orchestrate.mjs`: the shared HEAD helper. Depends on T-103.
   - After `const headCommit = …` (lines 365-368) add:
     ```js
     // A full object name or null: what an approval and the security seat anchor to (FEAT-055, FEAT-034).
     const headObject = (root) => { const head = gitValue(root, ['rev-parse', 'HEAD'], ''); return OBJECT_NAME.test(head) ? head : null; };
     ```
   - `resolveSecurity` (lines 333-334): replace `const head = gitValue(root, ['rev-parse', 'HEAD'], '');` and `const base = OBJECT_NAME.test(head) ? head : null;` with `const base = headObject(root);`. Same value, one definition. `headObject` is a `const` arrow declared below `resolveSecurity`, which is only called at runtime after module evaluation, so the order is safe.
-- [ ] [T-105] `scripts/orchestrate.mjs`, `approve` (line 774): `const approval = { at: new Date().toISOString(), by: gitValue(root, ['config', 'user.name'], 'unknown'), path: rel, sha256 };` → `const approval = { at: new Date().toISOString(), by: gitValue(root, ['config', 'user.name'], 'unknown'), path: rel, sha256, commit: headObject(root) };`. Add to the comment above `approve` (line 763): `// FEAT-055: and HEAD at that moment, so resume can tell whether history still holds it.` Depends on T-104.
-- [ ] [T-106] `scripts/orchestrate.mjs`, the SNAP line rides the entry. Depends on T-105.
+- [X] [T-105] `scripts/orchestrate.mjs`, `approve` (line 774): `const approval = { at: new Date().toISOString(), by: gitValue(root, ['config', 'user.name'], 'unknown'), path: rel, sha256 };` → `const approval = { at: new Date().toISOString(), by: gitValue(root, ['config', 'user.name'], 'unknown'), path: rel, sha256, commit: headObject(root) };`. Add to the comment above `approve` (line 763): `// FEAT-055: and HEAD at that moment, so resume can tell whether history still holds it.` Depends on T-104.
+- [X] [T-106] `scripts/orchestrate.mjs`, the SNAP line rides the entry. Depends on T-105.
   - `parseHandback` (lines 468-477): its last line `return env;` → `return { env, snap: json };`, and above the function add `// FEAT-055: the validated text is returned too, so resume can validate the same bytes again.`
   - `handback` (line 746): `const env = parseHandback(text);` → `const { env, snap } = parseHandback(text);`.
   - `handback` (line 753): `const recorded = recordHandback(run, role, env.ops.gate, verdict?.verdict);` → `const recorded = recordHandback(run, role, env.ops.gate, verdict?.verdict, { snap });`.
   - `securityHandback` is not changed (plan decision 2); its call at line 750 still passes `text` only.
   - `auditFix` rewrites the last entry as `{ ...entry, fix }` (line 495), so an audit entry keeps its `snap`.
   - `grep -n "parseHandback(" scripts/orchestrate.mjs` prints the definition and the one call in `handback`.
-- [ ] [T-107] Green step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-055"`. Predicted: the same 4 tests, all **green**. Then `npx vitest run tests/scripts/orchestrate.test.js`: 429 passed (426 + RS1, RS2, RS3), including `E2b` at line 1930 (no `snap` on the security entry). Depends on T-106.
-- [ ] [T-108] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-13-feat055-resume-verb-for-halted-orchestrated-runs.md`. Depends on T-107.
-- [ ] [T-109] Commit: `feat: approvals record their commit and hand-backs their SNAP line [FEAT-055]`. Depends on T-108.
+- [X] [T-107] Green step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-055"`. Predicted: the same 4 tests, all **green**. Then `npx vitest run tests/scripts/orchestrate.test.js`: 429 passed (426 + RS1, RS2, RS3), including `E2b` at line 1930 (no `snap` on the security entry). Depends on T-106.
+- [X] [T-108] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-13-feat055-resume-verb-for-halted-orchestrated-runs.md`. Depends on T-107.
+- [X] [T-109] Commit: `feat: approvals record their commit and hand-backs their SNAP line [FEAT-055]`. Depends on T-108.
 
 ---
 
@@ -123,11 +123,11 @@ Line numbers below are from HEAD 027d8b0; locate by the quoted text if they move
 - Modify: `tests/scripts/orchestrate.test.js`
 - Modify: `scripts/orchestrate.mjs`
 
-- [ ] [T-201] `tests/scripts/orchestrate.test.js`, the two existing tests that pin text this task changes. Depends on T-109 (ticks ride this group).
+- [X] [T-201] `tests/scripts/orchestrate.test.js`, the two existing tests that pin text this task changes. Depends on T-109 (ticks ride this group).
   - Line 345: name `'refuses every verb but end once a run has halted (D12)'` → `'refuses every verb but resume and end once a run has halted (D12, FEAT-055)'`; line 351: expected `'orchestrate: run FEAT-011 halted with ORCH_AGENT_MISSING; recover with end, then start (D12)'` → `'orchestrate: run FEAT-011 halted with ORCH_AGENT_MISSING; recover with resume, or end then start (D12, FEAT-055)'`.
   - Line 1029: name `'[FEAT-061] names review and envelope in the usage line'` → `'[FEAT-061, FEAT-055] names review, resume and envelope in the usage line'`; line 1030: expected string → `'orchestrate: usage: orchestrate.mjs start|install|handback|approve|hash|review|resume|envelope|end'`.
   - No `start` or `end` test is edited (spec AC3).
-- [ ] [T-202] `tests/scripts/orchestrate.test.js`: inside `describe('resume verb [FEAT-055]', …)`, after RS3, add the resume tests. Depends on T-201. Test names are the filter set predicted in T-203.
+- [X] [T-202] `tests/scripts/orchestrate.test.js`: inside `describe('resume verb [FEAT-055]', …)`, after RS3, add the resume tests. Depends on T-201. Test names are the filter set predicted in T-203.
 
   Entry acceptance criteria:
   - RS4 **"RS4 [AC1] a conflict on task 2 of 3 keeps both approvals and re-dispatches task 2"**: `built(2)`; `expect(orch(['handback', 'code'], { input: anchoredSay(head()) }).err).toMatch(/^ORCH_HANDBACK_CONFLICT: /)`; `const approvals = JSON.stringify(runFile().approvals)`; `r = orch(['resume'])` toEqual `{ status: 0, out: resumed('ORCH_HANDBACK_CONFLICT', 'define_approved', 5, 1, 'install code (task 2 of 3)'), err: '' }`; `JSON.stringify(runFile().approvals)` is `approvals`; `runFile()` toMatchObject `{ halt: null, role: null, gate: 'define_approved', tasks: { done: 1 } }`; `roles()` toEqual `['spec', 'plan', 'code:Task 1']`; `JSON.parse(orch(['install', 'code', '--check']).out).ops.scope` toEqual `['src/b.js', PLAN]`.
@@ -172,12 +172,12 @@ Line numbers below are from HEAD 027d8b0; locate by the quoted text if they move
   - RS19 **"RS19 [AC8] a second halt after a resume is resumed again and appends its own entry"**: `built(1)`; `haltAgentMissing()`; `orch(['resume']).status` is 0; `orch(['install', 'code']).status` is 0; `haltInvalid()`; `orch(['resume']).status` is 0; `runFile().resumes.map((x) => x.halt.code)` toEqual `['ORCH_AGENT_MISSING', 'ORCH_HANDBACK_INVALID']`.
   - RS20 **"RS20 [AC8] isValidRun accepts a run file with or without the new fields"**: `const base = { v: 1, session_id: 's', item: 'FEAT-011', gate: 'boundary_routed', approvals: { spec: null, plan: null }, handbacks: [], tasks: { ids: [], done: 0 } }`; `isValidRun(base)` is true; `isValidRun({ ...base, resumes: [{ at: 'x', halt: { code: 'C', reason: 'r', at: 'x' }, kept: 2, dropped: 0 }], handbacks: [{ role: 'spec', gate: 'boundary_routed', at: 'x', snap: '{}' }], approvals: { spec: { at: 'x', by: 'b', path: SPEC, sha256: 'a'.repeat(64), commit: null }, plan: null } })` is true.
   - Close the describe with `});`.
-- [ ] [T-203] Red step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-055"`. Predicted full match set, 39 tests: **green** 6 (A3, RS1, RS2, RS3 from Task 1; RS9, because `start` already refuses a halted run of its own session; RS20, because `isValidRun` ignores extra fields today); **red** 33 (the renamed D12 test and the renamed usage-line test, whose new texts are not printed yet, and every other new test, 31 including the 13 RS17 rows, since `resume` is still an unknown verb and is refused with the general usage line). Depends on T-202.
-- [ ] [T-204] `scripts/orchestrate.mjs`, text the verb changes. Depends on T-203.
+- [X] [T-203] Red step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-055"`. Predicted full match set, 39 tests: **green** 6 (A3, RS1, RS2, RS3 from Task 1; RS9, because `start` already refuses a halted run of its own session; RS20, because `isValidRun` ignores extra fields today); **red** 33 (the renamed D12 test and the renamed usage-line test, whose new texts are not printed yet, and every other new test, 31 including the 13 RS17 rows, since `resume` is still an unknown verb and is refused with the general usage line). Depends on T-202.
+- [X] [T-204] `scripts/orchestrate.mjs`, text the verb changes. Depends on T-203.
   - Line 71 comment: `// A halt stops the run and is recorded in it (D12). A refusal is a misuse of the CLI:` → `// A halt stops the run and is recorded in it (D12); resume clears it from the last gate whose record still validates (FEAT-055). A refusal is a misuse of the CLI:`. The next comment line stays.
   - Line 135 comment: `// Every verb but start and end drives a run that must exist, be this session's, and not be halted.` → `// Every verb but start, resume and end drives a run that must exist, be this session's, and not be halted.`
   - Line 141: `recover with end, then start (D12)` → `recover with resume, or end then start (D12, FEAT-055)`.
-- [ ] [T-205] `scripts/orchestrate.mjs`, `checkApprovedDocs` (lines 405-416) becomes a shared helper and its loop (plan decision 3). Depends on T-204. Replace the function with:
+- [X] [T-205] `scripts/orchestrate.mjs`, `checkApprovedDocs` (lines 405-416) becomes a shared helper and its loop (plan decision 3). Depends on T-204. Replace the function with:
   ```js
   // FEAT-056: after define_approved, a changed spec or plan means the run would execute text nobody approved.
   // FEAT-055: returned, not thrown, so resume refuses with the same text where install halts.
@@ -199,7 +199,7 @@ Line numbers below are from HEAD 027d8b0; locate by the quoted text if they move
   }
   ```
   Messages and order are unchanged, so every FEAT-056 B-test stays green.
-- [ ] [T-206] `scripts/orchestrate.mjs`, the resume helpers. Insert after `checkLoopClosed` (ends line 799) and before `reviewWellFormed`. Depends on T-205.
+- [X] [T-206] `scripts/orchestrate.mjs`, the resume helpers. Insert after `checkLoopClosed` (ends line 799) and before `reviewWellFormed`. Depends on T-205.
   ```js
   const RESUME_USAGE = 'usage: orchestrate.mjs resume';
   const RESTART = 'recover with end, then start';
@@ -241,7 +241,7 @@ Line numbers below are from HEAD 027d8b0; locate by the quoted text if they move
   }
   ```
   `failure.message` is `<code>: <reason>`, the `Halt` constructor's text, so the refusal reads `orchestrate: ORCH_APPROVED_DOC_CHANGED: …` (spec AC2).
-- [ ] [T-207] `scripts/orchestrate.mjs`, the record walk, right after `checkApproval`. Depends on T-206.
+- [X] [T-207] `scripts/orchestrate.mjs`, the record walk, right after `checkApproval`. Depends on T-206.
   ```js
   // The conflict's last entry is ambiguous, except a spec or plan entry whose approval already stands.
   function candidateEntries(run) {
@@ -281,7 +281,7 @@ Line numbers below are from HEAD 027d8b0; locate by the quoted text if they move
     return step.task ? `${describeStep(step)} (task ${run.tasks.done + 1} of ${run.tasks.ids.length})` : describeStep(step);
   }
   ```
-- [ ] [T-208] `scripts/orchestrate.mjs`, the verb, right after `nextLine`. Depends on T-207.
+- [X] [T-208] `scripts/orchestrate.mjs`, the verb, right after `nextLine`. Depends on T-207.
   ```js
   // FEAT-055: back to the last gate whose record still validates; every record after it is dropped and redone.
   function resume(root, sessionId, args) {
@@ -304,14 +304,14 @@ Line numbers below are from HEAD 027d8b0; locate by the quoted text if they move
   }
   ```
   `band`, `plan`, `tasks.ids`, `mode`, `test_command`, `audit_rounds`, `security`, `docs`, `ticket` and `approvals` ride through `...run` unchanged (spec main path, step 5). A `review` that was `undefined` stays `undefined`, which `JSON.stringify` omits.
-- [ ] [T-209] `scripts/orchestrate.mjs`, `cli` (lines 1035-1058). Depends on T-208.
+- [X] [T-209] `scripts/orchestrate.mjs`, `cli` (lines 1035-1058). Depends on T-208.
   - In `verbs`, after `review: …` add `resume: () => resume(root, sid, argv.slice(1)),`.
   - Line 1047: the usage string → `'usage: orchestrate.mjs start|install|handback|approve|hash|review|resume|envelope|end'`.
   - Line 1054: `if (verb !== 'start' && verb !== 'envelope') recordHalt(root, e);` → `if (!['start', 'envelope', 'resume'].includes(verb)) recordHalt(root, e);`, with the comment `// resume never records a halt: one thrown by a helper it reuses must not overwrite the halt it was resuming (FEAT-055).` above it.
   - `grep -n "function resume\|resume: ()" scripts/orchestrate.mjs` prints one definition and one verb entry.
-- [ ] [T-210] Green step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-055"`. Predicted: the same 39 tests, all **green**. Then `npx vitest run tests/scripts/orchestrate.test.js`: 462 passed (429 + 33). Depends on T-209.
-- [ ] [T-211] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-13-feat055-resume-verb-for-halted-orchestrated-runs.md`. Depends on T-210.
-- [ ] [T-212] Commit: `feat: resume a halted run from its last gate that still validates [FEAT-055]`. Depends on T-211.
+- [X] [T-210] Green step: `npx vitest run tests/scripts/orchestrate.test.js -t "FEAT-055"`. Predicted: the same 39 tests, all **green**. Then `npx vitest run tests/scripts/orchestrate.test.js`: 462 passed (429 + 33). Depends on T-209.
+- [X] [T-211] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-13-feat055-resume-verb-for-halted-orchestrated-runs.md`. Depends on T-210.
+- [X] [T-212] Commit: `feat: resume a halted run from its last gate that still validates [FEAT-055]`. Depends on T-211.
 
 ---
 
@@ -322,7 +322,7 @@ Line numbers below are from HEAD 027d8b0; locate by the quoted text if they move
 - Modify: `.claude/commands/cc-orchestrate.md`
 - Modify: `project-template/.claude/commands/cc-orchestrate.md`
 
-- [ ] [T-301] `tests/installer/commands-parity.test.js`: in `describe('cc-orchestrate mirrors [FEAT-011 AC10]', …)`, after the FEAT-057 test that ends just before the describe's closing `});` at line 288, add: Depends on T-212 (ticks ride this group).
+- [X] [T-301] `tests/installer/commands-parity.test.js`: in `describe('cc-orchestrate mirrors [FEAT-011 AC10]', …)`, after the FEAT-057 test that ends just before the describe's closing `});` at line 288, add: Depends on T-212 (ticks ride this group).
   ```js
   it('offers resume on a halt, names its refusals and reports each resume [FEAT-055]', () => {
     const text = read(ORCH_MIRRORS[0]);
@@ -333,16 +333,16 @@ Line numbers below are from HEAD 027d8b0; locate by the quoted text if they move
     expect(text).not.toContain('A halt is terminal in v1');
   });
   ```
-- [ ] [T-302] Red step: `npx vitest run tests/installer/commands-parity.test.js`. Predicted full match set, 87 tests: the new test **red** (no new phrase present, and `A halt is terminal in v1` still is); the 86 others **green**. Depends on T-301.
-- [ ] [T-303] `.claude/commands/cc-orchestrate.md`, then the identical edit to `project-template/.claude/commands/cc-orchestrate.md`. Depends on T-302.
+- [X] [T-302] Red step: `npx vitest run tests/installer/commands-parity.test.js`. Predicted full match set, 87 tests: the new test **red** (no new phrase present, and `A halt is terminal in v1` still is); the 86 others **green**. Depends on T-301.
+- [X] [T-303] `.claude/commands/cc-orchestrate.md`, then the identical edit to `project-template/.claude/commands/cc-orchestrate.md`. Depends on T-302.
   - "On any halt", line 33: replace `A halt is terminal in v1 (D12). Recovery is \`node "$S/orchestrate.mjs" end\`, then a fresh \`start\`, each only on the owner's word.` with `A halt stops the run (D12, amended by FEAT-055). Recovery is \`node "$S/orchestrate.mjs" resume\` (below), or \`node "$S/orchestrate.mjs" end\`, then a fresh \`start\`, each only on the owner's word. Where a halt below names \`end\`, then \`start\`, \`resume\` is the other recovery; it refuses, writing nothing, when a record it would keep no longer validates.` The sentence after it (`install spec|plan` halts `ORCH_DOC_LOCATION_UNRESOLVED` …) stays.
   - After the security paragraph (line 39), the last paragraph before `## Steps`, add a blank line and:
     > `**Resume (FEAT-055).** Offer \`resume\` next to \`end\` when the run recorded the spec approval; run it only on the owner's word, as \`end\`. \`node "$S/orchestrate.mjs" resume\` takes no argument. It keeps both approvals when each approved document still hashes as approved and HEAD descends from the commit each approval recorded, then keeps the Build task hand-backs, in order, while each stored SNAP still validates and HEAD descends from its commit. Every record after the first that fails, and every Verify record (audit, fix round, security, qa), is dropped and redone. On success it prints \`run <ITEM> resumed after <code> from <gate>: kept <k> record(s), dropped <d>; next: <step>\`: print the run header again and continue at step 2 with the step it names (\`install <role> --check\`, the pause in step mode, \`install <role>\`, a fresh dispatch); never revive the halted agent. A refusal exits 2 and writes nothing, so the run stays halted: \`ORCH_RESUME_NO_RUN\` (no valid run file), \`ORCH_RESUME_NOT_HALTED\` (the run is live: continue with the step it names), \`ORCH_NO_SESSION_ID\`, \`ORCH_RESUME_NO_GATE\` (no spec approval), \`ORCH_APPROVAL_UNHASHED\` (approved before FEAT-056), \`ORCH_RESUME_UNANCHORED\` (an approval records no commit, or git cannot check it), \`ORCH_APPROVED_DOC_CHANGED\` (an approved document changed; a ticked plan checkbox is not a change) and \`ORCH_RESUME_HISTORY_REWRITTEN\` (HEAD no longer descends from an approval's commit). After any of them but \`ORCH_RESUME_NOT_HALTED\`, recovery is \`end\`, then \`start\`.`
   - Step 6, "Report": after the bullet `   - each review loop's outcome and round, from the record's \`review\` field;` add the bullet `   - each \`resumes\` entry: when it ran, the halt it cleared (code and reason), and how many records it kept and dropped;`.
   - The exit-code section (lines 23-26) is read and left as it is: a failed `resume` is an ordinary exit-2 refusal (spec, System Impact).
-- [ ] [T-304] Green step: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: 87 passed (the byte-identical mirror test included). Depends on T-303.
-- [ ] [T-305] Stage: `git add -u .claude/commands/cc-orchestrate.md`, `git add -u project-template/.claude/commands/cc-orchestrate.md`, `git add -u tests/installer/commands-parity.test.js`, `git add -u docs/superpowers/plans/2026-11-13-feat055-resume-verb-for-halted-orchestrated-runs.md`. Depends on T-304.
-- [ ] [T-306] Commit: `docs: cc-orchestrate offers resume after a halt [FEAT-055]`. Depends on T-305.
+- [X] [T-304] Green step: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: 87 passed (the byte-identical mirror test included). Depends on T-303.
+- [X] [T-305] Stage: `git add -u .claude/commands/cc-orchestrate.md`, `git add -u project-template/.claude/commands/cc-orchestrate.md`, `git add -u tests/installer/commands-parity.test.js`, `git add -u docs/superpowers/plans/2026-11-13-feat055-resume-verb-for-halted-orchestrated-runs.md`. Depends on T-304.
+- [X] [T-306] Commit: `docs: cc-orchestrate offers resume after a halt [FEAT-055]`. Depends on T-305.
 
 ---
 
@@ -353,11 +353,11 @@ Line numbers below are from HEAD 027d8b0; locate by the quoted text if they move
 - Modify: `.github/wiki/pages/Orchestrator-Guide.md`
 - Modify: `.github/wiki/pages/C4-Components.md`
 
-- [ ] [T-401] `.github/wiki/pages/FAQ.md`, "The orchestrator halted — how do I recover?" (lines 78-88). Depends on T-306 (ticks ride this group).
+- [X] [T-401] `.github/wiki/pages/FAQ.md`, "The orchestrator halted — how do I recover?" (lines 78-88). Depends on T-306 (ticks ride this group).
   - Line 80: `A halted run cannot be resumed, only ended and restarted:` → `Resume it, or end it and start again. \`resume\` (FEAT-055) keeps the approved spec and plan and every Build task hand-back that still validates, and redoes everything after; it refuses, writing nothing, when an approved document changed or HEAD no longer descends from an approval's commit:`.
   - In the code block, before `# End the current run (removes the run file and the band envelope)` add the two lines `# Resume from the last gate whose record still validates` and `node .claude/scripts/orchestrate.mjs resume`, then a blank line; the comment line becomes `# Or end the current run (removes the run file and the band envelope)`.
   - Line 88: `Then start fresh with \`/cc-orchestrate <ITEM>\`, which runs \`orchestrate.mjs start <ITEM>\` for you.` → `After \`resume\`, \`/cc-orchestrate\` continues with the step it prints. After \`end\`, start fresh with \`/cc-orchestrate <ITEM>\`, which runs \`orchestrate.mjs start <ITEM>\` for you.`
-- [ ] [T-402] `.github/wiki/pages/Orchestrator-Guide.md`, "Recovery" (lines 76-83). No dependency on T-401.
+- [X] [T-402] `.github/wiki/pages/Orchestrator-Guide.md`, "Recovery" (lines 76-83). No dependency on T-401.
   - Line 78: `A failed validation halts the run terminally:` → `A failed validation halts the run:`. The rest of the line stays.
   - The code block becomes:
     ```
@@ -366,10 +366,10 @@ Line numbers below are from HEAD 027d8b0; locate by the quoted text if they move
     /cc-orchestrate <ITEM>                        # fresh start
     ```
   - After the block, before the `The band flow and the SNAP handoff …` line, add a blank line and: `\`resume\` (FEAT-055) keeps both approvals and every Build task hand-back that still validates, and redoes the rest, Verify included; it refuses, writing nothing, when an approved document changed or HEAD no longer descends from an approval's commit.`
-- [ ] [T-403] `.github/wiki/pages/C4-Components.md`, line 139. No dependency on T-402. Replace `` The verbs are `start`, `install`, `handback`, `approve`, `hash`, `review` and `end`. `` with `` The verbs are `start`, `install`, `handback`, `approve`, `hash`, `review`, `resume` and `end`. `` and `A halted run cannot resume: end it, then start again.` with `` A halted run resumes from the last gate whose record still validates (`resume`, FEAT-055), or is ended and started again. `` The rest of the line stays.
-- [ ] [T-404] Run `npx vitest run tests/wiki/wiki-gen.test.js`. Predicted: 22 passed (the edited lines are prose outside every generated block). Depends on T-401, T-402, T-403.
-- [ ] [T-405] Stage: `git add -u .github/wiki/pages/FAQ.md`, `git add -u .github/wiki/pages/Orchestrator-Guide.md`, `git add -u .github/wiki/pages/C4-Components.md`, `git add -u docs/superpowers/plans/2026-11-13-feat055-resume-verb-for-halted-orchestrated-runs.md`. Depends on T-404.
-- [ ] [T-406] Commit: `docs: the wiki describes resume after a halt [FEAT-055]`. Depends on T-405.
+- [X] [T-403] `.github/wiki/pages/C4-Components.md`, line 139. No dependency on T-402. Replace `` The verbs are `start`, `install`, `handback`, `approve`, `hash`, `review` and `end`. `` with `` The verbs are `start`, `install`, `handback`, `approve`, `hash`, `review`, `resume` and `end`. `` and `A halted run cannot resume: end it, then start again.` with `` A halted run resumes from the last gate whose record still validates (`resume`, FEAT-055), or is ended and started again. `` The rest of the line stays.
+- [X] [T-404] Run `npx vitest run tests/wiki/wiki-gen.test.js`. Predicted: 22 passed (the edited lines are prose outside every generated block). Depends on T-401, T-402, T-403.
+- [X] [T-405] Stage: `git add -u .github/wiki/pages/FAQ.md`, `git add -u .github/wiki/pages/Orchestrator-Guide.md`, `git add -u .github/wiki/pages/C4-Components.md`, `git add -u docs/superpowers/plans/2026-11-13-feat055-resume-verb-for-halted-orchestrated-runs.md`. Depends on T-404.
+- [X] [T-406] Commit: `docs: the wiki describes resume after a halt [FEAT-055]`. Depends on T-405.
 
 ---
 
@@ -378,10 +378,10 @@ Line numbers below are from HEAD 027d8b0; locate by the quoted text if they move
 **Files:**
 - Modify: `docs/superpowers/plans/2026-11-13-feat055-resume-verb-for-halted-orchestrated-runs.md`
 
-- [ ] [T-501] Run `npm test`. Predicted locally: exit 0, every file green, 37 tests more than the pre-change suite (36 in `orchestrate.test.js`, 1 in `commands-parity.test.js`; A3, the D12 test and the usage-line test are renamed, not added), no new skip. CI legs: each leg's skipped set equals its `tools/skip-baseline.json` key, unchanged, because no added test is conditional. Depends on T-406.
-- [ ] [T-502] Grep checks: `git grep -n "halt is terminal\|cannot be resumed\|cannot resume" -- .claude/commands project-template/.claude/commands .github/wiki scripts` prints nothing; `git grep -n "recover with end, then start (D12)" -- scripts tests` prints nothing; `cmp .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md` exits 0; `git diff --stat origin/main -- VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md .claude/memory .github/workflows .github/actions` prints nothing. Depends on T-501.
-- [ ] [T-503] Stage: `git add -u docs/superpowers/plans/2026-11-13-feat055-resume-verb-for-halted-orchestrated-runs.md` (ticks T-406 to T-502). Depends on T-502.
-- [ ] [T-504] Commit: `docs: close out the FEAT-055 plan [FEAT-055]`. Depends on T-503.
+- [X] [T-501] Run `npm test`. Predicted locally: exit 0, every file green, 37 tests more than the pre-change suite (36 in `orchestrate.test.js`, 1 in `commands-parity.test.js`; A3, the D12 test and the usage-line test are renamed, not added), no new skip. CI legs: each leg's skipped set equals its `tools/skip-baseline.json` key, unchanged, because no added test is conditional. Depends on T-406.
+- [X] [T-502] Grep checks: `git grep -n "halt is terminal\|cannot be resumed\|cannot resume" -- .claude/commands project-template/.claude/commands .github/wiki scripts` prints nothing; `git grep -n "recover with end, then start (D12)" -- scripts tests` prints nothing; `cmp .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md` exits 0; `git diff --stat origin/main -- VERSION package.json package-lock.json CHANGELOG.md "AGENT-READABLE BACKLOG.md" README.md .claude/memory .github/workflows .github/actions` prints nothing. Depends on T-501.
+- [X] [T-503] Stage: `git add -u docs/superpowers/plans/2026-11-13-feat055-resume-verb-for-halted-orchestrated-runs.md` (ticks T-406 to T-502). Depends on T-502.
+- [X] [T-504] Commit: `docs: close out the FEAT-055 plan [FEAT-055]`. Depends on T-503.
 
 ---
 

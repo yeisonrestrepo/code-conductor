@@ -285,6 +285,15 @@ describe('cc-orchestrate mirrors [FEAT-011 AC10]', () => {
     ]) expect(text).toContain(phrase);
     expect(text).not.toContain('.conductor/handback/audit.txt');
   });
+
+  it('offers resume on a halt, names its refusals and reports each resume [FEAT-055]', () => {
+    const text = read(ORCH_MIRRORS[0]);
+    for (const phrase of ['A halt stops the run (D12, amended by FEAT-055).', '**Resume (FEAT-055).**', 'node "$S/orchestrate.mjs" resume',
+      'run it only on the owner\'s word', 'continue at step 2 with the step it names', '`ORCH_RESUME_NO_RUN`', '`ORCH_RESUME_NOT_HALTED`',
+      '`ORCH_NO_SESSION_ID`', '`ORCH_RESUME_NO_GATE`', '`ORCH_APPROVAL_UNHASHED`', '`ORCH_RESUME_UNANCHORED`', '`ORCH_APPROVED_DOC_CHANGED`',
+      '`ORCH_RESUME_HISTORY_REWRITTEN`', 'each `resumes` entry']) expect(text).toContain(phrase);
+    expect(text).not.toContain('A halt is terminal in v1');
+  });
 });
 
 describe('cc-orchestrate review loop [FEAT-041 AC5, AC6, FEAT-058]', () => {

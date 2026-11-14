@@ -77,14 +77,17 @@ Don't. If a specific guard is wrong, report it as an issue. The guards are the v
 
 ### The orchestrator halted — how do I recover?
 
-A halted run cannot be resumed, only ended and restarted:
+Resume it, or end it and start again. `resume` (FEAT-055) keeps the approved spec and plan and every Build task hand-back that still validates, and redoes everything after; it refuses, writing nothing, when an approved document changed or HEAD no longer descends from an approval's commit:
 
 ```bash
-# End the current run (removes the run file and the band envelope)
+# Resume from the last gate whose record still validates
+node .claude/scripts/orchestrate.mjs resume
+
+# Or end the current run (removes the run file and the band envelope)
 node .claude/scripts/orchestrate.mjs end
 ```
 
-Then start fresh with `/cc-orchestrate <ITEM>`, which runs `orchestrate.mjs start <ITEM>` for you.
+After `resume`, `/cc-orchestrate` continues with the step it prints. After `end`, start fresh with `/cc-orchestrate <ITEM>`, which runs `orchestrate.mjs start <ITEM>` for you.
 
 ### Do I still need to approve things in `--auto` mode?
 

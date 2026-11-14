@@ -342,13 +342,13 @@ describe('run file [FEAT-011 AC9]', () => {
     expect(findAgent('plan', root, home)).toBeNull();
   });
 
-  it('refuses every verb but end once a run has halted (D12)', () => {
+  it('refuses every verb but resume and end once a run has halted (D12, FEAT-055)', () => {
     orch(['start', 'FEAT-011']);
     orch(['install', 'spec']);
     agents();
     const r = orch(['install', 'spec']);
     expect(r.status).toBe(2);
-    expect(r.err).toBe('orchestrate: run FEAT-011 halted with ORCH_AGENT_MISSING; recover with end, then start (D12)');
+    expect(r.err).toBe('orchestrate: run FEAT-011 halted with ORCH_AGENT_MISSING; recover with resume, or end then start (D12, FEAT-055)');
     expect(orch(['end']).status).toBe(0);
   });
 
@@ -1026,8 +1026,8 @@ describe('review loop over review files [FEAT-058]', () => {
     expect(loop('spec')).toEqual({ round: 1, outcome: null, sha256: sha(SPEC), doc: SPEC, await: 'review' });
   });
 
-  it('[FEAT-061] names review and envelope in the usage line', () => {
-    expect(orch(['nope']).err).toBe('orchestrate: usage: orchestrate.mjs start|install|handback|approve|hash|review|envelope|end');
+  it('[FEAT-061, FEAT-055] names review, resume and envelope in the usage line', () => {
+    expect(orch(['nope']).err).toBe('orchestrate: usage: orchestrate.mjs start|install|handback|approve|hash|review|resume|envelope|end');
   });
 });
 
@@ -1396,7 +1396,7 @@ describe('document hash [FEAT-056]', () => {
     expect(runText()).toBe(before);
   });
 
-  it('A3 both approvals record exactly at, by, path and a lower-case sha256, from an upper-case argument', () => {
+  it('A3 both approvals record exactly at, by, path, commit and a lower-case sha256, from an upper-case argument [FEAT-055]', () => {
     awaiting('spec');
     skipLoop('spec');
     const specSha = approveArgs('spec')[3];
@@ -1406,7 +1406,7 @@ describe('document hash [FEAT-056]', () => {
     skipLoop('plan');
     expect(orch(approveArgs('plan')).out).toBe(`plan approved: define_approved, 2 task(s); sha256 ${sha(PLAN)}`);
     for (const [a, rel] of [[runFile().approvals.spec, SPEC], [runFile().approvals.plan, PLAN]]) {
-      expect(Object.keys(a).sort()).toEqual(['at', 'by', 'path', 'sha256']);
+      expect(Object.keys(a).sort()).toEqual(['at', 'by', 'commit', 'path', 'sha256']);
       expect(a).toMatchObject({ path: rel, sha256: sha(rel), by: expect.any(String) });
       expect(a.sha256).toMatch(/^[0-9a-f]{64}$/);
     }
@@ -2486,5 +2486,298 @@ describe('envelope verb outside a run [FEAT-061]', () => {
     expect(r.status).toBe(2);
     expect(r.err).toContain('records no test command, so Guard 7 grants qa no shell');
     expect(runFile().halt).toBeNull();
+  });
+});
+
+describe('resume verb [FEAT-055]', () => {
+  const THREE_TASKS = `# Demo Plan\n\n${task(1, ['src/a.js'])}\n${task(2, ['src/b.js'])}\n${task(3, ['src/c.js'])}\n## Test List\n`;
+  const gitRoot = () => { fixtureGit('init', '-q'); fixtureCommit(); };
+  const head = () => fixtureGit('rev-parse', 'HEAD').stdout.trim();
+  const snapOf = (line) => line.slice('SNAP_HANDBACK '.length);
+  const anchoredSay = (c) => `Done.\nObservation: fine.\n${handbackLine('code', 'build_executed', { sys: { c } })}\n`;
+  // A task hand-back as the contract asks: sys.c is the c of the envelope the agent was dispatched with.
+  const codePass = () => { expect(orch(['install', 'code']).status).toBe(0); return orch(['handback', 'code'], { input: anchoredSay(envelope().sys.c) }); };
+  function built(done, { planText = THREE_TASKS, start = [] } = {}) {
+    driveTo('code', { planText, start, prep: gitRoot });
+    for (let i = 0; i < done; i++) expect(codePass().status).toBe(0);
+  }
+  // A halt with role null that lands on no entry; the agents come back so the resumed run can dispatch.
+  const haltAgentMissing = () => {
+    rmSync(join(root, '.claude', 'agents', 'code.md'));
+    expect(orch(['install', 'code']).err).toMatch(/^ORCH_AGENT_MISSING: /);
+    agents();
+  };
+  const haltInvalid = () => expect(orch(['handback', 'code'], { input: 'Done.\nSNAP_HANDBACK {"v":3}\n' }).err).toMatch(/^ORCH_HANDBACK_INVALID: /);
+  const editRun = (edit) => { const run = runFile(); edit(run); runFileText(JSON.stringify(run, null, 2) + '\n'); };
+  // A real commit object that HEAD no longer descends from.
+  const droppedCommit = () => { fixtureGit('commit', '-q', '--allow-empty', '-m', 'dropped'); const c = head(); fixtureGit('reset', '-q', 'HEAD~1'); return c; };
+  const runBytes = () => (existsSync(join(root, RUN_FILE)) ? readFileSync(join(root, RUN_FILE), 'utf8') : null);
+  const resumed = (code, gate, kept, dropped, next) => `run FEAT-011 resumed after ${code} from ${gate}: kept ${kept} record(s), dropped ${dropped}; next: ${next}`;
+  const roles = () => runFile().handbacks.map((h) => (h.task ? `${h.role}:${h.task}` : h.role));
+
+  it('RS1 approve records HEAD as each approval\'s commit in a git repository', () => {
+    driveTo('code', { prep: gitRoot });
+    expect(head()).toMatch(/^[0-9a-f]{40}$/);
+    expect(runFile().approvals.spec.commit).toBe(head());
+    expect(runFile().approvals.plan.commit).toBe(head());
+  });
+
+  it('RS2 approve records a null commit outside a git repository', () => {
+    driveTo('code');
+    expect(runFile().approvals.spec.commit).toBeNull();
+    expect(runFile().approvals.plan.commit).toBeNull();
+  });
+
+  it('RS3 handback stores the validated SNAP line verbatim as snap', () => {
+    driveTo('code');
+    expect(runFile().handbacks[0].snap).toBe(snapOf(handbackLine('spec', 'boundary_routed')));
+    expect(runFile().handbacks[1].snap).toBe(snapOf(handbackLine('plan', 'boundary_routed')));
+    orch(['install', 'code']);
+    orch(['handback', 'code'], { input: say('code', 'build_executed') });
+    expect(runFile().handbacks[2].snap).toBe(snapOf(handbackLine('code', 'build_executed')));
+  });
+
+  // Entry acceptance criteria.
+  it('RS4 [AC1] a conflict on task 2 of 3 keeps both approvals and re-dispatches task 2', () => {
+    built(2);
+    expect(orch(['handback', 'code'], { input: anchoredSay(head()) }).err).toMatch(/^ORCH_HANDBACK_CONFLICT: /);
+    const approvals = JSON.stringify(runFile().approvals);
+    const r = orch(['resume']);
+    expect(r).toEqual({ status: 0, out: resumed('ORCH_HANDBACK_CONFLICT', 'define_approved', 5, 1, 'install code (task 2 of 3)'), err: '' });
+    expect(JSON.stringify(runFile().approvals)).toBe(approvals);
+    expect(runFile()).toMatchObject({ halt: null, role: null, gate: 'define_approved', tasks: { done: 1 } });
+    expect(roles()).toEqual(['spec', 'plan', 'code:Task 1']);
+    expect(JSON.parse(orch(['install', 'code', '--check']).out).ops.scope).toEqual(['src/b.js', PLAN]);
+  });
+
+  it('RS5 [AC1] a halt with code dispatched on task 2 keeps both approvals and re-dispatches task 2', () => {
+    built(1);
+    expect(orch(['install', 'code']).status).toBe(0);
+    haltInvalid();
+    expect(runFile().role).toBe('code');
+    expect(orch(['resume']).out).toBe(resumed('ORCH_HANDBACK_INVALID', 'define_approved', 5, 0, 'install code (task 2 of 3)'));
+    expect(runFile()).toMatchObject({ halt: null, role: null, tasks: { done: 1 } });
+    expect(JSON.parse(orch(['install', 'code', '--check']).out).ops.scope).toEqual(['src/b.js', PLAN]);
+  });
+
+  it.each([
+    ['spec', 'install plan', 'boundary_routed', 2],
+    ['plan', 'install code (task 1 of 2)', 'define_approved', 4],
+  ])('RS6 [AC1] a conflict on the approved %s keeps its entry and continues with %s', (kind, next, gate, kept) => {
+    driveTo(kind === 'spec' ? 'plan' : 'code', { prep: gitRoot });
+    expect(orch(['handback', kind], { input: say(kind, 'boundary_routed') }).err).toMatch(/^ORCH_HANDBACK_CONFLICT: /);
+    const approvals = JSON.stringify(runFile().approvals);
+    expect(orch(['resume']).out).toBe(resumed('ORCH_HANDBACK_CONFLICT', gate, kept, 0, next));
+    expect(runFile().gate).toBe(gate);
+    expect(roles().at(-1)).toBe(kind);
+    expect(JSON.stringify(runFile().approvals)).toBe(approvals);
+    expect(orch(['install', kind === 'spec' ? 'plan' : 'code', '--check']).status).toBe(0);
+  });
+
+  it.each([
+    ['spec', () => writeFileSync(join(root, SPEC), '# Demo spec, revised\n')],
+    ['plan', () => plan(THREE_TASKS.replace('thing 2', 'thing two'))],
+  ])('RS7 [AC2] an edited approved %s refuses ORCH_APPROVED_DOC_CHANGED and writes nothing', (kind, edit) => {
+    built(1);
+    haltAgentMissing();
+    edit();
+    const before = runBytes();
+    const env = envelopeText();
+    const r = orch(['resume']);
+    expect(r.status).toBe(2);
+    expect(r.err).toMatch(new RegExp(`^orchestrate: ORCH_APPROVED_DOC_CHANGED: ${kind} `));
+    expect(r.err.endsWith('; recover with end, then start')).toBe(true);
+    expect(runBytes()).toBe(before);
+    expect(envelopeText()).toBe(env);
+  });
+
+  it('RS8 [AC2] a ticked plan checkbox is not a change: the resume succeeds', () => {
+    built(1);
+    haltAgentMissing();
+    plan(THREE_TASKS.replace('- [ ] **Step 1', '- [X] **Step 1'));
+    expect(orch(['resume']).status).toBe(0);
+    expect(runFile().halt).toBeNull();
+  });
+
+  it('RS9 [AC3] start in the run\'s own session still refuses ORCH_RUN_ACTIVE on a halted run', () => {
+    built(1);
+    haltAgentMissing();
+    const before = runBytes();
+    expect(orch(['start', 'FEAT-011'])).toMatchObject({ status: 1, err: 'ORCH_RUN_ACTIVE: run FEAT-011 is live in this session; end it first' });
+    expect(runBytes()).toBe(before);
+  });
+
+  it('RS10 [AC3] end on a resumed and re-halted run prints the record and removes every run file', () => {
+    built(1);
+    haltAgentMissing();
+    expect(orch(['resume']).status).toBe(0);
+    expect(orch(['install', 'code']).status).toBe(0);
+    haltInvalid();
+    mkdirSync(join(root, HANDBACK_DIR), { recursive: true });
+    writeFileSync(join(root, HANDBACK_DIR, 'code-2.txt'), 'x');
+    mkdirSync(join(root, REVIEW_DIR), { recursive: true });
+    writeFileSync(join(root, REVIEW_DIR, 'spec-1.md'), 'x');
+    const r = orch(['end']);
+    expect(r.status).toBe(0);
+    const record = JSON.parse(r.out);
+    expect(record).toMatchObject({ item: 'FEAT-011', halt: { code: 'ORCH_HANDBACK_INVALID' } });
+    expect(record.resumes).toHaveLength(1);
+    expect(record.resumes[0].halt.code).toBe('ORCH_AGENT_MISSING');
+    for (const f of [RUN_FILE, ENVELOPE_FILE, HANDBACK_DIR, REVIEW_DIR]) expect(existsSync(join(root, f))).toBe(false);
+  });
+
+  // Issue #185's validation.
+  it.each([
+    ['a corrupted snap on task 2', 3, (h) => { h.snap = '{"v":3}'; }, 1, 5, 1, 'install code (task 2 of 3)'],
+    ['a corrupted snap on task 1', 2, (h) => { h.snap = '{"v":3}'; }, 0, 4, 2, 'install code (task 1 of 3)'],
+    ['a task entry with no snap (written before FEAT-055)', 3, (h) => { delete h.snap; }, 1, 5, 1, 'install code (task 2 of 3)'],
+  ])('RS11 [AC4] %s cuts the sequence there', (_, index, edit, done, kept, dropped, next) => {
+    built(2);
+    haltAgentMissing();
+    editRun((run) => edit(run.handbacks[index]));
+    expect(orch(['resume']).out).toBe(resumed('ORCH_AGENT_MISSING', 'define_approved', kept, dropped, next));
+    expect(runFile().tasks.done).toBe(done);
+    expect(runFile().resumes[0]).toMatchObject({ kept, dropped });
+  });
+
+  it('RS12 [AC5] a task entry whose sys.c HEAD does not descend from is cut', () => {
+    built(0);
+    expect(orch(['install', 'code']).status).toBe(0);
+    const c = droppedCommit();
+    expect(orch(['handback', 'code'], { input: anchoredSay(c) }).status).toBe(0);
+    haltAgentMissing();
+    expect(orch(['resume']).out).toBe(resumed('ORCH_AGENT_MISSING', 'define_approved', 4, 1, 'install code (task 1 of 3)'));
+    expect(runFile().tasks.done).toBe(0);
+  });
+
+  it('RS13 [AC5] a task entry whose sys.c is the c of the envelope install code wrote is kept', () => {
+    built(0);
+    expect(orch(['install', 'code']).status).toBe(0);
+    const c = envelope().sys.c;
+    expect(c).toBe(head());
+    expect(orch(['handback', 'code'], { input: anchoredSay(c) }).status).toBe(0);
+    haltAgentMissing();
+    expect(orch(['resume']).status).toBe(0);
+    expect(runFile().tasks.done).toBe(1);
+    expect(JSON.parse(runFile().handbacks[2].snap).sys.c).toBe(c);
+  });
+
+  it('RS14 [AC5] HEAD reset to before the plan approval\'s commit refuses ORCH_RESUME_HISTORY_REWRITTEN', () => {
+    driveTo('plan', { prep: gitRoot });
+    const base = head();
+    fixtureGit('commit', '-q', '--allow-empty', '-m', 'later');
+    const later = head();
+    orch(['install', 'plan']);
+    orch(['handback', 'plan'], { input: say('plan', 'boundary_routed') });
+    skipLoop('plan');
+    expect(orch(approveArgs('plan')).status).toBe(0);
+    expect(runFile().approvals.plan.commit).toBe(later);
+    haltAgentMissing();
+    fixtureGit('reset', '-q', 'HEAD~1');
+    const before = runBytes();
+    const env = envelopeText();
+    expect(orch(['resume'])).toMatchObject({
+      status: 2,
+      err: `orchestrate: ORCH_RESUME_HISTORY_REWRITTEN: HEAD ${base} does not descend from the plan approval's commit ${later}; recover with end, then start`,
+    });
+    expect(runBytes()).toBe(before);
+    expect(envelopeText()).toBe(env);
+  });
+
+  // Anything after the gate is redone.
+  it('RS15 [AC6] a Verify halt keeps every task, drops every audit and fix entry, and redoes Verify', () => {
+    built(2, { planText: TWO_TASKS, start: ['--audit-rounds', '1'] });
+    const returned = auditReport('VERDICT: RETURN', ['- [blocker] src/a.js:10 — breaks AC1']);
+    orch(['install', 'audit']);
+    expect(orch(['handback', 'audit'], { input: returned }).status).toBe(0);
+    orch(['install', 'code']);
+    expect(orch(['handback', 'code'], { input: say('code', 'build_executed') }).status).toBe(0);
+    orch(['install', 'audit']);
+    expect(orch(['handback', 'audit'], { input: returned }).err).toMatch(/^ORCH_AUDIT_RETURN: /);
+    expect(orch(['resume']).out).toBe(resumed('ORCH_AUDIT_RETURN', 'build_executed', 6, 3, 'install audit'));
+    expect(runFile()).toMatchObject({ gate: 'build_executed', tasks: { done: 2 } });
+    expect(roles()).toEqual(['spec', 'plan', 'code:Task 1', 'code:Task 2']);
+    expect(orch(['install', 'audit', '--check']).status).toBe(0);
+  });
+
+  it('RS16 [AC6] a Define halt after the spec approval drops the plan entry and its loop and redoes the plan', () => {
+    driveTo('plan', { prep: gitRoot });
+    plan('# Plan\n\nNo tasks here.\n');
+    orch(['install', 'plan']);
+    orch(['handback', 'plan'], { input: say('plan', 'boundary_routed') });
+    skipLoop('plan');
+    expect(orch(approveArgs('plan')).err).toMatch(/^ORCH_EMPTY_SCOPE: /);
+    expect(orch(['resume']).out).toBe(resumed('ORCH_EMPTY_SCOPE', 'boundary_routed', 2, 1, 'install plan'));
+    expect(runFile()).toMatchObject({ gate: 'boundary_routed', approvals: { plan: null } });
+    expect(roles()).toEqual(['spec']);
+    expect(Object.keys(runFile().review)).toEqual(['spec']);
+    expect(orch(['install', 'plan', '--check']).status).toBe(0);
+  });
+
+  // Refusals write nothing.
+  it.each([
+    ['an argument after resume', () => {}, ['resume', 'now'], 'sess-1', 'orchestrate: usage: orchestrate.mjs resume'],
+    ['ORCH_RESUME_NO_RUN with no run file', () => rmSync(join(root, RUN_FILE)), ['resume'], 'sess-1', 'orchestrate: ORCH_RESUME_NO_RUN: '],
+    ['ORCH_RESUME_NO_RUN with an invalid run file', () => runFileText('{"v":1}\n'), ['resume'], 'sess-1', 'orchestrate: ORCH_RESUME_NO_RUN: '],
+    ['ORCH_RESUME_NOT_HALTED', () => editRun((r) => { r.halt = null; }), ['resume'], 'sess-1',
+      'orchestrate: ORCH_RESUME_NOT_HALTED: run FEAT-011 is not halted; continue with install code'],
+    ['ORCH_NO_SESSION_ID with no id', () => {}, ['resume'], null, 'orchestrate: ORCH_NO_SESSION_ID: '],
+    ['ORCH_NO_SESSION_ID with an empty id', () => {}, ['resume'], '', 'orchestrate: ORCH_NO_SESSION_ID: '],
+    ['ORCH_RESUME_NO_GATE', () => editRun((r) => { r.approvals = { spec: null, plan: null }; }), ['resume'], 'sess-1', 'orchestrate: ORCH_RESUME_NO_GATE: '],
+    ['ORCH_APPROVAL_UNHASHED', () => editRun((r) => { delete r.approvals.spec.sha256; }), ['resume'], 'sess-1', 'orchestrate: ORCH_APPROVAL_UNHASHED: '],
+    ['ORCH_RESUME_UNANCHORED with no commit', () => editRun((r) => { delete r.approvals.plan.commit; }), ['resume'], 'sess-1',
+      'orchestrate: ORCH_RESUME_UNANCHORED: the plan approval records no commit'],
+    ['ORCH_RESUME_UNANCHORED with a null commit', () => editRun((r) => { r.approvals.spec.commit = null; }), ['resume'], 'sess-1',
+      'orchestrate: ORCH_RESUME_UNANCHORED: the spec approval records a null commit'],
+    ['ORCH_RESUME_UNANCHORED when git cannot answer', () => editRun((r) => { r.approvals.plan.commit = 'f'.repeat(40); }), ['resume'], 'sess-1',
+      'orchestrate: ORCH_RESUME_UNANCHORED: the plan approval commit '],
+    ['ORCH_APPROVED_DOC_CHANGED', () => writeFileSync(join(root, SPEC), '# Changed\n'), ['resume'], 'sess-1', 'orchestrate: ORCH_APPROVED_DOC_CHANGED: spec '],
+    ['ORCH_RESUME_HISTORY_REWRITTEN', () => { const c = droppedCommit(); editRun((r) => { r.approvals.plan.commit = c; }); }, ['resume'], 'sess-1',
+      'orchestrate: ORCH_RESUME_HISTORY_REWRITTEN: '],
+  ])('RS17 [AC7] %s refuses with exit 2 and writes nothing', (_, setup, args, sid, prefix) => {
+    built(1);
+    haltAgentMissing();
+    setup();
+    const before = runBytes();
+    const env = envelopeText();
+    const r = orch(args, { sid });
+    expect(r.status).toBe(2);
+    expect(r.err.startsWith(prefix)).toBe(true);
+    expect(runBytes()).toBe(before);
+    expect(envelopeText()).toBe(env);
+  });
+
+  // The record.
+  it('RS18 [AC8] a resume records itself, binds the caller\'s session and removes the envelope', () => {
+    built(1);
+    haltAgentMissing();
+    const halt = runFile().halt;
+    expect(orch(['resume'], { sid: 'sess-2' }).out).toBe(resumed('ORCH_AGENT_MISSING', 'define_approved', 5, 0, 'install code (task 2 of 3)'));
+    expect(runFile().session_id).toBe('sess-2');
+    expect(runFile().resumes).toEqual([{ at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/), halt, kept: 5, dropped: 0 }]);
+    expect(existsSync(join(root, ENVELOPE_FILE))).toBe(false);
+    expect(orch(['install', 'code', '--check'], { sid: 'sess-2' }).status).toBe(0);
+    expect(orch(['install', 'code', '--check']).err).toBe('orchestrate: run FEAT-011 belongs to another session; end it, or start to replace it');
+  });
+
+  it('RS19 [AC8] a second halt after a resume is resumed again and appends its own entry', () => {
+    built(1);
+    haltAgentMissing();
+    expect(orch(['resume']).status).toBe(0);
+    expect(orch(['install', 'code']).status).toBe(0);
+    haltInvalid();
+    expect(orch(['resume']).status).toBe(0);
+    expect(runFile().resumes.map((x) => x.halt.code)).toEqual(['ORCH_AGENT_MISSING', 'ORCH_HANDBACK_INVALID']);
+  });
+
+  it('RS20 [AC8] isValidRun accepts a run file with or without the new fields', () => {
+    const base = { v: 1, session_id: 's', item: 'FEAT-011', gate: 'boundary_routed', approvals: { spec: null, plan: null }, handbacks: [], tasks: { ids: [], done: 0 } };
+    expect(isValidRun(base)).toBe(true);
+    expect(isValidRun({
+      ...base,
+      resumes: [{ at: 'x', halt: { code: 'C', reason: 'r', at: 'x' }, kept: 2, dropped: 0 }],
+      handbacks: [{ role: 'spec', gate: 'boundary_routed', at: 'x', snap: '{}' }],
+      approvals: { spec: { at: 'x', by: 'b', path: SPEC, sha256: 'a'.repeat(64), commit: null }, plan: null },
+    })).toBe(true);
   });
 });

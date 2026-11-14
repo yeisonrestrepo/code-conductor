@@ -75,12 +75,15 @@ You receive every hand-back, both approvals, and each review-loop outcome. **Rel
 
 ## Recovery
 
-A failed validation halts the run terminally: `orchestrate.mjs` exits 1 and records the halt in the run file. A refusal (exit 2) writes nothing and the run continues. Recover from a halt with:
+A failed validation halts the run: `orchestrate.mjs` exits 1 and records the halt in the run file. A refusal (exit 2) writes nothing and the run continues. Recover from a halt with:
 
 ```
-node .claude/scripts/orchestrate.mjs end   # then
-/cc-orchestrate <ITEM>                     # fresh start
+node .claude/scripts/orchestrate.mjs resume   # keep the record up to the last gate that still validates, or
+node .claude/scripts/orchestrate.mjs end      # then
+/cc-orchestrate <ITEM>                        # fresh start
 ```
+
+`resume` (FEAT-055) keeps both approvals and every Build task hand-back that still validates, and redoes the rest, Verify included; it refuses, writing nothing, when an approved document changed or HEAD no longer descends from an approval's commit.
 
 The band flow and the SNAP handoff are drawn on [C4 Components](C4-Components#cc-orchestrate-bands).
 
