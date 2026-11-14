@@ -897,10 +897,12 @@ function resume(root, sessionId, args) {
     ...run, session_id: sessionId, role: null, halt: null, gate: resumedGate(run, tasks),
     handbacks: kept, tasks: { ...run.tasks, done: tasks }, review: resumedReview(run, kept), resumes,
   };
+  // Computed before the write: resume records no halt, so a throw after saveRun would leave a changed run behind a failed exit.
+  const line = `run ${run.item} resumed after ${code} from ${next.gate}: kept ${records} record(s), dropped ${dropped}; next: ${nextLine(next)}`;
   saveRun(root, next);
   // The halted agent's envelope; the hand-back and review files stay for the owner and are overwritten on re-dispatch.
   rmSync(join(root, ENVELOPE_FILE), { force: true });
-  return `run ${run.item} resumed after ${code} from ${next.gate}: kept ${records} record(s), dropped ${dropped}; next: ${nextLine(next)}`;
+  return line;
 }
 
 const reviewWellFormed = (flag, arg, extra) => extra === undefined
