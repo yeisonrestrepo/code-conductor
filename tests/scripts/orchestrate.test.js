@@ -71,9 +71,11 @@ function approveArgs(kind) {
 // approve refuses while the role's review loop is open or never ran (FEAT-058); a recorded skip closes it.
 const skipLoop = (kind) => orch(['review', kind, '--close', 'skipped:fixture']);
 
+// The shipped default-model values (FEAT-053); read only by a run whose CLAUDE.md opts in.
+const FIXTURE_MODELS = { spec: 'opus', plan: 'opus', code: 'sonnet', audit: 'opus', security: 'opus', qa: 'haiku', 'define-review': 'opus' };
 function agents(roles = ROLES, dir = join(root, '.claude', 'agents')) {
   mkdirSync(dir, { recursive: true });
-  for (const r of roles) writeFileSync(join(dir, `${r}.md`), `---\nname: ${r}\ndescription: fixture\n---\nfixture\n`);
+  for (const r of roles) writeFileSync(join(dir, `${r}.md`), `---\nname: ${r}\ndescription: fixture\n${FIXTURE_MODELS[r] ? `default-model: ${FIXTURE_MODELS[r]}\n` : ''}---\nfixture\n`);
 }
 function plan(body) {
   mkdirSync(dirname(join(root, PLAN)), { recursive: true });
@@ -2791,5 +2793,310 @@ describe('resume verb [FEAT-055]', () => {
       handbacks: [{ role: 'spec', gate: 'boundary_routed', at: 'x', snap: '{}' }],
       approvals: { spec: { at: 'x', by: 'b', path: SPEC, sha256: 'a'.repeat(64), commit: null }, plan: null },
     })).toBe(true);
+  });
+});
+
+// FEAT-053 helpers, shared by the three role-model describes below.
+const DEFAULT_SEGMENT = 'spec=opus, plan=opus, code=sonnet, audit=opus, security=opus, qa=haiku, define-review=opus';
+const DEFAULT_MAP = { spec: 'opus', plan: 'opus', code: 'sonnet', audit: 'opus', security: 'opus', qa: 'haiku', 'define-review': 'opus' };
+const claudeMd = (text) => writeFileSync(join(root, 'CLAUDE.md'), `# P\n\n${text}`);
+const roleModels = (value) => claudeMd(`- Role models: ${value}\n`);
+// A driveTo prep: the reviewer's profile and the opt-in line, written before start reads them.
+const configured = (value = 'default') => () => { agents(['define-review']); roleModels(value); };
+const startConfigured = (value = 'default', sid = 'sess-1') => { agents(); configured(value)(); return orch(['start', 'FEAT-011'], { sid }); };
+const lastLine = (out) => out.split('\n').at(-1);
+const RUN_OK = { v: 1, session_id: 's', item: 'FEAT-011', gate: 'boundary_routed', approvals: { spec: null, plan: null }, handbacks: [], tasks: { ids: [], done: 0 } };
+
+describe('role models at start [FEAT-053]', () => {
+  const { 'define-review': _reviewer, ...six } = DEFAULT_MAP;
+  const modelsFile = (models) => runFileText(JSON.stringify({ ...runFile(), models }));
+
+  it('S1 default records the shipped defaults and ends the start line with the role models segment', () => {
+    const r = startConfigured();
+    expect(r.status).toBe(0);
+    expect(r.out.endsWith(`${SEC_NONE}; role models: ${DEFAULT_SEGMENT}`)).toBe(true);
+    expect(runFile().models).toEqual(DEFAULT_MAP);
+  });
+
+  it.each(['default, qa=sonnet', 'qa=sonnet, default', '  default ,qa=sonnet  '])('S2 a role=model token overrides default whatever its order: %j', (value) => {
+    expect(startConfigured(value).status).toBe(0);
+    expect(runFile().models).toEqual({ ...DEFAULT_MAP, qa: 'sonnet' });
+  });
+
+  it('S3 a partial configuration leaves every other role inherit', () => {
+    const r = startConfigured('code=sonnet');
+    expect(r.out.endsWith('; role models: spec=inherit, plan=inherit, code=sonnet, audit=inherit, security=inherit, qa=inherit, define-review=inherit')).toBe(true);
+    expect(r.out).not.toContain('; note:');
+  });
+
+  it('S4 default resolves a home profile without default-model: to inherit', () => {
+    agents();
+    rmSync(join(root, '.claude', 'agents', 'qa.md'));
+    mkdirSync(join(home, '.claude', 'agents'), { recursive: true });
+    writeFileSync(join(home, '.claude', 'agents', 'qa.md'), '---\nname: qa\ndescription: home\n---\nhome\n');
+    configured()();
+    const r = orch(['start', 'FEAT-011']);
+    expect(r.status).toBe(0);
+    expect(runFile().models.qa).toBe('inherit');
+    expect(r.out).toContain('qa=inherit');
+  });
+
+  it.each([
+    ['audit=sonnet, code=sonnet', '; note: audit and code share sonnet'],
+    ['audit=inherit, code=inherit', ''],
+  ])('S5 %j notes a shared model only for a non-inherit alias', (value, note) => {
+    const r = startConfigured(value);
+    expect(r.status).toBe(0);
+    expect(r.out.endsWith(note || 'define-review=inherit')).toBe(true);
+    if (note === '') expect(r.out).not.toContain('; note:');
+  });
+
+  it.each([
+    ['an unknown role', '- Role models: default, coder=opus\n', 'unknown role "coder" in "coder=opus"; the roles are spec, plan, code, audit, security, qa, define-review'],
+    ['a model outside the allow-list', '- Role models: qa=gpt\n', 'model "gpt" in "qa=gpt" is not one of opus, sonnet, haiku, inherit'],
+    ['a role set twice', '- Role models: qa=opus, qa=haiku\n', 'role "qa" is set twice'],
+    ['an empty token', '- Role models: default,,qa=opus\n', 'empty token in "- Role models: default,,qa=opus"'],
+    ['default twice', '- Role models: default, default\n', '"default" appears twice'],
+    ['a bare role', '- Role models: qa\n', 'token "qa" is neither default nor <role>=<model>'],
+    ['two lines', '- Role models: default\n- Role models: qa=haiku\n', 'CLAUDE.md has 2 "- Role models:" lines; keep one'],
+    ['a line with no value', '- Role models:\n', '"- Role models:" has no value; write default or <role>=<model> tokens'],
+  ])('S6 %s halts ORCH_ROLE_MODELS_INVALID and writes no run file', (_name, claudeText, reason) => {
+    agents();
+    agents(['define-review']);
+    claudeMd(claudeText);
+    const r = orch(['start', 'FEAT-011']);
+    expect(r.status).toBe(1);
+    expect(r.err).toBe(`ORCH_ROLE_MODELS_INVALID: ${reason}`);
+    expect(existsSync(join(root, RUN_FILE))).toBe(false);
+  });
+
+  it('S7 default with a profile default-model outside the allow-list halts naming the path and the value', () => {
+    agents();
+    writeFileSync(join(root, '.claude', 'agents', 'qa.md'), '---\nname: qa\ndescription: fixture\ndefault-model: gpt\n---\nfixture\n');
+    configured()();
+    const r = orch(['start', 'FEAT-011']);
+    expect(r.status).toBe(1);
+    expect(r.err).toBe(`ORCH_ROLE_MODELS_INVALID: ${join(root, '.claude', 'agents', 'qa.md')} sets default-model: gpt, not one of opus, sonnet, haiku, inherit`);
+    expect(existsSync(join(root, RUN_FILE))).toBe(false);
+  });
+
+  it('S8 a malformed line leaves another session\'s run file as it was', () => {
+    agents();
+    expect(orch(['start', 'FEAT-011'], { sid: 'sess-0' }).status).toBe(0);
+    const before = readFileSync(join(root, RUN_FILE), 'utf8');
+    roleModels('qa=gpt');
+    const r = orch(['start', 'FEAT-012']);
+    expect(r.status).toBe(1);
+    expect(r.err.startsWith('ORCH_ROLE_MODELS_INVALID')).toBe(true);
+    expect(readFileSync(join(root, RUN_FILE), 'utf8')).toBe(before);
+  });
+
+  it.each([['no CLAUDE.md', null], ['a CLAUDE.md without the line', '- Specs: docs/specs\n- Plans: docs/plans\n']])('S9 with %s start records no models and prints no role models segment', (_name, text) => {
+    agents();
+    if (text !== null) claudeMd(text);
+    const r = orch(['start', 'FEAT-011']);
+    expect(r.status).toBe(0);
+    expect(r.out).not.toContain('role models');
+    expect(runFile()).not.toHaveProperty('models');
+    expect(runFile()).not.toHaveProperty('dispatch_model');
+  });
+
+  it('S10 isValidRun accepts a run without models and with a valid models, dispatch_model and fix.model', () => {
+    expect(isValidRun(RUN_OK)).toBe(true);
+    expect(isValidRun({ ...RUN_OK, models: DEFAULT_MAP, dispatch_model: 'inherit', handbacks: [{ role: 'audit', fix: { round: 1, model: 'opus' } }] })).toBe(true);
+  });
+
+  it.each([
+    ['models without define-review', { ...RUN_OK, models: six }],
+    ['models with an extra role', { ...RUN_OK, models: { ...DEFAULT_MAP, review: 'opus' } }],
+    ['a models value outside the allow-list', { ...RUN_OK, models: { ...DEFAULT_MAP, qa: 'gpt' } }],
+    ['models as an array', { ...RUN_OK, models: [] }],
+    ['a dispatch_model outside the allow-list', { ...RUN_OK, dispatch_model: 'gpt' }],
+    ['a fix.model outside the allow-list', { ...RUN_OK, handbacks: [{ role: 'audit', fix: { round: 1, model: 'gpt' } }] }],
+  ])('S11 isValidRun rejects %s', (_name, run) => {
+    expect(isValidRun(run)).toBe(false);
+  });
+
+  it('S12 a run file edited to models.qa gpt halts ORCH_RUN_INVALID', () => {
+    expect(startConfigured().status).toBe(0);
+    modelsFile({ ...DEFAULT_MAP, qa: 'gpt' });
+    const r = orch(['install', 'spec', '--check']);
+    expect(r.status).toBe(1);
+    expect(r.err).toMatch(/^ORCH_RUN_INVALID: /);
+  });
+
+  it('S13 the allow-list and the role set are exported constants', () => {
+    expect(orchestrateModule.MODEL_ALIASES).toEqual(['opus', 'sonnet', 'haiku', 'inherit']);
+    expect(orchestrateModule.MODEL_ROLES).toEqual(['spec', 'plan', 'code', 'audit', 'security', 'qa', 'define-review']);
+  });
+});
+
+describe('role models at dispatch [FEAT-053]', () => {
+  it('D1 install --check prints model: last and writes nothing; install records dispatch_model; handback copies it into the entry', () => {
+    driveTo('spec', { prep: configured() });
+    const before = readFileSync(join(root, RUN_FILE), 'utf8');
+    const check = orch(['install', 'spec', '--check']);
+    expect(check.status).toBe(0);
+    expect(lastLine(check.out)).toBe('model: opus');
+    expect(JSON.parse(check.out.split('\n')[0]).sys.role).toBe('spec');
+    expect(readFileSync(join(root, RUN_FILE), 'utf8')).toBe(before);
+    const installed = orch(['install', 'spec']);
+    expect(installed.out).toBe(check.out);
+    expect(runFile().dispatch_model).toBe('opus');
+    const back = orch(['handback', 'spec'], { input: say('spec', 'boundary_routed') });
+    expect(back.status).toBe(0);
+    expect(back.out).toBe('spec handed back boundary_routed');
+    expect(runFile().handbacks[0].model).toBe('opus');
+  });
+
+  it('D2 every role dispatches on its configured model and each entry records it', () => {
+    driveTo('security', { prep: configured() });
+    expect(runFile().handbacks.map((h) => h.model)).toEqual(['opus', 'opus', 'sonnet', 'sonnet', 'opus']);
+    expect(lastLine(orch(['install', 'security', '--check']).out)).toBe('model: opus');
+    expect(securityPass().status).toBe(0);
+    expect(runFile().handbacks.at(-1).model).toBe('opus');
+    expect(lastLine(orch(['install', 'qa', '--check']).out)).toBe('model: haiku');
+    orch(['install', 'qa']);
+    expect(orch(['handback', 'qa'], { input: say('qa', 'verify_pass') }).status).toBe(0);
+    expect(runFile().handbacks.at(-1).model).toBe('haiku');
+  });
+
+  it('D3 a role=model token overrides default at dispatch', () => {
+    driveTo('code', { prep: configured('default, code=haiku') });
+    expect(lastLine(orch(['install', 'code', '--check']).out)).toBe('model: haiku');
+  });
+
+  it('D4 an uncovered role prints model: inherit, and the run records inherit', () => {
+    driveTo('spec', { prep: configured('code=sonnet') });
+    expect(lastLine(orch(['install', 'spec', '--check']).out)).toBe('model: inherit');
+    orch(['install', 'spec']);
+    expect(runFile().dispatch_model).toBe('inherit');
+    orch(['handback', 'spec'], { input: say('spec', 'boundary_routed') });
+    expect(runFile().handbacks[0].model).toBe('inherit');
+  });
+
+  it('D5 review --round names the define-review model and the OPEN line the author\'s model', () => {
+    driveTo('spec', { prep: configured('default, spec=sonnet') });
+    orch(['install', 'spec']);
+    orch(['handback', 'spec'], { input: say('spec', 'boundary_routed') });
+    putDoc('spec', '# Demo spec\n');
+    expect(orch(['review', 'spec', '--round', SPEC]).out).toBe(`review spec round 1 of 3: ${SPEC} sha256 ${sha(SPEC)}; model opus`);
+    const r1 = writeReview('spec', 1, 'OPEN 1', [ROW]);
+    expect(orch(['review', 'spec', '--record']).out).toBe(`review spec round 1: OPEN 1; revise ${SPEC} sha256 ${sha(SPEC)} from ${reviewPath('spec', 1)} sha256 ${r1}; model sonnet`);
+  });
+
+  it('D6 without the line no install, handback or review output carries model text and no record holds a model', () => {
+    driveTo('spec');
+    expect(orch(['install', 'spec', '--check']).out).not.toContain('model');
+    orch(['install', 'spec']);
+    expect(orch(['handback', 'spec'], { input: say('spec', 'boundary_routed') }).out).toBe('spec handed back boundary_routed');
+    putDoc('spec', '# Demo spec\n');
+    expect(orch(['review', 'spec', '--round', SPEC]).out).toBe(`review spec round 1 of 3: ${SPEC} sha256 ${sha(SPEC)}`);
+    expect(runFile()).not.toHaveProperty('models');
+    expect(runFile()).not.toHaveProperty('dispatch_model');
+    expect(runFile().handbacks[0]).not.toHaveProperty('model');
+  });
+});
+
+describe('escalation on repeated returns [FEAT-053]', () => {
+  const returned = (...findings) => auditReport('VERDICT: RETURN', findings);
+  const pass = (input) => { orch(['install', 'audit']); return orch(['handback', 'audit'], { input }); };
+  const fixPass = () => { orch(['install', 'code']); return orch(['handback', 'code'], { input: say('code', 'build_executed') }); };
+  const BLOCKER_A = '- [blocker] src/a.js:10 — breaks AC1';
+  const MAJOR_B = '- [major] src/b.js:2 — misses an edge';
+  const lastFix = () => runFile().handbacks.at(-1).fix;
+  const ESCALATED = '; model opus (escalated: Task 1 returned twice)';
+
+  it.each([['default', 'sonnet'], ['code=sonnet', 'sonnet'], ['default, code=opus', 'opus']])('E1 with %j a second return of Task 1 dispatches its fix on opus and records why', (value, first) => {
+    driveTo('audit', { prep: configured(value) });
+    const r1 = pass(returned(BLOCKER_A));
+    expect(r1.status).toBe(0);
+    expect(r1.out.endsWith(`; model ${first}`)).toBe(true);
+    expect(lastFix()).toMatchObject({ round: 1, tasks: ['Task 1'], model: first });
+    expect(lastFix()).not.toHaveProperty('escalated');
+    expect(lastLine(orch(['install', 'code', '--check']).out)).toBe(`model: ${first}`);
+    const f1 = fixPass();
+    expect(f1.status).toBe(0);
+    expect(runFile().handbacks.at(-1).model).toBe(first);
+    const r2 = pass(returned(BLOCKER_A));
+    expect(r2.status).toBe(0);
+    expect(r2.out.endsWith(ESCALATED)).toBe(true);
+    expect(lastFix()).toEqual({ round: 2, files: ['src/a.js'], review: '.conductor/handback/audit-2.txt', sha256: expect.any(String), tasks: ['Task 1'], model: 'opus', escalated: ['Task 1'] });
+    expect(lastLine(orch(['install', 'code', '--check']).out)).toBe('model: opus');
+    expect(fixPass().status).toBe(0);
+    expect(runFile().handbacks.at(-1).model).toBe('opus');
+    expect(runFile().dispatch_model).toBe('opus');
+  });
+
+  it('E2 a second return naming only new tasks keeps the code model', () => {
+    driveTo('audit', { prep: configured() });
+    pass(returned(BLOCKER_A));
+    fixPass();
+    const r = pass(returned(MAJOR_B));
+    expect(r.out.endsWith('; model sonnet')).toBe(true);
+    expect(lastFix()).toMatchObject({ round: 2, tasks: ['Task 2'], model: 'sonnet' });
+    expect(lastFix()).not.toHaveProperty('escalated');
+    expect(lastLine(orch(['install', 'code', '--check']).out)).toBe('model: sonnet');
+  });
+
+  it('E3 a path listed by two tasks returns both, and a later return of either escalates only the shared one', () => {
+    driveTo('audit', { prep: configured(), planText: `# Demo Plan\n\n${task(1, ['src/a.js'])}\n${task(2, ['src/a.js', 'src/b.js'])}\n## Test List\n` });
+    pass(returned(BLOCKER_A));
+    expect(lastFix().tasks).toEqual(['Task 1', 'Task 2']);
+    fixPass();
+    const r = pass(returned(MAJOR_B));
+    expect(lastFix()).toMatchObject({ tasks: ['Task 2'], model: 'opus', escalated: ['Task 2'] });
+    expect(r.out.endsWith('; model opus (escalated: Task 2 returned twice)')).toBe(true);
+  });
+
+  it('E4 a hand-edited fix.model halts the next verb ORCH_RUN_INVALID', () => {
+    driveTo('audit', { prep: configured() });
+    pass(returned(BLOCKER_A));
+    const run = runFile();
+    run.handbacks.at(-1).fix.model = 'gpt';
+    runFileText(JSON.stringify(run));
+    const r = orch(['install', 'code', '--check']);
+    expect(r.status).toBe(1);
+    expect(r.err).toMatch(/^ORCH_RUN_INVALID: /);
+  });
+
+  it('E5 at --audit-rounds 1 a second return of the same task halts ORCH_AUDIT_RETURN and records no fix', () => {
+    driveTo('audit', { start: ['--audit-rounds', '1'], prep: configured() });
+    expect(pass(returned(BLOCKER_A)).status).toBe(0);
+    expect(lastFix()).toMatchObject({ tasks: ['Task 1'], model: 'sonnet' });
+    fixPass();
+    const r = pass(returned(BLOCKER_A));
+    expect(r.status).toBe(1);
+    expect(r.err.startsWith('ORCH_AUDIT_RETURN: ')).toBe(true);
+    expect(runFile().handbacks.at(-1)).toMatchObject({ role: 'audit', verdict: 'RETURN', round: 2 });
+    expect(runFile().handbacks.at(-1)).not.toHaveProperty('fix');
+    expect(runFile().halt.code).toBe('ORCH_AUDIT_RETURN');
+  });
+
+  it('E6 without the line two returns of the same task record no model, tasks or escalated', () => {
+    driveTo('audit');
+    const r1 = pass(returned(BLOCKER_A));
+    fixPass();
+    const r2 = pass(returned(BLOCKER_A));
+    for (const r of [r1, r2]) {
+      expect(r.status).toBe(0);
+      expect(r.out).not.toContain('; model');
+    }
+    for (const h of runFile().handbacks.filter((e) => e.role === 'audit' && e.fix)) expect(Object.keys(h.fix).sort()).toEqual(['files', 'review', 'round', 'sha256']);
+    expect(orch(['install', 'code', '--check']).out.split('\n')).toHaveLength(2);
+    const text = JSON.stringify(runFile());
+    for (const key of ['"model"', '"models"', '"dispatch_model"']) expect(text).not.toContain(key);
+  });
+
+  it('E7 resume keeps the recorded models', () => {
+    driveTo('code', { prep: () => { configured()(); fixtureGit('init', '-q'); fixtureCommit(); } });
+    const { models } = runFile();
+    rmSync(join(root, '.claude', 'agents', 'code.md'));
+    expect(orch(['install', 'code']).err).toMatch(/^ORCH_AGENT_MISSING: /);
+    agents();
+    expect(orch(['resume']).status).toBe(0);
+    expect(runFile().models).toEqual(models);
+    expect(runFile().halt).toBeNull();
+    expect(lastLine(orch(['install', 'code', '--check']).out)).toBe('model: sonnet');
   });
 });

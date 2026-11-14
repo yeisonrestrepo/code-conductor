@@ -93,7 +93,7 @@ Line numbers below are from HEAD 1b60643; locate by the quoted text if they move
 
 Failure point: a profile edited in one mirror only, or a `model:` key that Claude Code would read. Verification: the byte-identity rows, the new no-`model:` rows and the updated hash rows.
 
-- [ ] [T-101] `tests/unit/role-profiles.test.js`: append at the end of the file. Depends on T-004.
+- [X] [T-101] `tests/unit/role-profiles.test.js`: append at the end of the file. Depends on T-004.
   ```js
   // FEAT-053: the shipped defaults, read only through `- Role models: default`; no profile carries the model key Claude Code reads.
   const DEFAULT_MODELS = { spec: 'opus', plan: 'opus', code: 'sonnet', audit: 'opus', security: 'opus', qa: 'haiku', 'define-review': 'opus' };
@@ -114,16 +114,16 @@ Failure point: a profile edited in one mirror only, or a `model:` key that Claud
   });
   ```
   `field()` anchors its key at the start of a frontmatter line (`^${key}:`, `m` flag), so `field(text, 'model')` never matches `default-model:`.
-- [ ] [T-102] Red step: `npx vitest run tests/unit/role-profiles.test.js -t "FEAT-053"`. Predicted full match set, 15 tests: the 14 `carries its default-model:` rows **red** (`field` answers `undefined`), the `covers every shipped profile` test **green**. Every other test is filtered out. Depends on T-101.
-- [ ] [T-103] The 14 profiles: with the Edit tool, add one line directly after the `tools:` line of each file's frontmatter, the same line in both mirrors. Depends on T-102.
+- [X] [T-102] Red step: `npx vitest run tests/unit/role-profiles.test.js -t "FEAT-053"`. Predicted full match set, 15 tests: the 14 `carries its default-model:` rows **red** (`field` answers `undefined`), the `covers every shipped profile` test **green**. Every other test is filtered out. Depends on T-101.
+- [X] [T-103] The 14 profiles: with the Edit tool, add one line directly after the `tools:` line of each file's frontmatter, the same line in both mirrors. Depends on T-102.
   - `spec.md`, `plan.md`, `audit.md`, `security.md`, `define-review.md`: `default-model: opus`
   - `code.md`: `default-model: sonnet`
   - `qa.md`: `default-model: haiku`
-- [ ] [T-104] Check: `for r in spec plan code audit security qa define-review; do cmp .claude/agents/$r.md project-template/.claude/agents/$r.md || echo DIFF $r; done` prints nothing, and `grep -n "^model:" .claude/agents/*.md project-template/.claude/agents/*.md` prints nothing. Then `npx vitest run tests/unit/role-profiles.test.js`. Predicted: 110 tests, 98 passed, 12 **red**: the `profiles unchanged since 1.37.0` rows for `audit`, `code`, `plan`, `qa`, `security`, `spec` in both directories (their bytes changed on purpose). The 15 FEAT-053 tests, the byte-identity rows and both 999-token ceilings are green. Depends on T-103.
-- [ ] [T-105] `tests/unit/role-profiles.test.js`, `PROFILE_SHA256_1_37_0` (lines 165-176): replace the six hashes with the values `sha256sum project-template/.claude/agents/{audit,code,plan,qa,security,spec}.md` prints (the mirror files hash the same, T-104), and add one comment line as the first line inside the object, above the FEAT-061 line: `// FEAT-053 changed every profile on purpose: each one carries a default-model: line, read only by orchestrate.mjs start through - Role models: default.` (owner decision 4). Depends on T-104.
-- [ ] [T-106] Green step: `npx vitest run tests/unit/role-profiles.test.js`. Predicted: 110 passed (95 + 15). Depends on T-105.
-- [ ] [T-107] Stage: `git add -u tests/unit/role-profiles.test.js`, then `git add -u` with each of the 14 profile paths listed in **Files:**, one explicit path each, then `git add -u docs/superpowers/plans/2026-11-14-feat053-per-role-model-selection-for-role-agents-with.md`. Depends on T-106.
-- [ ] [T-108] Commit: `feat: ship a default-model in every role profile, read only on opt-in [FEAT-053]`. Depends on T-107.
+- [X] [T-104] Check: `for r in spec plan code audit security qa define-review; do cmp .claude/agents/$r.md project-template/.claude/agents/$r.md || echo DIFF $r; done` prints nothing, and `grep -n "^model:" .claude/agents/*.md project-template/.claude/agents/*.md` prints nothing. Then `npx vitest run tests/unit/role-profiles.test.js`. Predicted: 110 tests, 98 passed, 12 **red**: the `profiles unchanged since 1.37.0` rows for `audit`, `code`, `plan`, `qa`, `security`, `spec` in both directories (their bytes changed on purpose). The 15 FEAT-053 tests, the byte-identity rows and both 999-token ceilings are green. Depends on T-103.
+- [X] [T-105] `tests/unit/role-profiles.test.js`, `PROFILE_SHA256_1_37_0` (lines 165-176): replace the six hashes with the values `sha256sum project-template/.claude/agents/{audit,code,plan,qa,security,spec}.md` prints (the mirror files hash the same, T-104), and add one comment line as the first line inside the object, above the FEAT-061 line: `// FEAT-053 changed every profile on purpose: each one carries a default-model: line, read only by orchestrate.mjs start through - Role models: default.` (owner decision 4). Depends on T-104.
+- [X] [T-106] Green step: `npx vitest run tests/unit/role-profiles.test.js`. Predicted: 110 passed (95 + 15). Depends on T-105.
+- [X] [T-107] Stage: `git add -u tests/unit/role-profiles.test.js`, then `git add -u` with each of the 14 profile paths listed in **Files:**, one explicit path each, then `git add -u docs/superpowers/plans/2026-11-14-feat053-per-role-model-selection-for-role-agents-with.md`. Depends on T-106.
+- [X] [T-108] Commit: `feat: ship a default-model in every role profile, read only on opt-in [FEAT-053]`. Depends on T-107.
 
 ---
 
@@ -135,8 +135,8 @@ Failure point: a profile edited in one mirror only, or a `model:` key that Claud
 
 Failure point: a parse error that writes or clears a run file, or a no-configuration start whose output moves. Verification: S6-S8 assert no run file is written or replaced; S9 and every existing start test assert the unconfigured output.
 
-- [ ] [T-201] `tests/scripts/orchestrate.test.js`, the `agents()` helper (lines 74-77): add above it `const FIXTURE_MODELS = { spec: 'opus', plan: 'opus', code: 'sonnet', audit: 'opus', security: 'opus', qa: 'haiku', 'define-review': 'opus' };` with the comment `// The shipped default-model values (FEAT-053); read only by a run whose CLAUDE.md opts in.`, and change the write to `` `---\nname: ${r}\ndescription: fixture\n${FIXTURE_MODELS[r] ? `default-model: ${FIXTURE_MODELS[r]}\n` : ''}---\nfixture\n` ``. Depends on T-108.
-- [ ] [T-202] `tests/scripts/orchestrate.test.js`: append at the end of the file a block of shared helpers and `describe('role models at start [FEAT-053]', …)`. Depends on T-201.
+- [X] [T-201] `tests/scripts/orchestrate.test.js`, the `agents()` helper (lines 74-77): add above it `const FIXTURE_MODELS = { spec: 'opus', plan: 'opus', code: 'sonnet', audit: 'opus', security: 'opus', qa: 'haiku', 'define-review': 'opus' };` with the comment `// The shipped default-model values (FEAT-053); read only by a run whose CLAUDE.md opts in.`, and change the write to `` `---\nname: ${r}\ndescription: fixture\n${FIXTURE_MODELS[r] ? `default-model: ${FIXTURE_MODELS[r]}\n` : ''}---\nfixture\n` ``. Depends on T-108.
+- [X] [T-202] `tests/scripts/orchestrate.test.js`: append at the end of the file a block of shared helpers and `describe('role models at start [FEAT-053]', …)`. Depends on T-201.
   ```js
   // FEAT-053 helpers, shared by the three role-model describes below.
   const DEFAULT_SEGMENT = 'spec=opus, plan=opus, code=sonnet, audit=opus, security=opus, qa=haiku, define-review=opus';
@@ -171,8 +171,8 @@ Failure point: a parse error that writes or clears a run file, or a no-configura
   - S11 `it.each` **"S11 isValidRun rejects %s"**, each `isValidRun(run)` false. With `const { 'define-review': _reviewer, ...six } = DEFAULT_MAP;` at the top of the describe, the rows are: `['models without define-review', { ...RUN_OK, models: six }]`, `['models with an extra role', { ...RUN_OK, models: { ...DEFAULT_MAP, review: 'opus' } }]`, `['a models value outside the allow-list', { ...RUN_OK, models: { ...DEFAULT_MAP, qa: 'gpt' } }]`, `['models as an array', { ...RUN_OK, models: [] }]`, `['a dispatch_model outside the allow-list', { ...RUN_OK, dispatch_model: 'gpt' }]`, `['a fix.model outside the allow-list', { ...RUN_OK, handbacks: [{ role: 'audit', fix: { round: 1, model: 'gpt' } }] }]`.
   - S12 **"S12 a run file edited to models.qa gpt halts ORCH_RUN_INVALID"**: `startConfigured()`; rewrite the run file with `models.qa = 'gpt'`; `orch(['install', 'spec', '--check'])` has status 1 and `err` matching `/^ORCH_RUN_INVALID: /`.
   - S13 **"S13 the allow-list and the role set are exported constants"**: `orchestrateModule.MODEL_ALIASES` equals `['opus', 'sonnet', 'haiku', 'inherit']`, `orchestrateModule.MODEL_ROLES` equals `['spec', 'plan', 'code', 'audit', 'security', 'qa', 'define-review']`. Read through the namespace import (line 11), so the file still loads before the export exists.
-- [ ] [T-203] Red step: `npx vitest run tests/scripts/orchestrate.test.js -t "role models at start"`. Predicted full match set, 29 tests: **green** S9 (2 rows) and S10 (1); **red** the other 26: S1, S2 (3), S3, S4, S5 (2), S6 (8, start succeeds), S7, S8 (the stale run is replaced), S11 (6, extra keys pass today), S12, S13. Every other test is filtered out. Depends on T-202.
-- [ ] [T-204] `scripts/orchestrate.mjs`, constants: after `const isAuditRounds = …` (line 36) add: Depends on T-203.
+- [X] [T-203] Red step: `npx vitest run tests/scripts/orchestrate.test.js -t "role models at start"`. Predicted full match set, 29 tests: **green** S9 (2 rows) and S10 (1); **red** the other 26: S1, S2 (3), S3, S4, S5 (2), S6 (8, start succeeds), S7, S8 (the stale run is replaced), S11 (6, extra keys pass today), S12, S13. Every other test is filtered out. Depends on T-202.
+- [X] [T-204] `scripts/orchestrate.mjs`, constants: after `const isAuditRounds = …` (line 36) add: Depends on T-203.
   ```js
   // FEAT-053: the Agent tool's model aliases plus inherit; the one list start, the profiles and isValidRun are checked against.
   export const MODEL_ALIASES = ['opus', 'sonnet', 'haiku', 'inherit'];
@@ -182,7 +182,7 @@ Failure point: a parse error that writes or clears a run file, or a no-configura
   const ROLE_MODELS_LINE = /^- Role models: (.+)$/;
   const isModel = (m) => MODEL_ALIASES.includes(m);
   ```
-- [ ] [T-205] `scripts/orchestrate.mjs`, `isValidRun` (lines 113-120): above it add `isModelRecord` (plan decision 13), and append `&& isModelRecord(run)` as the last term of `isValidRun`'s expression. Depends on T-204.
+- [X] [T-205] `scripts/orchestrate.mjs`, `isValidRun` (lines 113-120): above it add `isModelRecord` (plan decision 13), and append `&& isModelRecord(run)` as the last term of `isValidRun`'s expression. Depends on T-204.
   ```js
   // FEAT-053: a hand-edited model would let the run file, not the project, choose what a dispatch runs on.
   function isModelRecord(run) {
@@ -194,7 +194,7 @@ Failure point: a parse error that writes or clears a run file, or a no-configura
   }
   ```
   Add to the comment above `isValidRun`: `// FEAT-053: and models, dispatch_model and fix.model hold only the allow-list.`
-- [ ] [T-206] `scripts/orchestrate.mjs`, the parser: after `findAgent` (ends line 279) add `roleModelsValue`, `parseRoleModels`, `profileDefault`, `resolveRoleModels` and `modelsNote`, with the reasons of plan decision 3 verbatim. Depends on T-205.
+- [X] [T-206] `scripts/orchestrate.mjs`, the parser: after `findAgent` (ends line 279) add `roleModelsValue`, `parseRoleModels`, `profileDefault`, `resolveRoleModels` and `modelsNote`, with the reasons of plan decision 3 verbatim. Depends on T-205.
   ```js
   const modelsInvalid = (reason) => new Halt('ORCH_ROLE_MODELS_INVALID', reason);
 
@@ -255,14 +255,14 @@ Failure point: a parse error that writes or clears a run file, or a no-configura
   const modelsNote = (m) => (m ? `; role models: ${MODEL_ROLES.map((r) => `${r}=${m[r]}`).join(', ')}${shareNote(m)}` : '');
   ```
   `parseRoleModels` is 21 lines; every function stays under 30. `role in explicit` is safe because `role` already passed the `MODEL_ROLES` check.
-- [ ] [T-207] `scripts/orchestrate.mjs`, `start` (lines 1015-1039). Depends on T-206.
+- [X] [T-207] `scripts/orchestrate.mjs`, `start` (lines 1015-1039). Depends on T-206.
   - After `const docs = resolveDocs(root, item);` add `const models = resolveRoleModels(root);`. It runs before `if (old) clearRunFiles(root);` and before any write, so a halt leaves a stale run and every file as they were (S8).
   - In the `saveRun` object, after `security, docs,` add `...(models ? { models } : {}),` on its own line.
   - The return line: append `${modelsNote(models)}` after `${securityNote(security, root, stack())}`.
   - `start` stays in the `cli` list of verbs that record no halt (`['start', 'envelope', 'resume']`), so `ORCH_ROLE_MODELS_INVALID` writes nothing.
-- [ ] [T-208] Green step: `npx vitest run tests/scripts/orchestrate.test.js -t "role models at start"`. Predicted: the same 29 tests, all **green**. Then `npx vitest run tests/scripts/orchestrate.test.js`: 492 passed (463 + 29), including `[AC10] never writes CLAUDE.md` (the new line naming `CLAUDE.md` calls only `readFileSync`). Depends on T-207.
-- [ ] [T-209] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-14-feat053-per-role-model-selection-for-role-agents-with.md`. Depends on T-208.
-- [ ] [T-210] Commit: `feat: read per-role models from CLAUDE.md at start and freeze them in the run file [FEAT-053]`. Depends on T-209.
+- [X] [T-208] Green step: `npx vitest run tests/scripts/orchestrate.test.js -t "role models at start"`. Predicted: the same 29 tests, all **green**. Then `npx vitest run tests/scripts/orchestrate.test.js`: 492 passed (463 + 29), including `[AC10] never writes CLAUDE.md` (the new line naming `CLAUDE.md` calls only `readFileSync`). Depends on T-207.
+- [X] [T-209] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-14-feat053-per-role-model-selection-for-role-agents-with.md`. Depends on T-208.
+- [X] [T-210] Commit: `feat: read per-role models from CLAUDE.md at start and freeze them in the run file [FEAT-053]`. Depends on T-209.
 
 ---
 
@@ -274,15 +274,15 @@ Failure point: a parse error that writes or clears a run file, or a no-configura
 
 Failure point: `--check` writing `dispatch_model`, or a model line leaking into an unconfigured run. Verification: D1 compares the run file's bytes around `--check`; D6 asserts no model text without the line.
 
-- [ ] [T-301] `tests/scripts/orchestrate.test.js`: append `describe('role models at dispatch [FEAT-053]', …)` after the Task 2 describe. Depends on T-210.
+- [X] [T-301] `tests/scripts/orchestrate.test.js`: append `describe('role models at dispatch [FEAT-053]', …)` after the Task 2 describe. Depends on T-210.
   - D1 **"D1 install --check prints model: last and writes nothing; install records dispatch_model; handback copies it into the entry"**: `driveTo('spec', { prep: configured() })`; `const before = readFileSync(join(root, RUN_FILE), 'utf8')`; `const check = orch(['install', 'spec', '--check'])`: status 0, `lastLine(check.out)` is `model: opus`, `JSON.parse(check.out.split('\n')[0]).sys.role` is `spec`, the run file's bytes equal `before`; `orch(['install', 'spec'])` prints the same lines, and `runFile().dispatch_model` is `'opus'`; `orch(['handback', 'spec'], { input: say('spec', 'boundary_routed') })` has status 0, its `out` is `spec handed back boundary_routed`, and `runFile().handbacks[0].model` is `'opus'`.
   - D2 **"D2 every role dispatches on its configured model and each entry records it"**: `driveTo('security', { prep: configured() })`; `runFile().handbacks.map((h) => h.model)` equals `['opus', 'opus', 'sonnet', 'sonnet', 'opus']` (spec, plan, two code tasks, audit); `lastLine(orch(['install', 'security', '--check']).out)` is `model: opus`; `securityPass()` has status 0 and the security entry's `model` is `'opus'`; `lastLine(orch(['install', 'qa', '--check']).out)` is `model: haiku`; `orch(['install', 'qa'])`, then `orch(['handback', 'qa'], { input: say('qa', 'verify_pass') })` has status 0 and the qa entry's `model` is `'haiku'`.
   - D3 **"D3 a role=model token overrides default at dispatch"**: `driveTo('code', { prep: configured('default, code=haiku') })`; `lastLine(orch(['install', 'code', '--check']).out)` is `model: haiku`.
   - D4 **"D4 an uncovered role prints model: inherit, and the run records inherit"**: `driveTo('spec', { prep: configured('code=sonnet') })`; `lastLine(orch(['install', 'spec', '--check']).out)` is `model: inherit`; after `orch(['install', 'spec'])`, `runFile().dispatch_model` is `'inherit'`; after the spec hand-back, `runFile().handbacks[0].model` is `'inherit'`.
   - D5 **"D5 review --round names the define-review model and the OPEN line the author's model"**: `driveTo('spec', { prep: configured('default, spec=sonnet') })`; `orch(['install', 'spec'])`; `orch(['handback', 'spec'], { input: say('spec', 'boundary_routed') })`; `putDoc('spec', '# Demo spec\n')`; `orch(['review', 'spec', '--round', SPEC]).out` is `` `review spec round 1 of 3: ${SPEC} sha256 ${sha(SPEC)}; model opus` ``; `const r1 = writeReview('spec', 1, 'OPEN 1', [ROW])`; `orch(['review', 'spec', '--record']).out` is `` `review spec round 1: OPEN 1; revise ${SPEC} sha256 ${sha(SPEC)} from ${reviewPath('spec', 1)} sha256 ${r1}; model sonnet` ``.
   - D6 **"D6 without the line no install, handback or review output carries model text and no record holds a model"**: `driveTo('spec')`; `orch(['install', 'spec', '--check']).out` does not contain `model`; `orch(['install', 'spec'])`; the hand-back's `out` is `spec handed back boundary_routed`; `putDoc('spec', '# Demo spec\n')`; `orch(['review', 'spec', '--round', SPEC]).out` is `` `review spec round 1 of 3: ${SPEC} sha256 ${sha(SPEC)}` ``; `runFile()` has no `models` and no `dispatch_model`, and `runFile().handbacks[0]` has no `model`.
-- [ ] [T-302] Red step: `npx vitest run tests/scripts/orchestrate.test.js -t "role models at dispatch"`. Predicted full match set, 6 tests: **red** D1-D5 (no `model:` line, no `dispatch_model`, no entry `model`, no `; model` segment), **green** D6. Every other test is filtered out. Depends on T-301.
-- [ ] [T-303] `scripts/orchestrate.mjs`, `install` (lines 428-447). Depends on T-302.
+- [X] [T-302] Red step: `npx vitest run tests/scripts/orchestrate.test.js -t "role models at dispatch"`. Predicted full match set, 6 tests: **red** D1-D5 (no `model:` line, no `dispatch_model`, no entry `model`, no `; model` segment), **green** D6. Every other test is filtered out. Depends on T-301.
+- [X] [T-303] `scripts/orchestrate.mjs`, `install` (lines 428-447). Depends on T-302.
   - Above `install` add:
     ```js
     // FEAT-053: what the script says this dispatch runs on, never the orchestrator's choice; null in a run without models.
@@ -293,16 +293,16 @@ Failure point: `--check` writing `dispatch_model`, or a model line leaking into 
     ```
   - In `install`, replace `const out = built.out.trim() + (step.fix === undefined ? '' : `\n${fixNote(run)}`);` with `const model = dispatchModel(run, step);` and `const out = built.out.trim() + (step.fix === undefined ? '' : `\n${fixNote(run)}`) + (model ? `\nmodel: ${model}` : '');`.
   - Replace `saveRun(root, { ...run, band: ROLE_BAND[role], role });` with `saveRun(root, { ...run, band: ROLE_BAND[role], role, ...(model ? { dispatch_model: model } : {}) });`. The `if (check) return out;` line above it is unchanged, so `--check` writes nothing (owner decision 5).
-- [ ] [T-304] `scripts/orchestrate.mjs`, `recordHandback` (lines 469-475): after `const fields = entryFields(run, role);` add `const model = isPlainObject(run.models) && isModel(run.dispatch_model) ? { model: run.dispatch_model } : {};` and change the entry to `{ role, gate, at: new Date().toISOString(), ...fields, ...(verdict ? { verdict } : {}), ...model, ...extra }`. Add to the comment line above the function: `// FEAT-053: an entry carries the model install recorded, read from the run file and never from the report.` Depends on T-303.
-- [ ] [T-305] `scripts/orchestrate.mjs`, the review lines (plan decision 12). Depends on T-304.
+- [X] [T-304] `scripts/orchestrate.mjs`, `recordHandback` (lines 469-475): after `const fields = entryFields(run, role);` add `const model = isPlainObject(run.models) && isModel(run.dispatch_model) ? { model: run.dispatch_model } : {};` and change the entry to `{ role, gate, at: new Date().toISOString(), ...fields, ...(verdict ? { verdict } : {}), ...model, ...extra }`. Add to the comment line above the function: `// FEAT-053: an entry carries the model install recorded, read from the run file and never from the report.` Depends on T-303.
+- [X] [T-305] `scripts/orchestrate.mjs`, the review lines (plan decision 12). Depends on T-304.
   - Above `review` add `const modelSegment = (run, role) => (isPlainObject(run.models) ? `; model ${run.models[role]}` : '');` with the comment `// FEAT-053: the two lines that trigger a dispatch name its model; a closing line triggers none.`
   - In `review`, the dispatch expression: `openRound(root, role, loop, arg)` → `openRound(root, role, loop, arg, modelSegment(run, 'define-review'))`, and `recordRound(root, role, loop)` → `recordRound(root, role, loop, modelSegment(run, role))`.
   - `openRound(root, role, loop, rel)` → `openRound(root, role, loop, rel, model)`; its last return's `say` becomes `` `review ${role} round ${round} of ${REVIEW_CAP}: ${rel} sha256 ${sha256}${model}` ``. The `closed unchanged` return is unchanged.
   - `recordRound(root, role, loop)` → `recordRound(root, role, loop, model)`; the `OPEN` `say` becomes `` `review ${role} round ${loop.round}: OPEN ${verdict.open}; revise ${loop.doc} sha256 ${loop.sha256} from ${path} sha256 ${reviewSha}${model}` ``. The `closed clean` and `closed cap` returns are unchanged.
   - `grep -n "openRound(\|recordRound(" scripts/orchestrate.mjs` prints the two definitions and the two calls in `review`.
-- [ ] [T-306] Green step: `npx vitest run tests/scripts/orchestrate.test.js -t "role models at dispatch"`. Predicted: the same 6 tests, all **green**. Then `npx vitest run tests/scripts/orchestrate.test.js`: 498 passed (492 + 6), including every FEAT-058 review test and the FEAT-059 security-entry key test unchanged. Depends on T-305.
-- [ ] [T-307] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-14-feat053-per-role-model-selection-for-role-agents-with.md`. Depends on T-306.
-- [ ] [T-308] Commit: `feat: print and record the model of every dispatch in a configured run [FEAT-053]`. Depends on T-307.
+- [X] [T-306] Green step: `npx vitest run tests/scripts/orchestrate.test.js -t "role models at dispatch"`. Predicted: the same 6 tests, all **green**. Then `npx vitest run tests/scripts/orchestrate.test.js`: 498 passed (492 + 6), including every FEAT-058 review test and the FEAT-059 security-entry key test unchanged. Depends on T-305.
+- [X] [T-307] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-14-feat053-per-role-model-selection-for-role-agents-with.md`. Depends on T-306.
+- [X] [T-308] Commit: `feat: print and record the model of every dispatch in a configured run [FEAT-053]`. Depends on T-307.
 
 ---
 
@@ -314,7 +314,7 @@ Failure point: `--check` writing `dispatch_model`, or a model line leaking into 
 
 Failure point: escalation written at the round cap, or `fix.tasks` leaking into an unconfigured run. Verification: E5 at `--audit-rounds 1`; E6 two returns without the line.
 
-- [ ] [T-401] `tests/scripts/orchestrate.test.js`: append `describe('escalation on repeated returns [FEAT-053]', …)` after the Task 3 describe, with these local helpers (the FEAT-057 ones are scoped to their own describe): Depends on T-308.
+- [X] [T-401] `tests/scripts/orchestrate.test.js`: append `describe('escalation on repeated returns [FEAT-053]', …)` after the Task 3 describe, with these local helpers (the FEAT-057 ones are scoped to their own describe): Depends on T-308.
   ```js
   const returned = (...findings) => auditReport('VERDICT: RETURN', findings);
   const pass = (input) => { orch(['install', 'audit']); return orch(['handback', 'audit'], { input }); };
@@ -332,8 +332,8 @@ Failure point: escalation written at the round cap, or `fix.tasks` leaking into 
   - E5 **"E5 at --audit-rounds 1 a second return of the same task halts ORCH_AUDIT_RETURN and records no fix"**: `driveTo('audit', { start: ['--audit-rounds', '1'], prep: configured() })`; `pass(returned(BLOCKER_A))` status 0 and `lastFix()` matches `{ tasks: ['Task 1'], model: 'sonnet' }`; `fixPass()`; `const r = pass(returned(BLOCKER_A))`: status 1, `err` starts with `ORCH_AUDIT_RETURN: `; `runFile().handbacks.at(-1)` matches `{ role: 'audit', verdict: 'RETURN', round: 2 }` and has no `fix` (so no `fix.model`, `fix.tasks` or `fix.escalated`); `runFile().halt.code` is `ORCH_AUDIT_RETURN` (owner decision 6).
   - E6 **"E6 without the line two returns of the same task record no model, tasks or escalated"**: `driveTo('audit')`; `const r1 = pass(returned(BLOCKER_A))`, `fixPass()`, `const r2 = pass(returned(BLOCKER_A))`: both status 0 and neither `out` contains `; model`; for each audit entry's `fix`, `Object.keys(fix).sort()` equals `['files', 'review', 'round', 'sha256']`; `install code --check` prints exactly two lines (envelope and fix note); `JSON.stringify(runFile())` contains neither `"model"`, `"models"` nor `"dispatch_model"`.
   - E7 **"E7 resume keeps the recorded models"**: `driveTo('code', { prep: () => { configured()(); fixtureGit('init', '-q'); fixtureCommit(); } })`; `const models = runFile().models`; `rmSync(join(root, '.claude', 'agents', 'code.md'))`; `orch(['install', 'code']).err` matches `/^ORCH_AGENT_MISSING: /`; `agents()`; `orch(['resume'])` has status 0; `runFile().models` equals `models` and `runFile().halt` is `null`; `lastLine(orch(['install', 'code', '--check']).out)` is `model: sonnet`.
-- [ ] [T-402] Red step: `npx vitest run tests/scripts/orchestrate.test.js -t "escalation on repeated returns"`. Predicted full match set, 9 tests: **red** E1 (3 rows, no `; model` on the audit line, no `fix.tasks`), E2, E3, E5 (the first `fix` has no `tasks`); **green** E4 (Task 2's `isValidRun` already rejects it), E6 (nothing records a model yet) and E7 (`resume` already keeps `models`). Every other test is filtered out. Depends on T-401.
-- [ ] [T-403] `scripts/orchestrate.mjs`, above `auditFix` (line 501) add `fixModel` (plan decisions 10 and 11): Depends on T-402.
+- [X] [T-402] Red step: `npx vitest run tests/scripts/orchestrate.test.js -t "escalation on repeated returns"`. Predicted full match set, 9 tests: **red** E1 (3 rows, no `; model` on the audit line, no `fix.tasks`), E2, E3, E5 (the first `fix` has no `tasks`); **green** E4 (Task 2's `isValidRun` already rejects it), E6 (nothing records a model yet) and E7 (`resume` already keeps `models`). Every other test is filtered out. Depends on T-401.
+- [X] [T-403] `scripts/orchestrate.mjs`, above `auditFix` (line 501) add `fixModel` (plan decisions 10 and 11): Depends on T-402.
   ```js
   // FEAT-053: a plan task the audit returns a second time goes to the most capable model, and the record names the trigger.
   function fixModel(root, run, paths) {
@@ -349,14 +349,14 @@ Failure point: escalation written at the round cap, or `fix.tasks` leaking into 
     };
   }
   ```
-- [ ] [T-404] `scripts/orchestrate.mjs`, `auditFix` (lines 501-511). Depends on T-403.
+- [X] [T-404] `scripts/orchestrate.mjs`, `auditFix` (lines 501-511). Depends on T-403.
   - After `const scope = fixScope(root, run, fix.files, fix.round);` add `const { fields, note } = fixModel(root, run, verdict.paths);`.
   - `saveRun(root, { ...run, handbacks: [...run.handbacks.slice(0, -1), { ...entry, fix }] });` → `saveRun(root, { ...run, handbacks: [...run.handbacks.slice(0, -1), { ...entry, fix: { ...fix, ...fields } }] });`.
   - The return line: append `${note}` after `; scope ${scope.join(', ')}`.
   - The cap check (`if (verdict.verdict === 'ESCALATE' || used >= cap) throw auditStop(…)`) stays first, so a return at the cap writes no `fix` and no escalation (E5).
-- [ ] [T-405] Green step: `npx vitest run tests/scripts/orchestrate.test.js -t "escalation on repeated returns"`. Predicted: the same 9 tests, all **green**. Then `npx vitest run tests/scripts/orchestrate.test.js`: 507 passed (498 + 9), including the FEAT-057 tests `[E1]` (exact audit line and `fix` shape, unconfigured) and `[E2]` unchanged. Depends on T-404.
-- [ ] [T-406] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-14-feat053-per-role-model-selection-for-role-agents-with.md`. Depends on T-405.
-- [ ] [T-407] Commit: `feat: escalate a fix round to the most capable model when an audit returns the same task twice [FEAT-053]`. Depends on T-406.
+- [X] [T-405] Green step: `npx vitest run tests/scripts/orchestrate.test.js -t "escalation on repeated returns"`. Predicted: the same 9 tests, all **green**. Then `npx vitest run tests/scripts/orchestrate.test.js`: 507 passed (498 + 9), including the FEAT-057 tests `[E1]` (exact audit line and `fix` shape, unconfigured) and `[E2]` unchanged. Depends on T-404.
+- [X] [T-406] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-14-feat053-per-role-model-selection-for-role-agents-with.md`. Depends on T-405.
+- [X] [T-407] Commit: `feat: escalate a fix round to the most capable model when an audit returns the same task twice [FEAT-053]`. Depends on T-406.
 
 ---
 
@@ -370,7 +370,7 @@ Failure point: escalation written at the round cap, or `fix.tasks` leaking into 
 
 Failure point: an edit that breaks a phrase another parity test pins, or a mirror left behind. Verification: the whole `commands-parity` file, whose first test is byte-identity.
 
-- [ ] [T-501] `tests/installer/commands-parity.test.js`: inside `describe('cc-orchestrate mirrors [FEAT-011 AC10]', …)`, after the FEAT-055 test (ends line 297), add: Depends on T-407.
+- [X] [T-501] `tests/installer/commands-parity.test.js`: inside `describe('cc-orchestrate mirrors [FEAT-011 AC10]', …)`, after the FEAT-055 test (ends line 297), add: Depends on T-407.
   ```js
   it('passes the model the script prints, never its own, and reports escalations [FEAT-053]', () => {
     const text = read(ORCH_MIRRORS[0]);
@@ -389,8 +389,8 @@ Failure point: an edit that breaks a phrase another parity test pins, or a mirro
     for (const phrase of ['`- Role models: default`', '`default-model:`', 'a second time', 'inherits the session\'s model']) expect(readme).toContain(phrase);
   });
   ```
-- [ ] [T-502] Red step: `npx vitest run tests/installer/commands-parity.test.js -t "FEAT-053"`. Predicted full match set, 1 test, **red**. Every other test is filtered out. Depends on T-501.
-- [ ] [T-503] `.claude/commands/cc-orchestrate.md` and `project-template/.claude/commands/cc-orchestrate.md`, the same edits in both, with the Edit tool. No pinned phrase is altered: each edit appends a sentence or a bullet, or inserts a clause where no test pins the text. Depends on T-502.
+- [X] [T-502] Red step: `npx vitest run tests/installer/commands-parity.test.js -t "FEAT-053"`. Predicted full match set, 1 test, **red**. Every other test is filtered out. Depends on T-501.
+- [X] [T-503] `.claude/commands/cc-orchestrate.md` and `project-template/.claude/commands/cc-orchestrate.md`, the same edits in both, with the Edit tool. No pinned phrase is altered: each edit appends a sentence or a bullet, or inserts a clause where no test pins the text. Depends on T-502.
   1. Step 1 (line 45): after the sentence that ends `disabled (--no-dependency-audit)>`.` append ` With a `- Role models:` line in the project `CLAUDE.md`, it then ends with `; role models: spec=<m>, plan=<m>, code=<m>, audit=<m>, security=<m>, qa=<m>, define-review=<m>`, each `<m>` one of `opus`, `sonnet`, `haiku` or `inherit`, followed by `; note: audit and code share <m>` when both name the same model (FEAT-053).`
   2. Step 1: after the bullet that starts `   - On `ORCH_DOC_LOCATION_INVALID`` (line 50) add the bullet `   - On `ORCH_ROLE_MODELS_INVALID`, report it and stop. No run file was written. The owner fixes or removes the `- Role models:` line in `CLAUDE.md` that the reason names (an unknown role, a model outside `opus`, `sonnet`, `haiku` and `inherit`, a role set twice, an empty token, `default` twice, more than one line, or a profile's `default-model:` outside that list) before a fresh `start`.`
   3. Step 1's header sentence (line 54): `the spec and plan folders (and group) from `docs:`,` → `the spec and plan folders (and group) from `docs:`, the role models and their note from `role models:` when the start line has them,`.
@@ -400,11 +400,11 @@ Failure point: an edit that breaks a phrase another parity test pins, or a mirro
   7. The review loop, step 2 (line 92): after `Never revive an earlier reviewer, and never pass it an earlier round's findings. Wait for its completion notice.` append ` When the round line ends `; model <alias>`, pass that model to the reviewer's dispatch by the rule of step 2.4.`
   8. The review loop, step 4 (line 94): after `On `done`, go back to 1: the script decides whether the revision changed the document.` append ` When the `OPEN` line ends `; model <alias>`, pass that model to the author's dispatch by the rule of step 2.4.`
   Then `cmp .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md` prints nothing.
-- [ ] [T-504] `README.md`, the `/cc-orchestrate` walkthrough's "Useful variations" list: after the `--ticket 42` bullet (line 143), add the bullet: Depends on T-503.
+- [X] [T-504] `README.md`, the `/cc-orchestrate` walkthrough's "Useful variations" list: after the `--ticket 42` bullet (line 143), add the bullet: Depends on T-503.
   `- `- Role models: default` in the project `CLAUDE.md` puts each role on the model its profile ships as `default-model:` (`opus` for `spec`, `plan`, `audit`, `security` and the `define-review` reviewer, `sonnet` for `code`, `haiku` for `qa`), so the auditor reviews on another model than the author. `<role>=<opus|sonnet|haiku|inherit>` tokens override single roles (`- Role models: default, qa=sonnet`) or set only some. `start` freezes the map in the run file and every dispatch carries the model the script prints. When an audit returns a plan task a second time, that fix round runs on `opus`, and the audit entry records why. Without the line, every role inherits the session's model, as before.`
-- [ ] [T-505] Green step: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: 88 passed (87 + 1), including the mirror byte-identity test and the FEAT-047, FEAT-057, FEAT-058 phrase tests unchanged. Depends on T-504.
-- [ ] [T-506] Stage: `git add -u tests/installer/commands-parity.test.js`, `git add -u .claude/commands/cc-orchestrate.md`, `git add -u project-template/.claude/commands/cc-orchestrate.md`, `git add -u README.md`, `git add -u docs/superpowers/plans/2026-11-14-feat053-per-role-model-selection-for-role-agents-with.md`. Depends on T-505.
-- [ ] [T-507] Commit: `docs: the orchestrator passes the model the script prints [FEAT-053]`. Depends on T-506.
+- [X] [T-505] Green step: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: 88 passed (87 + 1), including the mirror byte-identity test and the FEAT-047, FEAT-057, FEAT-058 phrase tests unchanged. Depends on T-504.
+- [X] [T-506] Stage: `git add -u tests/installer/commands-parity.test.js`, `git add -u .claude/commands/cc-orchestrate.md`, `git add -u project-template/.claude/commands/cc-orchestrate.md`, `git add -u README.md`, `git add -u docs/superpowers/plans/2026-11-14-feat053-per-role-model-selection-for-role-agents-with.md`. Depends on T-505.
+- [X] [T-507] Commit: `docs: the orchestrator passes the model the script prints [FEAT-053]`. Depends on T-506.
 
 ---
 
@@ -413,21 +413,21 @@ Failure point: an edit that breaks a phrase another parity test pins, or a mirro
 **Files:**
 - Modify: `docs/superpowers/plans/2026-11-14-feat053-per-role-model-selection-for-role-agents-with.md`
 
-- [ ] [T-601] `npm test`. Predicted: 2870 tests, 2856 passed (the baseline's 2794, the 2 `gitignore-block-parity` tests green since Task 0, and 60 new: 15 role-profiles, 29 + 6 + 9 orchestrate, 1 commands-parity), 12 skipped, the same skipped set as the baseline; exit 0. A test that fails only because of the sandbox (network, tmp permissions, the two `staging-convention` git-exit tests) is reported as ENV with its name. Depends on T-507.
-- [ ] [T-602] `git status --short` lists only this plan file (the ticks since T-507), and no temporary file is left in the tree. Depends on T-601.
-- [ ] [T-603] Stage: `git add -u docs/superpowers/plans/2026-11-14-feat053-per-role-model-selection-for-role-agents-with.md`. Depends on T-602.
-- [ ] [T-604] Commit: `docs: close out the per-role model selection plan [FEAT-053]`. Depends on T-603.
+- [X] [T-601] `npm test`. Predicted: 2870 tests, 2856 passed (the baseline's 2794, the 2 `gitignore-block-parity` tests green since Task 0, and 60 new: 15 role-profiles, 29 + 6 + 9 orchestrate, 1 commands-parity), 12 skipped, the same skipped set as the baseline; exit 0. A test that fails only because of the sandbox (network, tmp permissions, the two `staging-convention` git-exit tests) is reported as ENV with its name. Depends on T-507.
+- [X] [T-602] `git status --short` lists only this plan file (the ticks since T-507), and no temporary file is left in the tree. Depends on T-601.
+- [X] [T-603] Stage: `git add -u docs/superpowers/plans/2026-11-14-feat053-per-role-model-selection-for-role-agents-with.md`. Depends on T-602.
+- [X] [T-604] Commit: `docs: close out the per-role model selection plan [FEAT-053]`. Depends on T-603.
 
 ---
 
 ## Test List
 
-- [ ] Unit (`tests/unit/role-profiles.test.js`): `default-model:` in all 14 profiles with the table's values and no `model:` key; the auditor's default differs from the author's; the six `PROFILE_SHA256_1_37_0` rows re-pinned (AC2).
-- [ ] CLI (`tests/scripts/orchestrate.test.js`, "role models at start"): parse, override order, partial configuration, home profile without the key, the shared-model note, the eight malformed-line halts and the bad profile default with no run file written, a stale run left in place, `isValidRun` accepts and rejects, the exported constants, and the unconfigured start (AC1 start, AC4 start, Error cases).
-- [ ] CLI ("role models at dispatch"): `model:` line on `--check` with the run file byte-identical, `dispatch_model` on install, the entry's `model` for every role (security and qa included), override and `inherit` at dispatch, the two review segments, and the unconfigured outputs (AC1, AC4).
-- [ ] CLI ("escalation on repeated returns"): escalation under three configurations, new tasks only, a path two tasks share, a hand-edited `fix.model`, the round cap at `--audit-rounds 1`, two returns unconfigured, and `resume` keeping `models` (AC3, AC4).
-- [ ] Parity (`tests/installer/commands-parity.test.js`): the command's model rule in both mirrors, its halt, its report line and the README bullet (AC1's documented rule).
-- [ ] No E2E: no UI is affected.
+- [X] Unit (`tests/unit/role-profiles.test.js`): `default-model:` in all 14 profiles with the table's values and no `model:` key; the auditor's default differs from the author's; the six `PROFILE_SHA256_1_37_0` rows re-pinned (AC2).
+- [X] CLI (`tests/scripts/orchestrate.test.js`, "role models at start"): parse, override order, partial configuration, home profile without the key, the shared-model note, the eight malformed-line halts and the bad profile default with no run file written, a stale run left in place, `isValidRun` accepts and rejects, the exported constants, and the unconfigured start (AC1 start, AC4 start, Error cases).
+- [X] CLI ("role models at dispatch"): `model:` line on `--check` with the run file byte-identical, `dispatch_model` on install, the entry's `model` for every role (security and qa included), override and `inherit` at dispatch, the two review segments, and the unconfigured outputs (AC1, AC4).
+- [X] CLI ("escalation on repeated returns"): escalation under three configurations, new tasks only, a path two tasks share, a hand-edited `fix.model`, the round cap at `--audit-rounds 1`, two returns unconfigured, and `resume` keeping `models` (AC3, AC4).
+- [X] Parity (`tests/installer/commands-parity.test.js`): the command's model rule in both mirrors, its halt, its report line and the README bullet (AC1's documented rule).
+- [X] No E2E: no UI is affected.
 
 ## Commit Order
 
