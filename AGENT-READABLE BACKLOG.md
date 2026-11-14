@@ -1380,6 +1380,29 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #213; reported by the automated security review of
   #212.
 
+### [ ] `[BUG-080]` Unattended plan check does not escalate tasks that write guard-enforcement and control-plane files
+
+- Symptom: in an unattended `/cc-orchestrate` run, `delegate plan`
+  deterministically escalates only tasks whose `Files` entries reach
+  the orchestrator write surface (scripts/orchestrate.mjs:1039,
+  `inSurface`, per the issue). A task declaring
+  `.claude/hooks/pre-tool-use.mjs`, its `project-template/` mirror,
+  `.claude/settings.json` or `.claude/memory/bash-scan-allowlist.txt`
+  is approved on the delegated reviewer's verdict alone, and the
+  `code` role can then modify the hooks that enforce Guards 5-7 for
+  the rest of the same run.
+- Impact per the issue: this requires `--unattended`, which the owner
+  opts into, and a reviewer that fails to apply its "security posture
+  change → ESCALATE" instruction (for example, after an injected
+  ticket body). The security seat still runs before `qa`, but a model
+  judgement is not a deterministic boundary.
+- Fix shape suggested by the issue: add the guard-enforcement files
+  (hooks in both mirrors, `settings*.json`, the Guard 3 allowlist) to
+  the paths `surfaceTask` escalates, record the `ESCALATE` reason the
+  same way, and add one test row per path.
+- Intake of issue #219; reported by the automated security review of
+  #218.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
