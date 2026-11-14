@@ -109,14 +109,24 @@ function untrackedLines(root) {
   return out;
 }
 
+// A line is judged on every match of every pattern: one value missing at the base, or a
+// marker row among them, keeps the whole line introduced (fail closed).
+function lineMatches(text) {
+  return SECRET_PATTERNS.flatMap((p) => [...text.matchAll(new RegExp(p.re.source, `${p.re.flags}g`))]
+    .map((m) => ({ pattern: p, value: p.marker ? null : m[0] })));
+}
+
+const highest = (matches) => matches.reduce((a, b) => (LEVELS.indexOf(b.pattern.level) > LEVELS.indexOf(a.pattern.level) ? b : a)).pattern;
+
 export function scanSecrets(lines, threshold) {
   const out = [];
   for (const { path, line, text } of lines) {
-    const hit = SECRET_PATTERNS.find((p) => p.re.test(text));
-    if (!hit) continue;
+    const matches = lineMatches(text);
+    if (matches.length === 0) continue;
+    const top = highest(matches);
     out.push({
-      value: hit.marker ? null : hit.re.exec(text)[0],
-      line: findingLine(hit.level, threshold, `${path}:${line}`, 'secret', `${hit.name}; value withheld`),
+      values: matches.map((m) => m.value),
+      line: findingLine(top.level, threshold, `${path}:${line}`, 'secret', `${top.name}; value withheld`),
     });
   }
   return out;
@@ -135,7 +145,7 @@ function atBase(root, base, value) {
 function splitSecrets(root, base, hits) {
   const introduced = [];
   const preExisting = [];
-  for (const hit of hits) (atBase(root, base, hit.value) ? preExisting : introduced).push(hit.line);
+  for (const hit of hits) (hit.values.every((v) => atBase(root, base, v)) ? preExisting : introduced).push(hit.line);
   return { introduced, preExisting };
 }
 

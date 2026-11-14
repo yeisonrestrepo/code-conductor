@@ -336,6 +336,32 @@ describe('scripts/security-scan.mjs verdict contract [FEAT-059]', () => {
     ]);
   });
 
+  it('[S3] a line holding a value the base tracks and a new key of another pattern is introduced', () => {
+    const gh = 'gh' + 'p_' + 'b'.repeat(36);
+    initRepo(); put('old/config.js', `const k = '${AWS}';\n`);
+    const base = commit();
+    put('src/config.js', `const k = '${AWS}', t = '${gh}';\n`);
+    expect(lines(scan(base).out)).toEqual([
+      '- [blocker] src/config.js:1 — critical secret: AWS access key id; value withheld',
+      LOCK_NONE, 'SCAN-RESULT secrets=ran scripts=ran',
+    ]);
+  });
+
+  it('[S3] a line holding a value the base tracks and a second new value of the same pattern is introduced', () => {
+    const other = 'AKIA' + 'R'.repeat(16);
+    initRepo(); put('old/config.js', `const k = '${AWS}';\n`);
+    const base = commit();
+    put('src/config.js', `const k = '${AWS}', j = '${other}';\n`);
+    expect(lines(scan(base).out)[0]).toBe('- [blocker] src/config.js:1 — critical secret: AWS access key id; value withheld');
+  });
+
+  it('[S3] a line matching a moderate and a critical pattern carries the critical level', () => {
+    initRepo(); put('README.md', 'x\n');
+    const base = commit();
+    put('src/settings.js', `token = "${'z'.repeat(14)}" + '${AWS}'\n`);
+    expect(lines(scan(base).out)[0]).toBe('- [blocker] src/settings.js:1 — critical secret: AWS access key id; value withheld');
+  });
+
   it('[S3] changedPackages on an npm lockfile lists a package whose versions changed and omits one whose versions did not', () => {
     expect(changed(lockFixture(), 'package-lock.json')).toEqual(['b']);
   });

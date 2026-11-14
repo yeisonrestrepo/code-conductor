@@ -2325,6 +2325,14 @@ describe('pre-existing findings never reach the public part [FEAT-059]', () => {
     });
   });
 
+  it('[E2] a line holding a value the base tracks and a new key of another pattern is introduced: it halts ORCH_SECURITY_BLOCKED', () => {
+    const gh = 'gh' + 'p_' + 'b'.repeat(36);
+    const mixed = () => { mkdirSync(join(root, 'src'), { recursive: true }); writeFileSync(join(root, 'src/config.js'), `const k = '${AWS}', t = '${gh}';\n`); };
+    const r = run({ base: oldKey, change: mixed, report: () => securityReport([aws()], SCANS_NONE, 'VERDICT: RETURN') });
+    expect(r.status).toBe(1);
+    expect(r.err).toBe(`ORCH_SECURITY_BLOCKED: security found 1 finding(s) at or above high; first: ${aws()}`);
+  });
+
   it('[P1] a report that omits a pre-existing local line and one that omits an introduced one halt with the same reason', () => {
     const a = run({ base: oldKey, change: moveKey, report: () => securityReport() });
     const b = run({ change: writeSecret, report: () => securityReport() });
