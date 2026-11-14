@@ -294,6 +294,23 @@ describe('cc-orchestrate mirrors [FEAT-011 AC10]', () => {
       '`ORCH_RESUME_HISTORY_REWRITTEN`', 'each `resumes` entry']) expect(text).toContain(phrase);
     expect(text).not.toContain('A halt is terminal in v1');
   });
+
+  it('passes the model the script prints, never its own, and reports escalations [FEAT-053]', () => {
+    const text = read(ORCH_MIRRORS[0]);
+    for (const phrase of [
+      '; role models: spec=<m>, plan=<m>, code=<m>, audit=<m>, security=<m>, qa=<m>, define-review=<m>',
+      'On `ORCH_ROLE_MODELS_INVALID`, report it and stop.',
+      'pass that alias as the `Agent` call\'s `model` parameter',
+      'on `model: inherit`, or when `install` printed no `model:` line, pass no `model`',
+      'never choose a model yourself',
+      '; model opus (escalated: <tasks> returned twice)',
+      'When the round line ends `; model <alias>`',
+      'When the `OPEN` line ends `; model <alias>`',
+      'each entry\'s `model`',
+    ]) expect(text).toContain(phrase);
+    const readme = read('README.md');
+    for (const phrase of ['`- Role models: default`', '`default-model:`', 'a second time', 'inherits the session\'s model']) expect(readme).toContain(phrase);
+  });
 });
 
 describe('cc-orchestrate review loop [FEAT-041 AC5, AC6, FEAT-058]', () => {

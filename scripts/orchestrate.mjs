@@ -34,6 +34,13 @@ export const AUDIT_ROUNDS_DEFAULT = 2;
 const AUDIT_ROUNDS_MAX = 5;
 const SNAP_STORE_MAX_BYTES = 64 * 1024;
 const isAuditRounds = (n) => Number.isInteger(n) && n >= 0 && n <= AUDIT_ROUNDS_MAX;
+// FEAT-053: the Agent tool's model aliases plus inherit; the one list start, the profiles and isValidRun are checked against.
+export const MODEL_ALIASES = ['opus', 'sonnet', 'haiku', 'inherit'];
+export const MODEL_ROLES = ['spec', 'plan', 'code', 'audit', 'security', 'qa', 'define-review'];
+const ESCALATION_MODEL = 'opus';
+const ROLE_MODELS_PREFIX = '- Role models:';
+const ROLE_MODELS_LINE = /^- Role models: (.+)$/;
+const isModel = (m) => MODEL_ALIASES.includes(m);
 // Every outcome a closed loop can carry; only the skip is the orchestrator's to record (FEAT-058).
 const REVIEW_OUTCOME = /^(clean|cap|unchanged|skipped:[a-z][a-z0-9-]{0,39})$/;
 const SKIP_OUTCOME = /^skipped:[a-z][a-z0-9-]{0,39}$/;
@@ -110,13 +117,24 @@ function isSecurity(s) {
   return typeof s.scan_command === 'string' && s.scan_command.endsWith(` ${s.threshold}`);
 }
 
+// FEAT-053: a hand-edited model would let the run file, not the project, choose what a dispatch runs on.
+function isModelRecord(run) {
+  const m = run.models;
+  const keys = isPlainObject(m) ? Object.keys(m).sort().join() : null;
+  if (m !== undefined && (keys !== [...MODEL_ROLES].sort().join() || !MODEL_ROLES.every((r) => isModel(m[r])))) return false;
+  if (run.dispatch_model !== undefined && !isModel(run.dispatch_model)) return false;
+  return run.handbacks.every((h) => !isPlainObject(h?.fix) || h.fix.model === undefined || isModel(h.fix.model));
+}
+
 // FEAT-057: a present audit_rounds that is not 0-5 would let a hand-edited run buy fix rounds without limit.
+// FEAT-053: and models, dispatch_model and fix.model hold only the allow-list.
 export function isValidRun(run) {
   return isPlainObject(run) && run.v === 1 && typeof run.session_id === 'string' && run.session_id !== ''
     && typeof run.item === 'string' && GATES.includes(run.gate) && isPlainObject(run.approvals)
     && Array.isArray(run.handbacks) && Array.isArray(run.tasks?.ids) && Number.isInteger(run.tasks?.done)
     && (run.audit_rounds === undefined || isAuditRounds(run.audit_rounds))
-    && (run.security === undefined || isSecurity(run.security));
+    && (run.security === undefined || isSecurity(run.security))
+    && isModelRecord(run);
 }
 
 function readRun(root) {
@@ -278,6 +296,64 @@ export function findAgent(role, root, home = homedir()) {
   return null;
 }
 
+const modelsInvalid = (reason) => new Halt('ORCH_ROLE_MODELS_INVALID', reason);
+
+// FEAT-053: the one CLAUDE.md opt-in line, or null; a prefix without a value halts rather than inheriting silently.
+function roleModelsValue(root) {
+  let text = '';
+  try { text = readFileSync(join(root, 'CLAUDE.md'), 'utf8').replace(/\r\n/g, '\n'); } catch { return null; }
+  const lines = text.split('\n').filter((l) => l.startsWith(ROLE_MODELS_PREFIX));
+  if (lines.length === 0) return null;
+  if (lines.length > 1) throw modelsInvalid(`CLAUDE.md has ${lines.length} "${ROLE_MODELS_PREFIX}" lines; keep one`);
+  const m = ROLE_MODELS_LINE.exec(lines[0]);
+  if (!m) throw modelsInvalid(`"${lines[0]}" has no value; write default or <role>=<model> tokens`);
+  return m[1];
+}
+
+// An explicit token wins over default whatever the order, so the parse only collects.
+function parseRoleModels(value) {
+  const explicit = {};
+  let defaults = false;
+  for (const token of value.split(',').map((t) => t.trim())) {
+    if (token === '') throw modelsInvalid(`empty token in "${ROLE_MODELS_PREFIX} ${value}"`);
+    if (token === 'default') {
+      if (defaults) throw modelsInvalid('"default" appears twice');
+      defaults = true;
+      continue;
+    }
+    const parts = token.split('=');
+    if (parts.length !== 2) throw modelsInvalid(`token "${token}" is neither default nor <role>=<model>`);
+    const [role, model] = parts;
+    if (!MODEL_ROLES.includes(role)) throw modelsInvalid(`unknown role "${role}" in "${token}"; the roles are ${MODEL_ROLES.join(', ')}`);
+    if (!isModel(model)) throw modelsInvalid(`model "${model}" in "${token}" is not one of ${MODEL_ALIASES.join(', ')}`);
+    if (role in explicit) throw modelsInvalid(`role "${role}" is set twice`);
+    explicit[role] = model;
+  }
+  return { defaults, explicit };
+}
+
+// The shipped default sits under a key Claude Code does not read; no profile, or no key, inherits.
+function profileDefault(role, root) {
+  const path = findAgent(role, root);
+  if (!path) return 'inherit';
+  const front = readFileSync(path, 'utf8').match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  const value = front?.[1].match(/^default-model:[ \t]*(\S*)[ \t]*\r?$/m)?.[1];
+  if (value === undefined) return 'inherit';
+  if (!isModel(value)) throw modelsInvalid(`${path} sets default-model: ${value}, not one of ${MODEL_ALIASES.join(', ')}`);
+  return value;
+}
+
+// Fixed at start, like audit_rounds; null keeps a run without the line exactly as it was before FEAT-053.
+function resolveRoleModels(root) {
+  const value = roleModelsValue(root);
+  if (value === null) return null;
+  const { defaults, explicit } = parseRoleModels(value);
+  return Object.fromEntries(MODEL_ROLES.map((r) => [r, explicit[r] ?? (defaults ? profileDefault(r, root) : 'inherit')]));
+}
+
+const shareNote = (m) => (m.audit === m.code && m.code !== 'inherit' ? `; note: audit and code share ${m.code}` : '');
+const modelsNote = (m) => (m ? `; role models: ${MODEL_ROLES.map((r) => `${r}=${m[r]}`).join(', ')}${shareNote(m)}` : '');
+
 function runScript(name, args, input = '') {
   const r = spawnSync(process.execPath, [join(HERE, name), ...args], { input, encoding: 'utf8' });
   return { status: r.status, out: r.stdout, err: (r.stderr || '').trim() };
@@ -425,6 +501,12 @@ function checkApprovedDocs(root, run) {
 
 const fixNote = (run) => { const f = fixDue(run); return `fix round ${f.round} of ${run.audit_rounds ?? 0}: review ${f.review} sha256 ${f.sha256}`; };
 
+// FEAT-053: what the script says this dispatch runs on, never the orchestrator's choice; null in a run without models.
+function dispatchModel(run, step) {
+  if (!isPlainObject(run.models)) return null;
+  return step.fix === undefined ? run.models[step.role] : fixDue(run).model ?? run.models.code;
+}
+
 // Builds and validates the next envelope with --to; installs it unless only checking.
 function install(root, sessionId, role, check) {
   const run = liveRun(root, sessionId);
@@ -438,10 +520,11 @@ function install(root, sessionId, role, check) {
   if (built.status !== 0) throw new Halt('SNAP_ERROR', built.err);
   const error = validate(built.out, role);
   if (error) throw new Halt(error.includes('SNAP_GATE_MISMATCH') ? 'SNAP_GATE_MISMATCH' : 'SNAP_ERROR', error);
-  const out = built.out.trim() + (step.fix === undefined ? '' : `\n${fixNote(run)}`);
+  const model = dispatchModel(run, step);
+  const out = built.out.trim() + (step.fix === undefined ? '' : `\n${fixNote(run)}`) + (model ? `\nmodel: ${model}` : '');
   if (check) return out;
   writeAtomic(join(root, ENVELOPE_FILE), built.out);
-  saveRun(root, { ...run, band: ROLE_BAND[role], role });
+  saveRun(root, { ...run, band: ROLE_BAND[role], role, ...(model ? { dispatch_model: model } : {}) });
   return out;
 }
 
@@ -466,10 +549,12 @@ function entryFields(run, role) {
   return {};
 }
 
+// FEAT-053: an entry carries the model install recorded, read from the run file and never from the report.
 export function recordHandback(run, role, gate, verdict, extra = {}) {
   if (role === 'qa' && gate === 'verify_pass') withholdUnlessApproved(run);
   const fields = entryFields(run, role);
-  const entry = { role, gate, at: new Date().toISOString(), ...fields, ...(verdict ? { verdict } : {}), ...extra };
+  const model = isPlainObject(run.models) && isModel(run.dispatch_model) ? { model: run.dispatch_model } : {};
+  const entry = { role, gate, at: new Date().toISOString(), ...fields, ...(verdict ? { verdict } : {}), ...model, ...extra };
   const tasks = role === 'code' && !('fix' in fields) ? { ...run.tasks, done: run.tasks.done + 1 } : run.tasks;
   return { ...run, role: null, gate: forwardGate(run, role, gate), tasks, handbacks: [...run.handbacks, entry] };
 }
@@ -496,6 +581,20 @@ function auditStop({ verdict, blockers }, round, cap) {
   return new Halt('ORCH_AUDIT_ESCALATE', `audit escalated a decision only the owner takes; see ${report}`);
 }
 
+// FEAT-053: a plan task the audit returns a second time goes to the most capable model, and the record names the trigger.
+function fixModel(root, run, paths) {
+  if (!isPlainObject(run.models)) return { fields: {}, note: '' };
+  const tasks = extractTasks(readDoc(root, run.plan, `cannot read ${run.plan}`).toString('utf8'))
+    .filter((t) => t.files.some((f) => paths.includes(f))).map((t) => t.id);
+  const earlier = new Set(run.handbacks.slice(0, -1).flatMap((h) => (h.role === 'audit' && Array.isArray(h.fix?.tasks) ? h.fix.tasks : [])));
+  const escalated = tasks.filter((id) => earlier.has(id));
+  if (escalated.length === 0) return { fields: { tasks, model: run.models.code }, note: `; model ${run.models.code}` };
+  return {
+    fields: { tasks, model: ESCALATION_MODEL, escalated },
+    note: `; model ${ESCALATION_MODEL} (escalated: ${escalated.join(', ')} returned twice)`,
+  };
+}
+
 // FEAT-057: the cap is read from the run file, never from the orchestrator, so its prompt cannot buy a round (E2).
 // Every halt here lands on top of the audit entry handback already saved.
 function auditFix(root, run, verdict, bytes) {
@@ -506,8 +605,9 @@ function auditFix(root, run, verdict, bytes) {
   checkApprovedDocs(root, run);
   const fix = { round: used + 1, files: verdict.paths, review: `${HANDBACK_DIR}/audit-${entry.round}.txt`, sha256: createHash('sha256').update(bytes).digest('hex') };
   const scope = fixScope(root, run, fix.files, fix.round);
-  saveRun(root, { ...run, handbacks: [...run.handbacks.slice(0, -1), { ...entry, fix }] });
-  return `audit round ${entry.round}: RETURN with ${verdict.blockers} blocker/major finding(s); fix round ${fix.round} of ${cap}: review ${fix.review} sha256 ${fix.sha256}; scope ${scope.join(', ')}`;
+  const { fields, note } = fixModel(root, run, verdict.paths);
+  saveRun(root, { ...run, handbacks: [...run.handbacks.slice(0, -1), { ...entry, fix: { ...fix, ...fields } }] });
+  return `audit round ${entry.round}: RETURN with ${verdict.blockers} blocker/major finding(s); fix round ${fix.round} of ${cap}: review ${fix.review} sha256 ${fix.sha256}; scope ${scope.join(', ')}${note}`;
 }
 
 // FEAT-060: a candidate is wider than the valid form, so a near-miss halts by name instead of passing unseen.
@@ -915,6 +1015,9 @@ const reviewWellFormed = (flag, arg, extra) => extra === undefined
 
 // FEAT-041 (e), reworked by FEAT-058: the loop revises through files, and its outcomes come
 // from the script's own reads of the review file and the document, never from the orchestrator's word.
+// FEAT-053: the two lines that trigger a dispatch name its model; a closing line triggers none.
+const modelSegment = (run, role) => (isPlainObject(run.models) ? `; model ${run.models[role]}` : '');
+
 function review(root, sessionId, [role, flag, arg, extra]) {
   const run = liveRun(root, sessionId);
   if (!reviewWellFormed(flag, arg, extra)) throw new Refusal(REVIEW_USAGE);
@@ -923,8 +1026,8 @@ function review(root, sessionId, [role, flag, arg, extra]) {
   const loops = isPlainObject(run.review) ? run.review : {};
   const loop = isPlainObject(loops[role]) && Number.isInteger(loops[role].round) ? loops[role] : { round: 0, outcome: null };
   if (loop.outcome) throw new Refusal(`review ${role}: the loop closed ${loop.outcome}; a closed loop does not reopen`);
-  const { next, say } = flag === '--round' ? openRound(root, role, loop, arg)
-    : flag === '--record' ? recordRound(root, role, loop)
+  const { next, say } = flag === '--round' ? openRound(root, role, loop, arg, modelSegment(run, 'define-review'))
+    : flag === '--record' ? recordRound(root, role, loop, modelSegment(run, role))
       : { next: closedLoop(loop, arg), say: `review ${role} closed ${arg} at round ${loop.round}` };
   saveRun(root, { ...run, review: { ...loops, [role]: next } });
   if (next.outcome) clearReviewDir(root);
@@ -935,7 +1038,7 @@ function review(root, sessionId, [role, flag, arg, extra]) {
 const closedLoop = (loop, outcome) => ({ round: loop.round, outcome, sha256: loop.sha256 ?? null });
 const clearReviewDir = (root) => rmSync(join(root, REVIEW_DIR), { recursive: true, force: true });
 
-function openRound(root, role, loop, rel) {
+function openRound(root, role, loop, rel, model) {
   if (loop.round > 0 && loop.await !== 'revision') throw new Refusal(`review ${role}: round ${loop.round} awaits its review record`);
   if (loop.round >= REVIEW_CAP) {
     throw new Refusal(`ORCH_REVIEW_CAP: review ${role} has run ${REVIEW_CAP} rounds; close it with --close skipped:<reason>`);
@@ -946,10 +1049,10 @@ function openRound(root, role, loop, rel) {
   if (loop.round > 0 && sha256 === loop.sha256) {
     return { next: closedLoop({ ...loop, round }, 'unchanged'), say: `review ${role} closed unchanged at round ${round}: ${rel} still hashes ${sha256}` };
   }
-  return { next: { round, outcome: null, sha256, doc: rel, await: 'review' }, say: `review ${role} round ${round} of ${REVIEW_CAP}: ${rel} sha256 ${sha256}` };
+  return { next: { round, outcome: null, sha256, doc: rel, await: 'review' }, say: `review ${role} round ${round} of ${REVIEW_CAP}: ${rel} sha256 ${sha256}${model}` };
 }
 
-function recordRound(root, role, loop) {
+function recordRound(root, role, loop, model) {
   if (loop.await !== 'review') throw new Refusal(`review ${role} --record: no reviewer pass is open`);
   const path = `${REVIEW_DIR}/${role}-${loop.round}.md`;
   let bytes = null;
@@ -965,7 +1068,7 @@ function recordRound(root, role, loop) {
   const reviewSha = createHash('sha256').update(bytes).digest('hex');
   return {
     next: { ...loop, await: 'revision' },
-    say: `review ${role} round ${loop.round}: OPEN ${verdict.open}; revise ${loop.doc} sha256 ${loop.sha256} from ${path} sha256 ${reviewSha}`,
+    say: `review ${role} round ${loop.round}: OPEN ${verdict.open}; revise ${loop.doc} sha256 ${loop.sha256} from ${path} sha256 ${reviewSha}${model}`,
   };
 }
 
@@ -1022,6 +1125,7 @@ function start(root, sessionId, args) {
   const stack = () => (detected ??= detectStack(root));
   const testCommand = checkTestCommand(resolveTestCommand(root, stack));
   const docs = resolveDocs(root, item);
+  const models = resolveRoleModels(root);
   const security = resolveSecurity(root, stack(), { threshold, dependencyAudit });
   const bound = ticket === undefined ? null : ticketIntake(root, item, ticket);
   if (old) clearRunFiles(root);
@@ -1032,10 +1136,11 @@ function start(root, sessionId, args) {
     v: 1, session_id: sessionId, item, mode: auto ? 'auto' : 'step', started: new Date().toISOString(),
     band: 'boundary', role: null, gate: 'boundary_routed', approvals: { spec: null, plan: null },
     plan: null, tasks: { ids: [], done: 0 }, handbacks: [], halt: null, test_command: testCommand, audit_rounds: auditRounds, security, docs,
+    ...(models ? { models } : {}),
     ...(bound ? { ticket: { ...bound.binding, snapshot: bound.path } } : {}),
   });
   const begun = old ? `replaced the stale run ${old.item} started ${old.started}` : `run ${item} started`;
-  return `${begun}; ${bound ? ticketNote(bound) : ''}${docsNote(docs)}test command: ${testCommand}; audit rounds: ${auditRounds}${securityNote(security, root, stack())}`;
+  return `${begun}; ${bound ? ticketNote(bound) : ''}${docsNote(docs)}test command: ${testCommand}; audit rounds: ${auditRounds}${securityNote(security, root, stack())}${modelsNote(models)}`;
 }
 
 function clearRunFiles(root) {

@@ -150,16 +150,17 @@ describe('role agent profiles [FEAT-012]', () => {
 // `git show v1.37.0:<path>`; CI checks out no tags, so the hashes are pinned here. A later item
 // that changes a profile on purpose updates its row in the same commit.
 const PROFILE_SHA256_1_37_0 = {
+  // FEAT-053 changed every profile on purpose: each one carries a default-model: line, read only by orchestrate.mjs start through - Role models: default.
   // FEAT-061 changed every profile on purpose: the ad-hoc ban is gone, and spec, plan, audit and qa name the phase command that dispatches them outside a run.
   // FEAT-060 changed audit on purpose: findings carry a severity and the report ends in a VERDICT line.
-  audit: 'f840693def0d12a71892bd2420570f90343597f35cc67137b8bc46fa60c50510',
-  code: '8f4242287bd1b96726c0d7bd4b284d6f1443a616e3063e101242381cb17a5e6c',
+  audit: 'e2a9d8269691a40dc66294e1f856105590519a203cd5b4231c1ed5134984e3cf',
+  code: '12361f33d8f607a1a7e3d1aeef21bb26899163344579bb6baebeedab87fe6773',
   // FEAT-047 changed plan and spec on purpose: the folder now comes from the envelope's scope.
-  plan: '177746869aec848ae12197e138f03a9512836fb83658cb6ad0a941f938ef8129',
-  qa: '8e539fa24b4e93bc60864667d9964509601dedb071bf83a03df2237ff13a2a09',
+  plan: '79384c3da80851c8291fded6dadbf8589b2cf25f057164a0acdd46ccf934b508',
+  qa: 'e7ca05e644821545950a48e6749363c24922454909c71ce4500ce8eef6a318f5',
   // FEAT-059 changed security on purpose: findings carry the audit's severities and the report ends in a VERDICT line. It shipped after 1.37.0, so this is its first pin.
-  security: '69fd9a36cdceebce2529793f2cdc909aa8d0dbc02d3f4d373d27485808992ad8',
-  spec: '507e65536b73419bebcbbed23bed4f4ba032c5bef05bc98452f3c42446b6758d',
+  security: '1148e01379aa82e67c378352cf93f26183e19d4b86eac4563a2efebe0edc6cfc',
+  spec: '25f2f8c6c358d43a83bc19c30c53f008f763ccb35503501a73accfde7576f5c0',
 };
 
 describe('profiles unchanged since 1.37.0 [FEAT-031 AC13]', () => {
@@ -225,5 +226,23 @@ describe('dispatch outside a run [FEAT-061]', () => {
     expect(text).toContain(DISPATCH_BODY);
     expect(text.includes(NO_ENVELOPE)).toBe(role === 'audit' || role === 'qa');
     expect(text.includes(QA_OUTSIDE)).toBe(role === 'qa');
+  });
+});
+
+// FEAT-053: the shipped defaults, read only through `- Role models: default`; no profile carries the model key Claude Code reads.
+const DEFAULT_MODELS = { spec: 'opus', plan: 'opus', code: 'sonnet', audit: 'opus', security: 'opus', qa: 'haiku', 'define-review': 'opus' };
+
+describe('per-role default models [FEAT-053 AC2]', () => {
+  const rows = [TEMPLATE, MIRROR].flatMap((d) => Object.keys(DEFAULT_MODELS).map((r) => [d, r]));
+
+  it.each(rows)('%s/%s.md carries its default-model: and no model: key', (dir, role) => {
+    const text = read(`${dir}/${role}.md`);
+    expect(field(text, 'default-model')).toBe(DEFAULT_MODELS[role]);
+    expect(field(text, 'model')).toBeUndefined();
+  });
+
+  it('covers every shipped profile, and the auditor defaults to another model than the code author', () => {
+    expect(Object.keys(DEFAULT_MODELS).sort()).toEqual([...ROLES, 'define-review'].sort());
+    expect(DEFAULT_MODELS.audit).not.toBe(DEFAULT_MODELS.code);
   });
 });
