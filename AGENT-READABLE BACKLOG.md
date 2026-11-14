@@ -1357,6 +1357,28 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #203; reported by the automated security review of
   the 1.47.0 release candidate (#202).
 
+### [ ] `[BUG-079]` Unbounded cumulative size of stored SNAPs in the orchestrator run file
+
+- Symptom: since `[FEAT-055]`, every non-security hand-back stores
+  its full SNAP in `.claude/memory/orchestrator-run.json`
+  (scripts/orchestrate.mjs:767, per the issue). Each SNAP is capped at
+  64 KiB (scripts/orchestrate.mjs:483), but nothing caps the total;
+  with JSON escaping an entry can take about 128 KiB, and the number
+  of plan tasks is unbounded.
+- Impact per the issue: with an approved plan of roughly 80 or more
+  tasks and maximally sized hand-backs, the run file passes the hook's
+  10 MiB read cap. `readRunFile` in `.claude/hooks/pre-tool-use.mjs`
+  then returns null, and Guard 6 downgrades from deny to warn for the
+  rest of the run. Reaching this needs an unusually large
+  owner-approved plan, so the issue rates the practical risk as low.
+- Fix shape suggested by the issue: either enforce a cumulative bound
+  on stored SNAP bytes before `saveRun`, halting with a named code
+  when it is exceeded, or store only what `resume` needs (`sys.role`,
+  `sys.c` and a sha256 of the SNAP); add a test where many max-size
+  hand-backs keep the run file under the hook's cap.
+- Intake of issue #213; reported by the automated security review of
+  #212.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
