@@ -307,6 +307,17 @@ function allowedCommands(role, run) {
   return [run.security.audit_command, run.security.scan_command].filter(nonEmptyString);
 }
 
+// FEAT-061 D1: outside every run, qa's one command is the one a phase command put in its envelope.
+// Any run file, even a foreign or unreadable one, withholds it, so a broken run's leftover envelope grants nothing.
+function envelopeCommand(role, payload) {
+  const cwd = payloadCwd(payload);
+  if (role !== 'qa' || findRootHolding(cwd, ORCH_RUN_REL)) return null;
+  const root = findRootHolding(cwd, BAND_ENVELOPE_REL);
+  const env = root ? readEnvelope(join(root, ...BAND_ENVELOPE_REL)) : null;
+  const command = env?.sys.role === 'qa' && isPlainObject(env.mem) ? env.mem.p?.test_command : undefined;
+  return nonEmptyString(command) ? [command] : null;
+}
+
 const unresolvedReason = (role) => (role === 'security'
   ? 'no live run in this session records the security commands, so security has no shell.'
   : `no live run in this session records a test command, so ${role} has no shell.`);
@@ -319,7 +330,7 @@ function roleShellDecision(role, input, payload) {
   const found = ROLE_SHELL_METACHARACTERS.find((m) => command.includes(m));
   if (found !== undefined) return deny(`Guard 7: ROLE_SHELL_CHAINING: the command contains ${JSON.stringify(found)}; a role runs one command, never a chain.`, 'ROLE_SHELL_CHAINING');
   const run = liveRunOf(payload);
-  const allowed = run && allowedCommands(role, run);
+  const allowed = run ? allowedCommands(role, run) : envelopeCommand(role, payload);
   if (!allowed) return deny(`Guard 7: ROLE_SHELL_UNRESOLVED: ${unresolvedReason(role)}`, 'ROLE_SHELL_UNRESOLVED');
   if (allowed.includes(command)) return null;
   const which = role === 'security' ? `allowed commands are ${allowed.join(', ')}` : `allowed command is ${allowed[0]}`;

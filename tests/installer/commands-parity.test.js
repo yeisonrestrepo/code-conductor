@@ -91,6 +91,14 @@ describe('cc-plan mirrors', () => {
   });
 });
 
+const SPEC_MIRRORS = ['.claude/commands/cc-spec.md', 'project-template/.claude/commands/cc-spec.md'];
+
+describe('cc-spec mirrors', () => {
+  it('differ only in the script path nesting', () => {
+    expect(unnest(read(SPEC_MIRRORS[1]))).toBe(read(SPEC_MIRRORS[0]));
+  });
+});
+
 const INIT_MIRRORS = ['.claude/commands/cc-init.md', 'project-template/.claude/commands/cc-init.md'];
 
 describe('cc-init mirrors', () => {
@@ -424,5 +432,48 @@ describe('shipped detector path [BUG-051 AC3]', () => {
   // FEAT-047: pins the deployed target of the cc-resume and cc-stack `L=` probe.
   it('deploys the spec/plan location resolver to .claude/scripts/', () => {
     expect(existsSync(join(cwd, '.claude/scripts/doc-locations.mjs'))).toBe(true);
+  });
+});
+
+describe('role dispatch from the phase commands [FEAT-061]', () => {
+  const PROBE = 'S=.claude/scripts; [ -f "$S/orchestrate.mjs" ] || S=scripts';
+  const CLEAR = 'node "$S/orchestrate.mjs" envelope --clear';
+  const BY_COMMAND = 'a phase command, not a run, dispatched the agent';
+  const DISPATCH = [
+    ...SPEC_MIRRORS.map((rel) => [rel, 'spec', 'envelope spec --item <ID-or-adhoc>']),
+    ...PLAN_MIRRORS.map((rel) => [rel, 'plan', 'envelope plan --item <ID-or-adhoc>']),
+    ['project-template/.claude/commands/cc-review.md', 'audit', 'envelope audit --item <ID-or-adhoc>'],
+    ['project-template/.claude/commands/cc-test.md', 'qa', 'envelope qa'],
+  ];
+
+  it.each(DISPATCH)('[AC1] %s installs the %s envelope, dispatches the role, clears it and names its fallback', (rel, role, call) => {
+    const text = read(rel);
+    expect(text).toContain(PROBE);
+    expect(text).toContain(`node "$S/orchestrate.mjs" ${call}`);
+    expect(text).toContain(`Agent({ subagent_type: "${role}"`);
+    expect(text).toContain(CLEAR);
+    expect(text).toContain(`${role} not dispatched: <the verb's stderr line>`);
+    expect(text).toContain('`installed:`');
+    expect(text).toContain(BY_COMMAND);
+  });
+
+  it.each([...SPEC_MIRRORS, ...PLAN_MIRRORS])('[AC1] %s delegates only under --delegate and stops on a live run', (rel) => {
+    const text = read(rel);
+    expect(text).toContain('Without `--delegate` in `$ARGUMENTS`, skip this section');
+    expect(text).toContain('is live in this session');
+  });
+
+  it('[AC1] cc-review dispatches audit only with --spec and --plan and offers to fix blocker and major findings', () => {
+    const text = read('project-template/.claude/commands/cc-review.md');
+    expect(text).toContain('audit not dispatched: name --spec and --plan to review against them');
+    expect(text).toContain('Want me to fix the blocker and major findings?');
+    expect(text).toContain('Do not run Phase 0 or the three-layer review below.');
+  });
+
+  it('[AC1] cc-test writes no test during a live run and never replaces qa\'s answer', () => {
+    const text = read('project-template/.claude/commands/cc-test.md');
+    expect(text).toContain('`not-installed:`');
+    expect(text).toContain('Write no test file');
+    expect(text).toContain('never rerun the suite in this session to replace qa\'s answer');
   });
 });

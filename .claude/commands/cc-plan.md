@@ -131,6 +131,24 @@ Each step must include:
 
 ---
 
+## Delegated writing (`--delegate`, FEAT-061)
+
+Without `--delegate` in `$ARGUMENTS`, skip this section: this session writes the plan, as above. With it, the `plan` role agent writes the file under its tool mask and Guard 5's scope check. `--delegate` is a flag, not part of the spec name. The approved-spec check and the codebase mapping above still run here first.
+
+1. Install the envelope, from the project root:
+
+   ```sh
+   S=.claude/scripts; [ -f "$S/orchestrate.mjs" ] || S=scripts
+   node "$S/orchestrate.mjs" envelope plan --item <ID-or-adhoc>
+   ```
+
+   `<ID-or-adhoc>` is the item's backlog id (for example `FEAT-061`), else `adhoc`.
+2. Only a first stdout line that starts with `installed:` allows the dispatch; the envelope's `ops.scope` is the folder the plan goes in. If the verb's stderr says the run `is live in this session`, stop: that run's Define band writes this document; continue with `/cc-orchestrate`, or end the run. On any other non-zero exit or first line, print `plan not dispatched: <the verb's stderr line>` and write the plan in this session, as above.
+3. Dispatch `Agent({ subagent_type: "plan", description: "write plan", prompt })`. The brief names the item, the approved spec's path and the folder from the envelope's scope. As the content to write, it gives the Task ID Requirements and the Ordered Steps, Test List, Commit Order and Identified Risks sections above, with a `**Files:**` block under each task. It says that a phase command, not a run, dispatched the agent, and that the envelope is installed at `.claude/memory/band-envelope.json`.
+4. Show the agent's report and its `SNAP_HANDBACK` line; do not record the hand-back. A guard denial or a report without a hand-back is shown as it is, never retried another way.
+5. Run `node "$S/orchestrate.mjs" envelope --clear`, also when the agent was denied or ended without a hand-back. If it refuses, report the refusal and leave the file alone: a run now owns it.
+6. Check the written plan's task ids as Task ID Requirements says. The plan then goes through the approval and the Phase exit branch gate, as a plan written in this session would.
+
 Execute one step at a time. Confirm between steps unless the developer explicitly says to proceed without confirmation.
 
 ---

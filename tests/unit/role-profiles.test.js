@@ -74,6 +74,20 @@ const SECURITY_REPORT = [
   'report `info` as `low`',
 ];
 
+// FEAT-061: who dispatches each role, as its description ends.
+const DISPATCHED_BY = {
+  spec: 'Dispatched by /cc-orchestrate during a run, or by /cc-spec --delegate outside one.',
+  plan: 'Dispatched by /cc-orchestrate during a run, or by /cc-plan --delegate outside one.',
+  audit: 'Dispatched by /cc-orchestrate during a run, or by /cc-review outside one.',
+  qa: 'Dispatched by /cc-orchestrate during a run, or by /cc-test outside one.',
+  code: 'Dispatched by /cc-orchestrate during a run.',
+  security: 'Dispatched by /cc-orchestrate during a run.',
+  'define-review': 'Dispatched by /cc-orchestrate during a run.',
+};
+const DISPATCH_BODY = 'The orchestrator during a run, or a phase command outside one, dispatched you';
+const NO_ENVELOPE = 'If your brief says no envelope was installed for you, there is none to read; leave the scope key out of the hand-back.';
+const QA_OUTSIDE = 'Outside a run, it is the `mem.p.test_command` field of your envelope.';
+
 describe('role agent profiles [FEAT-012]', () => {
   it('ships exactly the ROLES plus define-review in both agents directories [FEAT-041, FEAT-034]', () => {
     const expected = [...ROLES, 'define-review'].map((r) => `${r}.md`).sort();
@@ -136,15 +150,16 @@ describe('role agent profiles [FEAT-012]', () => {
 // `git show v1.37.0:<path>`; CI checks out no tags, so the hashes are pinned here. A later item
 // that changes a profile on purpose updates its row in the same commit.
 const PROFILE_SHA256_1_37_0 = {
+  // FEAT-061 changed every profile on purpose: the ad-hoc ban is gone, and spec, plan, audit and qa name the phase command that dispatches them outside a run.
   // FEAT-060 changed audit on purpose: findings carry a severity and the report ends in a VERDICT line.
-  audit: '4900de1fae7485ea57727e1919a398278f1743bd117940e87975b6fd886781e9',
-  code: '21b7697ef9317a7aca89dd3e99623208d6541cf7c794712ff2a76e4d0bb0c604',
+  audit: 'f840693def0d12a71892bd2420570f90343597f35cc67137b8bc46fa60c50510',
+  code: '8f4242287bd1b96726c0d7bd4b284d6f1443a616e3063e101242381cb17a5e6c',
   // FEAT-047 changed plan and spec on purpose: the folder now comes from the envelope's scope.
-  plan: '3de154b4b4cdda5cb256a79a62f99e7f9cf39d472d2a2da953b5c8616392d034',
-  qa: '19194c34cfc43b7886ef0a63a30e07cd8f633330bf298265eb55a4be4b224644',
+  plan: '177746869aec848ae12197e138f03a9512836fb83658cb6ad0a941f938ef8129',
+  qa: '8e539fa24b4e93bc60864667d9964509601dedb071bf83a03df2237ff13a2a09',
   // FEAT-059 changed security on purpose: findings carry the audit's severities and the report ends in a VERDICT line. It shipped after 1.37.0, so this is its first pin.
-  security: 'b8f709fde221e6a430305a00e15a679f18ae101f1e8e00f78e6d8b7f5deb3ea2',
-  spec: '68c13a86c583ed0320dc23bd659dd7a6dc0cfc9246f940093ee211fe508c67b2',
+  security: '69fd9a36cdceebce2529793f2cdc909aa8d0dbc02d3f4d373d27485808992ad8',
+  spec: '507e65536b73419bebcbbed23bed4f4ba032c5bef05bc98452f3c42446b6758d',
 };
 
 describe('profiles unchanged since 1.37.0 [FEAT-031 AC13]', () => {
@@ -186,5 +201,29 @@ describe('define-review profile [FEAT-041 AC1]', () => {
     const text = profile(REVIEWER);
     for (const phrase of REVIEWER_PHRASES) expect(text).toContain(phrase);
     for (const gate of GATES) expect(text).not.toContain(gate);
+  });
+});
+
+describe('dispatch outside a run [FEAT-061]', () => {
+  const BOTH = [TEMPLATE, MIRROR];
+  const ALL = [...ROLES, 'define-review'];
+  const rows = BOTH.flatMap((d) => ALL.map((r) => [d, r]));
+  const dispatched = BOTH.flatMap((d) => ['spec', 'plan', 'audit', 'qa'].map((r) => [d, r]));
+
+  it.each(rows)('[AC2] %s/%s.md no longer forbids ad-hoc use', (dir, role) => {
+    const text = read(`${dir}/${role}.md`);
+    expect(text).not.toContain('never use it for ad-hoc work');
+    expect(text).not.toContain('Dispatched only by');
+  });
+
+  it.each(rows)('[AC2] %s/%s.md ends its description with who dispatches it', (dir, role) => {
+    expect(field(read(`${dir}/${role}.md`), 'description').endsWith(DISPATCHED_BY[role])).toBe(true);
+  });
+
+  it.each(dispatched)('[AC3] %s/%s.md names both dispatchers and what an outside dispatch changes', (dir, role) => {
+    const text = read(`${dir}/${role}.md`);
+    expect(text).toContain(DISPATCH_BODY);
+    expect(text.includes(NO_ENVELOPE)).toBe(role === 'audit' || role === 'qa');
+    expect(text.includes(QA_OUTSIDE)).toBe(role === 'qa');
   });
 });

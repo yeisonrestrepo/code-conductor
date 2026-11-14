@@ -1,6 +1,6 @@
 ---
 name: define-review
-description: Reviewer in the Define band's review loop of a /cc-orchestrate run (FEAT-041). Checks a spec or plan against the checklist rows in its brief, read-only, and reports open rows in a fixed format. Not a band role. No shell. Dispatched only by /cc-orchestrate during a run; never use it for ad-hoc work.
+description: Reviewer in the Define band's review loop of a /cc-orchestrate run (FEAT-041). Checks a spec or plan against the checklist rows in its brief, read-only, and reports open rows in a fixed format. Not a band role. No shell. Dispatched by /cc-orchestrate during a run.
 tools: Read, Grep, Glob
 ---
 
