@@ -106,6 +106,15 @@ VERBOSITY: MIN (default)
 - Never overwrite plan or tracking files in bulk; all state updates must be surgical single-line edits targeting one checkbox or field at a time (BUG-003 invariant).
 - External contributions follow the hard constraints in [CONTRIBUTING.md](CONTRIBUTING.md#what-contributors-must-never-do); an agent working on a contribution is bound by its [If you are an AI agent](CONTRIBUTING.md#if-you-are-an-ai-agent) section.
 
+## Issue Triage
+
+Every issue an agent opens or picks up must be triaged before work starts. An untriaged issue is invisible on the board.
+
+- **Assignee:** `cc-reviewer-bot` (`gh issue edit N --add-assignee cc-reviewer-bot`). Keep any existing human assignee.
+- **Labels:** at least one type label (`bug`, `enhancement`, `documentation`) plus every area label that applies (`security`, `ci/cd`, `automation`, `dx`, `accessibility`). Never invent labels; use only those in `gh label list`.
+- **Milestone:** exactly one pillar: orchestrator, SNAP, role agents and guards → *Pillar 3: Multi-agent software factory*; `/cc-stack` and onboarding → *Pillar 4: Dynamic initialization and onboarding*; CI, installers, harness support and tests → *Pillar 5: Infrastructure, ecosystem and QA*.
+- Set all three in the same `gh issue create` (`--assignee`, `--label`, `--milestone`), or with one `gh issue edit` right after. Before closing a session, list open issues with no milestone, label or assignee (`gh issue list --search "no:milestone"`, `"no:label"`, `"no:assignee"`) and triage them.
+
 ## Staging Convention
 
 `git add` exits 1 whenever a pathspec matches an ignored ancestor, whether or not the file itself staged correctly. The exit code describes the warning, never the outcome.
