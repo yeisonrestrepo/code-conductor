@@ -1,6 +1,6 @@
 # FEAT-055 — Resume Verb for Halted Orchestrated Runs
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-13 by independent review (round 2)
 
 **Item:** FEAT-055 (intake of issue #185). **Date:** 2026-11-13.
 
