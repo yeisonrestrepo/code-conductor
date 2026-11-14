@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.50.0] - 2026-11-14
+
+### Added
+- **[FEAT-061]** Phase commands can dispatch the `spec`, `plan`, `audit` and `qa` role agents outside an `/cc-orchestrate` run. `scripts/orchestrate.mjs` has a new verb, `envelope <spec|plan|audit|qa> [--item <label>]` and `envelope --clear`. When no run file exists, it installs a validated envelope at `.claude/memory/band-envelope.json`: `spec`/`plan` are scoped to the docs folder `start` would pin, `audit` is read-only, and `qa` carries the resolved test command. When any run file exists, including a foreign or unreadable one, the verb writes nothing and records no halt. `audit` is still dispatchable (`not-installed:`). `qa` is dispatchable in this session's live run with the run's test command and refused otherwise. `spec`/`plan` are refused. `code` and `security` are never accepted. Guard 7 gains a `qa`-only fallback: with no run file at all, qa may run exactly its envelope's `mem.p.test_command`. Every other case is still denied, and the chaining check still runs first. `/cc-spec --delegate` and `/cc-plan --delegate` (both mirrors) hand the file writing to `spec` and `plan`. The template's `/cc-review --spec <path> --plan <path>` dispatches `audit` and ends in its `VERDICT:` line. The template's `/cc-test` hands its suite run to `qa`. Each command clears the envelope after the report and falls back to its classic path with a one-line reason. All seven role profiles stop forbidding ad-hoc use and name their dispatcher. The README command table describes the new flags. Landed from PR #210 (cc-lane-bot), intake of issue #179.
+
 ## [1.49.0] - 2026-11-14
 
 ### Added
