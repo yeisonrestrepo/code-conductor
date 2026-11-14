@@ -166,6 +166,7 @@ tests/.tmp/
 !/docs/superpowers/plans/2026-11-13-feat059-security-agent-verdict-contract-with-introduced.md
 !/docs/superpowers/plans/2026-11-13-feat061-role-agents-dispatched-by-phase-commands.md
 !/docs/superpowers/plans/2026-11-14-feat053-per-role-model-selection-for-role-agents-with.md
+!/docs/superpowers/plans/2026-11-14-feat054-opt-in-unattended-mode-for-cc-orchestrate-with.md
 !/docs/superpowers/specs/2026-06-09-bug001-cc-compact-design.md
 !/docs/superpowers/specs/2026-06-09-bug002-spec-read-budget-design.md
 !/docs/superpowers/specs/2026-06-11-bug006-feat018-bash-scan-guard-design.md
