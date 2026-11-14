@@ -222,11 +222,11 @@ Precondition for the role-profiles suite: `project-template/.claude/agents/` hol
 
 ## Test List
 
-- [ ] Unit/CLI: the `envelope` verb in state N for each role (fields, `snap-validate --to`, scope equal to `start`'s pin), its refusals, `--clear`, and the 15-row L/O matrix proving no byte or mtime of the run's files changes and no halt is recorded (`tests/scripts/orchestrate.test.js`, T-102).
-- [ ] Hook: Guard 7's qa fallback only with no run file, exact match, chaining first, every withholding case including the unreadable run file, no fallback for code and security, and the verb's real envelope passing the hook (`tests/hooks/guard7.test.js`, T-201).
-- [ ] Parity: the ban gone and the dispatcher named in both agents directories, the hash rows updated (`tests/unit/role-profiles.test.js`, T-301, T-303).
-- [ ] Parity: the dispatch wording in both mirrors of `cc-spec` and `cc-plan` and in the template's `cc-review` and `cc-test`, plus the new `cc-spec mirrors` block (`tests/installer/commands-parity.test.js`, T-401).
-- [ ] No E2E: no UI is affected.
+- [X] Unit/CLI: the `envelope` verb in state N for each role (fields, `snap-validate --to`, scope equal to `start`'s pin), its refusals, `--clear`, and the 15-row L/O matrix proving no byte or mtime of the run's files changes and no halt is recorded (`tests/scripts/orchestrate.test.js`, T-102).
+- [X] Hook: Guard 7's qa fallback only with no run file, exact match, chaining first, every withholding case including the unreadable run file, no fallback for code and security, and the verb's real envelope passing the hook (`tests/hooks/guard7.test.js`, T-201).
+- [X] Parity: the ban gone and the dispatcher named in both agents directories, the hash rows updated (`tests/unit/role-profiles.test.js`, T-301, T-303).
+- [X] Parity: the dispatch wording in both mirrors of `cc-spec` and `cc-plan` and in the template's `cc-review` and `cc-test`, plus the new `cc-spec mirrors` block (`tests/installer/commands-parity.test.js`, T-401).
+- [X] No E2E: no UI is affected.
 
 ## Commit Order
 
