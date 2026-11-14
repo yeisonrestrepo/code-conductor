@@ -614,11 +614,16 @@ export function parseSecurityReport(text, security) {
   const { publicLines, owner } = splitReport(text);
   const { verdict } = parseVerdict(publicLines.map((x) => x.line).join('\n'), 'security');
   const scans = scansLine(publicLines.map((x) => x.line));
+  // Defense in depth: the verdict check reads only the lines before SNAP_HANDBACK, so nothing may follow it.
+  const handbackAt = publicLines.findIndex((x) => x.line.startsWith('SNAP_HANDBACK '));
+  const late = publicLines.slice(handbackAt + 1).find((x) => SECURITY_CANDIDATE.test(x.line));
+  if (late) throw invalid(`the finding line at ${reportAt(late.n)} comes after SNAP_HANDBACK`);
   const findings = [
     ...publicLines.filter((x) => SECURITY_CANDIDATE.test(x.line)).map((x) => securityFinding(x, 'public', security.threshold)),
     ...owner.map((x) => securityFinding(x, 'owner', security.threshold)),
   ];
   checkDependency(scans, findings, security);
+  checkConsistent(verdict, findings.filter((f) => f.part === 'public' && f.severity === 'blocker').length, []);
   checkFailedEscalates(scans, verdict);
   return { verdict, scans, findings };
 }
@@ -699,8 +704,8 @@ function securitySummary(report, threshold) {
 }
 
 function securityStop({ entry, failed, blocking }, threshold) {
-  if (entry.verdict === 'APPROVE') return null;
-  if (entry.verdict === 'RETURN') return new Halt('ORCH_SECURITY_BLOCKED', `security found ${blocking.length} finding(s) at or above ${threshold}; first: ${blocking[0].line.slice(0, QUOTE_CAP)}`);
+  if (entry.verdict === 'APPROVE' && blocking.length === 0) return null;
+  if (entry.verdict !== 'ESCALATE') return new Halt('ORCH_SECURITY_BLOCKED', `security found ${blocking.length} finding(s) at or above ${threshold}; first: ${blocking[0].line.slice(0, QUOTE_CAP)}`);
   if (failed) return new Halt('ORCH_SECURITY_SCAN_FAILED', `the ${failed} scan did not complete; scans clean is the Verify exit, see ${REPORT_FILE}`);
   return new Halt('ORCH_SECURITY_ESCALATE', `security escalated a decision only the owner takes; see ${REPORT_FILE}`);
 }
