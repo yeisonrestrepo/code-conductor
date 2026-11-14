@@ -1030,7 +1030,8 @@ function globToRegExp(glob) {
 }
 // A glob reaches the surface when it matches a fixed path, or its first segment can be `.conductor` (everything beneath is surface).
 function inSurface(entry) {
-  const glob = entry.replace(/^\.\//, '');
+  // Case-insensitive filesystems resolve differently-cased spellings to the same file; every surface path is lower-case.
+  const glob = entry.replace(/^\.\//, '').toLowerCase();
   const first = glob.split('/')[0];
   if (first.startsWith('**') || globToRegExp(first).test('.conductor')) return true;
   return WRITE_SURFACE.some((s) => !s.endsWith('/**') && globToRegExp(glob).test(s));
