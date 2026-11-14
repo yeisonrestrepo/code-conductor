@@ -210,3 +210,63 @@ describe('Guard 7: the security role runs its two recorded commands [FEAT-034]',
     expect(as('qa', 'npm audit --json')).toEqual(NOT_ALLOWED);
   });
 });
+
+describe('Guard 7: qa outside any run runs its envelope\'s command [FEAT-061]', () => {
+  const ENV = join('.claude', 'memory', 'band-envelope.json');
+  const envelopeOf = (role, p) => writeFileSync(join(root, ENV), JSON.stringify({
+    v: 3, sys: { ph: 'rev', c: '0000000', s: 'adhoc', role, tk: 'X' }, ops: { n: [], f: [], gate: 'build_executed' },
+    mem: { d: [], x: [], ...(p === undefined ? {} : { p }) }, pr: '',
+  }));
+  const UNRESOLVED_QA = denied('Guard 7: ROLE_SHELL_UNRESOLVED: no live run in this session records a test command, so qa has no shell.');
+
+  it('[D1] allows qa the envelope\'s test command when no run file exists', () => {
+    envelopeOf('qa', { test_command: 'npm test' });
+    expect(as('qa', 'npm test')).toBeNull();
+  });
+
+  it('[D1] denies any other command with ROLE_SHELL_NOT_ALLOWED, naming the envelope\'s command', () => {
+    envelopeOf('qa', { test_command: 'npm test' });
+    expect(as('qa', 'npm test --watch')).toEqual(NOT_ALLOWED);
+  });
+
+  it('[D1] still checks chaining first', () => {
+    envelopeOf('qa', { test_command: 'npm test' });
+    expect(as('qa', 'npm test; x')).toEqual(chaining(';'));
+  });
+
+  it.each([
+    ['a run file of another session', () => { envelopeOf('qa', { test_command: 'npm test' }); runFile({ session_id: 'sess-2' }); }],
+    ['a run file that exists but is unreadable', () => { envelopeOf('qa', { test_command: 'npm test' }); writeFileSync(join(root, RUN_FILE), '{not json'); }],
+    ['an envelope of another role', () => envelopeOf('code', { test_command: 'npm test' })],
+    ['no p in the envelope', () => envelopeOf('qa')],
+    ['an empty test_command', () => envelopeOf('qa', { test_command: '' })],
+    ['a test_command that is not a string', () => envelopeOf('qa', { test_command: 42 })],
+    ['an unreadable envelope', () => writeFileSync(join(root, ENV), '{x')],
+  ])('[D1] leaves qa ROLE_SHELL_UNRESOLVED with %s', (_, setup) => {
+    setup();
+    expect(as('qa', 'npm test')).toEqual(UNRESOLVED_QA);
+  });
+
+  it.each([
+    ['code', 'no live run in this session records a test command, so code has no shell.'],
+    ['security', 'no live run in this session records the security commands, so security has no shell.'],
+  ])('[D1] gives %s no fallback from an envelope naming it', (role, reason) => {
+    envelopeOf(role, { test_command: 'npm test' });
+    expect(as(role, 'npm test')).toEqual(denied(`Guard 7: ROLE_SHELL_UNRESOLVED: ${reason}`));
+  });
+
+  it('[D1] finds the envelope by the ancestor walk from a subdirectory', () => {
+    envelopeOf('qa', { test_command: 'npm test' });
+    mkdirSync(join(root, 'sub'));
+    expect(fire(bash('npm test', { cwd: join(root, 'sub'), agentType: 'qa' }))).toBeNull();
+  });
+
+  it('[D1] the envelope the envelope verb installs passes Guard 7 as qa', () => {
+    writeFileSync(join(root, 'package.json'), PKG);
+    mkdirSync(join(root, '.claude', 'agents'), { recursive: true });
+    writeFileSync(join(root, '.claude', 'agents', 'qa.md'), '---\nname: qa\ndescription: fixture\n---\nfixture\n');
+    const r = spawnSync(process.execPath, [ORCH, 'envelope', 'qa'], { cwd: root, env: { ...process.env, CLAUDE_CODE_SESSION_ID: 'sess-1' }, encoding: 'utf8', timeout: 30000 });
+    expect(r.status).toBe(0);
+    expect(as('qa', 'npm test')).toBeNull();
+  });
+});

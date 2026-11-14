@@ -1,6 +1,6 @@
 ---
 name: code
-description: Build-band role of a /cc-orchestrate run. Implements one plan task inside the files it names, runs the run's recorded test command, and hands back build_executed. Dispatched only by /cc-orchestrate during a run; never use it for ad-hoc work.
+description: Build-band role of a /cc-orchestrate run. Implements one plan task inside the files it names, runs the run's recorded test command, and hands back build_executed. Dispatched by /cc-orchestrate during a run.
 tools: Read, Grep, Glob, Write, Edit, Bash
 ---
 

@@ -122,6 +122,24 @@ _None. List any source files that could not be understood within the 30-line cap
 
 ---
 
+## Delegated writing (`--delegate`, FEAT-061)
+
+Without `--delegate` in `$ARGUMENTS`, skip this section: this session writes the spec, as above. With it, the `spec` role agent writes the file under its tool mask and Guard 5's scope check. `--delegate` is a flag, not part of the topic: leave it out of the topic and of the codebase search. The search and the questions above still run here first.
+
+1. Install the envelope, from the project root:
+
+   ```sh
+   S=.claude/scripts; [ -f "$S/orchestrate.mjs" ] || S=scripts
+   node "$S/orchestrate.mjs" envelope spec --item <ID-or-adhoc>
+   ```
+
+   `<ID-or-adhoc>` is the item's backlog id (for example `FEAT-061`), else `adhoc`.
+2. Only a first stdout line that starts with `installed:` allows the dispatch; the envelope's `ops.scope` is the folder the spec goes in. If the verb's stderr says the run `is live in this session`, stop: that run's Define band writes this document; continue with `/cc-orchestrate`, or end the run. On any other non-zero exit or first line, print `spec not dispatched: <the verb's stderr line>` and write the spec in this session, as above.
+3. Dispatch `Agent({ subagent_type: "spec", description: "write spec", prompt })`. The brief names the item, the folder from the envelope's scope, the answers gathered above, and the section list above as the content to write. It says that a phase command, not a run, dispatched the agent, and that the envelope is installed at `.claude/memory/band-envelope.json`.
+4. Show the agent's report and its `SNAP_HANDBACK` line; do not record the hand-back. A guard denial or a report without a hand-back is shown as it is, never retried another way.
+5. Run `node "$S/orchestrate.mjs" envelope --clear`, also when the agent was denied or ended without a hand-back. If it refuses, report the refusal and leave the file alone: a run now owns it.
+6. The written spec then goes through the approval wait below, as a spec written in this session would.
+
 Wait for explicit approval before proceeding to `/cc-plan`.
 
 Once approved, append a summary to `.claude/memory/project.md` under:

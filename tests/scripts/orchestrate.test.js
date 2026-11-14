@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -1026,8 +1026,8 @@ describe('review loop over review files [FEAT-058]', () => {
     expect(loop('spec')).toEqual({ round: 1, outcome: null, sha256: sha(SPEC), doc: SPEC, await: 'review' });
   });
 
-  it('names review in the usage line', () => {
-    expect(orch(['nope']).err).toBe('orchestrate: usage: orchestrate.mjs start|install|handback|approve|hash|review|end');
+  it('[FEAT-061] names review and envelope in the usage line', () => {
+    expect(orch(['nope']).err).toBe('orchestrate: usage: orchestrate.mjs start|install|handback|approve|hash|review|envelope|end');
   });
 });
 
@@ -2352,5 +2352,139 @@ describe('pre-existing findings never reach the public part [FEAT-059]', () => {
     const r = securityPass(securityReport([line], SCANS_DEP));
     expect(r.status).toBe(1);
     expect(r.err).toBe("ORCH_SECURITY_REPORT_INVALID: the dependency finding at .conductor/handback/security.txt:2 does not name a line of the run's lockfile");
+  });
+});
+
+describe('envelope verb outside a run [FEAT-061]', () => {
+  const ENV_USAGE = 'orchestrate: usage: orchestrate.mjs envelope <spec|plan|audit|qa> [--item <label>] | --clear';
+  const INSTALLED = (role) => `installed: ${role} envelope at ${ENVELOPE_FILE}`;
+  const validates = (role) => spawnSync(process.execPath, [join(REPO_ROOT, 'scripts/snap-validate.mjs'), join(root, ENVELOPE_FILE), '--to', role], { encoding: 'utf8' }).status;
+  const walk = (dir) => (existsSync(dir) ? readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)])) : []);
+
+  // Bytes and mtime of every file the run owns, so "never alters a live run's file" is measured, not assumed.
+  function surface() {
+    const files = [join(root, RUN_FILE), join(root, ENVELOPE_FILE), ...walk(join(root, '.conductor'))].sort();
+    return files.filter((f) => existsSync(f)).map((f) => [relative(root, f), readFileSync(f).toString('base64'), statSync(f).mtimeMs]);
+  }
+  function setState(state) {
+    agents();
+    if (state === 'unparseable') {
+      writeFileSync(join(root, RUN_FILE), '{not json');
+      writeFileSync(join(root, ENVELOPE_FILE), '{"v":3}');
+    } else {
+      expect(orch(['start', 'FEAT-011']).status).toBe(0);
+      expect(orch(['install', 'spec']).status).toBe(0);
+    }
+    mkdirSync(join(root, '.conductor', 'handback'), { recursive: true });
+    writeFileSync(join(root, '.conductor', 'handback', 'keep.txt'), 'keep\n');
+    return state === 'foreign' ? 'sess-2' : 'sess-1';
+  }
+
+  it.each(['spec', 'plan'])('[AC1] %s in state N installs an RW envelope whose scope is the one start pins', (role) => {
+    agents();
+    const r = orch(['envelope', role, '--item', 'FEAT-011']);
+    expect(r.status).toBe(0);
+    expect(r.out.split('\n')[0]).toBe(INSTALLED(role));
+    expect(validates(role)).toBe(0);
+    expect(envelope().sys).toMatchObject({ tk: 'RW', s: 'FEAT-011' });
+    expect(existsSync(join(root, RUN_FILE))).toBe(false);
+    const { scope } = envelope().ops;
+    expect(orch(['start', 'FEAT-011']).status).toBe(0);
+    expect(runFile().docs.scopes[role]).toEqual(scope);
+  });
+
+  it('[AC1] audit in state N installs an R envelope with no scope, labelled adhoc', () => {
+    agents();
+    const r = orch(['envelope', 'audit']);
+    expect(r.status).toBe(0);
+    expect(r.out.split('\n')[0]).toBe(INSTALLED('audit'));
+    expect(validates('audit')).toBe(0);
+    expect(envelope().sys.tk).toBe('R');
+    expect(envelope().sys.s).toBe('adhoc');
+    expect(envelope().ops.gate).toBe('build_executed');
+    expect(envelope().ops.scope).toBeUndefined();
+    expect(existsSync(join(root, RUN_FILE))).toBe(false);
+  });
+
+  it('[AC1] qa in state N installs an X envelope carrying the resolved test command', () => {
+    agents();
+    expect(orch(['envelope', 'qa']).status).toBe(0);
+    expect(validates('qa')).toBe(0);
+    expect(envelope().sys.tk).toBe('X');
+    expect(envelope().mem.p).toEqual({ test_command: 'npm test' });
+    expect(existsSync(join(root, RUN_FILE))).toBe(false);
+  });
+
+  it('[AC1] qa in state N is refused when no test command resolves, and writes nothing', () => {
+    agents();
+    writeFileSync(join(root, 'package.json'), '{"scripts":{}}');
+    const r = orch(['envelope', 'qa']);
+    expect(r.status).toBe(2);
+    expect(r.err.startsWith('orchestrate: ORCH_TEST_COMMAND_UNRESOLVED: ')).toBe(true);
+    expect(existsSync(join(root, ENVELOPE_FILE))).toBe(false);
+    expect(existsSync(join(root, RUN_FILE))).toBe(false);
+  });
+
+  it('[AC1] state N is refused with ORCH_AGENT_MISSING when the role has no agent definition', () => {
+    const r = orch(['envelope', 'audit']);
+    expect(r.status).toBe(2);
+    expect(r.err).toBe('orchestrate: ORCH_AGENT_MISSING: no agent definition named audit in .claude/agents/ or ~/.claude/agents/');
+    expect(existsSync(join(root, ENVELOPE_FILE))).toBe(false);
+  });
+
+  it('[AC1] state N overwrites a leftover envelope', () => {
+    agents();
+    writeFileSync(join(root, ENVELOPE_FILE), '{"left":"over"}');
+    expect(orch(['envelope', 'audit']).status).toBe(0);
+    expect(envelope().sys.role).toBe('audit');
+  });
+
+  it('[AC1] --clear in state N removes the envelope, then is a no-op that exits 0', () => {
+    agents();
+    orch(['envelope', 'qa']);
+    expect(orch(['envelope', '--clear'])).toEqual({ status: 0, out: 'cleared', err: '' });
+    expect(existsSync(join(root, ENVELOPE_FILE))).toBe(false);
+    expect(orch(['envelope', '--clear'])).toEqual({ status: 0, out: 'no envelope', err: '' });
+  });
+
+  it.each([[['code']], [['security']], [['nope']], [[]], [['spec', '--item', 'a b']], [['spec', '--item', '../x']], [['spec', '--item']], [['audit', '--label', 'x']], [['qa', '--item', 'x', 'extra']]])(
+    '[AC1] envelope %j is refused with the usage line and writes nothing', (args) => {
+      agents();
+      const r = orch(['envelope', ...args]);
+      expect(r.status).toBe(2);
+      expect(r.err).toBe(ENV_USAGE);
+      expect(existsSync(join(root, ENVELOPE_FILE))).toBe(false);
+      expect(existsSync(join(root, RUN_FILE))).toBe(false);
+    });
+
+  const LIVE = 'is live in this session';
+  const OTHER = 'belongs to another session or is unreadable; clear it with: node ';
+  const ROWS = ['L', 'foreign', 'unparseable'].flatMap((state) => {
+    const refuse = state === 'L' ? LIVE : OTHER;
+    return [
+      [state, ['spec'], 2, refuse],
+      [state, ['plan'], 2, refuse],
+      [state, ['audit'], 0, state === 'L' ? 'not-installed: live run FEAT-011; audit has no write tool' : 'not-installed: a run file at '],
+      state === 'L' ? [state, ['qa'], 0, 'not-installed: live run FEAT-011; qa runs npm test'] : [state, ['qa'], 2, OTHER],
+      [state, ['--clear'], 2, 'envelope --clear: a run file exists at '],
+    ];
+  });
+  it.each(ROWS)('[AC1] %s: envelope %j leaves every run file as it was', (state, args, status, text) => {
+    const sid = setState(state);
+    const before = surface();
+    const r = orch(['envelope', ...args], { sid });
+    expect(r.status).toBe(status);
+    expect(status === 0 ? r.out : r.err).toContain(text);
+    expect(surface()).toEqual(before);
+    if (state !== 'unparseable') expect(runFile().halt).toBeNull();
+  });
+
+  it('[AC1] qa in a live run with no recorded test command is refused', () => {
+    setState('L');
+    runFileText(JSON.stringify({ ...runFile(), test_command: undefined }));
+    const r = orch(['envelope', 'qa']);
+    expect(r.status).toBe(2);
+    expect(r.err).toContain('records no test command, so Guard 7 grants qa no shell');
+    expect(runFile().halt).toBeNull();
   });
 });

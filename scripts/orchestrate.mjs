@@ -364,6 +364,11 @@ function gitValue(root, args, fallback) {
   return (r.status === 0 && r.stdout.trim()) || fallback;
 }
 
+const headCommit = (root) => {
+  const head = gitValue(root, ['rev-parse', 'HEAD'], '0000000').toLowerCase();
+  return /^[0-9a-f]{7,40}$/.test(head) ? head : '0000000';
+};
+
 // A fix step's files come from the record, re-checked against the plan because the run file is writable.
 function codeScope(root, run, step) {
   if (step.fix !== undefined) { const { files } = fixDue(run); return fixScope(root, run, Array.isArray(files) ? files : [], step.fix); }
@@ -372,10 +377,9 @@ function codeScope(root, run, step) {
 }
 
 function envelopeFields(run, root, step) {
-  const head = gitValue(root, ['rev-parse', 'HEAD'], '0000000').toLowerCase();
   const { tk, scope } = ROLE_ARTIFACTS[step.role];
   const fields = {
-    ph: PHASE[step.role], c: /^[0-9a-f]{7,40}$/.test(head) ? head : '0000000', s: run.item,
+    ph: PHASE[step.role], c: headCommit(root), s: run.item,
     // A fix re-enters Build, so it carries Build's entry gate, the one --to code checks (D6).
     n: [], f: [], d: [], x: [], role: step.role, tk, gate: step.fix === undefined ? run.gate : expectedGate('code'),
   };
@@ -942,6 +946,89 @@ function recordHalt(root, halt) {
   } catch { /* an unreadable run file cannot carry its own halt */ }
 }
 
+// FEAT-061: a phase command dispatches its role outside a run. With a run file present, even a foreign or broken one, the verb writes nothing: the envelope path is the run's.
+const ENVELOPE_ROLES = ['spec', 'plan', 'audit', 'qa'];
+const ENVELOPE_USAGE = 'usage: orchestrate.mjs envelope <spec|plan|audit|qa> [--item <label>] | --clear';
+const LABEL = /^[a-zA-Z0-9._-]+$/; // The sys.s pattern snap-validate enforces.
+
+function parseEnvelopeArgs(args) {
+  if (args.length === 1 && args[0] === '--clear') return { clear: true };
+  const [role, flag, label] = args;
+  if (!ENVELOPE_ROLES.includes(role)) throw new Refusal(ENVELOPE_USAGE);
+  if (args.length === 1) return { role, label: 'adhoc' };
+  if (args.length === 3 && flag === '--item' && LABEL.test(label)) return { role, label };
+  throw new Refusal(ENVELOPE_USAGE);
+}
+
+// Read without throwing: an unreadable run file is another owner's to clear, never this verb's halt.
+function runState(root, sessionId) {
+  const path = join(root, RUN_FILE);
+  if (!existsSync(path)) return { state: 'N' };
+  let run = null;
+  try { run = JSON.parse(readFileSync(path, 'utf8')); } catch { /* judged below */ }
+  if (isValidRun(run) && sessionId && run.session_id === sessionId) return { state: 'L', run, path };
+  return { state: 'O', path };
+}
+
+function withRunFile(root, role, st) {
+  const live = st.state === 'L';
+  if (role === 'audit') {
+    const who = live ? `live run ${st.run.item}` : `a run file at ${st.path} belongs to another session or is unreadable`;
+    return `not-installed: ${who}; audit has no write tool and no shell, so it needs no envelope`;
+  }
+  if (role === 'qa' && live) {
+    const command = st.run.test_command;
+    if (typeof command !== 'string' || command === '') {
+      throw new Refusal(`envelope qa: run ${st.run.item} records no test command, so Guard 7 grants qa no shell; end it, then start`);
+    }
+    return `not-installed: live run ${st.run.item}; qa runs ${command}`;
+  }
+  if (live) {
+    throw new Refusal(`envelope ${role}: run ${st.run.item} is live in this session and its Define band writes this document; continue with /cc-orchestrate, or end the run`);
+  }
+  throw new Refusal(`envelope ${role}: a run file at ${st.path} belongs to another session or is unreadable; clear it with: node ${scriptRef(root)} end`);
+}
+
+function adhocFields(root, role, label) {
+  const fields = {
+    ph: PHASE[role], c: headCommit(root), s: label, n: [], f: [], d: [], x: [], role, tk: ROLE_ARTIFACTS[role].tk, gate: expectedGate(role),
+  };
+  if (role === 'spec' || role === 'plan') fields.scope = resolveDocs(root, label).scopes[role];
+  if (role === 'qa') fields.p = { test_command: checkTestCommand(resolveTestCommand(root)) };
+  return fields;
+}
+
+function installAdhoc(root, role, label) {
+  if (!findAgent(role, root)) {
+    throw new Halt('ORCH_AGENT_MISSING', `no agent definition named ${role} in .claude/agents/ or ~/.claude/agents/`);
+  }
+  const built = runScript('snap-build.mjs', [], JSON.stringify(adhocFields(root, role, label)));
+  if (built.status !== 0) throw new Halt('SNAP_ERROR', built.err);
+  const error = validate(built.out, role);
+  if (error) throw new Halt('SNAP_ERROR', error);
+  writeAtomic(join(root, ENVELOPE_FILE), built.out);
+  return `installed: ${role} envelope at ${ENVELOPE_FILE}\n${built.out.trim()}`;
+}
+
+function clearAdhoc(root, st) {
+  if (st.state !== 'N') throw new Refusal(`envelope --clear: a run file exists at ${st.path}; the envelope belongs to that run`);
+  const path = join(root, ENVELOPE_FILE);
+  if (!existsSync(path)) return 'no envelope';
+  rmSync(path, { force: true });
+  return 'cleared';
+}
+
+function envelopeVerb(root, sessionId, args) {
+  const parsed = parseEnvelopeArgs(args);
+  const st = runState(root, sessionId);
+  if (parsed.clear) return clearAdhoc(root, st);
+  if (st.state !== 'N') return withRunFile(root, parsed.role, st);
+  // Every failure is a Refusal, so no halt is ever recorded in a run this verb does not own.
+  try { return installAdhoc(root, parsed.role, parsed.label); } catch (e) {
+    throw e instanceof Halt ? new Refusal(e.message) : e;
+  }
+}
+
 export async function cli(argv, env, cwd = process.cwd()) {
   const [verb, a, b, c] = argv;
   const root = findRunRoot(cwd);
@@ -953,16 +1040,17 @@ export async function cli(argv, env, cwd = process.cwd()) {
     approve: () => approve(root, sid, a, b, c),
     hash: () => hashDoc(root, a, b),
     review: () => review(root, sid, argv.slice(1)),
+    envelope: () => envelopeVerb(root, sid, argv.slice(1)),
     end: () => end(root),
   };
   try {
-    if (!verbs[verb]) throw new Refusal('usage: orchestrate.mjs start|install|handback|approve|hash|review|end');
+    if (!verbs[verb]) throw new Refusal('usage: orchestrate.mjs start|install|handback|approve|hash|review|envelope|end');
     process.stdout.write((await verbs[verb]()) + '\n');
     return 0;
   } catch (e) {
     if (e instanceof Refusal) { process.stderr.write(`orchestrate: ${e.message}\n`); return 2; }
     if (!(e instanceof Halt)) throw e;
-    if (verb !== 'start') recordHalt(root, e);
+    if (verb !== 'start' && verb !== 'envelope') recordHalt(root, e);
     process.stderr.write(`${e.code}: ${e.reason}\n`);
     return 1;
   }

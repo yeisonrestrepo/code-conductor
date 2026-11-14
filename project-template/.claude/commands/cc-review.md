@@ -28,6 +28,26 @@ If the file cannot be deleted after reading, report the error and halt.
 
 ---
 
+## Role dispatch - audit (FEAT-061)
+
+`/cc-review --spec <path> --plan <path> [target]` hands the review to the `audit` role agent, so its read-only tool mask, its guards and its fixed success condition apply. Without both flags, print `audit not dispatched: name --spec and --plan to review against them` and run the classic review below.
+
+1. Install the envelope, from the project root:
+
+   ```sh
+   S=.claude/scripts; [ -f "$S/orchestrate.mjs" ] || S=scripts
+   node "$S/orchestrate.mjs" envelope audit --item <ID-or-adhoc>
+   ```
+
+   `<ID-or-adhoc>` is the backlog id the spec names (for example `FEAT-061`), else `adhoc`.
+2. Read the first stdout line. `installed:` means the verb wrote `.claude/memory/band-envelope.json` for audit. `not-installed:` means a run file is present: nothing was written, and audit, which has no write tool and no shell, needs no envelope. On a non-zero exit, or a first line that starts with neither, do not dispatch: print `audit not dispatched: <the verb's stderr line>` and run the classic review below.
+3. Dispatch `Agent({ subagent_type: "audit", description: "audit review", prompt })`. The brief names the spec, the plan and the review target (no target means `git diff HEAD`). It says that a phase command, not a run, dispatched the agent, and either that the envelope is installed at `.claude/memory/band-envelope.json` or, after `not-installed:`, that no envelope was installed for it.
+4. Show the audit's findings and its `VERDICT:` line exactly as the agent wrote them. Show its `SNAP_HANDBACK` line; do not record it, because no run records an out-of-run hand-back. A guard denial or a report without a hand-back is shown as it is, never retried another way.
+5. Only after `installed:`, run `node "$S/orchestrate.mjs" envelope --clear`, also when the agent was denied or ended without a hand-back. If it refuses, report the refusal and leave the file alone: a run now owns it.
+6. Offer: "Want me to fix the blocker and major findings?" Do not run Phase 0 or the three-layer review below.
+
+---
+
 ## Phase 0 — Skill activation
 
 Before doing anything else, invoke both skills in order:

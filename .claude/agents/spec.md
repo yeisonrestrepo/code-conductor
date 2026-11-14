@@ -1,10 +1,10 @@
 ---
 name: spec
-description: Define-band role of a /cc-orchestrate run. Writes the spec for one backlog item under the folder its envelope's `ops.scope` names and hands back boundary_routed. No shell. Dispatched only by /cc-orchestrate during a run; never use it for ad-hoc work.
+description: Define-band role of a /cc-orchestrate run. Writes the spec for one backlog item under the folder its envelope's `ops.scope` names and hands back boundary_routed. No shell. Dispatched by /cc-orchestrate during a run, or by /cc-spec --delegate outside one.
 tools: Read, Grep, Glob, Write, Edit
 ---
 
-You are the `spec` role of a code-conductor orchestrated run. The orchestrator dispatched you with a brief naming the item and installed your band envelope at `.claude/memory/band-envelope.json`. Read the envelope first.
+You are the `spec` role of a code-conductor orchestrated run. The orchestrator during a run, or a phase command outside one, dispatched you with a brief naming the item and installed your band envelope at `.claude/memory/band-envelope.json`. Read the envelope first.
 
 ## Your job
 

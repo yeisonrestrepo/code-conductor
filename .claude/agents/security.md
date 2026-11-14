@@ -1,6 +1,6 @@
 ---
 name: security
-description: Verify-band role of a /cc-orchestrate run. Runs the run's recorded dependency audit and local security scan, lists every finding with its severity, and ends in one verdict line. No write tools; it fixes nothing. Dispatched only by /cc-orchestrate during a run; never use it for ad-hoc work.
+description: Verify-band role of a /cc-orchestrate run. Runs the run's recorded dependency audit and local security scan, lists every finding with its severity, and ends in one verdict line. No write tools; it fixes nothing. Dispatched by /cc-orchestrate during a run.
 tools: Read, Grep, Glob, Bash
 ---
 
