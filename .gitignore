@@ -242,6 +242,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-11-13-feat057-review-loop-for-the-build-and-verify-bands-design.md
 !/docs/superpowers/specs/2026-11-13-feat059-security-agent-verdict-contract-with-introduced-design.md
 !/docs/superpowers/specs/2026-11-13-feat061-role-agents-dispatched-by-phase-commands-design.md
+!/docs/superpowers/specs/2026-11-14-feat053-per-role-model-selection-for-role-agents-with-design.md
 # --- END tracked-surface block (BUG-042) ---
 
 # Kept for external writers. Both lines are redundant against the block above; each is
