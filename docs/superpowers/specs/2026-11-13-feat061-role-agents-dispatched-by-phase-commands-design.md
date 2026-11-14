@@ -26,7 +26,7 @@ Add one out-of-run verb to `scripts/orchestrate.mjs`: `envelope <spec|plan|audit
 
 The agent profiles stop banning ad-hoc use. Their opening paragraph names the phase-command dispatcher next to the orchestrator.
 
-Letting `qa` run its one command outside a run needs a change to the Guard 7 hook. That is an owner decision (see **Open question Q1**). This spec covers both outcomes. If Q1 is approved, the change is: when no run file exists, Guard 7 also accepts `mem.p.test_command` from a valid `qa` envelope.
+Letting `qa` run its one command outside a run needs a change to the Guard 7 hook (see **Owner decisions**, D1). When the hook's walk finds no run file at all, Guard 7 also accepts `mem.p.test_command` from a valid `qa` envelope.
 
 ## Behavior
 
@@ -48,7 +48,7 @@ If any run file is present (L or O), the verb never writes, renames or removes `
 |---|---|---|---|
 | `spec` (`/cc-spec --delegate`), `plan` (`/cc-plan --delegate`) | Install an RW envelope whose scope is the resolved docs folder. Dispatch, then clear. | Refuse: the run's Define band writes this document. Continue with `/cc-orchestrate`, or end the run. | Refuse: name `orchestrate.mjs end`. The command continues in-session, as it does today. |
 | `audit` (`/cc-review`) | Install an R envelope (no scope). Dispatch, then clear. | Install nothing. Dispatch. | Install nothing. Dispatch. |
-| `qa` (`/cc-test`) | **Q1 = A:** install an X envelope that carries `mem.p.test_command`. Dispatch, then clear. **Q1 = B:** refuse (qa has no shell outside a run), and the command runs the suite in-session. | Install nothing. Dispatch. Guard 7 allows the run's `test_command`. | Refuse: name `orchestrate.mjs end`. The command runs the suite in-session. |
+| `qa` (`/cc-test`) | Install an X envelope that carries `mem.p.test_command`. Dispatch, then clear. | Install nothing. Dispatch. Guard 7 allows the run's `test_command`. | Refuse: name `orchestrate.mjs end`. The command runs the suite in-session. |
 
 Why `audit` can be dispatched in L and O without a new envelope: it has no write tool and no shell. Guard 7 refuses its shell in every state (`ROLE_SHELL_DENIED`). If the run has an envelope, Guard 5 still refuses any write through `BAND_ROLE_MISMATCH` or `BAND_READ_ONLY`. Nothing has to be written for the guards to hold, so nothing is written.
 
@@ -66,7 +66,7 @@ Why `qa` in L needs no envelope: Guard 7 reads the run, not the envelope, and qa
    - `gate` is `expectedGate(role)` (spec and plan get `boundary_routed`; audit and qa get `build_executed`).
    - `tk` comes from `ROLE_ARTIFACTS`.
    - `scope` for `spec`/`plan` is `docScopes(resolveDocLocations(root, label))[role]`, the same resolver and cap that `start` pins. A resolver error is refused with its code in the message.
-   - For `qa` under Q1 = A only, `p` is `{ test_command: checkTestCommand(resolveTestCommand(root)) }`. An unresolvable or unsafe command is refused.
+   - For `qa`, `p` is `{ test_command: checkTestCommand(resolveTestCommand(root)) }`. An unresolvable or unsafe command is refused.
 
    The fields go through `snap-build.mjs` and `validate(out, role)`, as `install` does. The output is written atomically to `.claude/memory/band-envelope.json`, and an existing envelope there is overwritten. With no run file present, that file belongs to no run. It is either left over from an earlier out-of-run dispatch or absent. The verb prints a first line `installed: <role> envelope at .claude/memory/band-envelope.json`, followed by the envelope, and exits 0. It also checks `findAgent(role, root)` and refuses, as `install` does, when the agent definition is missing.
 
@@ -82,7 +82,7 @@ The verb usage line (`:959`) gains `envelope`.
 3. It shows the audit's findings and the `VERDICT:` line exactly as the agent wrote them. The `SNAP_HANDBACK` line is shown, not recorded, because there is no run to record it in.
 4. It runs `envelope --clear`. It then offers to fix the `blocker` and `major` findings, which replaces today's offer to fix critical and important issues. The three-layer review and its Phase 0 skills run only on the classic path.
 
-**`/cc-test [scope]`, state L:** The command writes no test file: Guard 6 would deny the write, and the run's code tasks own the writes. It runs `envelope qa`, reads `not-installed: live run <item>; qa runs <command>`, and dispatches `qa` with a brief that says no envelope was installed for it. It then reports qa's exit status and summary line. **State N under Q1 = A:** the command writes tests as today. At "Run tests after writing them. Confirm before running", it runs `envelope qa` and dispatches `qa` instead of running the suite itself, then clears the envelope.
+**`/cc-test [scope]`, state L:** The command writes no test file: Guard 6 would deny the write, and the run's code tasks own the writes. It runs `envelope qa`, reads `not-installed: live run <item>; qa runs <command>`, and dispatches `qa` with a brief that says no envelope was installed for it. It then reports qa's exit status and summary line. **State N:** the command writes tests as today. At "Run tests after writing them. Confirm before running", it runs `envelope qa` and dispatches `qa` instead of running the suite itself, then clears the envelope.
 
 **`/cc-spec --delegate <topic>`, state N:** Phase 0 and the codebase search run in the main session, as today. The command then runs `envelope spec --item <ID-or-adhoc>`. It dispatches `spec` with a brief that names the item, the folder (the envelope's scope) and the spec section list of this command. The written file goes through the command's normal approval wait. `/cc-plan --delegate` works the same way with `plan`. The plan brief adds the command's `T-NNN` task id rules and `**Files:**` block format to the content the agent writes. That is content, not a new success condition. After the hand-back, the command checks task ids as it does today and runs the branch gate.
 
@@ -95,7 +95,7 @@ The verb usage line (`:959`) gains `envelope`.
 
 ### Error cases
 
-- Verb exit 2: no dispatch. The command prints the verb's stderr line and continues in-session where the table allows (O, or N under Q1 = B for qa). It stops where the table says the run owns the work (L for spec and plan).
+- Verb exit 2: no dispatch. The command prints the verb's stderr line and continues in-session where the table allows (O). It stops where the table says the run owns the work (L for spec and plan).
 - The role is denied by a guard during the dispatch: the role stops and reports, as its rules already say. The command shows the report, still clears the envelope, and does not retry another way.
 - The role ends without a `SNAP_HANDBACK` line, or `qa` reports a failing suite: the command reports that outcome as the result. It never reruns the suite in-session to replace qa's answer.
 - `--clear` refuses (a run appeared during the dispatch, for example one started from another terminal): the command reports the refusal and leaves the file alone. The file now belongs to that run.
@@ -112,11 +112,11 @@ All seven profiles in both directories drop the clause "Dispatched only by /cc-o
 
 The last three state who dispatches them without banning anything else, which meets the entry's AC literally. No phase command dispatches them in this item (see Out of Scope).
 
-In the four dispatched profiles, the opening sentence ("The orchestrator dispatched you … and installed your band envelope …") changes to name both dispatchers: "The orchestrator during a run, or a phase command outside one". `audit` and `qa` add one sentence: "If your brief says no envelope was installed for you, there is none to read; leave the scope key out of the hand-back." Their existing rule already says what to do when there is no scope. In `qa`'s "The test command" section, the run file stays the only source under Q1 = B. Under Q1 = A, a second sentence adds: "Outside a run, it is the `mem.p.test_command` field of your envelope." Masks, success conditions, gate claims and hand-back rules do not change. Every phrase that `tests/unit/role-profiles.test.js` pins (D5, SHELL/NO_SHELL, CLAIM, gate names, no `docs/superpowers`) stays as it is.
+In the four dispatched profiles, the opening sentence ("The orchestrator dispatched you … and installed your band envelope …") changes to name both dispatchers: "The orchestrator during a run, or a phase command outside one". `audit` and `qa` add one sentence: "If your brief says no envelope was installed for you, there is none to read; leave the scope key out of the hand-back." Their existing rule already says what to do when there is no scope. In `qa`'s "The test command" section, a second sentence adds: "Outside a run, it is the `mem.p.test_command` field of your envelope." Masks, success conditions, gate claims and hand-back rules do not change. Every phrase that `tests/unit/role-profiles.test.js` pins (D5, SHELL/NO_SHELL, CLAIM, gate names, no `docs/superpowers`) stays as it is.
 
-### Guard 7 (only if Q1 = A)
+### Guard 7
 
-`roleShellDecision` changes only in its "no live run" branch. For `role === 'qa'`, if no run file exists at the root and the envelope at the root passes `readEnvelope` with `sys.role === 'qa'` and a non-empty string `mem.p.test_command`, the allowed list is `[mem.p.test_command]`. Otherwise the result stays `ROLE_SHELL_UNRESOLVED` as today. The metacharacter check (`:319-320`) still runs first. The match is still exact. `code` and `security` get no fallback. A run file of another session (state O) disables the fallback, so a stale run's leftover envelope can never grant a shell. Both hook copies stay byte-identical.
+`roleShellDecision` changes only in its "no live run" branch. The fallback applies to `role === 'qa'` only, and only when `findRootHolding(payloadCwd(payload), ORCH_RUN_REL)` finds no run file at all. The test is the file's existence, not `readRunFile` validity: a run file that exists but is unreadable, invalid or of another session (state O) disables the fallback, so a stale or broken run's leftover envelope can never grant a shell. When the fallback applies, the envelope is located by Guard 5's walk (`findRootHolding(payloadCwd(payload), BAND_ENVELOPE_REL)`). If it passes `readEnvelope` with `sys.role === 'qa'` and a non-empty string `mem.p.test_command`, that one command is the allowed list. Every other case keeps `ROLE_SHELL_UNRESOLVED` (no allowed list) or `ROLE_SHELL_NOT_ALLOWED` (a different command), as today. The metacharacter check (`:319-320`) still runs first. The match is still exact. `code` and `security` get no fallback. Both hook copies stay byte-identical.
 
 ## Acceptance Criteria
 
@@ -127,7 +127,7 @@ Entry AC1, "each command works with and without a live run, and never alters a l
 - [ ] `envelope code`, `envelope security`, an unknown role and a label outside `^[a-zA-Z0-9._-]+$` are refused, with nothing written.
 - [ ] `envelope --clear` removes the envelope in state N, is a no-op that exits 0 when none exists, and refuses in L and O.
 - [ ] Each of the four commands (both mirrors, where two exist) names the `envelope` verb, the `Agent` dispatch of its role, the `--clear` step after the report, and its classic-path fallback with the one-line reason.
-- [ ] Q1 = A: Guard 7 allows qa's envelope `mem.p.test_command`, exactly, only in state N. It still denies in state O, for `code` and `security`, for an envelope of another role, for a missing or empty `test_command`, and for any other command (`ROLE_SHELL_NOT_ALLOWED`). Q1 = B: `envelope qa` in state N refuses with `qa has no shell outside a run`, and Guard 7 does not change.
+- [ ] Guard 7 allows qa's envelope `mem.p.test_command`, exactly, only when no run file exists. It still denies (`ROLE_SHELL_UNRESOLVED`) when the run file belongs to another session, and when the run file exists but is unreadable (a `tests/hooks/guard7.test.js` row pins this case); for `code` and `security`; for an envelope of another role; for a missing or empty `test_command`. Any other command gets `ROLE_SHELL_NOT_ALLOWED`, and a command with a metacharacter still gets `ROLE_SHELL_CHAINING` first. Both hook copies stay byte-identical.
 
 Entry AC2, "the agents' descriptions stop forbidding ad-hoc use":
 - [ ] No file in either agents directory contains `never use it for ad-hoc work` or `Dispatched only by`.
@@ -149,11 +149,11 @@ Entry AC3, "the existing parity tests cover the new wording in both mirrors":
 ## System Impact
 
 - `scripts/orchestrate.mjs`: the new `envelope` verb, reusing `envelopeFields`-style construction, `docScopes`, `resolveDocLocations`, `expectedGate`, `ROLE_ARTIFACTS`, `resolveTestCommand`, `checkTestCommand`, `findAgent`, `validate`, `writeAtomic`. It is excluded from `recordHalt`. The usage line changes. It is deployed to `.claude/scripts/` by the existing installer path, so the installer does not change.
-- `.claude/hooks/pre-tool-use.mjs` and `project-template/.claude/hooks/pre-tool-use.mjs`: only if Q1 = A. This is a protected surface, so the change ships with its `tests/hooks/guard7.test.js` rows in the same commit.
+- `.claude/hooks/pre-tool-use.mjs` and `project-template/.claude/hooks/pre-tool-use.mjs`: the Guard 7 fallback (D1). This is a protected surface, so the change ships with its `tests/hooks/guard7.test.js` rows in the same commit.
 - `project-template/.claude/commands/cc-review.md`, `cc-test.md`. `cc-spec.md` and `cc-plan.md` in both mirrors.
 - All seven profiles in `.claude/agents/` and `project-template/.claude/agents/`.
 - `README.md` command table rows for the four commands (`:256`, `:257`, `:260`, `:263`), to name the new flags. The Known-limits lines are not touched.
-- Tests: `tests/scripts/orchestrate.test.js` (verb and state matrix), `tests/unit/role-profiles.test.js`, `tests/installer/commands-parity.test.js`, and `tests/hooks/guard7.test.js` if Q1 = A. Any test that pins the `orchestrate.mjs` usage string has to be located and updated.
+- Tests: `tests/scripts/orchestrate.test.js` (verb and state matrix), `tests/unit/role-profiles.test.js`, `tests/installer/commands-parity.test.js`, and `tests/hooks/guard7.test.js`. Any test that pins the `orchestrate.mjs` usage string has to be located and updated.
 
 ### Files Requiring Full Read (deferred to /cc-plan)
 
@@ -163,10 +163,11 @@ These were understood through targeted search only, within the 30-line cap:
 - `.claude/hooks/pre-tool-use.mjs`: Guard 7 and `findRootHolding`.
 - `tests/scripts/orchestrate.test.js`, `tests/hooks/guard7.test.js`, `tests/installer/commands-parity.test.js`: fixtures and helpers to reuse.
 
-## Open questions
+## Owner decisions
 
-- **Q1 (owner):** Should Guard 7 let `qa` run outside a run, taking its one command from a `qa` envelope's `mem.p.test_command` when no run file exists? **A:** yes, as specified above. This is a hook change. The entry's Components list does not name the hook, but without it `/cc-test` cannot dispatch qa in state N, and the issue's claim that Guard 7 holds "exactly as inside a run" is only true with this change. The source of the command is as trustworthy as the run file, because both are written by the main session through a verb that runs `checkTestCommand`, and qa itself has no write tool. **B:** no. `/cc-test` dispatches qa only during a live run of this session, and runs the suite in-session otherwise. **Recommendation: A.**
+- **D1 (Guard 7 fallback for `qa`): approved.** In `pre-tool-use.mjs` (both copies, byte-identical) the Guard 7 fallback applies to `qa` only, and only when the `orchestrator-run.json` walk from the payload cwd finds no run file at all. A run file that exists but is unreadable, invalid or of another session disables it, so the hook tests for the file's existence, not for `readRunFile` validity. When the fallback applies and the envelope passes `readEnvelope` with `sys.role` `"qa"` and a non-empty string `mem.p.test_command`, that one command is the allowed list. The metacharacter check still runs first and the match stays exact. Every other case keeps `ROLE_SHELL_UNRESOLVED` or `ROLE_SHELL_NOT_ALLOWED`. The unreadable-run-file case is pinned by a row in `tests/hooks/guard7.test.js`. The rejected alternative (qa dispatched only during a live run, the suite run in-session otherwise) is dropped from this spec.
+- **D2 (rest of the spec): confirmed as proposed.** This includes: the `envelope` verb never writes when a run file exists and stays out of `recordHalt`; `--delegate` is opt-in on `/cc-spec` and `/cc-plan`; `/cc-review` dispatches `audit` only with `--spec` and `--plan`; and no new root `.claude/commands/` copies of `cc-review` and `cc-test` are added.
 
 ## Complexity Estimate
 
-L: a new script verb with a three-state matrix, four commands across up to two mirrors, fourteen profile files with pinned hashes, and a conditional protected-surface hook change.
+L: a new script verb with a three-state matrix, four commands across up to two mirrors, fourteen profile files with pinned hashes, and a protected-surface hook change.
