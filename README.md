@@ -1,6 +1,6 @@
-<p align="center"><img src=".github/assets/logo.svg" width="96" alt="code-conductor logo"></p>
-
 # code-conductor
+
+<p align="center"><img src=".github/assets/logo.svg" width="96" alt="code-conductor logo"></p>
 
 [![npm version](https://img.shields.io/npm/v/%40yeison.restrepo.r%2Fcode-conductor.svg)](https://www.npmjs.com/package/@yeison.restrepo.r/code-conductor)
 [![npm downloads](https://img.shields.io/npm/dw/%40yeison.restrepo.r%2Fcode-conductor.svg)](https://www.npmjs.com/package/@yeison.restrepo.r/code-conductor)
