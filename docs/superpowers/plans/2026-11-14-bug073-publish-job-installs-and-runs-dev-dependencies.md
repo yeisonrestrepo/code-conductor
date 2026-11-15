@@ -28,25 +28,25 @@
 
 **Files:** `.gitignore`, `docs/superpowers/specs/2026-11-14-bug073-publish-job-installs-and-runs-dev-dependencies-design.md`, `docs/superpowers/plans/2026-11-14-bug073-publish-job-installs-and-runs-dev-dependencies.md`
 
-- [ ] Add `!/docs/superpowers/plans/2026-11-14-bug073-publish-job-installs-and-runs-dev-dependencies.md` before the bug076 plan leaf, and `!/docs/superpowers/specs/2026-11-14-bug073-publish-job-installs-and-runs-dev-dependencies-design.md` before the bug076 spec leaf.
-- [ ] `npx vitest run tests/unit/gitignore-block-parity.test.js` passes with both files staged.
+- [x] Add `!/docs/superpowers/plans/2026-11-14-bug073-publish-job-installs-and-runs-dev-dependencies.md` before the bug076 plan leaf, and `!/docs/superpowers/specs/2026-11-14-bug073-publish-job-installs-and-runs-dev-dependencies-design.md` before the bug076 spec leaf.
+- [x] `npx vitest run tests/unit/gitignore-block-parity.test.js` passes with both files staged.
 
 ### Task 2: Dev toolchain
 
 **Files:** `package.json`, `package-lock.json`
 
-- [ ] `npx npm@11 install --save-dev --package-lock-only --ignore-scripts vitest@^4.1.12 @vitest/coverage-v8@^4.1.12`; `git diff package.json` shows only the two ranges.
-- [ ] `npx npm@11 audit --package-lock-only` prints "found 0 vulnerabilities".
+- [x] `npx npm@11 install --save-dev --package-lock-only --ignore-scripts vitest@^4.1.12 @vitest/coverage-v8@^4.1.12`; `git diff package.json` shows only the two ranges.
+- [x] `npx npm@11 audit --package-lock-only` prints "found 0 vulnerabilities".
 
 ### Task 3: Tests
 
 **Files:** `tests/installer/workflow.test.js`
 
-- [ ] Rewrite the file to assert spec AC-1 to AC-5 per job, reading the workflow without comment lines and slicing it at the `jobs:` keys, with the `inSupportedLine` edge rows.
-- [ ] The file passes on the branch and fails against `git show 54cfb4f:.github/workflows/publish.yml` (the one-job file).
+- [x] Rewrite the file to assert spec AC-1 to AC-5 per job, reading the workflow without comment lines and slicing it at the `jobs:` keys, with the `inSupportedLine` edge rows.
+- [x] The file passes on the branch and fails against `git show 54cfb4f:.github/workflows/publish.yml` (the one-job file).
 
 ### Task 4: Verify
 
-- [ ] `npm test` locally: the same pass, fail and skip sets as the base on the same machine (vitest 3.2.6 against 4.1.12).
-- [ ] `npm run coverage` meets the `vitest.config.js` thresholds.
-- [ ] CI on the PR head: the three test.yml legs and their skip-baseline steps are green.
+- [x] `npm test` locally: the same pass, fail and skip sets as the base on the same machine (vitest 3.2.6 against 4.1.12).
+- [x] `npm run coverage` meets the `vitest.config.js` thresholds.
+- [x] CI on the PR head: the three test.yml legs and their skip-baseline steps are green.
