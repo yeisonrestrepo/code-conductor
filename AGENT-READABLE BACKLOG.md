@@ -1406,6 +1406,45 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #219; reported by the automated security review of
   #218.
 
+### [ ] `[BUG-081]` Unattended plan check does not escalate tasks that write git hooks, MCP config, CI workflows and package lifecycle scripts
+
+- Symptom: `CONTROL_PLANE` (scripts/orchestrate.mjs:25, per the
+  issue) does not cover files that run code outside the run:
+  `.git/hooks/**`, `.mcp.json`, `.github/workflows/**` and the
+  lifecycle scripts in `package.json`. The BUG-080 spec's out-of-scope
+  list does not mention these files.
+- Impact per the issue: in an `--unattended` run, a plan approved only
+  by the delegated review can leave persistent execution in place: on
+  the owner's next commit, in CI with repository secrets, or on the
+  next `npm install`. The owner never sees that plan.
+- Fix shape suggested by the issue: decide whether each of these
+  belongs in `CONTROL_PLANE` and add test rows for those that do;
+  `package.json` would need to be listed as a fixed file.
+- Intake of issue #231; reported by the automated security review of
+  the 1.52.0 release candidate (#229).
+
+### [ ] `[BUG-082]` Unattended plan check does not escalate tasks that write nested CLAUDE.md files
+
+- Symptom: `CONTROL_PLANE` (scripts/orchestrate.mjs:34, per the
+  issue) lists only `claude.md`, `claude.local.md`, `.claude/claude.md`
+  and `project-template/claude.md`. The BUG-080 spec keeps
+  `docs/CLAUDE.md` as a near miss that does not escalate, on the
+  premise that Claude Code reads only the named files, but Claude Code
+  also loads `CLAUDE.md` files in subdirectories when it reads files
+  there.
+- Impact per the issue: in an `--unattended` run, a delegated plan
+  that declares `src/CLAUDE.md` passes `delegate plan`, and its content
+  can reach the instructions of later reviewers in the same run
+  (audit, security, delegated build review). Hooks and guards are
+  unaffected and those reviewers are already model judgements, so the
+  issue rates the impact as limited.
+- Fix shape suggested by the issue: in `inControlPlane`, escalate any
+  entry whose last segment matches `claude.md` or `claude.local.md` at
+  any depth, and turn the `docs/CLAUDE.md` row in AC3 into an
+  escalation row.
+- Intake of issue #230; reported by the automated security review of
+  the 1.52.0 release candidate (#229).
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
