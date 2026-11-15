@@ -20,6 +20,22 @@ export const RUN_FILE = '.claude/memory/orchestrator-run.json';
 export const ENVELOPE_FILE = '.claude/memory/band-envelope.json';
 // The orchestrator's whole write surface (D4). Guard 6 carries a copy pinned to this one.
 export const WRITE_SURFACE = [RUN_FILE, ENVELOPE_FILE, '.claude/memory/session-snapshot.json', '.conductor/**'];
+// Owner decision (BUG-080): the files that enforce the guards or steer later dispatches, in both mirrors. Same notation
+// as WRITE_SURFACE; a trailing `/**` protects the whole directory, so a file added to it is covered too.
+export const CONTROL_PLANE = [
+  '.claude/hooks/**', 'project-template/.claude/hooks/**',
+  '.opencode/plugin/**', 'project-template/.opencode/plugin/**',
+  '.claude/settings.json', '.claude/settings.local.json', '.claude/review-loop.settings.json',
+  'project-template/.claude/settings.json', 'project-template/.claude/settings.local.json', 'project-template/.claude/review-loop.settings.json',
+  '.claude/memory/bash-scan-allowlist.txt', 'project-template/.claude/memory/bash-scan-allowlist.txt',
+  '.claude/agents/**', 'project-template/.claude/agents/**',
+  '.claude/commands/**', 'project-template/.claude/commands/**',
+  '.claude/skills/**', 'project-template/.claude/skills/**',
+  'claude.md', 'claude.local.md', '.claude/claude.md', 'project-template/claude.md',
+  // The router, the three modules it imports at load time, and the scan; the installer deploys them to .claude/scripts/.
+  'scripts/orchestrate.mjs', 'scripts/snap-contract.mjs', 'scripts/ticket.mjs', 'scripts/doc-locations.mjs', 'scripts/security-scan.mjs',
+  '.claude/scripts/**',
+];
 // Where /cc-orchestrate writes each agent's final message for `handback` to read: inside
 // the surface, and cleared with the run so file names never collide across runs.
 export const HANDBACK_DIR = '.conductor/handback';
@@ -1037,22 +1053,39 @@ function globToRegExp(glob) {
   }).join('');
   return new RegExp(`^${body}$`);
 }
-// A glob reaches the surface when it matches a fixed path, or its first segment can be `.conductor` (everything beneath is surface).
-function inSurface(entry) {
-  // Case-insensitive filesystems resolve differently-cased spellings to the same file; every surface path is lower-case.
-  const glob = entry.replace(/^\.\//, '').toLowerCase();
-  // NTFS aliases one file under other spellings: a data stream, an 8.3 short name, a trailing dot or space.
-  if (glob.split('/').some((seg) => /[:~]|[. ]$/.test(seg))) return true;
-  const first = glob.split('/')[0];
-  if (first.startsWith('**') || globToRegExp(first).test('.conductor')) return true;
-  return WRITE_SURFACE.some((s) => !s.endsWith('/**') && globToRegExp(glob).test(s));
+// A glob reaches a protected directory when its leading segments can name it; a segment holding `**` can name
+// anything beneath. A glob shorter than the directory names only the directory entry, never a file inside it.
+function reachesDir(segs, dir) {
+  for (const [i, part] of dir.split('/').entries()) {
+    if (i >= segs.length) return false;
+    if (segs[i].includes('**')) return true;
+    if (!globToRegExp(segs[i]).test(part)) return false;
+  }
+  return true;
 }
+function reachesList(glob, list) {
+  const segs = glob.split('/');
+  return list.some((p) => (p.endsWith('/**') ? reachesDir(segs, p.slice(0, -3)) : globToRegExp(glob).test(p)));
+}
+// Case-insensitive filesystems resolve differently-cased spellings to the same file; every protected path is lower-case.
+const taskGlob = (entry) => entry.replace(/^\.\//, '').toLowerCase();
+// NTFS aliases one file under other spellings: a data stream, an 8.3 short name, a trailing dot or space.
+const ntfsAlias = (glob) => glob.split('/').some((seg) => /[:~]|[. ]$/.test(seg));
+function inSurface(entry) {
+  const glob = taskGlob(entry);
+  return ntfsAlias(glob) || reachesList(glob, WRITE_SURFACE);
+}
+// No alias test: surfaceTask runs inSurface first, and it escalates every alias.
+const inControlPlane = (entry) => reachesList(taskGlob(entry), CONTROL_PLANE);
 
-// Owner decision (FEAT-054): a plan whose task would write the run's own record never passes on a delegated verdict.
+// Owner decisions (FEAT-054, BUG-080): a plan whose task would write the run's own record, or the files that enforce
+// the guards and steer later dispatches, never passes on a delegated verdict. The write surface keeps its reason first.
 function surfaceTask(planText) {
   for (const t of extractTasks(planText)) {
     const path = t.files.find(inSurface);
     if (path !== undefined) return `task ${t.id} declares ${path} inside the orchestrator write surface`;
+    const plane = t.files.find(inControlPlane);
+    if (plane !== undefined) return `task ${t.id} declares ${plane} inside the control-plane files`;
   }
   return null;
 }

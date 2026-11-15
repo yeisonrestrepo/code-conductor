@@ -59,7 +59,7 @@ Line numbers below are from HEAD 11b86a3; locate by the quoted text if they move
 - Modify: `tests/scripts/orchestrate.test.js`
 - Modify: `scripts/orchestrate.mjs`
 
-- [ ] [T-101] `tests/scripts/orchestrate.test.js`: inside `describe('write surface [FEAT-011 AC4]', …)` (line 468), after the test `declares exactly the four entries the spec enumerates` (its closing `});` at line 476) and before the describe's closing `});`, add the pin (plan decision 1). Depends on T-004.
+- [X] [T-101] `tests/scripts/orchestrate.test.js`: inside `describe('write surface [FEAT-011 AC4]', …)` (line 468), after the test `declares exactly the four entries the spec enumerates` (its closing `});` at line 476) and before the describe's closing `});`, add the pin (plan decision 1). Depends on T-004.
   ```js
   it('[BUG-080] CONTROL_PLANE declares exactly the control-plane entries the spec lists', () => {
     expect(orchestrateModule.CONTROL_PLANE).toEqual([
@@ -77,7 +77,7 @@ Line numbers below are from HEAD 11b86a3; locate by the quoted text if they move
     ]);
   });
   ```
-- [ ] [T-102] `tests/scripts/orchestrate.test.js`: inside `describe('unattended mode [FEAT-054]', …)`, right after the closing `});` of the U22 `it.each` (line 3536, the test `U22 [AC6] delegate plan over an APPROVE report escalates a task that declares %s`) and before the next `it.each([` (`['no verdict line', …`), add the BUG-080 rows (plan decision 7). It uses the block's `atPlan`, `delegateDoc` and the file-level `plan`, `task`, `runFile`, `sha`, `PLAN`, `orch`, `approveArgs`. Depends on T-101.
+- [X] [T-102] `tests/scripts/orchestrate.test.js`: inside `describe('unattended mode [FEAT-054]', …)`, right after the closing `});` of the U22 `it.each` (line 3536, the test `U22 [AC6] delegate plan over an APPROVE report escalates a task that declares %s`) and before the next `it.each([` (`['no verdict line', …`), add the BUG-080 rows (plan decision 7). It uses the block's `atPlan`, `delegateDoc` and the file-level `plan`, `task`, `runFile`, `sha`, `PLAN`, `orch`, `approveArgs`. Depends on T-101.
   ```js
   // BUG-080: the U22 assertions, with the list the reason names as a parameter; Task 1 is an ordinary source file.
   function expectEscalation(path, list) {
@@ -176,8 +176,8 @@ Line numbers below are from HEAD 11b86a3; locate by the quoted text if they move
     expect(runFile().delegated.plan).toMatchObject({ verdict: 'ESCALATE', reason });
   });
   ```
-- [ ] [T-103] Red step: `npx vitest run tests/scripts/orchestrate.test.js -t "BUG-080"`. Before T-101 no test name contained `BUG-080` (baseline grep: 0), so the filter's full match set is the 56 new tests and every other test is filtered out. Predicted: **44 red** — the pin (`CONTROL_PLANE` is `undefined`), all 28 U41 rows and all 14 U42 rows (each approved by the delegated review today instead of escalating), and U45 (today's reason names Task 2 and the write surface); **12 green** — the 9 U43 rows (approved today, and still approved after the change) and the 3 U44 rows (today's `inSurface` already escalates them with the write-surface reason). A U43 or U44 row that is red here means a fixture problem, not the missing feature: stop and fix the test. Depends on T-102.
-- [ ] [T-104] `scripts/orchestrate.mjs`: after `export const WRITE_SURFACE = [RUN_FILE, ENVELOPE_FILE, '.claude/memory/session-snapshot.json', '.conductor/**'];` (line 22), add the constant (plan decision 1). Depends on T-103.
+- [X] [T-103] Red step: `npx vitest run tests/scripts/orchestrate.test.js -t "BUG-080"`. Before T-101 no test name contained `BUG-080` (baseline grep: 0), so the filter's full match set is the 56 new tests and every other test is filtered out. Predicted: **44 red** — the pin (`CONTROL_PLANE` is `undefined`), all 28 U41 rows and all 14 U42 rows (each approved by the delegated review today instead of escalating), and U45 (today's reason names Task 2 and the write surface); **12 green** — the 9 U43 rows (approved today, and still approved after the change) and the 3 U44 rows (today's `inSurface` already escalates them with the write-surface reason). A U43 or U44 row that is red here means a fixture problem, not the missing feature: stop and fix the test. Depends on T-102.
+- [X] [T-104] `scripts/orchestrate.mjs`: after `export const WRITE_SURFACE = [RUN_FILE, ENVELOPE_FILE, '.claude/memory/session-snapshot.json', '.conductor/**'];` (line 22), add the constant (plan decision 1). Depends on T-103.
   ```js
   // Owner decision (BUG-080): the files that enforce the guards or steer later dispatches, in both mirrors. Same notation
   // as WRITE_SURFACE; a trailing `/**` protects the whole directory, so a file added to it is covered too.
@@ -196,7 +196,7 @@ Line numbers below are from HEAD 11b86a3; locate by the quoted text if they move
     '.claude/scripts/**',
   ];
   ```
-- [ ] [T-105] `scripts/orchestrate.mjs`: replace `inSurface` and `surfaceTask` (from the comment `// A glob reaches the surface when it matches a fixed path, …` above `function inSurface(entry)`, line 1040, through the closing `}` of `function surfaceTask(planText)`, line 1058) with the block below (plan decisions 3-6). `globToRegExp` above it is unchanged. Depends on T-104.
+- [X] [T-105] `scripts/orchestrate.mjs`: replace `inSurface` and `surfaceTask` (from the comment `// A glob reaches the surface when it matches a fixed path, …` above `function inSurface(entry)`, line 1040, through the closing `}` of `function surfaceTask(planText)`, line 1058) with the block below (plan decisions 3-6). `globToRegExp` above it is unchanged. Depends on T-104.
   ```js
   // A glob reaches a protected directory when its leading segments can name it; a segment holding `**` can name
   // anything beneath. A glob shorter than the directory names only the directory entry, never a file inside it.
@@ -235,9 +235,9 @@ Line numbers below are from HEAD 11b86a3; locate by the quoted text if they move
     return null;
   }
   ```
-- [ ] [T-106] Green step: `npx vitest run tests/scripts/orchestrate.test.js -t "BUG-080"`. Predicted: the same 56 tests, all **green**. Then `npx vitest run tests/scripts/orchestrate.test.js tests/hooks/guard6.test.js`: `orchestrate.test.js` 682 passed (626 + 56), U22's 18 rows and U16 included; `guard6.test.js` all green, its `ORCH_WRITE_SURFACE` parity pin (line 215) included (AC4, AC6). Depends on T-105.
-- [ ] [T-107] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-14-bug080-unattended-plan-check-does-not-escalate-tasks.md`. Depends on T-106.
-- [ ] [T-108] Commit: `fix: escalate unattended plan tasks that write guard-enforcement and control-plane files [BUG-080]`. Depends on T-107.
+- [X] [T-106] Green step: `npx vitest run tests/scripts/orchestrate.test.js -t "BUG-080"`. Predicted: the same 56 tests, all **green**. Then `npx vitest run tests/scripts/orchestrate.test.js tests/hooks/guard6.test.js`: `orchestrate.test.js` 682 passed (626 + 56), U22's 18 rows and U16 included; `guard6.test.js` all green, its `ORCH_WRITE_SURFACE` parity pin (line 215) included (AC4, AC6). Depends on T-105.
+- [X] [T-107] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-14-bug080-unattended-plan-check-does-not-escalate-tasks.md`. Depends on T-106.
+- [X] [T-108] Commit: `fix: escalate unattended plan tasks that write guard-enforcement and control-plane files [BUG-080]`. Depends on T-107.
 
 ---
 
@@ -246,10 +246,10 @@ Line numbers below are from HEAD 11b86a3; locate by the quoted text if they move
 **Files:**
 - Modify: `docs/superpowers/plans/2026-11-14-bug080-unattended-plan-check-does-not-escalate-tasks.md`
 
-- [ ] [T-201] Run `npm test`. Predicted: exit 0, every file green, 56 tests more than the pre-change suite (all in `orchestrate.test.js`; no existing test edited), no new skip (AC7). Depends on T-108.
-- [ ] [T-202] Grep checks: `git grep -n "inControlPlane\|reachesDir\|reachesList" -- scripts` shows each defined once in `scripts/orchestrate.mjs` and used only there; `git grep -n "first.startsWith('\*\*')" -- scripts` shows no match (the old first-segment test is gone); `git diff --stat 11b86a3 -- .claude project-template lib tools` is empty (no hook, settings, command, installer or skip-baseline change). Depends on T-201.
-- [ ] [T-203] Stage: `git add -u docs/superpowers/plans/2026-11-14-bug080-unattended-plan-check-does-not-escalate-tasks.md` (ticks T-108 to T-202). Depends on T-202.
-- [ ] [T-204] Commit: `docs: close out the BUG-080 plan [BUG-080]`. Depends on T-203.
+- [X] [T-201] Run `npm test`. Predicted: exit 0, every file green, 56 tests more than the pre-change suite (all in `orchestrate.test.js`; no existing test edited), no new skip (AC7). Depends on T-108.
+- [X] [T-202] Grep checks: `git grep -n "inControlPlane\|reachesDir\|reachesList" -- scripts` shows each defined once in `scripts/orchestrate.mjs` and used only there; `git grep -n "first.startsWith('\*\*')" -- scripts` shows no match (the old first-segment test is gone); `git diff --stat 11b86a3 -- .claude project-template lib tools` is empty (no hook, settings, command, installer or skip-baseline change). Depends on T-201.
+- [X] [T-203] Stage: `git add -u docs/superpowers/plans/2026-11-14-bug080-unattended-plan-check-does-not-escalate-tasks.md` (ticks T-108 to T-202). Depends on T-202.
+- [X] [T-204] Commit: `docs: close out the BUG-080 plan [BUG-080]`. Depends on T-203.
 
 ---
 
