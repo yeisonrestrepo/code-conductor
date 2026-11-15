@@ -1446,6 +1446,26 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #230; reported by the automated security review of
   the 1.52.0 release candidate (#229).
 
+### [ ] `[BUG-083]` Publish job relies on omitted cache key instead of disabling the setup-node package-manager cache explicitly
+
+- Symptom: the `publish` job in .github/workflows/publish.yml (line
+  60, per the issue) avoids restoring an npm cache only by omitting
+  `cache:`. `actions/setup-node` v5+ enables npm caching automatically
+  when `package.json` declares a `packageManager` (or
+  `devEngines.packageManager`) field.
+- Impact per the issue: none today, because `package.json` has no such
+  field. If one is ever added, the `publish` job would restore an npm
+  cache populated by the `verify` job, which installs and runs dev
+  dependencies, and `npm install -g npm@^11.5.1` would run in the job
+  that holds `id-token: write`. This is hardening against a future edit
+  silently re-coupling the two trust levels `[BUG-073]` separated.
+- Fix shape suggested by the issue: add `package-manager-cache: false`
+  under the `setup-node` step of the `publish` job, and update
+  tests/installer/workflow.test.js:391 to assert that explicit value
+  instead of the absence of the word `cache`.
+- Intake of issue #235; reported by the automated security review of
+  #234.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
