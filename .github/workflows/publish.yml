@@ -4,25 +4,22 @@ on:
   release:
     types: [published]
 
+# Deny by default: each job declares only what it needs [BUG-073].
+permissions: {}
+
 jobs:
-  publish:
+  # Installs and runs the dev dependencies. Holds no id-token and no environment, so
+  # nothing installed here can mint the npm publishing credential [BUG-073].
+  verify:
     runs-on: ubuntu-latest
-    environment: npm-publish
     permissions:
-      id-token: write
       contents: read
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
-      # OIDC trusted publishing needs npm >= 11.5.1. npm stays pinned to 11 rather than
-      # floating to @latest so this job's npm moves only by a deliberate edit: npm 12's
-      # engines (^22.22.2 || ^24.15.0 || >=26) would tie the job to whichever 24.x
-      # setup-node resolves, and npm 11 accepts ^20.17.0 || >=22.9.0.
-      - run: npm install -g npm@^11.5.1
       - run: npm ci
       # Node 24 is the most-covered runtime: it executes the node:sqlite suites that
       # Node 20 skips. The Node 20 floor is asserted by test.yml's matrix on the PR, and
@@ -45,5 +42,29 @@ jobs:
           if npm view "@yeison.restrepo.r/code-conductor@$PKG_VERSION" version >/dev/null 2>&1; then
             echo "::error::@yeison.restrepo.r/code-conductor@$PKG_VERSION already exists on the registry"; exit 1
           fi
+
+  # Holds the npm OIDC credential. Installs no project dependency, restores no cache and
+  # runs no lifecycle script; the package has no build step, so it packs the checkout
+  # verify tested (same release commit) [BUG-073].
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+      # OIDC trusted publishing needs npm >= 11.5.1. npm stays pinned to 11 rather than
+      # floating to @latest so this job's npm moves only by a deliberate edit: npm 12's
+      # engines (^22.22.2 || ^24.15.0 || >=26) would tie the job to whichever 24.x
+      # setup-node resolves, and npm 11 accepts ^20.17.0 || >=22.9.0.
+      - run: npm install -g npm@^11.5.1 --ignore-scripts
       # Auth via OIDC trusted publishing (configured on npmjs.com) — no token needed.
-      - run: npm publish --provenance --access public
+      - run: npm publish --provenance --access public --ignore-scripts
