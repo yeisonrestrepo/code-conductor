@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.52.1] - 2026-11-15
+
+### Fixed
+- **[BUG-073]** The publish workflow no longer installs or runs dev dependencies in the job that holds the npm OIDC credential. `.github/workflows/publish.yml` now denies every permission at the top level (`permissions: {}`) and runs two jobs. `verify` holds `contents: read` only, with no `environment` and no `id-token`. It runs `npm ci`, `npx vitest run`, the version-equals-tag check and the re-publish guard. `publish` runs only after it (`needs: verify`), in the `npm-publish` environment, with `id-token: write` and `contents: read`. It checks out with `persist-credentials: false`, sets up Node without a cache and runs exactly two commands: `npm install -g npm@^11.5.1 --ignore-scripts` and `npm publish --provenance --access public --ignore-scripts`. The package has no build step, so it publishes the same release commit `verify` tested. `vitest` and `@vitest/coverage-v8` move to `^4.1.12`, which clears the dev-tree audit advisories the issue named, and the Node `>=20` floor is kept. `tests/installer/workflow.test.js` asserts each job's permissions, steps and commands, and pins the toolchain range. Runtime dependencies were and remain empty, so installs were never affected. Landed from PR #234 (yeisonrestrepo), intake of issue #160.
+
 ## [1.52.0] - 2026-11-15
 
 ### Added
