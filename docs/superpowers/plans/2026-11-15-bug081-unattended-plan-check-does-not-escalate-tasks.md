@@ -132,14 +132,14 @@ Row count: fixed entries: `.mcp.json`, `opencode.json`, `opencode.jsonc`, the tw
 
 ## Test List
 
-- [ ] Unit, AC1: the renamed `CONTROL_PLANE` pin in `tests/scripts/orchestrate.test.js` equals the BUG-080 list followed by the fourteen new entries (T-101).
-- [ ] Integration, AC2: U46, 14 rows, one literal per new entry, with the U41 shape (escalation, `approvals.plan === null`, owner `approve plan` exits 0) (T-102).
-- [ ] Integration, AC3: U47, 51 rows, the directory, glob, case and `./` forms of the table (T-103).
-- [ ] Integration, AC4: U48, 20 near-miss rows approve; the two nested-manifest rows cite `[BUG-082]` (T-104).
-- [ ] Integration, AC5: U49, 4 rows keep the write-surface reason; U22 and U41-U45 unchanged and green (T-105, T-302).
-- [ ] AC6: `WRITE_SURFACE` pin, hook diff empty, Guard 6 parity suite green (T-204).
-- [ ] AC7: `npm test` green (T-301).
-- [ ] No E2E/UI test: there is no UI.
+- [X] Unit, AC1: the renamed `CONTROL_PLANE` pin in `tests/scripts/orchestrate.test.js` equals the BUG-080 list followed by the fourteen new entries (T-101).
+- [X] Integration, AC2: U46, 14 rows, one literal per new entry, with the U41 shape (escalation, `approvals.plan === null`, owner `approve plan` exits 0) (T-102).
+- [X] Integration, AC3: U47, 51 rows, the directory, glob, case and `./` forms of the table (T-103).
+- [X] Integration, AC4: U48, 20 near-miss rows approve; the two nested-manifest rows cite `[BUG-082]` (T-104).
+- [X] Integration, AC5: U49, 4 rows keep the write-surface reason; U22 and U41-U45 unchanged and green (T-105, T-302).
+- [X] AC6: `WRITE_SURFACE` pin, hook diff empty, Guard 6 parity suite green (T-204).
+- [X] AC7: `npm test` green (T-301).
+- [X] No E2E/UI test: there is no UI.
 
 ## Commit Order
 
