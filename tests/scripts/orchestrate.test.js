@@ -474,6 +474,22 @@ describe('write surface [FEAT-011 AC4]', () => {
       '.conductor/**',
     ]);
   });
+
+  it('[BUG-080] CONTROL_PLANE declares exactly the control-plane entries the spec lists', () => {
+    expect(orchestrateModule.CONTROL_PLANE).toEqual([
+      '.claude/hooks/**', 'project-template/.claude/hooks/**',
+      '.opencode/plugin/**', 'project-template/.opencode/plugin/**',
+      '.claude/settings.json', '.claude/settings.local.json', '.claude/review-loop.settings.json',
+      'project-template/.claude/settings.json', 'project-template/.claude/settings.local.json', 'project-template/.claude/review-loop.settings.json',
+      '.claude/memory/bash-scan-allowlist.txt', 'project-template/.claude/memory/bash-scan-allowlist.txt',
+      '.claude/agents/**', 'project-template/.claude/agents/**',
+      '.claude/commands/**', 'project-template/.claude/commands/**',
+      '.claude/skills/**', 'project-template/.claude/skills/**',
+      'claude.md', 'claude.local.md', '.claude/claude.md', 'project-template/claude.md',
+      'scripts/orchestrate.mjs', 'scripts/snap-contract.mjs', 'scripts/ticket.mjs', 'scripts/doc-locations.mjs', 'scripts/security-scan.mjs',
+      '.claude/scripts/**',
+    ]);
+  });
 });
 
 describe('test command [FEAT-012 AC8, AC9]', () => {
@@ -3533,6 +3549,103 @@ describe('unattended mode [FEAT-054]', () => {
     expect(runFile().approvals.plan).toBeNull();
     expect(runFile().delegated.plan).toMatchObject({ verdict: 'ESCALATE', reason });
     expect(orch(approveArgs('plan')).status).toBe(0);
+  });
+
+  // BUG-080: the U22 assertions, with the list the reason names as a parameter; Task 1 is an ordinary source file.
+  function expectEscalation(path, list) {
+    atPlan();
+    plan(`# Demo Plan\n\n${task(1, ['src/a.js'])}\n${task(2, [path])}\n## Test List\n`);
+    const reason = `task Task 2 declares ${path} inside the ${list}`;
+    expect(delegateDoc('plan')).toEqual({ status: 0, out: `owner approval required: delegated review plan returned ESCALATE (${reason}); see .conductor/delegate/plan.md`, err: '' });
+    expect(runFile().approvals.plan).toBeNull();
+    expect(runFile().delegated.plan).toMatchObject({ verdict: 'ESCALATE', reason });
+    expect(orch(approveArgs('plan')).status).toBe(0);
+  }
+
+  it.each([
+    '.claude/hooks/pre-tool-use.mjs',
+    'project-template/.claude/hooks/pre-tool-use.mjs',
+    '.opencode/plugin/conductor-guard.js',
+    'project-template/.opencode/plugin/conductor-guard.js',
+    '.claude/settings.json',
+    '.claude/settings.local.json',
+    '.claude/review-loop.settings.json',
+    'project-template/.claude/settings.json',
+    'project-template/.claude/settings.local.json',
+    'project-template/.claude/review-loop.settings.json',
+    '.claude/memory/bash-scan-allowlist.txt',
+    'project-template/.claude/memory/bash-scan-allowlist.txt',
+    '.claude/agents/code.md',
+    'project-template/.claude/agents/code.md',
+    '.claude/commands/cc-orchestrate.md',
+    'project-template/.claude/commands/cc-orchestrate.md',
+    '.claude/skills/demo/SKILL.md',
+    'project-template/.claude/skills/demo/SKILL.md',
+    'CLAUDE.md',
+    'CLAUDE.local.md',
+    '.claude/CLAUDE.md',
+    'project-template/CLAUDE.md',
+    'scripts/orchestrate.mjs',
+    'scripts/snap-contract.mjs',
+    'scripts/ticket.mjs',
+    'scripts/doc-locations.mjs',
+    'scripts/security-scan.mjs',
+    '.claude/scripts/orchestrate.mjs',
+  ])('U41 [BUG-080 AC1] delegate plan over an APPROVE report escalates a task that declares the control-plane file %s', (path) => {
+    expectEscalation(path, 'control-plane files');
+  });
+
+  it.each([
+    '.claude/hooks/context-guard.sh',
+    '.claude/hooks/new-hook.mjs',
+    '.claude/scripts/security-scan.mjs',
+    '.claude/hooks',
+    '.claude/scripts',
+    '.claude/hooks/*.mjs',
+    '.claude/*/pre-tool-use.mjs',
+    'project-template/**',
+    '.claude/*.json',
+    'scripts/*.mjs',
+    '*.md',
+    '.Claude/Hooks/pre-tool-use.mjs',
+    '.claude/SETTINGS.json',
+    'Scripts/Orchestrate.mjs',
+  ])('U42 [BUG-080 AC2] delegate plan escalates the directory, glob or case form %s with the control-plane reason', (path) => {
+    expectEscalation(path, 'control-plane files');
+  });
+
+  it.each([
+    '.claude/hooksx/a.mjs',
+    'docs/hooks/a.mjs',
+    '.claude/settings.backup.json',
+    'project-template/.claude/memory/project.md',
+    '.claude',
+    'project-template',
+    'scripts/snap-build.mjs',
+    'docs/CLAUDE.md',
+    'tests/scripts/orchestrate.test.js',
+  ])('U43 [BUG-080 AC3] delegate plan over an APPROVE report approves a task that declares the near miss %s', (path) => {
+    atPlan();
+    plan(`# Demo Plan\n\n${task(1, ['src/a.js'])}\n${task(2, [path])}\n## Test List\n`);
+    expect(delegateDoc('plan')).toEqual({ status: 0, out: `plan approved by delegated review: define_approved, 2 task(s); sha256 ${sha(PLAN)}`, err: '' });
+    expect(runFile().approvals.plan.by).toBe('define-review');
+  });
+
+  it.each([
+    '*/hooks/x.sh',
+    '**/bash-scan-allowlist.txt',
+    '.claude/hooks./x',
+  ])('U44 [BUG-080 AC4] a glob that reaches both lists, %s, keeps the write-surface reason', (path) => {
+    expectEscalation(path, 'orchestrator write surface');
+  });
+
+  it('U45 [BUG-080 AC5] the first task in plan order names the reason: a control-plane Task 1 wins over a write-surface Task 2', () => {
+    atPlan();
+    plan(`# Demo Plan\n\n${task(1, ['.claude/hooks/pre-tool-use.mjs'])}\n${task(2, ['.conductor/notes.md'])}\n## Test List\n`);
+    const reason = 'task Task 1 declares .claude/hooks/pre-tool-use.mjs inside the control-plane files';
+    expect(delegateDoc('plan')).toEqual({ status: 0, out: `owner approval required: delegated review plan returned ESCALATE (${reason}); see .conductor/delegate/plan.md`, err: '' });
+    expect(runFile().approvals.plan).toBeNull();
+    expect(runFile().delegated.plan).toMatchObject({ verdict: 'ESCALATE', reason });
   });
 
   it.each([

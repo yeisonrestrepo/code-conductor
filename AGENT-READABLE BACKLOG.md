@@ -243,7 +243,8 @@ The factory is five bands. Work enters through the Boundary band, flows Define, 
 * **Components Affected:** The role agent definitions under `.claude/agents/` and their `project-template/` mirror, `scripts/orchestrate.mjs` (escalation and run-file record).
 * **Acceptance Criteria:** The configuration is read from the project and written into the dispatched agent's model; the defaults ship in both mirrors; the escalation is enforced by `orchestrate.mjs` and recorded in the run file; with no configuration, behavior matches today's inheritance.
 
-### [ ] `[FEAT-054]` Opt-In Unattended Mode for /cc-orchestrate with an Independent Reviewer
+### [X] `[FEAT-054]` Opt-In Unattended Mode for /cc-orchestrate with an Independent Reviewer
+* **DONE, shipped as `1.52.0` on 2026-11-15.** `scripts/orchestrate.mjs` `start` takes `--unattended`, once at most. It is the only verb that writes `unattended: true`, always together with `mode: "auto"`, and its stdout ends with `; unattended: delegated review at spec, plan and build`. `start` refuses `ORCH_RUN_ACTIVE` while the session has a live run, `resume` carries the value over unchanged, and the other verbs ignore the token, so no agent of a run can set it. The reviewer is the existing `define-review` agent with a second brief, and both mirrors of its profile gain a "Delegated review (FEAT-054)" section. A new verb, `delegate <spec|plan> <doc> <sha256>` / `delegate build`, reads `.conductor/delegate/<kind>.md` under the audit's verdict contract, with a `REVIEWED <kind> sha256 <hash>` line right before the one `VERDICT:` line. `delegate <kind> --check` prints the brief's values, the source note included, and writes nothing. A Define `APPROVE` records the approval with `by: "define-review"`, `basis: "approved by delegated review"`, `sha256`, `commit` and `review_sha256`. The plan's approval goes through `approvePlan`, so `define_approved` is written as an owner approval writes it. `RETURN`, `ESCALATE` or `UNPARSED` records `delegated.<kind>`, prints `owner approval required: …` and leaves the step for an owner `approve`, which is unchanged. Each kind delegates once (`ORCH_DELEGATED_ONCE`), and an attended run refuses `ORCH_NOT_UNATTENDED`. `surfaceTask` never lets a delegated `APPROVE` pass a plan task whose `Files` entry reaches the orchestrator write surface. Entries are read as globs with Guard 5's semantics, lower-cased, and NTFS alias spellings always escalate. From this release the check also covers the control-plane files, which `[BUG-080]` added. `delegate build` runs after an approving security seat: `RETURN` halts `ORCH_DELEGATED_RETURN`, `ESCALATE` halts `ORCH_DELEGATED_ESCALATE`, and qa's `verify_pass` is withheld (`ORCH_GATE_WITHHELD`) until `delegated.build` is `APPROVE`. `isValidRun` rejects a malformed `unattended` or `delegated`. The final report names the approval mode and each approval's basis. A run without the flag is unchanged. Both `cc-orchestrate.md` copies document the flag, the verb, both briefs and the codes, along with the known limit that the run file sits inside the orchestrator's write surface. Pinned by `tests/scripts/orchestrate.test.js`, `tests/installer/commands-parity.test.js` and `tests/unit/role-profiles.test.js`. Landed from PR #218 (cc-lane-bot), intake of issue #186; the id was reserved by the triage and is owner-minted at landing. Spec: `docs/superpowers/specs/2026-11-14-feat054-opt-in-unattended-mode-for-cc-orchestrate-with-design.md` (approved 2026-11-14 by independent review). Plan: `docs/superpowers/plans/2026-11-14-feat054-opt-in-unattended-mode-for-cc-orchestrate-with.md`.
 * **Description:** Intake of issue #186. Today the spec and plan approvals pause in both modes and only an owner message approves, which the issue keeps as the default. It proposes an explicit per-run opt-in, `/cc-orchestrate <ITEM> --unattended`, in which a fresh, independent reviewer with no access to the author's context joins the cycle: at the spec and plan approvals it checks the document against the item's entry, the existing code and the repository's conventions, and its `APPROVE` on the exact document hash stands in for the owner's message, recorded as "approved by delegated review"; at the end of Build it checks the result against the spec, the plan and the item, together with the security review, under the same verdict contract as the audit and security roles. Unattended never takes an owner decision: a new dependency, network access, a security posture change or scope the item does not settle stops the run with `ESCALATE`. Part of the agent workflow v2 set (role agents, review loops and approvals), approved by the maintainer on 2026-11-12.
 * **Impact:** Runs nobody is watching can cross the Define approvals without waiting, while owner decisions still pause the run.
 * **Components Affected:** `.claude/commands/cc-orchestrate.md` and its `project-template/` mirror, `scripts/orchestrate.mjs` (flag and approval record).
@@ -1230,7 +1231,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #161; reported by the automated security review of
   the 1.44.0 release candidate (#157).
 
-### [ ] `[BUG-073]` Publish job installs and runs dev dependencies in the job holding the npm OIDC credential
+### [X] `[BUG-073]` Publish job installs and runs dev dependencies in the job holding the npm OIDC credential
+* **DONE, shipped as `1.52.1` on 2026-11-15.** `.github/workflows/publish.yml` sets `permissions: {}` at the top level and splits into two jobs. `verify` (`contents: read`, no `environment`, no `id-token`) runs `npm ci`, `npx vitest run`, the version-equals-tag check and the re-publish guard. `publish` (`needs: verify`, `environment: npm-publish`, `id-token: write`, `contents: read`) checks out with `persist-credentials: false`, runs `actions/setup-node` without a cache, and runs only `npm install -g npm@^11.5.1 --ignore-scripts` and `npm publish --provenance --access public --ignore-scripts`. No project dependency is installed or run in the job that can mint the credential. `vitest` and `@vitest/coverage-v8` move to `^4.1.12` with the lockfile regenerated. The Node `>=20` floor is kept, so the range stays below 5.0.0. Pinned by the `[BUG-073]` rows of `tests/installer/workflow.test.js`: the workflow-level deny, the job set and order, verify's and publish's permissions and commands, no cache, no persisted credential, no project dependency in `publish`, and the toolchain range and lock. Landed from PR #234 (yeisonrestrepo), intake of issue #160. The workflow commit was owner-applied, because the lane App has no Workflows permission. The id was filed at intake and is owner-minted at landing. Spec: `docs/superpowers/specs/2026-11-14-bug073-publish-job-installs-and-runs-dev-dependencies-design.md` (approved 2026-11-14 by the owner). Plan: `docs/superpowers/plans/2026-11-14-bug073-publish-job-installs-and-runs-dev-dependencies.md`.
 
 - Symptom: .github/workflows/publish.yml runs everything in one job:
   it requests `id-token: write` (line 12), then runs `npm ci`
@@ -1295,7 +1297,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   implied.
 - Intake of issue #175.
 
-### [ ] `[BUG-076]` Review-Loop Outcome Not Bound to the Document Being Approved
+### [X] `[BUG-076]` Review-Loop Outcome Not Bound to the Document Being Approved
+* **DONE, shipped as `1.52.0` on 2026-11-15.** `checkLoopClosed` in `scripts/orchestrate.mjs` takes the hash of the document being approved. When the role's loop closed `clean`, `cap` or `unchanged` over a different `sha256`, `approve` and `delegate` refuse `ORCH_REVIEW_DOC_MISMATCH` and leave the run file untouched. A `skipped:<reason>` close stays unbound, and the plan hash is the checkbox-blind one, so ticking a box still passes. `review <role> --round <doc>` refuses `ORCH_REVIEW_OUT_OF_SCOPE` for a path outside the role's recorded `run.docs.scopes` folder, and for an empty or missing scope. A loop closed with a review outcome may be closed once more with `--close skipped:<reason>`. That close keeps `round` and `sha256`, so a post-review edit goes on the record instead of leaving the run stuck. Both `cc-orchestrate.md` copies name the refusal, the `skipped:doc-changed` recovery and the new codes. Pinned by `tests/scripts/orchestrate.test.js` and `tests/installer/commands-parity.test.js`. Landed from PR #221 (cc-lane-bot), intake of issue #195; the id was reserved by the triage and is owner-minted at landing. Spec: `docs/superpowers/specs/2026-11-14-bug076-review-loop-outcome-not-bound-to-the-document-design.md` (approved 2026-11-14 by independent review). Plan: `docs/superpowers/plans/2026-11-14-bug076-review-loop-outcome-not-bound-to-the-document.md`.
 
 - Symptom: `approve` refuses with `ORCH_REVIEW_OPEN` until the role's
   review loop records an outcome (`checkLoopClosed`,
@@ -1379,6 +1382,69 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   hand-backs keep the run file under the hook's cap.
 - Intake of issue #213; reported by the automated security review of
   #212.
+
+### [X] `[BUG-080]` Unattended plan check does not escalate tasks that write guard-enforcement and control-plane files
+* **DONE, shipped as `1.52.0` on 2026-11-15.** `scripts/orchestrate.mjs` exports a second fixed list, `CONTROL_PLANE`, beside `WRITE_SURFACE`. Where both mirrors exist it lists both: `.claude/hooks/**`, `.opencode/plugin/**`, `.claude/settings.json`, `settings.local.json` and `review-loop.settings.json`, the Guard 3 allowlist `.claude/memory/bash-scan-allowlist.txt`, `.claude/agents/**`, `.claude/commands/**` and `.claude/skills/**`. It also lists `claude.md`, `claude.local.md`, `.claude/claude.md` and `project-template/claude.md`, and `scripts/orchestrate.mjs`, `snap-contract.mjs`, `ticket.mjs`, `doc-locations.mjs` and `security-scan.mjs`, plus `.claude/scripts/**`. `surfaceTask` escalates a delegated `APPROVE` when a task's `Files` entry reaches either list. The shared `reachesList`/`reachesDir` test is lower-cased, uses Guard 5's glob semantics and walks a glob's leading segments, so a protected directory is covered as a whole. The reason reads `task <id> declares <entry> inside the control-plane files`. Tasks are checked in plan order, the write-surface check runs first within a task, and every existing write-surface reason stays byte for byte. Near misses such as `.claude/hooksx/a.mjs`, `.claude`, `scripts/snap-build.mjs` and `docs/CLAUDE.md` still approve. `WRITE_SURFACE`, the hook's `ORCH_WRITE_SURFACE` and Guard 6 are unchanged, and an owner `approve plan` never consults the list. Pinned by integration rows U41–U45 and a `CONTROL_PLANE` pin in `tests/scripts/orchestrate.test.js`. Landed from PR #228 (cc-lane-bot), intake of issue #219; the id was reserved by the triage and is owner-minted at landing. Spec: `docs/superpowers/specs/2026-11-14-bug080-unattended-plan-check-does-not-escalate-tasks-design.md` (approved 2026-11-14 by independent review). Plan: `docs/superpowers/plans/2026-11-14-bug080-unattended-plan-check-does-not-escalate-tasks.md`.
+
+- Symptom: in an unattended `/cc-orchestrate` run, `delegate plan`
+  deterministically escalates only tasks whose `Files` entries reach
+  the orchestrator write surface (scripts/orchestrate.mjs:1039,
+  `inSurface`, per the issue). A task declaring
+  `.claude/hooks/pre-tool-use.mjs`, its `project-template/` mirror,
+  `.claude/settings.json` or `.claude/memory/bash-scan-allowlist.txt`
+  is approved on the delegated reviewer's verdict alone, and the
+  `code` role can then modify the hooks that enforce Guards 5-7 for
+  the rest of the same run.
+- Impact per the issue: this requires `--unattended`, which the owner
+  opts into, and a reviewer that fails to apply its "security posture
+  change → ESCALATE" instruction (for example, after an injected
+  ticket body). The security seat still runs before `qa`, but a model
+  judgement is not a deterministic boundary.
+- Fix shape suggested by the issue: add the guard-enforcement files
+  (hooks in both mirrors, `settings*.json`, the Guard 3 allowlist) to
+  the paths `surfaceTask` escalates, record the `ESCALATE` reason the
+  same way, and add one test row per path.
+- Intake of issue #219; reported by the automated security review of
+  #218.
+
+### [ ] `[BUG-081]` Unattended plan check does not escalate tasks that write git hooks, MCP config, CI workflows and package lifecycle scripts
+
+- Symptom: `CONTROL_PLANE` (scripts/orchestrate.mjs:25, per the
+  issue) does not cover files that run code outside the run:
+  `.git/hooks/**`, `.mcp.json`, `.github/workflows/**` and the
+  lifecycle scripts in `package.json`. The BUG-080 spec's out-of-scope
+  list does not mention these files.
+- Impact per the issue: in an `--unattended` run, a plan approved only
+  by the delegated review can leave persistent execution in place: on
+  the owner's next commit, in CI with repository secrets, or on the
+  next `npm install`. The owner never sees that plan.
+- Fix shape suggested by the issue: decide whether each of these
+  belongs in `CONTROL_PLANE` and add test rows for those that do;
+  `package.json` would need to be listed as a fixed file.
+- Intake of issue #231; reported by the automated security review of
+  the 1.52.0 release candidate (#229).
+
+### [ ] `[BUG-082]` Unattended plan check does not escalate tasks that write nested CLAUDE.md files
+
+- Symptom: `CONTROL_PLANE` (scripts/orchestrate.mjs:34, per the
+  issue) lists only `claude.md`, `claude.local.md`, `.claude/claude.md`
+  and `project-template/claude.md`. The BUG-080 spec keeps
+  `docs/CLAUDE.md` as a near miss that does not escalate, on the
+  premise that Claude Code reads only the named files, but Claude Code
+  also loads `CLAUDE.md` files in subdirectories when it reads files
+  there.
+- Impact per the issue: in an `--unattended` run, a delegated plan
+  that declares `src/CLAUDE.md` passes `delegate plan`, and its content
+  can reach the instructions of later reviewers in the same run
+  (audit, security, delegated build review). Hooks and guards are
+  unaffected and those reviewers are already model judgements, so the
+  issue rates the impact as limited.
+- Fix shape suggested by the issue: in `inControlPlane`, escalate any
+  entry whose last segment matches `claude.md` or `claude.local.md` at
+  any depth, and turn the `docs/CLAUDE.md` row in AC3 into an
+  escalation row.
+- Intake of issue #230; reported by the automated security review of
+  the 1.52.0 release candidate (#229).
 
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
