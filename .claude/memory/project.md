@@ -3300,3 +3300,15 @@ Process note: an earlier release PR for this version (#222) was sent back. That 
 Known limits: the BUG-076 and BUG-080 lines are removed. BUG-077 (triage #199), BUG-078 (triage #203) and BUG-079 (triage #213) stay open. The orchestrator item gains one line: the run file is inside the orchestrator's write surface, so a hand edit could set `unattended` or forge an approval, and Guard 6 does not stop it.
 
 No upgrade step: a run without `--unattended` writes no new field, and its stdout is unchanged. All three descriptions report two `tests/unit/staging-convention.test.js` assertions failing in their sandboxes (`git add -u` on an untracked path exits 0 under the local git); CI on the release PR is the authority.
+
+## Release: 1.52.1 batch landing 2026-11-15
+
+Two PRs merged since `v1.52.0`. Existing id closed: BUG-073 (#234 by `yeisonrestrepo`, publish workflow split). `.github/workflows/publish.yml` denies every permission at the top level and runs two jobs. `verify` holds `contents: read` only and runs `npm ci`, the suite and the version and re-publish guards. `publish` (`needs: verify`, `npm-publish` environment, `id-token: write`) checks out without persisted credentials, restores no cache and runs only the npm self-upgrade and `npm publish`, both with `--ignore-scripts`. `vitest` and `@vitest/coverage-v8` move to `^4.1.12` with the Node `>=20` floor kept, and `tests/installer/workflow.test.js` pins the per-job shape and the toolchain range. Intake of issue #160. The spec was approved 2026-11-14 by the owner. The workflow commit (`371647f`) was owner-applied, because the lane App has no Workflows permission.
+
+#233 (by `cc-lane-bot[bot]`, issue #219) is verification-only for BUG-080, which shipped in 1.52.0. It changes no code and only ticks the plan's checkboxes after confirming that `CONTROL_PLANE`, `inControlPlane` and rows U41–U45 stand as merged. It carries no CHANGELOG bullet, and BUG-080's backlog entry is unchanged.
+
+Nothing minted. BUG-081 (triage #231) and BUG-082 (triage #230) stay reserved and open. #234 names BUG-070, BUG-081 and BUG-082 as out of scope.
+
+Known limits: the BUG-073 line is removed. Every other defect line is unchanged.
+
+No upgrade step: the change touches only the maintainer's tag-triggered publish workflow and the dev toolchain. Runtime dependencies stay empty. #233's description reports `AC7`/`AC8` of `tests/unit/staging-convention.test.js` failing in its sandbox (`git add -u` on an untracked path exits 0 instead of 128). #234's description reports five environment-only local failures that also fail on the base. CI on the release PR is the authority.
