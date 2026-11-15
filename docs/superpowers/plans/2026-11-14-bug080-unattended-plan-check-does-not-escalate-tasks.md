@@ -2,279 +2,92 @@
 
 > **For agentic workers:** Steps use checkbox (`- [ ]`) syntax for tracking. Update one checkbox per edit (BUG-003 invariant). Execute in file order.
 
-**Goal:** In an unattended run, `delegate plan` turns a delegated `APPROVE` into `ESCALATE` when a plan task's `Files` entry reaches a new fixed list, `CONTROL_PLANE` (the hooks, the OpenCode guard plugin, the settings files, the Guard 3 allowlist, the agents, the commands, the skills, the `CLAUDE.md` files and the router with its imports and the scan, in both mirrors), recording the reason `task <id> declares <entry> inside the control-plane files`. The orchestrator write-surface check and its reason are unchanged and keep precedence.
+**Goal:** Confirm, on the `v1.52.0` base, that the BUG-080 fix stands as the approved spec describes it and keep it stable: `CONTROL_PLANE`, `inControlPlane`, the shared reach helper and the reason `task <id> declares <entry> inside the control-plane files` are already on `main` (`b06b2fd`, merged by `1208f40`, released in `76a37f5`). This round changes no code. It pins the state with drift checks and the existing tests, and it records the result.
 
-**Spec:** `docs/superpowers/specs/2026-11-14-bug080-unattended-plan-check-does-not-escalate-tasks-design.md` (approved 2026-11-14, sha256 `75c7ba1a00eed485dae26d89b32c4399bc0ff534396a0a941a282cae6efd5649`). Issue #219.
+**Spec:** `docs/superpowers/specs/2026-11-14-bug080-unattended-plan-check-does-not-escalate-tasks-design.md` (approved 2026-11-14 by independent review, round 1; sha256 `1d6ddf32509a423a3a7fafa57f83b55b138a343fc0e2c9f7e54560c19a0d4ade`). Issue #219.
 
 **Test command:** `npm test`. Filtered runs use `npx vitest run <file>` and `-t <pattern>`.
 
 ## Global Constraints
 
-- No release records: `VERSION`, the `package.json` / `package-lock.json` version, `CHANGELOG.md`, `AGENT-READABLE BACKLOG.md`, `.claude/memory/**` and the README "Known limits" lines stay untouched (the `[BUG-080]` Known-limits entry is updated at release; spec, Out of Scope).
-- No new dependency, no network, no workflow change, no hook, installer, SNAP-script or settings change. `scripts/orchestrate.mjs` is not a protected surface CONTRIBUTING names; no ritual applies.
-- `WRITE_SURFACE` and the hook's `ORCH_WRITE_SURFACE` are unchanged (AC6); `tests/hooks/guard6.test.js:215` keeps pinning one to the other.
-- No change to `defineOutcome`, `delegatedEntry`, `ownerRequired`, the run-file shape or `isValidRun` (spec, System Impact).
-- No change to `.claude/commands/cc-orchestrate.md` or its mirror: its unattended paragraph does not list which tasks escalate (spec, System Impact), so there is nothing to keep in step.
-- Functions of 30 lines or fewer, guard clauses, comments say why.
-- Tests are added, none skipped and none conditional, so `tools/skip-baseline.json` is untouched. U22 is not edited (AC4: its rows keep their reason byte for byte).
-- Every file this plan edits is already tracked, so every staging step is `git add -u <path>` with an explicit path; only Task 0 stages a new file.
+- No release records: `VERSION`, the `package.json` / `package-lock.json` version, `CHANGELOG.md`, `AGENT-READABLE BACKLOG.md`, `.claude/memory/**` and the README "Known limits" lines stay untouched (spec, Owner Decisions, "Records": they are written at release 1.52.1).
+- **Stable surface (spec, Owner Decisions).** `CONTROL_PLANE` and `WRITE_SURFACE` stay unchanged, and U22 and U41-U45 stay green byte for byte, including the `docs/CLAUDE.md` near miss in U43. No edit to `scripts/` or `tests/`.
+- **Matcher hardening is BUG-083, not this item.** No change to how `inSurface`, `inControlPlane`, `taskGlob`, `ntfsAlias`, `reachesDir` or `reachesList` normalize or match a `Files` entry.
+- **Hook untouched.** `.claude/hooks/pre-tool-use.mjs` and `project-template/.claude/hooks/pre-tool-use.mjs` are not edited; the matching Guard 5 check is a separate follow-up item. BUG-081 and BUG-082 are not folded in.
+- No new dependency, no network, no workflow, installer, settings, command or SNAP-script change; `tools/skip-baseline.json` untouched.
+- The only file this plan edits after Task 0 is the plan itself (its checkboxes). It is tracked, so every staging step is `git add -u <path>` with an explicit path.
 
 ## Plan decisions
 
-The spec fixes the list, the reach rule and the reason text; these follow from reading the code it cites.
+1. **Why no code task.** The spec's "Base and state" decision says the `CONTROL_PLANE` list, `inControlPlane` and U41-U45 stand as merged on `76a37f5`. Measured on this branch (HEAD `d3e644b`): `git diff --stat 76a37f5 HEAD -- scripts tests .claude project-template lib tools` is empty, so the code under review is the code that shipped. `scripts/orchestrate.mjs:22` holds `WRITE_SURFACE`, `:25` opens `CONTROL_PLANE`; `reachesDir`, `reachesList`, `taskGlob`, `ntfsAlias`, `inSurface`, `inControlPlane` and `surfaceTask` sit at lines 1057-1093 and match the spec's reach rule and precedence (write surface first, then control plane, per task, in plan order). Writing the code again would be an empty diff; changing it would break the "keep stable" decision.
+2. **How each AC maps to a merged test.** AC1 → U41 (28 rows); AC2 → U42 (14 rows); AC3 → U43 (9 rows, `docs/CLAUDE.md` included); AC4 → U22 (18 rows, unchanged) and U44 (3 rows); AC5 → U45; AC6 → the `WRITE_SURFACE` pin, the `CONTROL_PLANE` pin (`tests/scripts/orchestrate.test.js:478`) and the Guard 6 parity pin (`tests/hooks/guard6.test.js:215`); AC7 → `npm test`.
+3. **Drift checks are diffs against the release, not re-reads.** "Unchanged" is checked with `git diff --quiet 76a37f5 -- <paths>`, which proves byte identity for the code, the tests and the hook in one command, rather than with line-by-line comparisons that drift.
+4. **`.gitignore` leaf already present.** The leaf `!/docs/superpowers/plans/2026-11-14-bug080-unattended-plan-check-does-not-escalate-tasks.md` is at `.gitignore:169`, between the bug076 and feat053 plan leaves, from the first round of this item. Adding it again would duplicate the line, so Task 0 verifies it and does not edit `.gitignore`. This plan replaces the first round's plan at the same path; that file is tracked, so it is staged with `-u`.
 
-1. **Where `CONTROL_PLANE` sits.** An exported constant right after `export const WRITE_SURFACE = [...]` (`scripts/orchestrate.mjs:22`), in the order of the spec's table, 28 entries, all lower-case. The tests read it as `orchestrateModule.CONTROL_PLANE` (the namespace import at `tests/scripts/orchestrate.test.js:11`), so the named-import line is not touched.
-2. **`Files` entries as `surfaceTask` receives them.** `extractTasks` (`scripts/orchestrate.mjs:221`) reads only `- Create:`, `- Modify:` and `- Test:` lines under `**Files:**`, takes every backticked span, strips a `:N` or `:N-M` line suffix and a leading `./`. The reach rule therefore runs on that string; the reason quotes it in its original case, as U22's reason does.
-3. **One shared reach helper, rule 3 as the spec words it.** `reachesDir(segs, dir)` walks the directory's segments: past the end of the glob → no; a glob segment that *contains* `**` → yes; a segment whose `globToRegExp` does not match → no; all matched → yes. `reachesList(glob, list)` applies `reachesDir` to `/**` entries and `globToRegExp(glob).test(p)` to fixed ones. `inSurface` becomes `ntfsAlias(glob) || reachesList(glob, WRITE_SURFACE)`; `inControlPlane` is `reachesList(taskGlob(entry), CONTROL_PLANE)`. The lower-casing and `./` strip move into `taskGlob`, the NTFS test into `ntfsAlias`, both unchanged.
-4. **"Contains `**`" versus today's "starts with `**`".** Today's first-segment test is `first.startsWith('**') || globToRegExp(first).test('.conductor')`. Rule 3 says "contains". The two agree on every input where today escalates, and differ only on a segment with an inner `**` whose own pattern does not match the directory name: `.c**k/x` (which Guard 5's glob semantics match against `.conductor/handback/x`, so today misses a real reach) and `a**` (which cannot name a file under `.conductor`, a harmless extra escalation). The plan follows rule 3's wording: "starts with" would also miss `.c**` against the two-segment `.claude/hooks/**`, because the glob runs out after its first segment, and the extra escalations only ever ask the owner. Measured: no test in `tests/scripts/orchestrate.test.js` declares a glob with an inner `**` (`grep -n "[A-Za-z0-9._-]\*\*" tests/scripts/orchestrate.test.js` matches only the `**Files:**` literal at line 84), so no existing row changes outcome. A scratch run of the new predicates over every U22 row, every AC1-AC4 row and `src/a.js`, `tests/a.test.js`, `src/b.js` reproduced the spec's expected outcome for each and today's `inSurface` result for each U22 row.
-5. **Why `inControlPlane` has no NTFS test.** `surfaceTask` runs `inSurface`, which escalates every NTFS alias with the write-surface reason, on all of a task's entries before `inControlPlane` (spec, reason precedence; rule 1 "applies to both lists because it is checked first"). A second test would be unreachable.
-6. **Precedence inside `surfaceTask`.** Per task, in plan order: `t.files.find(inSurface)` first, then `t.files.find(inControlPlane)`; the first task with either wins. So `.claude/**` and `**/*.json` (U22) keep the write-surface reason, and AC5's Task 1 control-plane entry wins over Task 2's write-surface entry.
-7. **Test rows.** One escalation helper, `expectEscalation(path, list)`, holds U22's four assertions with the list name as a parameter; U22 itself stays as written. New ids are U41-U45 (the block's last id is U40, used twice at lines 3636 and 3742), each tagged `[BUG-080 ACn]` so `-t "BUG-080"` selects exactly the new tests. AC4's three new rows (`*/hooks/x.sh`, `**/bash-scan-allowlist.txt`, `.claude/hooks./x`) are U44 rather than new U22 rows, so U22's list stays byte-identical.
-8. **No existing fixture changes.** Every delegated plan in `describe('unattended mode [FEAT-054]', …)` is `TWO_TASKS` (`src/a.js`, `tests/a.test.js`, `src/b.js`) or U22's plan, measured by listing the `plan(` calls after line 3241; none reaches `CONTROL_PLANE`.
+## Baseline (measured on this branch, HEAD d3e644b)
 
-## Baseline (measured on this branch, HEAD 11b86a3, before Task 1)
-
-`npx vitest run tests/scripts/orchestrate.test.js`: 626 passed (about 400 s; the U-rows spawn the CLI several times each). `grep -c "BUG-080" tests/scripts/orchestrate.test.js`: 0.
-
-Line numbers below are from HEAD 11b86a3; locate by the quoted text if they move.
+- `npx vitest run tests/scripts/orchestrate.test.js -t "BUG-080|U22 |write surface"`: **76 passed, 606 skipped (682)**, about 70 s. The match set: the 56 BUG-080 tests (the `CONTROL_PLANE` pin, U41 ×28, U42 ×14, U43 ×9, U44 ×3, U45), the 18 U22 rows, and the `write surface [FEAT-011 AC4]` tests other than the pin.
+- `npx vitest run tests/hooks/guard6.test.js`: **30 passed (30)**.
+- `grep -c "BUG-080" tests/scripts/orchestrate.test.js`: 7.
 
 ---
 
 ### Task 0: Commit this plan
 
 **Files:**
-- Create: `docs/superpowers/plans/2026-11-14-bug080-unattended-plan-check-does-not-escalate-tasks.md`
-- Modify: `.gitignore`
+- Modify: `docs/superpowers/plans/2026-11-14-bug080-unattended-plan-check-does-not-escalate-tasks.md`
 
-- [X] [T-001] Create this plan file. No dependency.
-- [X] [T-002] `.gitignore`: add the leaf `!/docs/superpowers/plans/2026-11-14-bug080-unattended-plan-check-does-not-escalate-tasks.md` in sorted position, right after `!/docs/superpowers/plans/2026-11-14-bug076-review-loop-outcome-not-bound-to-the-document.md` and before `!/docs/superpowers/plans/2026-11-14-feat053-per-role-model-selection-for-role-agents-with.md`. Depends on T-001.
-- [X] [T-003] Stage: `git add -u .gitignore` and `git add -f docs/superpowers/plans/2026-11-14-bug080-unattended-plan-check-does-not-escalate-tasks.md` (new file at a tracked surface; `-f` on one explicit path, per the CLAUDE.md staging convention). Depends on T-002.
-- [X] [T-004] Commit: `docs: plan for escalating unattended plan tasks that write control-plane files [BUG-080]`. Depends on T-003.
+- [X] [T-001] Rewrite this plan file for the approved spec `1d6ddf32…`, replacing the first round's plan at the same path. No dependency.
+- [X] [T-002] `.gitignore`: verify the leaf `!/docs/superpowers/plans/2026-11-14-bug080-unattended-plan-check-does-not-escalate-tasks.md` is present once, in sorted position (`grep -c` gives 1, at line 169). No edit (plan decision 4). Depends on T-001.
+- [X] [T-003] Stage: `git add -u docs/superpowers/plans/2026-11-14-bug080-unattended-plan-check-does-not-escalate-tasks.md` (tracked file under the ignored `docs/superpowers/plans/`). Depends on T-002.
+- [X] [T-004] Commit: `docs: plan the BUG-080 verification on the 1.52.0 base [BUG-080]`. Depends on T-003.
 
 ---
 
-### Task 1: `CONTROL_PLANE` and the shared reach helper in `orchestrate.mjs`
+### Task 1: Drift checks and the BUG-080 tests
 
 **Files:**
-- Modify: `tests/scripts/orchestrate.test.js`
-- Modify: `scripts/orchestrate.mjs`
+- Modify: `docs/superpowers/plans/2026-11-14-bug080-unattended-plan-check-does-not-escalate-tasks.md` (checkboxes only)
 
-- [X] [T-101] `tests/scripts/orchestrate.test.js`: inside `describe('write surface [FEAT-011 AC4]', …)` (line 468), after the test `declares exactly the four entries the spec enumerates` (its closing `});` at line 476) and before the describe's closing `});`, add the pin (plan decision 1). Depends on T-004.
-  ```js
-  it('[BUG-080] CONTROL_PLANE declares exactly the control-plane entries the spec lists', () => {
-    expect(orchestrateModule.CONTROL_PLANE).toEqual([
-      '.claude/hooks/**', 'project-template/.claude/hooks/**',
-      '.opencode/plugin/**', 'project-template/.opencode/plugin/**',
-      '.claude/settings.json', '.claude/settings.local.json', '.claude/review-loop.settings.json',
-      'project-template/.claude/settings.json', 'project-template/.claude/settings.local.json', 'project-template/.claude/review-loop.settings.json',
-      '.claude/memory/bash-scan-allowlist.txt', 'project-template/.claude/memory/bash-scan-allowlist.txt',
-      '.claude/agents/**', 'project-template/.claude/agents/**',
-      '.claude/commands/**', 'project-template/.claude/commands/**',
-      '.claude/skills/**', 'project-template/.claude/skills/**',
-      'claude.md', 'claude.local.md', '.claude/claude.md', 'project-template/claude.md',
-      'scripts/orchestrate.mjs', 'scripts/snap-contract.mjs', 'scripts/ticket.mjs', 'scripts/doc-locations.mjs', 'scripts/security-scan.mjs',
-      '.claude/scripts/**',
-    ]);
-  });
-  ```
-- [X] [T-102] `tests/scripts/orchestrate.test.js`: inside `describe('unattended mode [FEAT-054]', …)`, right after the closing `});` of the U22 `it.each` (line 3536, the test `U22 [AC6] delegate plan over an APPROVE report escalates a task that declares %s`) and before the next `it.each([` (`['no verdict line', …`), add the BUG-080 rows (plan decision 7). It uses the block's `atPlan`, `delegateDoc` and the file-level `plan`, `task`, `runFile`, `sha`, `PLAN`, `orch`, `approveArgs`. Depends on T-101.
-  ```js
-  // BUG-080: the U22 assertions, with the list the reason names as a parameter; Task 1 is an ordinary source file.
-  function expectEscalation(path, list) {
-    atPlan();
-    plan(`# Demo Plan\n\n${task(1, ['src/a.js'])}\n${task(2, [path])}\n## Test List\n`);
-    const reason = `task Task 2 declares ${path} inside the ${list}`;
-    expect(delegateDoc('plan')).toEqual({ status: 0, out: `owner approval required: delegated review plan returned ESCALATE (${reason}); see .conductor/delegate/plan.md`, err: '' });
-    expect(runFile().approvals.plan).toBeNull();
-    expect(runFile().delegated.plan).toMatchObject({ verdict: 'ESCALATE', reason });
-    expect(orch(approveArgs('plan')).status).toBe(0);
-  }
-
-  it.each([
-    '.claude/hooks/pre-tool-use.mjs',
-    'project-template/.claude/hooks/pre-tool-use.mjs',
-    '.opencode/plugin/conductor-guard.js',
-    'project-template/.opencode/plugin/conductor-guard.js',
-    '.claude/settings.json',
-    '.claude/settings.local.json',
-    '.claude/review-loop.settings.json',
-    'project-template/.claude/settings.json',
-    'project-template/.claude/settings.local.json',
-    'project-template/.claude/review-loop.settings.json',
-    '.claude/memory/bash-scan-allowlist.txt',
-    'project-template/.claude/memory/bash-scan-allowlist.txt',
-    '.claude/agents/code.md',
-    'project-template/.claude/agents/code.md',
-    '.claude/commands/cc-orchestrate.md',
-    'project-template/.claude/commands/cc-orchestrate.md',
-    '.claude/skills/demo/SKILL.md',
-    'project-template/.claude/skills/demo/SKILL.md',
-    'CLAUDE.md',
-    'CLAUDE.local.md',
-    '.claude/CLAUDE.md',
-    'project-template/CLAUDE.md',
-    'scripts/orchestrate.mjs',
-    'scripts/snap-contract.mjs',
-    'scripts/ticket.mjs',
-    'scripts/doc-locations.mjs',
-    'scripts/security-scan.mjs',
-    '.claude/scripts/orchestrate.mjs',
-  ])('U41 [BUG-080 AC1] delegate plan over an APPROVE report escalates a task that declares the control-plane file %s', (path) => {
-    expectEscalation(path, 'control-plane files');
-  });
-
-  it.each([
-    '.claude/hooks/context-guard.sh',
-    '.claude/hooks/new-hook.mjs',
-    '.claude/scripts/security-scan.mjs',
-    '.claude/hooks',
-    '.claude/scripts',
-    '.claude/hooks/*.mjs',
-    '.claude/*/pre-tool-use.mjs',
-    'project-template/**',
-    '.claude/*.json',
-    'scripts/*.mjs',
-    '*.md',
-    '.Claude/Hooks/pre-tool-use.mjs',
-    '.claude/SETTINGS.json',
-    'Scripts/Orchestrate.mjs',
-  ])('U42 [BUG-080 AC2] delegate plan escalates the directory, glob or case form %s with the control-plane reason', (path) => {
-    expectEscalation(path, 'control-plane files');
-  });
-
-  it.each([
-    '.claude/hooksx/a.mjs',
-    'docs/hooks/a.mjs',
-    '.claude/settings.backup.json',
-    'project-template/.claude/memory/project.md',
-    '.claude',
-    'project-template',
-    'scripts/snap-build.mjs',
-    'docs/CLAUDE.md',
-    'tests/scripts/orchestrate.test.js',
-  ])('U43 [BUG-080 AC3] delegate plan over an APPROVE report approves a task that declares the near miss %s', (path) => {
-    atPlan();
-    plan(`# Demo Plan\n\n${task(1, ['src/a.js'])}\n${task(2, [path])}\n## Test List\n`);
-    expect(delegateDoc('plan')).toEqual({ status: 0, out: `plan approved by delegated review: define_approved, 2 task(s); sha256 ${sha(PLAN)}`, err: '' });
-    expect(runFile().approvals.plan.by).toBe('define-review');
-  });
-
-  it.each([
-    '*/hooks/x.sh',
-    '**/bash-scan-allowlist.txt',
-    '.claude/hooks./x',
-  ])('U44 [BUG-080 AC4] a glob that reaches both lists, %s, keeps the write-surface reason', (path) => {
-    expectEscalation(path, 'orchestrator write surface');
-  });
-
-  it('U45 [BUG-080 AC5] the first task in plan order names the reason: a control-plane Task 1 wins over a write-surface Task 2', () => {
-    atPlan();
-    plan(`# Demo Plan\n\n${task(1, ['.claude/hooks/pre-tool-use.mjs'])}\n${task(2, ['.conductor/notes.md'])}\n## Test List\n`);
-    const reason = 'task Task 1 declares .claude/hooks/pre-tool-use.mjs inside the control-plane files';
-    expect(delegateDoc('plan')).toEqual({ status: 0, out: `owner approval required: delegated review plan returned ESCALATE (${reason}); see .conductor/delegate/plan.md`, err: '' });
-    expect(runFile().approvals.plan).toBeNull();
-    expect(runFile().delegated.plan).toMatchObject({ verdict: 'ESCALATE', reason });
-  });
-  ```
-- [X] [T-103] Red step: `npx vitest run tests/scripts/orchestrate.test.js -t "BUG-080"`. Before T-101 no test name contained `BUG-080` (baseline grep: 0), so the filter's full match set is the 56 new tests and every other test is filtered out. Predicted: **44 red** — the pin (`CONTROL_PLANE` is `undefined`), all 28 U41 rows and all 14 U42 rows (each approved by the delegated review today instead of escalating), and U45 (today's reason names Task 2 and the write surface); **12 green** — the 9 U43 rows (approved today, and still approved after the change) and the 3 U44 rows (today's `inSurface` already escalates them with the write-surface reason). A U43 or U44 row that is red here means a fixture problem, not the missing feature: stop and fix the test. Depends on T-102.
-- [X] [T-104] `scripts/orchestrate.mjs`: after `export const WRITE_SURFACE = [RUN_FILE, ENVELOPE_FILE, '.claude/memory/session-snapshot.json', '.conductor/**'];` (line 22), add the constant (plan decision 1). Depends on T-103.
-  ```js
-  // Owner decision (BUG-080): the files that enforce the guards or steer later dispatches, in both mirrors. Same notation
-  // as WRITE_SURFACE; a trailing `/**` protects the whole directory, so a file added to it is covered too.
-  export const CONTROL_PLANE = [
-    '.claude/hooks/**', 'project-template/.claude/hooks/**',
-    '.opencode/plugin/**', 'project-template/.opencode/plugin/**',
-    '.claude/settings.json', '.claude/settings.local.json', '.claude/review-loop.settings.json',
-    'project-template/.claude/settings.json', 'project-template/.claude/settings.local.json', 'project-template/.claude/review-loop.settings.json',
-    '.claude/memory/bash-scan-allowlist.txt', 'project-template/.claude/memory/bash-scan-allowlist.txt',
-    '.claude/agents/**', 'project-template/.claude/agents/**',
-    '.claude/commands/**', 'project-template/.claude/commands/**',
-    '.claude/skills/**', 'project-template/.claude/skills/**',
-    'claude.md', 'claude.local.md', '.claude/claude.md', 'project-template/claude.md',
-    // The router, the three modules it imports at load time, and the scan; the installer deploys them to .claude/scripts/.
-    'scripts/orchestrate.mjs', 'scripts/snap-contract.mjs', 'scripts/ticket.mjs', 'scripts/doc-locations.mjs', 'scripts/security-scan.mjs',
-    '.claude/scripts/**',
-  ];
-  ```
-- [X] [T-105] `scripts/orchestrate.mjs`: replace `inSurface` and `surfaceTask` (from the comment `// A glob reaches the surface when it matches a fixed path, …` above `function inSurface(entry)`, line 1040, through the closing `}` of `function surfaceTask(planText)`, line 1058) with the block below (plan decisions 3-6). `globToRegExp` above it is unchanged. Depends on T-104.
-  ```js
-  // A glob reaches a protected directory when its leading segments can name it; a segment holding `**` can name
-  // anything beneath. A glob shorter than the directory names only the directory entry, never a file inside it.
-  function reachesDir(segs, dir) {
-    for (const [i, part] of dir.split('/').entries()) {
-      if (i >= segs.length) return false;
-      if (segs[i].includes('**')) return true;
-      if (!globToRegExp(segs[i]).test(part)) return false;
-    }
-    return true;
-  }
-  function reachesList(glob, list) {
-    const segs = glob.split('/');
-    return list.some((p) => (p.endsWith('/**') ? reachesDir(segs, p.slice(0, -3)) : globToRegExp(glob).test(p)));
-  }
-  // Case-insensitive filesystems resolve differently-cased spellings to the same file; every protected path is lower-case.
-  const taskGlob = (entry) => entry.replace(/^\.\//, '').toLowerCase();
-  // NTFS aliases one file under other spellings: a data stream, an 8.3 short name, a trailing dot or space.
-  const ntfsAlias = (glob) => glob.split('/').some((seg) => /[:~]|[. ]$/.test(seg));
-  function inSurface(entry) {
-    const glob = taskGlob(entry);
-    return ntfsAlias(glob) || reachesList(glob, WRITE_SURFACE);
-  }
-  // No alias test: surfaceTask runs inSurface first, and it escalates every alias.
-  const inControlPlane = (entry) => reachesList(taskGlob(entry), CONTROL_PLANE);
-
-  // Owner decisions (FEAT-054, BUG-080): a plan whose task would write the run's own record, or the files that enforce
-  // the guards and steer later dispatches, never passes on a delegated verdict. The write surface keeps its reason first.
-  function surfaceTask(planText) {
-    for (const t of extractTasks(planText)) {
-      const path = t.files.find(inSurface);
-      if (path !== undefined) return `task ${t.id} declares ${path} inside the orchestrator write surface`;
-      const plane = t.files.find(inControlPlane);
-      if (plane !== undefined) return `task ${t.id} declares ${plane} inside the control-plane files`;
-    }
-    return null;
-  }
-  ```
-- [X] [T-106] Green step: `npx vitest run tests/scripts/orchestrate.test.js -t "BUG-080"`. Predicted: the same 56 tests, all **green**. Then `npx vitest run tests/scripts/orchestrate.test.js tests/hooks/guard6.test.js`: `orchestrate.test.js` 682 passed (626 + 56), U22's 18 rows and U16 included; `guard6.test.js` all green, its `ORCH_WRITE_SURFACE` parity pin (line 215) included (AC4, AC6). Depends on T-105.
-- [X] [T-107] Stage: `git add -u scripts/orchestrate.mjs`, `git add -u tests/scripts/orchestrate.test.js`, `git add -u docs/superpowers/plans/2026-11-14-bug080-unattended-plan-check-does-not-escalate-tasks.md`. Depends on T-106.
-- [X] [T-108] Commit: `fix: escalate unattended plan tasks that write guard-enforcement and control-plane files [BUG-080]`. Depends on T-107.
+- [X] [T-101] No code drift since the release: `git diff --quiet 76a37f5 -- scripts tests lib tools .claude/hooks project-template/.claude/hooks .claude/commands project-template/.claude/commands .claude/settings.json project-template/.claude/settings.json` exits 0. A non-zero exit means the branch moved under the spec's base: stop and report it, do not edit. Depends on T-004.
+- [X] [T-102] The lists are the ones the spec names: `grep -n "^export const WRITE_SURFACE = \[RUN_FILE, ENVELOPE_FILE, '.claude/memory/session-snapshot.json', '.conductor/\*\*'\];" scripts/orchestrate.mjs` gives one match, and `grep -n "export const CONTROL_PLANE\|const inControlPlane\|function surfaceTask\|inside the control-plane files" scripts/orchestrate.mjs` gives exactly one line each. Depends on T-101.
+- [X] [T-103] Run `npx vitest run tests/scripts/orchestrate.test.js -t "BUG-080|U22 |write surface"`. This is a confirmation run, not a red step; the filter's full match set is predicted **all green, 76 passed, 606 skipped (682)**: the `CONTROL_PLANE` pin, U41 (28), U42 (14), U43 (9, `docs/CLAUDE.md` included), U44 (3), U45, the 18 U22 rows, and the `write surface [FEAT-011 AC4]` pins. Any red row is a regression against the release: stop and report it with the row name. Depends on T-102.
+- [X] [T-104] Run `npx vitest run tests/hooks/guard6.test.js`. Predicted: **30 passed (30)**, the `ORCH_WRITE_SURFACE` parity pin (line 215) included (AC6). Depends on T-103.
 
 ---
 
 ### Task 2: Full suite and closeout
 
 **Files:**
-- Modify: `docs/superpowers/plans/2026-11-14-bug080-unattended-plan-check-does-not-escalate-tasks.md`
+- Modify: `docs/superpowers/plans/2026-11-14-bug080-unattended-plan-check-does-not-escalate-tasks.md` (checkboxes only)
 
-- [X] [T-201] Run `npm test`. Predicted: exit 0, every file green, 56 tests more than the pre-change suite (all in `orchestrate.test.js`; no existing test edited), no new skip (AC7). Depends on T-108.
-- [X] [T-202] Grep checks: `git grep -n "inControlPlane\|reachesDir\|reachesList" -- scripts` shows each defined once in `scripts/orchestrate.mjs` and used only there; `git grep -n "first.startsWith('\*\*')" -- scripts` shows no match (the old first-segment test is gone); `git diff --stat 11b86a3 -- .claude project-template lib tools` is empty (no hook, settings, command, installer or skip-baseline change). Depends on T-201.
-- [X] [T-203] Stage: `git add -u docs/superpowers/plans/2026-11-14-bug080-unattended-plan-check-does-not-escalate-tasks.md` (ticks T-108 to T-202). Depends on T-202.
-- [X] [T-204] Commit: `docs: close out the BUG-080 plan [BUG-080]`. Depends on T-203.
+- [X] [T-201] Run `npm test`. Predicted: exit 0, every file green, no new skip (AC7). A failure that comes from the sandbox (network, tmp permissions) is reported as ENV with the test's name; any other red is a regression to report. Depends on T-104.
+- [X] [T-202] Final scope check: `git status --porcelain` lists only this plan file as modified; `git diff --quiet 76a37f5 -- scripts tests .claude project-template lib tools VERSION CHANGELOG.md package.json package-lock.json README.md "AGENT-READABLE BACKLOG.md"` exits 0 (no code, test, hook, installer or owner-record change against the base). Depends on T-201.
+- [X] [T-203] Stage: `git add -u docs/superpowers/plans/2026-11-14-bug080-unattended-plan-check-does-not-escalate-tasks.md` (ticks T-101 to T-202). Depends on T-202.
+- [X] [T-204] Commit: `docs: verify the BUG-080 control-plane escalation on the 1.52.0 base [BUG-080]`. Depends on T-203.
 
 ---
 
 ## Test List
 
-- [X] Integration, AC1 (one row per control-plane entry): U41, 28 rows, each asserting the printed line, `approvals.plan === null`, the recorded `delegated.plan` entry and a following owner `approve plan` at exit 0.
-- [X] Integration, AC2 (directory, glob and case forms): U42, 14 rows, same assertions.
-- [X] Integration, AC3 (near misses approve): U43, 9 rows, `plan approved by delegated review` and `approvals.plan.by === 'define-review'`.
-- [X] Integration, AC4 (write-surface reason kept): U22 unchanged (18 rows, `.claude/**` and `**/*.json` included) and U44 (`*/hooks/x.sh`, `**/bash-scan-allowlist.txt`, `.claude/hooks./x`).
+- [X] Integration, AC1 (one row per control-plane entry): U41, 28 rows, unchanged since `76a37f5`.
+- [X] Integration, AC2 (directory, glob and case forms): U42, 14 rows.
+- [X] Integration, AC3 (near misses approve): U43, 9 rows, the `docs/CLAUDE.md` near miss included.
+- [X] Integration, AC4 (write-surface reason kept): U22 (18 rows, byte for byte) and U44 (3 rows).
 - [X] Integration, AC5 (plan order wins): U45.
-- [X] Unit, AC6: the `WRITE_SURFACE` pins (`tests/scripts/orchestrate.test.js` lines 470 and 1240) and the Guard 6 parity pin (`tests/hooks/guard6.test.js:215`) unchanged; the new `CONTROL_PLANE` pin.
+- [X] Unit, AC6: the `WRITE_SURFACE` and `CONTROL_PLANE` pins in `tests/scripts/orchestrate.test.js` and the Guard 6 parity pin `tests/hooks/guard6.test.js:215`.
 - [X] AC7: `npm test` green (T-201).
-- [X] No E2E/UI test: there is no UI.
+- [X] No new test: the spec fixes U22 and U41-U45 as the tests that must stay as merged. No E2E/UI test: there is no UI.
 
 ## Commit Order
 
-0. Task 0 — the plan and its `.gitignore` leaf (done by this session's commit).
-1. Task 1 — the constant, the helper and the new rows, one commit; the suite is green at it.
-2. Task 2 — closeout of the plan ticks. The ticks of T-203 and T-204 are made after the last commit and ride whichever commit next stages this plan.
+0. Task 0: this plan (done by this session's commit).
+1. Tasks 1 and 2: one commit, T-204, carrying only the plan's ticks T-101 to T-202. Task 1 has no commit of its own because it edits nothing but checkboxes. The ticks of T-203 and T-204 are made after the last commit and ride whichever commit next stages this plan.
 
 ## Identified Risks
 
-- **The "contains `**`" generalization changes `inSurface` for an inner `**`** (plan decision 4). The change only adds escalations, and no existing row uses such a glob; if one was missed, it fails in T-106's full-file run as an unexpected `owner approval required` line naming the glob.
-- **A near-miss row that escalates.** `.claude` and `project-template` are one segment shorter than every directory entry they prefix; `reachesDir` returns false when the glob runs out. If a row escalates, T-103 already shows it red (it is predicted green there), before any code is written.
-- **Friction on this repository's own unattended runs** (spec, System Impact, accepted by the owner): a plan that edits the commands, agents, `CLAUDE.md` or the router now always waits for `approve plan`. Attended runs and owner approvals never consult the list.
-- **Host projects with their own `scripts/ticket.mjs` or similar** escalate although the file is not ours (spec, accepted friction); the owner approves it.
-- **Run time.** Each new row drives a run to the plan approval through the CLI, as U22 does; 56 rows add roughly a minute or two to `orchestrate.test.js` (measured baseline about 400 s for 626 tests). No timeout is changed.
-- **Line numbers drift.** References are from HEAD 11b86a3; locate by the quoted text if they move.
+- **The branch moves under the base.** If a later merge changes `scripts/`, `tests/` or the hook before the build runs, T-101 fails first and the build stops before any test runs, instead of reporting a green suite for code the spec did not approve.
+- **Scope creep into BUG-083 or the Guard 5 follow-up.** A reviewer may ask to harden the matcher or to mirror the list in the hook. The spec assigns both elsewhere; the build reports such a request and does not edit `scripts/orchestrate.mjs` or the hook.
+- **Run time.** The full `orchestrate.test.js` file takes several minutes (the U-rows spawn the CLI); T-103's filter keeps the targeted check at about 70 s, and `npm test` in T-201 runs everything once.
+- **A plan that only verifies.** The runner's build commit then holds only plan ticks. That matches the spec's "stand as merged" decision; the code itself is in `b06b2fd`.
+- **Line numbers drift.** References are from HEAD `d3e644b`; locate by the quoted text if they move.

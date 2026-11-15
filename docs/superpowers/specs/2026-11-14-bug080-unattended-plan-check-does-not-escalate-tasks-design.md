@@ -16,6 +16,12 @@ The precondition is `--unattended`, which the owner opts into. Attended runs are
 
 - **Scope of the deterministic list.** The list covers the full control plane, in both mirrors where they exist: the hooks, the settings files, the Guard 3 allowlist, the role agents, the commands, the skills, `CLAUDE.md`, and the orchestrator scripts (`scripts/orchestrate.mjs`, `scripts/security-scan.mjs` and their `.claude/scripts/` copies). Leaving the orchestrator scripts or the agents out would keep the reported attack open. The added friction is accepted: the check only fires on delegated approvals in unattended runs, an owner `approve plan` is unchanged, and a plan that rewrites its own control plane is exactly the plan the owner should see.
 - **Tests.** One test row per listed path, plus glob, case and near-miss rows.
+- **Base and state.** The base is `main` at `76a37f5` (tag `v1.52.0`); nothing under `scripts/` or `tests/` changed since `1208f40`, so the `CONTROL_PLANE` list, `inControlPlane` and rows U41-U45 described here stand as merged.
+- **Matcher hardening is a separate item.** Any further change to how `inSurface` and `inControlPlane` normalize a `Files` entry is tracked and fixed under `[BUG-083]`, in its own change from `76a37f5`, and is not part of BUG-080.
+- **What BUG-080 must keep stable.** `CONTROL_PLANE` and `WRITE_SURFACE` stay unchanged, and U22 and U41-U45 stay green byte for byte, including the `docs/CLAUDE.md` near miss in U43.
+- **Hook untouched.** `.claude/hooks/pre-tool-use.mjs` and its `project-template/` copy are not changed by BUG-080 or BUG-083; the matching Guard 5 check is a separate follow-up item.
+- **Other items stay separate.** BUG-081 and BUG-082 are their own items and are not folded into BUG-080 or BUG-083.
+- **Records.** Backlog checkboxes, the `README.md` Known-limits entry, `CHANGELOG.md` and the memory files are written at release (next version 1.52.1), not by this item.
 
 ## Solution
 
