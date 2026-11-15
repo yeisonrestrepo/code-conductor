@@ -4,7 +4,7 @@
 
 **Goal:** Append the fourteen outside-the-run entries the approved spec lists to `CONTROL_PLANE` in `scripts/orchestrate.mjs`, update the pin test to the new array, and add the test rows for AC2-AC5. No logic changes: the reach rule, `inControlPlane`, `surfaceTask` and the reason text stay as BUG-080 shipped them.
 
-**Spec:** `docs/superpowers/specs/2026-11-15-bug081-unattended-plan-check-does-not-escalate-tasks-design.md` (sha256 `96a11a22e8bee0ce125c1ece0aa06834314f458f418845d2812da66694a23bbf`). Issue #231.
+**Spec:** `docs/superpowers/specs/2026-11-15-bug081-unattended-plan-check-does-not-escalate-tasks-design.md` (sha256 `09e31928624b1e45d827bf24c5309b5ba4d40e401bca621f6bbdd26b46ea5381`). Issue #231.
 
 **Test command:** `npm test`. Filtered runs use `npx vitest run <file>` and `-t <pattern>`.
 
@@ -27,6 +27,14 @@
 5. **One commit.** Tests and constant land together (Task 3), because AC1 ties the pin to the constant and a commit with only the tests would be red. The red run in T-106 happens in the working tree before the constant edit.
 6. **`.gitignore` leaf.** `!/docs/superpowers/plans/2026-11-15-bug081-unattended-plan-check-does-not-escalate-tasks.md` is inserted after the `2026-11-14-feat054` plan leaf and before the first spec leaf, the sorted position; `tests/unit/gitignore-block-parity.test.js` checks it.
 7. **Approval (Owner Decision 11).** The spec requires an explicit owner approval of this plan, not a delegated one, before the build starts.
+
+## Owner decisions (plan)
+
+1. **Spec approval.** The spec approved at `e9e432b` (sha256 `96a11a22…`) is confirmed as approved by the owner. The owner records it in a separate commit on this branch on top of `e9e432b` that changes only the spec's Status line to "Approved 2026-11-15 by the owner" (`docs: record the owner's approval of the BUG-081 spec [BUG-081]`). After that commit the spec hashes `09e31928624b1e45d827bf24c5309b5ba4d40e401bca621f6bbdd26b46ea5381`, the value in the **Spec:** line above. No other spec edit is made.
+2. **Plan approval.** The build does not start (T-101) until the owner gives an explicit `approve plan` of this plan, outside any `--unattended` run. A delegated review does not count (Owner Decision 11 of the spec).
+3. **Plan confirmed as written at `e9e432b`.** This includes the U46-U49 row counts (14, 51, 20, 4), the T-106 red count `66 failed, 99 passed, 606 skipped (771)` and the single build commit T-305.
+4. **Pull request.** The pull request from this branch against `main` opens ready for review, not as a draft.
+5. **Issue triage.** Triage of issue #231 (assignee, labels, milestone) happens outside this plan and changes no file in the repository.
 
 ## Baseline (measured on this branch, HEAD 437a3da)
 
