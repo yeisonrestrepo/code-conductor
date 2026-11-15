@@ -1,6 +1,6 @@
 # BUG-080: Unattended plan check does not escalate tasks that write guard-enforcement and control-plane files
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-14 by independent review (round 1)
 
 **Item:** `[BUG-080]` (intake of issue #219). **Date:** 2026-11-14.
 
