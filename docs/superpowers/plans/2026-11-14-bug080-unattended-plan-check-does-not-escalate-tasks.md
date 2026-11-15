@@ -255,14 +255,14 @@ Line numbers below are from HEAD 11b86a3; locate by the quoted text if they move
 
 ## Test List
 
-- [ ] Integration, AC1 (one row per control-plane entry): U41, 28 rows, each asserting the printed line, `approvals.plan === null`, the recorded `delegated.plan` entry and a following owner `approve plan` at exit 0.
-- [ ] Integration, AC2 (directory, glob and case forms): U42, 14 rows, same assertions.
-- [ ] Integration, AC3 (near misses approve): U43, 9 rows, `plan approved by delegated review` and `approvals.plan.by === 'define-review'`.
-- [ ] Integration, AC4 (write-surface reason kept): U22 unchanged (18 rows, `.claude/**` and `**/*.json` included) and U44 (`*/hooks/x.sh`, `**/bash-scan-allowlist.txt`, `.claude/hooks./x`).
-- [ ] Integration, AC5 (plan order wins): U45.
-- [ ] Unit, AC6: the `WRITE_SURFACE` pins (`tests/scripts/orchestrate.test.js` lines 470 and 1240) and the Guard 6 parity pin (`tests/hooks/guard6.test.js:215`) unchanged; the new `CONTROL_PLANE` pin.
-- [ ] AC7: `npm test` green (T-201).
-- [ ] No E2E/UI test: there is no UI.
+- [X] Integration, AC1 (one row per control-plane entry): U41, 28 rows, each asserting the printed line, `approvals.plan === null`, the recorded `delegated.plan` entry and a following owner `approve plan` at exit 0.
+- [X] Integration, AC2 (directory, glob and case forms): U42, 14 rows, same assertions.
+- [X] Integration, AC3 (near misses approve): U43, 9 rows, `plan approved by delegated review` and `approvals.plan.by === 'define-review'`.
+- [X] Integration, AC4 (write-surface reason kept): U22 unchanged (18 rows, `.claude/**` and `**/*.json` included) and U44 (`*/hooks/x.sh`, `**/bash-scan-allowlist.txt`, `.claude/hooks./x`).
+- [X] Integration, AC5 (plan order wins): U45.
+- [X] Unit, AC6: the `WRITE_SURFACE` pins (`tests/scripts/orchestrate.test.js` lines 470 and 1240) and the Guard 6 parity pin (`tests/hooks/guard6.test.js:215`) unchanged; the new `CONTROL_PLANE` pin.
+- [X] AC7: `npm test` green (T-201).
+- [X] No E2E/UI test: there is no UI.
 
 ## Commit Order
 
