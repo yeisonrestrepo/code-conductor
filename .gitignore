@@ -171,6 +171,7 @@ tests/.tmp/
 !/docs/superpowers/plans/2026-11-14-feat053-per-role-model-selection-for-role-agents-with.md
 !/docs/superpowers/plans/2026-11-14-feat054-opt-in-unattended-mode-for-cc-orchestrate-with.md
 !/docs/superpowers/plans/2026-11-15-bug081-unattended-plan-check-does-not-escalate-tasks.md
+!/docs/superpowers/plans/2026-11-18-bug082-unattended-plan-check-does-not-escalate-tasks.md
 !/docs/superpowers/plans/2026-11-18-bug084-adopt-claude-md-mjs-skips-its-entry-point-when.md
 !/docs/superpowers/plans/2026-11-18-bug086-unattended-plan-check-accepts-files-entries.md
 !/docs/superpowers/specs/2026-06-09-bug001-cc-compact-design.md
