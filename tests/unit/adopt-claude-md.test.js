@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -265,5 +265,24 @@ describe('round 2 fixes', () => {
       expect(run.stderr).toMatch(/^ERROR: /);
       expect(run.stderr).not.toMatch(/\n\s+at /);
     }
+  });
+});
+
+describe('entry point [BUG-084]', () => {
+  it('runs the CLI when the script directory is reached through a symlink', () => {
+    const real = join(dir, 'real');
+    mkdirSync(join(real, 'scripts'), { recursive: true });
+    mkdirSync(join(real, 'lib', 'installer'), { recursive: true });
+    copyFileSync(SCRIPT, join(real, 'scripts', 'adopt-claude-md.mjs'));
+    copyFileSync(join(ROOT, 'lib', 'installer', 'merge-md.mjs'), join(real, 'lib', 'installer', 'merge-md.mjs'));
+    const link = join(dir, 'link');
+    symlinkSync(real, link, 'junction');
+    writeFileSync(file, '## Team Rules\nbe kind\n');
+    const sections = (root) => spawnSync('node', [join(root, 'scripts', 'adopt-claude-md.mjs'), 'sections', file], { encoding: 'utf8' });
+    const viaLink = sections(link);
+    const direct = sections(real);
+    expect(viaLink.status).toBe(0);
+    expect(JSON.parse(viaLink.stdout).trigger).toBe(true);
+    expect(viaLink.stdout).toBe(direct.stdout);
   });
 });
