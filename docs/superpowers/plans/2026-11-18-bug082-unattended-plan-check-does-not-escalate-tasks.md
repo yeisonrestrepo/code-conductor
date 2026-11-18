@@ -4,7 +4,7 @@
 
 **Goal:** In `inControlPlane` (`scripts/orchestrate.mjs`), also escalate with the control-plane reason any plan **Files:** entry whose last segment can name `claude.md`, `claude.local.md`, `package.json`, `package-lock.json`, `npm-shrinkwrap.json` or `.npmrc` at any depth (spec rules 1 and 2). The six names live in a new exported constant `CONTROL_PLANE_NAMES`, pinned by a test. Move `docs/CLAUDE.md` out of U43 and four rows out of U48, and add the U52-U54 rows for AC1-AC4.
 
-**Spec:** `docs/superpowers/specs/2026-11-18-bug082-unattended-plan-check-does-not-escalate-tasks-design.md` (sha256 `dd991eb1fdd8b30ea8518ad2813502b6494a6c408bc353b9120678ab908ffc20`). Issue #230.
+**Spec:** `docs/superpowers/specs/2026-11-18-bug082-unattended-plan-check-does-not-escalate-tasks-design.md` (sha256 `665fb408c79caa18763ec18d6e30d8edc4ef66d6e685f7349e7e12a04cdb50d4`). Issue #230.
 
 **Test command:** `npm test`. Filtered runs use `npx vitest run <file>` and `-t <pattern>`.
 
@@ -159,3 +159,7 @@
 - **Friction on later items.** Any unattended plan that declares a workspace `package.json` or a directory glob such as `src/**` now waits for the owner. The spec accepts that cost (Choices, "What matches at any depth").
 - **This item's own plan.** `scripts/orchestrate.mjs` is a `CONTROL_PLANE` entry, so an unattended review of this plan escalates; that is expected.
 - **Line numbers drift.** References are from HEAD `1cf894f`; locate by the quoted text if they move.
+
+## Deviations
+
+- The run ended after the build audit; tests and security review run on the pull request (CI and the security gate).
