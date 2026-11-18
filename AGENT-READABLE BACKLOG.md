@@ -1466,6 +1466,54 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #235; reported by the automated security review of
   #234.
 
+### [ ] `[BUG-084]` adopt-claude-md.mjs skips its entry point when run through a symlinked directory
+
+- Symptom: `scripts/adopt-claude-md.mjs:223` (per the issue) decides
+  whether it was run directly by comparing `import.meta.url` with
+  `pathToFileURL(process.argv[1])`. Under a symlinked directory, such
+  as the macOS default temp dir (`/var/...` -> `/private/var/...`),
+  `import.meta.url` holds the resolved path and `argv[1]` does not, so
+  the comparison fails, the main block is skipped, and the script exits
+  0 with empty stdout.
+- Reproduction per the issue: on macOS with the default `TMPDIR`,
+  tests/installer/deploy.test.js "ships the merge engine so the
+  deployed adopt-claude-md.mjs runs [FEAT-040]" fails at line 95 with
+  `SyntaxError: Unexpected end of JSON input`; with `TMPDIR` set to its
+  real path, the test passes.
+- Expected per the issue: the entry-point check holds whether or not
+  the script's directory is reached through a symlink.
+- Intake of issue #242.
+
+### [ ] `[BUG-085]` Unattended plan check does not escalate tasks that write config-read hook runners, editor and container auto-run files, other package managers or other CI systems
+
+- Symptom: the unattended plan check's `CONTROL_PLANE` covers git
+  hooks, MCP config, GitHub workflows and npm manifests (per the
+  issue); other files that run code outside the run are not covered
+  yet.
+- Scope of the follow-up per the issue: config-read hook runners,
+  editor and container auto-run configuration, other package managers,
+  and other CI systems. Nested and workspace manifests are tracked
+  separately and are out of scope here.
+- Follow-up to `[BUG-081]`.
+- Intake of issue #241.
+
+### [ ] `[BUG-086]` Unattended plan check accepts Files entries with characters outside printable ASCII
+
+- Symptom: the unattended plan check compares each task's **Files:**
+  entries against `WRITE_SURFACE` and `CONTROL_PLANE` after
+  normalizing them. An entry that holds characters outside printable
+  ASCII is not treated as protected.
+- Impact per the issue: such an entry can reach the delegated APPROVE
+  path without the owner seeing it.
+- Fix shape suggested by the issue: in `inSurface`
+  (scripts/orchestrate.mjs), protect any entry holding a character
+  outside 0x20-0x7E with the write-surface reason, testing the raw
+  entry before the leading `./` strip and before lower-casing. Rows at
+  the root and nested, across `WRITE_SURFACE` and `CONTROL_PLANE`
+  entries, escalate with that reason; ordinary ASCII entries such as
+  `src/a.js` and `docs/notes.md` keep the delegated APPROVE.
+- Intake of issue #240.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
