@@ -87,10 +87,10 @@ Written exactly as below in the test source (JavaScript string escapes):
 **Files:**
 - Modify: `tests/scripts/orchestrate.test.js`
 
-- [ ] [T-101] Add a one-line comment after U49 (ends near line 3766): `// BUG-086: an entry outside printable ASCII escalates with the write-surface reason, whatever list it spells; characters are \u escapes.` Depends on T-004.
-- [ ] [T-102] Add after that comment `it.each([...U50 rows])('U50 [BUG-086 AC1-AC4] delegate plan over an APPROVE report escalates the entry outside printable ASCII %j with the write-surface reason', (path) => { expectEscalation(path, 'orchestrator write surface'); });` with the 14 U50 rows in table order. `%j` prints the row JSON-escaped, so the test name shows the invisible character. Depends on T-101.
-- [ ] [T-103] Add after U50 `it.each([...U51 rows])('U51 [BUG-086 AC5] delegate plan over an APPROVE report approves the printable-ASCII entry %s', (path) => { … })` with the 4 U51 rows and the U43 body verbatim: `atPlan();`, `plan(\`# Demo Plan\n\n${task(1, ['src/a.js'])}\n${task(2, [path])}\n## Test List\n\`);`, `expect(delegateDoc('plan')).toEqual({ status: 0, out: \`plan approved by delegated review: define_approved, 2 task(s); sha256 ${sha(PLAN)}\`, err: '' });`, `expect(runFile().approvals.plan.by).toBe('define-review');`. Depends on T-102.
-- [ ] [T-104] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t "BUG-086"`. Predicted for the filter's full match set: **14 failed, 4 passed, 771 skipped (789)**. Failing: all 14 U50 rows (11 approved, 3 escalated with the control-plane reason, plan decision 3). Passing: the 4 U51 rows. No existing test name contains `BUG-086`, so nothing else matches. Any other count means a row is mistyped: fix the row, not the prediction. Depends on T-103.
+- [X] [T-101] Add a one-line comment after U49 (ends near line 3766): `// BUG-086: an entry outside printable ASCII escalates with the write-surface reason, whatever list it spells; characters are \u escapes.` Depends on T-004.
+- [X] [T-102] Add after that comment `it.each([...U50 rows])('U50 [BUG-086 AC1-AC4] delegate plan over an APPROVE report escalates the entry outside printable ASCII %j with the write-surface reason', (path) => { expectEscalation(path, 'orchestrator write surface'); });` with the 14 U50 rows in table order. `%j` prints the row JSON-escaped, so the test name shows the invisible character. Depends on T-101.
+- [X] [T-103] Add after U50 `it.each([...U51 rows])('U51 [BUG-086 AC5] delegate plan over an APPROVE report approves the printable-ASCII entry %s', (path) => { … })` with the 4 U51 rows and the U43 body verbatim: `atPlan();`, `plan(\`# Demo Plan\n\n${task(1, ['src/a.js'])}\n${task(2, [path])}\n## Test List\n\`);`, `expect(delegateDoc('plan')).toEqual({ status: 0, out: \`plan approved by delegated review: define_approved, 2 task(s); sha256 ${sha(PLAN)}\`, err: '' });`, `expect(runFile().approvals.plan.by).toBe('define-review');`. Depends on T-102.
+- [X] [T-104] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t "BUG-086"`. Predicted for the filter's full match set: **14 failed, 4 passed, 771 skipped (789)**. Failing: all 14 U50 rows (11 approved, 3 escalated with the control-plane reason, plan decision 3). Passing: the 4 U51 rows. No existing test name contains `BUG-086`, so nothing else matches. Any other count means a row is mistyped: fix the row, not the prediction. Depends on T-103.
 
 ---
 
@@ -99,11 +99,11 @@ Written exactly as below in the test source (JavaScript string escapes):
 **Files:**
 - Modify: `scripts/orchestrate.mjs`
 
-- [ ] [T-201] Modify `scripts/orchestrate.mjs`: after the `const ntfsAlias = …` line, add the two comment lines and the `nonAscii` predicate of plan decision 1. Depends on T-104.
-- [ ] [T-202] Modify `inSurface`: its return becomes `return nonAscii(entry) || ntfsAlias(glob) || reachesList(glob, WRITE_SURFACE);`. Depends on T-201.
-- [ ] [T-203] Modify the comment above `inControlPlane` to the text of plan decision 1. Depends on T-202.
-- [ ] [T-204] Green run: the T-104 command. Predicted: **18 passed, 771 skipped (789)**, no failure. Depends on T-203.
-- [ ] [T-205] AC6 run: `npx vitest run tests/scripts/orchestrate.test.js -t "BUG-080|BUG-081|U22 |write surface"`. Predicted: **165 passed, 624 skipped (789)**, the BUG-081 green count with 18 more skipped tests. Depends on T-204.
+- [X] [T-201] Modify `scripts/orchestrate.mjs`: after the `const ntfsAlias = …` line, add the two comment lines and the `nonAscii` predicate of plan decision 1. Depends on T-104.
+- [X] [T-202] Modify `inSurface`: its return becomes `return nonAscii(entry) || ntfsAlias(glob) || reachesList(glob, WRITE_SURFACE);`. Depends on T-201.
+- [X] [T-203] Modify the comment above `inControlPlane` to the text of plan decision 1. Depends on T-202.
+- [X] [T-204] Green run: the T-104 command. Predicted: **18 passed, 771 skipped (789)**, no failure. Depends on T-203.
+- [X] [T-205] AC6 run: `npx vitest run tests/scripts/orchestrate.test.js -t "BUG-080|BUG-081|U22 |write surface"`. Predicted: **165 passed, 624 skipped (789)**, the BUG-081 green count with 18 more skipped tests. Depends on T-204.
 
 ---
 
@@ -112,22 +112,22 @@ Written exactly as below in the test source (JavaScript string escapes):
 **Files:**
 - Modify: `scripts/orchestrate.mjs`, `tests/scripts/orchestrate.test.js` (staged), this plan (checkboxes)
 
-- [ ] [T-301] Run `npm test`. Predicted locally: exit 0, every file green (AC6). CI legs run 18 more tests each, none skipped, so `tools/skip-baseline.json` stays untouched. A failure that comes from the sandbox (network, tmp permissions) is reported as ENV with the test's name; any other red is fixed. Depends on T-205.
-- [ ] [T-302] Scope check: `git status --porcelain` lists exactly `scripts/orchestrate.mjs`, `tests/scripts/orchestrate.test.js` and this plan as modified; `git diff -U0 HEAD -- tests/scripts/orchestrate.test.js | grep '^-[^-]'` is empty (no existing row or helper changed); `git diff -U0 HEAD -- scripts/orchestrate.mjs | grep '^-[^-]'` shows exactly two lines, the old `inSurface` return and the old `inControlPlane` comment; `git diff --quiet HEAD -- VERSION CHANGELOG.md package.json package-lock.json README.md "AGENT-READABLE BACKLOG.md" .claude .github project-template tools` exits 0. Depends on T-301.
-- [ ] [T-303] Stage: `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js` (both tracked). Depends on T-302.
-- [ ] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-18-bug086-unattended-plan-check-accepts-files-entries.md` (ticks T-101 to T-303). Depends on T-303.
-- [ ] [T-305] Commit: `fix: escalate unattended plan entries outside printable ASCII [BUG-086]`. Depends on T-304.
+- [X] [T-301] Run `npm test`. Predicted locally: exit 0, every file green (AC6). CI legs run 18 more tests each, none skipped, so `tools/skip-baseline.json` stays untouched. A failure that comes from the sandbox (network, tmp permissions) is reported as ENV with the test's name; any other red is fixed. Depends on T-205.
+- [X] [T-302] Scope check: `git status --porcelain` lists exactly `scripts/orchestrate.mjs`, `tests/scripts/orchestrate.test.js` and this plan as modified; `git diff -U0 HEAD -- tests/scripts/orchestrate.test.js | grep '^-[^-]'` is empty (no existing row or helper changed); `git diff -U0 HEAD -- scripts/orchestrate.mjs | grep '^-[^-]'` shows exactly two lines, the old `inSurface` return and the old `inControlPlane` comment; `git diff --quiet HEAD -- VERSION CHANGELOG.md package.json package-lock.json README.md "AGENT-READABLE BACKLOG.md" .claude .github project-template tools` exits 0. Depends on T-301.
+- [X] [T-303] Stage: `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js` (both tracked). Depends on T-302.
+- [X] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-18-bug086-unattended-plan-check-accepts-files-entries.md` (ticks T-101 to T-303). Depends on T-303.
+- [X] [T-305] Commit: `fix: escalate unattended plan entries outside printable ASCII [BUG-086]`. Depends on T-304.
 
 ---
 
 ## Test List
 
-- [ ] Integration, AC1: U50 rows at the root and nested, spelled from `WRITE_SURFACE` and `CONTROL_PLANE` entries, escalate with the write-surface reason; `approvals.plan` stays `null`, `delegated.plan` records the verdict and reason, and the owner's `approve plan` exits 0 (`expectEscalation`; T-102).
-- [ ] Integration, AC2: U50 covers TAB, 0x1F, DEL, 0x80, U+00E9, U+200B, U+FF0E, an astral character, and `docs/r\u00E9sum\u00E9.md`, which matches no list (T-102).
-- [ ] Integration, AC3: U50 row `pac\u212Aage.json` names the write surface, not the control plane (T-102).
-- [ ] Integration, AC4: U50 row `./package.json\u200B` escalates and the reason names the entry without `./` (T-102).
-- [ ] Integration, AC5: U51, 4 printable-ASCII rows keep the delegated APPROVE (T-103).
-- [ ] AC6: U22 and U41-U49 unchanged and green (T-205, T-302); `npm test` green (T-301).
+- [X] Integration, AC1: U50 rows at the root and nested, spelled from `WRITE_SURFACE` and `CONTROL_PLANE` entries, escalate with the write-surface reason; `approvals.plan` stays `null`, `delegated.plan` records the verdict and reason, and the owner's `approve plan` exits 0 (`expectEscalation`; T-102).
+- [X] Integration, AC2: U50 covers TAB, 0x1F, DEL, 0x80, U+00E9, U+200B, U+FF0E, an astral character, and `docs/r\u00E9sum\u00E9.md`, which matches no list (T-102).
+- [X] Integration, AC3: U50 row `pac\u212Aage.json` names the write surface, not the control plane (T-102).
+- [X] Integration, AC4: U50 row `./package.json\u200B` escalates and the reason names the entry without `./` (T-102).
+- [X] Integration, AC5: U51, 4 printable-ASCII rows keep the delegated APPROVE (T-103).
+- [X] AC6: U22 and U41-U49 unchanged and green (T-205, T-302); `npm test` green (T-301).
 - [ ] No E2E/UI test: there is no UI.
 
 ## Commit Order
