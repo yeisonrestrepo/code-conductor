@@ -256,6 +256,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-11-14-feat054-opt-in-unattended-mode-for-cc-orchestrate-with-design.md
 !/docs/superpowers/specs/2026-11-15-bug081-unattended-plan-check-does-not-escalate-tasks-design.md
 !/docs/superpowers/specs/2026-11-18-bug084-adopt-claude-md-mjs-skips-its-entry-point-when-design.md
+!/docs/superpowers/specs/2026-11-18-bug086-unattended-plan-check-accepts-files-entries-design.md
 # --- END tracked-surface block (BUG-042) ---
 
 # Kept for external writers. Both lines are redundant against the block above; each is
