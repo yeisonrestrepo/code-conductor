@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.52.2] - 2026-11-18
+
+### Fixed
+- **[BUG-081]** An unattended `delegate plan` now also escalates a task whose `Files` entry reaches a file that runs code after the run ends. Fourteen entries join `CONTROL_PLANE` in `scripts/orchestrate.mjs`: git hooks (`.git/**`, `.husky/**`, `.githooks/**`), MCP and OpenCode server config (`.mcp.json`, `opencode.json`, `opencode.jsonc`), the status line script in both mirrors (`.claude/flow-status.mjs`, `project-template/.claude/flow-status.mjs`), CI (`.github/workflows/**`, `.github/actions/**`) and the root npm files (`package.json`, `package-lock.json`, `npm-shrinkwrap.json`, `.npmrc`). `package.json` is listed as a whole file, because a `Files` entry cannot name a lifecycle-script key inside it. The reach rule, `inControlPlane`, `surfaceTask` and the reason text (`task <id> declares <entry> inside the control-plane files`) are unchanged, so directory, glob, case and `./` forms escalate, and a glob that reaches both lists keeps the write-surface reason. Near misses such as `.gitignore`, `.github/CODEOWNERS`, `.github/workflowsx/a.yml`, `docs/.git/hooks/x`, `mcp.json` and `.npmrc.example` still approve, and nested manifests such as `tools/package.json` are left to `[BUG-082]`. `WRITE_SURFACE`, the hook's `ORCH_WRITE_SURFACE` and Guard 6 are unchanged, and an owner `approve plan` never consults the list. `tests/scripts/orchestrate.test.js` pins the list and adds rows U46–U49. Landed from PR #238 (yeisonrestrepo), intake of issue #231.
+
+### Changed
+- `CLAUDE.md` gains an **Issue Triage** section: every issue an agent opens or picks up gets `cc-reviewer-bot` as assignee, one type label plus every applicable area label from `gh label list`, and exactly one pillar milestone, with a session-end sweep for issues missing any of the three. Repository agent instructions only, not shipped in the package, no id. Landed from PR #225 (Ludocius), issue #227.
+
 ## [1.52.1] - 2026-11-15
 
 ### Fixed
