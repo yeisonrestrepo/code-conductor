@@ -1,6 +1,6 @@
 # BUG-081: Unattended plan check does not escalate tasks that write git hooks, MCP config, CI workflows and package lifecycle scripts
 
-**Status:** Approved 2026-11-15 by independent review (round 1)
+**Status:** Approved 2026-11-15 by the owner
 
 **Item:** `[BUG-081]` (intake of issue #231). **Date:** 2026-11-15.
 
