@@ -1,6 +1,6 @@
 # BUG-082: Unattended plan check does not escalate tasks that write nested CLAUDE.md files
 
-**Status:** Approved 2026-11-18 by independent review (round 1)
+**Status:** Approved 2026-11-18 by the owner
 
 **Item:** `[BUG-082]` (intake of issue #230). **Date:** 2026-11-18.
 
