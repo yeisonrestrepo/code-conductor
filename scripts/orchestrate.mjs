@@ -1077,11 +1077,14 @@ function reachesList(glob, list) {
 const taskGlob = (entry) => entry.replace(/^\.\//, '').toLowerCase();
 // NTFS aliases one file under other spellings: a data stream, an 8.3 short name, a trailing dot or space.
 const ntfsAlias = (glob) => glob.split('/').some((seg) => /[:~]|[. ]$/.test(seg));
+// Outside printable ASCII, no lexical test can tell which file a filesystem or tool resolves; tested before taskGlob
+// folds case, because toLowerCase maps some of these characters to ASCII (U+212A KELVIN SIGN to `k`).
+const nonAscii = (entry) => /[^\x20-\x7e]/.test(entry);
 function inSurface(entry) {
   const glob = taskGlob(entry);
-  return ntfsAlias(glob) || reachesList(glob, WRITE_SURFACE);
+  return nonAscii(entry) || ntfsAlias(glob) || reachesList(glob, WRITE_SURFACE);
 }
-// No alias test: surfaceTask runs inSurface first, and it escalates every alias.
+// No alias or non-ASCII test: surfaceTask runs inSurface first, and it escalates every alias and every non-ASCII entry.
 const inControlPlane = (entry) => reachesList(taskGlob(entry), CONTROL_PLANE);
 
 // Owner decisions (FEAT-054, BUG-080): a plan whose task would write the run's own record, or the files that enforce
