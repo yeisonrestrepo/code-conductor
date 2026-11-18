@@ -3295,8 +3295,6 @@ Three PRs merged since `v1.51.0`, all by `cc-lane-bot[bot]`. Existing ids closed
 
 All three specs were approved 2026-11-14 by independent review. Nothing minted: BUG-080 was reserved by triage #219 and is closed under that id.
 
-Process note: an earlier release PR for this version (#222) was sent back. That review asked for the FEAT-054 records to name a follow-up FEAT-054 fix PR carrying a printable-ASCII rule and a control-path rule. The control-path rule landed as BUG-080 (#228) under its own triage-reserved id, so the FEAT-054 entries point to `[BUG-080]` rather than claiming #228. No printable-ASCII rule is present in `scripts/orchestrate.mjs` on this base, so none is recorded; it remains for the owner to rule on.
-
 Known limits: the BUG-076 and BUG-080 lines are removed. BUG-077 (triage #199), BUG-078 (triage #203) and BUG-079 (triage #213) stay open. The orchestrator item gains one line: the run file is inside the orchestrator's write surface, so a hand edit could set `unattended` or forge an approval, and Guard 6 does not stop it.
 
 No upgrade step: a run without `--unattended` writes no new field, and its stdout is unchanged. All three descriptions report two `tests/unit/staging-convention.test.js` assertions failing in their sandboxes (`git add -u` on an untracked path exits 0 under the local git); CI on the release PR is the authority.
