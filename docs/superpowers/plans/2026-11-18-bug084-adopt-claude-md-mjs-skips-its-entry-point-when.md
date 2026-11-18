@@ -109,11 +109,11 @@
 
 ## Test List
 
-- [ ] Unit, AC1-AC3: `entry point [BUG-084]` runs `sections` through a junction-typed directory link and gets exit 0, `trigger: true` and the same stdout as through the real path. It is red before T-202 (T-103) and green after (T-203).
-- [ ] Unit, AC4: the 29 existing tests in `tests/unit/adopt-claude-md.test.js` pass unchanged, so importing the module still has no side effects (T-203).
-- [ ] Integration, AC5: `tests/installer/deploy.test.js` FEAT-040 deploy-and-run test passes unchanged (T-301).
-- [ ] AC6: `npm test` green (T-301).
-- [ ] No E2E/UI test: there is no UI.
+- [X] Unit, AC1-AC3: `entry point [BUG-084]` runs `sections` through a junction-typed directory link and gets exit 0, `trigger: true` and the same stdout as through the real path. It is red before T-202 (T-103) and green after (T-203).
+- [X] Unit, AC4: the 29 existing tests in `tests/unit/adopt-claude-md.test.js` pass unchanged, so importing the module still has no side effects (T-203).
+- [X] Integration, AC5: `tests/installer/deploy.test.js` FEAT-040 deploy-and-run test passes unchanged (T-301).
+- [X] AC6: `npm test` green (T-301).
+- [X] No E2E/UI test: there is no UI.
 
 ## Commit Order
 
