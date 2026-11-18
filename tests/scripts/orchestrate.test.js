@@ -3767,20 +3767,20 @@ describe('unattended mode [FEAT-054]', () => {
 
   // BUG-086: an entry outside printable ASCII escalates with the write-surface reason, whatever list it spells; characters are \u escapes.
   it.each([
-    '.conductor​/x',
-    '.claude/memory/band-envelope.json​',
-    '.claude/memory/orchestrator-runé.json',
-    'package.json​',
-    'CLAUDE․md',
+    '.conductor\u200B/x',
+    '.claude/memory/band-envelope.json\u200B',
+    '.claude/memory/orchestrator-run\u00E9.json',
+    'package.json\u200B',
+    'CLAUDE\u2024md',
     '.npmrc\u001F',
     'opencode.json\u0080',
     '.mcp\u{1F4E6}.json',
-    '.claude/hooks/pre-tool-use．mjs',
+    '.claude/hooks/pre-tool-use\uFF0Emjs',
     '.github/workflows/ci\t.yml',
     'scripts/orchestrate\u007F.mjs',
-    'docs/résumé.md',
-    'pacKage.json',
-    './package.json​',
+    'docs/r\u00E9sum\u00E9.md',
+    'pac\u212Aage.json',
+    './package.json\u200B',
   ])('U50 [BUG-086 AC1-AC4] delegate plan over an APPROVE report escalates the entry outside printable ASCII %j with the write-surface reason', (path) => {
     expectEscalation(path, 'orchestrator write surface');
   });
