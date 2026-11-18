@@ -7,6 +7,9 @@
 - **[BUG-084]** `scripts/adopt-claude-md.mjs` runs its main block when launched through a symlinked directory, such as the macOS default temp dir. The direct-run check now resolves `process.argv[1]` with `fs.realpathSync` before comparing it with `import.meta.url`, which Node already sets to the module's real path, and falls back to the raw argument when it cannot be resolved. Importing the module still has no side effects. A unit test, `entry point [BUG-084]` in `tests/unit/adopt-claude-md.test.js`, runs the `sections` command through a directory link and expects the same exit code and stdout as through the real path. Landed from PR #245 (cc-lane-bot), intake of issue #242.
 - **[BUG-086]** An unattended `delegate plan` now escalates a task whose `Files` entry holds any character outside printable ASCII (0x20–0x7E), with the write-surface reason, whichever list the entry spells. The test runs on the raw entry, before case folding, because `toLowerCase` maps some such characters to ASCII (U+212A KELVIN SIGN to `k`). Printable-ASCII entries, spaces and punctuation included, keep the delegated `APPROVE`. Pinned by rows U50 and U51 in `tests/scripts/orchestrate.test.js`. Landed from PR #247 (cc-lane-bot), intake of issue #240.
 
+### Changed
+- The repository's own `CLAUDE.md` gains an Issue Triage section: every issue an agent opens or picks up is assigned to `cc-reviewer-bot`, carries at least one type label and every applicable area label from `gh label list`, and gets exactly one pillar milestone, with a session-end sweep for open issues missing any of the three. It changes only a file the package does not ship, so it has no id. Landed from PR #225 (Ludocius), issue #227.
+
 ## [1.52.1] - 2026-11-15
 
 ### Fixed
