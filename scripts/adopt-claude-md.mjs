@@ -220,7 +220,17 @@ function main([command, file, planFile, token]) {
   throw new AdoptError('usage: adopt-claude-md.mjs sections|render|apply <file> [plan.json] [token]');
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+// Node's ESM loader sets import.meta.url to the module's realpath, so argv[1] must be
+// realpath-resolved too, or a launch through a symlinked directory skips the main block.
+function invokedDirectly() {
+  const argv1 = process.argv[1];
+  if (!argv1) return false;
+  let resolved;
+  try { resolved = fs.realpathSync(argv1); } catch { resolved = argv1; }
+  return import.meta.url === pathToFileURL(resolved).href;
+}
+
+if (invokedDirectly()) {
   try { main(process.argv.slice(2)); } catch (err) {
     if (!(err instanceof AdoptError)) throw err;
     console.error(`ERROR: ${err.message}`);

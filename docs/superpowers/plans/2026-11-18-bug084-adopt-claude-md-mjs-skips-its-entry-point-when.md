@@ -51,8 +51,8 @@
 **Files:**
 - Modify: `tests/unit/adopt-claude-md.test.js`
 
-- [ ] [T-101] Modify the `node:fs` import at `tests/unit/adopt-claude-md.test.js:3` to `import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';`. Depends on T-004.
-- [ ] [T-102] Append after the last line of the file (the close of `describe('round 2 fixes')`, line 269) a `describe('entry point [BUG-084]', …)` holding one test, `it('runs the CLI when the script directory is reached through a symlink', …)`. The body (plan decisions 2-4):
+- [X] [T-101] Modify the `node:fs` import at `tests/unit/adopt-claude-md.test.js:3` to `import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';`. Depends on T-004.
+- [X] [T-102] Append after the last line of the file (the close of `describe('round 2 fixes')`, line 269) a `describe('entry point [BUG-084]', …)` holding one test, `it('runs the CLI when the script directory is reached through a symlink', …)`. The body (plan decisions 2-4):
   - `const real = join(dir, 'real');`, then `mkdirSync(join(real, 'scripts'), { recursive: true });` and `mkdirSync(join(real, 'lib', 'installer'), { recursive: true });`.
   - `copyFileSync(SCRIPT, join(real, 'scripts', 'adopt-claude-md.mjs'));` and `copyFileSync(join(ROOT, 'lib', 'installer', 'merge-md.mjs'), join(real, 'lib', 'installer', 'merge-md.mjs'));`.
   - `const link = join(dir, 'link');`, then `symlinkSync(real, link, 'junction');`.
@@ -60,7 +60,7 @@
   - A local `const sections = (root) => spawnSync('node', [join(root, 'scripts', 'adopt-claude-md.mjs'), 'sections', file], { encoding: 'utf8' });`, then `const viaLink = sections(link);` and `const direct = sections(real);`.
   - `expect(viaLink.status).toBe(0);`, `expect(JSON.parse(viaLink.stdout).trigger).toBe(true);`, `expect(viaLink.stdout).toBe(direct.stdout);`.
   - Depends on T-101.
-- [ ] [T-103] Red run: `npx vitest run tests/unit/adopt-claude-md.test.js`. The filter is the whole file, so its full match set is the 29 baseline tests plus the new one. Predicted: **1 failed, 29 passed (30)**. The failure is the new test, with a `SyntaxError` from `JSON.parse` on the empty stdout through the link (spec, AC3). Any other count, or a failure at `status`, means the fixture is wrong: fix the fixture, not the prediction. Depends on T-102.
+- [X] [T-103] Red run: `npx vitest run tests/unit/adopt-claude-md.test.js`. The filter is the whole file, so its full match set is the 29 baseline tests plus the new one. Predicted: **1 failed, 29 passed (30)**. The failure is the new test, with a `SyntaxError` from `JSON.parse` on the empty stdout through the link (spec, AC3). Any other count, or a failure at `status`, means the fixture is wrong: fix the fixture, not the prediction. Depends on T-102.
 
 ---
 
@@ -69,7 +69,7 @@
 **Files:**
 - Modify: `scripts/adopt-claude-md.mjs`
 
-- [ ] [T-201] Insert between `main()` (closing brace at line 221) and the guarded block, separated from each by one blank line:
+- [X] [T-201] Insert between `main()` (closing brace at line 221) and the guarded block, separated from each by one blank line:
 
   ```js
   // Node's ESM loader sets import.meta.url to the module's realpath, so argv[1] must be
@@ -84,8 +84,8 @@
   ```
 
   Depends on T-103.
-- [ ] [T-202] Replace the condition `if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {` with `if (invokedDirectly()) {`. The block body stays byte for byte. Depends on T-201.
-- [ ] [T-203] Green run: the T-103 command. Predicted: **30 passed (30)**. The 29 existing tests staying green covers AC4: importing the module as `tests/unit/adopt-claude-md.test.js:7` does still does not run the main block. Depends on T-202.
+- [X] [T-202] Replace the condition `if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {` with `if (invokedDirectly()) {`. The block body stays byte for byte. Depends on T-201.
+- [X] [T-203] Green run: the T-103 command. Predicted: **30 passed (30)**. The 29 existing tests staying green covers AC4: importing the module as `tests/unit/adopt-claude-md.test.js:7` does still does not run the main block. Depends on T-202.
 
 ---
 
@@ -94,16 +94,16 @@
 **Files:**
 - Modify: `scripts/adopt-claude-md.mjs`, `tests/unit/adopt-claude-md.test.js` (staged), this plan (checkboxes)
 
-- [ ] [T-301] Run `npm test`. Predicted: exit 0, every file green, including `tests/installer/deploy.test.js` "ships the merge engine so the deployed adopt-claude-md.mjs runs [FEAT-040]", which is unchanged (AC5, AC6). On every CI leg the new test runs and is not skipped, so `tools/skip-baseline.json` stays untouched. A failure caused by the sandbox (network, tmp permissions) is reported as ENV with the test's name. Any other red is fixed. Depends on T-203.
-- [ ] [T-302] Scope check:
+- [X] [T-301] Run `npm test`. Predicted: exit 0, every file green, including `tests/installer/deploy.test.js` "ships the merge engine so the deployed adopt-claude-md.mjs runs [FEAT-040]", which is unchanged (AC5, AC6). On every CI leg the new test runs and is not skipped, so `tools/skip-baseline.json` stays untouched. A failure caused by the sandbox (network, tmp permissions) is reported as ENV with the test's name. Any other red is fixed. Depends on T-203.
+- [X] [T-302] Scope check:
   - `git status --porcelain` lists exactly `scripts/adopt-claude-md.mjs`, `tests/unit/adopt-claude-md.test.js` and this plan as modified.
   - `git diff -U0 HEAD -- scripts/adopt-claude-md.mjs | grep '^-[^-]'` shows only the old `if (import.meta.url === …)` line.
   - `git diff -U0 HEAD -- tests/unit/adopt-claude-md.test.js | grep '^-[^-]'` shows only the old `node:fs` import line.
   - `git diff --quiet HEAD -- VERSION CHANGELOG.md package.json package-lock.json README.md "AGENT-READABLE BACKLOG.md" .claude tools lib bin tests/installer .github` exits 0.
   - Depends on T-301.
-- [ ] [T-303] Stage: `git add -u scripts/adopt-claude-md.mjs tests/unit/adopt-claude-md.test.js` (both tracked). Depends on T-302.
-- [ ] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-18-bug084-adopt-claude-md-mjs-skips-its-entry-point-when.md` (carries the ticks for T-101 to T-303). Depends on T-303.
-- [ ] [T-305] Commit: `fix: run adopt-claude-md.mjs when its directory is reached through a symlink [BUG-084]`. Depends on T-304.
+- [X] [T-303] Stage: `git add -u scripts/adopt-claude-md.mjs tests/unit/adopt-claude-md.test.js` (both tracked). Depends on T-302.
+- [X] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-18-bug084-adopt-claude-md-mjs-skips-its-entry-point-when.md` (carries the ticks for T-101 to T-303). Depends on T-303.
+- [X] [T-305] Commit: `fix: run adopt-claude-md.mjs when its directory is reached through a symlink [BUG-084]`. Depends on T-304.
 
 ---
 
