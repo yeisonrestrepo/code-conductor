@@ -4,7 +4,7 @@
 
 **Goal:** In `inControlPlane` (`scripts/orchestrate.mjs`), also escalate with the control-plane reason any plan **Files:** entry whose last segment can name `claude.md`, `claude.local.md`, `package.json`, `package-lock.json`, `npm-shrinkwrap.json` or `.npmrc` at any depth (spec rules 1 and 2). The six names live in a new exported constant `CONTROL_PLANE_NAMES`, pinned by a test. Move `docs/CLAUDE.md` out of U43 and four rows out of U48, and add the U52-U54 rows for AC1-AC4.
 
-**Spec:** `docs/superpowers/specs/2026-11-18-bug082-unattended-plan-check-does-not-escalate-tasks-design.md` (sha256 `665fb408c79caa18763ec18d6e30d8edc4ef66d6e685f7349e7e12a04cdb50d4`). Issue #230.
+**Spec:** `docs/superpowers/specs/2026-11-18-bug082-unattended-plan-check-does-not-escalate-tasks-design.md` (sha256 `dd991eb1fdd8b30ea8518ad2813502b6494a6c408bc353b9120678ab908ffc20`). Issue #230.
 
 **Test command:** `npm test`. Filtered runs use `npx vitest run <file>` and `-t <pattern>`.
 
@@ -150,10 +150,6 @@
 
 0. Task 0: this plan and its `.gitignore` leaf (done by this session's commit).
 1. Tasks 1-3: one commit, T-305, carrying the constant, the helper, the tests and the ticks T-101 to T-303 (plan decision 6). Tasks 1 and 2 have no commit of their own: a tests-only commit would be red. The ticks of T-304 and T-305 are made after the last commit and ride whichever commit next stages this plan.
-
-## Deviations
-
-- **Spec approval.** The spec's approval was first recorded by a delegated review at `1cf894f`. Commit `2f0f9fb` (`docs: record the owner's approval of the BUG-082 spec`) replaces it: the owner approved the spec themselves, changing only line 3 (`**Status:**`). The spec body is unchanged, and its sha256 is now `665fb408c79caa18763ec18d6e30d8edc4ef66d6e685f7349e7e12a04cdb50d4`, the hash on the **Spec:** line above. The `HEAD \`1cf894f\`` references in this plan are line-number anchors only.
 
 ## Identified Risks
 
