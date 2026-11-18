@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.52.2] - 2026-11-18
+
+### Fixed
+- **[BUG-081]** An unattended `delegate plan` now also escalates a task whose `Files` entry reaches a file that runs code outside the run, after it ends. Fourteen entries are appended to `CONTROL_PLANE` in `scripts/orchestrate.mjs`: git hooks (`.git/**`, `.husky/**`, `.githooks/**`), MCP and OpenCode server config (`.mcp.json`, `opencode.json`, `opencode.jsonc`), the status line in both mirrors (`.claude/flow-status.mjs`, `project-template/.claude/flow-status.mjs`), CI (`.github/workflows/**`, `.github/actions/**`) and npm (`package.json`, `package-lock.json`, `npm-shrinkwrap.json`, `.npmrc`). They use the same reach test and the same `… inside the control-plane files` reason as `[BUG-080]`'s entries; `inControlPlane`, `surfaceTask` and the reason text are unchanged, and an owner `approve plan` never consults the list. Nested and workspace manifests are not covered (`[BUG-082]`), nor are config-read hook runners, editor and container auto-run files, other package managers or other CI systems (`[BUG-085]`). `tests/scripts/orchestrate.test.js` pins the list and adds rows U46–U49. Landed from PR #238 (yeisonrestrepo), intake of issue #231.
+- **[BUG-084]** `scripts/adopt-claude-md.mjs` runs its main block when launched through a symlinked directory, such as the macOS default temp dir. The direct-run check now resolves `process.argv[1]` with `fs.realpathSync` before comparing it with `import.meta.url`, which Node already sets to the module's real path, and falls back to the raw argument when it cannot be resolved. Importing the module still has no side effects. A unit test, `entry point [BUG-084]` in `tests/unit/adopt-claude-md.test.js`, runs the `sections` command through a directory link and expects the same exit code and stdout as through the real path. Landed from PR #245 (cc-lane-bot), intake of issue #242.
+- **[BUG-086]** An unattended `delegate plan` now escalates a task whose `Files` entry holds any character outside printable ASCII (0x20–0x7E), with the write-surface reason, whichever list the entry spells. The test runs on the raw entry, before case folding, because `toLowerCase` maps some such characters to ASCII (U+212A KELVIN SIGN to `k`). Printable-ASCII entries, spaces and punctuation included, keep the delegated `APPROVE`. Pinned by rows U50 and U51 in `tests/scripts/orchestrate.test.js`. Landed from PR #247 (cc-lane-bot), intake of issue #240.
+
 ## [1.52.1] - 2026-11-15
 
 ### Fixed

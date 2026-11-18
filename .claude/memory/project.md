@@ -3312,3 +3312,19 @@ Nothing minted. BUG-081 (triage #231) and BUG-082 (triage #230) stay reserved an
 Known limits: the BUG-073 line is removed. Every other defect line is unchanged.
 
 No upgrade step: the change touches only the maintainer's tag-triggered publish workflow and the dev toolchain. Runtime dependencies stay empty. #233's description reports `AC7`/`AC8` of `tests/unit/staging-convention.test.js` failing in its sandbox (`git add -u` on an untracked path exits 0 instead of 128). #234's description reports five environment-only local failures that also fail on the base. CI on the release PR is the authority.
+
+## Release: 1.52.2 batch landing 2026-11-18
+
+Four PRs merged since `v1.52.1`. Existing ids closed:
+
+- BUG-081 (#238 by `yeisonrestrepo`, unattended plan check extended to the files that run code outside the run). `CONTROL_PLANE` in `scripts/orchestrate.mjs` gains fourteen entries: `.git/**`, `.husky/**`, `.githooks/**`, `.mcp.json`, `opencode.json`, `opencode.jsonc`, `.claude/flow-status.mjs` in both mirrors, `.github/workflows/**`, `.github/actions/**`, `package.json`, `package-lock.json`, `npm-shrinkwrap.json` and `.npmrc`. The reach rule, `inControlPlane`, `surfaceTask` and the reason text are unchanged. Pinned by the `CONTROL_PLANE` pin test and rows U46–U49. Intake of issue #231. The spec was approved 2026-11-15 by the owner, and the plan by an explicit owner `approve plan`, because its tasks declare `scripts/orchestrate.mjs`. Two owner-approved build deviations are recorded in the plan: `expectEscalation` builds the reason without a leading `./`, and `ee3c243` is a second build commit carrying only the Test List ticks.
+- BUG-084 (#245 by `cc-lane-bot[bot]`, `adopt-claude-md.mjs` entry point under a symlinked directory). `invokedDirectly()` realpath-resolves `process.argv[1]` before comparing it with `import.meta.url`, falling back to the raw argument. Pinned by `entry point [BUG-084]` in `tests/unit/adopt-claude-md.test.js`. Intake of issue #242. The spec was approved 2026-11-18 by independent review.
+- BUG-086 (#247 by `cc-lane-bot[bot]`, unattended plan check and `Files` entries outside printable ASCII). `inSurface` escalates any entry holding a character outside 0x20–0x7E with the write-surface reason, tested on the raw entry before case folding. Pinned by rows U50 and U51. Intake of issue #240. The spec was approved 2026-11-18 by independent review.
+
+#225 (by `Ludocius`, issue #227) adds an Issue Triage section to the repository's own `CLAUDE.md` (assignee, type and area labels, one pillar milestone, a session-end sweep). It changes only a file the package does not ship, so it carries no CHANGELOG bullet and no id. Its description says the id is minted by issue intake; no backlog item for issue #227 exists on this base, so none is claimed here.
+
+Nothing minted. BUG-081, BUG-084 and BUG-086 were reserved by triage (#231, #242, #240) and are closed under those ids. BUG-085 (triage #241) stays reserved and open, as the follow-up to BUG-081.
+
+Known limits: the BUG-081, BUG-084 and BUG-086 lines are removed. The unattended-mode line under the orchestrator item now names the outside-the-run files (`[BUG-081]`) and the non-ASCII rule (`[BUG-086]`) as part of the deterministic plan check. Every other defect line is unchanged.
+
+No upgrade step: the plan check only escalates more delegated approvals to the owner, and an attended run and an owner `approve plan` are unchanged. #245's description reports `AC7`/`AC8` of `tests/unit/staging-convention.test.js` failing in its sandbox (read-only `.git`), not compared against `main`. CI on the release PR is the authority.

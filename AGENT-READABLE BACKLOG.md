@@ -1407,7 +1407,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #219; reported by the automated security review of
   #218.
 
-### [ ] `[BUG-081]` Unattended plan check does not escalate tasks that write git hooks, MCP config, CI workflows and package lifecycle scripts
+### [X] `[BUG-081]` Unattended plan check does not escalate tasks that write git hooks, MCP config, CI workflows and package lifecycle scripts
+* **DONE, shipped as `1.52.2` on 2026-11-18.** `CONTROL_PLANE` in `scripts/orchestrate.mjs` gains the fourteen entries the approved spec lists, the files that run code outside the run after it ends: `.git/**`, `.husky/**`, `.githooks/**`, `.mcp.json`, `opencode.json`, `opencode.jsonc`, `.claude/flow-status.mjs` and its `project-template/` mirror, `.github/workflows/**`, `.github/actions/**`, `package.json`, `package-lock.json`, `npm-shrinkwrap.json` and `.npmrc`. `package.json` is listed as a fixed file, so any write to it escalates, lifecycle scripts included. The reach rule, `inControlPlane`, `surfaceTask` and the `… inside the control-plane files` reason are unchanged. Nested and workspace manifests stay with `[BUG-082]`; config-read hook runners, editor and container auto-run, other package managers and other CI systems went to the follow-up `[BUG-085]`. Pinned by the `CONTROL_PLANE` pin test and rows U46–U49 in `tests/scripts/orchestrate.test.js`; U22 and U41–U45 are unchanged. Landed from PR #238 (yeisonrestrepo), intake of issue #231; the id was reserved by the triage and is owner-minted at landing. Spec: `docs/superpowers/specs/2026-11-15-bug081-unattended-plan-check-does-not-escalate-tasks-design.md` (approved 2026-11-15 by the owner). Plan: `docs/superpowers/plans/2026-11-15-bug081-unattended-plan-check-does-not-escalate-tasks.md` (approved by an explicit owner `approve plan`, because its tasks declare `scripts/orchestrate.mjs`).
 
 - Symptom: `CONTROL_PLANE` (scripts/orchestrate.mjs:25, per the
   issue) does not cover files that run code outside the run:
@@ -1466,7 +1467,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #235; reported by the automated security review of
   #234.
 
-### [ ] `[BUG-084]` adopt-claude-md.mjs skips its entry point when run through a symlinked directory
+### [X] `[BUG-084]` adopt-claude-md.mjs skips its entry point when run through a symlinked directory
+* **DONE, shipped as `1.52.2` on 2026-11-18.** `scripts/adopt-claude-md.mjs` decides a direct run in `invokedDirectly()`, which resolves `process.argv[1]` with `fs.realpathSync` (falling back to the raw argument when it cannot be resolved) before comparing it with `import.meta.url`, which Node's ESM loader already sets to the module's real path. A launch through a symlinked directory now runs the main block, and importing the module still has no side effects. Pinned by `entry point [BUG-084]` in `tests/unit/adopt-claude-md.test.js`, which runs the `sections` command through a directory link and expects the same exit code, `trigger: true` and stdout as through the real path. Landed from PR #245 (cc-lane-bot), intake of issue #242; the id was reserved by the triage and is owner-minted at landing. Spec: `docs/superpowers/specs/2026-11-18-bug084-adopt-claude-md-mjs-skips-its-entry-point-when-design.md` (approved 2026-11-18 by independent review). Plan: `docs/superpowers/plans/2026-11-18-bug084-adopt-claude-md-mjs-skips-its-entry-point-when.md`.
 
 - Symptom: `scripts/adopt-claude-md.mjs:223` (per the issue) decides
   whether it was run directly by comparing `import.meta.url` with
@@ -1497,7 +1499,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Follow-up to `[BUG-081]`.
 - Intake of issue #241.
 
-### [ ] `[BUG-086]` Unattended plan check accepts Files entries with characters outside printable ASCII
+### [X] `[BUG-086]` Unattended plan check accepts Files entries with characters outside printable ASCII
+* **DONE, shipped as `1.52.2` on 2026-11-18.** `inSurface` in `scripts/orchestrate.mjs` protects any `Files` entry holding a character outside 0x20–0x7E (`nonAscii`), so `delegate plan` escalates it with the write-surface reason whichever list it spells. The test runs on the raw entry, before `taskGlob` folds case, because `toLowerCase` maps some such characters to ASCII (U+212A KELVIN SIGN to `k`). Printable-ASCII entries keep the delegated `APPROVE`. Pinned by rows U50 (fourteen entries at the root and nested, across `WRITE_SURFACE` and `CONTROL_PLANE` spellings, control characters, DEL and astral characters included) and U51 (`src/a.js`, `docs/notes.md` and the boundary rows `docs/my notes.md` and `docs/a!b.md`) in `tests/scripts/orchestrate.test.js`. Landed from PR #247 (cc-lane-bot), intake of issue #240; the id was reserved by the triage and is owner-minted at landing. Spec: `docs/superpowers/specs/2026-11-18-bug086-unattended-plan-check-accepts-files-entries-design.md` (approved 2026-11-18 by independent review). Plan: `docs/superpowers/plans/2026-11-18-bug086-unattended-plan-check-accepts-files-entries.md`.
 
 - Symptom: the unattended plan check compares each task's **Files:**
   entries against `WRITE_SURFACE` and `CONTROL_PLANE` after
