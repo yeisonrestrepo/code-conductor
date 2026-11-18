@@ -1,6 +1,6 @@
 # BUG-086: Unattended plan check accepts Files entries with characters outside printable ASCII
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-18 by independent review (round 1)
 
 **Item:** `[BUG-086]` (intake of issue #240). **Date:** 2026-11-18.
 
