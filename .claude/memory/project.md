@@ -3312,3 +3312,18 @@ Nothing minted. BUG-081 (triage #231) and BUG-082 (triage #230) stay reserved an
 Known limits: the BUG-073 line is removed. Every other defect line is unchanged.
 
 No upgrade step: the change touches only the maintainer's tag-triggered publish workflow and the dev toolchain. Runtime dependencies stay empty. #233's description reports `AC7`/`AC8` of `tests/unit/staging-convention.test.js` failing in its sandbox (`git add -u` on an untracked path exits 0 instead of 128). #234's description reports five environment-only local failures that also fail on the base. CI on the release PR is the authority.
+
+## Release: 1.52.2 batch landing 2026-11-18
+
+Three PRs merged since `v1.52.1`. Existing ids closed:
+
+- BUG-081 (#238 by `yeisonrestrepo`, unattended plan check extended to files that run code after the run). Fourteen entries are appended to `CONTROL_PLANE` in `scripts/orchestrate.mjs`: `.git/**`, `.husky/**`, `.githooks/**`, `.mcp.json`, `opencode.json`, `opencode.jsonc`, `.claude/flow-status.mjs` in both mirrors, `.github/workflows/**`, `.github/actions/**`, `package.json`, `package-lock.json`, `npm-shrinkwrap.json` and `.npmrc`. `package.json` is a fixed whole-file entry, not a lifecycle-scripts rule. The reach rule, `inControlPlane`, `surfaceTask` and the reason text are unchanged; nested manifests stay near misses for BUG-082. Rows U46–U49 and the `CONTROL_PLANE` pin in `tests/scripts/orchestrate.test.js` pin it. Intake of issue #231. Spec approved 2026-11-15 by the owner; the plan needed an explicit owner `approve plan` because its tasks declare `scripts/orchestrate.mjs`. Owner-approved deviations recorded in the plan: `expectEscalation` builds the reason without a leading `./`, and `ee3c243` is a second build commit carrying only the Test List ticks.
+- BUG-084 (#245 by `cc-lane-bot[bot]`, symlink-safe entry point). `scripts/adopt-claude-md.mjs` realpath-resolves `process.argv[1]` in `invokedDirectly()` before comparing it with `import.meta.url`, so a launch through a symlinked directory (the macOS default `TMPDIR`) runs the main block. Pinned by `entry point [BUG-084]` in `tests/unit/adopt-claude-md.test.js`. Intake of issue #242. Spec approved 2026-11-18 by independent review.
+
+#225 (by `Ludocius`, issue #227) adds an Issue Triage section to the root `CLAUDE.md` (assignee `cc-reviewer-bot`, type and area labels, one pillar milestone, session-end sweep). It is repository process only and the root `CLAUDE.md` is not in the published package, so it is recorded under `### Changed` with no id. Its description says a FEAT id would be minted by issue intake; no backlog item exists for #227, and none is minted here.
+
+Nothing minted: BUG-081 (triage #231) and BUG-084 (triage #242) were reserved by triage and are closed under those ids. BUG-082 (triage #230), BUG-083 (triage #235), BUG-085 (triage #241) and BUG-086 (triage #240) stay open.
+
+Known limits: the BUG-081 and BUG-084 lines are removed. The unattended-mode line under the orchestrator item now names the BUG-081 coverage beside BUG-080. Every other defect line is unchanged.
+
+No upgrade step: attended runs are unaffected, and an unattended plan that declares one of the new entries now waits for an owner `approve plan` instead of approving on the delegated review. #245's description reports `AC7`/`AC8` of `tests/unit/staging-convention.test.js` failing in its sandbox with a read-only `.git`, not compared against `main`. CI on the release PR is the authority.
