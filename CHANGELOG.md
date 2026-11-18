@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.52.2] - 2026-11-18
+
+### Fixed
+- **[BUG-081]** An unattended `delegate plan` now also escalates a task whose `Files` entry reaches a file that runs code after the run ends. Fourteen entries are appended to `CONTROL_PLANE` in `scripts/orchestrate.mjs`: git hooks (`.git/**`, `.husky/**`, `.githooks/**`), MCP and OpenCode server config (`.mcp.json`, `opencode.json`, `opencode.jsonc`), the status line script in both mirrors (`.claude/flow-status.mjs`, `project-template/.claude/flow-status.mjs`), CI (`.github/workflows/**`, `.github/actions/**`) and the root npm files (`package.json`, `package-lock.json`, `npm-shrinkwrap.json`, `.npmrc`). The reach rule, `inControlPlane`, `surfaceTask` and the reason text `task <id> declares <entry> inside the control-plane files` are unchanged, so directory, glob, case-variant and `./` forms are caught as before. Near misses such as `.gitignore`, `.github/CODEOWNERS`, `.github/workflowsx/a.yml`, `docs/.mcp.json` and nested manifests like `tools/package.json` still approve; nested manifests belong to `[BUG-082]`. A glob that reaches both lists, such as `**/package.json`, keeps the write-surface reason. Config-read hook runners, editor and container auto-run files, other package managers and other CI systems remain open as `[BUG-085]`. Landed from PR #238 (yeisonrestrepo), intake of issue #231.
+
+### Changed
+- `CLAUDE.md` gains an **Issue Triage** section: every issue an agent opens or picks up gets `cc-reviewer-bot` as assignee, a type label plus every applicable area label from `gh label list`, and exactly one pillar milestone, set at creation or with one `gh issue edit` right after, with a session-end sweep for issues missing any of the three. Repository agent instructions only, no id. Landed from PR #225 (Ludocius), issue #227.
+
 ## [1.52.1] - 2026-11-15
 
 ### Fixed

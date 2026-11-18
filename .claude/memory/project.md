@@ -3312,3 +3312,15 @@ Nothing minted. BUG-081 (triage #231) and BUG-082 (triage #230) stay reserved an
 Known limits: the BUG-073 line is removed. Every other defect line is unchanged.
 
 No upgrade step: the change touches only the maintainer's tag-triggered publish workflow and the dev toolchain. Runtime dependencies stay empty. #233's description reports `AC7`/`AC8` of `tests/unit/staging-convention.test.js` failing in its sandbox (`git add -u` on an untracked path exits 0 instead of 128). #234's description reports five environment-only local failures that also fail on the base. CI on the release PR is the authority.
+
+## Release: 1.52.2 batch landing 2026-11-18
+
+Two PRs merged since `v1.52.1`. Existing id closed: BUG-081 (#238 by `yeisonrestrepo`, unattended plan check extended to files that run code outside the run). Fourteen entries are appended to `CONTROL_PLANE` in `scripts/orchestrate.mjs`: `.git/**`, `.husky/**`, `.githooks/**`, `.mcp.json`, `opencode.json`, `opencode.jsonc`, `.claude/flow-status.mjs` in both mirrors, `.github/workflows/**`, `.github/actions/**`, and the root `package.json`, `package-lock.json`, `npm-shrinkwrap.json` and `.npmrc`. The reach rule, `inControlPlane`, `surfaceTask` and the reason text are unchanged. The `CONTROL_PLANE` pin test and rows U46–U49 in `tests/scripts/orchestrate.test.js` cover it, and U22 and U41–U45 are unchanged. Intake of issue #231. The spec was approved 2026-11-15 by the owner. The plan needed an explicit owner `approve plan` because its tasks declare `scripts/orchestrate.mjs`, which is in `CONTROL_PLANE`. The plan records two owner-approved build deviations: `expectEscalation` builds the reason without a leading `./`, and `ee3c243` is a second build commit that carries only the Test List ticks.
+
+#225 (by `Ludocius`, issue #227) adds the **Issue Triage** section to `CLAUDE.md`: assignee `cc-reviewer-bot`, type plus area labels, one pillar milestone, and a session-end sweep. It covers repository agent instructions only, so it is recorded under `### Changed` with no id. Its description says the backlog id "is minted by issue intake", but no backlog item exists for it and none is minted here.
+
+Nothing minted. BUG-082 (triage #230), BUG-083, BUG-084 (triage #242), BUG-085 (triage #241) and BUG-086 (triage #240) stay open. #238 names BUG-082 (nested and workspace manifests) and the BUG-085 classes as out of scope.
+
+Known limits: the BUG-081 line is removed, and the unattended-mode item now names `[BUG-081]` beside `[BUG-080]` as what the deterministic plan check covers. Every other defect line is unchanged.
+
+No upgrade step: the list grows, and attended runs and owner `approve plan` never consult it. An unattended plan that declares one of the new paths now escalates to the owner where it used to be delegated-approved. #238's description reports `npm test` at 3149 passed and 12 skipped locally on `be68cb3`, with the CI legs unchecked at merge time. CI on the release PR is the authority.
