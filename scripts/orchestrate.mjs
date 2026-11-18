@@ -23,6 +23,7 @@ export const WRITE_SURFACE = [RUN_FILE, ENVELOPE_FILE, '.claude/memory/session-s
 // Owner decision (BUG-080): the files that enforce the guards or steer later dispatches, in both mirrors. Same notation
 // as WRITE_SURFACE; a trailing `/**` protects the whole directory, so a file added to it is covered too.
 // Owner decision (BUG-081): also the files that run code outside the run, after it ends.
+// Owner decision (BUG-082): a CLAUDE.md or an npm manifest also reaches it at any depth, by its last segment (CONTROL_PLANE_NAMES).
 export const CONTROL_PLANE = [
   '.claude/hooks/**', 'project-template/.claude/hooks/**',
   '.opencode/plugin/**', 'project-template/.opencode/plugin/**',
@@ -42,6 +43,7 @@ export const CONTROL_PLANE = [
   '.github/workflows/**', '.github/actions/**',
   'package.json', 'package-lock.json', 'npm-shrinkwrap.json', '.npmrc',
 ];
+export const CONTROL_PLANE_NAMES = ['claude.md', 'claude.local.md', 'package.json', 'package-lock.json', 'npm-shrinkwrap.json', '.npmrc'];
 // Where /cc-orchestrate writes each agent's final message for `handback` to read: inside
 // the surface, and cleared with the run so file names never collide across runs.
 export const HANDBACK_DIR = '.conductor/handback';
@@ -1084,8 +1086,15 @@ function inSurface(entry) {
   const glob = taskGlob(entry);
   return nonAscii(entry) || ntfsAlias(glob) || reachesList(glob, WRITE_SURFACE);
 }
+// A path the glob matches ends in a segment its last segment matches, except that a `**` there can span a `/`;
+// then only the text after the last `**` has to match the end of the file name (BUG-082).
+function namesControlFile(glob) {
+  const last = glob.slice(glob.lastIndexOf('/') + 1);
+  const tail = last.includes('**') ? `**${last.slice(last.lastIndexOf('**') + 2)}` : last;
+  return CONTROL_PLANE_NAMES.some((name) => globToRegExp(tail).test(name));
+}
 // No alias or non-ASCII test: surfaceTask runs inSurface first, and it escalates every alias and every non-ASCII entry.
-const inControlPlane = (entry) => reachesList(taskGlob(entry), CONTROL_PLANE);
+const inControlPlane = (entry) => reachesList(taskGlob(entry), CONTROL_PLANE) || namesControlFile(taskGlob(entry));
 
 // Owner decisions (FEAT-054, BUG-080): a plan whose task would write the run's own record, or the files that enforce
 // the guards and steer later dispatches, never passes on a delegated verdict. The write surface keeps its reason first.

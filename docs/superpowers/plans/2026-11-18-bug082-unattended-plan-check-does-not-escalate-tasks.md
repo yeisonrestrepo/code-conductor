@@ -100,11 +100,11 @@
 **Files:**
 - Modify: `tests/scripts/orchestrate.test.js`
 
-- [ ] [T-101] Add the `CONTROL_PLANE_NAMES` pin test of plan decision 4 after the `CONTROL_PLANE` pin, as its own `it`, leaving the `CONTROL_PLANE` pin byte-identical. Depends on T-004.
-- [ ] [T-102] U43: delete the `'docs/CLAUDE.md',` row; every other U43 row stays (AC3). Depends on T-101.
-- [ ] [T-103] U48: delete the rows `'tools/package.json', // [BUG-082]: …`, `'docs/.npmrc',`, `'tools/package-lock.json',` and `'src/package.json', // [BUG-082]: …`; `'.npmrc.example',` and the other rows stay (AC3b). Depends on T-102.
-- [ ] [T-104] After U51, add the comment line and the U52, U53 and U54 blocks of plan decision 3 with the rows of the Test rows section, in that order. Names: `'U52 [BUG-082 AC1 AC2 AC3b] delegate plan over an APPROVE report escalates the nested instruction file or manifest %s with the control-plane reason'`, `'U53 [BUG-082 AC3 AC3b] delegate plan over an APPROVE report approves the nested near miss %s'`, `'U54 [BUG-082 AC4] the nested instruction-file form %j keeps the write-surface reason'`. Depends on T-103.
-- [ ] [T-105] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t "BUG-082"`. Predicted for the filter's full match set: **33 failed, 18 passed, 784 skipped (835)**. Failing: the 32 U52 rows (approved today) and the `[BUG-082]` pin. Passing: the 15 U53 rows and the 3 U54 rows. No other test name contains `BUG-082` (the U48 `[BUG-082]` comments are gone and were never in a name). Any other count means a row is mistyped: fix the row, not the prediction. Depends on T-104.
+- [X] [T-101] Add the `CONTROL_PLANE_NAMES` pin test of plan decision 4 after the `CONTROL_PLANE` pin, as its own `it`, leaving the `CONTROL_PLANE` pin byte-identical. Depends on T-004.
+- [X] [T-102] U43: delete the `'docs/CLAUDE.md',` row; every other U43 row stays (AC3). Depends on T-101.
+- [X] [T-103] U48: delete the rows `'tools/package.json', // [BUG-082]: …`, `'docs/.npmrc',`, `'tools/package-lock.json',` and `'src/package.json', // [BUG-082]: …`; `'.npmrc.example',` and the other rows stay (AC3b). Depends on T-102.
+- [X] [T-104] After U51, add the comment line and the U52, U53 and U54 blocks of plan decision 3 with the rows of the Test rows section, in that order. Names: `'U52 [BUG-082 AC1 AC2 AC3b] delegate plan over an APPROVE report escalates the nested instruction file or manifest %s with the control-plane reason'`, `'U53 [BUG-082 AC3 AC3b] delegate plan over an APPROVE report approves the nested near miss %s'`, `'U54 [BUG-082 AC4] the nested instruction-file form %j keeps the write-surface reason'`. Depends on T-103.
+- [X] [T-105] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t "BUG-082"`. Predicted for the filter's full match set: **33 failed, 18 passed, 784 skipped (835)**. Failing: the 32 U52 rows (approved today) and the `[BUG-082]` pin. Passing: the 15 U53 rows and the 3 U54 rows. No other test name contains `BUG-082` (the U48 `[BUG-082]` comments are gone and were never in a name). Any other count means a row is mistyped: fix the row, not the prediction. Depends on T-104.
 
 ---
 
@@ -113,11 +113,11 @@
 **Files:**
 - Modify: `scripts/orchestrate.mjs`
 
-- [ ] [T-201] Modify `scripts/orchestrate.mjs`: add the `Owner decision (BUG-082)` comment line above `CONTROL_PLANE` and the `CONTROL_PLANE_NAMES` constant right after its `];` (plan decision 1). Depends on T-105.
-- [ ] [T-202] Add the `namesControlFile` helper and its two comment lines above the `// No alias or non-ASCII test: …` comment (plan decision 1). Depends on T-201.
-- [ ] [T-203] Modify `inControlPlane` to the two-disjunct form of plan decision 1. Depends on T-202.
-- [ ] [T-204] Green run: the T-105 command. Predicted: **51 passed, 784 skipped (835)**, no failure. Depends on T-203.
-- [ ] [T-205] AC5 run: `npx vitest run tests/scripts/orchestrate.test.js -t "BUG-080|BUG-081|BUG-086|U22 |write surface|FEAT-054"`. Predicted: **308 passed, 527 skipped (835)**, no failure (measured in plan decision 5). Depends on T-204.
+- [X] [T-201] Modify `scripts/orchestrate.mjs`: add the `Owner decision (BUG-082)` comment line above `CONTROL_PLANE` and the `CONTROL_PLANE_NAMES` constant right after its `];` (plan decision 1). Depends on T-105.
+- [X] [T-202] Add the `namesControlFile` helper and its two comment lines above the `// No alias or non-ASCII test: …` comment (plan decision 1). Depends on T-201.
+- [X] [T-203] Modify `inControlPlane` to the two-disjunct form of plan decision 1. Depends on T-202.
+- [X] [T-204] Green run: the T-105 command. Predicted: **51 passed, 784 skipped (835)**, no failure. Depends on T-203.
+- [X] [T-205] AC5 run: `npx vitest run tests/scripts/orchestrate.test.js -t "BUG-080|BUG-081|BUG-086|U22 |write surface|FEAT-054"`. Predicted: **308 passed, 527 skipped (835)**, no failure (measured in plan decision 5). Depends on T-204.
 
 ---
 
@@ -126,25 +126,25 @@
 **Files:**
 - Modify: `scripts/orchestrate.mjs`, `tests/scripts/orchestrate.test.js` (staged), this plan (checkboxes)
 
-- [ ] [T-301] Run `npm test`. Predicted locally: exit 0, every file green (AC6). CI legs run 46 more tests each (51 added, 5 removed), none skipped, so `tools/skip-baseline.json` stays untouched. A failure that comes from the sandbox (network, tmp permissions) is reported as ENV with the test's name; any other red is fixed. Depends on T-205.
-- [ ] [T-302] Scope check: `git status --porcelain` lists exactly `scripts/orchestrate.mjs`, `tests/scripts/orchestrate.test.js` and this plan as modified; `git diff -U0 HEAD -- tests/scripts/orchestrate.test.js | grep '^-[^-]'` shows exactly the five rows removed in T-102 and T-103; `git diff -U0 HEAD -- scripts/orchestrate.mjs | grep '^-[^-]'` shows exactly one line, the old `inControlPlane`; `git diff --quiet HEAD -- VERSION CHANGELOG.md package.json package-lock.json README.md "AGENT-READABLE BACKLOG.md" .claude .github project-template tools` exits 0. Depends on T-301.
-- [ ] [T-303] Stage: `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js` (both tracked). Depends on T-302.
-- [ ] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-18-bug082-unattended-plan-check-does-not-escalate-tasks.md` (ticks T-101 to T-303). Depends on T-303.
-- [ ] [T-305] Commit: `fix: escalate nested CLAUDE.md and npm manifests in the unattended plan check [BUG-082]`. Depends on T-304.
+- [X] [T-301] Run `npm test`. Predicted locally: exit 0, every file green (AC6). CI legs run 46 more tests each (51 added, 5 removed), none skipped, so `tools/skip-baseline.json` stays untouched. A failure that comes from the sandbox (network, tmp permissions) is reported as ENV with the test's name; any other red is fixed. Depends on T-205.
+- [X] [T-302] Scope check: `git status --porcelain` lists exactly `scripts/orchestrate.mjs`, `tests/scripts/orchestrate.test.js` and this plan as modified; `git diff -U0 HEAD -- tests/scripts/orchestrate.test.js | grep '^-[^-]'` shows exactly the five rows removed in T-102 and T-103; `git diff -U0 HEAD -- scripts/orchestrate.mjs | grep '^-[^-]'` shows exactly one line, the old `inControlPlane`; `git diff --quiet HEAD -- VERSION CHANGELOG.md package.json package-lock.json README.md "AGENT-READABLE BACKLOG.md" .claude .github project-template tools` exits 0. Depends on T-301.
+- [X] [T-303] Stage: `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js` (both tracked). Depends on T-302.
+- [X] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-18-bug082-unattended-plan-check-does-not-escalate-tasks.md` (ticks T-101 to T-303). Depends on T-303.
+- [X] [T-305] Commit: `fix: escalate nested CLAUDE.md and npm manifests in the unattended plan check [BUG-082]`. Depends on T-304.
 
 ---
 
 ## Test List
 
-- [ ] Integration, AC1: U52 nested `CLAUDE.md` / `CLAUDE.local.md` rows, including `./` and mixed-case forms, escalate with the control-plane reason; `approvals.plan` stays `null`, `delegated.plan` records the verdict and reason, and the owner's `approve plan` exits 0 (`expectEscalation`; T-104).
-- [ ] Integration, AC2: U52 glob rows that can name such a file escalate (T-104).
-- [ ] Integration, AC3: `docs/CLAUDE.md` leaves U43 (T-102); U53 near misses approve (T-104).
-- [ ] Integration, AC3b: U52 nested-manifest rows escalate, the four U48 rows leave it (T-103), U53 manifest near misses approve, `.npmrc.example` stays in U48.
-- [ ] Integration, AC4: U54 rows keep the write-surface reason (T-104).
-- [ ] Unit, AC5b: the `CONTROL_PLANE_NAMES` pin (T-101).
-- [ ] AC5: `CONTROL_PLANE` and `WRITE_SURFACE` pins and U41, U42, U44-U51 unchanged and green (T-205, T-302).
-- [ ] AC6: `npm test` green (T-301).
-- [ ] No E2E/UI test: there is no UI.
+- [X] Integration, AC1: U52 nested `CLAUDE.md` / `CLAUDE.local.md` rows, including `./` and mixed-case forms, escalate with the control-plane reason; `approvals.plan` stays `null`, `delegated.plan` records the verdict and reason, and the owner's `approve plan` exits 0 (`expectEscalation`; T-104).
+- [X] Integration, AC2: U52 glob rows that can name such a file escalate (T-104).
+- [X] Integration, AC3: `docs/CLAUDE.md` leaves U43 (T-102); U53 near misses approve (T-104).
+- [X] Integration, AC3b: U52 nested-manifest rows escalate, the four U48 rows leave it (T-103), U53 manifest near misses approve, `.npmrc.example` stays in U48.
+- [X] Integration, AC4: U54 rows keep the write-surface reason (T-104).
+- [X] Unit, AC5b: the `CONTROL_PLANE_NAMES` pin (T-101).
+- [X] AC5: `CONTROL_PLANE` and `WRITE_SURFACE` pins and U41, U42, U44-U51 unchanged and green (T-205, T-302).
+- [X] AC6: `npm test` green (T-301).
+- [X] No E2E/UI test: there is no UI.
 
 ## Commit Order
 
