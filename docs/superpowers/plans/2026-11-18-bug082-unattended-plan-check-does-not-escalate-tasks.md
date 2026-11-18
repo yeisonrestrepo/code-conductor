@@ -4,7 +4,7 @@
 
 **Goal:** In `inControlPlane` (`scripts/orchestrate.mjs`), also escalate with the control-plane reason any plan **Files:** entry whose last segment can name `claude.md`, `claude.local.md`, `package.json`, `package-lock.json`, `npm-shrinkwrap.json` or `.npmrc` at any depth (spec rules 1 and 2). The six names live in a new exported constant `CONTROL_PLANE_NAMES`, pinned by a test. Move `docs/CLAUDE.md` out of U43 and four rows out of U48, and add the U52-U54 rows for AC1-AC4.
 
-**Spec:** `docs/superpowers/specs/2026-11-18-bug082-unattended-plan-check-does-not-escalate-tasks-design.md` (sha256 `dd991eb1fdd8b30ea8518ad2813502b6494a6c408bc353b9120678ab908ffc20`). Issue #230.
+**Spec:** `docs/superpowers/specs/2026-11-18-bug082-unattended-plan-check-does-not-escalate-tasks-design.md` (sha256 `665fb408c79caa18763ec18d6e30d8edc4ef66d6e685f7349e7e12a04cdb50d4`). Issue #230.
 
 **Test command:** `npm test`. Filtered runs use `npx vitest run <file>` and `-t <pattern>`.
 
@@ -63,6 +63,14 @@
    The file holds 789 tests at HEAD; the change adds 51 and removes 5 (835).
 6. **One commit.** Tests and code land together (Task 3): a tests-only commit would be red. The red run in T-105 happens in the working tree before the code edit.
 7. **`.gitignore` leaf.** `!/docs/superpowers/plans/2026-11-18-bug082-unattended-plan-check-does-not-escalate-tasks.md` goes after the `2026-11-15-bug081` plan leaf and before the `2026-11-18-bug084` plan leaf, the sorted position; `tests/unit/gitignore-block-parity.test.js` checks it.
+
+## Deviations
+
+Approved by the owner after the build; the plan needs no new approve.
+
+1. The spec approval at `1cf894f` was delegated; the owner commit `2f0f9fb` replaces it.
+2. The merge commits `b717c62` and `135b050` bring in `main` and change no file of this item.
+3. The run ended after the build audit; tests and security review run on the pull request (CI and the security gate).
 
 ## Test rows
 
