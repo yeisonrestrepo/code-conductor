@@ -128,7 +128,7 @@ Written exactly as below in the test source (JavaScript string escapes):
 - [X] Integration, AC4: U50 row `./package.json\u200B` escalates and the reason names the entry without `./` (T-102).
 - [X] Integration, AC5: U51, 4 printable-ASCII rows keep the delegated APPROVE (T-103).
 - [X] AC6: U22 and U41-U49 unchanged and green (T-205, T-302); `npm test` green (T-301).
-- [ ] No E2E/UI test: there is no UI.
+- [X] No E2E/UI test: there is no UI.
 
 ## Commit Order
 
