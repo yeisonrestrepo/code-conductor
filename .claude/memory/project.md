@@ -3310,3 +3310,21 @@ Nothing minted. BUG-081 (triage #231) and BUG-082 (triage #230) stay reserved an
 Known limits: the BUG-073 line is removed. Every other defect line is unchanged.
 
 No upgrade step: the change touches only the maintainer's tag-triggered publish workflow and the dev toolchain. Runtime dependencies stay empty. #233's description reports `AC7`/`AC8` of `tests/unit/staging-convention.test.js` failing in its sandbox (`git add -u` on an untracked path exits 0 instead of 128). #234's description reports five environment-only local failures that also fail on the base. CI on the release PR is the authority.
+
+## Release: 1.52.2 batch landing 2026-11-18
+
+Seven PRs merged since `v1.52.1`. Existing ids closed:
+
+- BUG-081 (#238 by `yeisonrestrepo`, outside-the-run files in the unattended plan check). `CONTROL_PLANE` gains fourteen entries: `.git/**`, `.husky/**`, `.githooks/**`, `.mcp.json`, `opencode.json`, `opencode.jsonc`, both `flow-status.mjs` mirrors, `.github/workflows/**`, `.github/actions/**`, `package.json`, `package-lock.json`, `npm-shrinkwrap.json` and `.npmrc`. The reach rule, `inControlPlane`, `surfaceTask` and the reason text are unchanged. Rows U46–U49 and the `CONTROL_PLANE` pin. Intake of issue #231. The spec was approved 2026-11-15 by the owner, and the plan by an explicit owner `approve plan`, because its tasks declare `scripts/orchestrate.mjs`.
+- BUG-084 (#245 by `cc-lane-bot[bot]`, `adopt-claude-md.mjs` entry point through a symlinked directory). `invokedDirectly()` realpath-resolves `process.argv[1]` before comparing it with `import.meta.url`. Test `entry point [BUG-084]`. Intake of issue #242.
+- BUG-086 (#247 by `cc-lane-bot[bot]`, `Files` entries outside printable ASCII). `inSurface` escalates any raw entry holding a character outside 0x20–0x7E with the write-surface reason, tested before the `./` strip and lower-casing. Rows U50 and U51. Intake of issue #240.
+
+The BUG-084 and BUG-086 specs were approved 2026-11-18 by independent review.
+
+#225 (by `Ludocius`, issue #227) adds the Issue Triage section to `CLAUDE.md`. It is agent instructions only, so it is recorded under ### Changed with no id. #237 (`cc-lane-bot[bot]`, intake of BUG-083) and #243 (`cc-lane-bot[bot]`, intake of BUG-084, BUG-085 and BUG-086) are intake records PRs. #249 (by `yeisonrestrepo`) drops the 1.52.0 process note from this file; it carries no CHANGELOG bullet.
+
+Nothing minted: BUG-081 was reserved by triage #231, and BUG-084 and BUG-086 by triages #242 and #240. BUG-082 (triage #230), BUG-083 (triage #235) and BUG-085 (triage #241) stay reserved and open.
+
+Known limits: the BUG-081, BUG-084 and BUG-086 lines are removed. The unattended-mode line now names the non-ASCII check and the outside-the-run files. Every other defect line is unchanged.
+
+No upgrade step: an attended run is unaffected, and an unattended plan that declares one of the new entries now waits for an owner `approve` instead of passing on the delegated verdict. #245's description reports `AC7`/`AC8` of `tests/unit/staging-convention.test.js` failing in its sandbox with a read-only `.git`. CI on the release PR is the authority.

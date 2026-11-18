@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.52.2] - 2026-11-18
+
+### Fixed
+- **[BUG-081]** An unattended `delegate plan` now also escalates a task whose `Files` entry reaches a file that runs code outside the run, after it ends. `CONTROL_PLANE` in `scripts/orchestrate.mjs` gains fourteen entries: `.git/**`, `.husky/**` and `.githooks/**` (git hooks), `.mcp.json`, `opencode.json` and `opencode.jsonc` (MCP and OpenCode servers), `.claude/flow-status.mjs` and its `project-template/` mirror (the status line), `.github/workflows/**` and `.github/actions/**` (CI), and `package.json`, `package-lock.json`, `npm-shrinkwrap.json` and `.npmrc` (npm). The reach test, `inControlPlane`, `surfaceTask` and the reason `task <id> declares <entry> inside the control-plane files` are unchanged, so directory, glob, case-variant and `./` forms are caught as before, and a glob that reaches both lists keeps the write-surface reason. Nested and workspace manifests stay with `[BUG-082]`, and other hook runners, editor and container auto-run files, other package managers and other CI systems with `[BUG-085]`. Pinned by the `CONTROL_PLANE` pin and rows U46–U49 in `tests/scripts/orchestrate.test.js`. Landed from PR #238 (yeisonrestrepo), intake of issue #231.
+- **[BUG-084]** `scripts/adopt-claude-md.mjs` runs its CLI when launched through a symlinked directory, such as the macOS default temp dir. Node's ESM loader sets `import.meta.url` to the module's realpath, so the entry-point check now resolves `process.argv[1]` with `fs.realpathSync` (falling back to the raw path) before comparing. Importing the module still has no side effects. Pinned by `entry point [BUG-084]` in `tests/unit/adopt-claude-md.test.js`, which runs `sections` through a directory link and expects exit 0, `trigger: true` and the same stdout as through the real path. Landed from PR #245 (cc-lane-bot), intake of issue #242.
+- **[BUG-086]** An unattended `delegate plan` now escalates a task whose `Files` entry holds any character outside printable ASCII (0x20–0x7E), with the write-surface reason, whichever list the entry spells. `inSurface` tests the raw entry before the leading `./` is stripped and before lower-casing, because `toLowerCase` maps some such characters to ASCII (U+212A KELVIN SIGN to `k`). Printable-ASCII entries such as `src/a.js` and `docs/notes.md` keep the delegated `APPROVE`. Pinned by rows U50 and U51 in `tests/scripts/orchestrate.test.js`. Landed from PR #247 (cc-lane-bot), intake of issue #240.
+
+### Changed
+- `CLAUDE.md` gains an **Issue Triage** section: every issue an agent opens or picks up gets `cc-reviewer-bot` as assignee, at least one type label plus every area label that applies, and exactly one pillar milestone, set in the same `gh issue create` or one `gh issue edit` right after, with a session-end sweep for issues missing any of the three. Agent instructions only, no id. Landed from PR #225 (Ludocius), issue #227.
+
 ## [1.52.1] - 2026-11-15
 
 ### Fixed
