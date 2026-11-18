@@ -475,7 +475,7 @@ describe('write surface [FEAT-011 AC4]', () => {
     ]);
   });
 
-  it('[BUG-080] CONTROL_PLANE declares exactly the control-plane entries the spec lists', () => {
+  it('[BUG-080][BUG-081] CONTROL_PLANE declares exactly the control-plane entries the specs list', () => {
     expect(orchestrateModule.CONTROL_PLANE).toEqual([
       '.claude/hooks/**', 'project-template/.claude/hooks/**',
       '.opencode/plugin/**', 'project-template/.opencode/plugin/**',
@@ -488,6 +488,10 @@ describe('write surface [FEAT-011 AC4]', () => {
       'claude.md', 'claude.local.md', '.claude/claude.md', 'project-template/claude.md',
       'scripts/orchestrate.mjs', 'scripts/snap-contract.mjs', 'scripts/ticket.mjs', 'scripts/doc-locations.mjs', 'scripts/security-scan.mjs',
       '.claude/scripts/**',
+      '.git/**', '.husky/**', '.githooks/**', '.mcp.json', 'opencode.json', 'opencode.jsonc',
+      '.claude/flow-status.mjs', 'project-template/.claude/flow-status.mjs',
+      '.github/workflows/**', '.github/actions/**',
+      'package.json', 'package-lock.json', 'npm-shrinkwrap.json', '.npmrc',
     ]);
   });
 });
@@ -3552,10 +3556,11 @@ describe('unattended mode [FEAT-054]', () => {
   });
 
   // BUG-080: the U22 assertions, with the list the reason names as a parameter; Task 1 is an ordinary source file.
+  // The reason names the path without a leading ./ (the task parser strips it), so the ./ rows of U47 still pass the spelling they declare.
   function expectEscalation(path, list) {
     atPlan();
     plan(`# Demo Plan\n\n${task(1, ['src/a.js'])}\n${task(2, [path])}\n## Test List\n`);
-    const reason = `task Task 2 declares ${path} inside the ${list}`;
+    const reason = `task Task 2 declares ${path.replace(/^\.\//, '')} inside the ${list}`;
     expect(delegateDoc('plan')).toEqual({ status: 0, out: `owner approval required: delegated review plan returned ESCALATE (${reason}); see .conductor/delegate/plan.md`, err: '' });
     expect(runFile().approvals.plan).toBeNull();
     expect(runFile().delegated.plan).toMatchObject({ verdict: 'ESCALATE', reason });
@@ -3646,6 +3651,118 @@ describe('unattended mode [FEAT-054]', () => {
     expect(delegateDoc('plan')).toEqual({ status: 0, out: `owner approval required: delegated review plan returned ESCALATE (${reason}); see .conductor/delegate/plan.md`, err: '' });
     expect(runFile().approvals.plan).toBeNull();
     expect(runFile().delegated.plan).toMatchObject({ verdict: 'ESCALATE', reason });
+  });
+
+  it.each([
+    '.git/hooks/pre-commit',
+    '.husky/pre-commit',
+    '.githooks/pre-commit',
+    '.mcp.json',
+    'opencode.json',
+    'opencode.jsonc',
+    '.claude/flow-status.mjs',
+    'project-template/.claude/flow-status.mjs',
+    '.github/workflows/test.yml',
+    '.github/actions/setup/action.yml',
+    'package.json',
+    'package-lock.json',
+    'npm-shrinkwrap.json',
+    '.npmrc',
+  ])('U46 [BUG-081 AC2] delegate plan over an APPROVE report escalates a task that declares the outside-the-run file %s', (path) => {
+    expectEscalation(path, 'control-plane files');
+  });
+
+  it.each([
+    '.git',
+    '.git/hooks',
+    '.git/*',
+    '.GIT/hooks/pre-commit',
+    './.git/config',
+    '.git/config',
+    '.husky',
+    '.hus*/x',
+    '.HUSKY/Pre-Commit',
+    './.husky/pre-commit',
+    '.githooks',
+    '.githooks/*',
+    '.GitHooks/Pre-Commit',
+    './.githooks/pre-commit',
+    '.mcp.*',
+    '.MCP.json',
+    './.mcp.json',
+    'opencode.*',
+    'OpenCode.JSON',
+    './opencode.json',
+    '*.jsonc',
+    'OpenCode.JSONC',
+    './opencode.jsonc',
+    '.claude/*.mjs',
+    '.Claude/Flow-Status.mjs',
+    './.claude/flow-status.mjs',
+    'project-template/.claude/flow-*',
+    'Project-Template/.Claude/Flow-Status.mjs',
+    './project-template/.claude/flow-status.mjs',
+    '.github/workflows',
+    '.github/workflows/*.yml',
+    '.github/**',
+    '.GitHub/Workflows/Test.yml',
+    './.github/workflows/ci.yml',
+    '.github/workflows/new.yml',
+    '.github/actions',
+    '.github/actions/*/action.yml',
+    '.GitHub/Actions/Setup/Action.yml',
+    './.github/actions/setup/action.yml',
+    '*.json',
+    'Package.JSON',
+    './package.json',
+    'package-*.json',
+    'Package-Lock.JSON',
+    './package-lock.json',
+    'npm-*',
+    'NPM-Shrinkwrap.JSON',
+    './npm-shrinkwrap.json',
+    '.npm*',
+    '.NPMRC',
+    './.npmrc',
+  ])('U47 [BUG-081 AC3] delegate plan escalates the directory, glob, case or ./ form %s with the control-plane reason', (path) => {
+    expectEscalation(path, 'control-plane files');
+  });
+
+  it.each([
+    '.gitignore',
+    '.gitattributes',
+    '.github',
+    '.github/CODEOWNERS',
+    '.github/pull_request_template.md',
+    '.github/ISSUE_TEMPLATE/bug.yml',
+    '.github/wiki/Home.md',
+    '.github/workflowsx/a.yml',
+    'docs/.git/hooks/x',
+    'tools/package.json', // [BUG-082]: nested manifests belong to the any-depth rule
+    'mcp.json',
+    'docs/.mcp.json',
+    '.huskyx/pre-commit',
+    'docs/.husky/pre-commit',
+    'docs/.npmrc',
+    '.npmrc.example',
+    'tools/package-lock.json',
+    'docs/opencode.json',
+    '.claude/flow-status.md',
+    'src/package.json', // [BUG-082]: nested manifests belong to the any-depth rule
+  ])('U48 [BUG-081 AC4] delegate plan over an APPROVE report approves a task that declares the near miss %s', (path) => {
+    atPlan();
+    plan(`# Demo Plan\n\n${task(1, ['src/a.js'])}\n${task(2, [path])}\n## Test List\n`);
+    expect(delegateDoc('plan')).toEqual({ status: 0, out: `plan approved by delegated review: define_approved, 2 task(s); sha256 ${sha(PLAN)}`, err: '' });
+    expect(runFile().approvals.plan.by).toBe('define-review');
+  });
+
+  it.each([
+    '.*/config',
+    '*/workflows/x.yml',
+    '**/package.json',
+    '*/hooks/pre-commit',
+  ])('U49 [BUG-081 AC5] a glob that reaches both lists, %s, keeps the write-surface reason', (path) => {
+    expectEscalation(path, 'orchestrator write surface');
   });
 
   it.each([

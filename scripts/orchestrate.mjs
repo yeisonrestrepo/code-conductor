@@ -22,6 +22,7 @@ export const ENVELOPE_FILE = '.claude/memory/band-envelope.json';
 export const WRITE_SURFACE = [RUN_FILE, ENVELOPE_FILE, '.claude/memory/session-snapshot.json', '.conductor/**'];
 // Owner decision (BUG-080): the files that enforce the guards or steer later dispatches, in both mirrors. Same notation
 // as WRITE_SURFACE; a trailing `/**` protects the whole directory, so a file added to it is covered too.
+// Owner decision (BUG-081): also the files that run code outside the run, after it ends.
 export const CONTROL_PLANE = [
   '.claude/hooks/**', 'project-template/.claude/hooks/**',
   '.opencode/plugin/**', 'project-template/.opencode/plugin/**',
@@ -35,6 +36,11 @@ export const CONTROL_PLANE = [
   // The router, the three modules it imports at load time, and the scan; the installer deploys them to .claude/scripts/.
   'scripts/orchestrate.mjs', 'scripts/snap-contract.mjs', 'scripts/ticket.mjs', 'scripts/doc-locations.mjs', 'scripts/security-scan.mjs',
   '.claude/scripts/**',
+  // BUG-081: these run code after the run ends (git, MCP and OpenCode servers, the status line, CI, npm).
+  '.git/**', '.husky/**', '.githooks/**', '.mcp.json', 'opencode.json', 'opencode.jsonc',
+  '.claude/flow-status.mjs', 'project-template/.claude/flow-status.mjs',
+  '.github/workflows/**', '.github/actions/**',
+  'package.json', 'package-lock.json', 'npm-shrinkwrap.json', '.npmrc',
 ];
 // Where /cc-orchestrate writes each agent's final message for `handback` to read: inside
 // the surface, and cleared with the run so file names never collide across runs.
