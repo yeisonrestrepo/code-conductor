@@ -1,6 +1,6 @@
 # BUG-084: adopt-claude-md.mjs skips its entry point when run through a symlinked directory
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-18 by independent review (round 1)
 
 **Item:** `[BUG-084]` (intake of issue #242). Pillar 5: infrastructure, ecosystem and QA.
 
