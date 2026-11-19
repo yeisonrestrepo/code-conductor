@@ -1,6 +1,6 @@
 # BUG-077: Unbound `approve spec` path allowing the approval hash to protect the wrong file
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-19 by independent review (round 1)
 **Item:** BUG-077 (intake of issue #199)
 **Date:** 2026-11-19
 
