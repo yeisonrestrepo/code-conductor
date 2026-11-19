@@ -387,17 +387,17 @@ Recorded in the approved spec ("Owner decisions"). They are constraints on this 
 - Modify: `tests/scripts/orchestrate.test.js:56`, `:86-89`, `:270`, `:315-317`, `:750`, `:1064`, `:1734-1735`, `:1766`, `:1772`, `:2461`, `:2814-2815`, `:2936`, `:3430`, `:3485`, `:4352`, `:4364`
 - Modify: `tests/installer/commands-parity.test.js:407`
 
-- [ ] [T-101] `tests/scripts/orchestrate.test.js:86-89`: replace `handbackLine` with the fixture of plan decision 4. Depends on T-004.
-- [ ] [T-102] `tests/scripts/orchestrate.test.js:56`: add `abandonedRecord` below `runFile` (plan decision 5). Depends on T-101.
-- [ ] [T-103] `tests/scripts/orchestrate.test.js`: pass `--abandon` at the six live-run cleanups of plan decision 5 (`:270`, `:750`, `:2461`, `:3430`, `:3485`, `:4352`). Depends on T-102.
-- [ ] [T-104] `tests/scripts/orchestrate.test.js`: pass `--abandon` and read `abandonedRecord` at the three record parses of plan decision 5 (`:315-317`, `:1064`, `:4364`). Depends on T-103.
-- [ ] [T-105] `tests/scripts/orchestrate.test.js:2814-2815`: give RS3's spec and plan lines their explicit scopes (plan decision 5). Depends on T-104.
-- [ ] [T-106] `tests/scripts/orchestrate.test.js:1734-1766`: add `storedSpecFiles` and rewrite the B3 and B7 setups (plan decision 5). Depends on T-105.
-- [ ] [T-107] `tests/scripts/orchestrate.test.js:1772`: insert the `[BUG-075]` describe block of plan decision 6a above `describe('Build and Verify review loop [FEAT-057]'`. Depends on T-106.
-- [ ] [T-108] `tests/scripts/orchestrate.test.js`: insert RS21 (plan decision 6b) above `it('RS12 [AC5] …`. Depends on T-107.
-- [ ] [T-109] `tests/installer/commands-parity.test.js:407`: add the `[BUG-075]` `it` of plan decision 6c. Depends on T-108.
-- [ ] [T-110] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t 'BUG-075'`. Its full match set is the 29 tests of the BUG-075 block and the 2 RS21 cases; no existing title contains `BUG-075`. Predicted: **26 failed, 5 passed** (1092 skipped). Green: C4, C5, C8, E2, E3. Any other split means a test is wrong: fix the test, not the prediction. Depends on T-109.
-- [ ] [T-111] Red run: `npx vitest run tests/installer/commands-parity.test.js -t 'BUG-075'`. Predicted: **1 failed** (the new test, at its first `toContain`), every other test in the file skipped. Depends on T-110.
+- [X] [T-101] `tests/scripts/orchestrate.test.js:86-89`: replace `handbackLine` with the fixture of plan decision 4. Depends on T-004.
+- [X] [T-102] `tests/scripts/orchestrate.test.js:56`: add `abandonedRecord` below `runFile` (plan decision 5). Depends on T-101.
+- [X] [T-103] `tests/scripts/orchestrate.test.js`: pass `--abandon` at the six live-run cleanups of plan decision 5 (`:270`, `:750`, `:2461`, `:3430`, `:3485`, `:4352`). Depends on T-102.
+- [X] [T-104] `tests/scripts/orchestrate.test.js`: pass `--abandon` and read `abandonedRecord` at the three record parses of plan decision 5 (`:315-317`, `:1064`, `:4364`). Depends on T-103.
+- [X] [T-105] `tests/scripts/orchestrate.test.js:2814-2815`: give RS3's spec and plan lines their explicit scopes (plan decision 5). Depends on T-104.
+- [X] [T-106] `tests/scripts/orchestrate.test.js:1734-1766`: add `storedSpecFiles` and rewrite the B3 and B7 setups (plan decision 5). Depends on T-105.
+- [X] [T-107] `tests/scripts/orchestrate.test.js:1772`: insert the `[BUG-075]` describe block of plan decision 6a above `describe('Build and Verify review loop [FEAT-057]'`. Depends on T-106.
+- [X] [T-108] `tests/scripts/orchestrate.test.js`: insert RS21 (plan decision 6b) above `it('RS12 [AC5] …`. Depends on T-107.
+- [X] [T-109] `tests/installer/commands-parity.test.js:407`: add the `[BUG-075]` `it` of plan decision 6c. Depends on T-108.
+- [X] [T-110] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t 'BUG-075'`. Its full match set is the 29 tests of the BUG-075 block and the 2 RS21 cases; no existing title contains `BUG-075`. Predicted: **26 failed, 5 passed** (1092 skipped). Green: C4, C5, C8, E2, E3. Any other split means a test is wrong: fix the test, not the prediction. Depends on T-109.
+- [X] [T-111] Red run: `npx vitest run tests/installer/commands-parity.test.js -t 'BUG-075'`. Predicted: **1 failed** (the new test, at its first `toContain`), every other test in the file skipped. Depends on T-110.
 
 ---
 
@@ -408,18 +408,18 @@ Recorded in the approved spec ("Owner decisions"). They are constraints on this 
 - Modify: `.claude/commands/cc-orchestrate.md:35`, `:43`, `:49`, `:82`
 - Modify: `project-template/.claude/commands/cc-orchestrate.md:35`, `:43`, `:49`, `:82`
 
-- [ ] [T-201] `scripts/orchestrate.mjs:555-567`: add `docLocationHalt` and use it in `envelopeFields` (plan decision 1a). Depends on T-111.
-- [ ] [T-202] `scripts/orchestrate.mjs:972`: add `expectedScope`, `sameList`, `scopeText`, `unsafePath` and `claimHalt` above `handback` (plan decision 1b). Depends on T-201.
-- [ ] [T-203] `scripts/orchestrate.mjs` (`handback`): add the claim call after the `ORCH_GATE_UNEARNED` check (plan decision 1c). Depends on T-202.
-- [ ] [T-204] `scripts/orchestrate.mjs` (`approve`): record `by: 'owner'` (plan decision 1d). Depends on T-203.
-- [ ] [T-205] `scripts/orchestrate.mjs` (`taskEntryHolds`, `keptEntries`): add the resume claim check and pass `run` (plan decision 1e). Depends on T-204.
-- [ ] [T-206] `scripts/orchestrate.mjs` (`end`): add `END_USAGE` and `unverifiedRun`, and replace `end` (plan decision 1f). Depends on T-205.
-- [ ] [T-207] `scripts/orchestrate.mjs` (`cli`): pass `argv.slice(1)` to `end` (plan decision 1g). Depends on T-206.
-- [ ] [T-208] Green run: the T-110 command. Predicted: **31 passed** (1092 skipped). Depends on T-207.
-- [ ] [T-209] `.claude/commands/cc-orchestrate.md`: apply plan decision 8 a-d with a file-edit tool. Depends on T-208.
-- [ ] [T-210] `project-template/.claude/commands/cc-orchestrate.md`: apply the same four edits. Depends on T-209.
-- [ ] [T-211] Green run: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: **93 passed (93)**. Depends on T-210.
-- [ ] [T-212] `npx vitest run tests/scripts/orchestrate.test.js`. Predicted: **1123 passed (1123)**. This shows every existing hand-back, approval, resume and `end` case unchanged apart from plan decision 5 (spec, AC4, AC9, AC13). Depends on T-211.
+- [X] [T-201] `scripts/orchestrate.mjs:555-567`: add `docLocationHalt` and use it in `envelopeFields` (plan decision 1a). Depends on T-111.
+- [X] [T-202] `scripts/orchestrate.mjs:972`: add `expectedScope`, `sameList`, `scopeText`, `unsafePath` and `claimHalt` above `handback` (plan decision 1b). Depends on T-201.
+- [X] [T-203] `scripts/orchestrate.mjs` (`handback`): add the claim call after the `ORCH_GATE_UNEARNED` check (plan decision 1c). Depends on T-202.
+- [X] [T-204] `scripts/orchestrate.mjs` (`approve`): record `by: 'owner'` (plan decision 1d). Depends on T-203.
+- [X] [T-205] `scripts/orchestrate.mjs` (`taskEntryHolds`, `keptEntries`): add the resume claim check and pass `run` (plan decision 1e). Depends on T-204.
+- [X] [T-206] `scripts/orchestrate.mjs` (`end`): add `END_USAGE` and `unverifiedRun`, and replace `end` (plan decision 1f). Depends on T-205.
+- [X] [T-207] `scripts/orchestrate.mjs` (`cli`): pass `argv.slice(1)` to `end` (plan decision 1g). Depends on T-206.
+- [X] [T-208] Green run: the T-110 command. Predicted: **31 passed** (1092 skipped). Depends on T-207.
+- [X] [T-209] `.claude/commands/cc-orchestrate.md`: apply plan decision 8 a-d with a file-edit tool. Depends on T-208.
+- [X] [T-210] `project-template/.claude/commands/cc-orchestrate.md`: apply the same four edits. Depends on T-209.
+- [X] [T-211] Green run: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: **93 passed (93)**. Depends on T-210.
+- [X] [T-212] `npx vitest run tests/scripts/orchestrate.test.js`. Predicted: **1123 passed (1123)**. This shows every existing hand-back, approval, resume and `end` case unchanged apart from plan decision 5 (spec, AC4, AC9, AC13). Depends on T-211.
 
 ---
 
@@ -428,36 +428,36 @@ Recorded in the approved spec ("Owner decisions"). They are constraints on this 
 **Files:**
 - Modify: `scripts/orchestrate.mjs`, `tests/scripts/orchestrate.test.js`, `tests/installer/commands-parity.test.js`, `.claude/commands/cc-orchestrate.md`, `project-template/.claude/commands/cc-orchestrate.md` (staged), this plan (checkboxes)
 
-- [ ] [T-301] Run `npm test`. Predicted: as under Baseline, the two staging-convention ENV reds at most. A red outside the ENV set listed there is called ENV only if the sandbox causes it (network, tmp permissions, missing `node:sqlite`, uid 0) and its file is not one this plan touches; report it with its name. Any other red is fixed. Depends on T-212.
-- [ ] [T-302] Scope check:
+- [X] [T-301] Run `npm test`. Predicted: as under Baseline, the two staging-convention ENV reds at most. A red outside the ENV set listed there is called ENV only if the sandbox causes it (network, tmp permissions, missing `node:sqlite`, uid 0) and its file is not one this plan touches; report it with its name. Any other red is fixed. Depends on T-212.
+- [X] [T-302] Scope check:
   - `git status --porcelain` lists exactly the five files of this task and this plan as modified.
   - `diff .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md` prints nothing.
   - `git diff --quiet HEAD -- VERSION CHANGELOG.md package.json package-lock.json README.md "AGENT-READABLE BACKLOG.md" .claude/memory .claude/hooks .claude/agents .claude/settings.json .github scripts/snap-validate.mjs scripts/snap-build.mjs scripts/snap-contract.mjs tools lib bin` exits 0.
   - `grep -n "gitValue(root, \['config'" scripts/orchestrate.mjs` prints nothing.
   - Depends on T-301.
-- [ ] [T-303] Stage: `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js tests/installer/commands-parity.test.js .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md` (all tracked). Depends on T-302.
-- [ ] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-19-bug075-orchestrate-mjs-accepts-hand-backs-and-end-that.md` (carries the ticks for T-101 to T-303). Depends on T-303.
-- [ ] [T-305] Commit: `fix: check hand-back scope claims, require verify_pass before end and record the owner as approver [BUG-075]`. Depends on T-304.
+- [X] [T-303] Stage: `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js tests/installer/commands-parity.test.js .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md` (all tracked). Depends on T-302.
+- [X] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-19-bug075-orchestrate-mjs-accepts-hand-backs-and-end-that.md` (carries the ticks for T-101 to T-303). Depends on T-303.
+- [X] [T-305] Commit: `fix: check hand-back scope claims, require verify_pass before end and record the owner as approver [BUG-075]`. Depends on T-304.
 
 ---
 
 ## Test List
 
-- [ ] Unit, AC1: C1, `["**"]` halts `ORCH_HANDBACK_SCOPE_MISMATCH`; the halt is recorded, `handbacks` and `tasks` are unchanged.
-- [ ] Unit, AC2: C2, eight `ops.f` entries (another task's file, another repo file, `../x`, `/abs`, `a/./b`, `a//b`, `C:/x`, a trailing `/`) halt `ORCH_HANDBACK_OUT_OF_SCOPE` naming that path.
-- [ ] Unit, AC3: C3, the installed scope reversed halts `ORCH_HANDBACK_SCOPE_MISMATCH`.
-- [ ] Unit, AC4: C4 (task), C5 and C6 (fix round against its `fixScope`), plus every existing code hand-back through the shared fixture (T-212).
-- [ ] Unit, AC5: C7 (spec outside its folder, a `..` segment under it, a plan naming the spec) and C8 (a plan under its folder records).
-- [ ] Unit, AC6: C9, `audit`, `qa` and `security` with an `ops.scope` halt; without one they record as before (the existing suites, T-212).
-- [ ] Unit, AC7: C10, an envelope edited to `["**"]` still halts.
-- [ ] Unit, AC8: E1, `end` on a live unverified run exits 2 with `ORCH_END_UNVERIFIED`; run file and envelope stay.
-- [ ] Unit, AC9: E2 (after `verify_pass`, byte for byte) and E3 (halted, invalid, no run file), plus the unchanged FEAT-011 and RS2 `end` tests.
-- [ ] Unit, AC10: E4, the abandon line then the record on a live run; the record alone on a verified run. E5 pins the usage refusal.
-- [ ] Unit, AC11: A1, `by: "owner"` for both approvals with `user.name` set and unset; `define-review` stays (FEAT-054 tests).
-- [ ] Unit, AC12: RS21, a stored scope of `["**"]` or an `ops.f` of `../x:M` on task 2 is dropped with everything after it.
-- [ ] AC13: the nine live-run `end` call sites pass `--abandon` (plan decision 5); `npm test` (T-301).
-- [ ] Parity, AC14: the `[BUG-075]` `it` in `commands-parity.test.js`, plus the `diff` and the `.claude/agents` / SNAP-script check in T-302.
-- [ ] No integration or E2E/UI test: every verb is exercised end to end through the CLI fixture already, and there is no UI.
+- [X] Unit, AC1: C1, `["**"]` halts `ORCH_HANDBACK_SCOPE_MISMATCH`; the halt is recorded, `handbacks` and `tasks` are unchanged.
+- [X] Unit, AC2: C2, eight `ops.f` entries (another task's file, another repo file, `../x`, `/abs`, `a/./b`, `a//b`, `C:/x`, a trailing `/`) halt `ORCH_HANDBACK_OUT_OF_SCOPE` naming that path.
+- [X] Unit, AC3: C3, the installed scope reversed halts `ORCH_HANDBACK_SCOPE_MISMATCH`.
+- [X] Unit, AC4: C4 (task), C5 and C6 (fix round against its `fixScope`), plus every existing code hand-back through the shared fixture (T-212).
+- [X] Unit, AC5: C7 (spec outside its folder, a `..` segment under it, a plan naming the spec) and C8 (a plan under its folder records).
+- [X] Unit, AC6: C9, `audit`, `qa` and `security` with an `ops.scope` halt; without one they record as before (the existing suites, T-212).
+- [X] Unit, AC7: C10, an envelope edited to `["**"]` still halts.
+- [X] Unit, AC8: E1, `end` on a live unverified run exits 2 with `ORCH_END_UNVERIFIED`; run file and envelope stay.
+- [X] Unit, AC9: E2 (after `verify_pass`, byte for byte) and E3 (halted, invalid, no run file), plus the unchanged FEAT-011 and RS2 `end` tests.
+- [X] Unit, AC10: E4, the abandon line then the record on a live run; the record alone on a verified run. E5 pins the usage refusal.
+- [X] Unit, AC11: A1, `by: "owner"` for both approvals with `user.name` set and unset; `define-review` stays (FEAT-054 tests).
+- [X] Unit, AC12: RS21, a stored scope of `["**"]` or an `ops.f` of `../x:M` on task 2 is dropped with everything after it.
+- [X] AC13: the nine live-run `end` call sites pass `--abandon` (plan decision 5); `npm test` (T-301).
+- [X] Parity, AC14: the `[BUG-075]` `it` in `commands-parity.test.js`, plus the `diff` and the `.claude/agents` / SNAP-script check in T-302.
+- [X] No integration or E2E/UI test: every verb is exercised end to end through the CLI fixture already, and there is no UI.
 
 ## Commit Order
 

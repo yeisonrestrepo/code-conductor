@@ -54,6 +54,8 @@ function fixtureGit(...args) {
 }
 const fixtureCommit = () => { fixtureGit('add', '-A'); fixtureGit('commit', '-qm', 'base'); };
 const runFile = () => JSON.parse(readFileSync(join(root, RUN_FILE), 'utf8'));
+// BUG-075: end --abandon on a live run prints its abandon line, then the record.
+const abandonedRecord = (out) => JSON.parse(out.slice(out.indexOf('\n') + 1));
 const runFileText = (text) => writeFileSync(join(root, RUN_FILE), text);
 const envelopeText = () => readFileSync(join(root, ENVELOPE_FILE), 'utf8');
 const envelope = () => JSON.parse(envelopeText());
@@ -83,10 +85,15 @@ function plan(body) {
 }
 const task = (n, files) => `### Task ${n}: thing ${n}\n\n**Files:**\n${files.map((f) => `- Modify: \`${f}\``).join('\n')}\n\n- [ ] **Step 1: do it**\n`;
 const TWO_TASKS = `# Demo Plan\n\n${task(1, ['src/a.js:10-20', 'tests/a.test.js'])}\n${task(2, ['src/b.js'])}\n## Test List\n`;
-const handbackLine = (role, gate, extra = {}) => 'SNAP_HANDBACK ' + JSON.stringify({
-  v: extra.v ?? 3, sys: { ph: 'impl', c: '0000000', s: 'FEAT-011', role, tk: 'X', ...extra.sys },
-  ops: { n: [], f: extra.f ?? (role === 'spec' ? [`${SPEC}:C`] : []), gate }, mem: { d: [], x: [] }, pr: '',
-});
+// BUG-075: a role copies its installed envelope's ops.scope verbatim, so the fixture does too; extra.scope overrides it.
+const installedScope = (role) => { try { const env = envelope(); return env.sys.role === role ? env.ops.scope : undefined; } catch { return undefined; } };
+const handbackLine = (role, gate, extra = {}) => {
+  const scope = 'scope' in extra ? extra.scope : installedScope(role);
+  return 'SNAP_HANDBACK ' + JSON.stringify({
+    v: extra.v ?? 3, sys: { ph: 'impl', c: '0000000', s: 'FEAT-011', role, tk: 'X', ...extra.sys },
+    ops: { n: [], f: extra.f ?? (role === 'spec' ? [`${SPEC}:C`] : []), gate, ...(scope === undefined ? {} : { scope }) }, mem: { d: [], x: [] }, pr: '',
+  });
+};
 const say = (role, gate) => `Done.\nObservation: fine.\n${role === 'audit' ? 'VERDICT: APPROVE\n' : ''}${handbackLine(role, gate)}\n`;
 const auditReport = (verdict, findings = []) => ['Done.', ...findings, ...(verdict === null ? [] : [verdict]), handbackLine('audit', 'build_executed'), ''].join('\n');
 
@@ -267,7 +274,7 @@ describe('run file [FEAT-011 AC9]', () => {
   it('start records boundary_routed in step mode by default, and auto with --auto', () => {
     expect(orch(['start', 'FEAT-011']).status).toBe(0);
     expect(runFile()).toMatchObject({ v: 1, session_id: 'sess-1', item: 'FEAT-011', mode: 'step', band: 'boundary', gate: 'boundary_routed', halt: null, test_command: 'npm test' });
-    orch(['end']);
+    orch(['end', '--abandon']);
     orch(['start', 'FEAT-011', '--auto']);
     expect(runFile().mode).toBe('auto');
   });
@@ -312,9 +319,9 @@ describe('run file [FEAT-011 AC9]', () => {
     orch(['install', 'spec']);
     mkdirSync(join(root, HANDBACK_DIR), { recursive: true });
     writeFileSync(join(root, HANDBACK_DIR, 'spec.txt'), say('spec', 'boundary_routed'));
-    const r = orch(['end']);
+    const r = orch(['end', '--abandon']);
     expect(r.status).toBe(0);
-    expect(JSON.parse(r.out).item).toBe('FEAT-011');
+    expect(abandonedRecord(r.out).item).toBe('FEAT-011');
     expect(existsSync(join(root, RUN_FILE))).toBe(false);
     expect(existsSync(join(root, ENVELOPE_FILE))).toBe(false);
     expect(existsSync(join(root, HANDBACK_DIR))).toBe(false);
@@ -747,7 +754,7 @@ describe('ticket intake [FEAT-031 AC1-AC5, AC12]', () => {
     gh = withIssues(issue(REPO, 123));
     orchGh(['start', 'FEAT-031', '--ticket', '123']);
     const bound = snapText();
-    orch(['end']);
+    orch(['end', '--abandon']);
     expect(orchGh(['start', 'FEAT-031']).status).toBe(0);
     expect(snapText()).toBe(bound);
     const wb = spawnSync(process.execPath, [TICKET_SCRIPT, 'writeback', 'FEAT-031', '--version', '1.38.0', '--pr', '64'], { cwd: root, env: gh.env(cleanGitEnv()), encoding: 'utf8' });
@@ -1061,7 +1068,7 @@ describe('review loop over review files [FEAT-058]', () => {
   it('[E2] end prints the review record and removes .conductor/review', () => {
     openFirst('spec');
     writeReview('spec', 1, 'CLEAN');
-    expect(JSON.parse(orch(['end']).out).review).toEqual({ spec: { round: 1, outcome: null, sha256: sha(SPEC), doc: SPEC, await: 'review' } });
+    expect(abandonedRecord(orch(['end', '--abandon']).out).review).toEqual({ spec: { round: 1, outcome: null, sha256: sha(SPEC), doc: SPEC, await: 'review' } });
     expect(existsSync(join(root, REVIEW_DIR))).toBe(false);
   });
 
@@ -1731,8 +1738,18 @@ describe('approve spec binds the spec hand-back [BUG-077]', () => {
     refuses(OTHER, SPEC);
   });
 
+  // BUG-075: the hand-back itself halts on a path outside the folder, so only an edited run file still reaches approve with one.
+  const storedSpecFiles = (f) => {
+    const run = runFile();
+    const entry = run.handbacks.findLast((h) => h.role === 'spec');
+    const env = JSON.parse(entry.snap);
+    entry.snap = JSON.stringify({ ...env, ops: { ...env.ops, f } });
+    runFileText(JSON.stringify(run, null, 2) + '\n');
+  };
+
   it('B3 [AC3] a named document outside the spec folder refuses', () => {
-    handedBack([`${SPEC}:C`, 'README.md:M']);
+    handedBack([`${SPEC}:C`]);
+    storedSpecFiles([`${SPEC}:C`, 'README.md:M']);
     put(SPEC);
     put('README.md', '# Readme\n');
     refuses('README.md', SPEC);
@@ -1763,9 +1780,161 @@ describe('approve spec binds the spec hand-back [BUG-077]', () => {
     put('.claude/specs/a.md', '# x\n');
     put('BACKLOG.md', '# Backlog\n\n## Pillar 3: X\n\n### [ ] `[FEAT-011]` y\n');
     expect(orch(['start', 'FEAT-011']).status).toBe(0);
-    handBack(['.claude/specs/b-design.md:C']);
+    handBack([]);
+    storedSpecFiles(['.claude/specs/b-design.md:C']);
     put('.claude/specs/b-design.md', '# B\n');
     refuses('.claude/specs/b-design.md', 'none', '.claude/specs/pillar-3/');
+  });
+});
+
+describe('hand-back claims, end and approver [BUG-075]', () => {
+  const TASK1 = ['src/a.js', 'tests/a.test.js', PLAN];
+  const codeSay = (extra) => `Done.\nObservation: fine.\n${handbackLine('code', 'build_executed', extra)}\n`;
+  const atCode = () => { driveTo('code'); expect(orch(['install', 'code']).status).toBe(0); };
+  // A refused claim halts with its code and leaves the record as it was, apart from the halt.
+  const haltsUnrecorded = (role, input, err) => {
+    const before = runFile();
+    const r = orch(['handback', role], { input });
+    expect({ status: r.status, err: r.err }).toEqual({ status: 1, err });
+    const after = runFile();
+    expect(after.halt.code).toBe(err.split(':')[0]);
+    expect(after.handbacks).toEqual(before.handbacks);
+    expect(after.tasks).toEqual(before.tasks);
+  };
+  const mismatch = (role, expected, claimed) => `ORCH_HANDBACK_SCOPE_MISMATCH: ${role} was installed with scope ${expected}, the hand-back names ${claimed}`;
+  const outside = (role, path, scope) => `ORCH_HANDBACK_OUT_OF_SCOPE: ${role} lists ${path} in ops.f, outside its scope ${scope}`;
+  const unverified = (next) => `orchestrate: ORCH_END_UNVERIFIED: run FEAT-011 is at ${next} with no verify_pass; end it only after qa, after a halt, or with end --abandon on the owner's word`;
+  const verified = () => {
+    driveTo('qa');
+    expect(orch(['install', 'qa']).status).toBe(0);
+    expect(orch(['handback', 'qa'], { input: say('qa', 'verify_pass') }).status).toBe(0);
+  };
+
+  it('C1 [AC1] a code hand-back naming scope ["**"] halts ORCH_HANDBACK_SCOPE_MISMATCH and records nothing', () => {
+    atCode();
+    haltsUnrecorded('code', codeSay({ scope: ['**'], f: ['../x:M'] }), mismatch('code', JSON.stringify(TASK1), '["**"]'));
+  });
+
+  it.each(['src/b.js:M', 'README.md:M', '../x:M', '/abs:M', 'a/./b:M', 'a//b:M', 'C:/x:M', 'src/a.js/:M'])('C2 [AC2] ops.f entry %s halts ORCH_HANDBACK_OUT_OF_SCOPE', (entry) => {
+    atCode();
+    haltsUnrecorded('code', codeSay({ f: ['src/a.js:M', entry] }), outside('code', entry.slice(0, -2), JSON.stringify(TASK1)));
+  });
+
+  it('C3 [AC3] the installed scope in another order halts ORCH_HANDBACK_SCOPE_MISMATCH', () => {
+    atCode();
+    const reversed = [...TASK1].reverse();
+    haltsUnrecorded('code', codeSay({ scope: reversed }), mismatch('code', JSON.stringify(TASK1), JSON.stringify(reversed)));
+  });
+
+  it('C4 [AC4] a conforming code hand-back is recorded as before', () => {
+    atCode();
+    const r = orch(['handback', 'code'], { input: codeSay({ f: ['src/a.js:M', 'tests/a.test.js:C', `${PLAN}:M`] }) });
+    expect(r).toMatchObject({ status: 0, out: 'code handed back build_executed' });
+    expect(runFile().tasks.done).toBe(1);
+    expect(runFile().halt).toBeNull();
+  });
+
+  it('C5 [AC4] a fix round is checked against its fix scope', () => {
+    driveTo('audit');
+    expect(orch(['install', 'audit']).status).toBe(0);
+    expect(orch(['handback', 'audit'], { input: auditReport('VERDICT: RETURN', ['- [blocker] src/a.js:10 — breaks AC1']) }).status).toBe(0);
+    expect(orch(['install', 'code']).status).toBe(0);
+    expect(envelope().ops.scope).toEqual(['src/a.js', PLAN]);
+    expect(orch(['handback', 'code'], { input: codeSay({ f: ['src/a.js:M', `${PLAN}:M`] }) }).status).toBe(0);
+    expect(runFile().handbacks.at(-1)).toMatchObject({ role: 'code', fix: 1 });
+  });
+
+  it('C6 [AC4] a fix-round hand-back naming a plan file outside the fix scope halts', () => {
+    driveTo('audit');
+    expect(orch(['install', 'audit']).status).toBe(0);
+    expect(orch(['handback', 'audit'], { input: auditReport('VERDICT: RETURN', ['- [blocker] src/a.js:10 — breaks AC1']) }).status).toBe(0);
+    expect(orch(['install', 'code']).status).toBe(0);
+    haltsUnrecorded('code', codeSay({ f: ['src/b.js:M'] }), outside('code', 'src/b.js', JSON.stringify(['src/a.js', PLAN])));
+  });
+
+  it.each([
+    ['spec', 'README.md:M', '["docs/specs/**"]'],
+    ['spec', 'docs/specs/../x.md:C', '["docs/specs/**"]'],
+    ['plan', `${SPEC}:C`, '["docs/plans/**"]'],
+  ])('C7 [AC5] a %s hand-back naming %s halts ORCH_HANDBACK_OUT_OF_SCOPE', (role, entry, scope) => {
+    driveTo(role);
+    expect(orch(['install', role]).status).toBe(0);
+    const f = role === 'spec' ? [`${SPEC}:C`, entry] : [`${PLAN}:C`, entry];
+    haltsUnrecorded(role, `Done.\n${handbackLine(role, 'boundary_routed', { f })}\n`, outside(role, entry.slice(0, -2), scope));
+  });
+
+  it('C8 [AC5] a plan hand-back naming its document under the plan folder is recorded', () => {
+    driveTo('plan');
+    expect(orch(['install', 'plan']).status).toBe(0);
+    expect(orch(['handback', 'plan'], { input: `Done.\n${handbackLine('plan', 'boundary_routed', { f: [`${PLAN}:C`] })}\n` }).status).toBe(0);
+    expect(runFile().handbacks.at(-1).role).toBe('plan');
+  });
+
+  it.each(['audit', 'qa', 'security'])('C9 [AC6] a %s hand-back carrying ops.scope halts ORCH_HANDBACK_SCOPE_MISMATCH', (role) => {
+    driveTo(role);
+    expect(orch(['install', role]).status).toBe(0);
+    const extra = { scope: ['src/a.js'], ...(role === 'security' ? { v: 4, sys: { ph: 'rev' } } : {}) };
+    const line = handbackLine(role, role === 'qa' ? 'verify_pass' : 'build_executed', extra);
+    const input = role === 'security' ? securityReport().replace(/^SNAP_HANDBACK .*$/m, line) : role === 'audit' ? `Done.\nVERDICT: APPROVE\n${line}\n` : `Done.\n${line}\n`;
+    haltsUnrecorded(role, input, mismatch(role, 'none', '["src/a.js"]'));
+  });
+
+  it('C10 [AC7] the scope is recomputed, never read back from the envelope file', () => {
+    atCode();
+    const env = envelope();
+    writeFileSync(join(root, ENVELOPE_FILE), JSON.stringify({ ...env, ops: { ...env.ops, scope: ['**'] } }) + '\n');
+    haltsUnrecorded('code', codeSay({ scope: ['**'] }), mismatch('code', JSON.stringify(TASK1), '["**"]'));
+  });
+
+  it('E1 [AC8] end on a live run with no verify_pass refuses and removes nothing', () => {
+    atCode();
+    const before = readFileSync(join(root, RUN_FILE), 'utf8');
+    const r = orch(['end']);
+    expect({ status: r.status, err: r.err, out: r.out }).toEqual({ status: 2, err: unverified('install code'), out: '' });
+    expect(readFileSync(join(root, RUN_FILE), 'utf8')).toBe(before);
+    expect(existsSync(join(root, ENVELOPE_FILE))).toBe(true);
+  });
+
+  it('E2 [AC9] end after qa\'s verify_pass prints the record byte for byte', () => {
+    verified();
+    const record = readFileSync(join(root, RUN_FILE), 'utf8').trim();
+    expect(orch(['end'])).toMatchObject({ status: 0, out: record });
+    expect(existsSync(join(root, RUN_FILE))).toBe(false);
+  });
+
+  it('E3 [AC9] end on a halted run, an invalid run file and no run file behaves as before', () => {
+    atCode();
+    expect(orch(['handback', 'code'], { input: 'Done.\n' }).status).toBe(1);
+    const halted = readFileSync(join(root, RUN_FILE), 'utf8').trim();
+    expect(orch(['end'])).toMatchObject({ status: 0, out: halted });
+    runFileText('{not json');
+    expect(orch(['end'])).toMatchObject({ status: 0, out: '{not json' });
+    expect(orch(['end'])).toMatchObject({ status: 0, out: 'no run file' });
+  });
+
+  it('E4 [AC10] end --abandon drops a live unverified run under its abandon line, and prints a verified one alone', () => {
+    atCode();
+    const record = readFileSync(join(root, RUN_FILE), 'utf8').trim();
+    const r = orch(['end', '--abandon']);
+    expect(r).toMatchObject({ status: 0, out: `run FEAT-011 abandoned at define_approved before verify_pass\n${record}` });
+    for (const f of [RUN_FILE, ENVELOPE_FILE]) expect(existsSync(join(root, f))).toBe(false);
+    rmSync(join(root, PLAN));
+    verified();
+    const done = readFileSync(join(root, RUN_FILE), 'utf8').trim();
+    expect(orch(['end', '--abandon'])).toMatchObject({ status: 0, out: done });
+  });
+
+  it.each([[['--force']], [['--abandon', 'x']]])('E5 end with arguments %j refuses with its usage', (args) => {
+    atCode();
+    const before = readFileSync(join(root, RUN_FILE), 'utf8');
+    expect(orch(['end', ...args])).toMatchObject({ status: 2, err: 'orchestrate: usage: orchestrate.mjs end [--abandon]' });
+    expect(readFileSync(join(root, RUN_FILE), 'utf8')).toBe(before);
+  });
+
+  it.each([['set', true], ['unset', false]])('A1 [AC11] approve records by "owner" with git user.name %s', (_, named) => {
+    driveTo('code', { prep: () => { fixtureGit('init', '-q'); if (named) fixtureGit('config', 'user.name', 'Someone Else'); } });
+    expect(runFile().approvals.spec.by).toBe('owner');
+    expect(runFile().approvals.plan.by).toBe('owner');
   });
 });
 
@@ -2458,7 +2627,7 @@ describe('security verdict contract [FEAT-059]', () => {
     driveTo('qa');
     expect(readFileSync(join(root, OWNER_FILE), 'utf8')).toBe('none\n');
     writeFileSync(join(root, OWNER_FILE), 'stale\n');
-    orch(['end']);
+    orch(['end', '--abandon']);
     expect(readFileSync(join(root, OWNER_FILE), 'utf8')).toBe('stale\n');
     expect(orch(['start', 'FEAT-011']).status).toBe(0);
     expect(existsSync(join(root, OWNER_FILE))).toBe(false);
@@ -2811,8 +2980,8 @@ describe('resume verb [FEAT-055]', () => {
 
   it('RS3 handback stores the validated SNAP line verbatim as snap', () => {
     driveTo('code');
-    expect(runFile().handbacks[0].snap).toBe(snapOf(handbackLine('spec', 'boundary_routed')));
-    expect(runFile().handbacks[1].snap).toBe(snapOf(handbackLine('plan', 'boundary_routed')));
+    expect(runFile().handbacks[0].snap).toBe(snapOf(handbackLine('spec', 'boundary_routed', { scope: ['docs/specs/**'] })));
+    expect(runFile().handbacks[1].snap).toBe(snapOf(handbackLine('plan', 'boundary_routed', { scope: ['docs/plans/**'] })));
     orch(['install', 'code']);
     orch(['handback', 'code'], { input: say('code', 'build_executed') });
     expect(runFile().handbacks[2].snap).toBe(snapOf(handbackLine('code', 'build_executed')));
@@ -2931,6 +3100,17 @@ describe('resume verb [FEAT-055]', () => {
     expect(orch(['resume']).out).toBe(resumed('ORCH_AGENT_MISSING', 'define_approved', kept, dropped, next));
     expect(runFile().tasks.done).toBe(done);
     expect(runFile().resumes[0]).toMatchObject({ kept, dropped });
+  });
+
+  it.each([
+    ['a stored scope of ["**"]', (env) => ({ ...env, ops: { ...env.ops, scope: ['**'] } })],
+    ['a stored ops.f path outside the task', (env) => ({ ...env, ops: { ...env.ops, f: ['../x:M'] } })],
+  ])('RS21 [BUG-075 AC12] %s on task 2 cuts the sequence there', (_, edit) => {
+    built(2);
+    haltAgentMissing();
+    editRun((run) => { run.handbacks[3].snap = JSON.stringify(edit(JSON.parse(run.handbacks[3].snap))); });
+    expect(orch(['resume']).out).toBe(resumed('ORCH_AGENT_MISSING', 'define_approved', 5, 1, 'install code (task 2 of 3)'));
+    expect(runFile().tasks.done).toBe(1);
   });
 
   it('RS12 [AC5] a task entry whose sys.c HEAD does not descend from is cut', () => {
@@ -3427,7 +3607,7 @@ describe('unattended mode [FEAT-054]', () => {
     agents();
     expect(orch(['start', 'FEAT-011', '--auto', '--unattended']).status).toBe(0);
     expect(runFile().mode).toBe('auto');
-    orch(['end']);
+    orch(['end', '--abandon']);
     const r = orch(['start', 'FEAT-011', '--unattended', '--unattended']);
     expect(r).toMatchObject({ status: 2, err: START_USAGE });
     expect(existsSync(join(root, RUN_FILE))).toBe(false);
@@ -3482,7 +3662,7 @@ describe('unattended mode [FEAT-054]', () => {
     expect(orch(['start', 'FEAT-011', '--unattended']).status).toBe(0);
     expect(existsSync(join(root, DELEGATE_DIR))).toBe(false);
     putReport('spec', 'x\n');
-    orch(['end']);
+    orch(['end', '--abandon']);
     expect(existsSync(join(root, DELEGATE_DIR))).toBe(false);
     orch(['start', 'FEAT-011', '--unattended'], { sid: 'sess-2' });
     putReport('spec', 'x\n');
@@ -4349,7 +4529,7 @@ describe('unattended mode [FEAT-054]', () => {
     writeFileSync(join(root, other), '# Other\n');
     putReport('spec', report('spec', sha(other)));
     expect(orch(['delegate', 'spec', other, sha(other)]).err).toBe(`orchestrate: delegate spec: ${other} is not the document the spec hand-back names (${SPEC})`);
-    orch(['end']);
+    orch(['end', '--abandon']);
     expect(orch(['start', 'FEAT-011', '--unattended']).status).toBe(0);
     putSpec();
     expect(orch(['install', 'spec']).status).toBe(0);
@@ -4361,7 +4541,7 @@ describe('unattended mode [FEAT-054]', () => {
   it('U30 [AC6] the end record names the unattended mode and each approval\'s basis', () => {
     atPlan();
     expect(orch(approveArgs('plan')).status).toBe(0);
-    const rec = JSON.parse(orch(['end']).out);
+    const rec = abandonedRecord(orch(['end', '--abandon']).out);
     expect(rec.unattended).toBe(true);
     expect(rec.approvals.spec).toMatchObject({ by: 'define-review', basis: 'approved by delegated review' });
     expect('basis' in rec.approvals.plan).toBe(false);
