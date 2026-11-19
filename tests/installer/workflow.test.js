@@ -108,7 +108,7 @@ describe('publish workflow: publish job [BUG-073]', () => {
     const node = step(publish, 'actions/setup-node');
     expect(node).toMatch(/registry-url:\s*'https:\/\/registry\.npmjs\.org'/);
     expect((publish.match(/package-manager-cache:/g) ?? []).length).toBe(1);
-    expect(node).toMatch(/^ {10}package-manager-cache: false$/m);
+    expect(node).toMatch(/^ {8}with:\n(?: {10}\S.*\n)* {10}package-manager-cache: false$/m);
     expect(publish).not.toMatch(/^[ -]*cache:/m);
     expect(publish).not.toMatch(/^[ -]*cache-dependency-path:/m);
   });

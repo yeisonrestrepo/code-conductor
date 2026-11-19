@@ -47,7 +47,8 @@ jobs:
   # runs no lifecycle script; the package has no build step, so it packs the checkout
   # verify tested (same release commit) [BUG-073].
   # Its setup-node step turns the package-manager cache off explicitly, so a packageManager
-  # field in package.json can never make this job restore verify's cache [BUG-083].
+  # or devEngines.packageManager field in package.json does not make this job restore
+  # verify's cache [BUG-083].
   publish:
     needs: verify
     runs-on: ubuntu-latest

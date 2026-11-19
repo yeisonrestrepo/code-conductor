@@ -98,18 +98,18 @@
   - `git diff --quiet HEAD -- VERSION CHANGELOG.md package.json package-lock.json README.md "AGENT-READABLE BACKLOG.md" .claude tools lib bin scripts .github/workflows/test.yml .github/workflows/records-guard.yml .github/workflows/wiki-sync.yml` exits 0.
   - Depends on T-301.
 - [X] [T-303] Stage: `git add -u .github/workflows/publish.yml tests/installer/workflow.test.js` (both tracked). Depends on T-302.
-- [>] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-19-bug083-publish-job-relies-on-omitted-cache-key.md` (carries the ticks for T-101 to T-303). Depends on T-303.
-- [ ] [T-305] Commit: `fix: disable the setup-node package-manager cache explicitly in the publish job [BUG-083]`. Depends on T-304.
+- [X] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-19-bug083-publish-job-relies-on-omitted-cache-key.md` (carries the ticks for T-101 to T-303). Depends on T-303.
+- [X] [T-305] Commit: `fix: disable the setup-node package-manager cache explicitly in the publish job [BUG-083]`. Depends on T-304.
 
 ---
 
 ## Test List
 
-- [ ] Unit, AC3-AC4: the renamed test pins exactly one `package-manager-cache: false` line in the `setup-node` step and no `cache:` or `cache-dependency-path:` input in the `publish` job. Red before T-201 (T-103), green after (T-203).
-- [ ] Unit, AC5: the same test is red with a scratch `cache: 'npm'` in the step (T-204).
-- [ ] Unit, AC6: the other 30 tests in `tests/installer/workflow.test.js` pass unchanged (T-203).
-- [ ] AC7: `npm test` green (T-301).
-- [ ] No integration or E2E/UI test: the workflow runs only on a published release, and there is no UI.
+- [X] Unit, AC3-AC4: the renamed test pins exactly one `package-manager-cache: false` line in the `setup-node` step and no `cache:` or `cache-dependency-path:` input in the `publish` job. Red before T-201 (T-103), green after (T-203).
+- [X] Unit, AC5: the same test is red with a scratch `cache: 'npm'` in the step (T-204).
+- [X] Unit, AC6: the other 30 tests in `tests/installer/workflow.test.js` pass unchanged (T-203).
+- [X] AC7: `npm test` green (T-301).
+- [X] No integration or E2E/UI test: the workflow runs only on a published release, and there is no UI.
 
 ## Commit Order
 
@@ -122,3 +122,11 @@
 - **Step indent changes.** If the workflow is ever re-indented, `step()` returns `''` and the test fails loudly at the registry assertion rather than passing silently, because every positive assertion runs against the step text.
 - **Records guard.** The PR touches none of the owner-side records, so `tools/records-guard.mjs` has nothing to flag. Catch: T-302's `git diff --quiet` line.
 - **Full suite in this sandbox.** Some suites need `node:sqlite` or network. Catch: T-301 compares any red against the baseline run on the same HEAD before calling it ENV.
+
+## Review round 1 (independent whole-branch review, APPROVE, five minor findings)
+
+- **Fixed: the job comment overclaimed.** "can never" became "does not", and the comment now names `devEngines.packageManager` too, matching the spec's Problem and Error cases. It is three lines instead of the two plan decision 4 gave.
+- **Fixed: the literal-line assertion did not prove the line sits under `with:`.** `^ {10}package-manager-cache: false$` became `^ {8}with:\n(?: {10}\S.*\n)* {10}package-manager-cache: false$` inside `step(publish, 'actions/setup-node')`, which AC3 names. Re-measured in a throwaway test (deleted): green as shipped, red with the line moved under an 8-space `env:` of the same step, red with the line absent. `tests/installer/workflow.test.js`: 31 passed (31).
+- **Accepted: flow-style `with: { cache: npm }` and a quoted `'cache':` key are not caught.** Block style is the file's convention throughout.
+- **Accepted: a trailing comment naming `package-manager-cache:` would make the exactly-one count read 2.** That is a false red, never a false green; only full-line comments are stripped (`tests/installer/workflow.test.js:13`).
+- **Noted for the owner: AC7 on CI.** In this sandbox `npm test` shows the five baseline ENV failures; CI is where AC7's exit 0 is observed.
