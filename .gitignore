@@ -266,6 +266,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-11-18-bug085-unattended-plan-check-does-not-escalate-tasks-design.md
 !/docs/superpowers/specs/2026-11-18-bug086-unattended-plan-check-accepts-files-entries-design.md
 !/docs/superpowers/specs/2026-11-19-bug069-installer-overwrites-an-existing-opencode-guard-design.md
+!/docs/superpowers/specs/2026-11-19-bug075-orchestrate-mjs-accepts-hand-backs-and-end-that-design.md
 !/docs/superpowers/specs/2026-11-19-bug077-unbound-approve-spec-path-allowing-approval-design.md
 !/docs/superpowers/specs/2026-11-19-bug083-publish-job-relies-on-omitted-cache-key-design.md
 # --- END tracked-surface block (BUG-042) ---
