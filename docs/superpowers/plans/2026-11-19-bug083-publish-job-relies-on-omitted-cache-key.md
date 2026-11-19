@@ -57,8 +57,8 @@
 
 - [X] [T-001] Create this plan file from the approved spec `c0472396…`. No dependency.
 - [X] [T-002] `.gitignore`: insert the leaf `!/docs/superpowers/plans/2026-11-19-bug083-publish-job-relies-on-omitted-cache-key.md` after the `2026-11-18-bug086` plan leaf (plan decision 6). Depends on T-001.
-- [ ] [T-003] Stage: `git add -u .gitignore` (tracked) and `git add docs/superpowers/plans/2026-11-19-bug083-publish-job-relies-on-omitted-cache-key.md` (new, re-included by its leaf). Depends on T-002.
-- [ ] [T-004] Commit: `docs: plan the explicit package-manager-cache opt-out for the publish job [BUG-083]`. Depends on T-003.
+- [X] [T-003] Stage: `git add -u .gitignore` (tracked) and `git add docs/superpowers/plans/2026-11-19-bug083-publish-job-relies-on-omitted-cache-key.md` (new, re-included by its leaf). Depends on T-002.
+- [X] [T-004] Commit: `docs: plan the explicit package-manager-cache opt-out for the publish job [BUG-083]`. Depends on T-003.
 
 ---
 
@@ -67,9 +67,9 @@
 **Files:**
 - Modify: `tests/installer/workflow.test.js:37-39`, `tests/installer/workflow.test.js:99-102`
 
-- [ ] [T-101] Add the `step(block, action)` helper after `permissions()` (plan decision 1). Depends on T-004.
-- [ ] [T-102] Rename the `it` at lines 99-102 and replace its body with the assertions of plan decision 3 (plan decision 2). Depends on T-101.
-- [ ] [T-103] Red run: `npx vitest run tests/installer/workflow.test.js`. The filter is the whole file and the test count is unchanged (one `it` replaced), so its full match set is the 31 baseline tests. Predicted: **1 failed, 30 passed (31)**. The failure is the renamed test, at the exactly-one count (`expected +0 to be 1`) (spec, AC4). Any other count or failing line means the helper or an assertion is wrong: fix the test, not the prediction. Depends on T-102.
+- [X] [T-101] Add the `step(block, action)` helper after `permissions()` (plan decision 1). Depends on T-004.
+- [X] [T-102] Rename the `it` at lines 99-102 and replace its body with the assertions of plan decision 3 (plan decision 2). Depends on T-101.
+- [X] [T-103] Red run: `npx vitest run tests/installer/workflow.test.js`. The filter is the whole file and the test count is unchanged (one `it` replaced), so its full match set is the 31 baseline tests. Predicted: **1 failed, 30 passed (31)**. The failure is the renamed test, at the exactly-one count (`expected +0 to be 1`) (spec, AC4). Any other count or failing line means the helper or an assertion is wrong: fix the test, not the prediction. Depends on T-102.
 
 ---
 
@@ -78,10 +78,10 @@
 **Files:**
 - Modify: `.github/workflows/publish.yml:46-48`, `.github/workflows/publish.yml:60-63`
 
-- [ ] [T-201] Insert `          package-manager-cache: false` (10-space indent) after `          registry-url: 'https://registry.npmjs.org'` in the `publish` job's `setup-node` step. Depends on T-103.
-- [ ] [T-202] Append the two comment lines of plan decision 4 to the comment above `publish:`. Depends on T-201.
-- [ ] [T-203] Green run: the T-103 command. Predicted: **31 passed (31)**, so the other 30 tests, including "uses only checkout and setup-node" and the exact `runs(publish)` list, pass unchanged (spec, AC6). Depends on T-202.
-- [ ] [T-204] Scratch check for an explicit cache (spec, AC5): add `          cache: 'npm'` after the new line, run the T-103 command, expect **1 failed, 30 passed (31)** with the renamed test failing at `not.toMatch(/^[ -]*cache:/m)`, then remove the scratch line and confirm `git diff -U0 HEAD -- .github/workflows/publish.yml` shows only the T-201 and T-202 additions. Depends on T-203.
+- [X] [T-201] Insert `          package-manager-cache: false` (10-space indent) after `          registry-url: 'https://registry.npmjs.org'` in the `publish` job's `setup-node` step. Depends on T-103.
+- [X] [T-202] Append the two comment lines of plan decision 4 to the comment above `publish:`. Depends on T-201.
+- [X] [T-203] Green run: the T-103 command. Predicted: **31 passed (31)**, so the other 30 tests, including "uses only checkout and setup-node" and the exact `runs(publish)` list, pass unchanged (spec, AC6). Depends on T-202.
+- [X] [T-204] Scratch check for an explicit cache (spec, AC5): add `          cache: 'npm'` after the new line, run the T-103 command, expect **1 failed, 30 passed (31)** with the renamed test failing at `not.toMatch(/^[ -]*cache:/m)`, then remove the scratch line and confirm `git diff -U0 HEAD -- .github/workflows/publish.yml` shows only the T-201 and T-202 additions. Depends on T-203.
 
 ---
 
@@ -90,15 +90,15 @@
 **Files:**
 - Modify: `.github/workflows/publish.yml`, `tests/installer/workflow.test.js` (staged), this plan (checkboxes)
 
-- [ ] [T-301] Run `npm test`. Predicted: every file green except the five ENV failures listed under Baseline, which stay exactly as measured on HEAD `59f8709`; on CI, where neither cause applies, exit 0 (spec, AC7). The workflow test runs on every CI leg and is not skipped, so `tools/skip-baseline.json` stays untouched. A failure caused by the sandbox (network, tmp permissions, missing `node:sqlite`) is reported as ENV with the test's name and checked against the baseline run on HEAD `59f8709`. Any other red is fixed. Depends on T-204.
-- [ ] [T-302] Scope check:
+- [X] [T-301] Run `npm test`. Predicted: every file green except the five ENV failures listed under Baseline, which stay exactly as measured on HEAD `59f8709`; on CI, where neither cause applies, exit 0 (spec, AC7). The workflow test runs on every CI leg and is not skipped, so `tools/skip-baseline.json` stays untouched. A failure caused by the sandbox (network, tmp permissions, missing `node:sqlite`) is reported as ENV with the test's name and checked against the baseline run on HEAD `59f8709`. Any other red is fixed. Depends on T-204.
+- [X] [T-302] Scope check:
   - `git status --porcelain` lists exactly `.github/workflows/publish.yml`, `tests/installer/workflow.test.js` and this plan as modified.
   - `git diff -U0 HEAD -- .github/workflows/publish.yml | grep '^-[^-]'` prints nothing (additions only), and the `verify` job's lines are not in the diff (spec, AC1, AC2).
   - `git diff -U0 HEAD -- tests/installer/workflow.test.js | grep '^-[^-]'` shows only the old `it` title line and the old `registry-url` / `not.toMatch(/cache/)` lines.
   - `git diff --quiet HEAD -- VERSION CHANGELOG.md package.json package-lock.json README.md "AGENT-READABLE BACKLOG.md" .claude tools lib bin scripts .github/workflows/test.yml .github/workflows/records-guard.yml .github/workflows/wiki-sync.yml` exits 0.
   - Depends on T-301.
-- [ ] [T-303] Stage: `git add -u .github/workflows/publish.yml tests/installer/workflow.test.js` (both tracked). Depends on T-302.
-- [ ] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-19-bug083-publish-job-relies-on-omitted-cache-key.md` (carries the ticks for T-101 to T-303). Depends on T-303.
+- [X] [T-303] Stage: `git add -u .github/workflows/publish.yml tests/installer/workflow.test.js` (both tracked). Depends on T-302.
+- [>] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-19-bug083-publish-job-relies-on-omitted-cache-key.md` (carries the ticks for T-101 to T-303). Depends on T-303.
 - [ ] [T-305] Commit: `fix: disable the setup-node package-manager cache explicitly in the publish job [BUG-083]`. Depends on T-304.
 
 ---

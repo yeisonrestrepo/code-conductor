@@ -46,6 +46,8 @@ jobs:
   # Holds the npm OIDC credential. Installs no project dependency, restores no cache and
   # runs no lifecycle script; the package has no build step, so it packs the checkout
   # verify tested (same release commit) [BUG-073].
+  # Its setup-node step turns the package-manager cache off explicitly, so a packageManager
+  # field in package.json can never make this job restore verify's cache [BUG-083].
   publish:
     needs: verify
     runs-on: ubuntu-latest
@@ -61,6 +63,7 @@ jobs:
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
       # OIDC trusted publishing needs npm >= 11.5.1. npm stays pinned to 11 rather than
       # floating to @latest so this job's npm moves only by a deliberate edit: npm 12's
       # engines (^22.22.2 || ^24.15.0 || >=26) would tie the job to whichever 24.x
