@@ -91,11 +91,11 @@ The 52 forms of the spec's second Alternative-paths bullet, then the 17 nested m
 **Files:**
 - Modify: `tests/scripts/orchestrate.test.js`
 
-- [ ] [T-101] Modify the `CONTROL_PLANE` pin as plan decision 2 says: rename it to cite `[BUG-085]` and append the 130 entries, without the family comment lines (AC1). Depends on T-004.
-- [ ] [T-102] Modify the `CONTROL_PLANE_NAMES` pin as plan decision 2 says: rename it to cite `[BUG-085]` and set it to the 60-name multi-line array (AC2). Depends on T-101.
-- [ ] [T-103] After U54, add the comment line and the U55, U56, U57 and U58 blocks of plan decision 3, with the rows of the Test rows section in that order (AC3-AC6). Depends on T-102.
-- [ ] [T-104] Check the row counts before running: 130 rows in U55, 69 in U56, 42 in U57, 7 in U58; the U55 rows are exactly the spec's 130 entries in order with each `/**` turned into `/x`. Depends on T-103.
-- [ ] [T-105] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t "BUG-085"`. Predicted for the filter's full match set: **201 failed, 49 passed, 833 skipped (1083)**. Failing: the 130 U55 rows, the 69 U56 rows (each approved today) and the two renamed pins. Passing: the 42 U57 rows and the 7 U58 rows. No other test name contains `BUG-085`. Any other count means a row is mistyped: fix the row, not the prediction. Depends on T-104.
+- [X] [T-101] Modify the `CONTROL_PLANE` pin as plan decision 2 says: rename it to cite `[BUG-085]` and append the 130 entries, without the family comment lines (AC1). Depends on T-004.
+- [X] [T-102] Modify the `CONTROL_PLANE_NAMES` pin as plan decision 2 says: rename it to cite `[BUG-085]` and set it to the 60-name multi-line array (AC2). Depends on T-101.
+- [X] [T-103] After U54, add the comment line and the U55, U56, U57 and U58 blocks of plan decision 3, with the rows of the Test rows section in that order (AC3-AC6). Depends on T-102.
+- [X] [T-104] Check the row counts before running: 130 rows in U55, 69 in U56, 42 in U57, 7 in U58; the U55 rows are exactly the spec's 130 entries in order with each `/**` turned into `/x`. Depends on T-103.
+- [X] [T-105] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t "BUG-085"`. Predicted for the filter's full match set: **201 failed, 49 passed, 833 skipped (1083)**. Failing: the 130 U55 rows, the 69 U56 rows (each approved today) and the two renamed pins. Passing: the 42 U57 rows and the 7 U58 rows. No other test name contains `BUG-085`. Any other count means a row is mistyped: fix the row, not the prediction. Depends on T-104.
 
 ---
 
@@ -104,11 +104,11 @@ The 52 forms of the spec's second Alternative-paths bullet, then the 17 nested m
 **Files:**
 - Modify: `scripts/orchestrate.mjs`
 
-- [ ] [T-201] Modify `scripts/orchestrate.mjs`: add the `Owner decision (BUG-085)` comment line above `CONTROL_PLANE` (plan decision 1). Depends on T-105.
-- [ ] [T-202] Append the spec's 130 entries with their four family comment lines before the `CONTROL_PLANE` closing `];` (plan decision 1, AC1). Depends on T-201.
-- [ ] [T-203] Replace the one-line `CONTROL_PLANE_NAMES` with the spec's commented 60-name form (plan decision 1, AC2). Depends on T-202.
-- [ ] [T-204] Green run: the T-105 command. Predicted: **250 passed, 833 skipped (1083)**, no failure. Depends on T-203.
-- [ ] [T-205] AC7 run: `npx vitest run tests/scripts/orchestrate.test.js -t "BUG-080|BUG-081|BUG-082|BUG-086|U22 |write surface|FEAT-054"`. Predicted: **556 passed, 527 skipped (1083)**, no failure (measured in plan decision 4). Depends on T-204.
+- [X] [T-201] Modify `scripts/orchestrate.mjs`: add the `Owner decision (BUG-085)` comment line above `CONTROL_PLANE` (plan decision 1). Depends on T-105.
+- [X] [T-202] Append the spec's 130 entries with their four family comment lines before the `CONTROL_PLANE` closing `];` (plan decision 1, AC1). Depends on T-201.
+- [X] [T-203] Replace the one-line `CONTROL_PLANE_NAMES` with the spec's commented 60-name form (plan decision 1, AC2). Depends on T-202.
+- [X] [T-204] Green run: the T-105 command. Predicted: **250 passed, 833 skipped (1083)**, no failure. Depends on T-203.
+- [X] [T-205] AC7 run: `npx vitest run tests/scripts/orchestrate.test.js -t "BUG-080|BUG-081|BUG-082|BUG-086|U22 |write surface|FEAT-054"`. Predicted: **556 passed, 527 skipped (1083)**, no failure (measured in plan decision 4). Depends on T-204.
 
 ---
 
@@ -117,11 +117,11 @@ The 52 forms of the spec's second Alternative-paths bullet, then the 17 nested m
 **Files:**
 - Modify: `scripts/orchestrate.mjs`, `tests/scripts/orchestrate.test.js` (staged), this plan (checkboxes)
 
-- [ ] [T-301] Run `npm test`. Predicted locally: exit 0, every file green (AC8). CI legs run 250 more tests each, none skipped, so `tools/skip-baseline.json` stays untouched. A failure that comes from the sandbox (network, tmp permissions) is reported as ENV with the test's name; any other red is fixed. Depends on T-205.
-- [ ] [T-302] Scope check: `git status --porcelain` lists exactly `scripts/orchestrate.mjs`, `tests/scripts/orchestrate.test.js` and this plan as modified; `git diff -U0 HEAD -- scripts/orchestrate.mjs | grep '^-[^-]'` shows exactly one line, the old one-line `CONTROL_PLANE_NAMES`; `git diff -U0 HEAD -- tests/scripts/orchestrate.test.js | grep '^-[^-]'` shows exactly three lines, the two old pin names and the old one-line `CONTROL_PLANE_NAMES` expectation; `git diff --quiet HEAD -- VERSION CHANGELOG.md package.json package-lock.json README.md "AGENT-READABLE BACKLOG.md" .claude .github project-template tools` exits 0. Depends on T-301.
-- [ ] [T-303] Stage: `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js` (both tracked). Depends on T-302.
-- [ ] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-18-bug085-unattended-plan-check-does-not-escalate-tasks.md` (ticks T-101 to T-303). Depends on T-303.
-- [ ] [T-305] Commit: `fix: escalate hook-runner, editor, container, package-manager, build and CI files in the unattended plan check [BUG-085]`. Depends on T-304.
+- [X] [T-301] Run `npm test`. Predicted locally: exit 0, every file green (AC8). CI legs run 250 more tests each, none skipped, so `tools/skip-baseline.json` stays untouched. A failure that comes from the sandbox (network, tmp permissions) is reported as ENV with the test's name; any other red is fixed. Depends on T-205.
+- [X] [T-302] Scope check: `git status --porcelain` lists exactly `scripts/orchestrate.mjs`, `tests/scripts/orchestrate.test.js` and this plan as modified; `git diff -U0 HEAD -- scripts/orchestrate.mjs | grep '^-[^-]'` shows exactly one line, the old one-line `CONTROL_PLANE_NAMES`; `git diff -U0 HEAD -- tests/scripts/orchestrate.test.js | grep '^-[^-]'` shows exactly three lines, the two old pin names and the old one-line `CONTROL_PLANE_NAMES` expectation; `git diff --quiet HEAD -- VERSION CHANGELOG.md package.json package-lock.json README.md "AGENT-READABLE BACKLOG.md" .claude .github project-template tools` exits 0. Depends on T-301.
+- [X] [T-303] Stage: `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js` (both tracked). Depends on T-302.
+- [X] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-18-bug085-unattended-plan-check-does-not-escalate-tasks.md` (ticks T-101 to T-303). Depends on T-303.
+- [X] [T-305] Commit: `fix: escalate hook-runner, editor, container, package-manager, build and CI files in the unattended plan check [BUG-085]`. Depends on T-304.
 
 ---
 
