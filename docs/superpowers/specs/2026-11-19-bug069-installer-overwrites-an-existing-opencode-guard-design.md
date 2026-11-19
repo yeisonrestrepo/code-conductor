@@ -1,6 +1,6 @@
 # BUG-069: Installer overwrites an existing OpenCode guard plugin without a backup
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-19 by independent review (round 1)
 **Item:** BUG-069 (intake of issue #164)
 **Date:** 2026-11-19
 
