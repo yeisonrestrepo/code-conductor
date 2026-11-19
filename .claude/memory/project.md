@@ -3352,3 +3352,17 @@ Nothing minted: BUG-085 was reserved by triage #241. BUG-083 (triage #235) stays
 Known limits: the BUG-085 line is removed. The unattended-mode line now names hook runners, editor and container auto-run files, package-manager and build-system files and CI pipelines, and cites `[BUG-085]`. Every other defect line is unchanged.
 
 No upgrade step: an attended run is unaffected, and an unattended plan that declares one of the new files now waits for an owner `approve` instead of passing on the delegated verdict. #253's description reports two `tests/unit/staging-convention.test.js` failures in its sandbox's git. CI on the release PR is the authority.
+
+## Release: 1.52.5 batch landing 2026-11-19
+
+Three PRs merged since `v1.52.4`. Existing ids closed:
+
+- BUG-083 (#255 by `yeisonrestrepo`, publish job's implicit package-manager cache). The `publish` job's `setup-node` step sets `package-manager-cache: false`, with a job comment; `verify` is unchanged and keeps `cache: 'npm'`. The old `not.toMatch(/cache/)` assertion is replaced by a `step()` helper and a `[BUG-083]` row in `tests/installer/workflow.test.js` pinning one `package-manager-cache: false` line under the `setup-node` step's `with:` and no `cache:` or `cache-dependency-path:` input. Intake of issue #235. The spec (approach A) was approved 2026-11-19 by the owner.
+- BUG-077 (#256 by `cc-lane-bot[bot]`, unbound `approve spec` path). `approve spec` refuses `ORCH_SPEC_NOT_HANDED_BACK`, writing nothing, for a path the latest `spec` hand-back does not name under the pinned spec folder. The filter is shared with `delegate` as `handedBackDocs`; `delegate`'s refusal text and `approve plan` are unchanged. Both `cc-orchestrate.md` copies gain one bullet, with a parity row. Tests `approve spec binds the spec hand-back [BUG-077]`. Intake of issue #199. The spec was approved 2026-11-19 by independent review.
+- BUG-069 (#258 by `cc-lane-bot[bot]`, OpenCode guard plugin overwritten without a backup). `installOpencodePlugin` goes through `mergeFileInto` with the shipped bytes winning, so a host-edited plugin is backed up and reported first; a byte-identical one gets no backup, and a failed backup leaves the host file, warns on stderr and prints no `installed` line. Three `[BUG-069]` rows in `tests/installer/deploy.test.js` and a one-file pin in `tests/installer/templates.test.js`. The failed-backup row is POSIX non-root only and joins the `ci-windows-node24` set of `tools/skip-baseline.json`. Intake of issue #164. The spec was approved 2026-11-19 by independent review.
+
+Nothing minted: BUG-083 was reserved by triage #235, and BUG-069 and BUG-077 were filed at intake of issues #164 and #199.
+
+Known limits: the BUG-069, BUG-077 and BUG-083 lines are removed. Every other defect line is unchanged.
+
+No upgrade step: an `approve spec` for the document the hand-back named behaves as before, and a re-install with `--opencode` over an edited plugin now leaves a backup beside it. All three descriptions report `tests/unit/staging-convention.test.js` AC7/AC8 failing in their sandboxes' git; #255 also reports three permission-fixture failures under uid 0. CI on the release PR is the authority.
