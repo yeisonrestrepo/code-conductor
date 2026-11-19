@@ -35,6 +35,14 @@ function permissions(block) {
   if (m[1]) return {};
   return Object.fromEntries(m[2].trim().split('\n').filter(Boolean).map((l) => l.trim().split(/:\s*/)));
 }
+// One step of a job: from its `- uses: <action>@` line to the next step, or '' if absent. [BUG-083]
+function step(block, action) {
+  const lines = block.split('\n');
+  const i = lines.findIndex((l) => l.startsWith(`      - uses: ${action}@`));
+  if (i < 0) return '';
+  const j = lines.findIndex((l, k) => k > i && l.startsWith('      - '));
+  return lines.slice(i, j < 0 ? lines.length : j).join('\n');
+}
 
 const verify = job('verify');
 const publish = job('publish');
@@ -96,9 +104,13 @@ describe('publish workflow: publish job [BUG-073]', () => {
   it('does not persist the checkout credential', () => {
     expect(publish).toMatch(/persist-credentials:\s*false/);
   });
-  it('targets the npm registry and restores no cache', () => {
-    expect(publish).toMatch(/registry-url:\s*'https:\/\/registry\.npmjs\.org'/);
-    expect(publish).not.toMatch(/cache/);
+  it('targets the npm registry and disables the package-manager cache explicitly [BUG-083]', () => {
+    const node = step(publish, 'actions/setup-node');
+    expect(node).toMatch(/registry-url:\s*'https:\/\/registry\.npmjs\.org'/);
+    expect((publish.match(/package-manager-cache:/g) ?? []).length).toBe(1);
+    expect(node).toMatch(/^ {8}with:\n(?: {10}\S.*\n)* {10}package-manager-cache: false$/m);
+    expect(publish).not.toMatch(/^[ -]*cache:/m);
+    expect(publish).not.toMatch(/^[ -]*cache-dependency-path:/m);
   });
   it('runs exactly the npm self-upgrade and the publish, both without lifecycle scripts', () => {
     expect(runs(publish)).toEqual([
