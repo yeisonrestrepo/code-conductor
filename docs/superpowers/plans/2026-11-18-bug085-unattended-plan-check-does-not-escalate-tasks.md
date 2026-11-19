@@ -127,15 +127,15 @@ The 52 forms of the spec's second Alternative-paths bullet, then the 17 nested m
 
 ## Test List
 
-- [ ] Unit, AC1: the `CONTROL_PLANE` pin equals the shipped 42 entries followed by the 130 new ones, in order (T-101).
-- [ ] Unit, AC2: the `CONTROL_PLANE_NAMES` pin equals the 60 names, in order (T-102); the comment lines are checked by T-302's diff and the spec text.
-- [ ] Integration, AC3: U55, one row per new entry, escalates with the control-plane reason; `approvals.plan` stays `null`, `delegated.plan` records the verdict and reason, and the owner's `approve plan` exits 0 (`expectEscalation`; T-103).
-- [ ] Integration, AC4: U56 directory, glob, case, `./` and nested rows escalate with the control-plane reason (T-103).
-- [ ] Integration, AC5: U57 near misses keep the delegated APPROVE (T-103).
-- [ ] Integration, AC6: U58 rows keep the write-surface reason (T-103).
-- [ ] AC7: `WRITE_SURFACE` pin, U22 and U41-U54 unchanged and green (T-205, T-302).
-- [ ] AC8: `npm test` green (T-301).
-- [ ] No E2E/UI test: there is no UI.
+- [X] Unit, AC1: the `CONTROL_PLANE` pin equals the shipped 42 entries followed by the 130 new ones, in order (T-101).
+- [X] Unit, AC2: the `CONTROL_PLANE_NAMES` pin equals the 60 names, in order (T-102); the comment lines are checked by T-302's diff and the spec text.
+- [X] Integration, AC3: U55, one row per new entry, escalates with the control-plane reason; `approvals.plan` stays `null`, `delegated.plan` records the verdict and reason, and the owner's `approve plan` exits 0 (`expectEscalation`; T-103).
+- [X] Integration, AC4: U56 directory, glob, case, `./` and nested rows escalate with the control-plane reason (T-103).
+- [X] Integration, AC5: U57 near misses keep the delegated APPROVE (T-103).
+- [X] Integration, AC6: U58 rows keep the write-surface reason (T-103).
+- [X] AC7: `WRITE_SURFACE` pin, U22 and U41-U54 unchanged and green (T-205, T-302).
+- [X] AC8: `npm test` green (T-301).
+- [X] No E2E/UI test: there is no UI.
 
 ## Commit Order
 
