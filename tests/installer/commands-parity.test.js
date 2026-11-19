@@ -402,6 +402,10 @@ describe('cc-orchestrate review loop [FEAT-041 AC5, AC6, FEAT-058]', () => {
     expect(text()).not.toContain('Get-FileHash');
   });
 
+  it('binds the spec approval to the spec hand-back [BUG-077]', () => {
+    has('**The spec must be the one handed back.**', '`ORCH_SPEC_NOT_HANDED_BACK`');
+  });
+
   it('amends the brief line and names the loop without launch settings in the run header', () => {
     has('Your hand-back is the run\'s only record.', HEADER);
     expect(text()).not.toContain('After it, the orchestrator may send you revision requests');

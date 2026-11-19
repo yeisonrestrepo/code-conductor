@@ -175,6 +175,7 @@ tests/.tmp/
 !/docs/superpowers/plans/2026-11-18-bug084-adopt-claude-md-mjs-skips-its-entry-point-when.md
 !/docs/superpowers/plans/2026-11-18-bug085-unattended-plan-check-does-not-escalate-tasks.md
 !/docs/superpowers/plans/2026-11-18-bug086-unattended-plan-check-accepts-files-entries.md
+!/docs/superpowers/plans/2026-11-19-bug077-unbound-approve-spec-path-allowing-approval.md
 !/docs/superpowers/plans/2026-11-19-bug083-publish-job-relies-on-omitted-cache-key.md
 !/docs/superpowers/specs/2026-06-09-bug001-cc-compact-design.md
 !/docs/superpowers/specs/2026-06-09-bug002-spec-read-budget-design.md
@@ -263,6 +264,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-11-18-bug084-adopt-claude-md-mjs-skips-its-entry-point-when-design.md
 !/docs/superpowers/specs/2026-11-18-bug085-unattended-plan-check-does-not-escalate-tasks-design.md
 !/docs/superpowers/specs/2026-11-18-bug086-unattended-plan-check-accepts-files-entries-design.md
+!/docs/superpowers/specs/2026-11-19-bug077-unbound-approve-spec-path-allowing-approval-design.md
 !/docs/superpowers/specs/2026-11-19-bug083-publish-job-relies-on-omitted-cache-key-design.md
 # --- END tracked-surface block (BUG-042) ---
 
