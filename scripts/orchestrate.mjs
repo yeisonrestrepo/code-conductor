@@ -992,6 +992,13 @@ async function handback(root, sessionId, role, bytes) {
   return `${role} handed back ${env.ops.gate}${note}`;
 }
 
+// BUG-077: the owner's spec approval binds a document the spec hand-back named, as delegate's does.
+function checkSpecHandedBack(run, rel) {
+  const named = handedBackDocs(run, 'spec');
+  if (named.includes(rel)) return;
+  throw new Refusal(`ORCH_SPEC_NOT_HANDED_BACK: approve spec: ${rel} is not a document the spec hand-back names under ${docsFolder(run, 'spec')} (${named.length ? named.join(', ') : 'none'}); show the approval for a named document`);
+}
+
 // Two human approvals, one gate write (A4): only an approved plan writes define_approved.
 // FEAT-055: and HEAD at that moment, so resume can tell whether history still holds it.
 // FEAT-056: each approval binds the bytes the owner was shown; a stale hash writes nothing.
@@ -1003,6 +1010,7 @@ function approve(root, sessionId, what, rel, shown) {
   if (!RECORD_KINDS.includes(what)) throw new Refusal(APPROVE_USAGE);
   if (!SHA256_HEX.test(shown ?? '')) throw new Refusal(APPROVE_USAGE);
   const content = readDoc(root, rel, APPROVE_USAGE);
+  if (what === 'spec') checkSpecHandedBack(run, rel);
   const sha256 = documentHash(what, content);
   checkLoopClosed(run, what, rel, sha256);
   if (sha256 !== shown.toLowerCase()) {
@@ -1065,11 +1073,16 @@ const snapFiles = (entry) => { try { const f = JSON.parse(entry?.snap).ops.f; re
 // The role's pinned docs folder (FEAT-047): its scope glob without the trailing **, or '' when none was pinned.
 const docsFolder = (run, kind) => String(run.docs?.scopes?.[kind]?.[0] ?? '').replace(/\*\*$/, '');
 
-// The document the Define role named in its hand-back, inside its pinned folder: the brief's, never the orchestrator's pick.
+// The documents the Define role named in its hand-back, inside its pinned folder: the brief's, never the orchestrator's pick.
+function handedBackDocs(run, kind) {
+  const folder = docsFolder(run, kind);
+  return snapFiles(run.handbacks.findLast((h) => h.role === kind)).filter((f) => /:[CM]$/.test(f)).map((f) => f.slice(0, -2))
+    .filter((p) => folder !== '' && p.startsWith(folder) && p.endsWith('.md'));
+}
+
 function handedBackDoc(run, kind) {
   const folder = docsFolder(run, kind);
-  const docs = snapFiles(run.handbacks.findLast((h) => h.role === kind)).filter((f) => /:[CM]$/.test(f)).map((f) => f.slice(0, -2))
-    .filter((p) => folder !== '' && p.startsWith(folder) && p.endsWith('.md'));
+  const docs = handedBackDocs(run, kind);
   if (docs.length !== 1) throw new Refusal(`delegate ${kind}: the ${kind} hand-back names ${docs.length} document(s) under ${folder}; show the approval and wait for the owner`);
   return docs[0];
 }

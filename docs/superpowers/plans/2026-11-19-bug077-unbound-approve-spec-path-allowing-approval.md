@@ -125,13 +125,13 @@ These were decided by the owner when the plan phase opened. They are constraints
 - Modify: `tests/scripts/orchestrate.test.js:86-89`, `:1250-1255`, `:1279`, `:1294`, `:1697`, `:4280`
 - Modify: `tests/installer/commands-parity.test.js:403`
 
-- [ ] [T-101] `tests/scripts/orchestrate.test.js:86-89`: change the `handbackLine` default `f` (plan decision 3). Depends on T-004.
-- [ ] [T-102] `tests/scripts/orchestrate.test.js:4280`: pass the U29 no-document hand-back as `handbackLine('spec', 'boundary_routed', { f: [] })` (plan decision 4). Depends on T-101.
-- [ ] [T-103] `tests/scripts/orchestrate.test.js:1250-1255`, `:1279`, `:1294`: give `approveSpec` its `rel` parameter and pass the two in-scope paths (plan decision 4). Depends on T-102.
-- [ ] [T-104] `tests/scripts/orchestrate.test.js`: insert the `[BUG-077]` describe block above `describe('Build and Verify review loop [FEAT-057]'` (plan decision 6). Depends on T-103.
-- [ ] [T-105] `tests/installer/commands-parity.test.js`: add the `[BUG-077]` `it` after line 403 (plan decision 6). Depends on T-104.
-- [ ] [T-106] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t 'BUG-077'`. Its full match set is the 9 new tests and nothing else. No existing title contains `BUG-077`. Predicted: **5 failed, 4 passed** (1083 skipped). Red: B2, B3, B5 (two cases), B7. Green: B1, B4 (two cases), B6. Any other split means a test is wrong: fix the test, not the prediction. Depends on T-105.
-- [ ] [T-107] Red run: `npx vitest run tests/installer/commands-parity.test.js -t 'BUG-077'`. Predicted: **1 failed** (the new test, at `toContain('**The spec must be the one handed back.**')`), and every other test in the file is skipped. Depends on T-106.
+- [X] [T-101] `tests/scripts/orchestrate.test.js:86-89`: change the `handbackLine` default `f` (plan decision 3). Depends on T-004.
+- [X] [T-102] `tests/scripts/orchestrate.test.js:4280`: pass the U29 no-document hand-back as `handbackLine('spec', 'boundary_routed', { f: [] })` (plan decision 4). Depends on T-101.
+- [X] [T-103] `tests/scripts/orchestrate.test.js:1250-1255`, `:1279`, `:1294`: give `approveSpec` its `rel` parameter and pass the two in-scope paths (plan decision 4). Depends on T-102.
+- [X] [T-104] `tests/scripts/orchestrate.test.js`: insert the `[BUG-077]` describe block above `describe('Build and Verify review loop [FEAT-057]'` (plan decision 6). Depends on T-103.
+- [X] [T-105] `tests/installer/commands-parity.test.js`: add the `[BUG-077]` `it` after line 403 (plan decision 6). Depends on T-104.
+- [X] [T-106] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t 'BUG-077'`. Its full match set is the 9 new tests and nothing else. No existing title contains `BUG-077`. Predicted: **5 failed, 4 passed** (1083 skipped). Red: B2, B3, B5 (two cases), B7. Green: B1, B4 (two cases), B6. Any other split means a test is wrong: fix the test, not the prediction. Depends on T-105.
+- [X] [T-107] Red run: `npx vitest run tests/installer/commands-parity.test.js -t 'BUG-077'`. Predicted: **1 failed** (the new test, at `toContain('**The spec must be the one handed back.**')`), and every other test in the file is skipped. Depends on T-106.
 
 ---
 
@@ -141,13 +141,13 @@ These were decided by the owner when the plan phase opened. They are constraints
 - Modify: `scripts/orchestrate.mjs:995-1015`, `scripts/orchestrate.mjs:1068-1075`
 - Modify: `.claude/commands/cc-orchestrate.md:76`, `project-template/.claude/commands/cc-orchestrate.md:76`
 
-- [ ] [T-201] `scripts/orchestrate.mjs:1068-1075`: split `handedBackDoc` into `handedBackDocs` + `handedBackDoc` (plan decision 1). Depends on T-107.
-- [ ] [T-202] `scripts/orchestrate.mjs:995`: add `checkSpecHandedBack` above `approve`'s comment block, and add its call after `readDoc` in `approve` (plan decision 2). Depends on T-201.
-- [ ] [T-203] Green run: the T-106 command. Predicted: **9 passed** (1083 skipped). Depends on T-202.
-- [ ] [T-204] `.claude/commands/cc-orchestrate.md:76`: insert the bullet of plan decision 7 with a file-edit tool. Depends on T-203.
-- [ ] [T-205] `project-template/.claude/commands/cc-orchestrate.md:76`: insert the same bullet. Depends on T-204.
-- [ ] [T-206] Green run: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: every test passes (spec, AC9). Depends on T-205.
-- [ ] [T-207] `npx vitest run tests/scripts/orchestrate.test.js`. Predicted: **1092 passed (1092)** (1083 baseline + 9 new). This shows `delegate`'s texts (U29), `approve plan` and every existing `approve spec` case unchanged (spec, AC4, AC8, AC10). Depends on T-206.
+- [X] [T-201] `scripts/orchestrate.mjs:1068-1075`: split `handedBackDoc` into `handedBackDocs` + `handedBackDoc` (plan decision 1). Depends on T-107.
+- [X] [T-202] `scripts/orchestrate.mjs:995`: add `checkSpecHandedBack` above `approve`'s comment block, and add its call after `readDoc` in `approve` (plan decision 2). Depends on T-201.
+- [X] [T-203] Green run: the T-106 command. Predicted: **9 passed** (1083 skipped). Depends on T-202.
+- [X] [T-204] `.claude/commands/cc-orchestrate.md:76`: insert the bullet of plan decision 7 with a file-edit tool. Depends on T-203.
+- [X] [T-205] `project-template/.claude/commands/cc-orchestrate.md:76`: insert the same bullet. Depends on T-204.
+- [X] [T-206] Green run: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: every test passes (spec, AC9). Depends on T-205.
+- [X] [T-207] `npx vitest run tests/scripts/orchestrate.test.js`. Predicted: **1092 passed (1092)** (1083 baseline + 9 new). This shows `delegate`'s texts (U29), `approve plan` and every existing `approve spec` case unchanged (spec, AC4, AC8, AC10). Depends on T-206.
 
 ---
 
@@ -156,32 +156,32 @@ These were decided by the owner when the plan phase opened. They are constraints
 **Files:**
 - Modify: `scripts/orchestrate.mjs`, `tests/scripts/orchestrate.test.js`, `tests/installer/commands-parity.test.js`, `.claude/commands/cc-orchestrate.md`, `project-template/.claude/commands/cc-orchestrate.md` (staged), this plan (checkboxes)
 
-- [ ] [T-301] Run `npm test`. Predicted: every file green, except environment failures limited to the five ENV tests under Baseline. On CI, where none of those causes applies, the exit status is 0 (spec, AC10). A red outside that set is called ENV only if it is caused by the sandbox (network, tmp permissions, missing `node:sqlite`) and the test's file is not one this plan touches. Report it with its name. Any other red is fixed. Depends on T-207.
-- [ ] [T-302] Scope check:
+- [X] [T-301] Run `npm test`. Predicted: every file green, except environment failures limited to the five ENV tests under Baseline. On CI, where none of those causes applies, the exit status is 0 (spec, AC10). A red outside that set is called ENV only if it is caused by the sandbox (network, tmp permissions, missing `node:sqlite`) and the test's file is not one this plan touches. Report it with its name. Any other red is fixed. Depends on T-207.
+- [X] [T-302] Scope check:
   - `git status --porcelain` lists exactly the five files of this task and this plan as modified.
   - `diff .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md` prints nothing.
   - `git diff -U0 HEAD -- .claude/commands/cc-orchestrate.md | grep '^-[^-]'` prints nothing (one added bullet only).
   - `git diff --quiet HEAD -- VERSION CHANGELOG.md package.json package-lock.json README.md "AGENT-READABLE BACKLOG.md" .claude/memory .claude/hooks .claude/settings.json .github tools lib bin` exits 0.
   - Depends on T-301.
-- [ ] [T-303] Stage: `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js tests/installer/commands-parity.test.js .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md` (all tracked). Depends on T-302.
-- [ ] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-19-bug077-unbound-approve-spec-path-allowing-approval.md` (carries the ticks for T-101 to T-303). Depends on T-303.
-- [ ] [T-305] Commit: `fix: bind the approve spec path to the spec hand-back [BUG-077]`. Depends on T-304.
+- [X] [T-303] Stage: `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js tests/installer/commands-parity.test.js .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md` (all tracked). Depends on T-302.
+- [X] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-19-bug077-unbound-approve-spec-path-allowing-approval.md` (carries the ticks for T-101 to T-303). Depends on T-303.
+- [X] [T-305] Commit: `fix: bind the approve spec path to the spec hand-back [BUG-077]`. Depends on T-304.
 
 ---
 
 ## Test List
 
-- [ ] Unit, AC1: B1, the one named document approves as before.
-- [ ] Unit, AC2: B2, a readable, hash-matching, loop-closed document the hand-back does not name refuses, and the run file is byte-identical.
-- [ ] Unit, AC3: B3, a named `README.md:M` outside the folder refuses.
-- [ ] Unit, AC4: B6 (a missing file keeps `cannot read`) plus the unchanged A2 usage refusals.
-- [ ] Unit, AC5: B7, with a group pinned, a path under `.claude/specs/` but outside `pillar-3/` refuses.
-- [ ] Unit, AC6: B4, either of two named documents approves.
-- [ ] Unit, AC7: B5, no document or only a `:D` entry refuses with `none`.
-- [ ] Unit, AC8: U29 unchanged in text, plus the existing `approve plan` and `delegate` suites green (T-207).
-- [ ] Parity, AC9: the `[BUG-077]` `it` in `commands-parity.test.js`, plus `diff` in T-302.
-- [ ] AC10: `npm test` (T-301). The existing `approve spec` cases are kept meaningful by the shared fixture (plan decision 3).
-- [ ] No integration or E2E/UI test: the verb is exercised end to end through the CLI fixture already, and there is no UI.
+- [X] Unit, AC1: B1, the one named document approves as before.
+- [X] Unit, AC2: B2, a readable, hash-matching, loop-closed document the hand-back does not name refuses, and the run file is byte-identical.
+- [X] Unit, AC3: B3, a named `README.md:M` outside the folder refuses.
+- [X] Unit, AC4: B6 (a missing file keeps `cannot read`) plus the unchanged A2 usage refusals.
+- [X] Unit, AC5: B7, with a group pinned, a path under `.claude/specs/` but outside `pillar-3/` refuses.
+- [X] Unit, AC6: B4, either of two named documents approves.
+- [X] Unit, AC7: B5, no document or only a `:D` entry refuses with `none`.
+- [X] Unit, AC8: U29 unchanged in text, plus the existing `approve plan` and `delegate` suites green (T-207).
+- [X] Parity, AC9: the `[BUG-077]` `it` in `commands-parity.test.js`, plus `diff` in T-302.
+- [X] AC10: `npm test` (T-301). The existing `approve spec` cases are kept meaningful by the shared fixture (plan decision 3).
+- [X] No integration or E2E/UI test: the verb is exercised end to end through the CLI fixture already, and there is no UI.
 
 ## Commit Order
 

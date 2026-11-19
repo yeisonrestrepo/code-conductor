@@ -85,7 +85,7 @@ const task = (n, files) => `### Task ${n}: thing ${n}\n\n**Files:**\n${files.map
 const TWO_TASKS = `# Demo Plan\n\n${task(1, ['src/a.js:10-20', 'tests/a.test.js'])}\n${task(2, ['src/b.js'])}\n## Test List\n`;
 const handbackLine = (role, gate, extra = {}) => 'SNAP_HANDBACK ' + JSON.stringify({
   v: extra.v ?? 3, sys: { ph: 'impl', c: '0000000', s: 'FEAT-011', role, tk: 'X', ...extra.sys },
-  ops: { n: [], f: [], gate }, mem: { d: [], x: [] }, pr: '',
+  ops: { n: [], f: extra.f ?? (role === 'spec' ? [`${SPEC}:C`] : []), gate }, mem: { d: [], x: [] }, pr: '',
 });
 const say = (role, gate) => `Done.\nObservation: fine.\n${role === 'audit' ? 'VERDICT: APPROVE\n' : ''}${handbackLine(role, gate)}\n`;
 const auditReport = (verdict, findings = []) => ['Done.', ...findings, ...(verdict === null ? [] : [verdict]), handbackLine('audit', 'build_executed'), ''].join('\n');
@@ -1247,11 +1247,12 @@ describe('doc locations [FEAT-047]', () => {
     return JSON.parse(r.out).ops.scope;
   };
   // Spec through approval without plan(), so no other candidate pair exists at start.
-  const approveSpec = () => {
+  const approveSpec = (rel) => {
+    put(rel, '# Demo spec\n');
     expect(orch(['install', 'spec']).status).toBe(0);
-    expect(orch(['handback', 'spec'], { input: say('spec', 'boundary_routed') }).status).toBe(0);
+    expect(orch(['handback', 'spec'], { input: `Done.\n${handbackLine('spec', 'boundary_routed', { f: [`${rel}:C`] })}\n` }).status).toBe(0);
     expect(skipLoop('spec').status).toBe(0);
-    expect(orch(approveArgs('spec')).status).toBe(0);
+    expect(orch(['approve', 'spec', rel, sha(rel)]).status).toBe(0);
   };
   const recorded = (specs, plans) => put('CLAUDE.md', `# P\n\n${specs ? `- Specs: ${specs}\n` : ''}${plans ? `- Plans: ${plans}\n` : ''}`);
   const halts = (code) => {
@@ -1276,7 +1277,7 @@ describe('doc locations [FEAT-047]', () => {
       scopes: { spec: ['.claude/specs/**'], plan: ['.claude/plans/**'] },
     });
     expect(scopeOf('spec')).toEqual(['.claude/specs/**']);
-    approveSpec();
+    approveSpec('.claude/specs/demo-design.md');
     expect(scopeOf('plan')).toEqual(['.claude/plans/**']);
   });
 
@@ -1293,7 +1294,7 @@ describe('doc locations [FEAT-047]', () => {
     });
     expect(r.out.endsWith('docs: specs .claude/specs, plans .claude/plans (discovered); group pillar-3; test command: npm test; audit rounds: 2' + SEC_NONE)).toBe(true);
     expect(scopeOf('spec')).toEqual(['.claude/specs/pillar-3/**']);
-    approveSpec();
+    approveSpec('.claude/specs/pillar-3/demo-design.md');
     expect(scopeOf('plan')).toEqual(['.claude/plans/pillar-3/**']);
   });
 
@@ -1690,6 +1691,81 @@ describe('document hash [FEAT-056]', () => {
     expect(r.status).toBe(1);
     expect(r.err).toBe('ORCH_APPROVAL_UNHASHED: run FEAT-011 records an approval without a document hash (started before FEAT-056); run end, then start');
     expect(runFile().halt.code).toBe('ORCH_APPROVAL_UNHASHED');
+  });
+});
+
+describe('approve spec binds the spec hand-back [BUG-077]', () => {
+  const OTHER = 'docs/specs/other-design.md';
+  const put = (rel, text = '# Demo spec\n') => {
+    mkdirSync(dirname(join(root, rel)), { recursive: true });
+    writeFileSync(join(root, rel), text);
+  };
+  const handBack = (f) => {
+    expect(orch(['install', 'spec']).status).toBe(0);
+    expect(orch(['handback', 'spec'], { input: `Done.\n${handbackLine('spec', 'boundary_routed', { f })}\n` }).status).toBe(0);
+    expect(skipLoop('spec').status).toBe(0);
+  };
+  const handedBack = (f) => { driveTo('spec'); handBack(f); };
+  const notNamed = (rel, named, folder = 'docs/specs/') =>
+    `orchestrate: ORCH_SPEC_NOT_HANDED_BACK: approve spec: ${rel} is not a document the spec hand-back names under ${folder} (${named}); show the approval for a named document`;
+  const refuses = (rel, named, folder) => {
+    const before = runText();
+    const r = orch(['approve', 'spec', rel, sha(rel)]);
+    expect({ status: r.status, err: r.err }).toEqual({ status: 2, err: notNamed(rel, named, folder) });
+    expect(runText()).toBe(before);
+  };
+
+  it('B1 [AC1] the one named document approves as before', () => {
+    handedBack([`${SPEC}:C`]);
+    put(SPEC);
+    const r = orch(approveArgs('spec'));
+    expect(r.status).toBe(0);
+    expect(r.out).toContain(`spec approved: sha256 ${sha(SPEC)}`);
+    expect(runFile().approvals.spec).toMatchObject({ path: SPEC, sha256: sha(SPEC) });
+  });
+
+  it('B2 [AC2] a readable document the hand-back does not name refuses and writes nothing', () => {
+    handedBack([`${SPEC}:C`]);
+    put(SPEC);
+    put(OTHER, '# Other\n');
+    refuses(OTHER, SPEC);
+  });
+
+  it('B3 [AC3] a named document outside the spec folder refuses', () => {
+    handedBack([`${SPEC}:C`, 'README.md:M']);
+    put(SPEC);
+    put('README.md', '# Readme\n');
+    refuses('README.md', SPEC);
+  });
+
+  it.each([SPEC, OTHER])('B4 [AC6] either of two named documents approves: %s', (rel) => {
+    handedBack([`${SPEC}:C`, `${OTHER}:M`]);
+    put(SPEC);
+    put(OTHER, '# Other\n');
+    expect(orch(['approve', 'spec', rel, sha(rel)]).status).toBe(0);
+  });
+
+  it.each([[[]], [[`${SPEC}:D`]]])('B5 [AC7] a hand-back naming no usable document refuses with none: %j', (f) => {
+    handedBack(f);
+    put(SPEC);
+    refuses(SPEC, 'none');
+  });
+
+  it('B6 [AC4] a missing file keeps the cannot-read refusal', () => {
+    handedBack([`${SPEC}:C`]);
+    const r = orch(['approve', 'spec', 'docs/specs/none.md', '0'.repeat(64)]);
+    expect(r.status).toBe(2);
+    expect(r.err).toContain('orchestrate: cannot read docs/specs/none.md');
+  });
+
+  it('B7 [AC5] with a group pinned, a path outside the group folder refuses', () => {
+    agents();
+    put('.claude/specs/a.md', '# x\n');
+    put('BACKLOG.md', '# Backlog\n\n## Pillar 3: X\n\n### [ ] `[FEAT-011]` y\n');
+    expect(orch(['start', 'FEAT-011']).status).toBe(0);
+    handBack(['.claude/specs/b-design.md:C']);
+    put('.claude/specs/b-design.md', '# B\n');
+    refuses('.claude/specs/b-design.md', 'none', '.claude/specs/pillar-3/');
   });
 });
 
@@ -4277,7 +4353,7 @@ describe('unattended mode [FEAT-054]', () => {
     expect(orch(['start', 'FEAT-011', '--unattended']).status).toBe(0);
     putSpec();
     expect(orch(['install', 'spec']).status).toBe(0);
-    expect(orch(['handback', 'spec'], { input: say('spec', 'boundary_routed') }).status).toBe(0);
+    expect(orch(['handback', 'spec'], { input: `Done.\n${handbackLine('spec', 'boundary_routed', { f: [] })}\n` }).status).toBe(0);
     expect(skipLoop('spec').status).toBe(0);
     expect(orch(['delegate', 'spec', '--check']).err).toBe('orchestrate: delegate spec: the spec hand-back names 0 document(s) under docs/specs/; show the approval and wait for the owner');
   });
