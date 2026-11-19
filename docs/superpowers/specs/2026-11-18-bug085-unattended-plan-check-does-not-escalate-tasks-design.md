@@ -1,6 +1,6 @@
 # BUG-085: Unattended plan check does not escalate tasks that write config-read hook runners, editor and container auto-run files, other package managers or other CI systems
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-18 by the owner
 
 **Item:** `[BUG-085]` (intake of issue #241, follow-up to `[BUG-081]`). **Date:** 2026-11-18.
 
