@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { CAN_SYMLINK } from '../helpers/can-symlink.js';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync, readFileSync, readdirSync, lstatSync, symlinkSync, realpathSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync, readFileSync, readdirSync, lstatSync, chmodSync, symlinkSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
@@ -46,6 +46,7 @@ const capture = () => {
   out.opts = { warn: (m) => out.warned.push(m), report: (m) => out.said.push(m) };
   return out;
 };
+const POSIX_NON_ROOT = process.platform !== 'win32' && process.getuid?.() !== 0;
 
 describe('assertAssets', () => {
   it('throws MISSING_ASSET for an absent dir', () => {
@@ -655,6 +656,9 @@ describe('deployProject: flow status line (FEAT-044)', () => {
 // but lands only on request, so a Claude Code install stays byte for byte as it was.
 describe('deployProject: OpenCode plugin (FEAT-048)', () => {
   const PLUGIN_REL = join('.opencode', 'plugin', 'conductor-guard.js');
+  const PLUGIN_DIR = join('.opencode', 'plugin');
+  const SHIPPED = 'export const ConductorGuard = 1;\n';
+  const backupsIn = (dir) => readdirSync(dir).filter((n) => n.startsWith('conductor-guard.js.installer-backup.'));
   beforeEach(() => {
     mkdirSync(join(asset, 'project-template', '.opencode', 'plugin'), { recursive: true });
     writeFileSync(join(asset, 'project-template', PLUGIN_REL), 'export const ConductorGuard = 1;\n');
@@ -676,6 +680,43 @@ describe('deployProject: OpenCode plugin (FEAT-048)', () => {
     writeFileSync(join(home, '.opencode', 'command', 'mine.md'), 'host');
     deployProject(asset, home, { ...capture().opts, opencode: true });
     expect(readFileSync(join(home, '.opencode', 'command', 'mine.md'), 'utf8')).toBe('host');
+  });
+  it('[BUG-069] backs up a host-edited plugin, installs the shipped one and reports the backup first', () => {
+    mkdirSync(join(home, PLUGIN_DIR), { recursive: true });
+    writeFileSync(join(home, PLUGIN_REL), '// my edits\n');
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, opencode: true });
+    const backups = backupsIn(join(home, PLUGIN_DIR));
+    expect(backups).toHaveLength(1);
+    expect(readFileSync(join(home, PLUGIN_DIR, backups[0]), 'utf8')).toBe('// my edits\n');
+    expect(readFileSync(join(home, PLUGIN_REL), 'utf8')).toBe(SHIPPED);
+    expect(out.said).toEqual([
+      `code-conductor: backed up .opencode/plugin/conductor-guard.js to .opencode/plugin/${backups[0]} before replacing it (git-ignored by design)`,
+      'code-conductor: installed the OpenCode guard plugin at .opencode/plugin/conductor-guard.js',
+    ]);
+  });
+  it('[BUG-069] leaves a byte-identical plugin alone, with no backup and no backup line', () => {
+    mkdirSync(join(home, PLUGIN_DIR), { recursive: true });
+    writeFileSync(join(home, PLUGIN_REL), SHIPPED);
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, opencode: true });
+    expect(backupsIn(join(home, PLUGIN_DIR))).toEqual([]);
+    expect(out.said).toEqual(['code-conductor: installed the OpenCode guard plugin at .opencode/plugin/conductor-guard.js']);
+  });
+  it.skipIf(!POSIX_NON_ROOT)('[BUG-069] leaves the host plugin untouched and says nothing installed when the backup fails', () => {
+    mkdirSync(join(home, PLUGIN_DIR), { recursive: true });
+    writeFileSync(join(home, PLUGIN_REL), '// my edits\n');
+    const out = capture();
+    chmodSync(join(home, PLUGIN_DIR), 0o555);
+    try {
+      deployProject(asset, home, { ...out.opts, opencode: true });
+    } finally {
+      chmodSync(join(home, PLUGIN_DIR), 0o755);
+    }
+    expect(readFileSync(join(home, PLUGIN_REL), 'utf8')).toBe('// my edits\n');
+    expect(backupsIn(join(home, PLUGIN_DIR))).toEqual([]);
+    expect(out.warned.some((m) => /could not back it up/.test(m))).toBe(true);
+    expect(out.said.some((m) => /OpenCode/.test(m))).toBe(false);
   });
   it('ships the real plugin in the template', () => {
     expect(existsSync(join(ROOT, 'project-template', PLUGIN_REL))).toBe(true);
