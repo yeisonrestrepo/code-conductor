@@ -83,11 +83,11 @@
 - Modify: `tests/installer/deploy.test.js`
 - Modify: `tests/installer/templates.test.js`
 
-- [ ] [T-101] `tests/installer/deploy.test.js:3`: add `chmodSync` to the `node:fs` import. After `capture` (`:47`), add the `POSIX_NON_ROOT` constant (plan decision 5). Depends on T-004.
-- [ ] [T-102] `tests/installer/deploy.test.js`, FEAT-048 block: add `PLUGIN_DIR` next to `PLUGIN_REL`, and insert D1, D2 and D3 after the `keeps the host project's own .opencode/ files` case (plan decision 5). Depends on T-101.
-- [ ] [T-103] `tests/installer/templates.test.js`, `describe('shipped asset dirs')`: add the one-file pin (plan decision 6). Depends on T-102.
-- [ ] [T-104] Red run: `npx vitest run tests/installer/deploy.test.js -t 'OpenCode plugin'`. Its full match set is the 4 existing FEAT-048 tests plus D1, D2 and D3, because every test in the block carries the describe name. Predicted: **2 failed | 5 passed | 64 skipped (71)**. Red: D1 and D3. Green: D2 and the 4 existing tests (plan decision 7). On a root runner, D3 is skipped: **1 failed | 5 passed | 65 skipped**. Any other split means a test is wrong. Fix the test, not the prediction. Depends on T-103.
-- [ ] [T-105] Run: `npx vitest run tests/installer/templates.test.js -t 'BUG-069'`. Predicted: **1 passed**, every other test skipped (the pin is green already, plan decision 7). Depends on T-104.
+- [X] [T-101] `tests/installer/deploy.test.js:3`: add `chmodSync` to the `node:fs` import. After `capture` (`:47`), add the `POSIX_NON_ROOT` constant (plan decision 5). Depends on T-004.
+- [X] [T-102] `tests/installer/deploy.test.js`, FEAT-048 block: add `PLUGIN_DIR` next to `PLUGIN_REL`, and insert D1, D2 and D3 after the `keeps the host project's own .opencode/ files` case (plan decision 5). Depends on T-101.
+- [X] [T-103] `tests/installer/templates.test.js`, `describe('shipped asset dirs')`: add the one-file pin (plan decision 6). Depends on T-102.
+- [X] [T-104] Red run: `npx vitest run tests/installer/deploy.test.js -t 'OpenCode plugin'`. Its full match set is the 4 existing FEAT-048 tests plus D1, D2 and D3, because every test in the block carries the describe name. Predicted: **2 failed | 5 passed | 64 skipped (71)**. Red: D1 and D3. Green: D2 and the 4 existing tests (plan decision 7). On a root runner, D3 is skipped: **1 failed | 5 passed | 65 skipped**. Any other split means a test is wrong. Fix the test, not the prediction. Depends on T-103.
+- [X] [T-105] Run: `npx vitest run tests/installer/templates.test.js -t 'BUG-069'`. Predicted: **1 passed**, every other test skipped (the pin is green already, plan decision 7). Depends on T-104.
 
 ---
 
@@ -96,11 +96,11 @@
 **Files:**
 - Modify: `lib/installer/deploy.mjs`
 
-- [ ] [T-201] `lib/installer/deploy.mjs:34-42`: give `backupReporter` its `action` option (plan decision 1). Depends on T-105.
-- [ ] [T-202] `lib/installer/deploy.mjs`: add `OPENCODE_PLUGIN`, `PLUGIN_IN_PLACE`, `replaceWithTemplate` and `installOpencodePlugin` above `deployProject`'s comment block, and reword its `opencode` comment line (plan decisions 3 and 4). Depends on T-201.
-- [ ] [T-203] `lib/installer/deploy.mjs:262-265`: change the loop skip and remove the opencode skip and the in-loop report (plan decision 2). Add the `if (opencode) installOpencodePlugin(...)` call after the loop (plan decision 4). Depends on T-202.
-- [ ] [T-204] Green run: the T-104 command. Predicted: **7 passed | 64 skipped (71)**. Depends on T-203.
-- [ ] [T-205] `npx vitest run tests/installer/deploy.test.js tests/installer/templates.test.js tests/installer/cli.test.js`. Predicted: every test passes, 111 of them in the first two files (107 baseline + 4 new). This includes the BUG-049 `before merging` assertions (spec, AC8) and the FEAT-048 CLI cases (spec, AC4 and AC6). Depends on T-204.
+- [X] [T-201] `lib/installer/deploy.mjs:34-42`: give `backupReporter` its `action` option (plan decision 1). Depends on T-105.
+- [X] [T-202] `lib/installer/deploy.mjs`: add `OPENCODE_PLUGIN`, `PLUGIN_IN_PLACE`, `replaceWithTemplate` and `installOpencodePlugin` above `deployProject`'s comment block, and reword its `opencode` comment line (plan decisions 3 and 4). Depends on T-201.
+- [X] [T-203] `lib/installer/deploy.mjs:262-265`: change the loop skip and remove the opencode skip and the in-loop report (plan decision 2). Add the `if (opencode) installOpencodePlugin(...)` call after the loop (plan decision 4). Depends on T-202.
+- [X] [T-204] Green run: the T-104 command. Predicted: **7 passed | 64 skipped (71)**. Depends on T-203.
+- [X] [T-205] `npx vitest run tests/installer/deploy.test.js tests/installer/templates.test.js tests/installer/cli.test.js`. Predicted: every test passes, 111 of them in the first two files (107 baseline + 4 new). This includes the BUG-049 `before merging` assertions (spec, AC8) and the FEAT-048 CLI cases (spec, AC4 and AC6). Depends on T-204.
 
 ---
 
@@ -109,11 +109,11 @@
 **Files:**
 - Modify: `docs/superpowers/plans/2026-11-19-bug069-installer-overwrites-an-existing-opencode-guard.md` (ticks)
 
-- [ ] [T-301] Run `npm test`. Predicted: exit 0 (spec, AC10). A red is called ENV only if the sandbox caused it (network, tmp permissions) and its file is not one this plan touches. Report it with its name. Any other red is fixed. Depends on T-205.
-- [ ] [T-302] Scope check: `git status --short` lists exactly `lib/installer/deploy.mjs`, `tests/installer/deploy.test.js`, `tests/installer/templates.test.js` and this plan. No temporary file is left in the tree. `git diff lib/installer/file-merge.mjs` is empty. Depends on T-301.
-- [ ] [T-303] Stage: `git add -u lib/installer/deploy.mjs tests/installer/deploy.test.js tests/installer/templates.test.js` (all tracked). Depends on T-302.
-- [ ] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-19-bug069-installer-overwrites-an-existing-opencode-guard.md` (carries the ticks for T-101 to T-303). Depends on T-303.
-- [ ] [T-305] Commit: `fix: back up an existing OpenCode guard plugin before overwriting it [BUG-069]`. Depends on T-304.
+- [X] [T-301] Run `npm test`. Predicted: exit 0 (spec, AC10). A red is called ENV only if the sandbox caused it (network, tmp permissions) and its file is not one this plan touches. Report it with its name. Any other red is fixed. Depends on T-205.
+- [X] [T-302] Scope check: `git status --short` lists exactly `lib/installer/deploy.mjs`, `tests/installer/deploy.test.js`, `tests/installer/templates.test.js` and this plan. No temporary file is left in the tree. `git diff lib/installer/file-merge.mjs` is empty. Depends on T-301.
+- [X] [T-303] Stage: `git add -u lib/installer/deploy.mjs tests/installer/deploy.test.js tests/installer/templates.test.js` (all tracked). Depends on T-302.
+- [X] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-19-bug069-installer-overwrites-an-existing-opencode-guard.md` (carries the ticks for T-101 to T-303). Depends on T-303.
+- [X] [T-305] Commit: `fix: back up an existing OpenCode guard plugin before overwriting it [BUG-069]`. Depends on T-304.
 
 ---
 

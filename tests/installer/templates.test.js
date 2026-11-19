@@ -111,6 +111,18 @@ describe('shipped asset dirs', () => {
     for (const d of ['global', 'skills', 'scripts', 'project-template']) walk(join(root, d), d);
     expect(offenders).toEqual([]);
   });
+  it('[BUG-069] ships exactly one file under project-template/.opencode/', () => {
+    const files = [];
+    const walk = (dir, rel) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const path = rel ? `${rel}/${entry.name}` : entry.name;
+        if (entry.isDirectory()) walk(join(dir, entry.name), path);
+        else files.push(path);
+      }
+    };
+    walk(join(root, 'project-template', '.opencode'), '');
+    expect(files).toEqual(['plugin/conductor-guard.js']);
+  });
 });
 
 const SETTINGS = ['.claude/settings.json', 'project-template/.claude/settings.json'];
