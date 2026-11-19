@@ -1522,6 +1522,28 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   `src/a.js` and `docs/notes.md` keep the delegated APPROVE.
 - Intake of issue #240.
 
+### [ ] `[BUG-087]` Installer follows a symlink at the OpenCode guard plugin destination and overwrites its target
+
+- Symptom: since `[BUG-069]`, `installOpencodePlugin`
+  (lib/installer/deploy.mjs:71, per the issue) writes
+  `.opencode/plugin/conductor-guard.js` through `mergeFileInto`, which
+  resolves symlinks before writing (lib/installer/file-merge.mjs:17-23).
+  The previous `cpSync` path (`dereference: false`, `force: true`)
+  replaced a link at the destination instead of following it.
+- Impact per the issue: a project checkout that ships that path as a
+  symlink makes `code-conductor --opencode` overwrite the file the
+  link points to, which can be outside the project, with the shipped
+  plugin bytes, and a timestamped backup is written next to it. The
+  risk is integrity loss of one user-writable file, recoverable from
+  the backup; it is not code execution.
+- Fix shape suggested by the issue: `lstat` the destination before
+  calling `mergeFileInto`; if it is a symlink, skip it with a warning,
+  or unlink it and write a regular file. Add a test with a symlinked
+  destination that points outside the project root.
+- Regression of `[BUG-069]`.
+- Intake of issue #260; reported by the automated security review of
+  the 1.52.5 release candidate (#259).
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
