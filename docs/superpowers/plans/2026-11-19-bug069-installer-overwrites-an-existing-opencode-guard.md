@@ -119,16 +119,16 @@
 
 ## Test List
 
-- [ ] Unit, AC1 and AC2: D1. A host-edited plugin is backed up with its original bytes and replaced with the shipped bytes. The backup line prints exactly, before the "installed" line.
-- [ ] Unit, AC3: D2. A byte-identical plugin gets no backup and no backup line, and the "installed" line still prints.
-- [ ] Unit, AC4: the existing FEAT-048 cases in `deploy.test.js` (`installs the plugin byte for byte…`) and `cli.test.js` (`installs the OpenCode plugin with --project --opencode`), unchanged.
-- [ ] Unit, AC5: D3. A failed backup leaves the plugin byte for byte, warns on stderr, and prints no "installed" line.
-- [ ] Unit, AC6: the existing `writes no .opencode/ without the opencode option` cases in `deploy.test.js` and `cli.test.js`, unchanged.
-- [ ] Unit, AC7: the existing `keeps the host project's own .opencode/ files` case, unchanged.
-- [ ] Unit, AC8: the existing BUG-049 `before merging` assertions (`deploy.test.js:578-601`), unchanged.
-- [ ] Unit, AC9: the one-file pin in `templates.test.js`.
-- [ ] AC10: `npm test` (T-301).
-- [ ] No integration or E2E/UI test: the CLI already drives `deployProject` end to end in `cli.test.js`, and there is no UI.
+- [X] Unit, AC1 and AC2: D1. A host-edited plugin is backed up with its original bytes and replaced with the shipped bytes. The backup line prints exactly, before the "installed" line.
+- [X] Unit, AC3: D2. A byte-identical plugin gets no backup and no backup line, and the "installed" line still prints.
+- [X] Unit, AC4: the existing FEAT-048 cases in `deploy.test.js` (`installs the plugin byte for byte…`) and `cli.test.js` (`installs the OpenCode plugin with --project --opencode`), unchanged.
+- [X] Unit, AC5: D3. A failed backup leaves the plugin byte for byte, warns on stderr, and prints no "installed" line.
+- [X] Unit, AC6: the existing `writes no .opencode/ without the opencode option` cases in `deploy.test.js` and `cli.test.js`, unchanged.
+- [X] Unit, AC7: the existing `keeps the host project's own .opencode/ files` case, unchanged.
+- [X] Unit, AC8: the existing BUG-049 `before merging` assertions (`deploy.test.js:578-601`), unchanged.
+- [X] Unit, AC9: the one-file pin in `templates.test.js`.
+- [X] AC10: `npm test` (T-301).
+- [X] No integration or E2E/UI test: the CLI already drives `deployProject` end to end in `cli.test.js`, and there is no UI.
 
 ## Commit Order
 
