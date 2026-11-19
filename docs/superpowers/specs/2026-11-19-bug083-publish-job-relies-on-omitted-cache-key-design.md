@@ -1,6 +1,6 @@
 # BUG-083: Publish job relies on omitted cache key instead of disabling the setup-node package-manager cache explicitly
 
-**Status:** Draft, awaiting owner approval
+**Status:** Approved 2026-11-19 by the owner
 
 **Item:** `[BUG-083]` (intake of issue #235, reported by the automated security review of #234). Pillar 5: infrastructure, ecosystem and QA.
 
