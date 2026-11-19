@@ -3352,3 +3352,16 @@ Nothing minted: BUG-085 was reserved by triage #241. BUG-083 (triage #235) stays
 Known limits: the BUG-085 line is removed. The unattended-mode line now names hook runners, editor and container auto-run files, package-manager and build-system files and CI pipelines, and cites `[BUG-085]`. Every other defect line is unchanged.
 
 No upgrade step: an attended run is unaffected, and an unattended plan that declares one of the new files now waits for an owner `approve` instead of passing on the delegated verdict. #253's description reports two `tests/unit/staging-convention.test.js` failures in its sandbox's git. CI on the release PR is the authority.
+
+## Release: 1.52.5 batch landing 2026-11-19
+
+Two PRs merged since `v1.52.4`. Existing ids closed:
+
+- BUG-077 (#256 by `cc-lane-bot[bot]`, the owner's `approve spec` path bound to the spec hand-back). `approve spec <path> <sha256>` refuses `ORCH_SPEC_NOT_HANDED_BACK`, writing nothing, when the path is not a document the latest `spec` hand-back names (`ops.f`, `:C`/`:M`) under the run's pinned spec folder. A new `checkSpecHandedBack` reads a shared `handedBackDocs`, the filter that moved out of `handedBackDoc`, so `approve` and `delegate` share one definition and `delegate`'s refusal text is unchanged. Any member of the named set approves; the check runs after `readDoc` and before the hash and loop checks. `approve plan` is unchanged. Rows B1–B7 in `tests/scripts/orchestrate.test.js` and one parity assertion in `tests/installer/commands-parity.test.js`; both `cc-orchestrate.md` copies gain one bullet. Intake of issue #199. The spec and the plan were approved 2026-11-19 by independent review, round 1.
+- BUG-083 (#255 by `yeisonrestrepo`, the publish job's package-manager cache turned off explicitly). The `publish` job's `setup-node` step sets `package-manager-cache: false`, with a job comment; `verify` is unchanged and keeps `cache: 'npm'`. `tests/installer/workflow.test.js` gains a `step()` helper and replaces the old `not.toMatch(/cache/)` assertion with one pinning exactly one `package-manager-cache: false` under the step's `with:` and no `cache:` or `cache-dependency-path:` input. Intake of issue #235. The spec was approved 2026-11-19 by the owner (approach A); the plan records an independent whole-branch review that returned APPROVE in round 1.
+
+Nothing minted: BUG-077 was filed at intake of issue #199, and BUG-083 was reserved by triage #235. No reserved id stays open from this batch.
+
+Known limits: the BUG-077 and BUG-083 lines are removed. Every other defect line is unchanged.
+
+No upgrade step: an `approve spec` that named the handed-back spec behaves as before, and one naming any other path now refuses and writes nothing; publishing is unaffected because `package.json` declares no `packageManager` field. #255's description reports five sandbox-only failures identical to the `main` baseline (three uid-0 permission tests and `staging-convention` AC7/AC8), and #256's reports the same AC7/AC8 pair. CI on the release PR is the authority.

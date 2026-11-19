@@ -1321,7 +1321,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #195; reported by the automated security review of
   #194.
 
-### [ ] `[BUG-077]` Unbound approve spec path allowing approval hash to protect the wrong file
+### [X] `[BUG-077]` Unbound approve spec path allowing approval hash to protect the wrong file
+* **DONE, shipped as `1.52.5` on 2026-11-19.** `approve spec <path> <sha256>` refuses `ORCH_SPEC_NOT_HANDED_BACK`, writing nothing, when `<path>` is not one of the documents the latest `spec` hand-back names (`ops.f` entries marked `:C` or `:M`) under the run's pinned spec folder; the refusal lists the named documents, or `none`. A new `checkSpecHandedBack` in `scripts/orchestrate.mjs` reads a shared `handedBackDocs`, the filter that moved out of `handedBackDoc`, so `approve` and `delegate` share one definition and `delegate`'s refusal text is byte-identical. The owner's verb accepts any member of the named set; `delegate` still needs exactly one. The check runs after `readDoc` and before the hash and review-loop checks, so a missing file keeps `cannot read`, and the folder comes from the run's pinned scope, so a group scope is respected. `approve plan` is unchanged. Both `cc-orchestrate.md` copies gain one bullet on the refusal. Pinned by rows B1–B7 in `approve spec binds the spec hand-back [BUG-077]` in `tests/scripts/orchestrate.test.js` and `binds the spec approval to the spec hand-back [BUG-077]` in `tests/installer/commands-parity.test.js`. Landed from PR #256 (cc-lane-bot), intake of issue #199; the id was filed at intake and is owner-minted at landing. Spec: `docs/superpowers/specs/2026-11-19-bug077-unbound-approve-spec-path-allowing-approval-design.md` (approved 2026-11-19 by independent review, round 1). Plan: `docs/superpowers/plans/2026-11-19-bug077-unbound-approve-spec-path-allowing-approval.md` (approved by independent review, round 1).
 
 - Symptom: `approve spec <path> <sha256>` (new in 1.46.0,
   scripts/orchestrate.mjs:440, per the issue) accepts any file path
@@ -1448,7 +1449,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #230; reported by the automated security review of
   the 1.52.0 release candidate (#229).
 
-### [ ] `[BUG-083]` Publish job relies on omitted cache key instead of disabling the setup-node package-manager cache explicitly
+### [X] `[BUG-083]` Publish job relies on omitted cache key instead of disabling the setup-node package-manager cache explicitly
+* **DONE, shipped as `1.52.5` on 2026-11-19.** The `publish` job's `actions/setup-node` step in `.github/workflows/publish.yml` sets `package-manager-cache: false`, with a job comment saying why, so a future `packageManager` or `devEngines.packageManager` field in `package.json` cannot turn on a cache restore in the job that holds `id-token: write`. The `verify` job is unchanged and keeps `cache: 'npm'`. `tests/installer/workflow.test.js` gains a `step()` helper and replaces the old `not.toMatch(/cache/)` assertion, which stayed true while the automatic cache came on, with `targets the npm registry and disables the package-manager cache explicitly [BUG-083]`: exactly one `package-manager-cache:` line in the job, under the `with:` of the `setup-node` step with the literal value `false`, and no `cache:` or `cache-dependency-path:` input. Landed from PR #255 (yeisonrestrepo), intake of issue #235; the id was reserved by the triage and is owner-minted at landing. Spec: `docs/superpowers/specs/2026-11-19-bug083-publish-job-relies-on-omitted-cache-key-design.md` (approved 2026-11-19 by the owner, approach A). Plan: `docs/superpowers/plans/2026-11-19-bug083-publish-job-relies-on-omitted-cache-key.md`.
 
 - Symptom: the `publish` job in .github/workflows/publish.yml (line
   60, per the issue) avoids restoring an npm cache only by omitting
