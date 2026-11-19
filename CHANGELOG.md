@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.52.3] - 2026-11-19
+
+### Fixed
+- **[BUG-082]** An unattended `delegate plan` now escalates a task whose `Files` entry can name a `CLAUDE.md`, `CLAUDE.local.md`, `package.json`, `package-lock.json`, `npm-shrinkwrap.json` or `.npmrc` at any depth, with the control-plane reason. Claude Code loads a nested `CLAUDE.md` when it reads files in that directory, so a delegated plan that wrote `src/CLAUDE.md` could reach later reviewers in the same run. The six names sit in a new exported `CONTROL_PLANE_NAMES` in `scripts/orchestrate.mjs`, and `inControlPlane` gains a second disjunct, `namesControlFile`, which tests the entry's last segment (lower-cased, `./` stripped) against them; when that segment holds `**`, only the text after the last `**` has to match the end of the name. Globs that can name such a file escalate too, such as `src/**/CLAUDE.md`, `src/*`, `src/**` and `packages/*/package.json`. Near misses such as `src/CLAUDE.md.bak`, `src/CLAUDE.mdx`, `src/package.jsonc`, `docs/npmrc` and `src/**.js` still approve, and a form that also reaches the write surface (`**/CLAUDE.md`, a trailing dot, a non-ASCII character) keeps the write-surface reason. `CONTROL_PLANE`, `WRITE_SURFACE` and both reason texts are unchanged. Pinned by the `CONTROL_PLANE_NAMES` pin and rows U52–U54 in `tests/scripts/orchestrate.test.js`; the rows that now escalate, `docs/CLAUDE.md` among them, leave U43 and U48. Landed from PR #251 (cc-lane-bot), intake of issue #230.
+
 ## [1.52.2] - 2026-11-18
 
 ### Fixed
