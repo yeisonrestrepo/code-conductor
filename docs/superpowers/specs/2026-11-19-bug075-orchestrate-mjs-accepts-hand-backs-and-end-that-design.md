@@ -1,6 +1,6 @@
 # BUG-075: orchestrate.mjs accepts hand-backs and `end` that contradict the work claimed
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-19 by independent review (round 1)
 **Item:** BUG-075 (intake of issue #175)
 **Date:** 2026-11-19
 
