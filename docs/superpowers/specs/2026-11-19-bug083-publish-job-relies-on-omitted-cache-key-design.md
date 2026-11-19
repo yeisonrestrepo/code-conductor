@@ -25,6 +25,12 @@ Add `package-manager-cache: false` to the `with:` block of the `publish` job's `
 
 **Choice the entry leaves open: how strict the new test is.** The entry says to assert "that explicit value". This spec pins the literal line `package-manager-cache: false` (unquoted, as the issue writes it) inside the `setup-node` step, rather than accepting any truthy-false spelling (`'false'`, `"false"`, `False`). Action inputs reach the action as strings and `'false'` would work the same, but one spelling keeps the assertion simple and makes a later edit to the value a visible test failure rather than something the regex happens to tolerate. It also pins that no `cache:` key is present, because an explicit `cache: 'npm'` would turn caching on regardless of `package-manager-cache`, and the old test was the only thing guarding that.
 
+## Approaches
+
+- **A. Disable the cache explicitly in `publish` (picked by the owner, 2026-11-19).** Set `package-manager-cache: false` on the job's `setup-node` step and pin it in the workflow test, together with the absence of any `cache:` input. One line, the hardening the action's own README recommends for privileged workflows, and it keeps a future `packageManager` field safe for this job. Trade-off: if setup-node ever dropped the input, the job would fall back to today's implicit protection and the YAML-only test would not notice.
+- **B. Forbid the trigger.** A test that fails when `package.json` declares `packageManager` or `devEngines.packageManager`. Leaves the workflow untouched, but blocks a legitimate edit and keeps the `publish` job relying on an omission rather than a stated choice. Rejected.
+- **C. A and B together.** The strictest form, but it inherits B's cost and would settle now whether the project may declare `packageManager`, which the entry leaves out of scope. Rejected.
+
 ## Behavior
 
 ### Main path
