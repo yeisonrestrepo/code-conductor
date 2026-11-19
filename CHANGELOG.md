@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.52.4] - 2026-11-19
+
+### Fixed
+- **[BUG-085]** An unattended `delegate plan` now also escalates a task whose `Files` entry reaches a config-read git hook runner, an editor or container auto-run file, another package manager's or build system's file, or another CI system's pipeline, with the control-plane reason. `CONTROL_PLANE` in `scripts/orchestrate.mjs` gains 130 entries in four families: hook runners (`.pre-commit-config.yaml`, lefthook, overcommit, simple-git-hooks, husky 4 and lint-staged config), editors and containers (`.vscode/**`, `.idea/**`, `.zed/**`, `.devcontainer/**`, `.devcontainer.json`, `.gitpod.yml`), package managers and build systems (yarn, pnpm, bun, deno, Python, Ruby, Composer, Cargo and `build.rs`, Go, Maven, Gradle and .NET), and CI (GitLab, CircleCI, Azure Pipelines, Travis, Jenkins, Bitbucket, Buildkite, Drone, Woodpecker, AppVeyor, Gitea, Forgejo, Cirrus and Semaphore). The 54 fixed package-manager and build-system names also join `CONTROL_PLANE_NAMES`, so nested and workspace manifests such as `packages/a/pyproject.toml`, `src/go.mod` and `crates/a/build.rs` escalate at any depth; hook-runner, editor, container and CI files are matched at the root only. Near misses such as `src/.vscode/tasks.json`, `docs/.gitlab-ci.yml`, `.pre-commit-hooks.yaml`, `go.sum`, `src/pom.xml.bak`, `.eslintrc.json` and `makefile` still approve, and a glob that also reaches the write surface (`**/yarn.lock`, `*/tasks.json`) keeps the write-surface reason. No logic changed: `inSurface`, `inControlPlane`, `namesControlFile`, `surfaceTask`, `WRITE_SURFACE` and both reason texts are as shipped. Pinned by the `CONTROL_PLANE` and `CONTROL_PLANE_NAMES` pins and rows U55–U58 in `tests/scripts/orchestrate.test.js`. Landed from PR #253 (cc-lane-bot), intake of issue #241.
+
 ## [1.52.3] - 2026-11-19
 
 ### Fixed

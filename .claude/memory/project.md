@@ -3340,3 +3340,17 @@ Nothing minted: BUG-082 was reserved by triage #230. BUG-083 (triage #235) and B
 Known limits: the BUG-082 line is removed. The unattended-mode line now names `CLAUDE.md`, `CLAUDE.local.md` and npm manifests at any depth. Every other defect line is unchanged.
 
 No upgrade step: an attended run is unaffected, and an unattended plan that declares a nested `CLAUDE.md`, `CLAUDE.local.md` or npm manifest now waits for an owner `approve` instead of passing on the delegated verdict. #251's description reports two `tests/unit/staging-convention.test.js` assertions failing in its sandbox with a read-only `.git`. CI on the release PR is the authority.
+
+## Release: 1.52.4 batch landing 2026-11-19
+
+One PR merged since `v1.52.3`. Existing id closed:
+
+- BUG-085 (#253 by `cc-lane-bot[bot]`, config-read hook runners, editor and container auto-run files, other package managers, build systems and CI systems in the unattended plan check). `CONTROL_PLANE` gains 130 entries in four families, and the 54 fixed package-manager and build-system names join `CONTROL_PLANE_NAMES`, so nested and workspace manifests escalate at any depth; hook-runner, editor, container and CI files stay root-only. Data only: `inSurface`, `inControlPlane`, `namesControlFile`, `surfaceTask`, `WRITE_SURFACE` and both reason texts are unchanged. Rows U55–U58 and both pins; no existing row moved. The plan-stage setup is shared across the new rows (`atPlanShared`) so the Windows leg fits its timeout. Intake of issue #241. The spec was approved 2026-11-18 by the owner, and the plan by the owner, because its tasks declare `scripts/orchestrate.mjs`.
+
+Nothing minted: BUG-085 was reserved by triage #241. BUG-083 (triage #235) stays reserved and open.
+
+Known limits: the BUG-085 line is removed. The unattended-mode line now names hook runners, editor and container auto-run files, package-manager and build-system files and CI pipelines, and cites `[BUG-085]`. Every other defect line is unchanged.
+
+Follow-ups the spec sends to separate unnumbered issues: the rest of `.opencode/` outside `plugin/**`, a name-pattern rule (`*.code-workspace`, `requirements-*.txt`, `*.gemspec`, `*.csproj`), CI files reached only through an include, and deploy-platform config.
+
+No upgrade step: an attended run is unaffected, and an unattended plan that declares one of the new files now waits for an owner `approve` instead of passing on the delegated verdict. #253's description reports two `tests/unit/staging-convention.test.js` failures in its sandbox's git. CI on the release PR is the authority.
