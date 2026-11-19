@@ -3351,6 +3351,4 @@ Nothing minted: BUG-085 was reserved by triage #241. BUG-083 (triage #235) stays
 
 Known limits: the BUG-085 line is removed. The unattended-mode line now names hook runners, editor and container auto-run files, package-manager and build-system files and CI pipelines, and cites `[BUG-085]`. Every other defect line is unchanged.
 
-Follow-ups the spec sends to separate unnumbered issues: the rest of `.opencode/` outside `plugin/**`, a name-pattern rule (`*.code-workspace`, `requirements-*.txt`, `*.gemspec`, `*.csproj`), CI files reached only through an include, and deploy-platform config.
-
 No upgrade step: an attended run is unaffected, and an unattended plan that declares one of the new files now waits for an owner `approve` instead of passing on the delegated verdict. #253's description reports two `tests/unit/staging-convention.test.js` failures in its sandbox's git. CI on the release PR is the authority.
