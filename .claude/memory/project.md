@@ -3328,3 +3328,15 @@ Nothing minted: BUG-081 was reserved by triage #231, and BUG-084 and BUG-086 by 
 Known limits: the BUG-081, BUG-084 and BUG-086 lines are removed. The unattended-mode line now names the non-ASCII check and the outside-the-run files. Every other defect line is unchanged.
 
 No upgrade step: an attended run is unaffected, and an unattended plan that declares one of the new entries now waits for an owner `approve` instead of passing on the delegated verdict. #245's description reports `AC7`/`AC8` of `tests/unit/staging-convention.test.js` failing in its sandbox with a read-only `.git`. CI on the release PR is the authority.
+
+## Release: 1.52.3 batch landing 2026-11-19
+
+One PR merged since `v1.52.2`. Existing id closed:
+
+- BUG-082 (#251 by `cc-lane-bot[bot]`, nested instruction files and npm manifests in the unattended plan check). A new exported `CONTROL_PLANE_NAMES` (`claude.md`, `claude.local.md`, `package.json`, `package-lock.json`, `npm-shrinkwrap.json`, `.npmrc`) and a helper, `namesControlFile`, as the second disjunct of `inControlPlane`: a `Files` entry whose last segment can name one of them escalates at any depth with the control-plane reason, globs included. `CONTROL_PLANE`, `WRITE_SURFACE` and both reason texts are unchanged. Rows U52–U54 and the `CONTROL_PLANE_NAMES` pin; five rows left U43 and U48 because they now escalate. Intake of issue #230. The spec was approved 2026-11-18 by the owner (owner commit `2f0f9fb` replacing the delegated approval at `1cf894f`), and the plan by the owner after the build, as recorded in its Deviations section. The run ended after the build audit, so tests and security review ran on the pull request.
+
+Nothing minted: BUG-082 was reserved by triage #230. BUG-083 (triage #235) and BUG-085 (triage #241) stay reserved and open.
+
+Known limits: the BUG-082 line is removed. The unattended-mode line now names `CLAUDE.md`, `CLAUDE.local.md` and npm manifests at any depth. Every other defect line is unchanged.
+
+No upgrade step: an attended run is unaffected, and an unattended plan that declares a nested `CLAUDE.md`, `CLAUDE.local.md` or npm manifest now waits for an owner `approve` instead of passing on the delegated verdict. #251's description reports two `tests/unit/staging-convention.test.js` assertions failing in its sandbox with a read-only `.git`. CI on the release PR is the authority.
