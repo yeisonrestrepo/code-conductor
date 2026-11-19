@@ -1166,7 +1166,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   cwd on Windows, WSL and POSIX, and a test runs it from a
   subdirectory.
 
-### [ ] `[BUG-069]` Installer overwrites an existing OpenCode guard plugin without a backup
+### [X] `[BUG-069]` Installer overwrites an existing OpenCode guard plugin without a backup
+* **DONE, shipped as `1.52.5` on 2026-11-19.** `installOpencodePlugin` in `lib/installer/deploy.mjs` now installs `.opencode/plugin/conductor-guard.js` through `mergeFileInto`, the same backup-before-overwrite path the merged files use, with a merge function (`replaceWithTemplate`) under which the shipped bytes always win. A host-edited plugin is backed up first and the backup path is reported on stdout (`backed up .opencode/plugin/conductor-guard.js to … before replacing it (git-ignored by design)`), ahead of the `installed` line. A byte-identical plugin gets no backup and no backup line. If the backup fails, the host plugin is left untouched, a `could not back it up` warning goes to stderr, and no `installed` line is printed. Pinned by the three `[BUG-069]` rows of `tests/installer/deploy.test.js` (the failed-backup row is POSIX non-root only and is listed in `tools/skip-baseline.json` for the Windows leg) and the `[BUG-069]` one-file pin in `tests/installer/templates.test.js`. Landed from PR #258 (cc-lane-bot), intake of issue #164; the id was filed at intake and is owner-minted at landing. Spec: `docs/superpowers/specs/2026-11-19-bug069-installer-overwrites-an-existing-opencode-guard-design.md` (approved 2026-11-19 by independent review). Plan: `docs/superpowers/plans/2026-11-19-bug069-installer-overwrites-an-existing-opencode-guard.md`.
 
 - Symptom: with `--opencode`, lib/installer/deploy.mjs copies
   `.opencode/plugin/conductor-guard.js` into the project (the
@@ -1321,7 +1322,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #195; reported by the automated security review of
   #194.
 
-### [ ] `[BUG-077]` Unbound approve spec path allowing approval hash to protect the wrong file
+### [X] `[BUG-077]` Unbound approve spec path allowing approval hash to protect the wrong file
+* **DONE, shipped as `1.52.5` on 2026-11-19.** `approve spec <path> <sha256>` in `scripts/orchestrate.mjs` refuses with `ORCH_SPEC_NOT_HANDED_BACK`, writing nothing, when `<path>` is not one of the documents the latest `spec` hand-back names (`ops.f` entries marked `:C` or `:M`, ending in `.md`) under the run's pinned spec folder; the refusal lists the named documents, or `none`. The filter moved out of `handedBackDoc` into a shared `handedBackDocs`, so `approve` and `delegate` read one definition and `delegate`'s refusal text is unchanged. The check (`checkSpecHandedBack`) runs after the file is read and before the hash and loop checks, so a missing file still reports `cannot read`. When the hand-back names several documents, any one of them approves. `approve plan` is unchanged. Both `cc-orchestrate.md` copies gain a "The spec must be the one handed back" bullet. Pinned by `approve spec binds the spec hand-back [BUG-077]` in `tests/scripts/orchestrate.test.js` and the `[BUG-077]` row of `tests/installer/commands-parity.test.js`. Landed from PR #256 (cc-lane-bot), intake of issue #199; the id was filed at intake and is owner-minted at landing. Spec: `docs/superpowers/specs/2026-11-19-bug077-unbound-approve-spec-path-allowing-approval-design.md` (approved 2026-11-19 by independent review). Plan: `docs/superpowers/plans/2026-11-19-bug077-unbound-approve-spec-path-allowing-approval.md`.
 
 - Symptom: `approve spec <path> <sha256>` (new in 1.46.0,
   scripts/orchestrate.mjs:440, per the issue) accepts any file path
@@ -1448,7 +1450,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #230; reported by the automated security review of
   the 1.52.0 release candidate (#229).
 
-### [ ] `[BUG-083]` Publish job relies on omitted cache key instead of disabling the setup-node package-manager cache explicitly
+### [X] `[BUG-083]` Publish job relies on omitted cache key instead of disabling the setup-node package-manager cache explicitly
+* **DONE, shipped as `1.52.5` on 2026-11-19.** The `publish` job's `actions/setup-node` step in `.github/workflows/publish.yml` now sets `package-manager-cache: false`, with a job comment saying why, so a future `packageManager` or `devEngines.packageManager` field in `package.json` cannot make the job holding `id-token: write` restore the cache `verify` populated. The `verify` job is unchanged and keeps `cache: 'npm'`. The old assertion, the absence of the word `cache`, is replaced: a new `step()` helper in `tests/installer/workflow.test.js` and the `[BUG-083]` row pin exactly one `package-manager-cache:` line in the job, under the `with:` of the `setup-node` step with the literal value `false`, and no `cache:` or `cache-dependency-path:` input. Landed from PR #255 (yeisonrestrepo), intake of issue #235; the id was reserved by the triage and is owner-minted at landing. Spec: `docs/superpowers/specs/2026-11-19-bug083-publish-job-relies-on-omitted-cache-key-design.md` (approved 2026-11-19 by the owner). Plan: `docs/superpowers/plans/2026-11-19-bug083-publish-job-relies-on-omitted-cache-key.md`.
 
 - Symptom: the `publish` job in .github/workflows/publish.yml (line
   60, per the issue) avoids restoring an npm cache only by omitting
