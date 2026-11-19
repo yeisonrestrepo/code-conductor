@@ -494,6 +494,10 @@ describe('write surface [FEAT-011 AC4]', () => {
       'package.json', 'package-lock.json', 'npm-shrinkwrap.json', '.npmrc',
     ]);
   });
+
+  it('[BUG-082] CONTROL_PLANE_NAMES declares exactly the file names that reach the control plane at any depth', () => {
+    expect(orchestrateModule.CONTROL_PLANE_NAMES).toEqual(['claude.md', 'claude.local.md', 'package.json', 'package-lock.json', 'npm-shrinkwrap.json', '.npmrc']);
+  });
 });
 
 describe('test command [FEAT-012 AC8, AC9]', () => {
@@ -3627,7 +3631,6 @@ describe('unattended mode [FEAT-054]', () => {
     '.claude',
     'project-template',
     'scripts/snap-build.mjs',
-    'docs/CLAUDE.md',
     'tests/scripts/orchestrate.test.js',
   ])('U43 [BUG-080 AC3] delegate plan over an APPROVE report approves a task that declares the near miss %s', (path) => {
     atPlan();
@@ -3738,17 +3741,13 @@ describe('unattended mode [FEAT-054]', () => {
     '.github/wiki/Home.md',
     '.github/workflowsx/a.yml',
     'docs/.git/hooks/x',
-    'tools/package.json', // [BUG-082]: nested manifests belong to the any-depth rule
     'mcp.json',
     'docs/.mcp.json',
     '.huskyx/pre-commit',
     'docs/.husky/pre-commit',
-    'docs/.npmrc',
     '.npmrc.example',
-    'tools/package-lock.json',
     'docs/opencode.json',
     '.claude/flow-status.md',
-    'src/package.json', // [BUG-082]: nested manifests belong to the any-depth rule
   ])('U48 [BUG-081 AC4] delegate plan over an APPROVE report approves a task that declares the near miss %s', (path) => {
     atPlan();
     plan(`# Demo Plan\n\n${task(1, ['src/a.js'])}\n${task(2, [path])}\n## Test List\n`);
@@ -3795,6 +3794,75 @@ describe('unattended mode [FEAT-054]', () => {
     plan(`# Demo Plan\n\n${task(1, ['src/a.js'])}\n${task(2, [path])}\n## Test List\n`);
     expect(delegateDoc('plan')).toEqual({ status: 0, out: `plan approved by delegated review: define_approved, 2 task(s); sha256 ${sha(PLAN)}`, err: '' });
     expect(runFile().approvals.plan.by).toBe('define-review');
+  });
+
+  // BUG-082: a CLAUDE.md or npm manifest at any depth reaches the control plane, also through a glob that can name it.
+  it.each([
+    'docs/CLAUDE.md',
+    'src/CLAUDE.md',
+    'src/CLAUDE.local.md',
+    'packages/a/b/CLAUDE.md',
+    'src/.claude/CLAUDE.md',
+    'project-template/docs/CLAUDE.md',
+    './src/CLAUDE.md',
+    'Src/Claude.MD',
+    'src/**/CLAUDE.md',
+    'src/*/CLAUDE.md',
+    'src/*.md',
+    'src/*',
+    'src/**',
+    'src/CLAUDE*',
+    'src/**.md',
+    'src/a**',
+    'src/c*.local.md',
+    'tools/package.json',
+    'src/package.json',
+    'tools/package-lock.json',
+    'docs/.npmrc',
+    'packages/a/package.json',
+    'packages/a/b/package-lock.json',
+    'tools/npm-shrinkwrap.json',
+    'tools/.npmrc',
+    'packages/*/package.json',
+    'packages/**',
+    'packages/*/*.json',
+    'tools/.npm*',
+    'Packages/A/Package.JSON',
+    'Tools/.NPMRC',
+    './packages/a/package.json',
+  ])('U52 [BUG-082 AC1 AC2 AC3b] delegate plan over an APPROVE report escalates the nested instruction file or manifest %s with the control-plane reason', (path) => {
+    expectEscalation(path, 'control-plane files');
+  });
+
+  it.each([
+    'src/CLAUDE.md.bak',
+    'src/CLAUDE.mdx',
+    'src/xCLAUDE.md',
+    'src/CLAUDE.md/x.js',
+    'src/notes.md',
+    'src/**.js',
+    'src/**/x.js',
+    'docs/CLAUDE.local.md.example',
+    'src/claude-md',
+    'src/package.json.bak',
+    'src/package.jsonc',
+    'src/xpackage.json',
+    'docs/npmrc',
+    'src/package-lock.json.orig',
+    'src/package.json/x.js',
+  ])('U53 [BUG-082 AC3 AC3b] delegate plan over an APPROVE report approves the nested near miss %s', (path) => {
+    atPlan();
+    plan(`# Demo Plan\n\n${task(1, ['src/a.js'])}\n${task(2, [path])}\n## Test List\n`);
+    expect(delegateDoc('plan')).toEqual({ status: 0, out: `plan approved by delegated review: define_approved, 2 task(s); sha256 ${sha(PLAN)}`, err: '' });
+    expect(runFile().approvals.plan.by).toBe('define-review');
+  });
+
+  it.each([
+    '**/CLAUDE.md',
+    'src/CLAUDE.md.',
+    'src/CLAUDE​.md',
+  ])('U54 [BUG-082 AC4] the nested instruction-file form %j keeps the write-surface reason', (path) => {
+    expectEscalation(path, 'orchestrator write surface');
   });
 
   it.each([
