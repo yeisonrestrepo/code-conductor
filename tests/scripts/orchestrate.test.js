@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -475,7 +475,7 @@ describe('write surface [FEAT-011 AC4]', () => {
     ]);
   });
 
-  it('[BUG-080][BUG-081] CONTROL_PLANE declares exactly the control-plane entries the specs list', () => {
+  it('[BUG-080][BUG-081][BUG-085] CONTROL_PLANE declares exactly the control-plane entries the specs list', () => {
     expect(orchestrateModule.CONTROL_PLANE).toEqual([
       '.claude/hooks/**', 'project-template/.claude/hooks/**',
       '.opencode/plugin/**', 'project-template/.opencode/plugin/**',
@@ -492,11 +492,53 @@ describe('write surface [FEAT-011 AC4]', () => {
       '.claude/flow-status.mjs', 'project-template/.claude/flow-status.mjs',
       '.github/workflows/**', '.github/actions/**',
       'package.json', 'package-lock.json', 'npm-shrinkwrap.json', '.npmrc',
+      '.pre-commit-config.yaml',
+      'lefthook.yml', 'lefthook.yaml', 'lefthook.json', 'lefthook.toml', '.lefthook.yml', '.lefthook.yaml', '.lefthook.json', '.lefthook.toml',
+      'lefthook-local.yml', 'lefthook-local.yaml', 'lefthook-local.json', 'lefthook-local.toml',
+      '.lefthook-local.yml', '.lefthook-local.yaml', '.lefthook-local.json', '.lefthook-local.toml',
+      '.lefthook/**', '.lefthook-local/**', '.overcommit.yml',
+      '.simple-git-hooks.json', '.simple-git-hooks.js', '.simple-git-hooks.cjs', '.simple-git-hooks.mjs',
+      'simple-git-hooks.json', 'simple-git-hooks.js', 'simple-git-hooks.cjs', 'simple-git-hooks.mjs',
+      '.huskyrc', '.huskyrc.json', '.huskyrc.yaml', '.huskyrc.yml', '.huskyrc.js', '.huskyrc.cjs', 'husky.config.js', 'husky.config.cjs',
+      '.lintstagedrc', '.lintstagedrc.json', '.lintstagedrc.yaml', '.lintstagedrc.yml', '.lintstagedrc.js', '.lintstagedrc.cjs', '.lintstagedrc.mjs',
+      'lint-staged.config.js', 'lint-staged.config.cjs', 'lint-staged.config.mjs',
+      '.vscode/**', '.idea/**', '.zed/**', '.devcontainer/**', '.devcontainer.json', '.gitpod.yml',
+      '.yarnrc', '.yarnrc.yml', 'yarn.lock', '.yarn/**', '.pnp.cjs', '.pnp.loader.mjs',
+      'pnpm-workspace.yaml', 'pnpm-lock.yaml', '.pnpmfile.cjs',
+      'bunfig.toml', 'bun.lock', 'bun.lockb',
+      'deno.json', 'deno.jsonc', 'deno.lock',
+      'pyproject.toml', 'setup.py', 'setup.cfg', 'requirements.txt', 'pipfile', 'pipfile.lock',
+      'poetry.lock', 'poetry.toml', 'uv.lock', 'uv.toml', 'pdm.lock',
+      'gemfile', 'gemfile.lock', 'gems.rb', 'gems.locked', '.bundle/**',
+      'composer.json', 'composer.lock',
+      'cargo.toml', 'cargo.lock', '.cargo/**', 'rust-toolchain', 'rust-toolchain.toml', 'build.rs',
+      'go.mod', 'go.work',
+      '.mvn/**', 'mvnw', 'mvnw.cmd', 'pom.xml', 'gradle/**', 'gradlew', 'gradlew.bat', 'gradle.properties',
+      'build.gradle', 'build.gradle.kts', 'settings.gradle', 'settings.gradle.kts',
+      'nuget.config', 'packages.lock.json', 'global.json', 'directory.build.props', 'directory.build.targets', 'directory.packages.props',
+      '.gitlab-ci.yml', '.circleci/**', 'azure-pipelines.yml', 'azure-pipelines.yaml', '.travis.yml', 'jenkinsfile',
+      'bitbucket-pipelines.yml', '.buildkite/**', '.drone.yml', '.woodpecker.yml', '.woodpecker.yaml', '.woodpecker/**',
+      'appveyor.yml', '.appveyor.yml', '.gitea/workflows/**', '.forgejo/workflows/**', '.cirrus.yml', '.cirrus.star', '.semaphore/**',
     ]);
   });
 
-  it('[BUG-082] CONTROL_PLANE_NAMES declares exactly the file names that reach the control plane at any depth', () => {
-    expect(orchestrateModule.CONTROL_PLANE_NAMES).toEqual(['claude.md', 'claude.local.md', 'package.json', 'package-lock.json', 'npm-shrinkwrap.json', '.npmrc']);
+  it('[BUG-082][BUG-085] CONTROL_PLANE_NAMES declares exactly the file names that reach the control plane at any depth', () => {
+    expect(orchestrateModule.CONTROL_PLANE_NAMES).toEqual([
+        'claude.md', 'claude.local.md', 'package.json', 'package-lock.json', 'npm-shrinkwrap.json', '.npmrc',
+        '.yarnrc', '.yarnrc.yml', 'yarn.lock', '.pnp.cjs', '.pnp.loader.mjs',
+        'pnpm-workspace.yaml', 'pnpm-lock.yaml', '.pnpmfile.cjs',
+        'bunfig.toml', 'bun.lock', 'bun.lockb',
+        'deno.json', 'deno.jsonc', 'deno.lock',
+        'pyproject.toml', 'setup.py', 'setup.cfg', 'requirements.txt', 'pipfile', 'pipfile.lock',
+        'poetry.lock', 'poetry.toml', 'uv.lock', 'uv.toml', 'pdm.lock',
+        'gemfile', 'gemfile.lock', 'gems.rb', 'gems.locked',
+        'composer.json', 'composer.lock',
+        'cargo.toml', 'cargo.lock', 'rust-toolchain', 'rust-toolchain.toml', 'build.rs',
+        'go.mod', 'go.work',
+        'mvnw', 'mvnw.cmd', 'pom.xml', 'gradlew', 'gradlew.bat', 'gradle.properties',
+        'build.gradle', 'build.gradle.kts', 'settings.gradle', 'settings.gradle.kts',
+        'nuget.config', 'packages.lock.json', 'global.json', 'directory.build.props', 'directory.build.targets', 'directory.packages.props',
+    ]);
   });
 });
 
@@ -3561,8 +3603,23 @@ describe('unattended mode [FEAT-054]', () => {
 
   // BUG-080: the U22 assertions, with the list the reason names as a parameter; Task 1 is an ordinary source file.
   // The reason names the path without a leading ./ (the task parser strips it), so the ./ rows of U47 still pass the spelling they declare.
-  function expectEscalation(path, list) {
+  // atPlan replays a dozen orchestrate processes, and the BUG-085 rows run it ~200 times; every row after the first
+  // restores that result from a copy instead, which keeps the slow Windows leg inside the job timeout.
+  let planState;
+  afterAll(() => { if (planState) rmSync(planState, { recursive: true, force: true }); });
+  function atPlanShared() {
+    if (planState) {
+      rmSync(root, { recursive: true, force: true });
+      cpSync(planState, root, { recursive: true });
+      return;
+    }
     atPlan();
+    planState = mkdtempSync(join(tmpdir(), 'cc-orch-plan-'));
+    cpSync(root, planState, { recursive: true });
+  }
+
+  function expectEscalation(path, list) {
+    atPlanShared();
     plan(`# Demo Plan\n\n${task(1, ['src/a.js'])}\n${task(2, [path])}\n## Test List\n`);
     const reason = `task Task 2 declares ${path.replace(/^\.\//, '')} inside the ${list}`;
     expect(delegateDoc('plan')).toEqual({ status: 0, out: `owner approval required: delegated review plan returned ESCALATE (${reason}); see .conductor/delegate/plan.md`, err: '' });
@@ -3862,6 +3919,278 @@ describe('unattended mode [FEAT-054]', () => {
     'src/CLAUDE.md.',
     'src/CLAUDE​.md',
   ])('U54 [BUG-082 AC4] the nested instruction-file form %j keeps the write-surface reason', (path) => {
+    expectEscalation(path, 'orchestrator write surface');
+  });
+
+  // BUG-085: config-read hook runners, editor and container auto-run files, other package managers, build systems and CI systems reach the control plane.
+  it.each([
+    '.pre-commit-config.yaml',
+    'lefthook.yml',
+    'lefthook.yaml',
+    'lefthook.json',
+    'lefthook.toml',
+    '.lefthook.yml',
+    '.lefthook.yaml',
+    '.lefthook.json',
+    '.lefthook.toml',
+    'lefthook-local.yml',
+    'lefthook-local.yaml',
+    'lefthook-local.json',
+    'lefthook-local.toml',
+    '.lefthook-local.yml',
+    '.lefthook-local.yaml',
+    '.lefthook-local.json',
+    '.lefthook-local.toml',
+    '.lefthook/x',
+    '.lefthook-local/x',
+    '.overcommit.yml',
+    '.simple-git-hooks.json',
+    '.simple-git-hooks.js',
+    '.simple-git-hooks.cjs',
+    '.simple-git-hooks.mjs',
+    'simple-git-hooks.json',
+    'simple-git-hooks.js',
+    'simple-git-hooks.cjs',
+    'simple-git-hooks.mjs',
+    '.huskyrc',
+    '.huskyrc.json',
+    '.huskyrc.yaml',
+    '.huskyrc.yml',
+    '.huskyrc.js',
+    '.huskyrc.cjs',
+    'husky.config.js',
+    'husky.config.cjs',
+    '.lintstagedrc',
+    '.lintstagedrc.json',
+    '.lintstagedrc.yaml',
+    '.lintstagedrc.yml',
+    '.lintstagedrc.js',
+    '.lintstagedrc.cjs',
+    '.lintstagedrc.mjs',
+    'lint-staged.config.js',
+    'lint-staged.config.cjs',
+    'lint-staged.config.mjs',
+    '.vscode/x',
+    '.idea/x',
+    '.zed/x',
+    '.devcontainer/x',
+    '.devcontainer.json',
+    '.gitpod.yml',
+    '.yarnrc',
+    '.yarnrc.yml',
+    'yarn.lock',
+    '.yarn/x',
+    '.pnp.cjs',
+    '.pnp.loader.mjs',
+    'pnpm-workspace.yaml',
+    'pnpm-lock.yaml',
+    '.pnpmfile.cjs',
+    'bunfig.toml',
+    'bun.lock',
+    'bun.lockb',
+    'deno.json',
+    'deno.jsonc',
+    'deno.lock',
+    'pyproject.toml',
+    'setup.py',
+    'setup.cfg',
+    'requirements.txt',
+    'pipfile',
+    'pipfile.lock',
+    'poetry.lock',
+    'poetry.toml',
+    'uv.lock',
+    'uv.toml',
+    'pdm.lock',
+    'gemfile',
+    'gemfile.lock',
+    'gems.rb',
+    'gems.locked',
+    '.bundle/x',
+    'composer.json',
+    'composer.lock',
+    'cargo.toml',
+    'cargo.lock',
+    '.cargo/x',
+    'rust-toolchain',
+    'rust-toolchain.toml',
+    'build.rs',
+    'go.mod',
+    'go.work',
+    '.mvn/x',
+    'mvnw',
+    'mvnw.cmd',
+    'pom.xml',
+    'gradle/x',
+    'gradlew',
+    'gradlew.bat',
+    'gradle.properties',
+    'build.gradle',
+    'build.gradle.kts',
+    'settings.gradle',
+    'settings.gradle.kts',
+    'nuget.config',
+    'packages.lock.json',
+    'global.json',
+    'directory.build.props',
+    'directory.build.targets',
+    'directory.packages.props',
+    '.gitlab-ci.yml',
+    '.circleci/x',
+    'azure-pipelines.yml',
+    'azure-pipelines.yaml',
+    '.travis.yml',
+    'jenkinsfile',
+    'bitbucket-pipelines.yml',
+    '.buildkite/x',
+    '.drone.yml',
+    '.woodpecker.yml',
+    '.woodpecker.yaml',
+    '.woodpecker/x',
+    'appveyor.yml',
+    '.appveyor.yml',
+    '.gitea/workflows/x',
+    '.forgejo/workflows/x',
+    '.cirrus.yml',
+    '.cirrus.star',
+    '.semaphore/x',
+  ])('U55 [BUG-085 AC3] delegate plan over an APPROVE report escalates a task that declares the outside-the-run file %s', (path) => {
+    expectEscalation(path, 'control-plane files');
+  });
+
+  it.each([
+    '.vscode',
+    '.vscode/tasks.json',
+    '.vscode/settings.json',
+    '.vscode/tasks.*',
+    '.VSCode/Tasks.json',
+    '.idea/workspace.xml',
+    '.zed/tasks.json',
+    '.devcontainer',
+    '.devcontainer/devcontainer.json',
+    '.devcontainer/*.yml',
+    './.devcontainer/devcontainer.json',
+    '.lefthook/pre-commit/a.sh',
+    '.Pre-Commit-Config.YAML',
+    './.huskyrc',
+    '.LintStagedRC',
+    'Lint-Staged.Config.mjs',
+    '*.yaml',
+    '*.yml',
+    '*.lock',
+    '*.toml',
+    '*.py',
+    '*.cjs',
+    'setup.*',
+    'go.*',
+    'jenkins*',
+    'JENKINSFILE',
+    'Jenkinsfile',
+    'Cargo.TOML',
+    'Gemfile',
+    'Pipfile',
+    'Build.RS',
+    'POM.xml',
+    'Directory.Build.props',
+    'NuGet.Config',
+    '.GitLab-CI.yml',
+    './.gitlab-ci.yml',
+    './yarn.lock',
+    '.yarn',
+    '.yarn/releases/yarn-4.cjs',
+    '.mvn',
+    '.mvn/wrapper/maven-wrapper.properties',
+    'gradle',
+    'gradle/wrapper/gradle-wrapper.properties',
+    '.circleci',
+    '.circleci/config.yml',
+    '.circle*/config.yml',
+    '.gitea/workflows',
+    '.gitea/workflows/ci.yml',
+    '.gitea/*/ci.yml',
+    '.forgejo/workflows/ci.yml',
+    '.cargo/config.toml',
+    '.bundle/config',
+    'src/setup.py',
+    'src/go.mod',
+    'tools/yarn.lock',
+    'tools/cargo.toml',
+    'packages/a/pyproject.toml',
+    'crates/a/build.rs',
+    'app/pom.xml',
+    'modules/a/build.gradle.kts',
+    'src/a/packages.lock.json',
+    'src/**/*.py',
+    'lib/**/*.rb',
+    'src/**/*.rs',
+    'src/Cargo.toml',
+    'Packages/A/PyProject.TOML',
+    './src/setup.py',
+    'src/**/pom.xml',
+    'src/*/build.rs',
+  ])('U56 [BUG-085 AC4] delegate plan escalates the directory, glob, case, ./ or nested form %s with the control-plane reason', (path) => {
+    expectEscalation(path, 'control-plane files');
+  });
+
+  it.each([
+    'docs/.vscode/settings.json',
+    'src/.vscode/tasks.json',
+    '.vscodex/a.json',
+    'vscode/settings.json',
+    '.devcontainerx/devcontainer.json',
+    'devcontainer.json',
+    '.idea.md',
+    '.gitlab/issue_templates/bug.md',
+    'gitlab-ci.yml',
+    '.gitlab-ci.yml.example',
+    'docs/.gitlab-ci.yml',
+    '.travis.yml.bak',
+    'docs/jenkinsfile',
+    '.pre-commit-hooks.yaml',
+    'docs/.pre-commit-config.yaml',
+    'lefthook.yml.example',
+    'docs/.huskyrc',
+    'docs/.lintstagedrc',
+    '.commitlintrc.json',
+    'commitlint.config.js',
+    '.eslintrc.json',
+    'eslint.config.js',
+    '.prettierrc',
+    '.circlecix/config.yml',
+    '.gitea',
+    '.gitea/issue_template/bug.md',
+    '.forgejo',
+    '.yarnrc.yml.bak',
+    'cargo.toml.orig',
+    'go.sum',
+    'docs/setup.py.md',
+    'src/cargo.toml.orig',
+    'src/go.sum',
+    'docs/requirements-dev.txt',
+    'src/pom.xml.bak',
+    'src/xbuild.rs',
+    '.mvnx/x',
+    'gradlex/x',
+    'src/**/x.py',
+    'makefile',
+    'justfile',
+    'taskfile.yml',
+  ])('U57 [BUG-085 AC5] delegate plan over an APPROVE report approves a task that declares the near miss %s', (path) => {
+    atPlanShared();
+    plan(`# Demo Plan\n\n${task(1, ['src/a.js'])}\n${task(2, [path])}\n## Test List\n`);
+    expect(delegateDoc('plan')).toEqual({ status: 0, out: `plan approved by delegated review: define_approved, 2 task(s); sha256 ${sha(PLAN)}`, err: '' });
+    expect(runFile().approvals.plan.by).toBe('define-review');
+  });
+
+  it.each([
+    '*/tasks.json',
+    '.*/config.yml',
+    '**/yarn.lock',
+    '*/workflows/ci.yml',
+    '**/go.mod',
+    '**/build.rs',
+    '**/pom.xml',
+  ])('U58 [BUG-085 AC6] a glob that reaches both lists, %s, keeps the write-surface reason', (path) => {
     expectEscalation(path, 'orchestrator write surface');
   });
 

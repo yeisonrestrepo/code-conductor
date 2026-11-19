@@ -24,6 +24,7 @@ export const WRITE_SURFACE = [RUN_FILE, ENVELOPE_FILE, '.claude/memory/session-s
 // as WRITE_SURFACE; a trailing `/**` protects the whole directory, so a file added to it is covered too.
 // Owner decision (BUG-081): also the files that run code outside the run, after it ends.
 // Owner decision (BUG-082): a CLAUDE.md or an npm manifest also reaches it at any depth, by its last segment (CONTROL_PLANE_NAMES).
+// Owner decision (BUG-085): also the config-read hook runners, editor and container auto-run files, other package managers, build systems and CI systems.
 export const CONTROL_PLANE = [
   '.claude/hooks/**', 'project-template/.claude/hooks/**',
   '.opencode/plugin/**', 'project-template/.opencode/plugin/**',
@@ -42,8 +43,55 @@ export const CONTROL_PLANE = [
   '.claude/flow-status.mjs', 'project-template/.claude/flow-status.mjs',
   '.github/workflows/**', '.github/actions/**',
   'package.json', 'package-lock.json', 'npm-shrinkwrap.json', '.npmrc',
+  // BUG-085: config-read git hook runners.
+  '.pre-commit-config.yaml',
+  'lefthook.yml', 'lefthook.yaml', 'lefthook.json', 'lefthook.toml', '.lefthook.yml', '.lefthook.yaml', '.lefthook.json', '.lefthook.toml',
+  'lefthook-local.yml', 'lefthook-local.yaml', 'lefthook-local.json', 'lefthook-local.toml',
+  '.lefthook-local.yml', '.lefthook-local.yaml', '.lefthook-local.json', '.lefthook-local.toml',
+  '.lefthook/**', '.lefthook-local/**', '.overcommit.yml',
+  '.simple-git-hooks.json', '.simple-git-hooks.js', '.simple-git-hooks.cjs', '.simple-git-hooks.mjs',
+  'simple-git-hooks.json', 'simple-git-hooks.js', 'simple-git-hooks.cjs', 'simple-git-hooks.mjs',
+  '.huskyrc', '.huskyrc.json', '.huskyrc.yaml', '.huskyrc.yml', '.huskyrc.js', '.huskyrc.cjs', 'husky.config.js', 'husky.config.cjs',
+  '.lintstagedrc', '.lintstagedrc.json', '.lintstagedrc.yaml', '.lintstagedrc.yml', '.lintstagedrc.js', '.lintstagedrc.cjs', '.lintstagedrc.mjs',
+  'lint-staged.config.js', 'lint-staged.config.cjs', 'lint-staged.config.mjs',
+  // BUG-085: editor and container auto-run configuration.
+  '.vscode/**', '.idea/**', '.zed/**', '.devcontainer/**', '.devcontainer.json', '.gitpod.yml',
+  // BUG-085: other package managers' and build systems' manifests, lockfiles, config and build files.
+  '.yarnrc', '.yarnrc.yml', 'yarn.lock', '.yarn/**', '.pnp.cjs', '.pnp.loader.mjs',
+  'pnpm-workspace.yaml', 'pnpm-lock.yaml', '.pnpmfile.cjs',
+  'bunfig.toml', 'bun.lock', 'bun.lockb',
+  'deno.json', 'deno.jsonc', 'deno.lock',
+  'pyproject.toml', 'setup.py', 'setup.cfg', 'requirements.txt', 'pipfile', 'pipfile.lock',
+  'poetry.lock', 'poetry.toml', 'uv.lock', 'uv.toml', 'pdm.lock',
+  'gemfile', 'gemfile.lock', 'gems.rb', 'gems.locked', '.bundle/**',
+  'composer.json', 'composer.lock',
+  'cargo.toml', 'cargo.lock', '.cargo/**', 'rust-toolchain', 'rust-toolchain.toml', 'build.rs',
+  'go.mod', 'go.work',
+  '.mvn/**', 'mvnw', 'mvnw.cmd', 'pom.xml', 'gradle/**', 'gradlew', 'gradlew.bat', 'gradle.properties',
+  'build.gradle', 'build.gradle.kts', 'settings.gradle', 'settings.gradle.kts',
+  'nuget.config', 'packages.lock.json', 'global.json', 'directory.build.props', 'directory.build.targets', 'directory.packages.props',
+  // BUG-085: other CI systems' pipeline files.
+  '.gitlab-ci.yml', '.circleci/**', 'azure-pipelines.yml', 'azure-pipelines.yaml', '.travis.yml', 'jenkinsfile',
+  'bitbucket-pipelines.yml', '.buildkite/**', '.drone.yml', '.woodpecker.yml', '.woodpecker.yaml', '.woodpecker/**',
+  'appveyor.yml', '.appveyor.yml', '.gitea/workflows/**', '.forgejo/workflows/**', '.cirrus.yml', '.cirrus.star', '.semaphore/**',
 ];
-export const CONTROL_PLANE_NAMES = ['claude.md', 'claude.local.md', 'package.json', 'package-lock.json', 'npm-shrinkwrap.json', '.npmrc'];
+// Owner decision (BUG-085): the other package managers' and build systems' fixed files also reach it at any depth, like npm's.
+export const CONTROL_PLANE_NAMES = [
+  'claude.md', 'claude.local.md', 'package.json', 'package-lock.json', 'npm-shrinkwrap.json', '.npmrc',
+  '.yarnrc', '.yarnrc.yml', 'yarn.lock', '.pnp.cjs', '.pnp.loader.mjs',
+  'pnpm-workspace.yaml', 'pnpm-lock.yaml', '.pnpmfile.cjs',
+  'bunfig.toml', 'bun.lock', 'bun.lockb',
+  'deno.json', 'deno.jsonc', 'deno.lock',
+  'pyproject.toml', 'setup.py', 'setup.cfg', 'requirements.txt', 'pipfile', 'pipfile.lock',
+  'poetry.lock', 'poetry.toml', 'uv.lock', 'uv.toml', 'pdm.lock',
+  'gemfile', 'gemfile.lock', 'gems.rb', 'gems.locked',
+  'composer.json', 'composer.lock',
+  'cargo.toml', 'cargo.lock', 'rust-toolchain', 'rust-toolchain.toml', 'build.rs',
+  'go.mod', 'go.work',
+  'mvnw', 'mvnw.cmd', 'pom.xml', 'gradlew', 'gradlew.bat', 'gradle.properties',
+  'build.gradle', 'build.gradle.kts', 'settings.gradle', 'settings.gradle.kts',
+  'nuget.config', 'packages.lock.json', 'global.json', 'directory.build.props', 'directory.build.targets', 'directory.packages.props',
+];
 // Where /cc-orchestrate writes each agent's final message for `handback` to read: inside
 // the surface, and cleared with the run so file names never collide across runs.
 export const HANDBACK_DIR = '.conductor/handback';
