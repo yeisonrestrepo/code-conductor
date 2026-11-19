@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -3603,8 +3603,23 @@ describe('unattended mode [FEAT-054]', () => {
 
   // BUG-080: the U22 assertions, with the list the reason names as a parameter; Task 1 is an ordinary source file.
   // The reason names the path without a leading ./ (the task parser strips it), so the ./ rows of U47 still pass the spelling they declare.
-  function expectEscalation(path, list) {
+  // atPlan replays a dozen orchestrate processes, and the BUG-085 rows run it ~200 times; every row after the first
+  // restores that result from a copy instead, which keeps the slow Windows leg inside the job timeout.
+  let planState;
+  afterAll(() => { if (planState) rmSync(planState, { recursive: true, force: true }); });
+  function atPlanShared() {
+    if (planState) {
+      rmSync(root, { recursive: true, force: true });
+      cpSync(planState, root, { recursive: true });
+      return;
+    }
     atPlan();
+    planState = mkdtempSync(join(tmpdir(), 'cc-orch-plan-'));
+    cpSync(root, planState, { recursive: true });
+  }
+
+  function expectEscalation(path, list) {
+    atPlanShared();
     plan(`# Demo Plan\n\n${task(1, ['src/a.js'])}\n${task(2, [path])}\n## Test List\n`);
     const reason = `task Task 2 declares ${path.replace(/^\.\//, '')} inside the ${list}`;
     expect(delegateDoc('plan')).toEqual({ status: 0, out: `owner approval required: delegated review plan returned ESCALATE (${reason}); see .conductor/delegate/plan.md`, err: '' });
@@ -4161,7 +4176,7 @@ describe('unattended mode [FEAT-054]', () => {
     'justfile',
     'taskfile.yml',
   ])('U57 [BUG-085 AC5] delegate plan over an APPROVE report approves a task that declares the near miss %s', (path) => {
-    atPlan();
+    atPlanShared();
     plan(`# Demo Plan\n\n${task(1, ['src/a.js'])}\n${task(2, [path])}\n## Test List\n`);
     expect(delegateDoc('plan')).toEqual({ status: 0, out: `plan approved by delegated review: define_approved, 2 task(s); sha256 ${sha(PLAN)}`, err: '' });
     expect(runFile().approvals.plan.by).toBe('define-review');
