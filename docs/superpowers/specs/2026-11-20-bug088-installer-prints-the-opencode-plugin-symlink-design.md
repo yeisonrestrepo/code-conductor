@@ -1,6 +1,6 @@
 # BUG-088: Installer prints the OpenCode plugin symlink target to stderr without escaping control characters
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-20 by independent review (round 1)
 **Item:** BUG-088 (intake of issue #265; follow-up of BUG-087)
 **Date:** 2026-11-20
 
