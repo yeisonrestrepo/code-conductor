@@ -76,9 +76,9 @@
 **Files:**
 - Modify: `tests/installer/deploy.test.js`
 
-- [ ] [T-101] `tests/installer/deploy.test.js`, FEAT-048 block: add `POSIX_SYMLINK` and `replacedLine` next to `OUTSIDE_TEXT` (plan decision 3). Depends on T-004.
-- [ ] [T-102] `tests/installer/deploy.test.js`, FEAT-048 block: insert E1 and E2 after the `[BUG-087] leaves the symlink and its target alone…` case and before `ships the real plugin in the template` (plan decision 3). Depends on T-101.
-- [ ] [T-103] Red run: `npx vitest run tests/installer/deploy.test.js -t 'OpenCode plugin'`. Its full match set is the 10 existing FEAT-048 rows plus E1 and E2, because every row in the block carries the describe name; the other 64 rows of the file are skipped by the filter. Predicted: **2 failed | 10 passed | 64 skipped (76)**. Red: E1, E2. Green: `writes no .opencode/…`, `installs the plugin byte for byte…`, `keeps the host project's own .opencode/ files`, the 3 `[BUG-069]` rows, the 3 `[BUG-087]` rows and `ships the real plugin in the template` (plan decision 5). On a root runner the `[BUG-069]` backup-failure row and the `[BUG-087]` cannot-remove row are skipped: **2 failed | 8 passed | 66 skipped**. Any other split means a test is wrong: fix the test, not the prediction. Depends on T-102.
+- [X] [T-101] `tests/installer/deploy.test.js`, FEAT-048 block: add `POSIX_SYMLINK` and `replacedLine` next to `OUTSIDE_TEXT` (plan decision 3). Depends on T-004.
+- [X] [T-102] `tests/installer/deploy.test.js`, FEAT-048 block: insert E1 and E2 after the `[BUG-087] leaves the symlink and its target alone…` case and before `ships the real plugin in the template` (plan decision 3). Depends on T-101.
+- [X] [T-103] Red run: `npx vitest run tests/installer/deploy.test.js -t 'OpenCode plugin'`. Its full match set is the 10 existing FEAT-048 rows plus E1 and E2, because every row in the block carries the describe name; the other 64 rows of the file are skipped by the filter. Predicted: **2 failed | 10 passed | 64 skipped (76)**. Red: E1, E2. Green: `writes no .opencode/…`, `installs the plugin byte for byte…`, `keeps the host project's own .opencode/ files`, the 3 `[BUG-069]` rows, the 3 `[BUG-087]` rows and `ships the real plugin in the template` (plan decision 5). On a root runner the `[BUG-069]` backup-failure row and the `[BUG-087]` cannot-remove row are skipped: **2 failed | 8 passed | 66 skipped**. Any other split means a test is wrong: fix the test, not the prediction. Depends on T-102.
 
 ---
 
@@ -88,11 +88,11 @@
 - Modify: `lib/installer/deploy.mjs`
 - Modify: `tools/skip-baseline.json`
 
-- [ ] [T-201] `lib/installer/deploy.mjs`: add `escapeControlChars` between `replaceWithTemplate` and the BUG-087 comment of `removePluginSymlink` (plan decision 1). Depends on T-103.
-- [ ] [T-202] `lib/installer/deploy.mjs:260`: interpolate `escapeControlChars(linkText)` in place of `linkText` (plan decision 2). Depends on T-201.
-- [ ] [T-203] `tools/skip-baseline.json`, `ci-windows-node24`: insert E2's then E1's full name after the `[BUG-087] leaves the symlink and its target alone…` line (plan decision 4). Depends on T-202.
-- [ ] [T-204] Green run: the T-103 command. Predicted: **12 passed | 64 skipped (76)** (root runner: **10 passed | 66 skipped**). Depends on T-203.
-- [ ] [T-205] Run: `npx vitest run tests/installer/deploy.test.js tests/installer/file-merge.test.js tests/installer/cli.test.js tests/tools/skip-baseline.test.js`. Predicted: every test passes, 92 of them in the first two files (90 baseline + 2 new). This covers the BUG-087 rows unchanged (AC4), the FEAT-048 CLI cases, and the baseline file still parsing. Depends on T-204.
+- [X] [T-201] `lib/installer/deploy.mjs`: add `escapeControlChars` between `replaceWithTemplate` and the BUG-087 comment of `removePluginSymlink` (plan decision 1). Depends on T-103.
+- [X] [T-202] `lib/installer/deploy.mjs:260`: interpolate `escapeControlChars(linkText)` in place of `linkText` (plan decision 2). Depends on T-201.
+- [X] [T-203] `tools/skip-baseline.json`, `ci-windows-node24`: insert E2's then E1's full name after the `[BUG-087] leaves the symlink and its target alone…` line (plan decision 4). Depends on T-202.
+- [X] [T-204] Green run: the T-103 command. Predicted: **12 passed | 64 skipped (76)** (root runner: **10 passed | 66 skipped**). Depends on T-203.
+- [X] [T-205] Run: `npx vitest run tests/installer/deploy.test.js tests/installer/file-merge.test.js tests/installer/cli.test.js tests/tools/skip-baseline.test.js`. Predicted: every test passes, 92 of them in the first two files (90 baseline + 2 new). This covers the BUG-087 rows unchanged (AC4), the FEAT-048 CLI cases, and the baseline file still parsing. Depends on T-204.
 
 ---
 
@@ -101,11 +101,11 @@
 **Files:**
 - Modify: `docs/superpowers/plans/2026-11-20-bug088-installer-prints-the-opencode-plugin-symlink.md` (ticks)
 
-- [ ] [T-301] Run `npm test`. Predicted: exit 0 (spec, AC6). A red is called ENV only if the sandbox caused it (network, tmp permissions) and its file is not one this plan touches; report it with its name. Any other red is fixed. Depends on T-205.
-- [ ] [T-302] Scope check: `git status --short` lists exactly `lib/installer/deploy.mjs`, `tests/installer/deploy.test.js`, `tools/skip-baseline.json` and this plan; no temporary file is left in the tree. `grep -nP '[\x00-\x08\x0b-\x1f\x7f]' lib/installer/deploy.mjs tests/installer/deploy.test.js` prints nothing (no raw control byte was written into source). Depends on T-301.
-- [ ] [T-303] Stage: `git add -u lib/installer/deploy.mjs tests/installer/deploy.test.js tools/skip-baseline.json` (all tracked). Depends on T-302.
-- [ ] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-20-bug088-installer-prints-the-opencode-plugin-symlink.md` (carries the ticks for T-101 to T-303). Depends on T-303.
-- [ ] [T-305] Commit: `fix: escape control characters in the OpenCode plugin symlink warning [BUG-088]`. Depends on T-304.
+- [X] [T-301] Run `npm test`. Predicted: exit 0 (spec, AC6). A red is called ENV only if the sandbox caused it (network, tmp permissions) and its file is not one this plan touches; report it with its name. Any other red is fixed. Depends on T-205.
+- [X] [T-302] Scope check: `git status --short` lists exactly `lib/installer/deploy.mjs`, `tests/installer/deploy.test.js`, `tools/skip-baseline.json` and this plan; no temporary file is left in the tree. `grep -nP '[\x00-\x08\x0b-\x1f\x7f]' lib/installer/deploy.mjs tests/installer/deploy.test.js` prints nothing (no raw control byte was written into source). Depends on T-301.
+- [X] [T-303] Stage: `git add -u lib/installer/deploy.mjs tests/installer/deploy.test.js tools/skip-baseline.json` (all tracked). Depends on T-302.
+- [X] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-20-bug088-installer-prints-the-opencode-plugin-symlink.md` (carries the ticks for T-101 to T-303). Depends on T-303.
+- [X] [T-305] Commit: `fix: escape control characters in the OpenCode plugin symlink warning [BUG-088]`. Depends on T-304.
 
 ---
 

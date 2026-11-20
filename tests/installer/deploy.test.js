@@ -660,6 +660,9 @@ describe('deployProject: OpenCode plugin (FEAT-048)', () => {
   const SHIPPED = 'export const ConductorGuard = 1;\n';
   const INSTALLED = 'code-conductor: installed the OpenCode guard plugin at .opencode/plugin/conductor-guard.js';
   const OUTSIDE_TEXT = '// a file outside the project\n';
+  // Link targets with control bytes are a POSIX fact; win32 rejects them in paths (BUG-088).
+  const POSIX_SYMLINK = process.platform !== 'win32' && CAN_SYMLINK;
+  const replacedLine = (shown) => `code-conductor: replaced the symlink at .opencode/plugin/conductor-guard.js (it pointed to ${shown}) with the shipped plugin; the file it pointed to was not touched`;
   const backupsIn = (dir) => readdirSync(dir).filter((n) => n.startsWith('conductor-guard.js.installer-backup.'));
   beforeEach(() => {
     mkdirSync(join(asset, 'project-template', '.opencode', 'plugin'), { recursive: true });
@@ -775,6 +778,34 @@ describe('deployProject: OpenCode plugin (FEAT-048)', () => {
     } finally {
       rmSync(outside, { recursive: true, force: true });
     }
+  });
+  it.skipIf(!POSIX_SYMLINK)('[BUG-088] escapes control characters in the link text of the replaced-symlink warning', () => {
+    const target = 'evil\x1b[2K\rcode-conductor: all good\n.js';
+    mkdirSync(join(home, PLUGIN_DIR), { recursive: true });
+    symlinkSync(target, join(home, PLUGIN_REL));
+    expect(readlinkSync(join(home, PLUGIN_REL))).toBe(target);
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, opencode: true });
+    expect(out.warned).toHaveLength(1);
+    expect(out.warned[0]).not.toMatch(/[\x00-\x1f\x7f-\x9f]/);
+    expect(out.warned[0]).toContain('\\x1b');
+    expect(out.warned[0]).toContain('\\x0d');
+    expect(out.warned[0]).toContain('\\x0a');
+    expect(out.warned[0]).toBe(replacedLine('evil\\x1b[2K\\x0dcode-conductor: all good\\x0a.js'));
+    expect(lstatSync(join(home, PLUGIN_REL)).isSymbolicLink()).toBe(false);
+    expect(readFileSync(join(home, PLUGIN_REL), 'utf8')).toBe(SHIPPED);
+    expect(out.said).toEqual([INSTALLED]);
+  });
+  it.skipIf(!POSIX_SYMLINK)('[BUG-088] escapes C1 control characters and keeps printable non-ASCII in the replaced-symlink warning', () => {
+    const target = 'código\u009b2Kfin.js';
+    mkdirSync(join(home, PLUGIN_DIR), { recursive: true });
+    symlinkSync(target, join(home, PLUGIN_REL));
+    expect(readlinkSync(join(home, PLUGIN_REL))).toBe(target);
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, opencode: true });
+    expect(out.warned).toEqual([replacedLine('código\\x9b2Kfin.js')]);
+    expect(out.warned[0]).not.toMatch(/[\x00-\x1f\x7f-\x9f]/);
+    expect(out.said).toEqual([INSTALLED]);
   });
   it('ships the real plugin in the template', () => {
     expect(existsSync(join(ROOT, 'project-template', PLUGIN_REL))).toBe(true);
