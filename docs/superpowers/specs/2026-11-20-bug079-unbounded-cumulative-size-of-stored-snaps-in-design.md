@@ -1,6 +1,6 @@
 # BUG-079 — Unbounded cumulative size of stored SNAPs in the orchestrator run file
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-20 by independent review (round 1)
 
 **Item:** `[BUG-079]` (intake of issue #213). Pillar 5: infrastructure, ecosystem and quality assurance.
 
