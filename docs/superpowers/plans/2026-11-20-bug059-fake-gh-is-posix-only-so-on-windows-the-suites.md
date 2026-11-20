@@ -55,10 +55,10 @@ None, per the spec. Checked by grep during planning: the five test titles at `te
 
 ## Test List
 
-- [ ] Unit: `tests/unit/gh-guard.test.js`, the five `[BUG-059]` tests (AC1-AC5), unchanged.
-- [ ] Integration: `tests/scripts/ticket.test.js` writeback and `tests/scripts/orchestrate.test.js` ticket intake, served by the fake (AC1), unchanged.
-- [ ] Full suite: `npm test` green (AC7).
-- [ ] E2E: not applicable, no UI.
+- [X] Unit: `tests/unit/gh-guard.test.js`, the five `[BUG-059]` tests (AC1-AC5), unchanged.
+- [X] Integration: `tests/scripts/ticket.test.js` writeback and `tests/scripts/orchestrate.test.js` ticket intake, served by the fake (AC1), unchanged.
+- [X] Full suite: `npm test` green (AC7).
+- [X] E2E: not applicable, no UI.
 - No new test: the item changes no behavior, and the criteria are already pinned by the tests above.
 
 ## Commit Order
