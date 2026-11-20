@@ -3402,3 +3402,15 @@ Nothing minted: BUG-072 was filed at intake of issue #161. BUG-088 (triage #265)
 Known limits: the BUG-072 line is removed. Every other defect line is unchanged.
 
 Upgrade note: a project whose `CLAUDE.md` records `- Specs:` or `- Plans:` under a root dot-directory other than `.claude`, or under `bin`, `lib` or `tools`, now halts `/cc-orchestrate start` with `ORCH_DOC_LOCATION_INVALID`; move that line to a documentation folder such as `docs/specs` and `docs/plans`. #269's description reports one `tests/unit/staging-convention.test.js` failure from its sandbox's git exit-code behavior. CI on the release PR is the authority.
+
+## Release: 1.52.9 batch landing 2026-11-20
+
+One PR merged since `v1.52.8`. Existing id closed:
+
+- BUG-088 (#271 by `cc-lane-bot[bot]`, installer printing the OpenCode plugin symlink target to stderr without escaping control characters). `removePluginSymlink` in `lib/installer/deploy.mjs` interpolates `escapeControlChars(linkText)` instead of the raw link text in the `replaced the symlink` warning; the new helper renders C0, DEL and C1 (U+0000–U+001F, U+007F, U+0080–U+009F) as visible `\xHH` escapes and keeps every printable character, non-ASCII included, so an ordinary target's warning is byte-identical to `[BUG-087]`'s. The `skipping` warning and the link handling are unchanged. Tests: two `[BUG-088]` rows in `tests/installer/deploy.test.js` (ESC, CR, LF shown as `\x1b`, `\x0d`, `\x0a`; U+009B shown as `\x9b` with `ó` kept; no raw control byte in the warning), guarded by a new `POSIX_SYMLINK` and added to the `ci-windows-node24` set of `tools/skip-baseline.json`; the three `[BUG-087]` rows are unchanged. The PR also adds the spec and plan leaves to the `.gitignore` tracked-surface block. Follow-up of `[BUG-087]`, reported by the automated security review of #264. Intake of issue #265. The spec and plan were approved by independent review, round 1.
+
+Nothing minted: BUG-088 was reserved by triage #265.
+
+Known limits: the BUG-088 line is removed. Every other defect line is unchanged.
+
+No upgrade step: only the text of one installer warning changes, and only for a link target that holds control characters. #271's description reports two `tests/unit/staging-convention.test.js` failures from its sandbox's git version. CI on the release PR is the authority.
