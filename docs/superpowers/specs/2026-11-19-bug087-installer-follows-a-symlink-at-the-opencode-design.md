@@ -1,6 +1,6 @@
 # BUG-087: Installer follows a symlink at the OpenCode guard plugin destination and overwrites its target
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-19 by independent review (round 1)
 **Item:** BUG-087 (intake of issue #260; regression of BUG-069)
 **Date:** 2026-11-19
 
