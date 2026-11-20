@@ -45,13 +45,13 @@ None, per the spec. Checked by grep during planning: the five test titles at `te
 - Read only: `tests/unit/gh-guard.test.js`, `tests/scripts/ticket.test.js`, `tests/scripts/orchestrate.test.js`, `tests/helpers/`
 - Modify: this plan (checkboxes only)
 
-- [ ] [T-001-A] Run `npx vitest run tests/unit/gh-guard.test.js`. Expected: `Test Files 1 passed (1)`, `Tests 5 passed (5)`. The filter's full match set, all green: "routes a gh call to the fake through fakeGh().env(), leaving PATH alone" (AC1), "kills a node child that names gh without a fake, with a named error" (AC2), "kills a node grandchild too, because NODE_OPTIONS is inherited" (AC3), "blocks gh in the test worker itself, by name and by an .exe path" (AC4), "strands any path the preload cannot see with no gh credentials" (AC5). No dependency.
-- [ ] [T-001-B] Run `npx vitest run tests/scripts/ticket.test.js tests/scripts/orchestrate.test.js`. Expected: `Test Files 2 passed (2)` with no failed test; every gh call is served by the fake (AC1). Depends on T-001-A only for order.
-- [ ] [T-001-C] Run `grep -nE "skip|runIf|process\.platform|win32" tests/unit/gh-guard.test.js` and `grep -rn "bin/sh" tests/helpers/`. Expected: both print nothing (exit 1) (AC6, Plan decision 2).
-- [ ] [T-001-D] Run `git diff --stat origin/main -- tests scripts lib vitest.config.js`. Expected: empty (AC7, no code change).
-- [ ] [T-001-E] Run `npm test`. Expected: exit 0, no failed test file (AC7). A failure caused by the sandbox environment (network, tmp permissions) is reported as ENV with its test name; any other red stops the build and is reported as a regression (Global Constraints).
-- [ ] [T-001-F] Stage: `git add -u docs/superpowers/plans/2026-11-20-bug059-fake-gh-is-posix-only-so-on-windows-the-suites.md` so the ticked boxes ride the commit. Depends on T-001-A through T-001-E.
-- [ ] [T-001-G] Commit: `docs: verify the fake gh fix on main meets the entry [BUG-059]`. Depends on T-001-F. Its own tick rides no later commit, since this is the last group; the closeout leaves it as the runner's commit of the tree.
+- [X] [T-001-A] Run `npx vitest run tests/unit/gh-guard.test.js`. Expected: `Test Files 1 passed (1)`, `Tests 5 passed (5)`. The filter's full match set, all green: "routes a gh call to the fake through fakeGh().env(), leaving PATH alone" (AC1), "kills a node child that names gh without a fake, with a named error" (AC2), "kills a node grandchild too, because NODE_OPTIONS is inherited" (AC3), "blocks gh in the test worker itself, by name and by an .exe path" (AC4), "strands any path the preload cannot see with no gh credentials" (AC5). No dependency.
+- [X] [T-001-B] Run `npx vitest run tests/scripts/ticket.test.js tests/scripts/orchestrate.test.js`. Expected: `Test Files 2 passed (2)` with no failed test; every gh call is served by the fake (AC1). Depends on T-001-A only for order.
+- [X] [T-001-C] Run `grep -nE "skip|runIf|process\.platform|win32" tests/unit/gh-guard.test.js` and `grep -rn "bin/sh" tests/helpers/`. Expected: both print nothing (exit 1) (AC6, Plan decision 2).
+- [X] [T-001-D] Run `git diff --stat origin/main -- tests scripts lib vitest.config.js`. Expected: empty (AC7, no code change).
+- [X] [T-001-E] Run `npm test`. Expected: exit 0, no failed test file (AC7). A failure caused by the sandbox environment (network, tmp permissions) is reported as ENV with its test name; any other red stops the build and is reported as a regression (Global Constraints).
+- [X] [T-001-F] Stage: `git add -u docs/superpowers/plans/2026-11-20-bug059-fake-gh-is-posix-only-so-on-windows-the-suites.md` so the ticked boxes ride the commit. Depends on T-001-A through T-001-E.
+- [X] [T-001-G] Commit: `docs: verify the fake gh fix on main meets the entry [BUG-059]`. Depends on T-001-F. Its own tick rides no later commit, since this is the last group; the closeout leaves it as the runner's commit of the tree.
 
 ## Test List
 
