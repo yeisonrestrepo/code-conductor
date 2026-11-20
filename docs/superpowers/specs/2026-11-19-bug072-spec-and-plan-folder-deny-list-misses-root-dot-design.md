@@ -1,6 +1,6 @@
 # BUG-072 — Spec and plan folder deny list misses root dot-directories and bin, lib and tools
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-19 by independent review (round 1)
 
 Item: `[BUG-072]`, PILLAR 5. Intake of issue #161, reported by the automated security review of the 1.44.0 release candidate (#157).
 
