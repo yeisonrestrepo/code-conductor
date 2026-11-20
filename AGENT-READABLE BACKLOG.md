@@ -1546,6 +1546,26 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #260; reported by the automated security review of
   the 1.52.5 release candidate (#259).
 
+### [ ] `[BUG-088]` Installer prints the OpenCode plugin symlink target to stderr without escaping control characters
+
+- Symptom: since `[BUG-087]`, when the installer replaces a symlink at
+  `.opencode/plugin/conductor-guard.js`, it prints the result of
+  `readlinkSync(pluginPath)` verbatim to stderr
+  (lib/installer/deploy.mjs:260, per the issue). The link text comes
+  from the checkout, so a crafted link target can contain ANSI escape
+  sequences or newlines.
+- Impact per the issue: the installer's terminal output can be spoofed
+  or partly hidden, for example by clearing lines or forging a success
+  message. It does not execute code or write files, and it needs a
+  crafted checkout plus `--opencode`.
+- Fix shape suggested by the issue: render the link text with control
+  characters escaped before interpolating it, for example
+  `JSON.stringify(linkText)` or replacing `[\x00-\x1f\x7f]` with
+  visible escapes; add a test whose link target contains an escape
+  character and assert the warning has no raw control bytes.
+- Intake of issue #265; reported by the automated security review of
+  #264.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
