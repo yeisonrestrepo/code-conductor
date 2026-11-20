@@ -180,9 +180,11 @@ describe('checkDocDir boundary [FEAT-047 AC9]', () => {
   });
 
   it('compares reserved roots segment-wise', () => {
-    // .claude/memoryx is now refused by the .claude allowlist (pre-1.44.0 hardening), so the
-    // segment-wise acceptance is pinned on a reserved root outside .claude.
-    expect(checkDocDir('.conductorx')).toBe('');
+    // .conductorx is a root dot-directory, refused since BUG-072, so the segment-wise acceptance of a reserved root is pinned on scriptsx and binx, and of a root-only rule on docs/.vscode.
+    expect(checkDocDir('.conductorx')).toMatch(/root dot-directory `\.conductorx`/);
+    expect(checkDocDir('scriptsx')).toBe('');
+    expect(checkDocDir('binx')).toBe('');
+    expect(checkDocDir('docs/.vscode')).toBe('');
     expect(checkDocDir('.claude/memoryx')).not.toBe('');
     expect(checkDocDir('.github/specs')).not.toBe('');
     expect(checkDocDir('.claude/memory')).not.toBe('');
@@ -230,11 +232,50 @@ describe('checkDocDir reserved folders [FEAT-047 AC9, review #120]', () => {
     expect(checkDocDir('.claude/hooks')).toMatch(/reserved `\.claude\/hooks`/);
   });
 
-  it.each(['.claude/specs', '.claude/plans', 'docs/scripts', 'scriptsx', '.githubx', '.opencodex', 'docs/specs/'])(
+  it.each(['.claude/specs', '.claude/plans', 'docs/scripts', 'scriptsx', 'binx', 'docs/.vscode', 'docs/specs/'])(
     'still accepts %s', (value) => {
       expect(checkDocDir(value)).toBe('');
     },
   );
+
+  const dotReason = (seg) => `sits in the root dot-directory \`${seg}\`; among root dot-directories only \`.claude/specs\` and \`.claude/plans\` may hold documents`;
+  const reservedText = (entry) => `sits in the reserved \`${entry}\``;
+
+  it.each([
+    ['.husky', '.husky'], ['.vscode', '.vscode'], ['.devcontainer', '.devcontainer'],
+    ['.husky/specs', '.husky'], ['.vscode/plans/x', '.vscode'], ['.circleci', '.circleci'],
+    ['.idea', '.idea'], ['.Husky', '.husky'], ['.VSCode/specs', '.vscode'],
+  ])('[BUG-072] rejects %s in the root dot-directory %s', (value, seg) => {
+    expect(checkDocDir(value)).toBe(dotReason(seg));
+  });
+
+  it.each([
+    ['bin', 'bin'], ['lib', 'lib'], ['tools', 'tools'], ['bin/specs', 'bin'], ['lib/plans', 'lib'],
+    ['tools/x', 'tools'], ['BIN', 'bin'], ['Tools', 'tools'],
+  ])('[BUG-072] rejects %s in the reserved %s', (value, entry) => {
+    expect(checkDocDir(value)).toBe(reservedText(entry));
+  });
+
+  it.each([
+    'docs/specs', 'design/plans', 'binx', 'libraries', 'toolsx', 'scriptsx', 'docs/bin', 'docs/lib',
+    'docs/tools', 'docs/scripts', 'docs/.vscode',
+  ])('[BUG-072] still accepts the ordinary folder %s', (value) => {
+    expect(checkDocDir(value)).toBe('');
+  });
+
+  it('[BUG-072] keeps the reserved and .claude reasons for folders the new rule also covers', () => {
+    expect(checkDocDir('.git/x')).toBe('sits in the reserved `.git`');
+    expect(checkDocDir('.github')).toBe('sits in the reserved `.github`');
+    expect(checkDocDir('.conductor')).toBe('sits in the reserved `.conductor`');
+    expect(checkDocDir('.opencode')).toBe('sits in the reserved `.opencode`');
+    expect(checkDocDir('.claude/hooks')).toBe('sits in the reserved `.claude/hooks`');
+    expect(checkDocDir('.claude')).toBe('covers the reserved `.claude/memory`');
+    expect(checkDocDir('.claude/skills')).toBe('sits in `.claude`, where only `.claude/specs` and `.claude/plans` may hold documents');
+  });
+
+  it.each(['.conductorx', '.githubx', '.opencodex'])('[BUG-072] rejects the look-alike root dot-directory %s', (value) => {
+    expect(checkDocDir(value)).toBe(dotReason(value));
+  });
 });
 
 describe('grouping [FEAT-047 AC7, AC8]', () => {

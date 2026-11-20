@@ -108,12 +108,12 @@ The spec defers none. Read for this plan:
 - Modify: `tests/scripts/doc-locations.test.js`
 - Modify: `tests/scripts/orchestrate.test.js`
 
-- [ ] [T-101] `tests/scripts/doc-locations.test.js:182-189`: edit `'compares reserved roots segment-wise'` as plan decision 5 says (comment, `.conductorx` refused, `scriptsx`, `binx` and `docs/.vscode` accepted). Depends on T-004.
-- [ ] [T-102] `tests/scripts/doc-locations.test.js:233`: replace `'.githubx', '.opencodex'` with `'binx', 'docs/.vscode'` in the trailing `'still accepts %s'` table (plan decision 5). Depends on T-101.
-- [ ] [T-103] `tests/scripts/doc-locations.test.js`: insert `dotReason`, `reservedText` and rows R1 to R5 after the trailing table, inside `checkDocDir reserved folders` (plan decision 4). Depends on T-102.
-- [ ] [T-104] `tests/scripts/orchestrate.test.js`: insert the AC7 `it.each` after the review #120 case (plan decision 6). Depends on T-103.
-- [ ] [T-105] Red run: `npx vitest run tests/scripts/doc-locations.test.js -t 'checkDocDir'`. Its full match set is every row of the `checkDocDir boundary` and `checkDocDir reserved folders` blocks: the 47 baseline rows (one of them edited) plus the 32 new rows (R1 9, R2 8, R3 11, R4 1, R5 3). Predicted: **21 failed | 58 passed | 56 skipped (135)**. Red: R1 (9), R2 (8), R5 (3) and `compares reserved roots segment-wise`. Green: the other 46 baseline rows (including the edited trailing table), R3 (11) and R4 (plan decision 7). Any other split means a test is wrong: fix the test, not the prediction. Depends on T-104.
-- [ ] [T-106] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t 'halts start on'`. Its full match set is the 4 baseline rows plus the 2 AC7 rows. Predicted: **2 failed | 4 passed | 1119 skipped (1125)**. Red: both `[BUG-072] halts start on a recorded …` rows. Green: the three `[AC9] halts start on %s` rows and the review #120 case. Depends on T-105.
+- [X] [T-101] `tests/scripts/doc-locations.test.js:182-189`: edit `'compares reserved roots segment-wise'` as plan decision 5 says (comment, `.conductorx` refused, `scriptsx`, `binx` and `docs/.vscode` accepted). Depends on T-004.
+- [X] [T-102] `tests/scripts/doc-locations.test.js:233`: replace `'.githubx', '.opencodex'` with `'binx', 'docs/.vscode'` in the trailing `'still accepts %s'` table (plan decision 5). Depends on T-101.
+- [X] [T-103] `tests/scripts/doc-locations.test.js`: insert `dotReason`, `reservedText` and rows R1 to R5 after the trailing table, inside `checkDocDir reserved folders` (plan decision 4). Depends on T-102.
+- [X] [T-104] `tests/scripts/orchestrate.test.js`: insert the AC7 `it.each` after the review #120 case (plan decision 6). Depends on T-103.
+- [X] [T-105] Red run: `npx vitest run tests/scripts/doc-locations.test.js -t 'checkDocDir'`. Its full match set is every row of the `checkDocDir boundary` and `checkDocDir reserved folders` blocks: the 47 baseline rows (one of them edited) plus the 32 new rows (R1 9, R2 8, R3 11, R4 1, R5 3). Predicted: **21 failed | 58 passed | 56 skipped (135)**. Red: R1 (9), R2 (8), R5 (3) and `compares reserved roots segment-wise`. Green: the other 46 baseline rows (including the edited trailing table), R3 (11) and R4 (plan decision 7). Any other split means a test is wrong: fix the test, not the prediction. Depends on T-104.
+- [X] [T-106] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t 'halts start on'`. Its full match set is the 4 baseline rows plus the 2 AC7 rows. Predicted: **2 failed | 4 passed | 1119 skipped (1125)**. Red: both `[BUG-072] halts start on a recorded …` rows. Green: the three `[AC9] halts start on %s` rows and the review #120 case. Depends on T-105.
 
 ---
 
@@ -122,12 +122,12 @@ The spec defers none. Read for this plan:
 **Files:**
 - Modify: `scripts/doc-locations.mjs`
 
-- [ ] [T-201] `scripts/doc-locations.mjs:26-30`: replace the comment above `RESERVED` (plan decision 2). Depends on T-106.
-- [ ] [T-202] `scripts/doc-locations.mjs`, `RESERVED`: add `bin`, `lib` and `tools` (plan decision 1). Depends on T-201.
-- [ ] [T-203] `scripts/doc-locations.mjs`, `reservedReason`: add the root dot-directory rule after the `.claude` allowlist (plan decision 3). Depends on T-202.
-- [ ] [T-204] Green run: the T-105 command. Predicted: **79 passed | 56 skipped (135)**. Depends on T-203.
-- [ ] [T-205] Green run: the T-106 command. Predicted: **6 passed | 1119 skipped (1125)**. Depends on T-204.
-- [ ] [T-206] Run: `npx vitest run tests/scripts/doc-locations.test.js`. Predicted: **135 passed (135)**; this includes the unedited `recorded errors [FEAT-047]` table and the `names the reserved folder a parent covers` case (AC5). Depends on T-205.
+- [X] [T-201] `scripts/doc-locations.mjs:26-30`: replace the comment above `RESERVED` (plan decision 2). Depends on T-106.
+- [X] [T-202] `scripts/doc-locations.mjs`, `RESERVED`: add `bin`, `lib` and `tools` (plan decision 1). Depends on T-201.
+- [X] [T-203] `scripts/doc-locations.mjs`, `reservedReason`: add the root dot-directory rule after the `.claude` allowlist (plan decision 3). Depends on T-202.
+- [X] [T-204] Green run: the T-105 command. Predicted: **79 passed | 56 skipped (135)**. Depends on T-203.
+- [X] [T-205] Green run: the T-106 command. Predicted: **6 passed | 1119 skipped (1125)**. Depends on T-204.
+- [X] [T-206] Run: `npx vitest run tests/scripts/doc-locations.test.js`. Predicted: **135 passed (135)**; this includes the unedited `recorded errors [FEAT-047]` table and the `names the reserved folder a parent covers` case (AC5). Depends on T-205.
 
 ---
 
@@ -136,11 +136,11 @@ The spec defers none. Read for this plan:
 **Files:**
 - Modify: `docs/superpowers/plans/2026-11-19-bug072-spec-and-plan-folder-deny-list-misses-root-dot.md` (ticks)
 
-- [ ] [T-301] Run `npm test`. Predicted: exit 0 (spec, AC8). A red is called ENV only if the sandbox caused it (network, tmp permissions) and its file is not one this plan touches; report it with its name. Any other red is fixed. Depends on T-206.
-- [ ] [T-302] Scope check: `git status --short` lists exactly `scripts/doc-locations.mjs`, `tests/scripts/doc-locations.test.js`, `tests/scripts/orchestrate.test.js` and this plan, and no temporary file is left in the tree. Depends on T-301.
-- [ ] [T-303] Stage: `git add -u scripts/doc-locations.mjs tests/scripts/doc-locations.test.js tests/scripts/orchestrate.test.js` (all tracked). Depends on T-302.
-- [ ] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-19-bug072-spec-and-plan-folder-deny-list-misses-root-dot.md` (carries the ticks for T-101 to T-303). Depends on T-303.
-- [ ] [T-305] Commit: `fix: reserve root dot-directories and bin, lib, tools as spec and plan folders [BUG-072]`. Depends on T-304.
+- [X] [T-301] Run `npm test`. Predicted: exit 0 (spec, AC8). A red is called ENV only if the sandbox caused it (network, tmp permissions) and its file is not one this plan touches; report it with its name. Any other red is fixed. Depends on T-206.
+- [X] [T-302] Scope check: `git status --short` lists exactly `scripts/doc-locations.mjs`, `tests/scripts/doc-locations.test.js`, `tests/scripts/orchestrate.test.js` and this plan, and no temporary file is left in the tree. Depends on T-301.
+- [X] [T-303] Stage: `git add -u scripts/doc-locations.mjs tests/scripts/doc-locations.test.js tests/scripts/orchestrate.test.js` (all tracked). Depends on T-302.
+- [X] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-19-bug072-spec-and-plan-folder-deny-list-misses-root-dot.md` (carries the ticks for T-101 to T-303). Depends on T-303.
+- [X] [T-305] Commit: `fix: reserve root dot-directories and bin, lib, tools as spec and plan folders [BUG-072]`. Depends on T-304.
 
 ---
 
