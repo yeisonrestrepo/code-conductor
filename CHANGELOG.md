@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.52.8] - 2026-11-20
+
+### Fixed
+- **[BUG-072]** A recorded `- Specs:` or `- Plans:` folder in the project `CLAUDE.md` can no longer make a folder that holds auto-executed configuration or code the spec or plan agent's Guard 5 write scope. `checkDocDir` in `scripts/doc-locations.mjs` now refuses every root dot-directory other than `.claude` as a class (`.husky`, `.vscode`, `.devcontainer`, `.circleci`, `.idea` and any other), with the reason `sits in the root dot-directory …; among root dot-directories only .claude/specs and .claude/plans may hold documents`, and `bin`, `lib` and `tools` join `RESERVED`. Inside `.claude` the `.claude/specs` and `.claude/plans` allowlist is unchanged, and a folder the existing rules already refused (`.git`, `.github`, `.conductor`, `.opencode`, `.claude/hooks`, `.claude/skills`) keeps its existing reason. Matching is segment-wise and case-folded, so `.Husky` and `BIN` are refused while look-alikes such as `binx`, `libraries`, `docs/bin` and `docs/.vscode` are still accepted; `.conductorx`, `.githubx` and `.opencodex` are now refused as root dot-directories. `/cc-orchestrate start` on such a recorded folder halts `ORCH_DOC_LOCATION_INVALID` and records no run. Pinned by the `[BUG-072]` rows of `tests/scripts/doc-locations.test.js` and the two `[BUG-072]` `start` rows of `tests/scripts/orchestrate.test.js`. Landed from PR #269 (cc-lane-bot), intake of issue #161.
+
 ## [1.52.7] - 2026-11-20
 
 ### Fixed
