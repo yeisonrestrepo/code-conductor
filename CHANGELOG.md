@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.52.7] - 2026-11-20
+
+### Fixed
+- **[BUG-087]** With `--opencode`, the installer no longer writes through a symlink at `.opencode/plugin/conductor-guard.js`. Since `[BUG-069]` the plugin went through `mergeFileInto`, which resolves symlinks before writing, so a checkout that shipped that path as a link made the install overwrite the link's target, possibly outside the project, and leave a timestamped backup beside it. `installOpencodePlugin` in `lib/installer/deploy.mjs` now runs a new `removePluginSymlink` first: it `lstat`s the destination and, if it is a symlink (live, dangling or pointing at a directory), unlinks it, prints a stderr line naming the old link text, and then writes the shipped plugin as a regular file; the file the link pointed to is never opened, backed up or written. If the link cannot be removed, it is left in place, a `skipping … nothing was written` warning goes to stderr, and no `installed` line is printed. A destination that is not a link behaves as before, and `mergeFileInto` and `resolveRealTarget` are unchanged, so a symlinked `CLAUDE.md` or `.gitignore` is still merged through its link. Pinned by the three `[BUG-087]` rows of `tests/installer/deploy.test.js` (the cannot-remove row runs on POSIX as non-root only, and is in the Windows leg's `tools/skip-baseline.json` set). Landed from PR #264 (cc-lane-bot), intake of issue #260.
+
 ## [1.52.6] - 2026-11-20
 
 ### Fixed

@@ -1523,7 +1523,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
   `src/a.js` and `docs/notes.md` keep the delegated APPROVE.
 - Intake of issue #240.
 
-### [ ] `[BUG-087]` Installer follows a symlink at the OpenCode guard plugin destination and overwrites its target
+### [X] `[BUG-087]` Installer follows a symlink at the OpenCode guard plugin destination and overwrites its target
+* **DONE, shipped as `1.52.7` on 2026-11-20.** `installOpencodePlugin` in `lib/installer/deploy.mjs` calls a new `removePluginSymlink` before `mergeFileInto`: a symlink at `.opencode/plugin/conductor-guard.js` (live, dangling or pointing at a directory) is unlinked with a stderr line naming the old link text, and the shipped plugin is written as a regular file; the link's target is never opened, backed up or written. A link that cannot be removed is left in place with a `skipping … nothing was written` warning and no `installed` line. A non-link destination is unchanged, and the shared `mergeFileInto`/`resolveRealTarget` path is untouched, so symlinked `CLAUDE.md` and `.gitignore` files still merge through their links. Pinned by the three `[BUG-087]` rows of `tests/installer/deploy.test.js`; the cannot-remove row runs on POSIX as non-root only and is in the `ci-windows-node24` set of `tools/skip-baseline.json`. Landed from PR #264 (cc-lane-bot), intake of issue #260; the id was reserved by the triage and is owner-minted at landing. Spec: `docs/superpowers/specs/2026-11-19-bug087-installer-follows-a-symlink-at-the-opencode-design.md` (approved 2026-11-19 by independent review, round 1). Plan: `docs/superpowers/plans/2026-11-19-bug087-installer-follows-a-symlink-at-the-opencode.md`.
 
 - Symptom: since `[BUG-069]`, `installOpencodePlugin`
   (lib/installer/deploy.mjs:71, per the issue) writes

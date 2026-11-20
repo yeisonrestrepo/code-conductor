@@ -3378,3 +3378,15 @@ Nothing minted: BUG-075 was filed at intake of issue #175. BUG-087 (triage #260)
 Known limits: the BUG-075 line is removed. The BUG-074 line is unchanged, because `code` may still hand back `build_executed` on a red suite. Every other defect line is unchanged.
 
 Upgrade note: `end` on a live run that has not reached `verify_pass` now refuses; use `end --abandon` to drop such a run. A hand-back whose `ops.scope` differs from its installed envelope now halts, so a role must copy the installed scope verbatim, as the role files already instruct. An existing run file's `approvals[].by` is not rewritten. #262's description reports `tests/unit/staging-convention.test.js` AC7/AC8 failing in its sandbox's git (uid 0, git 2.43.0). CI on the release PR is the authority.
+
+## Release: 1.52.7 batch landing 2026-11-20
+
+One PR merged since `v1.52.6`. Existing id closed:
+
+- BUG-087 (#264 by `cc-lane-bot[bot]`, installer following a symlink at the OpenCode guard plugin path). `installOpencodePlugin` calls a new `removePluginSymlink` before `mergeFileInto`: a symlink at `.opencode/plugin/conductor-guard.js` (live, dangling or to a directory) is unlinked with a stderr line naming its old text, and the shipped plugin is written as a regular file; the target is never opened, backed up or written. A link that cannot be removed stays, with a `skipping` warning and no `installed` line. `mergeFileInto` and `resolveRealTarget` are unchanged, so symlinked `CLAUDE.md` and `.gitignore` still merge through the link. Three `[BUG-087]` rows in `tests/installer/deploy.test.js`; the cannot-remove row is POSIX non-root only and joins the `ci-windows-node24` set of `tools/skip-baseline.json`. The existing `[BUG-069]` and FEAT-048 rows are unchanged. Regression of `[BUG-069]`, reported by the automated security review of the 1.52.5 release candidate (#259). Intake of issue #260. The spec and plan were approved 2026-11-19 by independent review, round 1.
+
+Nothing minted: BUG-087 was reserved by triage #260.
+
+Known limits: the BUG-087 line is removed. The BUG-071 line is unchanged, since it concerns the plugin's runtime behavior, not its install. Every other defect line is unchanged.
+
+No upgrade step: a re-install with `--opencode` over a regular plugin file behaves as before, and one over a symlinked plugin now replaces the link instead of overwriting its target. #264's description reports two `tests/unit/staging-convention.test.js` failures from its sandbox's git `git add -u` exit code. CI on the release PR is the authority.
