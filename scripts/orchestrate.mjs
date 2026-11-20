@@ -321,24 +321,30 @@ export function extractTasks(planText) {
 }
 
 // D9: an empty scope is a plan defect, never a read-only fallback; scopes are never truncated.
-export function taskScope(task, planRel) {
-  if (task.files.length === 0) throw new Halt('ORCH_EMPTY_SCOPE', `${task.id} declares no files`);
-  const scope = [...new Set([...task.files, planRel])];
+// The empty check reads the declared files, so the plan alone never passes as a task's scope.
+function checkedScope(id, files, added) {
+  if (files.length === 0) throw new Halt('ORCH_EMPTY_SCOPE', `${id} declares no files`);
+  const scope = [...new Set([...files, ...added])];
   const [cap, elemCap] = V3_CAPS['ops.scope'];
-  if (scope.length > cap) throw new Halt('ORCH_SCOPE_OVER_CAP', `${task.id} needs ${scope.length} scope entries; the cap is ${cap}`);
+  if (scope.length > cap) throw new Halt('ORCH_SCOPE_OVER_CAP', `${id} needs ${scope.length} scope entries; the cap is ${cap}`);
   const long = scope.find((p) => elementLength(p) > elemCap);
-  if (long) throw new Halt('ORCH_SCOPE_OVER_CAP', `${task.id} has a ${elementLength(long)}-character path; the cap is ${elemCap}`);
+  if (long) throw new Halt('ORCH_SCOPE_OVER_CAP', `${id} has a ${elementLength(long)}-character path; the cap is ${elemCap}`);
   return scope;
+}
+
+export function taskScope(task, planRel) {
+  return checkedScope(task.id, task.files, [planRel]);
 }
 
 // FEAT-057: the audit text is not owner-approved, so it may name only files the approved plan's tasks
 // declare, never the approved documents themselves (owner decision, 2026-11-13).
+// A fix round ticks no boxes, so the plan stays out of its write scope and Guard 5 enforces that (BUG-078).
 function fixScope(root, run, files, round) {
   const planned = new Set(extractTasks(readDoc(root, run.plan, `cannot read ${run.plan}`).toString('utf8')).flatMap((t) => t.files));
   const approved = [run.plan, run.approvals.spec?.path];
   const outside = files.find((p) => typeof p !== 'string' || !planned.has(p) || approved.includes(p));
   if (outside !== undefined) throw new Halt('ORCH_FIX_SCOPE_UNAPPROVED', `${outside} is not a file the approved plan declares; the fix scope stays inside the plan`);
-  return taskScope({ id: `fix round ${round}`, files }, run.plan);
+  return checkedScope(`fix round ${round}`, files, []);
 }
 
 // FEAT-047: one glob per role, checked against the element cap once, at start.
