@@ -1547,7 +1547,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #260; reported by the automated security review of
   the 1.52.5 release candidate (#259).
 
-### [ ] `[BUG-088]` Installer prints the OpenCode plugin symlink target to stderr without escaping control characters
+### [X] `[BUG-088]` Installer prints the OpenCode plugin symlink target to stderr without escaping control characters
+* **DONE, shipped as `1.52.9` on 2026-11-20.** `removePluginSymlink` in `lib/installer/deploy.mjs` now passes the old link text through a new `escapeControlChars` before interpolating it into the `replaced the symlink` warning: every C0 (U+0000–U+001F), DEL (U+007F) and C1 (U+0080–U+009F) character is rendered as a visible `\xHH` escape, C1 included because U+009B acts as CSI on some terminals. Printable characters, non-ASCII included, are kept, so an ordinary target prints byte-for-byte as `[BUG-087]` printed it; the `skipping` warning interpolates only `err.code` and is unchanged. Pinned by the two `[BUG-088]` rows of `tests/installer/deploy.test.js` (ESC, CR and LF escaped as `\x1b`, `\x0d`, `\x0a` with no raw control byte left; U+009B escaped as `\x9b` with `ó` kept), which run on POSIX with symlinks only and are in the `ci-windows-node24` set of `tools/skip-baseline.json`; the three `[BUG-087]` rows are unchanged. Landed from PR #271 (cc-lane-bot), intake of issue #265; the id was reserved by the triage and is owner-minted at landing. Spec: `docs/superpowers/specs/2026-11-20-bug088-installer-prints-the-opencode-plugin-symlink-design.md` (approved by independent review, round 1). Plan: `docs/superpowers/plans/2026-11-20-bug088-installer-prints-the-opencode-plugin-symlink.md`.
 
 - Symptom: since `[BUG-087]`, when the installer replaces a symlink at
   `.opencode/plugin/conductor-guard.js`, it prints the result of
