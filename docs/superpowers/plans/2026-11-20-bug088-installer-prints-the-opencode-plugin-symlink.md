@@ -111,11 +111,11 @@
 
 ## Test List
 
-- [ ] Unit, AC1, AC2 and AC3: E1. A link whose target holds ESC, CR and LF is replaced by a regular file with the shipped bytes; the single stderr warning has no raw C0/DEL/C1 character and shows `\x1b`, `\x0d`, `\x0a` literally in the BUG-087 message; stdout is exactly the `installed` line.
-- [ ] Unit, AC5: E2. U+009B in the target is shown as `\x9b`; the printable `ó` is kept.
-- [ ] Unit, AC4: the three `[BUG-087]` rows and the other FEAT-048 rows, unchanged and green; `tests/installer/file-merge.test.js` unchanged.
-- [ ] AC6: `npm test` (T-301).
-- [ ] No integration or E2E/UI test: the change is one message string on a path `cli.test.js` already drives end to end with `--opencode`, and there is no UI.
+- [X] Unit, AC1, AC2 and AC3: E1. A link whose target holds ESC, CR and LF is replaced by a regular file with the shipped bytes; the single stderr warning has no raw C0/DEL/C1 character and shows `\x1b`, `\x0d`, `\x0a` literally in the BUG-087 message; stdout is exactly the `installed` line.
+- [X] Unit, AC5: E2. U+009B in the target is shown as `\x9b`; the printable `ó` is kept.
+- [X] Unit, AC4: the three `[BUG-087]` rows and the other FEAT-048 rows, unchanged and green; `tests/installer/file-merge.test.js` unchanged.
+- [X] AC6: `npm test` (T-301).
+- [X] No integration or E2E/UI test: the change is one message string on a path `cli.test.js` already drives end to end with `--opencode`, and there is no UI.
 
 ## Commit Order
 
