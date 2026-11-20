@@ -63,10 +63,10 @@ None, per the spec. Checked by grep during planning:
 - Read only: `.claude/hooks/context-guard.{sh,ps1}`, `project-template/.claude/hooks/context-guard.{sh,ps1}`, `tests/hooks/context-guard.test.js`
 - Modify: this plan (checkboxes only; the ticks ride Task 2's commit)
 
-- [ ] [T-001-A] Run `git merge-base --is-ancestor 2d8e236 HEAD`. Expected: exit 0 (AC1). No dependency.
-- [ ] [T-001-B] Run `git merge-base --is-ancestor 2d8e236 b62b1fa && git show b62b1fa:VERSION`. Expected: exit 0 and `1.42.0`. This confirms the release that Plan decisions 1-2 name. Depends on T-001-A only for order.
-- [ ] [T-001-C] Run `cmp .claude/hooks/context-guard.sh project-template/.claude/hooks/context-guard.sh && cmp .claude/hooks/context-guard.ps1 project-template/.claude/hooks/context-guard.ps1 && grep -c session_id .claude/hooks/context-guard.sh .claude/hooks/context-guard.ps1`. Expected: both `cmp` print nothing (exit 0), and each `grep -c` count is at least 1 (AC2).
-- [ ] [T-001-D] Run `npx vitest run tests/hooks/context-guard.test.js`. Expected: `Test Files 1 passed (1)` and no failed test. The filter's full match set is the whole file, including both `session reset (BUG-056)` describes and the row "stale count from another session — restarts at 1" (AC3). The `.ps1` rows are skipped when `pwsh` is absent, as `tools/skip-baseline.json` records, and skipped rows are expected, not red.
+- [X] [T-001-A] Run `git merge-base --is-ancestor 2d8e236 HEAD`. Expected: exit 0 (AC1). No dependency.
+- [X] [T-001-B] Run `git merge-base --is-ancestor 2d8e236 b62b1fa && git show b62b1fa:VERSION`. Expected: exit 0 and `1.42.0`. This confirms the release that Plan decisions 1-2 name. Depends on T-001-A only for order.
+- [X] [T-001-C] Run `cmp .claude/hooks/context-guard.sh project-template/.claude/hooks/context-guard.sh && cmp .claude/hooks/context-guard.ps1 project-template/.claude/hooks/context-guard.ps1 && grep -c session_id .claude/hooks/context-guard.sh .claude/hooks/context-guard.ps1`. Expected: both `cmp` print nothing (exit 0), and each `grep -c` count is at least 1 (AC2).
+- [X] [T-001-D] Run `npx vitest run tests/hooks/context-guard.test.js`. Expected: `Test Files 1 passed (1)` and no failed test. The filter's full match set is the whole file, including both `session reset (BUG-056)` describes and the row "stale count from another session — restarts at 1" (AC3). The `.ps1` rows are skipped when `pwsh` is absent, as `tools/skip-baseline.json` records, and skipped rows are expected, not red.
 
 ## Records hand-off (AC4-AC6, not executed on this branch)
 
@@ -105,11 +105,11 @@ By owner decision (Owner decisions 2) these edits are made on a `records/*` bran
 **Files:**
 - Modify: this plan (checkboxes only)
 
-- [ ] [T-002-A] Run `git diff --stat origin/main -- .claude project-template global skills lib scripts tools tests bin VERSION package.json package-lock.json .github README.md CHANGELOG.md "AGENT-READABLE BACKLOG.md"`. Expected: empty. No hook, installer, settings, code, test, version, workflow or record change (AC7, Owner decisions 2). Depends on T-001-A through T-001-D.
-- [ ] [T-002-B] Run `git diff --name-only origin/main`. Expected: exactly `.gitignore`, the spec and this plan.
-- [ ] [T-002-C] Run `npm test`. Expected: exit 0 and no failed test file. A failure caused by the sandbox environment (network, tmp permissions) is reported as ENV with its test name. Any other red stops the build and is reported (Global Constraints).
-- [ ] [T-002-D] Stage: `git add -u docs/superpowers/plans/2026-11-20-bug056-context-guard-the-turn-counter-persists-across.md` so the Task 1 and Task 2 ticks are committed. Depends on T-002-A through T-002-C.
-- [ ] [T-002-E] Commit: `docs: verify the BUG-056 fix on main against the full suite [BUG-056]`. Depends on T-002-D. This is the last group, so no later commit picks up its own tick. The closeout leaves that tick in the runner's commit of the tree.
+- [X] [T-002-A] Run `git diff --stat origin/main -- .claude project-template global skills lib scripts tools tests bin VERSION package.json package-lock.json .github README.md CHANGELOG.md "AGENT-READABLE BACKLOG.md"`. Expected: empty. No hook, installer, settings, code, test, version, workflow or record change (AC7, Owner decisions 2). Depends on T-001-A through T-001-D.
+- [X] [T-002-B] Run `git diff --name-only origin/main`. Expected: exactly `.gitignore`, the spec and this plan.
+- [X] [T-002-C] Run `npm test`. Expected: exit 0 and no failed test file. A failure caused by the sandbox environment (network, tmp permissions) is reported as ENV with its test name. Any other red stops the build and is reported (Global Constraints).
+- [X] [T-002-D] Stage: `git add -u docs/superpowers/plans/2026-11-20-bug056-context-guard-the-turn-counter-persists-across.md` so the Task 1 and Task 2 ticks are committed. Depends on T-002-A through T-002-C.
+- [X] [T-002-E] Commit: `docs: verify the BUG-056 fix on main against the full suite [BUG-056]`. Depends on T-002-D. This is the last group, so no later commit picks up its own tick. The closeout leaves that tick in the runner's commit of the tree.
 
 ## Test List
 
