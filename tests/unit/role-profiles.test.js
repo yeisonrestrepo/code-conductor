@@ -154,7 +154,8 @@ const PROFILE_SHA256_1_37_0 = {
   // FEAT-061 changed every profile on purpose: the ad-hoc ban is gone, and spec, plan, audit and qa name the phase command that dispatches them outside a run.
   // FEAT-060 changed audit on purpose: findings carry a severity and the report ends in a VERDICT line.
   audit: 'e2a9d8269691a40dc66294e1f856105590519a203cd5b4231c1ed5134984e3cf',
-  code: '12361f33d8f607a1a7e3d1aeef21bb26899163344579bb6baebeedab87fe6773',
+  // BUG-078 changed code on purpose: a fix round's scope is the files the review names, without the plan.
+  code: '21c2587a37aa105b9df4ad0f70429c5011c2cbef51b0033fa395a5039cf8a70e',
   // FEAT-047 changed plan and spec on purpose: the folder now comes from the envelope's scope.
   plan: '79384c3da80851c8291fded6dadbf8589b2cf25f057164a0acdd46ccf934b508',
   qa: 'e7ca05e644821545950a48e6749363c24922454909c71ce4500ce8eef6a318f5',

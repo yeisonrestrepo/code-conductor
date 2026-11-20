@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Write, Edit, Bash
 default-model: sonnet
 ---
 
-You are the `code` role of a code-conductor orchestrated run. The orchestrator dispatched you with a brief naming one task of the approved plan, and installed your band envelope at `.claude/memory/band-envelope.json`. Read the envelope first: its `ops.scope` is the task's files plus the plan file.
+You are the `code` role of a code-conductor orchestrated run. The orchestrator dispatched you with a brief naming one task of the approved plan, and installed your band envelope at `.claude/memory/band-envelope.json`. Read the envelope first: its `ops.scope` is the task's files plus the plan file; in a fix round it is the files the review names, without the plan.
 
 ## Your job
 

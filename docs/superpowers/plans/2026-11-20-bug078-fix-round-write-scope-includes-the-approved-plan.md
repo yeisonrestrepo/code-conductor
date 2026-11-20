@@ -80,13 +80,13 @@
 **Files:**
 - Modify: `tests/scripts/orchestrate.test.js`
 
-- [ ] [T-101] `tests/scripts/orchestrate.test.js`, C5 (`:1848`): update the scope, the hand-back's `f` and add the `tasks.done` assertion (plan decision 3). Depends on T-004.
-- [ ] [T-102] `tests/scripts/orchestrate.test.js`: insert C5b after C5 (plan decision 3). Depends on T-101.
-- [ ] [T-103] `tests/scripts/orchestrate.test.js`, C6: expected scope `JSON.stringify(['src/a.js'])` (plan decision 3). Depends on T-102.
-- [ ] [T-104] `tests/scripts/orchestrate.test.js`, E1 (`:2053`): new title, RETURN line, both `ops.scope` expectations and the `not.toContain(PLAN)` line (plan decision 3). Depends on T-103.
-- [ ] [T-105] `tests/scripts/orchestrate.test.js`, cap test (`:2108`): replace it with the 20/21 `it.each` (plan decision 3). Depends on T-104.
-- [ ] [T-106] `tests/scripts/orchestrate.test.js`, `describe('scope [FEAT-011 AC8]')`: insert the approve-plan 20-file row after the empty-plan row (plan decision 3). Depends on T-105.
-- [ ] [T-107] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t 'BUG-075|FEAT-057|scope \[FEAT-011'`. Its full match set is every row of the three describe blocks: the 83 of the baseline (C5, C6, E1 and the old cap test among them) minus the old cap test, plus C5b, the two cap rows and the approve-plan row, so 86 rows. Predicted: **6 failed | 80 passed | 1045 skipped (1131)**. Red: C5, C5b, C6, E1, cap row 20, cap row 21 (plan decision 5). Green: the other 80, the approve-plan row and the four `ORCH_FIX_SCOPE_UNAPPROVED` rows included. Any other split means a test is wrong: fix the test, not the prediction. Depends on T-106.
+- [X] [T-101] `tests/scripts/orchestrate.test.js`, C5 (`:1848`): update the scope, the hand-back's `f` and add the `tasks.done` assertion (plan decision 3). Depends on T-004.
+- [X] [T-102] `tests/scripts/orchestrate.test.js`: insert C5b after C5 (plan decision 3). Depends on T-101.
+- [X] [T-103] `tests/scripts/orchestrate.test.js`, C6: expected scope `JSON.stringify(['src/a.js'])` (plan decision 3). Depends on T-102.
+- [X] [T-104] `tests/scripts/orchestrate.test.js`, E1 (`:2053`): new title, RETURN line, both `ops.scope` expectations and the `not.toContain(PLAN)` line (plan decision 3). Depends on T-103.
+- [X] [T-105] `tests/scripts/orchestrate.test.js`, cap test (`:2108`): replace it with the 20/21 `it.each` (plan decision 3). Depends on T-104.
+- [X] [T-106] `tests/scripts/orchestrate.test.js`, `describe('scope [FEAT-011 AC8]')`: insert the approve-plan 20-file row after the empty-plan row (plan decision 3). Depends on T-105.
+- [X] [T-107] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t 'BUG-075|FEAT-057|scope \[FEAT-011'`. Its full match set is every row of the three describe blocks: the 83 of the baseline (C5, C6, E1 and the old cap test among them) minus the old cap test, plus C5b, the two cap rows and the approve-plan row, so 86 rows. Predicted: **6 failed | 80 passed | 1045 skipped (1131)**. Red: C5, C5b, C6, E1, cap row 20, cap row 21 (plan decision 5). Green: the other 80, the approve-plan row and the four `ORCH_FIX_SCOPE_UNAPPROVED` rows included. Any other split means a test is wrong: fix the test, not the prediction. Depends on T-106.
 
 ---
 
@@ -98,13 +98,13 @@
 - Modify: `project-template/.claude/agents/code.md`
 - Modify: `tests/unit/role-profiles.test.js`
 
-- [ ] [T-201] `scripts/orchestrate.mjs:323-332`: replace `taskScope` with `checkedScope` and the one-line `taskScope` of plan decision 1. Depends on T-107.
-- [ ] [T-202] `scripts/orchestrate.mjs`, `fixScope`: append the BUG-078 comment line and return `checkedScope(\`fix round ${round}\`, files, [])` (plan decision 2). Depends on T-201.
-- [ ] [T-203] Green run: the T-107 command. Predicted: **86 passed | 1045 skipped (1131)**. Depends on T-202.
-- [ ] [T-204] `.claude/agents/code.md:8` (Edit tool): the new sentence of plan decision 4. Depends on T-203.
-- [ ] [T-205] `project-template/.claude/agents/code.md:8`: the same sentence; then `cmp .claude/agents/code.md project-template/.claude/agents/code.md` prints nothing and `sha256sum` of both prints `21c2587a…`. If the hash differs, the edit differs from plan decision 4: fix the edit. Depends on T-204.
-- [ ] [T-206] `tests/unit/role-profiles.test.js:157`: the BUG-078 comment line and the new `code:` hash (plan decision 4). Depends on T-205.
-- [ ] [T-207] Run: `npx vitest run tests/unit/role-profiles.test.js`. Predicted: every test passes (the mirror row and both `code.md` hash rows included). Depends on T-206.
+- [X] [T-201] `scripts/orchestrate.mjs:323-332`: replace `taskScope` with `checkedScope` and the one-line `taskScope` of plan decision 1. Depends on T-107.
+- [X] [T-202] `scripts/orchestrate.mjs`, `fixScope`: append the BUG-078 comment line and return `checkedScope(\`fix round ${round}\`, files, [])` (plan decision 2). Depends on T-201.
+- [X] [T-203] Green run: the T-107 command. Predicted: **86 passed | 1045 skipped (1131)**. Depends on T-202.
+- [X] [T-204] `.claude/agents/code.md:8` (Edit tool): the new sentence of plan decision 4. Depends on T-203.
+- [X] [T-205] `project-template/.claude/agents/code.md:8`: the same sentence; then `cmp .claude/agents/code.md project-template/.claude/agents/code.md` prints nothing and `sha256sum` of both prints `21c2587a…`. If the hash differs, the edit differs from plan decision 4: fix the edit. Depends on T-204.
+- [X] [T-206] `tests/unit/role-profiles.test.js:157`: the BUG-078 comment line and the new `code:` hash (plan decision 4). Depends on T-205.
+- [X] [T-207] Run: `npx vitest run tests/unit/role-profiles.test.js`. Predicted: every test passes (the mirror row and both `code.md` hash rows included). Depends on T-206.
 
 ---
 
@@ -113,11 +113,11 @@
 **Files:**
 - Modify: `docs/superpowers/plans/2026-11-20-bug078-fix-round-write-scope-includes-the-approved-plan.md` (ticks)
 
-- [ ] [T-301] Run `npm test` (long: `orchestrate.test.js` alone takes about 9 minutes; run it in the background if the shell times out). Predicted: exit 0 (AC8), with `tests/scripts/orchestrate.test.js` at **1131 passed** (1128 + 3 net new rows). A red is called ENV only if the sandbox caused it (network, tmp permissions) and its file is not one this plan touches; report it with its name. Any other red is fixed. Depends on T-207.
-- [ ] [T-302] Scope check: `git status --short` lists exactly `scripts/orchestrate.mjs`, `tests/scripts/orchestrate.test.js`, `.claude/agents/code.md`, `project-template/.claude/agents/code.md`, `tests/unit/role-profiles.test.js` and this plan; no temporary file is left in the tree. `git diff --stat` shows no change to the spec. Depends on T-301.
-- [ ] [T-303] Stage: `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js .claude/agents/code.md project-template/.claude/agents/code.md tests/unit/role-profiles.test.js` (all tracked). Depends on T-302.
-- [ ] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-20-bug078-fix-round-write-scope-includes-the-approved-plan.md` (carries the ticks for T-101 to T-303). Depends on T-303.
-- [ ] [T-305] Commit: `fix: keep the approved plan out of the fix-round write scope [BUG-078]`. Depends on T-304.
+- [X] [T-301] Run `npm test` (long: `orchestrate.test.js` alone takes about 9 minutes; run it in the background if the shell times out). Predicted: exit 0 (AC8), with `tests/scripts/orchestrate.test.js` at **1131 passed** (1128 + 3 net new rows). A red is called ENV only if the sandbox caused it (network, tmp permissions) and its file is not one this plan touches; report it with its name. Any other red is fixed. Depends on T-207.
+- [X] [T-302] Scope check: `git status --short` lists exactly `scripts/orchestrate.mjs`, `tests/scripts/orchestrate.test.js`, `.claude/agents/code.md`, `project-template/.claude/agents/code.md`, `tests/unit/role-profiles.test.js` and this plan; no temporary file is left in the tree. `git diff --stat` shows no change to the spec. Depends on T-301.
+- [X] [T-303] Stage: `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js .claude/agents/code.md project-template/.claude/agents/code.md tests/unit/role-profiles.test.js` (all tracked). Depends on T-302.
+- [X] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-20-bug078-fix-round-write-scope-includes-the-approved-plan.md` (carries the ticks for T-101 to T-303). Depends on T-303.
+- [X] [T-305] Commit: `fix: keep the approved plan out of the fix-round write scope [BUG-078]`. Depends on T-304.
 
 ---
 

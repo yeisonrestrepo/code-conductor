@@ -246,6 +246,18 @@ describe('scope [FEAT-011 AC8]', () => {
     expect(runFile().halt.code).toBe('ORCH_EMPTY_SCOPE');
   });
 
+  it('[BUG-078] a plan task of 20 files still halts ORCH_SCOPE_OVER_CAP at approve plan', () => {
+    driveTo('plan');
+    plan(`# Plan\n\n${task(1, Array.from({ length: 20 }, (_, i) => `src/f${i}.js`))}`);
+    orch(['install', 'plan']);
+    orch(['handback', 'plan'], { input: say('plan', 'boundary_routed') });
+    skipLoop('plan');
+    const r = orch(approveArgs('plan'));
+    expect(r.status).toBe(1);
+    expect(r.err).toBe('ORCH_SCOPE_OVER_CAP: Task 1 needs 21 scope entries; the cap is 20');
+    expect(runFile().halt.code).toBe('ORCH_SCOPE_OVER_CAP');
+  });
+
   it.each([[19, 'passes'], [20, 'halts']])('a task with %i files plus the plan file %s at the cap of 20', (n, outcome) => {
     const files = Array.from({ length: n }, (_, i) => `src/f${i}.js`);
     const call = () => taskScope({ id: 'Task 1', files }, PLAN);
@@ -1850,9 +1862,19 @@ describe('hand-back claims, end and approver [BUG-075]', () => {
     expect(orch(['install', 'audit']).status).toBe(0);
     expect(orch(['handback', 'audit'], { input: auditReport('VERDICT: RETURN', ['- [blocker] src/a.js:10 — breaks AC1']) }).status).toBe(0);
     expect(orch(['install', 'code']).status).toBe(0);
-    expect(envelope().ops.scope).toEqual(['src/a.js', PLAN]);
-    expect(orch(['handback', 'code'], { input: codeSay({ f: ['src/a.js:M', `${PLAN}:M`] }) }).status).toBe(0);
+    expect(envelope().ops.scope).toEqual(['src/a.js']);
+    const done = runFile().tasks.done;
+    expect(orch(['handback', 'code'], { input: codeSay({ f: ['src/a.js:M'] }) }).status).toBe(0);
     expect(runFile().handbacks.at(-1)).toMatchObject({ role: 'code', fix: 1 });
+    expect(runFile().tasks.done).toBe(done);
+  });
+
+  it('C5b [BUG-078] a fix-round hand-back naming the plan in ops.f halts ORCH_HANDBACK_OUT_OF_SCOPE', () => {
+    driveTo('audit');
+    expect(orch(['install', 'audit']).status).toBe(0);
+    expect(orch(['handback', 'audit'], { input: auditReport('VERDICT: RETURN', ['- [blocker] src/a.js:10 — breaks AC1']) }).status).toBe(0);
+    expect(orch(['install', 'code']).status).toBe(0);
+    haltsUnrecorded('code', codeSay({ f: ['src/a.js:M', `${PLAN}:M`] }), outside('code', PLAN, JSON.stringify(['src/a.js'])));
   });
 
   it('C6 [AC4] a fix-round hand-back naming a plan file outside the fix scope halts', () => {
@@ -1860,7 +1882,7 @@ describe('hand-back claims, end and approver [BUG-075]', () => {
     expect(orch(['install', 'audit']).status).toBe(0);
     expect(orch(['handback', 'audit'], { input: auditReport('VERDICT: RETURN', ['- [blocker] src/a.js:10 — breaks AC1']) }).status).toBe(0);
     expect(orch(['install', 'code']).status).toBe(0);
-    haltsUnrecorded('code', codeSay({ f: ['src/b.js:M'] }), outside('code', 'src/b.js', JSON.stringify(['src/a.js', PLAN])));
+    haltsUnrecorded('code', codeSay({ f: ['src/b.js:M'] }), outside('code', 'src/b.js', JSON.stringify(['src/a.js'])));
   });
 
   it.each([
@@ -2050,14 +2072,14 @@ describe('Build and Verify review loop [FEAT-057]', () => {
 
   const SELF_PLAN = `# Demo Plan\n\n${task(1, ['src/a.js'])}\n${task(2, ['src/b.js', PLAN, SPEC])}\n## Test List\n`;
 
-  it('[E1] a returned audit dispatches a fix scoped to the blocker and major files plus the plan', () => {
+  it('[E1] a returned audit dispatches a fix scoped to the blocker and major files, without the plan [BUG-078]', () => {
     driveTo('audit');
     const input = returned(BLOCKER_A, '- [major] src/b.js:2 — misses an edge', '- [major] src/a.js:30 — same file again', '- [minor] tests/a.test.js:1 — nit', '- [minor] src/outside.js:1 — nit outside the plan');
     const h = shaOf(input);
     const review = '.conductor/handback/audit-1.txt';
     const r = pass(input);
     expect(r.status).toBe(0);
-    expect(r.out).toBe(`audit round 1: RETURN with 3 blocker/major finding(s); fix round 1 of 2: review ${review} sha256 ${h}; scope src/a.js, src/b.js, ${PLAN}`);
+    expect(r.out).toBe(`audit round 1: RETURN with 3 blocker/major finding(s); fix round 1 of 2: review ${review} sha256 ${h}; scope src/a.js, src/b.js`);
     expect(runFile().handbacks.at(-1)).toMatchObject({ role: 'audit', gate: 'build_executed', verdict: 'RETURN', round: 1, fix: { round: 1, files: ['src/a.js', 'src/b.js'], review, sha256: h } });
     for (const role of ['audit', 'qa']) {
       const wrong = orch(['install', role, '--check']);
@@ -2067,13 +2089,14 @@ describe('Build and Verify review loop [FEAT-057]', () => {
     const check = orch(['install', 'code', '--check']);
     expect(check.status).toBe(0);
     const [json, note] = check.out.split('\n');
-    expect(JSON.parse(json).ops.scope).toEqual(['src/a.js', 'src/b.js', PLAN]);
+    expect(JSON.parse(json).ops.scope).toEqual(['src/a.js', 'src/b.js']);
     expect(JSON.parse(json).ops.gate).toBe('define_approved');
     expect(note).toBe(`fix round 1 of 2: review ${review} sha256 ${h}`);
     const installed = orch(['install', 'code']);
     expect(installed.status).toBe(0);
     expect(installed.out.split('\n')).toEqual([json, note]);
-    expect(envelope().ops.scope).toEqual(['src/a.js', 'src/b.js', PLAN]);
+    expect(envelope().ops.scope).toEqual(['src/a.js', 'src/b.js']);
+    expect(envelope().ops.scope).not.toContain(PLAN);
     expect(orch(['handback', 'code'], { input: say('code', 'build_executed') }).status).toBe(0);
     expect(runFile().tasks.done).toBe(2);
     expect(runFile().handbacks.at(-1)).toMatchObject({ role: 'code', fix: 1 });
@@ -2105,10 +2128,19 @@ describe('Build and Verify review loop [FEAT-057]', () => {
     expect(runFile().handbacks.at(-1).fix.files).toEqual(['src/a.js']);
   });
 
-  it('a fix scope over the scope cap halts ORCH_SCOPE_OVER_CAP with the audit entry recorded', () => {
-    const files = (p) => Array.from({ length: 10 }, (_, i) => `src/${p}${i}.js`);
-    driveTo('audit', { planText: `# Demo Plan\n\n${task(1, files('f'))}\n${task(2, files('g'))}\n## Test List\n` });
-    const r = pass(returned(...[...files('f'), ...files('g')].map((f) => `- [major] ${f}:1 — x`)));
+  it.each([[20, 'passes'], [21, 'halts']])('[BUG-078] a fix round of %i plan files %s at the scope cap of 20', (n, outcome) => {
+    const files = (p, k) => Array.from({ length: k }, (_, i) => `src/${p}${i}.js`);
+    const all = [...files('f', 10), ...files('g', n - 10)];
+    driveTo('audit', { planText: `# Demo Plan\n\n${task(1, files('f', 10))}\n${task(2, files('g', n - 10))}\n## Test List\n` });
+    const r = pass(returned(...all.map((f) => `- [major] ${f}:1 — x`)));
+    if (outcome === 'passes') {
+      expect(r.status).toBe(0);
+      expect(runFile().handbacks.at(-1).fix.files).toHaveLength(20);
+      const scope = JSON.parse(orch(['install', 'code', '--check']).out.split('\n')[0]).ops.scope;
+      expect(scope).toHaveLength(20);
+      expect(scope).not.toContain(PLAN);
+      return;
+    }
     expect(r.status).toBe(1);
     expect(r.err).toBe('ORCH_SCOPE_OVER_CAP: fix round 1 needs 21 scope entries; the cap is 20');
     expect(runFile().handbacks.at(-1)).toMatchObject({ role: 'audit', verdict: 'RETURN', round: 1 });
