@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.52.9] - 2026-11-20
+
+### Fixed
+- **[BUG-088]** With `--opencode`, the installer's warning about a replaced symlink at `.opencode/plugin/conductor-guard.js` no longer prints the old link text verbatim. That text comes from the checkout, so since `[BUG-087]` a crafted link target carrying ANSI escape sequences, carriage returns or newlines could erase or forge part of the installer's terminal output. `removePluginSymlink` in `lib/installer/deploy.mjs` now renders the link text through a new `escapeControlChars`, which turns every C0, DEL and C1 control character (U+0000–U+001F, U+007F, U+0080–U+009F) into a visible `\xHH` escape; C1 is included because U+009B acts as CSI on some terminals. Printable characters, non-ASCII included, are kept, so an ordinary target prints exactly as before, and what the installer does with the link is unchanged. Pinned by the two `[BUG-088]` rows of `tests/installer/deploy.test.js` (POSIX with symlinks only, and in the Windows leg's `tools/skip-baseline.json` set); the `[BUG-087]` rows are unchanged. Landed from PR #271 (cc-lane-bot), intake of issue #265.
+
 ## [1.52.8] - 2026-11-20
 
 ### Fixed
