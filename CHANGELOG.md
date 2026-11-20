@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.52.12] - 2026-11-20
+
+### Fixed
+- **[BUG-071]** Under OpenCode, the guard plugin no longer judges a `bash` call as if it ran in the project directory when the call carries an argument that could make it run elsewhere. `bashTool` in `project-template/.opencode/plugin/conductor-guard.js` mapped OpenCode's `bash` call to a `Bash` payload carrying only `command`, so a working-directory argument was dropped and Guard 3 judged the command against the project root. The plugin now blocks, before the guard runs, any `bash` call that carries an argument outside the closed set `command`, `description` and `timeout`. The set is closed rather than a list of directory names because OpenCode's `bash` schema is not verified, so `workdir`, `cwd`, `directory` or any other unknown key is blocked alike. The reason names every such argument, sorted (`argument "workdir" is not supported; …` or `arguments "cwd", "workdir" are not supported; …`), and tells the agent to put any `cd` in the command, where the guard sees it. An argument whose value is `undefined` counts as absent, and a call that uses only the known arguments reaches the guard as `Bash { command }` exactly as before. Forwarding the directory as the payload's `cwd` was not taken, since Guard 3 does not read `cwd`. The README's OpenCode table gains the blocked row. Pinned by the `[BUG-071]` rows of `tests/hooks/opencode-guard.test.js` (`workdir`, `cwd` and `directory` each blocked, an unrelated `env` key, two keys in one sorted reason, the known-argument pass-through and the `undefined` case). Landed from PR #277 (cc-lane-bot), intake of issue #162.
+
 ## [1.52.11] - 2026-11-20
 
 ### Fixed

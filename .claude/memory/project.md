@@ -3438,3 +3438,15 @@ Nothing minted: BUG-078 was filed at intake of issue #203.
 Known limits: the BUG-078 line is removed. Every other defect line is unchanged.
 
 No upgrade step: a fix round's agent loses only write access to the approved plan, which its brief already forbade; reinstalling ships the updated `code` profile. CI on the release PR is the authority.
+
+## Release: 1.52.12 batch landing 2026-11-20
+
+One PR merged since `v1.52.11`. Existing id closed:
+
+- BUG-071 (#277 by `cc-lane-bot[bot]`, OpenCode guard evaluating `bash` commands without the tool's working directory). `bashTool` in `project-template/.opencode/plugin/conductor-guard.js` now blocks, before the guard runs, a `bash` call carrying any argument outside the closed set `BASH_ARGS` (`command`, `description`, `timeout`); the reason names every unknown argument, sorted, and says to put any `cd` in the command. The set is closed rather than a list of directory names because OpenCode's `bash` schema has not been verified against a running OpenCode. Keys whose value is `undefined` are ignored, and a known-argument call still reaches the guard as `Bash { command }`. Forwarding as the payload's `cwd` was rejected in the spec, since Guard 3 does not read `cwd`. The README's OpenCode table gains the blocked row. Tests: the `OpenCode plugin: bash arguments outside the known set (BUG-071)` block in `tests/hooks/opencode-guard.test.js` (`workdir`, `cwd`, `directory`, an `env` key, two sorted keys, known-argument pass-through, `undefined`). The PR also adds the spec and plan leaves to the `.gitignore` tracked-surface block. Intake of issue #162, reported by the automated security review of the 1.44.0 release candidate (#157). The spec and plan were approved by independent review, round 1.
+
+Nothing minted: BUG-071 was filed at intake of issue #162.
+
+Known limits: the BUG-071 line is removed. Every other defect line is unchanged.
+
+No upgrade step: reinstalling with `--opencode` ships the updated plugin; an OpenCode `bash` call that used only `command`, `description` and `timeout` behaves exactly as before, and one carrying any other argument is now blocked with a reason instead of being judged against the project root. CI on the release PR is the authority.
