@@ -146,13 +146,13 @@ The spec defers none. Read for this plan:
 
 ## Test List
 
-- [ ] Unit: `checkDocDir` refuses root dot-directories other than `.claude`, with the folded segment in the reason (R1, R5; AC1, AC6).
-- [ ] Unit: `checkDocDir` refuses `bin`, `lib`, `tools` and their case variants and subfolders as reserved (R2; AC2).
-- [ ] Unit: `.claude/specs`, `.claude/plans`, every fixed pair and `DEFAULT_PAIR` stay accepted (existing rows; AC3).
-- [ ] Unit: ordinary and look-alike folders stay accepted (R3, edited rows; AC4, AC6).
-- [ ] Unit: existing `RESERVED` and `.claude` reasons are unchanged (R4 and the unedited rows; AC5).
-- [ ] Integration: `orchestrate.mjs start` halts with `ORCH_DOC_LOCATION_INVALID` and writes no run for `- Specs: .husky` and `- Plans: tools` (AC7).
-- [ ] Full suite: `npm test` exit 0 (AC8).
+- [X] Unit: `checkDocDir` refuses root dot-directories other than `.claude`, with the folded segment in the reason (R1, R5; AC1, AC6).
+- [X] Unit: `checkDocDir` refuses `bin`, `lib`, `tools` and their case variants and subfolders as reserved (R2; AC2).
+- [X] Unit: `.claude/specs`, `.claude/plans`, every fixed pair and `DEFAULT_PAIR` stay accepted (existing rows; AC3).
+- [X] Unit: ordinary and look-alike folders stay accepted (R3, edited rows; AC4, AC6).
+- [X] Unit: existing `RESERVED` and `.claude` reasons are unchanged (R4 and the unedited rows; AC5).
+- [X] Integration: `orchestrate.mjs start` halts with `ORCH_DOC_LOCATION_INVALID` and writes no run for `- Specs: .husky` and `- Plans: tools` (AC7).
+- [X] Full suite: `npm test` exit 0 (AC8).
 - No E2E: no UI.
 
 ## Commit Order
