@@ -89,8 +89,8 @@ The spec defers no full read. Read for this plan:
 **Files:**
 - Modify: `tests/hooks/opencode-guard.test.js`
 
-- [ ] [T-101] `tests/hooks/opencode-guard.test.js`: insert the `bash arguments outside the known set (BUG-071)` block with `REASON_TAIL` and rows B1-B5 after the `argument checks (AC6)` block and before `multiedit (AC2)` (plan decision 4). Depends on T-004.
-- [ ] [T-102] Red run: `npx vitest run tests/hooks/opencode-guard.test.js -t 'bash arguments outside the known set'`. Its full match set is exactly the 7 new rows (B1's three, B2, B3, B4, B5), since the describe name is new; the other 213 rows are skipped by the filter. Predicted: **5 failed | 2 passed | 213 skipped (220)**. Red: B1 `workdir`, B1 `cwd`, B1 `directory`, B2, B3. Green: B4, B5 (plan decision 6). Any other split means a test is wrong: fix the test, not the prediction. Depends on T-101.
+- [X] [T-101] `tests/hooks/opencode-guard.test.js`: insert the `bash arguments outside the known set (BUG-071)` block with `REASON_TAIL` and rows B1-B5 after the `argument checks (AC6)` block and before `multiedit (AC2)` (plan decision 4). Depends on T-004.
+- [X] [T-102] Red run: `npx vitest run tests/hooks/opencode-guard.test.js -t 'bash arguments outside the known set'`. Its full match set is exactly the 7 new rows (B1's three, B2, B3, B4, B5), since the describe name is new; the other 213 rows are skipped by the filter. Predicted: **5 failed | 2 passed | 213 skipped (220)**. Red: B1 `workdir`, B1 `cwd`, B1 `directory`, B2, B3. Green: B4, B5 (plan decision 6). Any other split means a test is wrong: fix the test, not the prediction. Depends on T-101.
 
 ---
 
@@ -100,13 +100,13 @@ The spec defers no full read. Read for this plan:
 - Modify: `project-template/.opencode/plugin/conductor-guard.js`
 - Modify: `README.md`
 
-- [ ] [T-201] `project-template/.opencode/plugin/conductor-guard.js`: add `BASH_ARGS`, `BASH_ARG_REASON` and `bashTool` after `patchTool` (plan decision 1). Depends on T-102.
-- [ ] [T-202] `project-template/.opencode/plugin/conductor-guard.js`, `MAPPED`: replace the `bash` entry and its comment with `bash: bashTool,` (plan decision 2). Depends on T-201.
-- [ ] [T-203] `project-template/.opencode/plugin/conductor-guard.js`: add the header sentence after `:7` (plan decision 3). Depends on T-202.
-- [ ] [T-204] Green run: the T-102 command. Predicted: **7 passed | 213 skipped (220)**. Depends on T-203.
-- [ ] [T-205] Run: `npx vitest run tests/hooks/opencode-guard.test.js`. Predicted: **220 passed (220)** (213 baseline + 7 new; spec, AC5). Depends on T-204.
-- [ ] [T-206] AC7 check: `grep -n "^import" project-template/.opencode/plugin/conductor-guard.js` lists only `node:child_process` and `node:path`, and `git diff --quiet package.json package-lock.json` exits 0 (today `package.json` has no `dependencies` key at all, so there is none to add to). Depends on T-205.
-- [ ] [T-207] `README.md`: insert the row of plan decision 5 after the `` `patch`/`apply_patch`, `multiedit` `` row of the `On OpenCode | Status` table. Depends on T-206.
+- [X] [T-201] `project-template/.opencode/plugin/conductor-guard.js`: add `BASH_ARGS`, `BASH_ARG_REASON` and `bashTool` after `patchTool` (plan decision 1). Depends on T-102.
+- [X] [T-202] `project-template/.opencode/plugin/conductor-guard.js`, `MAPPED`: replace the `bash` entry and its comment with `bash: bashTool,` (plan decision 2). Depends on T-201.
+- [X] [T-203] `project-template/.opencode/plugin/conductor-guard.js`: add the header sentence after `:7` (plan decision 3). Depends on T-202.
+- [X] [T-204] Green run: the T-102 command. Predicted: **7 passed | 213 skipped (220)**. Depends on T-203.
+- [X] [T-205] Run: `npx vitest run tests/hooks/opencode-guard.test.js`. Predicted: **220 passed (220)** (213 baseline + 7 new; spec, AC5). Depends on T-204.
+- [X] [T-206] AC7 check: `grep -n "^import" project-template/.opencode/plugin/conductor-guard.js` lists only `node:child_process` and `node:path`, and `git diff --quiet package.json package-lock.json` exits 0 (today `package.json` has no `dependencies` key at all, so there is none to add to). Depends on T-205.
+- [X] [T-207] `README.md`: insert the row of plan decision 5 after the `` `patch`/`apply_patch`, `multiedit` `` row of the `On OpenCode | Status` table. Depends on T-206.
 
 ---
 
@@ -115,11 +115,11 @@ The spec defers no full read. Read for this plan:
 **Files:**
 - Modify: `docs/superpowers/plans/2026-11-20-bug071-opencode-guard-evaluates-bash-commands-without.md` (ticks)
 
-- [ ] [T-301] Run `npm test`. Predicted: exit 0. A red is called ENV only if the sandbox caused it (network, tmp permissions) and its file is not one this plan touches; report it with its name. Any other red is fixed. Depends on T-207.
-- [ ] [T-302] Scope check: `git status --short` lists exactly `README.md`, `project-template/.opencode/plugin/conductor-guard.js`, `tests/hooks/opencode-guard.test.js` and this plan. No temporary file is left in the tree. `git diff --stat .claude/hooks project-template/.claude/hooks tests/fixtures tools/skip-baseline.json` is empty, and the `git diff README.md` hunk touches only the OpenCode table. Depends on T-301.
-- [ ] [T-303] Stage: `git add -u README.md project-template/.opencode/plugin/conductor-guard.js tests/hooks/opencode-guard.test.js` (all tracked; `project-template/.opencode/` is not ignored). Depends on T-302.
-- [ ] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-20-bug071-opencode-guard-evaluates-bash-commands-without.md` (carries the ticks for T-101 to T-303). Depends on T-303.
-- [ ] [T-305] Commit: `fix: block OpenCode bash calls with arguments the guard cannot check [BUG-071]`. Depends on T-304.
+- [X] [T-301] Run `npm test`. Predicted: exit 0. A red is called ENV only if the sandbox caused it (network, tmp permissions) and its file is not one this plan touches; report it with its name. Any other red is fixed. Depends on T-207.
+- [X] [T-302] Scope check: `git status --short` lists exactly `README.md`, `project-template/.opencode/plugin/conductor-guard.js`, `tests/hooks/opencode-guard.test.js` and this plan. No temporary file is left in the tree. `git diff --stat .claude/hooks project-template/.claude/hooks tests/fixtures tools/skip-baseline.json` is empty, and the `git diff README.md` hunk touches only the OpenCode table. Depends on T-301.
+- [X] [T-303] Stage: `git add -u README.md project-template/.opencode/plugin/conductor-guard.js tests/hooks/opencode-guard.test.js` (all tracked; `project-template/.opencode/` is not ignored). Depends on T-302.
+- [X] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-20-bug071-opencode-guard-evaluates-bash-commands-without.md` (carries the ticks for T-101 to T-303). Depends on T-303.
+- [X] [T-305] Commit: `fix: block OpenCode bash calls with arguments the guard cannot check [BUG-071]`. Depends on T-304.
 
 ---
 
