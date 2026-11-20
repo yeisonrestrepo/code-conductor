@@ -125,14 +125,14 @@ The spec defers no full read. Read for this plan:
 
 ## Test List
 
-- [ ] Unit, AC1: B1 (`workdir`, `cwd`, `directory`). Blocked before the guard runs: no payload recorded, exact reason naming `"bash"` and the key, not a `could not run` reason.
-- [ ] Unit, AC2: B2 (an unrelated unknown key) and B3 (two unknown keys, named sorted in one reason).
-- [ ] Unit, AC3: B4. `command`, `description`, `timeout` reach the guard as exactly `tool_input` `{ command }`, one payload, allowed.
-- [ ] Unit, AC4: B5. An `undefined`-valued unknown key does not block.
-- [ ] Unit, AC5: the 213 existing rows of `tests/hooks/opencode-guard.test.js`, unchanged, including the Guard 3 corpus through `bash` and `bash without command` (T-205).
-- [ ] AC6: the README row (T-207), checked by reading the diff in T-302; no test reads the README table.
-- [ ] AC7: T-206.
-- [ ] No integration or E2E/UI test: the rows drive the plugin the way OpenCode does (`tool.execute.before`), and there is no UI.
+- [X] Unit, AC1: B1 (`workdir`, `cwd`, `directory`). Blocked before the guard runs: no payload recorded, exact reason naming `"bash"` and the key, not a `could not run` reason.
+- [X] Unit, AC2: B2 (an unrelated unknown key) and B3 (two unknown keys, named sorted in one reason).
+- [X] Unit, AC3: B4. `command`, `description`, `timeout` reach the guard as exactly `tool_input` `{ command }`, one payload, allowed.
+- [X] Unit, AC4: B5. An `undefined`-valued unknown key does not block.
+- [X] Unit, AC5: the 213 existing rows of `tests/hooks/opencode-guard.test.js`, unchanged, including the Guard 3 corpus through `bash` and `bash without command` (T-205).
+- [X] AC6: the README row (T-207), checked by reading the diff in T-302; no test reads the README table.
+- [X] AC7: T-206.
+- [X] No integration or E2E/UI test: the rows drive the plugin the way OpenCode does (`tool.execute.before`), and there is no UI.
 
 ## Commit Order
 
