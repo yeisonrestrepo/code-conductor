@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.52.10] - 2026-11-20
+
+### Fixed
+- **[BUG-079]** `/cc-orchestrate`'s run file can no longer grow past the hooks' 10 MiB read cap through stored hand-back SNAPs. Since `[FEAT-055]` every non-security hand-back stores its full SNAP in `.claude/memory/orchestrator-run.json`, each capped at 64 KiB but with no cap on the total, so a plan of roughly 80 or more tasks with maximally sized hand-backs could make `readRunFile` in `.claude/hooks/pre-tool-use.mjs` return null and downgrade Guard 6 from deny to warn for the rest of the run. `handback` in `scripts/orchestrate.mjs` now saves through a new `saveHandedBackRun`, which serializes the run and halts `ORCH_RUN_FILE_FULL` when it would exceed a new exported `RUN_FILE_MAX_BYTES` of 8 MiB, naming the would-be size, the bound and the recovery (`end`, then `start` with a smaller plan). The halting hand-back is not recorded. The 2 MiB left below the hooks' cap covers the writes after a hand-back that are not checked (a halt, approvals, dispatch fields). Hand-backs under the bound, and every other run-file write, are unchanged. Both `cc-orchestrate.md` copies name the halt and its recovery. Pinned by rows RS3c–RS3e in `tests/scripts/orchestrate.test.js` (80-task plan with max-size hand-backs stays under both bounds until one halts; the halting hand-back is not recorded; the bound sits at least 1 MiB below both hooks' `BAND_ENVELOPE_MAX_BYTES`) and the `[BUG-079]` row of `tests/installer/commands-parity.test.js`. Landed from PR #273 (cc-lane-bot), intake of issue #213.
+
 ## [1.52.9] - 2026-11-20
 
 ### Fixed
