@@ -24,11 +24,14 @@ export const DIR_MAX = V3_CAPS['ops.scope'][1] - (GROUP_MAX + '/'.length + '/**'
 
 const CODE = 'ORCH_DOC_LOCATION_INVALID';
 // A recorded folder becomes the spec and plan agents' Guard 5 write scope, so it may not cover
-// the orchestrator write surface, git internals, or any folder that holds enforcement code
-// (`.opencode` holds the OpenCode guard). Inside `.claude`, only specs and plans may hold
-// documents: everything else there is agent instructions or configuration (skills, settings,
-// rules), so the rule below it is an allowlist, not this deny list.
-const RESERVED = ['.claude/memory', '.claude/hooks', '.claude/agents', '.claude/commands', '.claude/scripts', '.conductor', '.git', '.github', '.opencode', 'scripts'];
+// the orchestrator write surface, git internals, any folder that holds enforcement code
+// (`.opencode` holds the OpenCode guard), or a conventional code folder (`bin`, `lib`, `tools`).
+// Inside `.claude`, only specs and plans may hold documents: everything else there is agent
+// instructions or configuration (skills, settings, rules), so that rule is an allowlist, not
+// this deny list. Every other root dot-directory is refused as a class (BUG-072): tools run
+// what `.husky`, `.vscode` or `.devcontainer` hold on their own, and the class is open-ended,
+// so no list of names can close it.
+const RESERVED = ['.claude/memory', '.claude/hooks', '.claude/agents', '.claude/commands', '.claude/scripts', '.conductor', '.git', '.github', '.opencode', 'bin', 'lib', 'scripts', 'tools'];
 const CLAUDE_DOCS = ['.claude/specs', '.claude/plans'];
 const GROUP_RE = /^(#{1,5})\s+(phase|epic|pillar)\b[\s:#-]*(\d+)?[\s:.-]*(.*)$/i;
 const HEADING_RE = /^(#{1,6})\s/;
@@ -56,6 +59,10 @@ function reservedReason(value) {
   }
   if (underRoot(folded, '.claude') && !CLAUDE_DOCS.some((ok) => underRoot(folded, ok))) {
     return 'sits in `.claude`, where only `.claude/specs` and `.claude/plans` may hold documents';
+  }
+  const rootSegment = folded.split('/')[0];
+  if (rootSegment.startsWith('.') && rootSegment !== '.claude') {
+    return `sits in the root dot-directory \`${rootSegment}\`; among root dot-directories only \`.claude/specs\` and \`.claude/plans\` may hold documents`;
   }
   return '';
 }

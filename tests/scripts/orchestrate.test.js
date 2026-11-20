@@ -1349,6 +1349,17 @@ describe('doc locations [FEAT-047]', () => {
     expect(existsSync(join(root, RUN_FILE))).toBe(false);
   });
 
+  it.each([
+    ['root dot-directory', '.husky', 'rec/plans', '`- Specs: .husky`', '`.husky`'],
+    ['tools folder', 'rec/specs', 'tools', '`- Plans: tools`', 'reserved `tools`'],
+  ])('[BUG-072] halts start on a recorded %s and records no run', (_, specs, plans, line, folder) => {
+    recorded(specs, plans);
+    const r = halts('ORCH_DOC_LOCATION_INVALID');
+    expect(r.err).toContain(line);
+    expect(r.err).toContain(folder);
+    expect(existsSync(join(root, RUN_FILE))).toBe(false);
+  });
+
   it('[AC9] leaves a stale run in place when start halts on the doc location', () => {
     expect(orch(['start', 'FEAT-011'], { sid: 'old-session' }).status).toBe(0);
     recorded('rec/specs', null);
