@@ -3366,3 +3366,15 @@ Nothing minted: BUG-083 was reserved by triage #235, and BUG-069 and BUG-077 wer
 Known limits: the BUG-069, BUG-077 and BUG-083 lines are removed. Every other defect line is unchanged.
 
 No upgrade step: an `approve spec` for the document the hand-back named behaves as before, and a re-install with `--opencode` over an edited plugin now leaves a backup beside it. All three descriptions report `tests/unit/staging-convention.test.js` AC7/AC8 failing in their sandboxes' git; #255 also reports three permission-fixture failures under uid 0. CI on the release PR is the authority.
+
+## Release: 1.52.6 batch landing 2026-11-20
+
+One PR merged since `v1.52.5`. Existing id closed:
+
+- BUG-075 (#262 by `cc-lane-bot[bot]`, hand-backs and `end` that contradict the work claimed). `handback` runs `claimHalt` after the gate check: `ORCH_HANDBACK_SCOPE_MISMATCH` when `ops.scope` is not the scope `expectedScope` recomputes (none for `audit`, `security`, `qa`), `ORCH_HANDBACK_OUT_OF_SCOPE` for an unsafe or uncovered `ops.f` path; neither records the hand-back, and `resume` drops a kept `code` hand-back that fails it. `end` refuses `ORCH_END_UNVERIFIED` on a live run without `qa`'s `verify_pass`; `end --abandon` drops it with an abandon line. `approve` records `by: 'owner'`. A red `code` suite stays accepted, since `end` now needs `verify_pass`. Both `cc-orchestrate.md` copies gain the halts and `end --abandon`, with a parity row. Tests `hand-back claims, end and approver [BUG-075]` and RS21; nine existing live-run `end` calls now pass `--abandon`, and the B3 and B7 setups reach `approve` through an edited run file. Intake of issue #175. The spec and plan were approved by independent review, round 1.
+
+Nothing minted: BUG-075 was filed at intake of issue #175. BUG-087 (triage #260) stays reserved and open.
+
+Known limits: the BUG-075 line is removed. The BUG-074 line is unchanged, because `code` may still hand back `build_executed` on a red suite. Every other defect line is unchanged.
+
+Upgrade note: `end` on a live run that has not reached `verify_pass` now refuses; use `end --abandon` to drop such a run. A hand-back whose `ops.scope` differs from its installed envelope now halts, so a role must copy the installed scope verbatim, as the role files already instruct. An existing run file's `approvals[].by` is not rewritten. #262's description reports `tests/unit/staging-convention.test.js` AC7/AC8 failing in its sandbox's git (uid 0, git 2.43.0). CI on the release PR is the authority.
