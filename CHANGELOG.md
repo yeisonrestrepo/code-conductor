@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.52.6] - 2026-11-20
+
+### Fixed
+- **[BUG-075]** `scripts/orchestrate.mjs` now checks what a role hand-back claims, not only its shape. `handback <role>` halts `ORCH_HANDBACK_SCOPE_MISMATCH` when the hand-back's `ops.scope` is not, in the same order, the scope the script recomputes for that position from the plan and the run's pinned folders (never read back from `band-envelope.json`); `audit`, `security` and `qa` are installed with no scope, so naming one halts. It halts `ORCH_HANDBACK_OUT_OF_SCOPE` when an `ops.f` path is unsafe (a drive letter, an empty, `.` or `..` segment, a leading or trailing `/`) or lies outside that scope. Neither halt records the hand-back, and `resume` applies the same check to the `code` hand-backs it keeps, dropping one that fails. `end` on a live run refuses `ORCH_END_UNVERIFIED`, removing nothing, unless the last hand-back is `qa`'s `verify_pass`; a halted, invalid or missing run file ends as before, and `end --abandon` drops an unverified run, printing `run <ITEM> abandoned at <gate> before verify_pass` before the record. `approve` records `by: "owner"` instead of the global `git config user.name`. A red suite in a `code` hand-back is still accepted: the pass claim rides the `verify_pass` that `end` now requires. Both `cc-orchestrate.md` copies name the new halts, the refusal and `end --abandon`. Pinned by `hand-back claims, end and approver [BUG-075]` and resume row RS21 in `tests/scripts/orchestrate.test.js`, and the `[BUG-075]` row of `tests/installer/commands-parity.test.js`. Landed from PR #262 (cc-lane-bot), intake of issue #175.
+
 ## [1.52.5] - 2026-11-19
 
 ### Fixed
