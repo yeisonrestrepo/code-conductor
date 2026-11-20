@@ -142,6 +142,7 @@
     "tests/hooks/verbosity-remind.test.js > verbosity-remind hooks T-14: traversal cap=40 blocks verbosity.md 45 levels above; HOME fallback emits MIN",
     "tests/hooks/verbosity-remind.test.js > verbosity-remind hooks row13: unreadable project hook -> global retains authority",
     "tests/installer/deploy.test.js > deployProject: OpenCode plugin (FEAT-048) [BUG-069] leaves the host plugin untouched and says nothing installed when the backup fails",
+    "tests/installer/deploy.test.js > deployProject: OpenCode plugin (FEAT-048) [BUG-087] leaves the symlink and its target alone and says nothing installed when the link cannot be removed",
     "tests/installer/heal.test.js > SHIPPED_GRAPHIFY_HASHES pins each shipped hash to its blob (skips on a shallow clone: CI depth 1, id-ceiling ruling)",
     "tests/installer/heal.test.js > sweepGraphifyHooks names each file it could not delete and keeps going",
     "tests/plugin/code-conductor-plugin.test.js > code-conductor personal skills SKILL.md for agent-delegation exists and is non-empty",

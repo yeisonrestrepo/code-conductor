@@ -85,10 +85,10 @@ The spec defers none. Read for this plan:
 **Files:**
 - Modify: `tests/installer/deploy.test.js`
 
-- [ ] [T-101] `tests/installer/deploy.test.js:3`: add `readlinkSync` to the `node:fs` import. Depends on T-004.
-- [ ] [T-102] `tests/installer/deploy.test.js`, FEAT-048 block: add `INSTALLED` and `OUTSIDE_TEXT` next to `SHIPPED` (plan decision 4). Depends on T-101.
-- [ ] [T-103] `tests/installer/deploy.test.js`, FEAT-048 block: insert L1, L2 and L3 after the `[BUG-069] leaves the host plugin untouched…` case and before `ships the real plugin in the template` (plan decision 4). Depends on T-102.
-- [ ] [T-104] Red run: `npx vitest run tests/installer/deploy.test.js -t 'OpenCode plugin'`. Its full match set is the 7 existing FEAT-048 rows plus L1, L2 and L3, because every row in the block carries the describe name; the other 64 rows of the file are skipped by the filter. Predicted: **3 failed | 7 passed | 64 skipped (74)**. Red: L1, L2, L3. Green: the 3 `[BUG-069]` rows, `writes no .opencode/…`, `installs the plugin byte for byte…`, `keeps the host project's own .opencode/ files` and `ships the real plugin in the template` (plan decision 6). On a root runner L3 is skipped: **2 failed | 7 passed | 65 skipped**. Any other split means a test is wrong: fix the test, not the prediction. Depends on T-103.
+- [X] [T-101] `tests/installer/deploy.test.js:3`: add `readlinkSync` to the `node:fs` import. Depends on T-004.
+- [X] [T-102] `tests/installer/deploy.test.js`, FEAT-048 block: add `INSTALLED` and `OUTSIDE_TEXT` next to `SHIPPED` (plan decision 4). Depends on T-101.
+- [X] [T-103] `tests/installer/deploy.test.js`, FEAT-048 block: insert L1, L2 and L3 after the `[BUG-069] leaves the host plugin untouched…` case and before `ships the real plugin in the template` (plan decision 4). Depends on T-102.
+- [X] [T-104] Red run: `npx vitest run tests/installer/deploy.test.js -t 'OpenCode plugin'`. Its full match set is the 7 existing FEAT-048 rows plus L1, L2 and L3, because every row in the block carries the describe name; the other 64 rows of the file are skipped by the filter. Predicted: **3 failed | 7 passed | 64 skipped (74)**. Red: L1, L2, L3. Green: the 3 `[BUG-069]` rows, `writes no .opencode/…`, `installs the plugin byte for byte…`, `keeps the host project's own .opencode/ files` and `ships the real plugin in the template` (plan decision 6). On a root runner L3 is skipped: **2 failed | 7 passed | 65 skipped**. Any other split means a test is wrong: fix the test, not the prediction. Depends on T-103.
 
 ---
 
@@ -98,12 +98,12 @@ The spec defers none. Read for this plan:
 - Modify: `lib/installer/deploy.mjs`
 - Modify: `tools/skip-baseline.json`
 
-- [ ] [T-201] `lib/installer/deploy.mjs:1`: add `readlinkSync` to the `node:fs` import (plan decision 3). Depends on T-104.
-- [ ] [T-202] `lib/installer/deploy.mjs`: add `removePluginSymlink` between `replaceWithTemplate` and `installOpencodePlugin` (plan decision 1). Depends on T-201.
-- [ ] [T-203] `lib/installer/deploy.mjs`, `installOpencodePlugin`: bind `pluginPath`, add the early return, and pass `pluginPath` to `mergeFileInto` (plan decision 2). Depends on T-202.
-- [ ] [T-204] `tools/skip-baseline.json`, `ci-windows-node24`: insert L3's full name after the `[BUG-069] leaves the host plugin untouched…` line (plan decision 5). Depends on T-203.
-- [ ] [T-205] Green run: the T-104 command. Predicted: **10 passed | 64 skipped (74)** (root runner: **9 passed | 65 skipped**). Depends on T-204.
-- [ ] [T-206] Run: `npx vitest run tests/installer/deploy.test.js tests/installer/file-merge.test.js tests/installer/cli.test.js tests/tools/skip-baseline.test.js`. Predicted: every test passes, 90 of them in the first two files (87 baseline + 3 new). This covers the `through realpath and keeps the link` rows and `file-merge.test.js` unchanged (spec, AC5), the FEAT-048 CLI cases, and the baseline file still parsing. Depends on T-205.
+- [X] [T-201] `lib/installer/deploy.mjs:1`: add `readlinkSync` to the `node:fs` import (plan decision 3). Depends on T-104.
+- [X] [T-202] `lib/installer/deploy.mjs`: add `removePluginSymlink` between `replaceWithTemplate` and `installOpencodePlugin` (plan decision 1). Depends on T-201.
+- [X] [T-203] `lib/installer/deploy.mjs`, `installOpencodePlugin`: bind `pluginPath`, add the early return, and pass `pluginPath` to `mergeFileInto` (plan decision 2). Depends on T-202.
+- [X] [T-204] `tools/skip-baseline.json`, `ci-windows-node24`: insert L3's full name after the `[BUG-069] leaves the host plugin untouched…` line (plan decision 5). Depends on T-203.
+- [X] [T-205] Green run: the T-104 command. Predicted: **10 passed | 64 skipped (74)** (root runner: **9 passed | 65 skipped**). Depends on T-204.
+- [X] [T-206] Run: `npx vitest run tests/installer/deploy.test.js tests/installer/file-merge.test.js tests/installer/cli.test.js tests/tools/skip-baseline.test.js`. Predicted: every test passes, 90 of them in the first two files (87 baseline + 3 new). This covers the `through realpath and keeps the link` rows and `file-merge.test.js` unchanged (spec, AC5), the FEAT-048 CLI cases, and the baseline file still parsing. Depends on T-205.
 
 ---
 
@@ -112,22 +112,22 @@ The spec defers none. Read for this plan:
 **Files:**
 - Modify: `docs/superpowers/plans/2026-11-19-bug087-installer-follows-a-symlink-at-the-opencode.md` (ticks)
 
-- [ ] [T-301] Run `npm test`. Predicted: exit 0 (spec, AC6). A red is called ENV only if the sandbox caused it (network, tmp permissions) and its file is not one this plan touches; report it with its name. Any other red is fixed. Depends on T-206.
-- [ ] [T-302] Scope check: `git status --short` lists exactly `lib/installer/deploy.mjs`, `tests/installer/deploy.test.js`, `tools/skip-baseline.json` and this plan. No temporary file is left in the tree, and no `cc-outside-` directory is left in the temp dir. `git diff lib/installer/file-merge.mjs` is empty. Depends on T-301.
-- [ ] [T-303] Stage: `git add -u lib/installer/deploy.mjs tests/installer/deploy.test.js tools/skip-baseline.json` (all tracked). Depends on T-302.
-- [ ] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-19-bug087-installer-follows-a-symlink-at-the-opencode.md` (carries the ticks for T-101 to T-303). Depends on T-303.
-- [ ] [T-305] Commit: `fix: replace a symlink at the OpenCode guard plugin path instead of writing through it [BUG-087]`. Depends on T-304.
+- [X] [T-301] Run `npm test`. Predicted: exit 0 (spec, AC6). A red is called ENV only if the sandbox caused it (network, tmp permissions) and its file is not one this plan touches; report it with its name. Any other red is fixed. Depends on T-206.
+- [X] [T-302] Scope check: `git status --short` lists exactly `lib/installer/deploy.mjs`, `tests/installer/deploy.test.js`, `tools/skip-baseline.json` and this plan. No temporary file is left in the tree, and no `cc-outside-` directory is left in the temp dir. `git diff lib/installer/file-merge.mjs` is empty. Depends on T-301.
+- [X] [T-303] Stage: `git add -u lib/installer/deploy.mjs tests/installer/deploy.test.js tools/skip-baseline.json` (all tracked). Depends on T-302.
+- [X] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-19-bug087-installer-follows-a-symlink-at-the-opencode.md` (carries the ticks for T-101 to T-303). Depends on T-303.
+- [X] [T-305] Commit: `fix: replace a symlink at the OpenCode guard plugin path instead of writing through it [BUG-087]`. Depends on T-304.
 
 ---
 
 ## Test List
 
-- [ ] Unit, AC1 and AC2: L1. A link to a file outside the project root is replaced by a regular file with the shipped bytes; the outside file keeps its bytes and gets no backup; the stderr line names the link text; stdout is exactly the `installed` line.
-- [ ] Unit, AC3: L2. A dangling link is replaced and the plugin is installed; nothing is created at the link's target.
-- [ ] Unit, AC4: L3. A link that cannot be removed stays a link to the same text, its target is unchanged, stderr has the `could not be removed` line, and stdout has no `OpenCode` line. Its name is in `ci-windows-node24`.
-- [ ] Unit, AC5: the three `[BUG-069]` rows and the other FEAT-048 rows, `tests/installer/file-merge.test.js`, and the `through realpath and keeps the link` rows of `deploy.test.js`, all unchanged.
-- [ ] AC6: `npm test` (T-301).
-- [ ] No integration or E2E/UI test: `cli.test.js` already drives `deployProject` with `--opencode` end to end, and there is no UI.
+- [X] Unit, AC1 and AC2: L1. A link to a file outside the project root is replaced by a regular file with the shipped bytes; the outside file keeps its bytes and gets no backup; the stderr line names the link text; stdout is exactly the `installed` line.
+- [X] Unit, AC3: L2. A dangling link is replaced and the plugin is installed; nothing is created at the link's target.
+- [X] Unit, AC4: L3. A link that cannot be removed stays a link to the same text, its target is unchanged, stderr has the `could not be removed` line, and stdout has no `OpenCode` line. Its name is in `ci-windows-node24`.
+- [X] Unit, AC5: the three `[BUG-069]` rows and the other FEAT-048 rows, `tests/installer/file-merge.test.js`, and the `through realpath and keeps the link` rows of `deploy.test.js`, all unchanged.
+- [X] AC6: `npm test` (T-301).
+- [X] No integration or E2E/UI test: `cli.test.js` already drives `deployProject` with `--opencode` end to end, and there is no UI.
 
 ## Commit Order
 

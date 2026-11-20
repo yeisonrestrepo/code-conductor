@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { CAN_SYMLINK } from '../helpers/can-symlink.js';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync, readFileSync, readdirSync, lstatSync, chmodSync, symlinkSync, realpathSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync, readFileSync, readdirSync, lstatSync, chmodSync, symlinkSync, readlinkSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
@@ -658,6 +658,8 @@ describe('deployProject: OpenCode plugin (FEAT-048)', () => {
   const PLUGIN_REL = join('.opencode', 'plugin', 'conductor-guard.js');
   const PLUGIN_DIR = join('.opencode', 'plugin');
   const SHIPPED = 'export const ConductorGuard = 1;\n';
+  const INSTALLED = 'code-conductor: installed the OpenCode guard plugin at .opencode/plugin/conductor-guard.js';
+  const OUTSIDE_TEXT = '// a file outside the project\n';
   const backupsIn = (dir) => readdirSync(dir).filter((n) => n.startsWith('conductor-guard.js.installer-backup.'));
   beforeEach(() => {
     mkdirSync(join(asset, 'project-template', '.opencode', 'plugin'), { recursive: true });
@@ -717,6 +719,62 @@ describe('deployProject: OpenCode plugin (FEAT-048)', () => {
     expect(backupsIn(join(home, PLUGIN_DIR))).toEqual([]);
     expect(out.warned.some((m) => /could not back it up/.test(m))).toBe(true);
     expect(out.said.some((m) => /OpenCode/.test(m))).toBe(false);
+  });
+  it.skipIf(!CAN_SYMLINK)('[BUG-087] replaces a symlinked plugin with a regular file and leaves the file it pointed to outside the project untouched', () => {
+    const outside = mkdtempSync(join(tmpdir(), 'cc-outside-'));
+    try {
+      writeFileSync(join(outside, 'victim.js'), OUTSIDE_TEXT);
+      mkdirSync(join(home, PLUGIN_DIR), { recursive: true });
+      symlinkSync(join(outside, 'victim.js'), join(home, PLUGIN_REL));
+      const linkText = readlinkSync(join(home, PLUGIN_REL));
+      const out = capture();
+      deployProject(asset, home, { ...out.opts, opencode: true });
+      expect(readFileSync(join(outside, 'victim.js'), 'utf8')).toBe(OUTSIDE_TEXT);
+      expect(readdirSync(outside)).toEqual(['victim.js']);
+      expect(lstatSync(join(home, PLUGIN_REL)).isSymbolicLink()).toBe(false);
+      expect(lstatSync(join(home, PLUGIN_REL)).isFile()).toBe(true);
+      expect(readFileSync(join(home, PLUGIN_REL), 'utf8')).toBe(SHIPPED);
+      expect(out.warned).toEqual([`code-conductor: replaced the symlink at .opencode/plugin/conductor-guard.js (it pointed to ${linkText}) with the shipped plugin; the file it pointed to was not touched`]);
+      expect(out.said).toEqual([INSTALLED]);
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+  it.skipIf(!CAN_SYMLINK)('[BUG-087] replaces a dangling symlink at the plugin path and installs the plugin', () => {
+    mkdirSync(join(home, PLUGIN_DIR), { recursive: true });
+    symlinkSync(join(home, 'missing-target.js'), join(home, PLUGIN_REL));
+    const linkText = readlinkSync(join(home, PLUGIN_REL));
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, opencode: true });
+    expect(lstatSync(join(home, PLUGIN_REL)).isSymbolicLink()).toBe(false);
+    expect(readFileSync(join(home, PLUGIN_REL), 'utf8')).toBe(SHIPPED);
+    expect(existsSync(join(home, 'missing-target.js'))).toBe(false);
+    expect(out.warned).toEqual([`code-conductor: replaced the symlink at .opencode/plugin/conductor-guard.js (it pointed to ${linkText}) with the shipped plugin; the file it pointed to was not touched`]);
+    expect(out.said).toEqual([INSTALLED]);
+  });
+  it.skipIf(!POSIX_NON_ROOT || !CAN_SYMLINK)('[BUG-087] leaves the symlink and its target alone and says nothing installed when the link cannot be removed', () => {
+    const outside = mkdtempSync(join(tmpdir(), 'cc-outside-'));
+    try {
+      writeFileSync(join(outside, 'victim.js'), OUTSIDE_TEXT);
+      mkdirSync(join(home, PLUGIN_DIR), { recursive: true });
+      symlinkSync(join(outside, 'victim.js'), join(home, PLUGIN_REL));
+      const linkText = readlinkSync(join(home, PLUGIN_REL));
+      const out = capture();
+      chmodSync(join(home, PLUGIN_DIR), 0o555);
+      try {
+        deployProject(asset, home, { ...out.opts, opencode: true });
+      } finally {
+        chmodSync(join(home, PLUGIN_DIR), 0o755);
+      }
+      expect(lstatSync(join(home, PLUGIN_REL)).isSymbolicLink()).toBe(true);
+      expect(readlinkSync(join(home, PLUGIN_REL))).toBe(linkText);
+      expect(readFileSync(join(outside, 'victim.js'), 'utf8')).toBe(OUTSIDE_TEXT);
+      expect(readdirSync(outside)).toEqual(['victim.js']);
+      expect(out.warned).toEqual(['code-conductor: skipping .opencode/plugin/conductor-guard.js — it is a symlink and could not be removed (EACCES); nothing was written']);
+      expect(out.said.some((m) => /OpenCode/.test(m))).toBe(false);
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
   });
   it('ships the real plugin in the template', () => {
     expect(existsSync(join(ROOT, 'project-template', PLUGIN_REL))).toBe(true);
