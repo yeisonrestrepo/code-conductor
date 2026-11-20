@@ -113,9 +113,9 @@ By owner decision (Owner decisions 2) these edits are made on a `records/*` bran
 
 ## Test List
 
-- [ ] Hooks: `tests/hooks/context-guard.test.js`, both `session reset (BUG-056)` describes (AC3), unchanged.
-- [ ] Records on this branch: `tests/tools/repo-invariants.test.js` stays green inside `npm test`, with no record changed. On the `records/*` branch, R-4 runs it with `tools/record-parity.mjs` and `tools/version-gate.mjs` (AC4-AC6).
-- [ ] Full suite: `npm test` green (AC7).
+- [X] Hooks: `tests/hooks/context-guard.test.js`, both `session reset (BUG-056)` describes (AC3), unchanged.
+- [X] Records on this branch: `tests/tools/repo-invariants.test.js` stays green inside `npm test`, with no record changed. On the `records/*` branch, R-4 runs it with `tools/record-parity.mjs` and `tools/version-gate.mjs` (AC4-AC6).
+- [X] Full suite: `npm test` green (AC7).
 
 ## Commit Order
 
