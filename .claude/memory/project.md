@@ -3426,3 +3426,15 @@ Nothing minted: BUG-079 was filed at intake of issue #213.
 Known limits: the BUG-079 line is removed. Every other defect line is unchanged.
 
 No upgrade step: a run whose run file stays under 8 MiB behaves exactly as before; a run that would cross it now halts `ORCH_RUN_FILE_FULL` instead of silently weakening Guard 6. CI on the release PR is the authority.
+
+## Release: 1.52.11 batch landing 2026-11-20
+
+One PR merged since `v1.52.10`. Existing id closed:
+
+- BUG-078 (#275 by `cc-lane-bot[bot]`, fix-round write scope includes the approved plan). `fixScope` in `scripts/orchestrate.mjs` builds the scope with `checkedScope(..., files, [])` instead of `taskScope()`, so a fix round's `ops.scope` is the review-named files alone and Guard 5 now denies the fix-round `code` agent a write to the approved plan; before, only the brief's wording did, and checkbox ticks could get past `checkApprovedDocs`. The `ORCH_FIX_SCOPE_UNAPPROVED` check, the 20-entry scope cap and plan-task scopes (which still carry the plan) are unchanged. Both `code.md` agent profiles name the fix-round scope without the plan. Tests: rows E1, C5b, the 20/21-file fix-round cap rows and a 20-file plan-task cap row in `tests/scripts/orchestrate.test.js`, and the `code` profile hash in `tests/unit/role-profiles.test.js`. The PR also adds the spec and plan leaves to the `.gitignore` tracked-surface block. Intake of issue #203, reported by the automated security review of the 1.47.0 release candidate (#202). The spec and plan were approved by independent review, round 1.
+
+Nothing minted: BUG-078 was filed at intake of issue #203.
+
+Known limits: the BUG-078 line is removed. Every other defect line is unchanged.
+
+No upgrade step: a fix round's agent loses only write access to the approved plan, which its brief already forbade; reinstalling ships the updated `code` profile. CI on the release PR is the authority.

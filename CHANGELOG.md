@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.52.11] - 2026-11-20
+
+### Fixed
+- **[BUG-078]** In a `/cc-orchestrate` fix round, the `code` agent's write scope no longer includes the approved plan. `fixScope` in `scripts/orchestrate.mjs` built the scope through `taskScope()`, which always appends the plan path, so Guard 5 let the fix-round agent write to the plan and only the brief's "tick no boxes" instruction stopped it. The scope is now the files the review names alone, built by `checkedScope` with nothing added, so Guard 5 enforces what the brief states; a fix-round hand-back naming the plan in `ops.f` halts `ORCH_HANDBACK_OUT_OF_SCOPE`. Plan-task scopes still carry the plan, and the 20-entry scope cap is unchanged. Both `code.md` agent profiles say that a fix round's scope is the files the review names, without the plan. Pinned by the `[BUG-078]` rows of `tests/scripts/orchestrate.test.js` (E1, C5b, the fix-round cap rows where 20 files pass and 21 halt, and a 20-file plan-task cap row) and the updated `code` profile hash in `tests/unit/role-profiles.test.js`. Landed from PR #275 (cc-lane-bot), intake of issue #203.
+
 ## [1.52.10] - 2026-11-20
 
 ### Fixed
