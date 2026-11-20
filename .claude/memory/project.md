@@ -3390,3 +3390,15 @@ Nothing minted: BUG-087 was reserved by triage #260.
 Known limits: the BUG-087 line is removed. The BUG-071 line is unchanged, since it concerns the plugin's runtime behavior, not its install. Every other defect line is unchanged.
 
 No upgrade step: a re-install with `--opencode` over a regular plugin file behaves as before, and one over a symlinked plugin now replaces the link instead of overwriting its target. #264's description reports two `tests/unit/staging-convention.test.js` failures from its sandbox's git `git add -u` exit code. CI on the release PR is the authority.
+
+## Release: 1.52.8 batch landing 2026-11-20
+
+One PR merged since `v1.52.7`. Existing id closed:
+
+- BUG-072 (#269 by `cc-lane-bot[bot]`, spec and plan folder deny list missing root dot-directories and `bin`, `lib`, `tools`). `reservedReason` in `scripts/doc-locations.mjs` gains a third rule after the `RESERVED` and `.claude` allowlist checks: a root segment starting with `.` other than `.claude` is refused as a root dot-directory, so the class is closed rather than listed. `RESERVED` gains `bin`, `lib` and `tools`. Matching stays segment-wise and case-folded; `binx`, `docs/bin` and `docs/.vscode` are accepted, `.conductorx` is now refused, so the existing segment-wise row moved its acceptance pins to `scriptsx`, `binx` and `docs/.vscode`. Folders already refused keep their old reason text. Tests: `[BUG-072]` rows in `tests/scripts/doc-locations.test.js` and two `start` rows in `tests/scripts/orchestrate.test.js` (`ORCH_DOC_LOCATION_INVALID`, no run written). The PR also adds the spec and plan leaves to the `.gitignore` tracked-surface block. Intake of issue #161, reported by the automated security review of the 1.44.0 release candidate (#157). The spec and plan were approved by independent review, round 1.
+
+Nothing minted: BUG-072 was filed at intake of issue #161. BUG-088 (triage #265) stays reserved and open.
+
+Known limits: the BUG-072 line is removed. Every other defect line is unchanged.
+
+Upgrade note: a project whose `CLAUDE.md` records `- Specs:` or `- Plans:` under a root dot-directory other than `.claude`, or under `bin`, `lib` or `tools`, now halts `/cc-orchestrate start` with `ORCH_DOC_LOCATION_INVALID`; move that line to a documentation folder such as `docs/specs` and `docs/plans`. #269's description reports one `tests/unit/staging-convention.test.js` failure from its sandbox's git exit-code behavior. CI on the release PR is the authority.
