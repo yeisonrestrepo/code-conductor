@@ -127,11 +127,11 @@
 - Modify: `tests/scripts/orchestrate.test.js:13`, `:3013`
 - Modify: `tests/installer/commands-parity.test.js:407`
 
-- [ ] [T-101] `tests/scripts/orchestrate.test.js:13`: add `RUN_FILE_MAX_BYTES` to the named import (plan decision 4). Depends on T-004.
-- [ ] [T-102] `tests/scripts/orchestrate.test.js:3013`: insert the BUG-079 helpers and RS3c, RS3d and RS3e above `// Entry acceptance criteria.` (plan decision 4). Depends on T-101.
-- [ ] [T-103] `tests/installer/commands-parity.test.js:407`: add the `[BUG-079]` `it` after the `[BUG-077]` one (plan decision 4). Depends on T-102.
-- [ ] [T-104] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t 'BUG-079'`. Its full match set is RS3c, RS3d and RS3e. No existing title contains `BUG-079`. Predicted: **3 failed** (1125 skipped), with the failure messages of plan decision 6. Any other split means a test is wrong: fix the test, not the prediction. Depends on T-103.
-- [ ] [T-105] Red run: `npx vitest run tests/installer/commands-parity.test.js -t 'BUG-079'`. Its full match set is the new test only. Predicted: **1 failed** (at `toContain('`ORCH_RUN_FILE_FULL`')`), and every other test in the file is skipped. Depends on T-104.
+- [X] [T-101] `tests/scripts/orchestrate.test.js:13`: add `RUN_FILE_MAX_BYTES` to the named import (plan decision 4). Depends on T-004.
+- [X] [T-102] `tests/scripts/orchestrate.test.js:3013`: insert the BUG-079 helpers and RS3c, RS3d and RS3e above `// Entry acceptance criteria.` (plan decision 4). Depends on T-101.
+- [X] [T-103] `tests/installer/commands-parity.test.js:407`: add the `[BUG-079]` `it` after the `[BUG-077]` one (plan decision 4). Depends on T-102.
+- [X] [T-104] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t 'BUG-079'`. Its full match set is RS3c, RS3d and RS3e. No existing title contains `BUG-079`. Predicted: **3 failed** (1125 skipped), with the failure messages of plan decision 6. Any other split means a test is wrong: fix the test, not the prediction. Depends on T-103.
+- [X] [T-105] Red run: `npx vitest run tests/installer/commands-parity.test.js -t 'BUG-079'`. Its full match set is the new test only. Predicted: **1 failed** (at `toContain('`ORCH_RUN_FILE_FULL`')`), and every other test in the file is skipped. Depends on T-104.
 
 ---
 
@@ -141,14 +141,14 @@
 - Modify: `scripts/orchestrate.mjs:112`, `:239`, `:1017`
 - Modify: `.claude/commands/cc-orchestrate.md:37`, `project-template/.claude/commands/cc-orchestrate.md:37`
 
-- [ ] [T-201] `scripts/orchestrate.mjs:112`: add `RUN_FILE_MAX_BYTES` with its comment after `SNAP_STORE_MAX_BYTES` (plan decision 1). Depends on T-105.
-- [ ] [T-202] `scripts/orchestrate.mjs:239` (now `:241`): replace `saveRun` with `serializeRun`, `saveRun` and `saveHandedBackRun` (plan decision 2). Depends on T-201.
-- [ ] [T-203] `scripts/orchestrate.mjs:1017` (now about `:1030`): in `handback`, change `saveRun(root, recorded);` to `saveHandedBackRun(root, recorded, role);` (plan decision 3). Depends on T-202.
-- [ ] [T-204] Green run: the T-104 command. Predicted: **3 passed** (1125 skipped). Depends on T-203.
-- [ ] [T-205] `.claude/commands/cc-orchestrate.md:37`: append the sentence of plan decision 5 with a file-edit tool. Depends on T-204.
-- [ ] [T-206] `project-template/.claude/commands/cc-orchestrate.md:37`: append the same sentence. Depends on T-205.
-- [ ] [T-207] Green run: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: **94 passed (94)**, including the mirrors suite (spec, AC5). Depends on T-206.
-- [ ] [T-208] `npx vitest run tests/scripts/orchestrate.test.js`. Predicted: **1128 passed (1128)** (1125 baseline + 3 new), with RS3 and RS3b unmodified and green (spec, AC3). Depends on T-207.
+- [X] [T-201] `scripts/orchestrate.mjs:112`: add `RUN_FILE_MAX_BYTES` with its comment after `SNAP_STORE_MAX_BYTES` (plan decision 1). Depends on T-105.
+- [X] [T-202] `scripts/orchestrate.mjs:239` (now `:241`): replace `saveRun` with `serializeRun`, `saveRun` and `saveHandedBackRun` (plan decision 2). Depends on T-201.
+- [X] [T-203] `scripts/orchestrate.mjs:1017` (now about `:1030`): in `handback`, change `saveRun(root, recorded);` to `saveHandedBackRun(root, recorded, role);` (plan decision 3). Depends on T-202.
+- [X] [T-204] Green run: the T-104 command. Predicted: **3 passed** (1125 skipped). Depends on T-203.
+- [X] [T-205] `.claude/commands/cc-orchestrate.md:37`: append the sentence of plan decision 5 with a file-edit tool. Depends on T-204.
+- [X] [T-206] `project-template/.claude/commands/cc-orchestrate.md:37`: append the same sentence. Depends on T-205.
+- [X] [T-207] Green run: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: **94 passed (94)**, including the mirrors suite (spec, AC5). Depends on T-206.
+- [X] [T-208] `npx vitest run tests/scripts/orchestrate.test.js`. Predicted: **1128 passed (1128)** (1125 baseline + 3 new), with RS3 and RS3b unmodified and green (spec, AC3). Depends on T-207.
 
 ---
 
@@ -157,28 +157,28 @@
 **Files:**
 - Modify: `scripts/orchestrate.mjs`, `tests/scripts/orchestrate.test.js`, `tests/installer/commands-parity.test.js`, `.claude/commands/cc-orchestrate.md`, `project-template/.claude/commands/cc-orchestrate.md` (staged), this plan (checkboxes)
 
-- [ ] [T-301] Run `npm test`. Predicted: every file green, apart from environment failures in files this plan does not touch. On CI the exit status is 0 (spec, AC6). A red counts as ENV only if the sandbox causes it (network, tmp permissions, uid, missing `node:sqlite`) and the test's file is not one this plan touches. Report it with its name. Any other red is fixed. Depends on T-208.
-- [ ] [T-302] Scope check:
+- [X] [T-301] Run `npm test`. Predicted: every file green, apart from environment failures in files this plan does not touch. On CI the exit status is 0 (spec, AC6). A red counts as ENV only if the sandbox causes it (network, tmp permissions, uid, missing `node:sqlite`) and the test's file is not one this plan touches. Report it with its name. Any other red is fixed. Depends on T-208.
+- [X] [T-302] Scope check:
   - `git status --porcelain` lists exactly the five files of this task and this plan as modified.
   - `cmp .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md` prints nothing.
   - `git diff -U0 HEAD -- tests/scripts/orchestrate.test.js | grep '^-[^-]'` prints only the old import line 13 (no existing test edited, spec AC3).
   - `git diff --quiet HEAD -- VERSION CHANGELOG.md package.json package-lock.json README.md "AGENT-READABLE BACKLOG.md" .claude/memory .claude/hooks project-template/.claude/hooks .claude/settings.json scripts/snap-contract.mjs scripts/snap-validate.mjs .github tools lib bin` exits 0.
   - Depends on T-301.
-- [ ] [T-303] Stage: `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js tests/installer/commands-parity.test.js .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md` (all tracked). Depends on T-302.
-- [ ] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-20-bug079-unbounded-cumulative-size-of-stored-snaps-in.md` (carries the ticks for T-101 to T-303). Depends on T-303.
-- [ ] [T-305] Commit: `fix: bound the orchestrator run file below the hooks' read cap [BUG-079]`. Depends on T-304.
+- [X] [T-303] Stage: `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js tests/installer/commands-parity.test.js .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md` (all tracked). Depends on T-302.
+- [X] [T-304] Stage: `git add -u docs/superpowers/plans/2026-11-20-bug079-unbounded-cumulative-size-of-stored-snaps-in.md` (carries the ticks for T-101 to T-303). Depends on T-303.
+- [X] [T-305] Commit: `fix: bound the orchestrator run file below the hooks' read cap [BUG-079]`. Depends on T-304.
 
 ---
 
 ## Test List
 
-- [ ] Integration (CLI), AC1: RS3c, many 64 KiB hand-backs that double under escaping, the last ones through the real `handback code` verb. The file stays at most 8 MiB and under 10 MiB until one halts `ORCH_RUN_FILE_FULL`.
-- [ ] Integration (CLI), AC2: RS3d. The halting hand-back leaves `handbacks` equal to before, `halt.code` is `ORCH_RUN_FILE_FULL`, the file stays at most 10 MiB, and the exact stderr text names the size, the bound and the recovery.
-- [ ] Unit, AC3: every existing `tests/scripts/orchestrate.test.js` case unmodified and green, RS3 and RS3b included (T-208, T-302).
-- [ ] Unit, AC4: RS3e, `RUN_FILE_MAX_BYTES` at least 1 MiB below `BAND_ENVELOPE_MAX_BYTES` in both hook copies.
-- [ ] Parity, AC5: the `[BUG-079]` `it` in `commands-parity.test.js`, the mirrors suite, and `cmp` in T-302.
-- [ ] AC6: `npm test` (T-301).
-- [ ] No E2E/UI test: the verb is exercised end to end through the CLI fixture, and there is no UI.
+- [X] Integration (CLI), AC1: RS3c, many 64 KiB hand-backs that double under escaping, the last ones through the real `handback code` verb. The file stays at most 8 MiB and under 10 MiB until one halts `ORCH_RUN_FILE_FULL`.
+- [X] Integration (CLI), AC2: RS3d. The halting hand-back leaves `handbacks` equal to before, `halt.code` is `ORCH_RUN_FILE_FULL`, the file stays at most 10 MiB, and the exact stderr text names the size, the bound and the recovery.
+- [X] Unit, AC3: every existing `tests/scripts/orchestrate.test.js` case unmodified and green, RS3 and RS3b included (T-208, T-302).
+- [X] Unit, AC4: RS3e, `RUN_FILE_MAX_BYTES` at least 1 MiB below `BAND_ENVELOPE_MAX_BYTES` in both hook copies.
+- [X] Parity, AC5: the `[BUG-079]` `it` in `commands-parity.test.js`, the mirrors suite, and `cmp` in T-302.
+- [X] AC6: `npm test` (T-301).
+- [X] No E2E/UI test: the verb is exercised end to end through the CLI fixture, and there is no UI.
 
 ## Commit Order
 

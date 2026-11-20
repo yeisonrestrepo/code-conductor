@@ -406,6 +406,10 @@ describe('cc-orchestrate review loop [FEAT-041 AC5, AC6, FEAT-058]', () => {
     has('**The spec must be the one handed back.**', '`ORCH_SPEC_NOT_HANDED_BACK`');
   });
 
+  it('names the run file bound halt and its recovery [BUG-079]', () => {
+    has('`ORCH_RUN_FILE_FULL`', 'the hand-back is not recorded, and recovery is `end`, then `start` with a smaller plan');
+  });
+
   it('names the hand-back claim halts, the end refusal and end --abandon [BUG-075]', () => {
     has('`ORCH_HANDBACK_SCOPE_MISMATCH`', '`ORCH_HANDBACK_OUT_OF_SCOPE`', '`ORCH_END_UNVERIFIED`', '**Abandon (BUG-075).**',
       'node "$S/orchestrate.mjs" end --abandon', 'Never pass `--abandon` on your own.');
