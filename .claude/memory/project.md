@@ -3414,3 +3414,15 @@ Nothing minted: BUG-088 was reserved by triage #265.
 Known limits: the BUG-088 line is removed. Every other defect line is unchanged.
 
 No upgrade step: only the text of one installer warning changes, and only for a link target that holds control characters. #271's description reports two `tests/unit/staging-convention.test.js` failures from its sandbox's git version. CI on the release PR is the authority.
+
+## Release: 1.52.10 batch landing 2026-11-20
+
+One PR merged since `v1.52.9`. Existing id closed:
+
+- BUG-079 (#273 by `cc-lane-bot[bot]`, unbounded cumulative size of stored SNAPs in the orchestrator run file). `handback` in `scripts/orchestrate.mjs` now saves through a new `saveHandedBackRun`, which serializes the run and halts `ORCH_RUN_FILE_FULL` when the text would exceed the new exported `RUN_FILE_MAX_BYTES` of 8 MiB; the halt names the would-be byte count, the bound and the recovery (`end`, then `start` with a smaller plan), and the halting hand-back is not recorded. The bound sits 2 MiB under the hooks' 10 MiB `BAND_ENVELOPE_MAX_BYTES` so the unchecked writes after a hand-back (a halt, approvals, dispatch fields) still land readable. Security hand-backs, which store no SNAP, and every other `saveRun` call are unchanged. Both `cc-orchestrate.md` copies name the halt and its recovery. Tests: rows RS3c, RS3d and RS3e in `tests/scripts/orchestrate.test.js` (an 80-task plan seeded with max-size hand-backs up to one entry below the bound, then driven through the verb until it halts; the halt text and unchanged `handbacks`; the bound at least 1 MiB below both hooks' cap) and a `[BUG-079]` row in `tests/installer/commands-parity.test.js`. The PR also adds the spec and plan leaves to the `.gitignore` tracked-surface block. Intake of issue #213, reported by the automated security review of #212. The spec and plan were approved by independent review, round 1.
+
+Nothing minted: BUG-079 was filed at intake of issue #213.
+
+Known limits: the BUG-079 line is removed. Every other defect line is unchanged.
+
+No upgrade step: a run whose run file stays under 8 MiB behaves exactly as before; a run that would cross it now halts `ORCH_RUN_FILE_FULL` instead of silently weakening Guard 6. CI on the release PR is the authority.

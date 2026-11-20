@@ -1365,7 +1365,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #203; reported by the automated security review of
   the 1.47.0 release candidate (#202).
 
-### [ ] `[BUG-079]` Unbounded cumulative size of stored SNAPs in the orchestrator run file
+### [X] `[BUG-079]` Unbounded cumulative size of stored SNAPs in the orchestrator run file
+* **DONE, shipped as `1.52.10` on 2026-11-20.** `handback` in `scripts/orchestrate.mjs` saves through a new `saveHandedBackRun`, which serializes the run and halts `ORCH_RUN_FILE_FULL` when the result would exceed the new exported `RUN_FILE_MAX_BYTES` (8 MiB), 2 MiB below the hooks' 10 MiB `BAND_ENVELOPE_MAX_BYTES`, so the unchecked writes after a hand-back (a halt, approvals, dispatch fields) keep the file readable. The halt names the would-be byte count, the bound and the recovery (`end`, then `start` with a smaller plan), and the halting hand-back is not recorded. Security hand-backs, which store no SNAP, and every other run-file write are unchanged. Both `cc-orchestrate.md` copies name the halt and its recovery. Pinned by rows RS3c (80-task plan, max-size hand-backs stay under both bounds until one halts), RS3d (halting hand-back not recorded, exact halt text) and RS3e (bound at least 1 MiB below both hooks' cap) in `tests/scripts/orchestrate.test.js`, and the `[BUG-079]` row of `tests/installer/commands-parity.test.js`. Landed from PR #273 (cc-lane-bot), intake of issue #213; the id was filed at intake. Spec: `docs/superpowers/specs/2026-11-20-bug079-unbounded-cumulative-size-of-stored-snaps-in-design.md` (approved by independent review, round 1). Plan: `docs/superpowers/plans/2026-11-20-bug079-unbounded-cumulative-size-of-stored-snaps-in.md`.
 
 - Symptom: since `[FEAT-055]`, every non-security hand-back stores
   its full SNAP in `.claude/memory/orchestrator-run.json`
