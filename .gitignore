@@ -275,6 +275,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-11-19-bug077-unbound-approve-spec-path-allowing-approval-design.md
 !/docs/superpowers/specs/2026-11-19-bug083-publish-job-relies-on-omitted-cache-key-design.md
 !/docs/superpowers/specs/2026-11-19-bug087-installer-follows-a-symlink-at-the-opencode-design.md
+!/docs/superpowers/specs/2026-11-20-bug079-unbounded-cumulative-size-of-stored-snaps-in-design.md
 !/docs/superpowers/specs/2026-11-20-bug088-installer-prints-the-opencode-plugin-symlink-design.md
 # --- END tracked-surface block (BUG-042) ---
 
