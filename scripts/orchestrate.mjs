@@ -552,6 +552,8 @@ function codeScope(root, run, step) {
   return taskScope(task ?? { id: step.task, files: [] }, run.plan);
 }
 
+const docLocationHalt = (run) => new Halt('ORCH_DOC_LOCATION_UNRESOLVED', `run ${run.item} records no docs location (started before FEAT-047); run end, then start`);
+
 function envelopeFields(run, root, step) {
   const { tk, scope } = ROLE_ARTIFACTS[step.role];
   const fields = {
@@ -562,9 +564,7 @@ function envelopeFields(run, root, step) {
   if (step.role === 'code') fields.scope = codeScope(root, run, step);
   else if (step.role === 'spec' || step.role === 'plan') {
     // Read as pinned, never re-checked: the cap was enforced once, at start.
-    if (!isPlainObject(run.docs?.scopes) || !Array.isArray(run.docs.scopes[step.role])) {
-      throw new Halt('ORCH_DOC_LOCATION_UNRESOLVED', `run ${run.item} records no docs location (started before FEAT-047); run end, then start`);
-    }
+    if (!isPlainObject(run.docs?.scopes) || !Array.isArray(run.docs.scopes[step.role])) throw docLocationHalt(run);
     fields.scope = run.docs.scopes[step.role];
   } else if (scope) fields.scope = scope;
   // Ruling 2: ticket identity rides the spec envelope only, never its content.
@@ -969,6 +969,33 @@ async function securityHandback(root, run, gate, text) {
   return `security handed back ${gate}; VERDICT: APPROVE; ${summary.total} finding(s) below ${threshold} recorded; dependency=${report.scans.dependency}; pre-existing findings, if any, are in ${OWNER_FILE} (owner only)`;
 }
 
+// BUG-075: recomputed as install computed it, never read back from the envelope file, which the orchestrator can write.
+function expectedScope(root, run, role) {
+  if (role === 'code') return codeScope(root, run, nextStep(run));
+  if (role !== 'spec' && role !== 'plan') return null;
+  if (!isPlainObject(run.docs)) throw docLocationHalt(run);
+  return docScopes(run.docs)[role];
+}
+
+const sameList = (a, b) => Array.isArray(a) && a.length === b.length && a.every((x, i) => x === b[i]);
+const scopeText = (scope) => (scope === null || scope === undefined ? 'none' : JSON.stringify(scope));
+// A path that needs normalizing is not the one the scope names, so it is never normalized.
+const unsafePath = (p) => /^[A-Za-z]:/.test(p) || p.split('/').some((seg) => seg === '' || seg === '.' || seg === '..');
+
+// BUG-075: returned, not thrown, so resume drops the record where handback halts on it.
+function claimHalt(env, role, expected) {
+  const claimed = env.ops.scope;
+  if (expected === null ? claimed !== undefined : !sameList(claimed, expected)) {
+    return new Halt('ORCH_HANDBACK_SCOPE_MISMATCH', `${role} was installed with scope ${scopeText(expected)}, the hand-back names ${scopeText(claimed)}`);
+  }
+  if (expected === null) return null;
+  const covers = expected.map(globToRegExp);
+  const paths = (Array.isArray(env.ops.f) ? env.ops.f : []).map((f) => String(f).replace(/:[CMD]$/, ''));
+  const outside = paths.find((p) => unsafePath(p) || !covers.some((re) => re.test(p)));
+  if (outside === undefined) return null;
+  return new Halt('ORCH_HANDBACK_OUT_OF_SCOPE', `${role} lists ${outside} in ops.f, outside its scope ${scopeText(expected)}`);
+}
+
 async function handback(root, sessionId, role, bytes) {
   const text = bytes.toString('utf8');
   const run = liveRun(root, sessionId);
@@ -982,6 +1009,8 @@ async function handback(root, sessionId, role, bytes) {
   if (!MAY_HAND_BACK[role].includes(env.ops.gate)) {
     throw new Halt('ORCH_GATE_UNEARNED', `${role} may hand back ${MAY_HAND_BACK[role].join('|')}, not ${env.ops.gate}`);
   }
+  const claim = claimHalt(env, role, expectedScope(root, run, role));
+  if (claim) throw claim;
   if (role === 'security') return securityHandback(root, run, env.ops.gate, text);
   const verdict = role === 'audit' ? parseVerdict(text) : null;
   const recorded = recordHandback(run, role, env.ops.gate, verdict?.verdict, { snap });
@@ -1016,7 +1045,7 @@ function approve(root, sessionId, what, rel, shown) {
   if (sha256 !== shown.toLowerCase()) {
     throw new Refusal(`ORCH_DOC_HASH_STALE: ${what} ${rel} hashes ${sha256}, not the ${shown} that was shown; show the document again`);
   }
-  const approval = { at: new Date().toISOString(), by: gitValue(root, ['config', 'user.name'], 'unknown'), path: rel, sha256, commit: headObject(root) };
+  const approval = { at: new Date().toISOString(), by: 'owner', path: rel, sha256, commit: headObject(root) };
   if (what === 'plan') return approvePlan(root, run, content.toString('utf8'), approval);
   saveRun(root, { ...run, approvals: { ...run.approvals, spec: approval } });
   return `spec approved: sha256 ${sha256}`;
@@ -1275,11 +1304,16 @@ function candidateEntries(run) {
 }
 
 // A task entry still describes the repository: its position, its SNAP and its commit all hold.
-function taskEntryHolds(root, entry, taskId) {
+// BUG-075: and it still names the scope its task installs, over paths inside it.
+function taskEntryHolds(root, run, entry, taskId) {
   if (entry.task !== taskId || typeof entry.snap !== 'string' || validate(`${entry.snap}\n`) !== '') return false;
   let env = null;
   try { env = JSON.parse(entry.snap); } catch { return false; }
-  return env?.sys?.role === 'code' && ancestry(root, env.sys.c) === 0;
+  if (env?.sys?.role !== 'code' || ancestry(root, env.sys.c) !== 0) return false;
+  try { return claimHalt(env, 'code', codeScope(root, run, { task: taskId })) === null; } catch (e) {
+    if (e instanceof Halt) return false;
+    throw e;
+  }
 }
 
 // Each approved document's entry, then Build's task entries up to the first that fails; Verify is always redone.
@@ -1289,7 +1323,7 @@ function keptEntries(root, run) {
   if (!run.approvals.plan) return { kept: approved, tasks: 0 };
   const tasks = entries.filter((h) => h.role === 'code' && !('fix' in h));
   let n = 0;
-  while (n < tasks.length && n < run.tasks.ids.length && taskEntryHolds(root, tasks[n], run.tasks.ids[n])) n += 1;
+  while (n < tasks.length && n < run.tasks.ids.length && taskEntryHolds(root, run, tasks[n], run.tasks.ids[n])) n += 1;
   return { kept: [...approved, ...tasks.slice(0, n)], tasks: n };
 }
 
@@ -1487,13 +1521,30 @@ function clearRunFiles(root) {
   rmSync(join(root, DELEGATE_DIR), { recursive: true, force: true });
 }
 
+const END_USAGE = 'usage: orchestrate.mjs end [--abandon]';
+
+// BUG-075: the run end would drop before Verify passed, or null; a missing, broken or halted run is never held.
+function unverifiedRun(root) {
+  let run = null;
+  try { run = readRun(root); } catch { return null; }
+  if (!run || run.halt) return null;
+  const last = run.handbacks.at(-1);
+  return last?.role === 'qa' && last.gate === 'verify_pass' ? null : run;
+}
+
 // Prints the run it removes, so the closing report reads the record rather than memory.
-function end(root) {
+// BUG-075: a live run ends only after qa's verify_pass, unless the owner abandons it by name.
+function end(root, args) {
+  if (args.length > 1 || (args.length === 1 && args[0] !== '--abandon')) throw new Refusal(END_USAGE);
+  const run = unverifiedRun(root);
+  if (run && args.length === 0) {
+    throw new Refusal(`ORCH_END_UNVERIFIED: run ${run.item} is at ${describeStep(nextStep(run))} with no verify_pass; end it only after qa, after a halt, or with end --abandon on the owner's word`);
+  }
   const path = join(root, RUN_FILE);
   const text = existsSync(path) ? readFileSync(path, 'utf8').trim() : 'no run file';
   rmSync(path, { force: true });
   clearRunFiles(root);
-  return text;
+  return run ? `run ${run.item} abandoned at ${run.gate} before verify_pass\n${text}` : text;
 }
 
 function recordHalt(root, halt) {
@@ -1600,7 +1651,7 @@ export async function cli(argv, env, cwd = process.cwd()) {
     delegate: () => delegate(root, sid, argv.slice(1)),
     resume: () => resume(root, sid, argv.slice(1)),
     envelope: () => envelopeVerb(root, sid, argv.slice(1)),
-    end: () => end(root),
+    end: () => end(root, argv.slice(1)),
   };
   try {
     if (!verbs[verb]) throw new Refusal('usage: orchestrate.mjs start|install|handback|approve|hash|review|delegate|resume|envelope|end');
