@@ -1,6 +1,6 @@
 # BUG-059 (re-dispatch): The Fake gh Is POSIX-Only — Verification That the Fix on `main` Meets the Entry
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-20 by independent review (round 1)
 
 **Base:** `origin/main` at `3b23689`. **Prior work:** spec `docs/superpowers/specs/2026-10-22-bug059-fake-gh-win32-design.md`, plan `docs/superpowers/plans/2026-10-22-bug059-fake-gh-win32.md`, fix commits `8a943ad` and `88a9076`, merged in `25e29e8` (PR #87, 2026-10-24). `git merge-base --is-ancestor 25e29e8 HEAD` succeeds.
 
