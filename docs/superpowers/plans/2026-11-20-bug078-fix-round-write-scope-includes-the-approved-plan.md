@@ -123,14 +123,14 @@
 
 ## Test List
 
-- [ ] Integration, AC1 and AC2: E1. The RETURN line ends `scope src/a.js, src/b.js`; `install code --check` and `install code` write `ops.scope` `['src/a.js', 'src/b.js']`, without `run.plan`.
-- [ ] Integration, AC3: C5 (a hand-back inside the fix files is recorded as fix round 1, `tasks.done` unchanged) and C5b (a hand-back naming the plan halts `ORCH_HANDBACK_OUT_OF_SCOPE`, unrecorded); C6 updated.
-- [ ] Integration, AC4: the new approve-plan 20-file row; the unchanged `taskScope` rows and envelope row.
-- [ ] Integration, AC5: the 20/21-file fix-round cap rows.
-- [ ] Integration, AC6: the four unchanged `ORCH_FIX_SCOPE_UNAPPROVED` rows.
-- [ ] Unit, AC7: `tests/unit/role-profiles.test.js` mirror and hash rows.
-- [ ] AC8: `npm test` (T-301).
-- [ ] No E2E/UI test: the change is a script's scope computation and one profile sentence; there is no UI. Guard 5 is unchanged and already tested to enforce exactly `ops.scope`.
+- [X] Integration, AC1 and AC2: E1. The RETURN line ends `scope src/a.js, src/b.js`; `install code --check` and `install code` write `ops.scope` `['src/a.js', 'src/b.js']`, without `run.plan`.
+- [X] Integration, AC3: C5 (a hand-back inside the fix files is recorded as fix round 1, `tasks.done` unchanged) and C5b (a hand-back naming the plan halts `ORCH_HANDBACK_OUT_OF_SCOPE`, unrecorded); C6 updated.
+- [X] Integration, AC4: the new approve-plan 20-file row; the unchanged `taskScope` rows and envelope row.
+- [X] Integration, AC5: the 20/21-file fix-round cap rows.
+- [X] Integration, AC6: the four unchanged `ORCH_FIX_SCOPE_UNAPPROVED` rows.
+- [X] Unit, AC7: `tests/unit/role-profiles.test.js` mirror and hash rows.
+- [X] AC8: `npm test` (T-301).
+- [X] No E2E/UI test: the change is a script's scope computation and one profile sentence; there is no UI. Guard 5 is unchanged and already tested to enforce exactly `ops.scope`.
 
 ## Commit Order
 
