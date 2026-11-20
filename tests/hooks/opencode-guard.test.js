@@ -192,6 +192,49 @@ describe('OpenCode plugin: argument checks (AC6)', () => {
   });
 });
 
+describe('OpenCode plugin: bash arguments outside the known set (BUG-071)', () => {
+  const REASON_TAIL = 'not supported; the guard checks a command as if it runs in the project directory, so drop the argument and put any cd in the command, where the guard sees it';
+
+  it.each(['workdir', 'cwd', 'directory'])('blocks bash with a %s argument before the guard runs (AC1)', async (k) => {
+    const dir = stubProject();
+    const reason = await call(dir, 'bash', { command: 'git status', [k]: '/tmp' });
+    expect(reason).toBe(`code-conductor guard blocked "bash": argument "${k}" is ${REASON_TAIL}`);
+    expect(reason).not.toMatch(NOT_RUN);
+    expect(payloads(dir)).toEqual([]);
+  });
+
+  it('blocks bash with any other argument outside command, description and timeout (AC2)', async () => {
+    const dir = stubProject();
+    const reason = await call(dir, 'bash', { command: 'ls', env: { X: '1' } });
+    expect(reason).toBe(`code-conductor guard blocked "bash": argument "env" is ${REASON_TAIL}`);
+    expect(payloads(dir)).toEqual([]);
+  });
+
+  it('names every unknown argument, sorted, in one reason (AC2)', async () => {
+    const dir = stubProject();
+    const reason = await call(dir, 'bash', { command: 'ls', workdir: '/tmp', cwd: '/x' });
+    expect(reason).toBe(`code-conductor guard blocked "bash": arguments "cwd", "workdir" are ${REASON_TAIL}`);
+    expect(payloads(dir)).toEqual([]);
+  });
+
+  it('sends a call with command, description and timeout to the guard as Bash { command } (AC3)', async () => {
+    const dir = stubProject();
+    expect(await call(dir, 'bash', { command: 'git status', description: 'd', timeout: 1000 })).toBe('');
+    const seen = payloads(dir);
+    expect(seen).toHaveLength(1);
+    expect(seen[0].tool_name).toBe('Bash');
+    expect(seen[0].tool_input).toEqual({ command: 'git status' });
+  });
+
+  it('treats an unknown argument whose value is undefined as absent (AC4)', async () => {
+    const dir = stubProject();
+    expect(await call(dir, 'bash', { command: 'git status', workdir: undefined })).toBe('');
+    const seen = payloads(dir);
+    expect(seen).toHaveLength(1);
+    expect(seen[0].tool_input).toEqual({ command: 'git status' });
+  });
+});
+
 describe('OpenCode plugin: multiedit (AC2)', () => {
   it('runs the guard once per entry and passes on an allowed path', async () => {
     const dir = stubProject();

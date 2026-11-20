@@ -407,6 +407,7 @@ This is the first slice of `[FEAT-048]` (issue #97), and it covers enforcement o
 | Guards 5, 6 and 7 (band roles, orchestrator run) | Not enforced for subagents: OpenCode does not tell the plugin which subagent made the call |
 | Guard warnings | Not shown |
 | `patch`/`apply_patch`, `multiedit` | Sent to the guard; a patch is checked file by file, confined to the project, under a strict marker grammar |
+| `bash` with an argument other than `command`, `description` or `timeout`, a working directory included | Blocked: the guard checks a command as if it runs in the project directory, so put any `cd` in the command itself |
 | `task`, `batch`, MCP and any other tool | Blocked: the guard cannot inspect them |
 | `glob`, `grep`, `list`, `webfetch`, `websearch`, `codesearch` and other read-only tools | Allowed, as on Claude Code |
 | `cc-*` commands, band agents, verbosity and context hooks | Not installed for OpenCode yet. OpenCode reads `CLAUDE.md` when there is no `AGENTS.md`, and loads `.claude/skills` |

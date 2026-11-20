@@ -5,6 +5,7 @@
 // Every tool is one of three kinds: mapped (sent to the guard), read-only (passes, as its
 // Claude Code twin passes the hook matcher), or blocked. Anything not named is blocked:
 // OpenCode's tool set is not versioned with this guard, so an unknown tool is never trusted.
+// An unknown argument of a mapped tool is not trusted either: bash blocks any argument outside the few it knows.
 // Zero dependencies by design; node: builtins only.
 import { spawnSync } from 'node:child_process';
 import { join, resolve, sep } from 'node:path';
@@ -85,10 +86,25 @@ function patchTool(a, directory, tool) {
   return parsePatch(tool, a.patchText, directory);
 }
 
+// The guard checks a command as if it runs in the project directory, so an argument that
+// could change where or how it runs is not trusted. The set is closed because OpenCode's
+// bash schema is not versioned with this guard (BUG-071). An empty command is the guard's
+// to judge (it allows it), so only the type of command is checked.
+const BASH_ARGS = new Set(['command', 'description', 'timeout']);
+const BASH_ARG_REASON = 'not supported; the guard checks a command as if it runs in the project directory, so drop the argument and put any cd in the command, where the guard sees it';
+
+function bashTool(a, _d, tool) {
+  if (typeof a.command !== 'string') return badArg(tool, 'command', 'a string');
+  const unknown = Object.keys(a).filter((k) => a[k] !== undefined && !BASH_ARGS.has(k)).sort();
+  if (unknown.length === 0) return one('Bash', { command: a.command });
+  const names = unknown.map((k) => `"${k}"`).join(', ');
+  const which = unknown.length === 1 ? `argument ${names} is` : `arguments ${names} are`;
+  return blocked(tool, `${which} ${BASH_ARG_REASON}`);
+}
+
 // OpenCode tool name -> { payloads } for the guard, or { block } before any guard runs.
 const MAPPED = {
-  // An empty command is the guard's to judge (it allows it), so only the type is checked.
-  bash: (a, _d, t) => (typeof a.command === 'string' ? one('Bash', { command: a.command }) : badArg(t, 'command', 'a string')),
+  bash: bashTool,
   read: (a, _d, t) => (isText(a.filePath) ? one('Read', { file_path: a.filePath, offset: a.offset, limit: a.limit }) : badArg(t, 'filePath', 'a non-empty string')),
   write: (a, _d, t) => (isText(a.filePath) ? one('Write', { file_path: a.filePath, content: a.content }) : badArg(t, 'filePath', 'a non-empty string')),
   edit: (a, _d, t) => (isText(a.filePath) ? one('Edit', { file_path: a.filePath, old_string: a.oldString, new_string: a.newString }) : badArg(t, 'filePath', 'a non-empty string')),
