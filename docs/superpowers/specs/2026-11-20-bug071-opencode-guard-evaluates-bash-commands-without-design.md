@@ -1,6 +1,6 @@
 # BUG-071: OpenCode guard evaluates bash commands without the tool's working directory
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-20 by independent review (round 1)
 **Item:** BUG-071 (intake of issue #162; reported by the automated security review of the 1.44.0 release candidate, #157)
 **Date:** 2026-11-20
 
