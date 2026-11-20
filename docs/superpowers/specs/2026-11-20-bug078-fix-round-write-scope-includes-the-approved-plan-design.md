@@ -1,6 +1,6 @@
 # BUG-078 — Fix-round write scope includes the approved plan
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-20 by independent review (round 1)
 
 **Item:** `[BUG-078]` (intake of issue #203). Pillar 5: infrastructure, ecosystem and quality assurance.
 
