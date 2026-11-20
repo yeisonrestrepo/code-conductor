@@ -10,7 +10,7 @@ import { parseSnapshotHeader } from '../../scripts/ticket.mjs';
 import { cleanGitEnv } from '../helpers/git-env.js';
 import * as orchestrateModule from '../../scripts/orchestrate.mjs';
 import {
-  ENVELOPE_FILE, HANDBACK_DIR, MAY_HAND_BACK, ROLE_ARTIFACTS, REVIEW_CAP, REVIEW_DIR, RUN_FILE, SHELL_METACHARACTERS, WRITE_SURFACE,
+  ENVELOPE_FILE, HANDBACK_DIR, MAY_HAND_BACK, ROLE_ARTIFACTS, REVIEW_CAP, REVIEW_DIR, RUN_FILE, RUN_FILE_MAX_BYTES, SHELL_METACHARACTERS, WRITE_SURFACE,
   Halt, checkTestCommand, docScopes, documentHash, extractTasks, findAgent, forwardGate, isValidRun, nextStep, parseVerdict, recordHandback, taskScope,
 } from '../../scripts/orchestrate.mjs';
 import { CANDIDATE_PAIRS, DEFAULT_PAIR } from '../../scripts/doc-locations.mjs';
@@ -3008,6 +3008,71 @@ describe('resume verb [FEAT-055]', () => {
     const run = runFile();
     expect(run.handbacks.some((h) => h.role === 'code' && h.snap)).toBe(false);
     expect(Buffer.byteLength(JSON.stringify(run))).toBeLessThan(64 * 1024);
+  });
+
+  // BUG-079: the hooks' read cap on the run file, and a code SNAP at the 64 KiB cap whose pr is all \" pairs, so its escaped stored copy is about twice that.
+  const HOOK_READ_CAP = 10485760;
+  const MANY_TASKS = `# Demo Plan\n\n${Array.from({ length: 80 }, (_, i) => task(i + 1, [`src/t${i + 1}.js`])).join('\n')}\n## Test List\n`;
+  const runSize = () => statSync(join(root, RUN_FILE)).size;
+  function maxSay() {
+    const line = handbackLine('code', 'build_executed');
+    const room = 64 * 1024 - Buffer.byteLength(snapOf(line));
+    return `Done.\n${line.replace('"pr":""', `"pr":"${'\\"'.repeat(Math.floor(room / 2))}"`)}\n`;
+  }
+  const maxPass = () => { expect(orch(['install', 'code']).status).toBe(0); return orch(['handback', 'code'], { input: maxSay() }); };
+  // One real max-size hand-back, then copies of it seeded up to one entry below the bound, so the last ones run through the verb.
+  function nearBound() {
+    driveTo('code', { planText: MANY_TASKS });
+    expect(maxPass().status).toBe(0);
+    const entry = runFile().handbacks.at(-1);
+    expect(Buffer.byteLength(JSON.stringify(entry.snap))).toBeGreaterThan(120 * 1024);
+    const entryBytes = Buffer.byteLength(JSON.stringify(entry, null, 2)) + 8;
+    const seeded = Math.floor((RUN_FILE_MAX_BYTES - runSize()) / entryBytes) - 1;
+    editRun((run) => {
+      const ids = run.tasks.ids.slice(run.tasks.done, run.tasks.done + seeded);
+      run.handbacks.push(...ids.map((task) => ({ ...entry, task })));
+      run.tasks.done += seeded;
+    });
+  }
+
+  it('RS3c[BUG-079 AC1] many max-size hand-backs keep the run file under the hooks\' cap until one halts ORCH_RUN_FILE_FULL', () => {
+    nearBound();
+    let last;
+    let accepted = 0;
+    for (let i = 0; i < 5; i++) {
+      last = maxPass();
+      expect(runSize()).toBeLessThanOrEqual(RUN_FILE_MAX_BYTES);
+      expect(runSize()).toBeLessThan(HOOK_READ_CAP);
+      if (last.status !== 0) break;
+      accepted++;
+    }
+    expect(accepted).toBeGreaterThanOrEqual(1);
+    expect(last.status).toBe(1);
+    expect(last.err).toMatch(/^ORCH_RUN_FILE_FULL: /);
+  });
+
+  it('RS3d[BUG-079 AC2] the halting hand-back is not recorded and the halt names the size, the bound and the recovery', () => {
+    nearBound();
+    let before;
+    let last;
+    for (let i = 0; i < 5; i++) {
+      before = runFile().handbacks;
+      last = maxPass();
+      if (last.status !== 0) break;
+    }
+    expect(last.status).toBe(1);
+    expect(runFile().halt.code).toBe('ORCH_RUN_FILE_FULL');
+    expect(last.err).toMatch(/^ORCH_RUN_FILE_FULL: the run file would be \d+ bytes with this code hand-back, over the 8388608-byte bound that keeps it readable by the hooks; end, then start with a smaller plan$/);
+    expect(Number(last.err.match(/would be (\d+) bytes/)[1])).toBeGreaterThan(RUN_FILE_MAX_BYTES);
+    expect(runFile().handbacks).toEqual(before);
+    expect(runSize()).toBeLessThanOrEqual(HOOK_READ_CAP);
+  });
+
+  it('RS3e[BUG-079 AC4] the run file bound sits at least 1 MiB below both hooks\' read cap', () => {
+    for (const hook of ['.claude/hooks/pre-tool-use.mjs', 'project-template/.claude/hooks/pre-tool-use.mjs']) {
+      const cap = Number(readFileSync(join(REPO_ROOT, hook), 'utf8').match(/^const BAND_ENVELOPE_MAX_BYTES = (\d+);$/m)[1]);
+      expect(RUN_FILE_MAX_BYTES).toBeLessThanOrEqual(cap - 1024 * 1024);
+    }
   });
 
   // Entry acceptance criteria.

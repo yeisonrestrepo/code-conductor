@@ -110,6 +110,8 @@ export const DELEGATE_DIR = '.conductor/delegate';
 export const AUDIT_ROUNDS_DEFAULT = 2;
 const AUDIT_ROUNDS_MAX = 5;
 const SNAP_STORE_MAX_BYTES = 64 * 1024;
+// BUG-079: the hooks stop reading the run file at 10 MiB; the 2 MiB below that is for the unchecked writes after a hand-back (a halt, approvals, dispatch fields).
+export const RUN_FILE_MAX_BYTES = 8 * 1024 * 1024;
 const isAuditRounds = (n) => Number.isInteger(n) && n >= 0 && n <= AUDIT_ROUNDS_MAX;
 // FEAT-053: the Agent tool's model aliases plus inherit; the one list start, the profiles and isValidRun are checked against.
 export const MODEL_ALIASES = ['opus', 'sonnet', 'haiku', 'inherit'];
@@ -236,7 +238,18 @@ function readRun(root) {
   return run;
 }
 
-const saveRun = (root, run) => writeAtomic(join(root, RUN_FILE), JSON.stringify(run, null, 2) + '\n');
+const serializeRun = (run) => JSON.stringify(run, null, 2) + '\n';
+const saveRun = (root, run) => writeAtomic(join(root, RUN_FILE), serializeRun(run));
+
+// BUG-079: a hand-back stores its SNAP, so it is the write that could carry the run file past the hooks' read cap.
+function saveHandedBackRun(root, run, role) {
+  const text = serializeRun(run);
+  const bytes = Buffer.byteLength(text);
+  if (bytes > RUN_FILE_MAX_BYTES) {
+    throw new Halt('ORCH_RUN_FILE_FULL', `the run file would be ${bytes} bytes with this ${role} hand-back, over the ${RUN_FILE_MAX_BYTES}-byte bound that keeps it readable by the hooks; end, then start with a smaller plan`);
+  }
+  writeAtomic(join(root, RUN_FILE), text);
+}
 
 // Every verb but start, resume and end drives a run that must exist, be this session's, and not be halted.
 function liveRun(root, sessionId) {
@@ -1014,7 +1027,7 @@ async function handback(root, sessionId, role, bytes) {
   if (role === 'security') return securityHandback(root, run, env.ops.gate, text);
   const verdict = role === 'audit' ? parseVerdict(text) : null;
   const recorded = recordHandback(run, role, env.ops.gate, verdict?.verdict, { snap });
-  saveRun(root, recorded);
+  saveHandedBackRun(root, recorded, role);
   // Saved first, so the halt cli records lands on top of the audit entry (FEAT-060, FEAT-057).
   if (verdict && verdict.verdict !== 'APPROVE') return auditFix(root, recorded, verdict, bytes);
   const note = recorded.handbacks.at(-1).security === SECURITY_NOT_CONFIGURED ? `; security=${SECURITY_NOT_CONFIGURED}` : '';
