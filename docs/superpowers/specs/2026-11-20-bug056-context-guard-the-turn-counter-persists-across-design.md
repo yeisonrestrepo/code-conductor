@@ -1,6 +1,6 @@
 # BUG-056 Context-Guard Turn Counter Persists Across Sessions — Closure Design
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-20 by independent review (round 1)
 **Backlog:** `[BUG-056]` · **Issue:** #78
 
 ## Problem
