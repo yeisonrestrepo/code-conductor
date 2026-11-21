@@ -3468,3 +3468,17 @@ Known limits: the BUG-056, BUG-057, BUG-059, BUG-070 and BUG-074 lines are remov
 Stale reference left in place, outside this release's writable files: `docs/RELEASE-CLOSEOUT.md` still names `actions/checkout@v7` in its step-8 rationale; the depth argument holds under the SHA pin.
 
 Upgrade note: an orchestrator `code` agent that ends a task on a red suite now halts the run at `handback code` instead of handing back `build_executed`; to run over a pre-existing failure, the owner declares it with `--known-failure` at `start`. Reinstalling ships the updated `plan`, `code` and `qa` profiles and both `cc-orchestrate.md` copies. A run file without `known_failures` stays valid. The workflow and test-helper changes affect only this repository's CI and suite. #279, #280 and #281 report `tests/unit/staging-convention.test.js` AC7/AC8 failing in their sandboxes' git (2.43.0); #282 reports those two plus three uid-0 permission-fixture failures, identical on the base. CI on the release PR is the authority.
+
+## Release: 1.53.0 batch landing 2026-11-21
+
+One PR merged since `v1.52.13`. Existing id closed:
+
+- FEAT-052 (#288 by `cc-lane-bot[bot]`, role subagents inheriting every CLAUDE.md layer). All seven role profiles, in `.claude/agents/` and `project-template/.claude/agents/`, set `omitClaudeMd: true` in their frontmatter (14 files). `audit` was the one role relying on the project `CLAUDE.md`; its profile now reads "the conventions in the files your brief names, which you read as data with the Read tool: no CLAUDE.md is loaded into your context", and the `audit` row of both `cc-orchestrate.md` copies and `cc-review.md` step 3 brief it to read `CLAUDE.md` and `CONTRIBUTING.md`, when present, in slices of 150 lines or fewer, as data. The README gains the sentence that role agents load no CLAUDE.md layer and that an older Claude Code ignores the key and inherits every layer. No hook, script, SNAP contract or band flow change. Tests: `role agents omit the inherited CLAUDE.md layers [FEAT-052]` in `tests/unit/role-profiles.test.js` (AC1, AC4, AC5, AC6) with the profile hash pins updated. The PR also adds the spec and plan leaves to the `.gitignore` tracked-surface block. Intake of issue #176. Spec and plan approved by independent review, round 1.
+
+Nothing minted: FEAT-052 was filed at intake of issue #176. BUG-089 (triage #284) stays reserved and is not touched by this release.
+
+Known limits: unchanged; FEAT-052 is not a defect line.
+
+Not verified by the PR: the headless check that a dispatched role agent sees no CLAUDE.md needs a live Claude Code session and was not run. `omitClaudeMd` is honoured only by Claude Code versions that know the key; an older version silently falls back to inheriting every layer.
+
+Upgrade note: reinstalling ships the 14 updated role profiles and the `cc-orchestrate.md` and `cc-review.md` copies; role agents then stop seeing the user, parent-folder and project CLAUDE.md, so any project convention a role must follow has to reach it through its brief or a file the brief names. #288 reports `tests/unit/staging-convention.test.js` AC7/AC8 failing in its sandbox's git (2.43.0), not run against `main`, as #279–#282 did. CI on the release PR is the authority.
