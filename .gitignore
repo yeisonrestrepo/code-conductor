@@ -190,6 +190,7 @@ tests/.tmp/
 !/docs/superpowers/plans/2026-11-20-bug078-fix-round-write-scope-includes-the-approved-plan.md
 !/docs/superpowers/plans/2026-11-20-bug079-unbounded-cumulative-size-of-stored-snaps-in.md
 !/docs/superpowers/plans/2026-11-20-bug088-installer-prints-the-opencode-plugin-symlink.md
+!/docs/superpowers/plans/2026-11-21-feat052-orchestrate-role-subagents-omit-inherited.md
 !/docs/superpowers/specs/2026-06-09-bug001-cc-compact-design.md
 !/docs/superpowers/specs/2026-06-09-bug002-spec-read-budget-design.md
 !/docs/superpowers/specs/2026-06-11-bug006-feat018-bash-scan-guard-design.md
