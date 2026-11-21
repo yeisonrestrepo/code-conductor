@@ -274,18 +274,18 @@
 
 ## Test List
 
-- [ ] Unit, AC1: the six `[AC1]` rows pin the shared sentence in `plan`, `code` and `qa`, in both agent directories.
-- [ ] Unit, AC2: `[AC2]` (tick and hand back only on green; the removed sentence is gone) and the updated `CLAIM.code` `[AC5]` row.
-- [ ] Unit, AC3: `[AC3]` and the updated `CLAIM.qa` `[AC5]` row.
-- [ ] Unit, AC4: the `plan` `[AC1]` rows; `plan.md` keeps "Order the tasks so that each one ends with the suite green."
-- [ ] Integration, AC5: K1-K5 (zero, one, two values, spaces and `>` as one argument, the segment's position with role models and `--unattended`), plus the unchanged whole-start-line rows (`:320`, `:589`, `:594`, `:701`).
-- [ ] Integration, AC6: the nine K6 refusals (the shell-split row included) and K7.
-- [ ] Unit and integration, AC7: K8, K9, K10 (validation), K11 (`resume`), and the unit `[AC7]` profile row.
-- [ ] Parity, AC8: the new `commands-parity` row and the existing byte-identical mirror row.
-- [ ] AC9: K12 (a red `code` report halts `ORCH_HANDBACK_MISSING` with `tasks.done` unchanged); the existing hand-back and SNAP suites pass unchanged in T-501.
-- [ ] AC10: the token-cap, mirror and sha rows of `role-profiles.test.js`.
-- [ ] AC11: `npm test` (T-501).
-- [ ] No E2E/UI test: there is no UI. CI legs: no new test is conditionally skipped, so no leg's skipped set in `tools/skip-baseline.json` changes.
+- [X] Unit, AC1: the six `[AC1]` rows pin the shared sentence in `plan`, `code` and `qa`, in both agent directories.
+- [X] Unit, AC2: `[AC2]` (tick and hand back only on green; the removed sentence is gone) and the updated `CLAIM.code` `[AC5]` row.
+- [X] Unit, AC3: `[AC3]` and the updated `CLAIM.qa` `[AC5]` row.
+- [X] Unit, AC4: the `plan` `[AC1]` rows; `plan.md` keeps "Order the tasks so that each one ends with the suite green."
+- [X] Integration, AC5: K1-K5 (zero, one, two values, spaces and `>` as one argument, the segment's position with role models and `--unattended`), plus the unchanged whole-start-line rows (`:320`, `:589`, `:594`, `:701`).
+- [X] Integration, AC6: the nine K6 refusals (the shell-split row included) and K7.
+- [X] Unit and integration, AC7: K8, K9, K10 (validation), K11 (`resume`), and the unit `[AC7]` profile row.
+- [X] Parity, AC8: the new `commands-parity` row and the existing byte-identical mirror row.
+- [X] AC9: K12 (a red `code` report halts `ORCH_HANDBACK_MISSING` with `tasks.done` unchanged); the existing hand-back and SNAP suites pass unchanged in T-501.
+- [X] AC10: the token-cap, mirror and sha rows of `role-profiles.test.js`.
+- [X] AC11: `npm test` (T-501).
+- [X] No E2E/UI test: there is no UI. CI legs: no new test is conditionally skipped, so no leg's skipped set in `tools/skip-baseline.json` changes.
 
 ## Commit Order
 
