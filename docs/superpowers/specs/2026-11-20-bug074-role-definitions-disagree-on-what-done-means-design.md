@@ -103,11 +103,17 @@ report halts through the existing `ORCH_HANDBACK_MISSING` path, exactly as a red
      character, and asks them to quote the value. It never adds the quotes itself. This is a refusal, not an edit, so
      `$ARGUMENTS` still reaches `start` verbatim or not at all. The same check holds with or without
      `--known-failure`: no flag `start` accepts takes such a character, so an unquoted one is always a mistake.
+     The item must match `^[A-Z]+-\d{3,}$`, and `--ticket` takes a number or an issue URL that must match
+     `ISSUE_URL_RE` (`scripts/ticket.mjs:26`, `https://github.com/<owner>/<repo>/issues/<n>`), so the check refuses no
+     valid run.
    - **`start`'s echo.** The start line's segment is `; known failures: <k> <values>`, with `<values>` the recorded
      list as a JSON array, so the owner sees in the start line and the run header exactly what was declared, and a
      value the shell cut short shows as cut short. If the orchestrator's check is missed and the shell redirects the
      output, `start` prints nothing to the session; the Start step treats a `start` that exits 0 with an empty stdout
-     as a halt: it runs `end` and tells the owner the shell consumed part of the arguments.
+     as a halt: it runs `end` and tells the owner the shell consumed part of the arguments. After `end`, it also shows
+     the owner `git status --short` and names each redirect target in `$ARGUMENTS` (the word after an unquoted `>` or
+     `>>`) that the shell created or overwrote; it restores or deletes none of them, because which file to keep is the
+     owner's call.
    A value the shell splits on an unquoted space (`--known-failure tests/x.test.js isolated store`, if the check is
    missed) fails safe: `start` sees `isolated` as an unknown argument and refuses with `START_USAGE`, writing nothing.
    A value that starts with `--` is refused with `START_USAGE`, so a missing value never swallows the next flag
@@ -165,7 +171,9 @@ report halts through the existing `ORCH_HANDBACK_MISSING` path, exactly as a red
 - **The owner leaves a value unquoted.** With a shell character in it, the orchestrator does not run `start`; it shows
   `$ARGUMENTS`, names the character, and asks the owner to quote the value (decision 7). With only spaces, the same
   check applies; if it is missed, the split value fails safe with `START_USAGE`. If a redirection still gets through,
-  `start` exits 0 with an empty stdout, and the orchestrator runs `end` and tells the owner the arguments were cut.
+  `start` exits 0 with an empty stdout, and the orchestrator runs `end`, tells the owner the arguments were cut, shows
+  `git status --short`, and names each redirect target in `$ARGUMENTS` the shell created or overwrote, restoring or
+  deleting none of them.
 
 ### Error cases
 
@@ -222,11 +230,13 @@ contract (AC9).
   the failing tests it names. The Start step says `--known-failure` comes only from `$ARGUMENTS`, passed verbatim, and
   that the orchestrator never adds, edits or drops one, including after a red `code` halt; it states the quoting rule,
   the orchestrator's check (no `start` on an unquoted shell character in `$ARGUMENTS`, quotes never added for the
-  owner), the halt on a `start` that exits 0 with an empty stdout, and that the run header prints the known-failures
+  owner), the halt on a `start` that exits 0 with an empty stdout (after `end`, `git status --short` and each redirect
+  target in `$ARGUMENTS` the shell created or overwrote, named and neither restored nor deleted), and that the run header prints the known-failures
   segment. The Report step names, when
   the record's `known_failures` is non-empty, each declared entry with the failing tests it matched in `qa`'s report.
   `tests/installer/commands-parity.test.js` pins the new brief line, the removed one, the usage text, the verbatim
-  rule, the quoting rule with the orchestrator's check, the empty-stdout halt and the Report item.
+  rule, the quoting rule with the orchestrator's check, the empty-stdout halt with its `git status --short` and
+  redirect-target lines, and the Report item.
 - [ ] **AC9.** No gate, router position or SNAP field is added or changed: `MAY_HAND_BACK`, `nextStep` and
   `scripts/snap-contract.mjs` are untouched, `code.md` still names only `build_executed` and `qa.md` only
   `verify_pass`, and the existing hand-back and SNAP tests pass unchanged.
@@ -288,3 +298,12 @@ M — the profile and brief edits are small, but the change spans three profiles
    non-zero exit with no failing test named, `known_failures: []` with a byte-identical start line when the flag is
    absent, a run file written before this item read as none, `/cc-test` staying exit-0-only, and no change to gates,
    router positions or the SNAP contract.
+4. **Decision 7 is approved, including the orchestrator's check on every run.** No value any `start` flag accepts
+   today can hold those characters: the item matches `^[A-Z]+-\d{3,}$`, and `--ticket` takes only an issue URL of
+   the form `https://github.com/<owner>/<repo>/issues/<n>` (`ISSUE_URL_RE`) or its number. The check therefore refuses
+   no valid run, with or without `--known-failure`.
+5. **The empty-stdout halt also reports what the shell wrote.** After it runs `end`, the orchestrator shows the owner
+   `git status --short` and names each redirect target from `$ARGUMENTS` that the shell created or overwrote, and it
+   restores or deletes none of them. This is in the Start step text and in its `commands-parity` pin (AC8).
+6. **Everything else stands as written**, including the shared green sentence, the red `code` report with no
+   hand-back, the JSON echo in the start-line segment and its position before `; unattended: …`, and AC1-AC11.
