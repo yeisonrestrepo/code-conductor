@@ -199,8 +199,8 @@
 **Files:**
 - Test: `tests/scripts/orchestrate.test.js`
 
-- [ ] [T-101] `tests/scripts/orchestrate.test.js`: append `describe('known failures [BUG-074]')` with `KF` and rows K1-K12 (plan decision 4). Leave `START_USAGE` (`:19`) as it is. Depends on T-004.
-- [ ] [T-102] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t 'BUG-074'`. Its full match set is the 25 new tests. Predicted: **14 failed | 11 passed** of the 25, every other test of the file skipped (plan decision 10). Any other split means a test is wrong: fix the test, not the prediction. Depends on T-101.
+- [X] [T-101] `tests/scripts/orchestrate.test.js`: append `describe('known failures [BUG-074]')` with `KF` and rows K1-K12 (plan decision 4). Leave `START_USAGE` (`:19`) as it is. Depends on T-004.
+- [X] [T-102] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t 'BUG-074'`. Its full match set is the 25 new tests. Predicted: **14 failed | 11 passed** of the 25, every other test of the file skipped (plan decision 10). Any other split means a test is wrong: fix the test, not the prediction. Depends on T-101.
 
 ---
 
@@ -210,12 +210,12 @@
 - Modify: `scripts/orchestrate.mjs`
 - Test: `tests/scripts/orchestrate.test.js`
 
-- [ ] [T-201] `scripts/orchestrate.mjs`: `isKnownFailureList` after `isUnattendedRecord`, and the comment line and conjunct in `isValidRun` (plan decision 3). Depends on T-102.
-- [ ] [T-202] `scripts/orchestrate.mjs`: new `START_USAGE`, the comment addition, `KNOWN_FAILURE_MAX` and `isKnownFailureArg`, and the `parseStartArgs` option and branch (plan decision 3). Depends on T-201.
-- [ ] [T-203] `scripts/orchestrate.mjs`, `start`: destructure `knownFailures`, write `known_failures`, insert the segment; add `knownFailuresNote` above `UNATTENDED_NOTE` (plan decision 3). Depends on T-202.
-- [ ] [T-204] `tests/scripts/orchestrate.test.js:19`: the new `START_USAGE` backtick string (plan decision 4). Depends on T-203.
-- [ ] [T-205] Green run: the T-102 command. Predicted: **25 passed** of the 25. Depends on T-204.
-- [ ] [T-206] Run: `npx vitest run tests/scripts/orchestrate.test.js -t 'usage line|refuses start FEAT-031|U2 \[AC2a\]|start without the flag|run file \[FEAT-011 AC9\]'`. Predicted: every selected test passes (the four `START_USAGE` users and the whole-start-line rows, against the new constant and an unchanged no-flag start line). Depends on T-205.
+- [X] [T-201] `scripts/orchestrate.mjs`: `isKnownFailureList` after `isUnattendedRecord`, and the comment line and conjunct in `isValidRun` (plan decision 3). Depends on T-102.
+- [X] [T-202] `scripts/orchestrate.mjs`: new `START_USAGE`, the comment addition, `KNOWN_FAILURE_MAX` and `isKnownFailureArg`, and the `parseStartArgs` option and branch (plan decision 3). Depends on T-201.
+- [X] [T-203] `scripts/orchestrate.mjs`, `start`: destructure `knownFailures`, write `known_failures`, insert the segment; add `knownFailuresNote` above `UNATTENDED_NOTE` (plan decision 3). Depends on T-202.
+- [X] [T-204] `tests/scripts/orchestrate.test.js:19`: the new `START_USAGE` backtick string (plan decision 4). Depends on T-203.
+- [X] [T-205] Green run: the T-102 command. Predicted: **25 passed** of the 25. Depends on T-204.
+- [X] [T-206] Run: `npx vitest run tests/scripts/orchestrate.test.js -t 'usage line|refuses start FEAT-031|U2 \[AC2a\]|start without the flag|run file \[FEAT-011 AC9\]'`. Predicted: every selected test passes (the four `START_USAGE` users and the whole-start-line rows, against the new constant and an unchanged no-flag start line). Depends on T-205.
 
 ---
 
@@ -230,14 +230,14 @@
 - Modify: `project-template/.claude/agents/qa.md`
 - Test: `tests/unit/role-profiles.test.js`
 
-- [ ] [T-301] `tests/unit/role-profiles.test.js`: the new `CLAIM.code` and `CLAIM.qa`, the `GREEN` and `KNOWN_MATCH` constants, and `describe('one definition of done [BUG-074]')` (plan decision 2). Do not touch the sha rows yet. Depends on T-206.
-- [ ] [T-302] Red run: `npx vitest run tests/unit/role-profiles.test.js`. Predicted: **11 failed | 109 passed (120)** (111 + 9 new; red as in plan decision 10). Depends on T-301.
-- [ ] [T-303] `.claude/agents/plan.md` (Edit tool): the plan edit of decision 1. Depends on T-302.
-- [ ] [T-304] `.claude/agents/code.md` (Edit tool): the five code edits of decision 1, one Edit per line. Depends on T-303.
-- [ ] [T-305] `.claude/agents/qa.md` (Edit tool): the four qa edits of decision 1, one Edit per line. Depends on T-304.
-- [ ] [T-306] `project-template/.claude/agents/{plan,code,qa}.md`: the same edits; then `cmp` each pair prints nothing and `sha256sum` of each prints the hash of decision 1's table. A different hash means the edit differs from decision 1: fix the edit. Depends on T-305.
-- [ ] [T-307] `tests/unit/role-profiles.test.js`, `PROFILE_SHA256_1_37_0`: the three BUG-074 comment lines and the new `code`, `plan` and `qa` hashes (plan decision 2). Depends on T-306.
-- [ ] [T-308] Green run: the T-302 command. Predicted: **120 passed (120)**, the token cap, mirror, `D5`, `[AC5]` and both directories' hash rows included. Depends on T-307.
+- [X] [T-301] `tests/unit/role-profiles.test.js`: the new `CLAIM.code` and `CLAIM.qa`, the `GREEN` and `KNOWN_MATCH` constants, and `describe('one definition of done [BUG-074]')` (plan decision 2). Do not touch the sha rows yet. Depends on T-206.
+- [X] [T-302] Red run: `npx vitest run tests/unit/role-profiles.test.js`. Predicted: **11 failed | 109 passed (120)** (111 + 9 new; red as in plan decision 10). Depends on T-301.
+- [X] [T-303] `.claude/agents/plan.md` (Edit tool): the plan edit of decision 1. Depends on T-302.
+- [X] [T-304] `.claude/agents/code.md` (Edit tool): the five code edits of decision 1, one Edit per line. Depends on T-303.
+- [X] [T-305] `.claude/agents/qa.md` (Edit tool): the four qa edits of decision 1, one Edit per line. Depends on T-304.
+- [X] [T-306] `project-template/.claude/agents/{plan,code,qa}.md`: the same edits; then `cmp` each pair prints nothing and `sha256sum` of each prints the hash of decision 1's table. A different hash means the edit differs from decision 1: fix the edit. Depends on T-305.
+- [X] [T-307] `tests/unit/role-profiles.test.js`, `PROFILE_SHA256_1_37_0`: the three BUG-074 comment lines and the new `code`, `plan` and `qa` hashes (plan decision 2). Depends on T-306.
+- [X] [T-308] Green run: the T-302 command. Predicted: **120 passed (120)**, the token cap, mirror, `D5`, `[AC5]` and both directories' hash rows included. Depends on T-307.
 
 ---
 
@@ -249,13 +249,13 @@
 - Modify: `README.md`
 - Test: `tests/installer/commands-parity.test.js`
 
-- [ ] [T-401] `tests/installer/commands-parity.test.js`: the new row of plan decision 9 at the end of `describe('cc-orchestrate mirrors [FEAT-011 AC10]')`. Depends on T-308.
-- [ ] [T-402] Red run: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: **1 failed | 94 passed (95)**, the new row red. Depends on T-401.
-- [ ] [T-403] `.claude/commands/cc-orchestrate.md` (Edit tool): title, the "On any halt" paragraph, the Start step opening, its two new bullets and the run header (plan decision 5). Depends on T-402.
-- [ ] [T-404] `.claude/commands/cc-orchestrate.md` (Edit tool): the Verify-step sentence, the Report item, the brief line and the three dispatch-table rows (plan decision 5). Depends on T-403.
-- [ ] [T-405] `project-template/.claude/commands/cc-orchestrate.md`: the same edits; then `cmp` of the two copies prints nothing. Depends on T-404.
-- [ ] [T-406] `README.md:260`: the usage cell and the description sentence of plan decision 8. Depends on T-405.
-- [ ] [T-407] Green run: the T-402 command. Predicted: **95 passed (95)**, the byte-identical mirror row included. Depends on T-406.
+- [X] [T-401] `tests/installer/commands-parity.test.js`: the new row of plan decision 9 at the end of `describe('cc-orchestrate mirrors [FEAT-011 AC10]')`. Depends on T-308.
+- [X] [T-402] Red run: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: **1 failed | 94 passed (95)**, the new row red. Depends on T-401.
+- [X] [T-403] `.claude/commands/cc-orchestrate.md` (Edit tool): title, the "On any halt" paragraph, the Start step opening, its two new bullets and the run header (plan decision 5). Depends on T-402.
+- [X] [T-404] `.claude/commands/cc-orchestrate.md` (Edit tool): the Verify-step sentence, the Report item, the brief line and the three dispatch-table rows (plan decision 5). Depends on T-403.
+- [X] [T-405] `project-template/.claude/commands/cc-orchestrate.md`: the same edits; then `cmp` of the two copies prints nothing. Depends on T-404.
+- [X] [T-406] `README.md:260`: the usage cell and the description sentence of plan decision 8. Depends on T-405.
+- [X] [T-407] Green run: the T-402 command. Predicted: **95 passed (95)**, the byte-identical mirror row included. Depends on T-406.
 
 ---
 
@@ -264,11 +264,11 @@
 **Files:**
 - Modify: `docs/superpowers/plans/2026-11-20-bug074-role-definitions-disagree-on-what-done-means.md` (ticks)
 
-- [ ] [T-501] Run `npm test` (long: `orchestrate.test.js` alone takes about 9 minutes; run it in the background if the shell times out). Predicted: exit 0 (AC11), with `tests/scripts/orchestrate.test.js` at **1156 passed** (1131 + 25), `tests/unit/role-profiles.test.js` at 120 and `tests/installer/commands-parity.test.js` at 95. A red is called ENV only if the sandbox caused it (network, tmp permissions) and its file is not one this plan touches; report it with its name. Any other red is fixed. Depends on T-407.
-- [ ] [T-502] Scope check: `git status --short` lists exactly the fourteen files of the Global Constraints and this plan; no temporary file is left in the tree. `git diff --stat` shows no change to the spec, `scripts/snap-contract.mjs`, any hook, the `audit`, `spec`, `security` or `define-review` profiles, or `README.md` outside line 260. Depends on T-501.
-- [ ] [T-503] Stage: `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js .claude/agents/plan.md .claude/agents/code.md .claude/agents/qa.md project-template/.claude/agents/plan.md project-template/.claude/agents/code.md project-template/.claude/agents/qa.md tests/unit/role-profiles.test.js .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md tests/installer/commands-parity.test.js README.md` (all tracked). Depends on T-502.
-- [ ] [T-504] Stage: `git add -u docs/superpowers/plans/2026-11-20-bug074-role-definitions-disagree-on-what-done-means.md` (carries the ticks for T-101 to T-503). Depends on T-503.
-- [ ] [T-505] Commit: `fix: share one definition of a green suite across plan, code and qa [BUG-074]`. Depends on T-504.
+- [X] [T-501] Run `npm test` (long: `orchestrate.test.js` alone takes about 9 minutes; run it in the background if the shell times out). Predicted: exit 0 (AC11), with `tests/scripts/orchestrate.test.js` at **1156 passed** (1131 + 25), `tests/unit/role-profiles.test.js` at 120 and `tests/installer/commands-parity.test.js` at 95. A red is called ENV only if the sandbox caused it (network, tmp permissions) and its file is not one this plan touches; report it with its name. Any other red is fixed. Depends on T-407.
+- [X] [T-502] Scope check: `git status --short` lists exactly the fourteen files of the Global Constraints and this plan; no temporary file is left in the tree. `git diff --stat` shows no change to the spec, `scripts/snap-contract.mjs`, any hook, the `audit`, `spec`, `security` or `define-review` profiles, or `README.md` outside line 260. Depends on T-501.
+- [X] [T-503] Stage: `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js .claude/agents/plan.md .claude/agents/code.md .claude/agents/qa.md project-template/.claude/agents/plan.md project-template/.claude/agents/code.md project-template/.claude/agents/qa.md tests/unit/role-profiles.test.js .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md tests/installer/commands-parity.test.js README.md` (all tracked). Depends on T-502.
+- [X] [T-504] Stage: `git add -u docs/superpowers/plans/2026-11-20-bug074-role-definitions-disagree-on-what-done-means.md` (carries the ticks for T-101 to T-503). Depends on T-503.
+- [X] [T-505] Commit: `fix: share one definition of a green suite across plan, code and qa [BUG-074]`. Depends on T-504.
 
 ---
 

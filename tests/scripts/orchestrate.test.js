@@ -16,7 +16,7 @@ import {
 import { CANDIDATE_PAIRS, DEFAULT_PAIR } from '../../scripts/doc-locations.mjs';
 
 const SEC_NONE = '; security: threshold high, dependency scan not covered for no lockfile';
-const START_USAGE = 'orchestrate: usage: orchestrate.mjs start <ITEM> [--auto] [--ticket <N|issue URL>] [--audit-rounds <0-5>] [--security-threshold <low|moderate|high|critical>] [--no-dependency-audit] [--unattended]';
+const START_USAGE = 'orchestrate: usage: orchestrate.mjs start <ITEM> [--auto] [--ticket <N|issue URL>] [--audit-rounds <0-5>] [--security-threshold <low|moderate|high|critical>] [--no-dependency-audit] [--unattended] [--known-failure \'<text>\']...';
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const SCRIPT = join(REPO_ROOT, 'scripts/orchestrate.mjs');
 const ROLES = ['spec', 'plan', 'code', 'audit', 'qa', 'security'];
@@ -4783,5 +4783,106 @@ describe('unattended mode [FEAT-054]', () => {
     });
     expect(runBytes()).toBe(before);
     expect(runFile().delegated?.[kind]).toBeUndefined();
+  });
+});
+
+describe('known failures [BUG-074]', () => {
+  const KF = 'tests/contract/x.test.js > isolated store';
+
+  it('[AC5] start without the flag records known_failures [] and prints no known-failures segment', () => {
+    const r = orch(['start', 'FEAT-011']);
+    expect(r.status).toBe(0);
+    expect(runFile().known_failures).toEqual([]);
+    expect(r.out).not.toContain('; known failures');
+    expect(r.out.endsWith(SEC_NONE)).toBe(true);
+  });
+
+  it('[AC5] one --known-failure is recorded and echoed after the security segment', () => {
+    const r = orch(['start', 'FEAT-011', '--known-failure', 'tests/a.test.js']);
+    expect(r.status).toBe(0);
+    expect(runFile().known_failures).toEqual(['tests/a.test.js']);
+    expect(r.out.endsWith(`${SEC_NONE}; known failures: 1 ["tests/a.test.js"]`)).toBe(true);
+  });
+
+  it('[AC5] two values are recorded in order, in any position after the item', () => {
+    const r = orch(['start', 'FEAT-011', '--known-failure', 'a', '--auto', '--known-failure', 'b']);
+    expect(r.status).toBe(0);
+    expect(runFile().known_failures).toEqual(['a', 'b']);
+    expect(runFile().mode).toBe('auto');
+    expect(r.out.endsWith('; known failures: 2 ["a","b"]')).toBe(true);
+  });
+
+  it('[AC5] a value holding spaces and > passed as one argument is recorded and echoed byte for byte', () => {
+    const r = orch(['start', 'FEAT-011', '--known-failure', KF]);
+    expect(r.status).toBe(0);
+    expect(runFile().known_failures).toEqual([KF]);
+    expect(r.out.endsWith(`; known failures: 1 ${JSON.stringify([KF])}`)).toBe(true);
+  });
+
+  it('[AC5] the segment follows the role models and precedes the unattended segment', () => {
+    agents();
+    configured()();
+    const r = orch(['start', 'FEAT-011', '--unattended', '--known-failure', 'tests/a.test.js']);
+    expect(r.status).toBe(0);
+    expect(r.out.endsWith(`; role models: ${DEFAULT_SEGMENT}; known failures: 1 ["tests/a.test.js"]; unattended: delegated review at spec, plan and build`)).toBe(true);
+  });
+
+  it.each([
+    [['--known-failure']],
+    [['--known-failure', '']],
+    [['--known-failure', '   ']],
+    [['--known-failure', 'a\nb']],
+    [['--known-failure', 'a\rb']],
+    [['--known-failure', 'a'.repeat(201)]],
+    [['--known-failure', '--auto']],
+    [['--known-failure', 'a', '--known-failure', 'a']],
+    [['--known-failure', 'tests/x.test.js', 'isolated', 'store']],
+  ])('[AC6] start FEAT-011 %j refuses START_USAGE, exit 2, writing nothing', (args) => {
+    expect(orch(['start', 'FEAT-011', ...args])).toMatchObject({ status: 2, err: START_USAGE });
+    expect(existsSync(join(root, RUN_FILE))).toBe(false);
+  });
+
+  it('[AC6] a value of exactly 200 characters is accepted', () => {
+    const value = 'a'.repeat(200);
+    expect(orch(['start', 'FEAT-011', '--known-failure', value]).status).toBe(0);
+    expect(runFile().known_failures).toEqual([value]);
+  });
+
+  it('[AC7] isValidRun reads a run file without known_failures as valid, and accepts [] and strings', () => {
+    expect(isValidRun(RUN_OK)).toBe(true);
+    expect(isValidRun({ ...RUN_OK, known_failures: [] })).toBe(true);
+    expect(isValidRun({ ...RUN_OK, known_failures: ['a', KF] })).toBe(true);
+  });
+
+  it.each(['x', {}, null, [1], [''], ['a', 2]])('[AC7] isValidRun rejects known_failures %j', (value) => {
+    expect(isValidRun({ ...RUN_OK, known_failures: value })).toBe(false);
+  });
+
+  it('[AC7] a run file edited to a malformed known_failures halts install ORCH_RUN_INVALID', () => {
+    driveTo('spec');
+    runFileText(JSON.stringify({ ...runFile(), known_failures: 'x' }));
+    const r = orch(['install', 'spec']);
+    expect(r.status).toBe(1);
+    expect(r.err).toMatch(/^ORCH_RUN_INVALID: /);
+  });
+
+  it('[AC7] resume keeps the declared known failures', () => {
+    driveTo('code', { start: ['--known-failure', 'tests/a.test.js'], prep: () => { fixtureGit('init', '-q'); fixtureCommit(); } });
+    rmSync(join(root, '.claude', 'agents', 'code.md'));
+    expect(orch(['install', 'code']).err).toMatch(/^ORCH_AGENT_MISSING: /);
+    agents();
+    expect(orch(['resume']).status).toBe(0);
+    expect(runFile().known_failures).toEqual(['tests/a.test.js']);
+  });
+
+  it('[AC9] a red code report with no SNAP_HANDBACK line halts ORCH_HANDBACK_MISSING and leaves tasks.done', () => {
+    driveTo('code');
+    expect(orch(['install', 'code']).status).toBe(0);
+    const r = orch(['handback', 'code'], { input: 'Tests  1 failed | 2308 passed (2309)\nThe suite is red: tests/a.test.js > title failed.\n' });
+    expect(r.status).toBe(1);
+    expect(r.err.startsWith('ORCH_HANDBACK_MISSING: ')).toBe(true);
+    expect(runFile().tasks.done).toBe(0);
+    expect(runFile().handbacks.some((h) => h.role === 'code')).toBe(false);
+    expect(runFile().halt.code).toBe('ORCH_HANDBACK_MISSING');
   });
 });
