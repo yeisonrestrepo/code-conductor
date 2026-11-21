@@ -1,6 +1,6 @@
 # BUG-074 — Role definitions disagree on what done means for a task's tests
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-21 by the owner
 
 **Item:** `[BUG-074]` (intake of issue #177). Pillar 5: infrastructure, ecosystem and quality assurance.
 
