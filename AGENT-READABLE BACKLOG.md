@@ -1576,6 +1576,30 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #265; reported by the automated security review of
   #264.
 
+### [ ] `[BUG-089]` Known-failure substring matching lets generic entries or newly added failing tests pass a red suite
+
+- Symptom: since `[BUG-074]`, `isKnownFailureArg`
+  (scripts/orchestrate.mjs:1484, per the issue) accepts any non-blank
+  `--known-failure` value of up to 200 characters, and the `qa` and
+  `code` role definitions (`.claude/agents/qa.md:20`,
+  `.claude/agents/code.md`) treat a failing test as known when its
+  runner line contains a declared entry verbatim.
+- Impact per the issue: a very short or generic entry (one word, or a
+  single character) matches almost every failure line, so a red suite
+  can be read as green and reach `verify_pass`. Separately, a build
+  agent could add a new failing test whose title contains a declared
+  entry, and that new failure would count as known. Both need an
+  owner-declared entry, and the start line and the final report show
+  the entries and their matches, so this is hardening, not a bypass of
+  owner intent.
+- Fix shape suggested by the issue: require a minimum length or a
+  test-file path segment in each entry, and have `qa` treat as red any
+  failing test that the change itself added, even when it matches a
+  declared entry.
+- Follow-up of `[BUG-074]`.
+- Intake of issue #284; reported by the automated security review of
+  #283.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
