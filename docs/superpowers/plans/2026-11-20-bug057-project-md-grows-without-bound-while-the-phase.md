@@ -107,10 +107,10 @@ By owner decision (spec, Owner Decisions, "Records routing") these edits are mad
 
 ## Test List
 
-- [ ] Unit: `tests/unit/bounded-project-memory.test.js`, 9 of 9 (AC2-AC3), unchanged.
-- [ ] Hooks: Guard 1's `limit` early return and the byte identity of the two `pre-tool-use.mjs` copies (AC4), checked by T-001-E; the existing hook suites run inside `npm test`, unchanged.
-- [ ] Records on this branch: `tests/tools/repo-invariants.test.js` stays green inside `npm test`, with no record changed. On the `records/*` branch, R-4 runs it with `tools/record-parity.mjs` and `tools/version-gate.mjs` (AC5).
-- [ ] Full suite: `npm test` green (AC6).
+- [X] Unit: `tests/unit/bounded-project-memory.test.js`, 9 of 9 (AC2-AC3), unchanged.
+- [X] Hooks: Guard 1's `limit` early return and the byte identity of the two `pre-tool-use.mjs` copies (AC4), checked by T-001-E; the existing hook suites run inside `npm test`, unchanged.
+- [X] Records on this branch: `tests/tools/repo-invariants.test.js` stays green inside `npm test`, with no record changed. On the `records/*` branch, R-4 runs it with `tools/record-parity.mjs` and `tools/version-gate.mjs` (AC5).
+- [X] Full suite: `npm test` green (AC6).
 
 ## Commit Order
 
