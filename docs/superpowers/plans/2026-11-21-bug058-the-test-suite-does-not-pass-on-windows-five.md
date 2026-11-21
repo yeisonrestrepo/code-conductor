@@ -89,7 +89,7 @@ None, per the spec. Checked by grep and targeted reads during planning: `.gitatt
 - [X] Unit: `tests/unit/merge-md.test.js` (AC9b) and `tests/installer/templates.test.js` (gitignore header), the cause-1 byte comparisons (AC1).
 - [X] Integration: `tests/scripts/conductor-db.test.js` (`--import` URL, AC2) and `tests/installer/smoke.test.js` (`npm pack` shell string, AC5).
 - [X] Full suite: `npm test`, red only in the named ENV pair (AC9).
-- [ ] Windows: the PR's `ci-windows-node24` leg, green with `SKIP_BASELINE_OK ci-windows-node24` (AC6); CI evidence, not run in this sandbox.
+- [X] Windows: the PR's `ci-windows-node24` leg, green with `SKIP_BASELINE_OK ci-windows-node24` (AC6); CI evidence, not run in this sandbox.
 - [X] E2E: not applicable, no UI.
 - No new test: the item changes no behavior, and the criteria are already pinned by the tests above and by the skip-baseline instrument.
 
