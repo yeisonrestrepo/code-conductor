@@ -158,6 +158,7 @@ describe.skipIf(!BASH_AVAILABLE)('verbosity-remind hooks', () => {
     expect(runGlobal(home, home)).toContain('VERBOSITY:MIN')
   })
 
+  // Skipped on win32: chmod 0o000 does not make a file unreadable there, so the project hook would still be read.
   it.skipIf(process.platform === 'win32')(
     'row13: unreadable project hook -> global retains authority',
     { timeout: 5000 },
@@ -227,6 +228,7 @@ describe.skipIf(!BASH_AVAILABLE)('verbosity-remind hooks', () => {
     expect(result.status).toBe(0)
   })
 
+  // Skipped on win32: the 45-level working directory sits within a few characters of the 260-character MAX_PATH limit under a default temp directory.
   it.skipIf(process.platform === 'win32')('T-14: traversal cap=40 blocks verbosity.md 45 levels above; HOME fallback emits MIN', { timeout: 15000 }, () => {
     const deepBase = join(tmpDir, 'deep-path-test')
     let deepPath = deepBase
