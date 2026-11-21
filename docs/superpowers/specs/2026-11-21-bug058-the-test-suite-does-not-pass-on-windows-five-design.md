@@ -1,6 +1,6 @@
 # BUG-058 (re-dispatch): The Test Suite Does Not Pass on Windows — Verification That the Fix on `main` Meets the Entry
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-21 by independent review (round 2)
 
 **Base:** `origin/main` at `a8c584c`. **Prior work:** spec `docs/superpowers/specs/2026-10-22-bug058-windows-suite-design.md`, plan `docs/superpowers/plans/2026-10-22-bug058-windows-suite.md`, fix commits `18ddaf8` through `f16f207`, merged in `8d0be53` (PR #90, 2026-10-24). `git merge-base --is-ancestor 8d0be53 HEAD` succeeds.
 
