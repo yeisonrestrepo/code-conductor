@@ -287,6 +287,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-11-20-bug059-fake-gh-is-posix-only-so-on-windows-the-suites-design.md
 !/docs/superpowers/specs/2026-11-20-bug070-github-actions-pinned-by-tag-instead-of-commit-design.md
 !/docs/superpowers/specs/2026-11-20-bug071-opencode-guard-evaluates-bash-commands-without-design.md
+!/docs/superpowers/specs/2026-11-20-bug074-role-definitions-disagree-on-what-done-means-design.md
 !/docs/superpowers/specs/2026-11-20-bug078-fix-round-write-scope-includes-the-approved-plan-design.md
 !/docs/superpowers/specs/2026-11-20-bug079-unbounded-cumulative-size-of-stored-snaps-in-design.md
 !/docs/superpowers/specs/2026-11-20-bug088-installer-prints-the-opencode-plugin-symlink-design.md
