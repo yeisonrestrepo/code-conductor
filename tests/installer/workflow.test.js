@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -162,5 +162,33 @@ describe('publish verify toolchain [BUG-073]', () => {
     for (const s of ['prepare', 'prepack', 'postpack', 'prepublish', 'prepublishOnly', 'publish', 'postpublish']) {
       expect(pkg.scripts?.[s]).toBeUndefined();
     }
+  });
+});
+
+// Every action in every workflow is pinned to a full commit SHA with its release as a
+// trailing comment, and one action resolves to one commit everywhere. A tag can be
+// moved; a SHA cannot. Reading the directory makes a new workflow inherit the rule. [BUG-070]
+describe('[BUG-070] action pins across .github/workflows', () => {
+  const dir = join(root, '.github', 'workflows');
+  const files = readdirSync(dir).filter((f) => /\.ya?ml$/.test(f)).sort();
+  const lines = files.flatMap((f) =>
+    readFileSync(join(dir, f), 'utf8').replace(/\r\n/g, '\n').split('\n')
+      .filter((l) => /^\s*(?:-\s+)?uses:/.test(l))
+      .map((l) => ({ file: f, line: l.trim() })));
+  const PIN = /^(?:-\s+)?uses: ([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)@([0-9a-f]{40}) # (v\d+\.\d+\.\d+)$/;
+
+  it('pins every action to a full commit SHA with its release as a comment', () => {
+    expect(lines.length).toBeGreaterThan(0);
+    expect(lines.filter((l) => !PIN.test(l.line)).map((l) => `${l.file}: ${l.line}`)).toEqual([]);
+  });
+
+  it('resolves each action to one SHA across all workflows', () => {
+    const pairs = {};
+    for (const { line } of lines) {
+      const m = line.match(PIN);
+      if (m) (pairs[m[1]] ??= new Set()).add(`${m[2]} # ${m[3]}`);
+    }
+    expect(Object.keys(pairs).length).toBeGreaterThan(0);
+    expect(Object.entries(pairs).filter(([, s]) => s.size > 1).map(([a, s]) => `${a}: ${[...s].join(', ')}`)).toEqual([]);
   });
 });
