@@ -1,6 +1,6 @@
 # FEAT-052 — Orchestrate Role Subagents Omit Inherited CLAUDE.md Layers
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-21 by independent review (round 1)
 
 Source: the `[FEAT-052]` entry of `AGENT-READABLE BACKLOG.md` (intake of issue #176).
 
