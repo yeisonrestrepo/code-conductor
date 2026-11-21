@@ -182,6 +182,7 @@ tests/.tmp/
 !/docs/superpowers/plans/2026-11-19-bug083-publish-job-relies-on-omitted-cache-key.md
 !/docs/superpowers/plans/2026-11-19-bug087-installer-follows-a-symlink-at-the-opencode.md
 !/docs/superpowers/plans/2026-11-20-bug056-context-guard-the-turn-counter-persists-across.md
+!/docs/superpowers/plans/2026-11-20-bug057-project-md-grows-without-bound-while-the-phase.md
 !/docs/superpowers/plans/2026-11-20-bug059-fake-gh-is-posix-only-so-on-windows-the-suites.md
 !/docs/superpowers/plans/2026-11-20-bug071-opencode-guard-evaluates-bash-commands-without.md
 !/docs/superpowers/plans/2026-11-20-bug078-fix-round-write-scope-includes-the-approved-plan.md
@@ -281,6 +282,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-11-19-bug083-publish-job-relies-on-omitted-cache-key-design.md
 !/docs/superpowers/specs/2026-11-19-bug087-installer-follows-a-symlink-at-the-opencode-design.md
 !/docs/superpowers/specs/2026-11-20-bug056-context-guard-the-turn-counter-persists-across-design.md
+!/docs/superpowers/specs/2026-11-20-bug057-project-md-grows-without-bound-while-the-phase-design.md
 !/docs/superpowers/specs/2026-11-20-bug059-fake-gh-is-posix-only-so-on-windows-the-suites-design.md
 !/docs/superpowers/specs/2026-11-20-bug071-opencode-guard-evaluates-bash-commands-without-design.md
 !/docs/superpowers/specs/2026-11-20-bug078-fix-round-write-scope-includes-the-approved-plan-design.md
