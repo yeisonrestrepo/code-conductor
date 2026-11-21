@@ -149,51 +149,51 @@
 
 **Files:** `tests/unit/role-profiles.test.js`
 
-- [ ] [T-101] `tests/unit/role-profiles.test.js` (modify): append the constants and `describe('role agents omit the inherited CLAUDE.md layers [FEAT-052]')` of plan decision 6 at the end of the file. Do not touch the sha rows yet. Depends on T-004.
-- [ ] [T-102] Red run: `npx vitest run tests/unit/role-profiles.test.js`. Predicted: **20 failed | 120 passed (140)**: every new row red (14 `[AC1]`, 2 `[AC4]`, 3 `[AC5]`, 1 `[AC6]`), every existing row green. Any other split means a test is wrong: fix the test, not the prediction. Depends on T-101.
+- [X] [T-101] `tests/unit/role-profiles.test.js` (modify): append the constants and `describe('role agents omit the inherited CLAUDE.md layers [FEAT-052]')` of plan decision 6 at the end of the file. Do not touch the sha rows yet. Depends on T-004.
+- [X] [T-102] Red run: `npx vitest run tests/unit/role-profiles.test.js`. Predicted: **20 failed | 120 passed (140)**: every new row red (14 `[AC1]`, 2 `[AC4]`, 3 `[AC5]`, 1 `[AC6]`), every existing row green. Any other split means a test is wrong: fix the test, not the prediction. Depends on T-101.
 
 ### Task 2: The profiles and their pins (green for AC1, AC2, AC4)
 
 **Files:** `.claude/agents/{spec,plan,code,audit,security,qa,define-review}.md`, `project-template/.claude/agents/{spec,plan,code,audit,security,qa,define-review}.md`, `tests/unit/role-profiles.test.js`
 
-- [ ] [T-201] `.claude/agents/spec.md`, `plan.md`, `code.md`, `security.md`, `qa.md`, `define-review.md` (modify, Edit tool, one Edit per file): insert `omitClaudeMd: true` after the `default-model:` line (plan decision 2). Depends on T-102.
-- [ ] [T-202] `.claude/agents/audit.md` (modify, Edit tool): insert `omitClaudeMd: true` after the `default-model:` line (plan decision 2). Depends on T-201.
-- [ ] [T-203] `.claude/agents/audit.md` (modify, Edit tool): the line-12 replacement of plan decision 3. Depends on T-202.
-- [ ] [T-204] `project-template/.claude/agents/{spec,plan,code,audit,security,qa,define-review}.md` (modify): the same bytes as each mirror; then `cmp` each of the seven pairs prints nothing, and `sha256sum` of each prints the hash of plan decision 7's table. Depends on T-203.
-- [ ] [T-205] `tests/unit/role-profiles.test.js` (modify), `PROFILE_SHA256_1_37_0`: the FEAT-052 comment line and the six new hashes of plan decision 7. Depends on T-204.
-- [ ] [T-206] Run: the T-102 command. Predicted: **4 failed | 136 passed (140)**: the three `[AC5]` rows and the `[AC6]` row still red; the `[AC1]`, `[AC4]`, mirror, token-cap, `[FEAT-053 AC2]` and both directories' hash rows green. Depends on T-205.
+- [X] [T-201] `.claude/agents/spec.md`, `plan.md`, `code.md`, `security.md`, `qa.md`, `define-review.md` (modify, Edit tool, one Edit per file): insert `omitClaudeMd: true` after the `default-model:` line (plan decision 2). Depends on T-102.
+- [X] [T-202] `.claude/agents/audit.md` (modify, Edit tool): insert `omitClaudeMd: true` after the `default-model:` line (plan decision 2). Depends on T-201.
+- [X] [T-203] `.claude/agents/audit.md` (modify, Edit tool): the line-12 replacement of plan decision 3. Depends on T-202.
+- [X] [T-204] `project-template/.claude/agents/{spec,plan,code,audit,security,qa,define-review}.md` (modify): the same bytes as each mirror; then `cmp` each of the seven pairs prints nothing, and `sha256sum` of each prints the hash of plan decision 7's table. Depends on T-203.
+- [X] [T-205] `tests/unit/role-profiles.test.js` (modify), `PROFILE_SHA256_1_37_0`: the FEAT-052 comment line and the six new hashes of plan decision 7. Depends on T-204.
+- [X] [T-206] Run: the T-102 command. Predicted: **4 failed | 136 passed (140)**: the three `[AC5]` rows and the `[AC6]` row still red; the `[AC1]`, `[AC4]`, mirror, token-cap, `[FEAT-053 AC2]` and both directories' hash rows green. Depends on T-205.
 
 ### Task 3: The audit briefs and the README (green)
 
 **Files:** `.claude/commands/cc-orchestrate.md`, `project-template/.claude/commands/cc-orchestrate.md`, `project-template/.claude/commands/cc-review.md`, `README.md`
 
-- [ ] [T-301] `.claude/commands/cc-orchestrate.md:212` (modify, Edit tool): the `audit` row's Task cell of plan decision 4. Depends on T-206.
-- [ ] [T-302] `project-template/.claude/commands/cc-orchestrate.md:212` (modify): the same edit; then `cmp` of the two copies prints nothing. Depends on T-301.
-- [ ] [T-303] `project-template/.claude/commands/cc-review.md:44` (modify): the step-3 insertion of plan decision 4. Depends on T-302.
-- [ ] [T-304] `README.md` (modify): the paragraph of plan decision 5 after line 148. Depends on T-303.
-- [ ] [T-305] Green run: `npx vitest run tests/unit/role-profiles.test.js tests/installer/commands-parity.test.js`. Predicted: **235 passed (235)** (140 + 95), the cc-orchestrate byte-identical row and the FEAT-061 cc-review rows included. Depends on T-304.
+- [X] [T-301] `.claude/commands/cc-orchestrate.md:212` (modify, Edit tool): the `audit` row's Task cell of plan decision 4. Depends on T-206.
+- [X] [T-302] `project-template/.claude/commands/cc-orchestrate.md:212` (modify): the same edit; then `cmp` of the two copies prints nothing. Depends on T-301.
+- [X] [T-303] `project-template/.claude/commands/cc-review.md:44` (modify): the step-3 insertion of plan decision 4. Depends on T-302.
+- [X] [T-304] `README.md` (modify): the paragraph of plan decision 5 after line 148. Depends on T-303.
+- [X] [T-305] Green run: `npx vitest run tests/unit/role-profiles.test.js tests/installer/commands-parity.test.js`. Predicted: **235 passed (235)** (140 + 95), the cc-orchestrate byte-identical row and the FEAT-061 cc-review rows included. Depends on T-304.
 
 ### Task 4: Full suite, scope check and commit
 
 **Files:** every file of Tasks 1-3, and this plan (ticks)
 
-- [ ] [T-401] Run `npm test` (long: `tests/scripts/orchestrate.test.js` alone takes several minutes; run it in the background if the shell times out). Predicted: exit 0 (AC7), with `tests/unit/role-profiles.test.js` at **140** and `tests/installer/commands-parity.test.js` at **95**. A red is called ENV only if the sandbox caused it (network, tmp permissions) and its file is not one this plan touches; report it with its name. Any other red is fixed. Depends on T-305.
-- [ ] [T-402] Scope check: `git status --short` lists exactly the nineteen files of the Global Constraints and this plan; no temporary file is left in the tree. `git diff --stat` shows no change to the spec, any hook, `scripts/`, `tests/installer/commands-parity.test.js`, any CLAUDE.md, `.github/`, or `README.md` outside the one inserted paragraph. Depends on T-401.
-- [ ] [T-403] Stage: `git add -u .claude/agents/spec.md .claude/agents/plan.md .claude/agents/code.md .claude/agents/audit.md .claude/agents/security.md .claude/agents/qa.md .claude/agents/define-review.md project-template/.claude/agents/spec.md project-template/.claude/agents/plan.md project-template/.claude/agents/code.md project-template/.claude/agents/audit.md project-template/.claude/agents/security.md project-template/.claude/agents/qa.md project-template/.claude/agents/define-review.md .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-review.md tests/unit/role-profiles.test.js README.md` (all tracked). Depends on T-402.
-- [ ] [T-404] Stage: `git add -u docs/superpowers/plans/2026-11-21-feat052-orchestrate-role-subagents-omit-inherited.md` (carries the ticks for T-101 to T-403). Depends on T-403.
-- [ ] [T-405] Commit: `feat: role subagents start without the inherited CLAUDE.md layers [FEAT-052]`. Depends on T-404.
+- [X] [T-401] Run `npm test` (long: `tests/scripts/orchestrate.test.js` alone takes several minutes; run it in the background if the shell times out). Predicted: exit 0 (AC7), with `tests/unit/role-profiles.test.js` at **140** and `tests/installer/commands-parity.test.js` at **95**. A red is called ENV only if the sandbox caused it (network, tmp permissions) and its file is not one this plan touches; report it with its name. Any other red is fixed. Depends on T-305.
+- [X] [T-402] Scope check: `git status --short` lists exactly the nineteen files of the Global Constraints and this plan; no temporary file is left in the tree. `git diff --stat` shows no change to the spec, any hook, `scripts/`, `tests/installer/commands-parity.test.js`, any CLAUDE.md, `.github/`, or `README.md` outside the one inserted paragraph. Depends on T-401.
+- [X] [T-403] Stage: `git add -u .claude/agents/spec.md .claude/agents/plan.md .claude/agents/code.md .claude/agents/audit.md .claude/agents/security.md .claude/agents/qa.md .claude/agents/define-review.md project-template/.claude/agents/spec.md project-template/.claude/agents/plan.md project-template/.claude/agents/code.md project-template/.claude/agents/audit.md project-template/.claude/agents/security.md project-template/.claude/agents/qa.md project-template/.claude/agents/define-review.md .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-review.md tests/unit/role-profiles.test.js README.md` (all tracked). Depends on T-402.
+- [X] [T-404] Stage: `git add -u docs/superpowers/plans/2026-11-21-feat052-orchestrate-role-subagents-omit-inherited.md` (carries the ticks for T-101 to T-403). Depends on T-403.
+- [X] [T-405] Commit: `feat: role subagents start without the inherited CLAUDE.md layers [FEAT-052]`. Depends on T-404.
 
 ## Test List
 
-- [ ] Unit, AC1: the 14 `[AC1]` rows pin exactly one `omitClaudeMd: true` frontmatter line in every profile of both directories.
-- [ ] Unit, AC2: the mirror rows (`[AC2]` per role, the `define-review` mirror row) and both directories' hash rows with the new pins.
-- [ ] AC3: the spec's reliance inventory (no test; recorded in the spec, which this plan does not change).
-- [ ] Unit, AC4: the two `[AC4]` rows.
-- [ ] Unit, AC5: the three `[AC5]` rows, each scoped to the audit line of its site.
-- [ ] Unit, AC6: the `[AC6]` README row.
-- [ ] AC7: `npm test` (T-401) and the scope check (T-402).
-- [ ] AC8: manual, not run in the build (plan decision 9); the PR description says so.
-- [ ] No E2E/UI test: there is no UI. No new test is conditionally skipped, so no leg's skipped set in `tools/skip-baseline.json` changes.
+- [X] Unit, AC1: the 14 `[AC1]` rows pin exactly one `omitClaudeMd: true` frontmatter line in every profile of both directories.
+- [X] Unit, AC2: the mirror rows (`[AC2]` per role, the `define-review` mirror row) and both directories' hash rows with the new pins.
+- [X] AC3: the spec's reliance inventory (no test; recorded in the spec, which this plan does not change).
+- [X] Unit, AC4: the two `[AC4]` rows.
+- [X] Unit, AC5: the three `[AC5]` rows, each scoped to the audit line of its site.
+- [X] Unit, AC6: the `[AC6]` README row.
+- [X] AC7: `npm test` (T-401) and the scope check (T-402).
+- [X] AC8: manual, not run in the build (plan decision 9); the PR description says so.
+- [X] No E2E/UI test: there is no UI. No new test is conditionally skipped, so no leg's skipped set in `tools/skip-baseline.json` changes.
 
 ## Commit Order
 
