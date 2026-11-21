@@ -54,7 +54,9 @@ red suite it ticks nothing, leaves out its `SNAP_HANDBACK` line and says why, as
 Known failures are declared by the owner when the run starts, with a repeatable `start --known-failure <text>` flag;
 `start` records them in the run file as `known_failures`, where `code` and `qa` read them next to `test_command`. The
 orchestrator passes `--known-failure` to `start` only as it appears in `$ARGUMENTS`, verbatim, and never adds, edits or
-drops one itself. When `known_failures` is non-empty, the run's final report repeats each declared entry with the
+drops one itself. A value with spaces or shell characters reaches `start` whole only when the owner quotes it, so the
+orchestrator checks `$ARGUMENTS` before it runs `start` and refuses to run it on an unquoted shell character, and the
+start line echoes every recorded value so a value cut short is visible (decision 7). When `known_failures` is non-empty, the run's final report repeats each declared entry with the
 failing tests it matched in `qa`'s run, so a green on a non-zero exit is never silent. The
 dispatch brief's "Verify your work before you hand back." becomes "Check your work against your success condition
 before you hand back.", which every role can do. No gate, position, router step or SNAP field changes: a red `code`
@@ -87,16 +89,43 @@ report halts through the existing `ORCH_HANDBACK_MISSING` path, exactly as a red
    exit-0-only. Declaring known failures outside a run is left to a later item if anyone asks for it.
 6. **The sentence is duplicated, not referenced.** Each profile is the agent's whole instruction; an agent does not
    read the others. A test pins the identical sentence in all three, in both agent directories, so it cannot drift.
+7. **The owner quotes a value; the orchestrator refuses an unquoted shell character; `start` echoes what it got.** The
+   Start step runs `node "$S/orchestrate.mjs" start $ARGUMENTS` through the shell, so an unquoted `>` in
+   `--known-failure tests/x.test.js > suite > title` is a redirection: `start` would receive only `tests/x.test.js`,
+   declare the whole file, and write its start line to a file named `title`. Quoting the value for the owner would
+   break the verbatim rule (owner decision 1), so the fix is three layers that keep it:
+   - **The rule.** A `--known-failure` value that contains a space or any of these shell characters:
+     `>` `<` `|` `;` `&` `$` `` ` `` `(` `)` `*` `?` `[` `]` `#` `~` `\`,
+     must be quoted by the owner, in single quotes (`'tests/x.test.js > suite > title'`) or double quotes. The Start
+     step, the title line's usage text and README's command row say so.
+   - **The orchestrator's check.** Before it runs `start`, the orchestrator reads `$ARGUMENTS` and, if any of those
+     characters stands outside a quoted span, it does not run `start`: it shows the owner `$ARGUMENTS`, names the
+     character, and asks them to quote the value. It never adds the quotes itself. This is a refusal, not an edit, so
+     `$ARGUMENTS` still reaches `start` verbatim or not at all. The same check holds with or without
+     `--known-failure`: no flag `start` accepts takes such a character, so an unquoted one is always a mistake.
+   - **`start`'s echo.** The start line's segment is `; known failures: <k> <values>`, with `<values>` the recorded
+     list as a JSON array, so the owner sees in the start line and the run header exactly what was declared, and a
+     value the shell cut short shows as cut short. If the orchestrator's check is missed and the shell redirects the
+     output, `start` prints nothing to the session; the Start step treats a `start` that exits 0 with an empty stdout
+     as a halt: it runs `end` and tells the owner the shell consumed part of the arguments.
+   A value the shell splits on an unquoted space (`--known-failure tests/x.test.js isolated store`, if the check is
+   missed) fails safe: `start` sees `isolated` as an unknown argument and refuses with `START_USAGE`, writing nothing.
+   A value that starts with `--` is refused with `START_USAGE`, so a missing value never swallows the next flag
+   (`--known-failure --auto` is a usage error, not a declaration of `--auto`).
 
 ## Behavior
 
 ### Main path
 
 1. The owner starts a run, optionally declaring known failures:
-   `node "$S/orchestrate.mjs" start BUG-074 --known-failure "tests/contract/x.test.js > isolated store"`.
+   `/cc-orchestrate BUG-074 --known-failure 'tests/contract/x.test.js > isolated store'`, the value quoted because it
+   holds spaces and `>` (decision 7). The orchestrator checks `$ARGUMENTS` for an unquoted shell character, finds none,
+   and runs `node "$S/orchestrate.mjs" start BUG-074 --known-failure 'tests/contract/x.test.js > isolated store'`.
    `start` validates each value, records `known_failures: ["tests/contract/x.test.js > isolated store"]` in
-   `.claude/memory/orchestrator-run.json`, and appends `; known failures: 1` to its start line. With no flag it records
-   `known_failures: []` and prints no new segment, so the start line is byte-identical to today's.
+   `.claude/memory/orchestrator-run.json`, and appends `; known failures: 1 ["tests/contract/x.test.js > isolated store"]`
+   to its start line. The segment comes after the security segment and the role-models segment (and its `; note:`), and
+   before `; unattended: …`, which stays last. With no flag it records `known_failures: []` and prints no new segment, so
+   the start line is byte-identical to today's.
 2. `plan` writes tasks ordered so each ends with the suite green, by the shared sentence.
 3. For each task, `code` implements it, runs the test command once after its last edit, and reads the exit status and
    output:
@@ -133,11 +162,15 @@ report halts through the existing `ORCH_HANDBACK_MISSING` path, exactly as a red
   which is `qa`'s behavior today. `resume` keeps the field as it is.
 - **Outside a run** (`/cc-test`, `qa` with `mem.p.test_command`): no known failures, exit-0-only.
 - **Unattended runs** behave the same; the declaration is part of the owner's `start` arguments, passed verbatim.
+- **The owner leaves a value unquoted.** With a shell character in it, the orchestrator does not run `start`; it shows
+  `$ARGUMENTS`, names the character, and asks the owner to quote the value (decision 7). With only spaces, the same
+  check applies; if it is missed, the split value fails safe with `START_USAGE`. If a redirection still gets through,
+  `start` exits 0 with an empty stdout, and the orchestrator runs `end` and tells the owner the arguments were cut.
 
 ### Error cases
 
 - `start --known-failure` with no value, an empty or whitespace-only value, a value containing a line break, a value
-  longer than 200 characters, or a value repeated: `start` refuses with its usage line (`START_USAGE`), exit 2, and
+  longer than 200 characters, a value that starts with `--`, or a value repeated: `start` refuses with its usage line (`START_USAGE`), exit 2, and
   writes nothing, as it does for every other malformed flag today.
 - A run file whose `known_failures` is present but is not an array of non-empty strings: the run file fails validation
   the way any other malformed field does, so `install` and `handback` treat it as an invalid run file. No role decides
@@ -167,11 +200,16 @@ contract (AC9).
   is non-zero. A test pins it.
 - [ ] **AC4.** `plan.md` keeps ordering tasks so each ends green, and its green is the shared sentence (AC1).
 - [ ] **AC5.** `start --known-failure <text>` is accepted any number of times in any position after the item, records
-  the values in order as the run file's `known_failures`, and appends `; known failures: <k>` to the start line; with
-  no flag the run file records `known_failures: []` and the start line is unchanged. Tests in
-  `tests/scripts/orchestrate.test.js` cover zero, one and two values.
+  the values in order as the run file's `known_failures`, and appends `; known failures: <k> <JSON array of the values>`
+  to the start line, after the role-models segment and before `; unattended: …`; with no flag the run file records
+  `known_failures: []` and the start line is unchanged. Tests in `tests/scripts/orchestrate.test.js` cover zero, one
+  and two values, one value holding spaces and `>` passed as one argument (recorded and echoed byte for byte), and the
+  segment's position in a run with role models and `--unattended`.
 - [ ] **AC6.** `start` refuses with `START_USAGE`, exit 2 and nothing written for a missing value, an empty or
-  whitespace-only value, a line break, a value over 200 characters, and a repeated value. A test covers each.
+  whitespace-only value, a line break, a value over 200 characters, a value that starts with `--` (for example
+  `--known-failure --auto`), and a repeated value. A test covers each, and one more passes the arguments as the shell
+  splits an unquoted value with spaces (`--known-failure`, `tests/x.test.js`, `isolated`, `store`) and expects
+  `START_USAGE` with nothing written.
 - [ ] **AC7.** A run file with no `known_failures` field still validates (read as none); one with a non-array or a
   non-string or empty entry does not. `resume` keeps the field. `code.md` and `qa.md` name the run file's
   `known_failures` field as where the declared failures are, and `qa.md` says that outside a run there are none.
@@ -179,13 +217,16 @@ contract (AC9).
 - [ ] **AC8.** The dispatch brief in `.claude/commands/cc-orchestrate.md` and its `project-template` copy no longer
   contain "Verify your work"; they contain "Check your work against your success condition before you hand back."
   The dispatch table's `code`, `code` (fix round) and `qa` rows state the red-suite rule, the Start step documents
-  `--known-failure`, the title line and README's command table list the flag, and "On any halt" names
+  `--known-failure`, the title line and README's command table list the flag with the quoting rule of decision 7, and "On any halt" names
   `.conductor/handback/code-<N>.txt` (or `code-fix-<r>.txt`) as what the owner reads after a red `code` report, with
   the failing tests it names. The Start step says `--known-failure` comes only from `$ARGUMENTS`, passed verbatim, and
-  that the orchestrator never adds, edits or drops one, including after a red `code` halt. The Report step names, when
+  that the orchestrator never adds, edits or drops one, including after a red `code` halt; it states the quoting rule,
+  the orchestrator's check (no `start` on an unquoted shell character in `$ARGUMENTS`, quotes never added for the
+  owner), the halt on a `start` that exits 0 with an empty stdout, and that the run header prints the known-failures
+  segment. The Report step names, when
   the record's `known_failures` is non-empty, each declared entry with the failing tests it matched in `qa`'s report.
   `tests/installer/commands-parity.test.js` pins the new brief line, the removed one, the usage text, the verbatim
-  rule and the Report item.
+  rule, the quoting rule with the orchestrator's check, the empty-stdout halt and the Report item.
 - [ ] **AC9.** No gate, router position or SNAP field is added or changed: `MAY_HAND_BACK`, `nextStep` and
   `scripts/snap-contract.mjs` are untouched, `code.md` still names only `build_executed` and `qa.md` only
   `verify_pass`, and the existing hand-back and SNAP tests pass unchanged.
@@ -211,7 +252,7 @@ contract (AC9).
 - `.claude/agents/code.md`, `qa.md`, `plan.md` and their `project-template/.claude/agents/` copies: the shared
   sentence, the success conditions (AC1-AC4, AC7).
 - `scripts/orchestrate.mjs`: `parseStartArgs` and `START_USAGE` (`:1470`-`:1490`), the run-file write in `start`
-  (`:1525`), the start line (`:1531`), and `isValidRun` (`:221`), which `install`, `handback` and `resume` read through `readRun`.
+  (`:1525`), the start line (`:1531`, the new segment between `modelsNote` and `UNATTENDED_NOTE`), and `isValidRun` (`:221`), which `install`, `handback` and `resume` read through `readRun`.
 - `.claude/commands/cc-orchestrate.md` and its `project-template` copy: title line, Start step (the verbatim rule),
   "On any halt", the Report step (the matched-entry list), the dispatch brief and the dispatch table (AC8).
 - `README.md`: the `/cc-orchestrate` row of the command table (`:260`). Not the "Known limits" lines.
