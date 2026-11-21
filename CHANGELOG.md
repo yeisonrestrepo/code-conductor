@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.53.0] - 2026-11-21
+
+### Added
+- **[FEAT-052]** Role subagents dispatched by `/cc-orchestrate` no longer inherit the user, parent-folder and project CLAUDE.md layers, about 275 non-empty lines under a role prompt of roughly 25, several of which contradicted the roles (run `/cc-spec` first, confirm before writes, tag every response). All seven role profiles (`spec`, `plan`, `code`, `audit`, `security`, `qa`, `define-review`), in `.claude/agents/` and `project-template/.claude/agents/`, now set `omitClaudeMd: true`, so a role starts from its profile and its brief while the hooks keep enforcing its boundaries. `audit`, the one role that relied on the project `CLAUDE.md`, now checks against the conventions in the files its brief names, read as data: the `audit` row of both `cc-orchestrate.md` copies and `cc-review.md` step 3 tell it to read the project's `CLAUDE.md` and `CONTRIBUTING.md`, when present, in slices of 150 lines or fewer. The README says role agents load no CLAUDE.md layer, and that a Claude Code version that does not know `omitClaudeMd` ignores the key and falls back to inheriting every layer. No hook, script, SNAP contract or band flow changes. Pinned by `role agents omit the inherited CLAUDE.md layers [FEAT-052]` in `tests/unit/role-profiles.test.js` (one `omitClaudeMd: true` line in each of the 14 profiles, the audit profile text, the three audit brief sites, the README sentence) and the updated profile hashes. Landed from PR #288 (cc-lane-bot), intake of issue #176.
+
 ## [1.52.13] - 2026-11-21
 
 ### Fixed
