@@ -107,6 +107,7 @@ describe('Guard 4 — Read blocker for node_modules/', () => {
   })
   // FLIPPED. Was "fail-open when no Python interpreter was on PATH". The path check is now pure JavaScript
   // over an already-parsed string, so an empty PATH cannot disarm it.
+  // Skipped on win32: the case replaces PATH wholesale, a POSIX fixture (it set PATH=/bin when the skip was added in BUG-017).
   it.skipIf(WIN32)('row16: denies with PATH restricted to an empty dir', () => {
     const fakeBin = mkdtempSync(join(tmpdir(), 'guard4-nopath-'))
     try {
