@@ -499,7 +499,10 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 // Read per case, so a missing workflow fails each case on ENOENT instead of the whole file.
 const workflow = (name) =>
   readFileSync(join(REPO_ROOT, '.github', 'workflows', name), 'utf8').replace(/\r\n/g, '\n');
-const usesValues = (text) => new Set([...text.matchAll(/^\s*(?:-\s+)?uses:\s*(\S+)\s*$/gm)].map((m) => m[1]));
+// A SHA pin keeps its release comment in the value: `<action>@<sha> # vX.Y.Z`. [BUG-070]
+const usesValues = (text) =>
+  new Set([...text.matchAll(/^\s*(?:-\s+)?uses:\s*(\S+)(?:\s+#\s*(v\d+\.\d+\.\d+))?\s*$/gm)]
+    .map((m) => (m[2] ? `${m[1]} # ${m[2]}` : m[1])));
 
 describe('the workflow', () => {
   // Pre-1.44.0 hardening: pull_request_target runs the workflow file from the base branch,
@@ -510,9 +513,10 @@ describe('the workflow', () => {
     expect(text).not.toMatch(/^\s+(push|pull_request|workflow_dispatch|schedule|workflow_run):/m);
   });
 
-  it('uses the same action majors as test.yml', () => {
+  it('uses the same action majors as test.yml, pinned by commit SHA [BUG-070]', () => {
     const uses = usesValues(workflow('records-guard.yml'));
-    expect(uses).toEqual(new Set(['actions/checkout@v7', 'actions/setup-node@v7']));
+    const pin = /^(actions\/(?:checkout|setup-node))@[0-9a-f]{40} # v7\.\d+\.\d+$/;
+    expect([...uses].map((u) => u.match(pin)?.[1]).sort()).toEqual(['actions/checkout', 'actions/setup-node']);
     const testUses = usesValues(workflow('test.yml'));
     for (const value of uses) expect(testUses.has(value)).toBe(true);
   });

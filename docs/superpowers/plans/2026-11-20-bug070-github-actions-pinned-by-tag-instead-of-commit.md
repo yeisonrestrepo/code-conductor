@@ -58,9 +58,9 @@
 **Files:**
 - Modify: `tests/tools/records-guard.test.js:502`, `tests/tools/records-guard.test.js:513-518`, `tests/installer/workflow.test.js:2`, end of `tests/installer/workflow.test.js`
 
-- [ ] [T-101] Change `usesValues` and the row (plan decisions 1 and 2). Depends on T-004.
-- [ ] [T-102] Add the `[BUG-070]` describe and the `readdirSync` import (plan decision 3). Depends on T-101.
-- [ ] [T-103] Red run: `npx vitest run tests/tools/records-guard.test.js tests/installer/workflow.test.js tests/wiki/wiki-gen.test.js`. Predicted: **3 failed**, the renamed records-guard row and both new `[BUG-070]` tests, and every other test passing (spec, AC3). Depends on T-102.
+- [X] [T-101] Change `usesValues` and the row (plan decisions 1 and 2). Depends on T-004.
+- [X] [T-102] Add the `[BUG-070]` describe and the `readdirSync` import (plan decision 3). Depends on T-101.
+- [X] [T-103] Red run: `npx vitest run tests/tools/records-guard.test.js tests/installer/workflow.test.js tests/wiki/wiki-gen.test.js`. Predicted: **3 failed**, the renamed records-guard row and both new `[BUG-070]` tests, and every other test passing (spec, AC3). Depends on T-102.
 
 ---
 
@@ -69,10 +69,10 @@
 **Files:**
 - Modify: `.github/workflows/records-guard.yml:23,30`, `.github/workflows/test.yml:32,34,41`, `.github/workflows/publish.yml:18,19,60,63`, `.github/workflows/wiki-sync.yml:38,40`
 
-- [ ] [T-201] Apply the three substitutions of plan decision 4. Depends on T-103.
-- [ ] [T-202] Green run: the T-103 command. Predicted: **0 failed** (spec, AC2, AC3, AC5). Depends on T-201.
-- [ ] [T-203] Regression check for AC2: set `records-guard.yml:23` back to `actions/checkout@v7`, run `npx vitest run tests/tools/records-guard.test.js`, expect the renamed row red, then restore. Depends on T-202.
-- [ ] [T-204] Scratch check for AC4: change the SHA on `wiki-sync.yml:38` to forty `0`s, run `npx vitest run tests/installer/workflow.test.js`, expect only the one-pair-per-action test red, then restore and confirm `git diff --stat` still shows eleven lines changed in the workflows. Depends on T-203.
+- [X] [T-201] Apply the three substitutions of plan decision 4. Depends on T-103.
+- [X] [T-202] Green run: the T-103 command. Predicted: **0 failed** (spec, AC2, AC3, AC5). Depends on T-201.
+- [X] [T-203] Regression check for AC2: set `records-guard.yml:23` back to `actions/checkout@v7`, run `npx vitest run tests/tools/records-guard.test.js`, expect the renamed row red, then restore. Depends on T-202.
+- [X] [T-204] Scratch check for AC4: change the SHA on `wiki-sync.yml:38` to forty `0`s, run `npx vitest run tests/installer/workflow.test.js`, expect only the one-pair-per-action test red, then restore and confirm `git diff --stat` still shows eleven lines changed in the workflows. Depends on T-203.
 
 ---
 
@@ -81,25 +81,25 @@
 **Files:**
 - Modify: the four workflows and two test files (staged), this plan (checkboxes)
 
-- [ ] [T-301] Run `npm test`. Predicted: the same failures as the Baseline and no others (spec, AC6). Depends on T-204.
-- [ ] [T-302] Scope check:
+- [X] [T-301] Run `npm test`. Predicted: the same failures as the Baseline and no others (spec, AC6). Depends on T-204.
+- [X] [T-302] Scope check:
   - `git status --porcelain` lists exactly the four workflows, the two test files and this plan.
   - `git diff -U0 HEAD -- .github/workflows | grep -c '^[-+] '` prints `22`, and every removed/added pair differs only after `@` (spec, AC1).
   - `git diff --quiet HEAD -- VERSION CHANGELOG.md package.json package-lock.json README.md "AGENT-READABLE BACKLOG.md" .claude tools lib bin scripts` exits 0.
   - Depends on T-301.
-- [ ] [T-303] Stage: `git add -u` with the six explicit paths and this plan. Depends on T-302.
-- [ ] [T-304] Commit: `fix: pin GitHub Actions by commit SHA in every workflow [BUG-070]`. Depends on T-303.
+- [X] [T-303] Stage: `git add -u` with the six explicit paths and this plan. Depends on T-302.
+- [X] [T-304] Commit: `fix: pin GitHub Actions by commit SHA in every workflow [BUG-070]`. Depends on T-303.
 
 ---
 
 ## Test List
 
-- [ ] Unit, AC2: the renamed records-guard row passes on the pins and is red on a restored `@v7` (T-202, T-203).
-- [ ] Unit, AC3: the `[BUG-070]` describe is red on today's files (T-103) and green after (T-202).
-- [ ] Unit, AC4: the one-pair test is red with a scratch SHA (T-204).
-- [ ] Unit, AC5: every other test in the three workflow test files passes unchanged (T-202).
-- [ ] AC6: `npm test` matches the baseline (T-301).
-- [ ] No integration or E2E test: the pins are exercised by the next CI run of each workflow, and there is no UI.
+- [X] Unit, AC2: the renamed records-guard row passes on the pins and is red on a restored `@v7` (T-202, T-203).
+- [X] Unit, AC3: the `[BUG-070]` describe is red on today's files (T-103) and green after (T-202).
+- [X] Unit, AC4: the one-pair test is red with a scratch SHA (T-204).
+- [X] Unit, AC5: every other test in the three workflow test files passes unchanged (T-202).
+- [X] AC6: `npm test` matches the baseline (T-301).
+- [X] No integration or E2E test: the pins are exercised by the next CI run of each workflow, and there is no UI.
 
 ## Commit Order
 
