@@ -1,6 +1,6 @@
 # BUG-057 project.md Grows Without Bound While the Phase Commands Instruct a Full Read — Closure Design
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-20 by independent review (round 1)
 **Backlog:** `[BUG-057]` · **Issue:** #77
 
 ## Problem
