@@ -7,7 +7,8 @@
 The spec and the plan need an owner approval, not a delegated one: the change edits control-plane files
 (`.claude/agents/*.md`, `.claude/commands/cc-orchestrate.md`, `scripts/orchestrate.mjs`), which a delegated plan
 review escalates (BUG-080), and it lets `qa` pass a suite that exits non-zero when the owner declared the failures,
-which relaxes the Verify gate. See [Open questions for the owner](#open-questions-for-the-owner).
+which relaxes the Verify gate. The owner's answers to the questions this spec raised are recorded in
+[Owner decisions](#owner-decisions), and the text below follows them.
 
 ## Problem
 
@@ -52,6 +53,9 @@ red suite it ticks nothing, leaves out its `SNAP_HANDBACK` line and says why, as
 `verify_pass` only when the suite is green. `plan` keeps ordering tasks so each ends green, now by that definition.
 Known failures are declared by the owner when the run starts, with a repeatable `start --known-failure <text>` flag;
 `start` records them in the run file as `known_failures`, where `code` and `qa` read them next to `test_command`. The
+orchestrator passes `--known-failure` to `start` only as it appears in `$ARGUMENTS`, verbatim, and never adds, edits or
+drops one itself. When `known_failures` is non-empty, the run's final report repeats each declared entry with the
+failing tests it matched in `qa`'s run, so a green on a non-zero exit is never silent. The
 dispatch brief's "Verify your work before you hand back." becomes "Check your work against your success condition
 before you hand back.", which every role can do. No gate, position, router step or SNAP field changes: a red `code`
 report halts through the existing `ORCH_HANDBACK_MISSING` path, exactly as a red `qa` report does today.
@@ -70,7 +74,10 @@ report halts through the existing `ORCH_HANDBACK_MISSING` path, exactly as a red
 3. **Known failures are declared per run, by the owner, at `start`.** The run file is in the orchestrator's write
    surface, which Guard 6 keeps every role from writing, so no role can declare its own failure as known. A tracked
    project file was rejected for that reason: a plan task could name it and a `code` agent could write to it. The
-   declaration is visible in the start line and in the run record.
+   orchestrator is held to the same rule: it passes `$ARGUMENTS` to `start` verbatim, as it already does for
+   `--unattended`, and never adds, edits or drops a `--known-failure` itself, including after a red `code` halt, where
+   it stops and names the failing tests for the owner. The declaration is visible in the start line, in the run record
+   and in the final report.
 4. **A failing test is known when the runner's failure line for it contains a declared entry verbatim.** Runners print
    a failing test as a line naming its file and its title (vitest: `FAIL  tests/x.test.js > suite > title`). Matching by
    substring lets the owner declare a whole file or one test title, and is a judgment `code` and `qa` can make from the
@@ -100,18 +107,23 @@ report halts through the existing `ORCH_HANDBACK_MISSING` path, exactly as a red
 4. After audit and security, `qa` runs the test command and applies the same sentence: green hands back
    `verify_pass` with the exit status, summary line and, when non-zero, each failing test with its matched entry.
 5. Every role's brief ends with "Check your work against your success condition before you hand back."
+6. After `end`, the orchestrator's report names, when the record's `known_failures` is non-empty, each declared entry
+   with the failing tests `qa`'s report (`.conductor/handback/qa.txt`) matched to it, or that it matched none. With
+   `known_failures: []` the report has no such part.
 
 ### Alternative paths
 
 - **A task turns the suite red.** `code` ticks no box, leaves out its `SNAP_HANDBACK` line, and says why, quoting the
   summary line and naming each failing test that matched no declared entry. The orchestrator writes the report to
   `.conductor/handback/code-<N>.txt` as always; `handback code` halts `ORCH_HANDBACK_MISSING`; the orchestrator
-  follows "On any halt" and names that file. Recovery is the existing one: `resume` (keeps the earlier tasks'
+  follows "On any halt", names that file and the failing tests the report names, and stops. It never restarts the run
+  with a `--known-failure` of its own. Recovery is the existing one: `resume` (keeps the earlier tasks'
   hand-backs) or `end`, then `start`, on the owner's word.
 - **A fix round leaves the suite red.** Same as above for `code-fix-<r>.txt`; a fix round ticks no boxes in any case.
 - **The suite is red at the base and the owner did not declare it.** The first `code` task halts. The owner reads the
-  report, which names the failing tests, and restarts with `end`, then `start … --known-failure <text>`; the run file
-  of a live or resumed run is not edited to add one.
+  report, which names the failing tests, and restarts with `end`, then `start … --known-failure <text>` in their own
+  start arguments; the orchestrator does not compose that restart, and the run file of a live or resumed run is not
+  edited to add one.
 - **A declared known failure stops failing.** Nothing changes: exit 0 is green. A declared entry matching no failure is
   never an error.
 - **A declared entry matches a new failure** (for example, a whole file is declared and a task breaks another test in
@@ -120,7 +132,7 @@ report halts through the existing `ORCH_HANDBACK_MISSING` path, exactly as a red
 - **A run file written before this item** has no `known_failures` field. It is read as no known failures: exit-0-only,
   which is `qa`'s behavior today. `resume` keeps the field as it is.
 - **Outside a run** (`/cc-test`, `qa` with `mem.p.test_command`): no known failures, exit-0-only.
-- **Unattended runs** behave the same; the declaration is part of the owner's `start` command.
+- **Unattended runs** behave the same; the declaration is part of the owner's `start` arguments, passed verbatim.
 
 ### Error cases
 
@@ -168,8 +180,12 @@ contract (AC9).
   contain "Verify your work"; they contain "Check your work against your success condition before you hand back."
   The dispatch table's `code`, `code` (fix round) and `qa` rows state the red-suite rule, the Start step documents
   `--known-failure`, the title line and README's command table list the flag, and "On any halt" names
-  `.conductor/handback/code-<N>.txt` (or `code-fix-<r>.txt`) as what the owner reads after a red `code` report.
-  `tests/installer/commands-parity.test.js` pins the new brief line, the removed one and the usage text.
+  `.conductor/handback/code-<N>.txt` (or `code-fix-<r>.txt`) as what the owner reads after a red `code` report, with
+  the failing tests it names. The Start step says `--known-failure` comes only from `$ARGUMENTS`, passed verbatim, and
+  that the orchestrator never adds, edits or drops one, including after a red `code` halt. The Report step names, when
+  the record's `known_failures` is non-empty, each declared entry with the failing tests it matched in `qa`'s report.
+  `tests/installer/commands-parity.test.js` pins the new brief line, the removed one, the usage text, the verbatim
+  rule and the Report item.
 - [ ] **AC9.** No gate, router position or SNAP field is added or changed: `MAY_HAND_BACK`, `nextStep` and
   `scripts/snap-contract.mjs` are untouched, `code.md` still names only `build_executed` and `qa.md` only
   `verify_pass`, and the existing hand-back and SNAP tests pass unchanged.
@@ -196,8 +212,8 @@ contract (AC9).
   sentence, the success conditions (AC1-AC4, AC7).
 - `scripts/orchestrate.mjs`: `parseStartArgs` and `START_USAGE` (`:1470`-`:1490`), the run-file write in `start`
   (`:1525`), the start line (`:1531`), and `isValidRun` (`:221`), which `install`, `handback` and `resume` read through `readRun`.
-- `.claude/commands/cc-orchestrate.md` and its `project-template` copy: title line, Start step, "On any halt", the
-  dispatch brief and the dispatch table (AC8).
+- `.claude/commands/cc-orchestrate.md` and its `project-template` copy: title line, Start step (the verbatim rule),
+  "On any halt", the Report step (the matched-entry list), the dispatch brief and the dispatch table (AC8).
 - `README.md`: the `/cc-orchestrate` row of the command table (`:260`). Not the "Known limits" lines.
 - Tests: `tests/unit/role-profiles.test.js` (`CLAIM`, sha pins, new pins), `tests/scripts/orchestrate.test.js`
   (`START_USAGE` constant at `:19`, new start and validation cases), `tests/installer/commands-parity.test.js`
@@ -217,14 +233,17 @@ contract (AC9).
 M — the profile and brief edits are small, but the change spans three profiles with mirrors and sha pins, one new
 `start` flag with validation and run-file plumbing, and the orchestrator command text with its parity tests.
 
-## Open questions for the owner
+## Owner decisions
 
-1. **How known failures are declared.** (a) Per run at `start --known-failure <text>`, recorded in the run file that
-   no role can write (this spec; recommended). (b) A tracked file in the project, persistent across runs, but
-   writable by any `code` task that names it. (c) No declaration at all: green is exit 0 only, and a pre-existing
-   failure must be fixed or skipped in the suite before a run. (c) is the strictest and the smallest change, but does
-   not meet the backlog entry's "a way to declare known pre-existing failures".
-2. **Whether `qa` may pass a non-zero exit at all.** Under (a) the Verify gate passes a red exit when the owner
-   declared every failure. If the owner wants `verify_pass` to keep meaning exit 0, the known-failure exception can
-   apply to `code` only, and `qa` keeps exit-0-only; the shared sentence would then be stated for `plan` and `code`,
-   and `qa.md` would say why it differs. Recommendation: one sentence for all three, as the backlog entry asks.
+1. **How known failures are declared: option (a).** Known failures come only from the owner's start arguments,
+   through `start --known-failure <text>`, recorded in the run file that no role can write. The orchestrator passes
+   `--known-failure` only when it is in `$ARGUMENTS` verbatim, and never adds, edits or drops one itself, including
+   after a red `code` halt, where it stops and names the failing tests for the owner. The rejected options were a
+   tracked project file (writable by a `code` task) and no declaration at all (does not meet the backlog entry).
+2. **Whether `qa` may pass a non-zero exit: yes, with one shared sentence for `plan`, `code` and `qa`.** When
+   `known_failures` is non-empty, the run's final report repeats each declared entry with the failing tests it matched
+   in `qa`'s run, so a green on a non-zero exit is never silent. The rejected option kept `qa` exit-0-only.
+3. **The rest of the spec stands as proposed**, including substring matching on the runner's failure line, red on a
+   non-zero exit with no failing test named, `known_failures: []` with a byte-identical start line when the flag is
+   absent, a run file written before this item read as none, `/cc-test` staying exit-0-only, and no change to gates,
+   router positions or the SNAP contract.
