@@ -52,11 +52,11 @@ None, per the spec. Checked by grep during planning:
 - Read only: `.claude/commands/`, `project-template/.claude/commands/`, `global/commands/`, `.claude/hooks/pre-tool-use.mjs`, `project-template/.claude/hooks/pre-tool-use.mjs`, `tests/unit/bounded-project-memory.test.js`
 - Modify: this plan (checkboxes only; the ticks ride Task 2's commit)
 
-- [ ] [T-001-A] Run `git merge-base --is-ancestor 5b4411d HEAD`. Expected: exit 0 (AC1). No dependency.
-- [ ] [T-001-B] Run `git merge-base --is-ancestor 5b4411d b62b1fa && git show b62b1fa:VERSION`. Expected: exit 0 and `1.42.0`. This confirms the release that Plan decision 1 names. Depends on T-001-A only for order.
-- [ ] [T-001-C] Run ``grep -rnE 'Read[^`]*`\.claude/memory/project\.md`' .claude/commands project-template/.claude/commands global/commands | grep -vc 'limit: '``. Expected: `0`. No command line that Reads `.claude/memory/project.md` lacks a `limit` (AC2).
-- [ ] [T-001-D] Run `npx vitest run tests/unit/bounded-project-memory.test.js`. Expected: `Test Files 1 passed (1)` and `Tests 9 passed (9)`. The filter's full match set is the whole file, the `bounded project memory [BUG-057]` describe (AC2, AC3).
-- [ ] [T-001-E] Run `cmp .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs && grep -n "if (input.limit !== undefined) return null;" .claude/hooks/pre-tool-use.mjs`. Expected: `cmp` prints nothing (exit 0), and `grep` prints one line inside `guard1LargeRead` (line 117 at planning time) (AC4).
+- [X] [T-001-A] Run `git merge-base --is-ancestor 5b4411d HEAD`. Expected: exit 0 (AC1). No dependency.
+- [X] [T-001-B] Run `git merge-base --is-ancestor 5b4411d b62b1fa && git show b62b1fa:VERSION`. Expected: exit 0 and `1.42.0`. This confirms the release that Plan decision 1 names. Depends on T-001-A only for order.
+- [X] [T-001-C] Run ``grep -rnE 'Read[^`]*`\.claude/memory/project\.md`' .claude/commands project-template/.claude/commands global/commands | grep -vc 'limit: '``. Expected: `0`. No command line that Reads `.claude/memory/project.md` lacks a `limit` (AC2).
+- [X] [T-001-D] Run `npx vitest run tests/unit/bounded-project-memory.test.js`. Expected: `Test Files 1 passed (1)` and `Tests 9 passed (9)`. The filter's full match set is the whole file, the `bounded project memory [BUG-057]` describe (AC2, AC3).
+- [X] [T-001-E] Run `cmp .claude/hooks/pre-tool-use.mjs project-template/.claude/hooks/pre-tool-use.mjs && grep -n "if (input.limit !== undefined) return null;" .claude/hooks/pre-tool-use.mjs`. Expected: `cmp` prints nothing (exit 0), and `grep` prints one line inside `guard1LargeRead` (line 117 at planning time) (AC4).
 
 ## Records hand-off (spec AC5, not executed on this branch)
 
@@ -99,11 +99,11 @@ By owner decision (spec, Owner Decisions, "Records routing") these edits are mad
 **Files:**
 - Modify: this plan (checkboxes only)
 
-- [ ] [T-002-A] Run `git diff --stat origin/main -- .claude project-template global skills lib scripts tools tests bin VERSION package.json package-lock.json .github README.md CHANGELOG.md "AGENT-READABLE BACKLOG.md"`. Expected: empty. No command, hook, installer, settings, code, test, version, workflow or record change (AC6). Depends on T-001-A through T-001-E.
-- [ ] [T-002-B] Run `git diff --name-only origin/main`. Expected: exactly `.gitignore`, the spec and this plan.
-- [ ] [T-002-C] Run `npm test`. Expected: exit 0 and no failed test file. A failure caused by the sandbox environment (network, tmp permissions) is reported as ENV with its test name. Any other red stops the build and is reported (Global Constraints).
-- [ ] [T-002-D] Stage: `git add -u docs/superpowers/plans/2026-11-20-bug057-project-md-grows-without-bound-while-the-phase.md` so the Task 1 and Task 2 ticks are committed. Depends on T-002-A through T-002-C.
-- [ ] [T-002-E] Commit: `docs: verify the BUG-057 fix on main against the full suite [BUG-057]`. Depends on T-002-D. This is the last group, so no later commit picks up its own tick; the closeout leaves that tick in the final commit of the tree.
+- [X] [T-002-A] Run `git diff --stat origin/main -- .claude project-template global skills lib scripts tools tests bin VERSION package.json package-lock.json .github README.md CHANGELOG.md "AGENT-READABLE BACKLOG.md"`. Expected: empty. No command, hook, installer, settings, code, test, version, workflow or record change (AC6). Depends on T-001-A through T-001-E.
+- [X] [T-002-B] Run `git diff --name-only origin/main`. Expected: exactly `.gitignore`, the spec and this plan.
+- [X] [T-002-C] Run `npm test`. Expected: exit 0 and no failed test file. A failure caused by the sandbox environment (network, tmp permissions) is reported as ENV with its test name. Any other red stops the build and is reported (Global Constraints).
+- [X] [T-002-D] Stage: `git add -u docs/superpowers/plans/2026-11-20-bug057-project-md-grows-without-bound-while-the-phase.md` so the Task 1 and Task 2 ticks are committed. Depends on T-002-A through T-002-C.
+- [X] [T-002-E] Commit: `docs: verify the BUG-057 fix on main against the full suite [BUG-057]`. Depends on T-002-D. This is the last group, so no later commit picks up its own tick; the closeout leaves that tick in the final commit of the tree.
 
 ## Test List
 
