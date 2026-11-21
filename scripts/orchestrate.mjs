@@ -215,16 +215,21 @@ function isUnattendedRecord(run) {
   return isPlainObject(d) && Object.entries(d).every(([k, v]) => DELEGATE_KINDS.includes(k) && isPlainObject(v) && DELEGATED_VERDICTS.includes(v.verdict));
 }
 
+// BUG-074: start always writes an array of non-empty strings; a run file from before it has none, read as no known failures.
+const isKnownFailureList = (list) => Array.isArray(list) && list.every((v) => typeof v === 'string' && v !== '');
+
 // FEAT-057: a present audit_rounds that is not 0-5 would let a hand-edited run buy fix rounds without limit.
 // FEAT-053: and models, dispatch_model and fix.model hold only the allow-list.
 // FEAT-054: and unattended and delegated hold only what start and delegate write.
+// BUG-074: and known_failures, when present, holds only what start writes.
 export function isValidRun(run) {
   return isPlainObject(run) && run.v === 1 && typeof run.session_id === 'string' && run.session_id !== ''
     && typeof run.item === 'string' && GATES.includes(run.gate) && isPlainObject(run.approvals)
     && Array.isArray(run.handbacks) && Array.isArray(run.tasks?.ids) && Number.isInteger(run.tasks?.done)
     && (run.audit_rounds === undefined || isAuditRounds(run.audit_rounds))
     && (run.security === undefined || isSecurity(run.security))
-    && isModelRecord(run) && isUnattendedRecord(run);
+    && isModelRecord(run) && isUnattendedRecord(run)
+    && (run.known_failures === undefined || isKnownFailureList(run.known_failures));
 }
 
 function readRun(root) {
@@ -1467,14 +1472,20 @@ function parseReview(text, role, round) {
   return rows.length === open ? { open, rows } : null;
 }
 
-const START_USAGE = 'usage: orchestrate.mjs start <ITEM> [--auto] [--ticket <N|issue URL>] [--audit-rounds <0-5>] [--security-threshold <low|moderate|high|critical>] [--no-dependency-audit] [--unattended]';
+const START_USAGE = 'usage: orchestrate.mjs start <ITEM> [--auto] [--ticket <N|issue URL>] [--audit-rounds <0-5>] [--security-threshold <low|moderate|high|critical>] [--no-dependency-audit] [--unattended] [--known-failure \'<text>\']...';
 
 // The item first, then --auto, --ticket <ref>, --audit-rounds <0-5>, --security-threshold <level> and
 // --no-dependency-audit and --unattended in any order, each at
-// most once. A --ticket with no value reaches intake as '' and halts there (FEAT-031 B1.1).
+// most once. --known-failure <text> any number of times, each value once (BUG-074).
+// A --ticket with no value reaches intake as '' and halts there (FEAT-031 B1.1).
+// BUG-074: a declared known failure is a fragment of one runner failure line. A blank value, a line break,
+// more than 200 characters, a repeat, or a leading -- (a missing value swallowing the next flag) is a usage error.
+const KNOWN_FAILURE_MAX = 200;
+const isKnownFailureArg = (value, seen) => typeof value === 'string' && value.trim() !== '' && !/[\r\n]/.test(value)
+  && [...value].length <= KNOWN_FAILURE_MAX && !value.startsWith('--') && !seen.includes(value);
 function parseStartArgs(args) {
   const [item, ...rest] = args;
-  const opts = { item, auto: false, ticket: undefined, auditRounds: undefined, threshold: undefined, dependencyAudit: true, unattended: false };
+  const opts = { item, auto: false, ticket: undefined, auditRounds: undefined, threshold: undefined, dependencyAudit: true, unattended: false, knownFailures: [] };
   for (let i = 0; i < rest.length; i++) {
     if (rest[i] === '--auto' && !opts.auto) opts.auto = true;
     else if (rest[i] === '--ticket' && opts.ticket === undefined) opts.ticket = rest[++i] ?? '';
@@ -1482,6 +1493,7 @@ function parseStartArgs(args) {
     else if (rest[i] === '--security-threshold' && opts.threshold === undefined && SECURITY_LEVELS.includes(rest[i + 1])) opts.threshold = rest[++i];
     else if (rest[i] === '--no-dependency-audit' && opts.dependencyAudit) opts.dependencyAudit = false;
     else if (rest[i] === '--unattended' && !opts.unattended) opts.unattended = true;
+    else if (rest[i] === '--known-failure' && isKnownFailureArg(rest[i + 1], opts.knownFailures)) opts.knownFailures.push(rest[++i]);
     else throw new Refusal(START_USAGE);
   }
   if (!/^[A-Z]+-\d{3,}$/.test(item ?? '')) throw new Refusal(START_USAGE);
@@ -1501,7 +1513,7 @@ function ticketIntake(root, item, ref) {
 const ticketNote = (t) => `ticket ${t.binding.repo}#${t.binding.number} "${t.title}"; snapshot ${t.path} sha256 ${t.binding.sha256}; `;
 
 function start(root, sessionId, args) {
-  const { item, auto, ticket, auditRounds, threshold, dependencyAudit, unattended } = parseStartArgs(args);
+  const { item, auto, ticket, auditRounds, threshold, dependencyAudit, unattended, knownFailures } = parseStartArgs(args);
   if (!sessionId) throw new Halt('ORCH_NO_SESSION_ID', 'CLAUDE_CODE_SESSION_ID is absent or empty, so Guard 6 could never bind this run');
   const old = readRun(root);
   if (old && old.session_id === sessionId) throw new Halt('ORCH_RUN_ACTIVE', `run ${old.item} is live in this session; end it first`);
@@ -1522,15 +1534,17 @@ function start(root, sessionId, args) {
   saveRun(root, {
     v: 1, session_id: sessionId, item, mode: auto || unattended ? 'auto' : 'step', started: new Date().toISOString(),
     band: 'boundary', role: null, gate: 'boundary_routed', approvals: { spec: null, plan: null },
-    plan: null, tasks: { ids: [], done: 0 }, handbacks: [], halt: null, test_command: testCommand, audit_rounds: auditRounds, security, docs,
+    plan: null, tasks: { ids: [], done: 0 }, handbacks: [], halt: null, test_command: testCommand, audit_rounds: auditRounds, security, docs, known_failures: knownFailures,
     ...(unattended ? { unattended: true } : {}),
     ...(models ? { models } : {}),
     ...(bound ? { ticket: { ...bound.binding, snapshot: bound.path } } : {}),
   });
   const begun = old ? `replaced the stale run ${old.item} started ${old.started}` : `run ${item} started`;
-  return `${begun}; ${bound ? ticketNote(bound) : ''}${docsNote(docs)}test command: ${testCommand}; audit rounds: ${auditRounds}${securityNote(security, root, stack())}${modelsNote(models)}${unattended ? UNATTENDED_NOTE : ''}`;
+  return `${begun}; ${bound ? ticketNote(bound) : ''}${docsNote(docs)}test command: ${testCommand}; audit rounds: ${auditRounds}${securityNote(security, root, stack())}${modelsNote(models)}${knownFailuresNote(knownFailures)}${unattended ? UNATTENDED_NOTE : ''}`;
 }
 
+// BUG-074: the echo shows the values exactly as start received them, so a value the shell cut short is visible.
+const knownFailuresNote = (list) => (list.length > 0 ? `; known failures: ${list.length} ${JSON.stringify(list)}` : '');
 const UNATTENDED_NOTE = '; unattended: delegated review at spec, plan and build';
 
 function clearRunFiles(root) {

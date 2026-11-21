@@ -40,9 +40,9 @@ const NO_SHELL = 'You have no shell';
 const CLAIM = {
   spec: 'a spec file that answers the item was written under the folder your envelope\'s `ops.scope` names',
   plan: 'a plan file was written under the folder your envelope\'s `ops.scope` names, from the approved spec, and each task names its files',
-  code: 'after your last edit you ran the test command, and your report states its exact exit status and summary line',
+  code: 'after your last edit you ran the test command, the suite is green, and your report states its exact exit status and summary line',
   audit: 'a static review of the changes against the spec and plan was completed, and its findings are listed',
-  qa: 'you ran the test command yourself and the suite passed',
+  qa: 'you ran the test command yourself and the suite is green',
   security: 'you ran every recorded scan and listed each of its findings with its severity',
 };
 // FEAT-060: the verdict format the router parses, pinned in the profile that asks for it.
@@ -87,6 +87,9 @@ const DISPATCHED_BY = {
 const DISPATCH_BODY = 'The orchestrator during a run, or a phase command outside one, dispatched you';
 const NO_ENVELOPE = 'If your brief says no envelope was installed for you, there is none to read; leave the scope key out of the hand-back.';
 const QA_OUTSIDE = 'Outside a run, it is the `mem.p.test_command` field of your envelope.';
+// BUG-074: one definition of a green suite for the three roles that judge one, and how code and qa match a declared failure.
+const GREEN = 'The suite is green when the test command exits with status 0, or when it exits non-zero and every failing test it reports is a known failure the run declared; anything else is red.';
+const KNOWN_MATCH = 'A failing test is known when the line the runner prints for it contains a declared entry verbatim.';
 
 describe('role agent profiles [FEAT-012]', () => {
   it('ships exactly the ROLES plus define-review in both agents directories [FEAT-041, FEAT-034]', () => {
@@ -146,6 +149,34 @@ describe('role agent profiles [FEAT-012]', () => {
   });
 });
 
+describe('one definition of done [BUG-074]', () => {
+  it.each([TEMPLATE, MIRROR].flatMap((dir) => ['plan', 'code', 'qa'].map((role) => [`${dir}/${role}.md`])))('[AC1] %s carries the shared green sentence verbatim', (rel) => {
+    expect(read(rel)).toContain(GREEN);
+  });
+
+  it('[AC2] code ticks and hands back only on a green suite, and no longer claims only that the run happened', () => {
+    const text = profile('code');
+    expect(text).toContain('When the task is done and the suite is green after your last edit, tick its checkboxes in the plan.');
+    expect(text).toContain('If it is red, tick no box, leave the `SNAP_HANDBACK` line out and say why, quoting the summary line');
+    expect(text).not.toContain('the gate claims only that the run happened and was reported');
+  });
+
+  it('[AC3] qa passes only a green suite and lists each failing test with its matched entry', () => {
+    const text = profile('qa');
+    expect(text).toContain('If the suite is green, end it in exactly one `SNAP_HANDBACK` line and claim only the gate `verify_pass`. If it is red, leave the `SNAP_HANDBACK` line out and say why, quoting the summary line.');
+    expect(text).toContain('each failing test with the entry it matched');
+    expect(text).not.toContain('exit status 0 is a pass');
+  });
+
+  it('[AC7] code and qa read the declared failures from known_failures, and qa has none outside a run', () => {
+    for (const role of ['code', 'qa']) {
+      expect(profile(role)).toContain('`known_failures` field');
+      expect(profile(role)).toContain(KNOWN_MATCH);
+    }
+    expect(profile('qa')).toContain('with no such field, and outside a run, there are none.');
+  });
+});
+
 // FEAT-031 AC13: FEAT-031 changes no role profile. Each value was measured from v1.37.0 with
 // `git show v1.37.0:<path>`; CI checks out no tags, so the hashes are pinned here. A later item
 // that changes a profile on purpose updates its row in the same commit.
@@ -155,10 +186,13 @@ const PROFILE_SHA256_1_37_0 = {
   // FEAT-060 changed audit on purpose: findings carry a severity and the report ends in a VERDICT line.
   audit: 'e2a9d8269691a40dc66294e1f856105590519a203cd5b4231c1ed5134984e3cf',
   // BUG-078 changed code on purpose: a fix round's scope is the files the review names, without the plan.
-  code: '21c2587a37aa105b9df4ad0f70429c5011c2cbef51b0033fa395a5039cf8a70e',
+  // BUG-074 changed code on purpose: one definition of a green suite, shared by plan, code and qa, with the run's declared known failures.
+  code: '60404be832003d7edf7701f558e9d40f7b5f4a00dc8c01f0fb9b798ce8ba4b82',
   // FEAT-047 changed plan and spec on purpose: the folder now comes from the envelope's scope.
-  plan: '79384c3da80851c8291fded6dadbf8589b2cf25f057164a0acdd46ccf934b508',
-  qa: 'e7ca05e644821545950a48e6749363c24922454909c71ce4500ce8eef6a318f5',
+  // BUG-074 changed plan on purpose: one definition of a green suite, shared by plan, code and qa, with the run's declared known failures.
+  plan: 'e61fbf058289f1a70b540c65a6ecb745926e955508613bbca54d1f56f21d2515',
+  // BUG-074 changed qa on purpose: one definition of a green suite, shared by plan, code and qa, with the run's declared known failures.
+  qa: 'c91df4fddf2bafe6a8cd602478bdcb9df8d04f6845a9888a1598e4f1b05f67cb',
   // FEAT-059 changed security on purpose: findings carry the audit's severities and the report ends in a VERDICT line. It shipped after 1.37.0, so this is its first pin.
   security: '1148e01379aa82e67c378352cf93f26183e19d4b86eac4563a2efebe0edc6cfc',
   spec: '25f2f8c6c358d43a83bc19c30c53f008f763ccb35503501a73accfde7576f5c0',

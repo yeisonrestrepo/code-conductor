@@ -338,6 +338,34 @@ describe('cc-orchestrate mirrors [FEAT-011 AC10]', () => {
     expect(briefs.slice(0, briefs.indexOf('\n## '))).not.toContain('security.txt');
     expect(text).not.toContain('approve build');
   });
+
+  it('states one definition of done and the owner-only known-failure declaration [BUG-074]', () => {
+    const text = read(ORCH_MIRRORS[0]);
+    for (const phrase of [
+      'Check your work against your success condition before you hand back.',
+      "[--unattended] [--known-failure '<text>']...",
+      'never add, edit or drop a `--known-failure` yourself, including after a red `code` halt',
+      'The owner quotes a value that holds a space or any of the characters above, in single or double quotes',
+      'stands outside a single- or double-quoted span, do not run `start`',
+      'Never add the quotes yourself.',
+      'If `start` exits 0 with an empty stdout',
+      'git status --short',
+      'the word after an unquoted `>` or `>>`',
+      'Restore or delete none of them',
+      'the known failures from `known failures:` when the start line has them',
+      '`handback code` halts `ORCH_HANDBACK_MISSING` when the `code` report carries no `SNAP_HANDBACK` line',
+      '.conductor/handback/code-<N>.txt`, or `.conductor/handback/code-fix-<r>.txt` for a fix round',
+      'Never restart the run with a `--known-failure` of your own',
+      "when the record's `known_failures` is non-empty, each declared entry with the failing tests",
+      'before you run `end`, which removes that file',
+      'If the suite is red, tick no box, leave out the `SNAP_HANDBACK` line and say why.',
+      'If the suite is red, leave out the `SNAP_HANDBACK` line and say why.',
+    ]) expect(text).toContain(phrase);
+    expect(text).not.toContain('Verify your work');
+    const readme = read('README.md');
+    expect(readme).toContain("[--no-dependency-audit] [--known-failure '<text>']...");
+    expect(readme).toContain('quote a value that holds a space or a shell character');
+  });
 });
 
 describe('cc-orchestrate review loop [FEAT-041 AC5, AC6, FEAT-058]', () => {
