@@ -3497,3 +3497,19 @@ Known limits: the BUG-058 line is removed. Every other defect line, BUG-089 incl
 Not verified by the PRs: #291 runs no real install against the marketplace; the Windows behaviour of the three newly commented skips was not re-measured, and none is lifted.
 
 Upgrade note: reinstalling now ends with the superpowers offer. Interactive runs get a `[y/N]` prompt (default No); scripted installs print a one-line manual-install hint on stderr unless `--with-plugins` is passed, and the exit code is unchanged in every case. BUG-058 changes only test comments. #290 and #291 both report `tests/unit/staging-convention.test.js` AC7/AC8 failing in their sandboxes' git (2.43.0 exits 0 on `git add -u <untracked>`), as #279–#288 did. CI on the release PR is the authority.
+
+## Release: 1.55.0 batch landing 2026-11-22
+
+One PR merged since `v1.54.0`. Existing id closed:
+
+- FEAT-036 (#293 by `cc-lane-bot[bot]`, documentation drifting a release behind what shipped). A seventh band role, `docs`, in the Ship band, dispatched by `/cc-docs --release <ref> [--since <ref>]` outside any run. New `scripts/docs-sync.mjs`: `digest` proves the work tree is a clean checkout of the release and prints its commits, changed paths and documentation surface; `check` judges the uncommitted diff against the agent's report (surface-only paths, managed-block-only edits to `project-template/CLAUDE.md`, a `CITE` per changed non-blank line naming a release commit or non-documentation file, and a `DOCS:` line matching the diff). The profile holds `Read, Grep, Glob, Edit`, exists only at SNAP v5 and claims only `verify_pass`; v1-v4 envelopes are byte-identical. `orchestrate.mjs envelope docs` installs the surface as `ops.scope` and refuses inside a live run; `docs-sync.mjs` joins the control-plane list. Guards 5, 6 and 7 accept, step aside for, and deny a shell to the role, identically in both hook copies. The diff is left uncommitted for the owner. Tests: new `tests/scripts/docs-sync.test.js` plus `[FEAT-036]` rows across the orchestrate, guard 5/6/7, SNAP contract/validate/build, role-profile and commands-parity suites. Intake of issue #144. Spec approved by independent review, round 3; plan by independent review, round 2. The PR also adds the spec and plan leaves to the `.gitignore` tracked-surface block.
+
+Nothing minted: FEAT-036 was filed at intake of issue #144. BUG-089 (triage #284) stays reserved and is not touched by this release.
+
+Known limits: unchanged; FEAT-036 is not a defect line.
+
+`[ARCH-009]`: its flip still waits on `FEAT-009`, `FEAT-032`, `FEAT-033` and `FEAT-035`; FEAT-036 is no longer among them.
+
+Not verified by the PR: no live `/cc-docs --release` dispatch of the `docs` agent against a real release is reported; `docs-sync.mjs` is exercised only in fixture repositories. `/cc-docs` gains the `--release` section only in `project-template/.claude/commands/cc-docs.md`.
+
+Upgrade note: reinstalling ships the `docs` profile, `scripts/docs-sync.mjs`, the updated hooks and `/cc-docs --release`; plain `/cc-docs` keeps its inline-docs audit. #293 reports two `tests/unit/staging-convention.test.js` tests failing in its sandbox's git, as #279–#291 did, and two `tests/unit/gitignore-block-parity.test.js` tests failing only while the new files were uncommitted. CI on the release PR is the authority.
