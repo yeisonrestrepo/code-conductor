@@ -223,6 +223,34 @@ describe('offerSuperpowers: the spawn', () => {
   });
 });
 
+describe('offerSuperpowers: the spawn working directory', () => {
+  // Captured during the call: the temp dir is removed once the spawn returns.
+  const recordCwd = () => {
+    const seen = [];
+    const { spawn } = fakeSpawn();
+    const recording = (...args) => {
+      const { cwd } = args.at(-1);
+      seen.push({ cwd, entries: readdirSync(cwd).sort() });
+      return spawn(...args);
+    };
+    return { recording, seen };
+  };
+
+  for (const platform of ['linux', 'win32']) {
+    it(`runs the child from the installer's private temp dir on ${platform}, not process.cwd()`, () => {
+      const home = tempDir('cc-plugins-home-');
+      const { recording, seen } = recordCwd();
+      offerSuperpowers({ home, withPlugins: true, spawn: recording, platform });
+      const [{ cwd, entries }] = seen;
+      expect(cwd).not.toBe(process.cwd());
+      expect(dirname(cwd)).toBe(tmpdir());
+      expect(cwd.startsWith(join(tmpdir(), 'cc-plugin-'))).toBe(true);
+      expect(entries).toEqual(['err', 'out']);
+      expect(existsSync(cwd)).toBe(false);
+    });
+  }
+});
+
 describe('offerSuperpowers: outcomes', () => {
   const offer = (spawnOptions, extra = {}) => {
     const home = tempDir('cc-plugins-home-');
