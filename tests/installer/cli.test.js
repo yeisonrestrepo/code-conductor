@@ -3,17 +3,24 @@ import { mkdtempSync, rmSync, mkdirSync, statSync, existsSync, readFileSync, rea
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { run } from '../../bin/code-conductor.mjs';
+import { run as runCli } from '../../bin/code-conductor.mjs';
+import { fallbackLine } from '../../lib/installer/plugins.mjs';
 
 const binPath = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'bin', 'code-conductor.mjs');
 let home, cwd, logs;
 const log = (stream, msg) => logs.push(`${stream}:${msg}`);
+// FEAT-039: every run() here is non-interactive with a spawn that records its calls, so
+// no test prompts or starts a real claude whatever the runner's TTY; afterEach asserts
+// nothing was spawned.
+let spawned;
+const run = (argv, env, options) => runCli(argv, env, { isInteractive: false, spawn: (...args) => { spawned.push(args); return { status: 1 }; }, ...options });
 beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), 'cc-run-h-'));
   cwd = mkdtempSync(join(tmpdir(), 'cc-run-c-'));
   logs = [];
+  spawned = [];
 });
-afterEach(() => { rmSync(home, { recursive: true, force: true }); rmSync(cwd, { recursive: true, force: true }); });
+afterEach(() => { expect(spawned).toEqual([]); rmSync(home, { recursive: true, force: true }); rmSync(cwd, { recursive: true, force: true }); });
 
 describe('run', () => {
   it('deploys the global set and exits 0', () => {
@@ -211,6 +218,10 @@ describe('run', () => {
     run(['--help'], { HOME: home }, { cwd, log });
     expect(logs.some(l => l.startsWith('stdout:') && l.includes('[--opencode]'))).toBe(true);
   });
+  it('lists --with-plugins in --help (FEAT-039)', () => {
+    run(['--help'], { HOME: home }, { cwd, log });
+    expect(logs.some(l => l.startsWith('stdout:') && l.includes('[--with-plugins]'))).toBe(true);
+  });
   it('installs the OpenCode plugin with --project --opencode (FEAT-048)', () => {
     expect(run(['--project', '--opencode'], { HOME: home }, { cwd, log })).toBe(0);
     expect(existsSync(join(cwd, '.opencode', 'plugin', 'conductor-guard.js'))).toBe(true);
@@ -231,7 +242,7 @@ describe('run', () => {
     const rc = run(['-Verbosity', 'INFO'], { HOME: home }, { cwd, log });
     expect(rc).toBe(0);
     expect(readFileSync(join(home, '.claude', 'memory', 'verbosity.md'), 'utf8')).toMatch(/VERBOSITY: INFO/);
-    expect(logs.some(l => l.startsWith('stderr:'))).toBe(false);
+    expect(logs.filter(l => l.startsWith('stderr:'))).toEqual([`stderr:code-conductor: ${fallbackLine('non-interactive run; pass --with-plugins to install it')}`]);
   });
   it('accepts the inline -Verbosity=LEVEL form (issue #109)', () => {
     run(['-Verbosity=VERBOSE'], { HOME: home }, { cwd, log });
