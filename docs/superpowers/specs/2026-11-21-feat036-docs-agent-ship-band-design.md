@@ -1,6 +1,6 @@
 # FEAT-036: Docs Agent (Ship Band)
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-22 by independent review (round 3)
 
 Source: the `[FEAT-036]` entry in `AGENT-READABLE BACKLOG.md` (PILLAR 3), the intake of issue #144. Its three acceptance criteria are answered in "Acceptance Criteria" below, tagged `[E1]`-`[E3]`. The rows tagged `[D1]`-`[D3]` answer the entry's description: the surfaces it reconciles, "proposes diffs", and "does not invent claims".
 
