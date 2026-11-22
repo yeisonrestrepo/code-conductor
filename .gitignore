@@ -301,6 +301,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-11-21-feat036-docs-agent-ship-band-design.md
 !/docs/superpowers/specs/2026-11-21-feat039-superpowers-auto-install-via-the-claude-code-design.md
 !/docs/superpowers/specs/2026-11-21-feat052-orchestrate-role-subagents-omit-inherited-design.md
+!/docs/superpowers/specs/2026-11-22-feat035-release-agent-ship-band-design.md
 # --- END tracked-surface block (BUG-042) ---
 
 # Kept for external writers. Both lines are redundant against the block above; each is
