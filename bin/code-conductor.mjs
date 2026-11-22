@@ -7,8 +7,9 @@ import { assertAssets, assertMergeTargets, assertNotSelfInstall, deployGlobal, d
 import { verbosityHookCommand, mergeVerbosityHook } from '../lib/installer/settings.mjs';
 import { healGraphifyHook } from '../lib/installer/heal.mjs';
 import { writeVerbosity, writeVersionFile } from '../lib/installer/config.mjs';
+import { offerSuperpowers, NOTICES } from '../lib/installer/plugins.mjs';
 
-const USAGE = `Usage: code-conductor [--project|-Project] [--no-deps|-NoDeps] [--verbosity|-Verbosity MIN|INFO|VERBOSE] [--opencode] [--version] [--help]`;
+const USAGE = `Usage: code-conductor [--project|-Project] [--no-deps|-NoDeps] [--verbosity|-Verbosity MIN|INFO|VERBOSE] [--opencode] [--with-plugins] [--version] [--help]`;
 
 // -Verbosity is the spelling the retired install.ps1 documented. Both spellings share
 // every form (space-separated, inline `=`, missing value) and last-wins across them.
@@ -23,18 +24,21 @@ const isVerbosityFlag = (a) => VERBOSITY_FLAGS.some((f) => a === f || a.startsWi
 // is idempotent. No "conflicting flags" error is raised — last-wins is the least
 // surprising CLI convention and keeps the parser branchless.
 function parseArgs(argv) {
-  const opts = { project: false, opencode: false, noDeps: false, verbosity: undefined, verbosityGiven: false, version: false, help: false, unknown: [] };
+  const opts = { project: false, opencode: false, noDeps: false, withPlugins: false, verbosity: undefined, verbosityGiven: false, version: false, help: false, unknown: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     // -Project is the spelling the retired install.ps1 documented; matched exact-case
     // like every other flag here.
     if (a === '--project' || a === '-Project') opts.project = true;
-    // Accepted no-op: the npm CLI installs no dependencies since FEAT-023 removed the
-    // shell installers, so there is nothing to skip. Recognized so callers carried over
-    // from install.sh get no misleading "unrecognized" warning.
+    // Accepted no-op since FEAT-023 removed the shell installers: recognized so callers
+    // carried over from install.sh get no misleading "unrecognized" warning. It does not
+    // affect the superpowers offer, which only --with-plugins or the prompt controls.
     else if (a === '--no-deps' || a === '-NoDeps') opts.noDeps = true;
     // FEAT-048: also install the OpenCode guard plugin; meaningful only with --project.
     else if (a === '--opencode') opts.opencode = true;
+    // FEAT-039: consent to install the superpowers plugin without asking; the only way a
+    // non-interactive run installs it. Matched exact-case like every other flag.
+    else if (a === '--with-plugins') opts.withPlugins = true;
     else if (isVerbosityFlag(a)) {
       opts.verbosityGiven = true;
       if (a.includes('=')) {
@@ -66,8 +70,20 @@ function pkgVersion(assetRoot) {
   return JSON.parse(readFileSync(join(assetRoot, 'package.json'), 'utf8')).version;
 }
 
-// log(stream, msg) is injected so tests capture output without spawning a process.
-export function run(argv, env = process.env, { cwd = process.cwd(), log, nodeVersion = process.versions.node } = {}) {
+// FEAT-039: the last setup step, fail-open. Its own try keeps it out of run()'s exit
+// classes: nothing here can turn a finished deploy into an exit 1 or 2.
+function offerPlugins(emit, options) {
+  try {
+    const result = offerSuperpowers(options);
+    if (NOTICES[result.status]) emit('stdout', `code-conductor: ${NOTICES[result.status]}`);
+    for (const line of result.lines) emit('stderr', `code-conductor: ${line}`);
+  } catch { /* fail-open: a reporting error never changes the exit code */ }
+}
+
+// log(stream, msg) is injected so tests capture output without spawning a process. The
+// plugin options (FEAT-039) let tests replace the TTY check, the prompt, the spawn, the
+// timeout and the child's env, so no test can prompt or reach a real claude.
+export function run(argv, env = process.env, { cwd = process.cwd(), log, nodeVersion = process.versions.node, isInteractive = Boolean(process.stdin.isTTY && process.stdout.isTTY), ask, spawn, pluginTimeoutMs, pluginEnv = process.env } = {}) {
   const emit = log || ((stream, msg) => process[stream].write(`${msg}\n`));
 
   // Hard runtime floor: refuse to run on Node < 20 with a clear message rather than
@@ -121,6 +137,7 @@ export function run(argv, env = process.env, { cwd = process.cwd(), log, nodeVer
     for (const line of heal.lines) emit('stderr', `code-conductor: ${line}`);
     writeVersionFile(home, pkgVersion(assetRoot));
     if (opts.project) deployProject(assetRoot, cwd, { warn: (m) => emit('stderr', m), report: (m) => emit('stdout', m), home, opencode: opts.opencode });
+    offerPlugins(emit, { home, withPlugins: opts.withPlugins, isInteractive, ask, spawn, timeoutMs: pluginTimeoutMs, env: pluginEnv });
     return 0;
   } catch (err) {
     // Pre-flight failures (nothing written yet) → exit 1.

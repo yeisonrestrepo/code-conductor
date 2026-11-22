@@ -82,7 +82,7 @@ code-conductor assumes these are already in place; the installer does not set th
 |---|---|---|
 | Node.js `>= 20` | Running the `code-conductor` CLI itself | Any current Node LTS |
 | Claude Code | The environment every command, skill and hook here runs inside | See [Anthropic's Claude Code docs](https://code.claude.com/docs) |
-| **superpowers plugin** | `/cc-spec` (`brainstorming`), `/cc-plan` (`writing-plans`), and `/cc-debug`, `/cc-refactor`, `/cc-review`, `/cc-test` (all four via `subagent-driven-development`) | Install from Claude Code's `/plugin` marketplace, then run `/reload-plugins`, **before** using these commands; without it, their `Skill(...)` calls fail |
+| **superpowers plugin** | `/cc-spec` (`brainstorming`), `/cc-plan` (`writing-plans`), and `/cc-debug`, `/cc-refactor`, `/cc-review`, `/cc-test` (all four via `subagent-driven-development`) | The installer offers it: an interactive run asks first (default No), and a non-interactive run installs it only with `--with-plugins`. If it cannot install it, it prints the manual fallback and still succeeds: run `/plugin install superpowers@claude-plugins-official` inside Claude Code, then `/reload-plugins`, **before** using these commands; without it, their `Skill(...)` calls fail |
 | GitHub CLI (`gh`), authenticated | Only `/cc-orchestrate --ticket` and `ticket.mjs writeback`. code-conductor holds no credential; `gh` owns authentication | Install GitHub CLI, then run `gh auth login` |
 | ui-ux-pro-max skill | Nothing: retired guidance | No shipped code downloads, installs, or activates it. Its replacement is filed as `[FEAT-037]` |
 
@@ -386,9 +386,10 @@ By default, only the global core files are installed. Flags extend that:
 | Flag | Description |
 |---|---|
 | `--project` / `-Project` | Also install the project template into the current directory |
-| `--no-deps` / `-NoDeps` | Accepted for compatibility with the retired shell installers; a no-op, since the npm CLI installs no dependencies and copies agent files only |
+| `--no-deps` / `-NoDeps` | Accepted for compatibility with the retired shell installers; a no-op that copies agent files only and does not affect the superpowers offer (see `--with-plugins`) |
 | `--verbosity MIN\|INFO\|VERBOSE` / `-Verbosity LEVEL` | Default response verbosity (default `MIN`). `MIN` = one sentence per response, `INFO` = bullet list, `VERBOSE` = full explanation. Re-run the installer to change it. PowerShell's `-Verbosity:INFO` form is not supported; it warns and the level stays `MIN`. |
 | `--opencode` | With `--project`, also install the OpenCode guard plugin at `.opencode/plugin/conductor-guard.js` (see [OpenCode](#opencode)). Without `--project` it warns and writes nothing for OpenCode |
+| `--with-plugins` | Install the superpowers plugin without asking, through `claude plugin install superpowers@claude-plugins-official` (60 s timeout). A non-interactive run installs it only with this flag; an interactive run asks instead. If the install cannot run, the installer prints `/plugin install superpowers@claude-plugins-official` and still exits 0 |
 
 **Updating:** re-run the same install command. User-configured files are never overwritten; agent-managed files are always updated.
 

@@ -6,7 +6,7 @@
 |---|---|---|
 | Node.js `>= 20` | Running the CLI | Any current Node LTS |
 | Claude Code | The environment everything runs inside | [Anthropic's Claude Code docs](https://www.anthropic.com/claude-code) |
-| superpowers plugin | `/cc-spec`, `/cc-plan`, `/cc-debug`, `/cc-refactor`, `/cc-review`, `/cc-test` | Install from Claude Code's `/plugin` marketplace, then `/reload-plugins` |
+| superpowers plugin | `/cc-spec`, `/cc-plan`, `/cc-debug`, `/cc-refactor`, `/cc-review`, `/cc-test` | The installer offers it (it asks first; a non-interactive run needs `--with-plugins`). Fallback: `/plugin install superpowers@claude-plugins-official` inside Claude Code, then `/reload-plugins` |
 | GitHub CLI (`gh`) | Only `/cc-orchestrate --ticket` | [Install GitHub CLI](https://cli.github.com/), then `gh auth login` |
 
 ## Installation
@@ -30,13 +30,14 @@ npx @yeison.restrepo.r/code-conductor@latest --project
 | Flag | Description |
 |---|---|
 | `--project` / `-Project` | Also scaffold `.claude/` in the current directory. Refused, before anything is written, in a clone of code-conductor itself |
-| `--no-deps` / `-NoDeps` | Accepted for compatibility with the retired shell installers; a no-op, since the npm CLI installs no dependencies |
+| `--no-deps` / `-NoDeps` | Accepted for compatibility with the retired shell installers; a no-op that does not affect the superpowers offer |
 | `--verbosity MIN\|INFO\|VERBOSE` / `-Verbosity LEVEL` | Response verbosity (default `MIN`; also `--verbosity=INFO`). An invalid value warns and falls back to `MIN`. PowerShell's `-Verbosity:INFO` is not supported; it warns and stays `MIN` |
 | `--opencode` | With `--project`, also install the OpenCode guard plugin at `.opencode/plugin/conductor-guard.js`, which sends OpenCode's `bash`, `read`, `write`, `edit`, `multiedit` and patch calls to the project's own guard, lets read-only tools through, and blocks every other tool. Without `--project` it warns and writes nothing for OpenCode |
+| `--with-plugins` | Install the superpowers plugin without asking (`claude plugin install superpowers@claude-plugins-official`); a non-interactive run installs it only with this flag. On any failure the installer prints the manual command and still exits 0 |
 | `--version`, `-v` | Print the version and exit |
 | `--help`, `-h` | Print usage and exit |
 
-Any other argument is reported as unrecognized on stderr and ignored; the install continues. The installer installs no dependencies: Claude Code, the Superpowers plugin and `gh` are yours to set up (see Prerequisites).
+Any other argument is reported as unrecognized on stderr and ignored; the install continues. The installer offers the superpowers plugin (it asks first, or installs it with `--with-plugins` when non-interactive); Claude Code and `gh` stay yours to set up (see Prerequisites).
 
 ## Your First Session
 

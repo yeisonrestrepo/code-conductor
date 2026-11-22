@@ -365,42 +365,42 @@
 
 **Files:** `tests/installer/plugins.test.js`
 
-- [ ] [T-101] `tests/installer/plugins.test.js` (create): the fixtures and the 35 tests of plan decision 5. Depends on T-004.
-- [ ] [T-102] Red run: `npx vitest run tests/installer/plugins.test.js`. Predicted: the file fails to load (`Failed to load` / cannot find `lib/installer/plugins.mjs`), **Test Files 1 failed (1)**, no test collected. Any other result means the test file is wrong. Depends on T-101.
+- [X] [T-101] `tests/installer/plugins.test.js` (create): the fixtures and the 35 tests of plan decision 5. Depends on T-004.
+- [X] [T-102] Red run: `npx vitest run tests/installer/plugins.test.js`. Predicted: the file fails to load (`Failed to load` / cannot find `lib/installer/plugins.mjs`), **Test Files 1 failed (1)**, no test collected. Any other result means the test file is wrong. Depends on T-101.
 
 ### Task 2: The module (green for the unit tests)
 
 **Files:** `lib/installer/plugins.mjs`
 
-- [ ] [T-201] `lib/installer/plugins.mjs` (create): the module of plan decision 2, verbatim. Depends on T-102.
-- [ ] [T-202] Run: the T-102 command. Predicted: **9 failed | 26 passed (35)**: tests 1–26 green; red are the eight stub tests 27–34 (`run()` does not call the step yet and treats `--with-plugins` as unrecognized) and test 35 (the docs are unchanged). Any other split means a test or the module is wrong: fix it, not the prediction. Depends on T-201.
+- [X] [T-201] `lib/installer/plugins.mjs` (create): the module of plan decision 2, verbatim. Depends on T-102.
+- [X] [T-202] Run: the T-102 command. Predicted: **9 failed | 26 passed (35)**: tests 1–26 green; red are the eight stub tests 27–34 (`run()` does not call the step yet and treats `--with-plugins` as unrecognized) and test 35 (the docs are unchanged). Any other split means a test or the module is wrong: fix it, not the prediction. Depends on T-201.
 
 ### Task 3: The CLI step and the existing CLI tests (green for the stub tests)
 
 **Files:** `bin/code-conductor.mjs`, `tests/installer/cli.test.js`
 
-- [ ] [T-301] `bin/code-conductor.mjs` (modify): the import, `USAGE`, the `opts` literal, the `--no-deps` comment, the `--with-plugins` branch, `offerPlugins`, the `run()` signature and comment, and the call before `return 0`, all of plan decision 3. Depends on T-202.
-- [ ] [T-302] `tests/installer/cli.test.js` (modify): the import, the `run` wrapper and `spawned`, the `beforeEach`/`afterEach` lines, the `:234` assertion and the `--with-plugins` help test, all of plan decision 4. Depends on T-301.
-- [ ] [T-303] Run: `npx vitest run tests/installer/plugins.test.js tests/installer/cli.test.js tests/installer/smoke.test.js`. Predicted: **1 failed | 106 passed (107)**: `plugins.test.js` 34 green and test 35 red; `cli.test.js` **65 passed** (64 + the help test); `smoke.test.js` **7 passed**. Depends on T-302.
+- [X] [T-301] `bin/code-conductor.mjs` (modify): the import, `USAGE`, the `opts` literal, the `--no-deps` comment, the `--with-plugins` branch, `offerPlugins`, the `run()` signature and comment, and the call before `return 0`, all of plan decision 3. Depends on T-202.
+- [X] [T-302] `tests/installer/cli.test.js` (modify): the import, the `run` wrapper and `spawned`, the `beforeEach`/`afterEach` lines, the `:234` assertion and the `--with-plugins` help test, all of plan decision 4. Depends on T-301.
+- [X] [T-303] Run: `npx vitest run tests/installer/plugins.test.js tests/installer/cli.test.js tests/installer/smoke.test.js`. Predicted: **1 failed | 106 passed (107)**: `plugins.test.js` 34 green and test 35 red; `cli.test.js` **65 passed** (64 + the help test); `smoke.test.js` **7 passed**. Depends on T-302.
 
 ### Task 4: README and wiki (green)
 
 **Files:** `README.md`, `.github/wiki/pages/Getting-Started.md`
 
-- [ ] [T-401] `README.md` (modify): the `:85` cell, the `:389` row and the new `--with-plugins` row of plan decision 6. Depends on T-303.
-- [ ] [T-402] `.github/wiki/pages/Getting-Started.md` (modify): the `:9` cell, the `:33` row, the new `--with-plugins` row and the `:39` sentence of plan decision 6. Depends on T-401.
-- [ ] [T-403] Run: the T-303 command plus `tests/wiki/wiki-gen.test.js`. Predicted: every test green; `plugins.test.js` **35 passed**, `cli.test.js` **65**, `smoke.test.js` **7**. Depends on T-402.
+- [X] [T-401] `README.md` (modify): the `:85` cell, the `:389` row and the new `--with-plugins` row of plan decision 6. Depends on T-303.
+- [X] [T-402] `.github/wiki/pages/Getting-Started.md` (modify): the `:9` cell, the `:33` row, the new `--with-plugins` row and the `:39` sentence of plan decision 6. Depends on T-401.
+- [X] [T-403] Run: the T-303 command plus `tests/wiki/wiki-gen.test.js`. Predicted: every test green; `plugins.test.js` **35 passed**, `cli.test.js` **65**, `smoke.test.js` **7**. Depends on T-402.
 
 ### Task 5: Full suite, scope check and commit
 
 **Files:** every file of Tasks 1–4, and this plan (ticks)
 
-- [ ] [T-501] Run `npm test` (long; run it in the background if the shell times out). Predicted: exit 0, with `tests/installer/plugins.test.js` at **35**, `tests/installer/cli.test.js` at **65** and no new skipped test. A red is called ENV only if the sandbox caused it (network, tmp permissions) and its file is not one this plan touches; report it with its name. Any other red is fixed. Depends on T-403.
-- [ ] [T-502] Scope check: `git status --short` lists exactly the six files of the Global Constraints and this plan; no temporary file is left in the tree (the stub dirs and `cc-plugin-*` dirs live under `os.tmpdir()`). `git diff --stat` shows no change to the spec, `package.json`, `tools/skip-baseline.json`, `.github/workflows/`, `.github/actions/` or any installer module other than the new one. `grep -n '"dependencies": {}' package.json` still matches. Depends on T-501.
-- [ ] [T-503] Stage: `git add lib/installer/plugins.mjs tests/installer/plugins.test.js` (new, not under an ignored directory). Depends on T-502.
-- [ ] [T-504] Stage: `git add -u bin/code-conductor.mjs tests/installer/cli.test.js README.md .github/wiki/pages/Getting-Started.md` (tracked). Depends on T-503.
-- [ ] [T-505] Stage: `git add -u docs/superpowers/plans/2026-11-21-feat039-superpowers-auto-install-via-the-claude-code.md` (carries the ticks for T-101 to T-504). Depends on T-504.
-- [ ] [T-506] Commit: `feat: offer the superpowers plugin through the Claude Code plugin CLI at install [FEAT-039]`. Depends on T-505.
+- [X] [T-501] Run `npm test` (long; run it in the background if the shell times out). Predicted: exit 0, with `tests/installer/plugins.test.js` at **35**, `tests/installer/cli.test.js` at **65** and no new skipped test. A red is called ENV only if the sandbox caused it (network, tmp permissions) and its file is not one this plan touches; report it with its name. Any other red is fixed. Depends on T-403.
+- [X] [T-502] Scope check: `git status --short` lists exactly the six files of the Global Constraints and this plan; no temporary file is left in the tree (the stub dirs and `cc-plugin-*` dirs live under `os.tmpdir()`). `git diff --stat` shows no change to the spec, `package.json`, `tools/skip-baseline.json`, `.github/workflows/`, `.github/actions/` or any installer module other than the new one. `grep -n '"dependencies": {}' package.json` still matches. Depends on T-501.
+- [X] [T-503] Stage: `git add lib/installer/plugins.mjs tests/installer/plugins.test.js` (new, not under an ignored directory). Depends on T-502.
+- [X] [T-504] Stage: `git add -u bin/code-conductor.mjs tests/installer/cli.test.js README.md .github/wiki/pages/Getting-Started.md` (tracked). Depends on T-503.
+- [X] [T-505] Stage: `git add -u docs/superpowers/plans/2026-11-21-feat039-superpowers-auto-install-via-the-claude-code.md` (carries the ticks for T-101 to T-504). Depends on T-504.
+- [X] [T-506] Commit: `feat: offer the superpowers plugin through the Claude Code plugin CLI at install [FEAT-039]`. Depends on T-505.
 
 ## Test List
 
