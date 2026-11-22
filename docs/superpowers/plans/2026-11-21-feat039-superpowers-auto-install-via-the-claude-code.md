@@ -404,17 +404,17 @@
 
 ## Test List
 
-- [ ] Unit, the constant (AC1): tests 1–2.
-- [ ] Unit, the pre-check and helpers: tests 3–5.
-- [ ] Unit, consent (AC "Interactive", AC "Non-interactive"): tests 6–14.
-- [ ] Unit, spawn options and the win32 shape (AC "stdin `'ignore'`… file descriptors… timeout"): tests 15–16.
-- [ ] Unit, classification (AC "already installed", error table): tests 17–24.
-- [ ] Unit, best-effort cleanup (AC "Temp-directory cleanup"): tests 25–26.
-- [ ] Integration, stub `claude` through `run()` (AC "No `claude` on PATH", "unknown command", "network or schema", "sleeps past the timeout", "already installed", "Two consecutive installer runs"): tests 27–34, cross-platform with no skip.
-- [ ] Docs (AC "`USAGE` and the README", AC wiki): test 35 and the `cli.test.js` help test.
-- [ ] Isolation (AC "No test spawns a real `claude`"): the `cli.test.js` wrapper and its `afterEach`, every new `run()` call with `isInteractive` and a `spawn` or a stub-only `pluginEnv`; decision 7 for the smoke child.
-- [ ] Full suite (AC "`dependencies` stays `{}`… no skip"): T-501 and T-502.
-- [ ] No E2E/UI test: there is no UI. A real install against the marketplace is not run by any test (spec, System Impact); the PR description says so.
+- [X] Unit, the constant (AC1): tests 1–2.
+- [X] Unit, the pre-check and helpers: tests 3–5.
+- [X] Unit, consent (AC "Interactive", AC "Non-interactive"): tests 6–14.
+- [X] Unit, spawn options and the win32 shape (AC "stdin `'ignore'`… file descriptors… timeout"): tests 15–16.
+- [X] Unit, classification (AC "already installed", error table): tests 17–24.
+- [X] Unit, best-effort cleanup (AC "Temp-directory cleanup"): tests 25–26.
+- [X] Integration, stub `claude` through `run()` (AC "No `claude` on PATH", "unknown command", "network or schema", "sleeps past the timeout", "already installed", "Two consecutive installer runs"): tests 27–34, cross-platform with no skip.
+- [X] Docs (AC "`USAGE` and the README", AC wiki): test 35 and the `cli.test.js` help test.
+- [X] Isolation (AC "No test spawns a real `claude`"): the `cli.test.js` wrapper and its `afterEach`, every new `run()` call with `isInteractive` and a `spawn` or a stub-only `pluginEnv`; decision 7 for the smoke child.
+- [X] Full suite (AC "`dependencies` stays `{}`… no skip"): T-501 and T-502.
+- [X] No E2E/UI test: there is no UI. A real install against the marketplace is not run by any test (spec, System Impact); the PR description says so.
 
 ## Commit Order
 
