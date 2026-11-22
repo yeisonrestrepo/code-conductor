@@ -200,6 +200,27 @@ describe('Guard 5: band scope for role agents [ARCH-010]', () => {
     expect(d.permissionDecisionReason).toBe('Guard 5: BAND_READ_ONLY: role security holds tk X, not RW.');
   });
 
+  describe('[FEAT-036] the docs role under a v5 envelope', () => {
+    const docsEnvelope = () => writeFileSync(envelopePath(), JSON.stringify({
+      v: 5,
+      sys: { ph: 'rev', c: 'abc1234', s: 'v1.54.0', role: 'docs', tk: 'RW' },
+      ops: { n: [], f: [], scope: ['README.md', 'docs/*.md'], gate: 'verify_pass' },
+      mem: { d: [], x: [] },
+    }));
+    const asDocs = (file) => fire(payload('Edit', file, { cwd: root, agent: 'docs' }));
+
+    it('[G5-1] allows an Edit inside the documentation surface', () => {
+      docsEnvelope();
+      expect(asDocs(join(root, 'docs', 'guide.md'))).toBeNull();
+    });
+
+    it('[G5-2] denies an Edit outside the documentation surface', () => {
+      docsEnvelope();
+      const outside = join(root, 'CHANGELOG.md');
+      expect(asDocs(outside).permissionDecisionReason).toBe(violation(outside, 'README.md, docs/*.md'));
+    });
+  });
+
   it('[AC10] carries band constants equal to scripts/snap-contract.mjs (D7)', () => {
     const text = readFileSync(HOOK, 'utf8');
     const list = (name) => JSON.parse(text.match(new RegExp(`const ${name} = (\\[[^\\]]*\\]);`))[1].replace(/'/g, '"'));

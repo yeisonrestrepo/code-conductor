@@ -160,7 +160,7 @@ function guard2DuplicateWrite(input) {
 // Copies of scripts/snap-contract.mjs values (ARCH-010 D7). This file is mirrored to two
 // locations and the contract sits at a different relative path from each, so no import is
 // correct in both; tests/hooks/guard5.test.js pins every copy to the contract instead.
-const BAND_ROLES = ['spec', 'plan', 'code', 'audit', 'qa', 'security'];
+const BAND_ROLES = ['spec', 'plan', 'code', 'audit', 'qa', 'security', 'docs'];
 const BAND_TOOL_KINDS = ['R', 'RW', 'X'];
 const BAND_WRITE_TOOLS = ['Write', 'Edit', 'create_file', 'write_file'];
 const BAND_ENVELOPE_MAX_BYTES = 10485760;
@@ -189,8 +189,8 @@ function readEnvelope(path) {
     if (statSync(path).size > BAND_ENVELOPE_MAX_BYTES) return null;
     env = JSON.parse(readFileSync(path, 'utf8'));
   } catch { return null; }
-  // FEAT-034: security exists only at v4; snap-validate already bound each role to its version.
-  if (!isPlainObject(env) || (env.v !== 3 && env.v !== 4) || !isPlainObject(env.sys) || !isPlainObject(env.ops)) return null;
+  // FEAT-034, FEAT-036: security exists from v4 and docs only at v5; snap-validate already bound each role to its version.
+  if (!isPlainObject(env) || ![3, 4, 5].includes(env.v) || !isPlainObject(env.sys) || !isPlainObject(env.ops)) return null;
   if (!BAND_ROLES.includes(env.sys.role) || !BAND_TOOL_KINDS.includes(env.sys.tk)) return null;
   const scope = env.ops.scope;
   if (env.sys.tk === 'RW' && !(Array.isArray(scope) && scope.every((g) => typeof g === 'string'))) return null;

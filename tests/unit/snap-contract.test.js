@@ -79,12 +79,13 @@ describe('snap-contract.mjs', () => {
     expect(POST_PARSE_MAX[2]).toBe(PRE_PARSE_MAX_BYTES)
     expect(POST_PARSE_MAX[3]).toBe(PRE_PARSE_MAX_BYTES)
     expect(POST_PARSE_MAX[4]).toBe(PRE_PARSE_MAX_BYTES)
-    expect(MAX_VERSION).toBe(4)
-    expect(Object.keys(POST_PARSE_MAX).map(Number)).toEqual([1, 2, 3, MAX_VERSION])
+    expect(POST_PARSE_MAX[5]).toBe(PRE_PARSE_MAX_BYTES)
+    expect(MAX_VERSION).toBe(5)
+    expect(Object.keys(POST_PARSE_MAX).map(Number)).toEqual([1, 2, 3, 4, MAX_VERSION])
   })
 
   it('[AC1] defines v3: the version ceiling, its top-level fields and its post-parse cap', () => {
-    expect(contract.MAX_VERSION).toBe(4)
+    expect(contract.MAX_VERSION).toBe(5)
     expect(contract.TOP_FIELDS[3]).toEqual(['v', 'sys', 'ops', 'mem', 'pr'])
     expect(contract.POST_PARSE_MAX[3]).toBe(contract.PRE_PARSE_MAX_BYTES)
   })
@@ -96,18 +97,18 @@ describe('snap-contract.mjs', () => {
     expect(contract.BLOCK_FIELDS[3]).toEqual({
       sys: ['ph', 'c', 's', 'role', 'tk'], ops: ['n', 'f', 'scope', 'gate'], mem: ['d', 'x', 'p'],
     })
-    expect(Object.keys(contract.BLOCK_FIELDS).map(Number)).toEqual([1, 2, 3, 4])
+    expect(Object.keys(contract.BLOCK_FIELDS).map(Number)).toEqual([1, 2, 3, 4, 5])
   })
 
   it('holds the band enums, the band order and the handoff map [ARCH-010]', () => {
-    expect(contract.ROLES).toEqual(['spec', 'plan', 'code', 'audit', 'qa', 'security'])
+    expect(contract.ROLES).toEqual(['spec', 'plan', 'code', 'audit', 'qa', 'security', 'docs'])
     expect(contract.TOOL_KINDS).toEqual(['R', 'RW', 'X'])
     expect(contract.BANDS).toEqual(['boundary', 'define', 'build', 'verify', 'ship'])
     expect(contract.GATES).toEqual(['boundary_routed', 'define_approved', 'build_executed', 'verify_pass', 'ship_released'])
     expect(contract.WRITE_TOOLS).toEqual(['Write', 'Edit', 'create_file', 'write_file'])
     expect(contract.V3_CAPS).toEqual({ 'ops.scope': [20, 300] })
     expect(Object.fromEntries(contract.ROLES.map(r => [r, contract.expectedGate(r)]))).toEqual({
-      spec: 'boundary_routed', plan: 'boundary_routed', code: 'define_approved', audit: 'build_executed', qa: 'build_executed', security: 'build_executed',
+      spec: 'boundary_routed', plan: 'boundary_routed', code: 'define_approved', audit: 'build_executed', qa: 'build_executed', security: 'build_executed', docs: 'verify_pass',
     })
   })
 })
@@ -128,5 +129,27 @@ describe('SNAP v4: the security role [FEAT-034]', () => {
   it('security belongs to verify and expects build_executed', () => {
     expect(contract.ROLE_BAND.security).toBe('verify')
     expect(contract.expectedGate('security')).toBe('build_executed')
+  })
+})
+
+describe('SNAP v5: the docs role [FEAT-036]', () => {
+  it('[C1] v5 is v4 with the same top fields, block fields and post-parse cap', () => {
+    expect(contract.TOP_FIELDS[5]).toEqual(contract.TOP_FIELDS[4])
+    expect(contract.BLOCK_FIELDS[5]).toEqual(contract.BLOCK_FIELDS[4])
+    expect(contract.POST_PARSE_MAX[5]).toBe(contract.POST_PARSE_MAX[4])
+  })
+
+  it('[C2] ROLES_BY_VERSION keeps six roles at v4, adds docs at v5, and ROLES is the MAX_VERSION roster', () => {
+    const V4 = ['spec', 'plan', 'code', 'audit', 'qa', 'security']
+    expect(contract.ROLES_BY_VERSION[4]).toEqual(V4)
+    expect(contract.ROLES_BY_VERSION[5]).toEqual([...V4, 'docs'])
+    expect(contract.ROLES).toEqual(contract.ROLES_BY_VERSION[contract.MAX_VERSION])
+  })
+
+  it('[C3] docs belongs to ship and expects verify_pass', () => {
+    expect(contract.ROLE_BAND.docs).toBe('ship')
+    expect(contract.expectedGate('docs')).toBe('verify_pass')
+    expect(contract.BANDS).toEqual(['boundary', 'define', 'build', 'verify', 'ship'])
+    expect(contract.GATES).toEqual(['boundary_routed', 'define_approved', 'build_executed', 'verify_pass', 'ship_released'])
   })
 })

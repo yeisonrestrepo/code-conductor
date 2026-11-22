@@ -411,8 +411,8 @@ describe('snap-validate.mjs', () => {
     expect(src).toContain('BLOCK_FIELDS')
     const V1 = { sys: ['ph', 'c', 's'], ops: ['n', 'f'], mem: ['d', 'x'] }
     const V3 = { sys: ['ph', 'c', 's', 'role', 'tk'], ops: ['n', 'f', 'scope', 'gate'], mem: ['d', 'x', 'p'] }
-    // v4 shares the v3 field sets (FEAT-034).
-    expect(BLOCK_FIELDS).toEqual({ 1: V1, 2: V1, 3: V3, 4: V3 })
+    // v4 and v5 share the v3 field sets (FEAT-034, FEAT-036).
+    expect(BLOCK_FIELDS).toEqual({ 1: V1, 2: V1, 3: V3, 4: V3, 5: V3 })
     const r = run(fixture(j({ ...VALID, sys: { ...VALID.sys, extra: 1 } })))
     expect(r.status).toBe(1)
     expect(r.stderr).toBe('SNAP_ERROR: unexpected key: sys.extra\n')
@@ -537,7 +537,7 @@ describe('snap-validate.mjs v3 [ARCH-010]', () => {
   it('rejects an unknown --to role with the usage line', () => {
     const r = runTo(fixture(j(VALID3)), '--to', 'boss')
     expect(r.status).toBe(1)
-    expect(r.stderr).toBe('SNAP_ERROR: usage: snap-validate.mjs <file> [--to spec|plan|code|audit|qa|security]\n')
+    expect(r.stderr).toBe('SNAP_ERROR: usage: snap-validate.mjs <file> [--to spec|plan|code|audit|qa|security|docs]\n')
   })
 })
 
@@ -577,5 +577,38 @@ describe('snap-validate.mjs v4 [FEAT-034]', () => {
     const r = run(fixture(j({ ...VALID4, sys: { ...VALID4.sys, zz: 1 } })))
     expect(r.status).toBe(1)
     expect(r.stderr).toBe('SNAP_ERROR: unexpected key: sys.zz\n')
+  })
+})
+
+describe('snap-validate.mjs v5 [FEAT-036]', () => {
+  const VALID5 = { ...VALID3, v: 5, sys: { ...VALID3.sys, ph: 'rev', role: 'docs', tk: 'RW' }, ops: { n: [], f: [], scope: ['README.md', 'docs/*.md'], gate: 'verify_pass' } }
+
+  it('[V1] accepts a v5 docs envelope --to docs on verify_pass', () => {
+    expect(runTo(fixture(j(VALID5)), '--to', 'docs')).toEqual({ status: 0, stderr: '' })
+  })
+
+  it('[V2] accepts a v5 envelope for each of the six v4 roles', () => {
+    for (const role of ['spec', 'plan', 'code', 'audit', 'qa', 'security']) {
+      const env = { ...VALID5, sys: { ...VALID5.sys, role, tk: 'X' }, ops: { n: [], f: [], gate: expectedGate(role) } }
+      expect(run(fixture(j(env)))).toEqual({ status: 0, stderr: '', stdout: '' })
+    }
+  })
+
+  it('[V3] rejects a v4 envelope naming docs with the v4 role message', () => {
+    const r = run(fixture(j({ ...VALID5, v: 4 })))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: role must be spec|plan|code|audit|qa|security\n')
+  })
+
+  it('[V4] names the v5 roster when a v5 role is outside it', () => {
+    const r = run(fixture(j({ ...VALID5, sys: { ...VALID5.sys, role: 'boss' } })))
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: role must be spec|plan|code|audit|qa|security|docs\n')
+  })
+
+  it('[V5] --to docs halts SNAP_GATE_MISMATCH on build_executed', () => {
+    const r = runTo(fixture(j({ ...VALID5, ops: { ...VALID5.ops, gate: 'build_executed' } })), '--to', 'docs')
+    expect(r.status).toBe(1)
+    expect(r.stderr).toBe('SNAP_ERROR: SNAP_GATE_MISMATCH: docs expects verify_pass, got build_executed\n')
   })
 })

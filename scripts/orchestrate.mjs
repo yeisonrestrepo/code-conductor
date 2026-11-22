@@ -13,6 +13,7 @@ import { GATES, ROLE_BAND, V3_CAPS, elementLength, expectedGate } from './snap-c
 // Imported, not spawned: ticket.mjs holds the four import-safety conditions (FEAT-031 B1.7, T2).
 import { TicketHalt, intake, writeSnapshot } from './ticket.mjs';
 import { DocLocationError, resolveDocLocations } from './doc-locations.mjs';
+import { DocsSyncError, docSurface } from './docs-sync.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -35,8 +36,8 @@ export const CONTROL_PLANE = [
   '.claude/commands/**', 'project-template/.claude/commands/**',
   '.claude/skills/**', 'project-template/.claude/skills/**',
   'claude.md', 'claude.local.md', '.claude/claude.md', 'project-template/claude.md',
-  // The router, the three modules it imports at load time, and the scan; the installer deploys them to .claude/scripts/.
-  'scripts/orchestrate.mjs', 'scripts/snap-contract.mjs', 'scripts/ticket.mjs', 'scripts/doc-locations.mjs', 'scripts/security-scan.mjs',
+  // The router, the modules it imports at load time, and the scan; the installer deploys them to .claude/scripts/.
+  'scripts/orchestrate.mjs', 'scripts/snap-contract.mjs', 'scripts/ticket.mjs', 'scripts/doc-locations.mjs', 'scripts/security-scan.mjs', 'scripts/docs-sync.mjs',
   '.claude/scripts/**',
   // BUG-081: these run code after the run ends (git, MCP and OpenCode servers, the status line, CI, npm).
   '.git/**', '.husky/**', '.githooks/**', '.mcp.json', 'opencode.json', 'opencode.jsonc',
@@ -130,6 +131,7 @@ const REVIEW_USAGE = 'usage: orchestrate.mjs review <spec|plan> --round <doc> | 
 
 // D5: the reviewed role-artifact table. Code's scope comes from its plan task instead.
 // Spec and plan scopes come from run.docs, pinned at start, so no folder is named here (FEAT-047).
+// Docs' scope is the documentation surface, computed when /cc-docs installs its envelope (FEAT-036 C4).
 export const ROLE_ARTIFACTS = {
   spec: { tk: 'RW', scope: null },
   plan: { tk: 'RW', scope: null },
@@ -137,13 +139,16 @@ export const ROLE_ARTIFACTS = {
   audit: { tk: 'R', scope: null },
   qa: { tk: 'X', scope: null },
   security: { tk: 'X', scope: null },
+  docs: { tk: 'RW', scope: null },
 };
 // The router table's "may hand back" column.
+// FEAT-036 C9: docs claims its entry gate; ship_released stays the Release seat's.
 export const MAY_HAND_BACK = {
   spec: ['boundary_routed'], plan: ['boundary_routed'], code: ['build_executed'],
   audit: ['build_executed'], qa: ['verify_pass'], security: ['build_executed'],
+  docs: ['verify_pass'],
 };
-const PHASE = { spec: 'spec', plan: 'plan', code: 'impl', audit: 'rev', qa: 'rev', security: 'rev' };
+const PHASE = { spec: 'spec', plan: 'plan', code: 'impl', audit: 'rev', qa: 'rev', security: 'rev', docs: 'rev' };
 // Guard 7's chaining set (FEAT-012 D7). The hook carries a copy pinned to this one (D10).
 export const SHELL_METACHARACTERS = [';', '&', '|', '`', '$(', '<', '>', '\n', '\r'];
 // D6: each package manager's invocation of the owner's `test` script. `bun test` would run
@@ -1588,8 +1593,8 @@ function recordHalt(root, halt) {
 }
 
 // FEAT-061: a phase command dispatches its role outside a run. With a run file present, even a foreign or broken one, the verb writes nothing: the envelope path is the run's.
-const ENVELOPE_ROLES = ['spec', 'plan', 'audit', 'qa'];
-const ENVELOPE_USAGE = 'usage: orchestrate.mjs envelope <spec|plan|audit|qa> [--item <label>] | --clear';
+const ENVELOPE_ROLES = ['spec', 'plan', 'audit', 'qa', 'docs'];
+const ENVELOPE_USAGE = 'usage: orchestrate.mjs envelope <spec|plan|audit|qa|docs> [--item <label>] | --clear';
 const LABEL = /^[a-zA-Z0-9._-]+$/; // The sys.s pattern snap-validate enforces.
 
 function parseEnvelopeArgs(args) {
@@ -1624,10 +1629,20 @@ function withRunFile(root, role, st) {
     }
     return `not-installed: live run ${st.run.item}; qa runs ${command}`;
   }
+  // FEAT-036 C1: no run seats docs, so the Define-band message would name the wrong owner.
+  if (role === 'docs' && live) throw new Refusal(`envelope docs: run ${st.run.item} is live in this session; reconcile documentation after a release, not inside a run`);
   if (live) {
     throw new Refusal(`envelope ${role}: run ${st.run.item} is live in this session and its Define band writes this document; continue with /cc-orchestrate, or end the run`);
   }
   throw new Refusal(`envelope ${role}: a run file at ${st.path} belongs to another session or is unreadable; clear it with: node ${scriptRef(root)} end`);
+}
+
+// FEAT-036 C4: the documentation surface tracked at HEAD, which /cc-docs checked out as the release.
+function docsScope(root) {
+  try { return docSurface(root); } catch (e) {
+    if (e instanceof DocLocationError || e instanceof DocsSyncError) throw new Halt(e.code, e.reason);
+    throw e;
+  }
 }
 
 function adhocFields(root, role, label) {
@@ -1635,6 +1650,7 @@ function adhocFields(root, role, label) {
     ph: PHASE[role], c: headCommit(root), s: label, n: [], f: [], d: [], x: [], role, tk: ROLE_ARTIFACTS[role].tk, gate: expectedGate(role),
   };
   if (role === 'spec' || role === 'plan') fields.scope = resolveDocs(root, label).scopes[role];
+  if (role === 'docs') fields.scope = docsScope(root);
   if (role === 'qa') fields.p = { test_command: checkTestCommand(resolveTestCommand(root)) };
   return fields;
 }

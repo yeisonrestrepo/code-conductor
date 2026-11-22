@@ -14,6 +14,7 @@ import {
   Halt, checkTestCommand, docScopes, documentHash, extractTasks, findAgent, forwardGate, isValidRun, nextStep, parseVerdict, recordHandback, taskScope,
 } from '../../scripts/orchestrate.mjs';
 import { CANDIDATE_PAIRS, DEFAULT_PAIR } from '../../scripts/doc-locations.mjs';
+import { docSurface } from '../../scripts/docs-sync.mjs';
 
 const SEC_NONE = '; security: threshold high, dependency scan not covered for no lockfile';
 const START_USAGE = 'orchestrate: usage: orchestrate.mjs start <ITEM> [--auto] [--ticket <N|issue URL>] [--audit-rounds <0-5>] [--security-threshold <low|moderate|high|critical>] [--no-dependency-audit] [--unattended] [--known-failure \'<text>\']...';
@@ -156,6 +157,7 @@ describe('router [FEAT-011 AC7]', () => {
     expect(MAY_HAND_BACK).toEqual({
       spec: ['boundary_routed'], plan: ['boundary_routed'], code: ['build_executed'],
       audit: ['build_executed'], qa: ['verify_pass'], security: ['build_executed'],
+      docs: ['verify_pass'],
     });
   });
 
@@ -167,6 +169,7 @@ describe('router [FEAT-011 AC7]', () => {
       audit: { tk: 'R', scope: null },
       qa: { tk: 'X', scope: null },
       security: { tk: 'X', scope: null },
+      docs: { tk: 'RW', scope: null },
     });
   });
 
@@ -505,7 +508,7 @@ describe('write surface [FEAT-011 AC4]', () => {
       '.claude/commands/**', 'project-template/.claude/commands/**',
       '.claude/skills/**', 'project-template/.claude/skills/**',
       'claude.md', 'claude.local.md', '.claude/claude.md', 'project-template/claude.md',
-      'scripts/orchestrate.mjs', 'scripts/snap-contract.mjs', 'scripts/ticket.mjs', 'scripts/doc-locations.mjs', 'scripts/security-scan.mjs',
+      'scripts/orchestrate.mjs', 'scripts/snap-contract.mjs', 'scripts/ticket.mjs', 'scripts/doc-locations.mjs', 'scripts/security-scan.mjs', 'scripts/docs-sync.mjs',
       '.claude/scripts/**',
       '.git/**', '.husky/**', '.githooks/**', '.mcp.json', 'opencode.json', 'opencode.jsonc',
       '.claude/flow-status.mjs', 'project-template/.claude/flow-status.mjs',
@@ -2849,7 +2852,7 @@ describe('pre-existing findings never reach the public part [FEAT-059]', () => {
 });
 
 describe('envelope verb outside a run [FEAT-061]', () => {
-  const ENV_USAGE = 'orchestrate: usage: orchestrate.mjs envelope <spec|plan|audit|qa> [--item <label>] | --clear';
+  const ENV_USAGE = 'orchestrate: usage: orchestrate.mjs envelope <spec|plan|audit|qa|docs> [--item <label>] | --clear';
   const INSTALLED = (role) => `installed: ${role} envelope at ${ENVELOPE_FILE}`;
   const validates = (role) => spawnSync(process.execPath, [join(REPO_ROOT, 'scripts/snap-validate.mjs'), join(root, ENVELOPE_FILE), '--to', role], { encoding: 'utf8' }).status;
   const walk = (dir) => (existsSync(dir) ? readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)])) : []);
@@ -2940,7 +2943,7 @@ describe('envelope verb outside a run [FEAT-061]', () => {
     expect(orch(['envelope', '--clear'])).toEqual({ status: 0, out: 'no envelope', err: '' });
   });
 
-  it.each([[['code']], [['security']], [['nope']], [[]], [['spec', '--item', 'a b']], [['spec', '--item', '../x']], [['spec', '--item']], [['audit', '--label', 'x']], [['qa', '--item', 'x', 'extra']]])(
+  it.each([[['code']], [['security']], [['nope']], [[]], [['spec', '--item', 'a b']], [['spec', '--item', '../x']], [['spec', '--item']], [['audit', '--label', 'x']], [['qa', '--item', 'x', 'extra']], [['docs', '--item', 'a b']]])(
     '[AC1] envelope %j is refused with the usage line and writes nothing', (args) => {
       agents();
       const r = orch(['envelope', ...args]);
@@ -2957,6 +2960,7 @@ describe('envelope verb outside a run [FEAT-061]', () => {
     return [
       [state, ['spec'], 2, refuse],
       [state, ['plan'], 2, refuse],
+      [state, ['docs'], 2, state === 'L' ? 'envelope docs: run FEAT-011 is live in this session; reconcile documentation after a release, not inside a run' : OTHER],
       [state, ['audit'], 0, state === 'L' ? 'not-installed: live run FEAT-011; audit has no write tool' : 'not-installed: a run file at '],
       state === 'L' ? [state, ['qa'], 0, 'not-installed: live run FEAT-011; qa runs npm test'] : [state, ['qa'], 2, OTHER],
       [state, ['--clear'], 2, 'envelope --clear: a run file exists at '],
@@ -4020,6 +4024,7 @@ describe('unattended mode [FEAT-054]', () => {
     'scripts/ticket.mjs',
     'scripts/doc-locations.mjs',
     'scripts/security-scan.mjs',
+    'scripts/docs-sync.mjs',
     '.claude/scripts/orchestrate.mjs',
   ])('U41 [BUG-080 AC1] delegate plan over an APPROVE report escalates a task that declares the control-plane file %s', (path) => {
     expectEscalation(path, 'control-plane files');
@@ -4884,5 +4889,86 @@ describe('known failures [BUG-074]', () => {
     expect(runFile().tasks.done).toBe(0);
     expect(runFile().handbacks.some((h) => h.role === 'code')).toBe(false);
     expect(runFile().halt.code).toBe('ORCH_HANDBACK_MISSING');
+  });
+});
+
+describe('docs envelope [FEAT-036]', () => {
+  // A repository whose HEAD tracks the given files plus a README and one top-level doc.
+  function docsRepo(files = {}) {
+    fixtureGit('init', '-q');
+    writeFileSync(join(root, 'README.md'), '# Demo\n');
+    mkdirSync(join(root, 'docs'), { recursive: true });
+    writeFileSync(join(root, 'docs', 'a.md'), '# A\n');
+    for (const [rel, text] of Object.entries(files)) {
+      mkdirSync(dirname(join(root, rel)), { recursive: true });
+      writeFileSync(join(root, rel), text);
+    }
+    fixtureCommit();
+  }
+  // An in-process docSurface call must not reach a GIT_DIR a hook exported (BUG-053).
+  function scrubbed(fn) {
+    const saved = { ...process.env };
+    for (const key of Object.keys(process.env)) delete process.env[key];
+    Object.assign(process.env, cleanGitEnv(saved));
+    try { return fn(); } finally {
+      for (const key of Object.keys(process.env)) delete process.env[key];
+      Object.assign(process.env, saved);
+    }
+  }
+
+  it('[O1] installs a v5 docs envelope whose scope is the documentation surface', () => {
+    agents(['docs']);
+    docsRepo();
+    const r = orch(['envelope', 'docs', '--item', 'v1.54.0']);
+    expect(r.status).toBe(0);
+    expect(r.out.split('\n')[0]).toBe(`installed: docs envelope at ${ENVELOPE_FILE}`);
+    expect(spawnSync(process.execPath, [join(REPO_ROOT, 'scripts/snap-validate.mjs'), join(root, ENVELOPE_FILE), '--to', 'docs'], { encoding: 'utf8' }).status).toBe(0);
+    expect(envelope()).toMatchObject({ v: 5, sys: { ph: 'rev', s: 'v1.54.0', role: 'docs', tk: 'RW' }, ops: { gate: 'verify_pass' } });
+    expect(envelope().ops.scope).toEqual(scrubbed(() => docSurface(root)));
+    expect(envelope().ops.scope).toEqual(['README.md', 'docs/*.md']);
+    expect(existsSync(join(root, RUN_FILE))).toBe(false);
+  });
+
+  it('[O2] refuses a directory that is not a repository', () => {
+    agents(['docs']);
+    const r = orch(['envelope', 'docs']);
+    expect(r.status).toBe(2);
+    expect(r.err).toMatch(/^orchestrate: DOCS_NOT_A_REPO: /);
+    expect(existsSync(join(root, ENVELOPE_FILE))).toBe(false);
+  });
+
+  it('[O3] refuses a repository that tracks no documentation', () => {
+    agents(['docs']);
+    fixtureGit('init', '-q');
+    mkdirSync(join(root, 'src'), { recursive: true });
+    writeFileSync(join(root, 'src', 'a.js'), 'a\n');
+    fixtureCommit();
+    const r = orch(['envelope', 'docs']);
+    expect(r.status).toBe(2);
+    expect(r.err).toMatch(/^orchestrate: DOCS_NO_SURFACE: /);
+    expect(existsSync(join(root, ENVELOPE_FILE))).toBe(false);
+  });
+
+  it('[O4] forwards a malformed recorded spec or plan folder', () => {
+    agents(['docs']);
+    docsRepo({ 'CLAUDE.md': '- Specs: docs/specs\n' });
+    const r = orch(['envelope', 'docs']);
+    expect(r.status).toBe(2);
+    expect(r.err).toMatch(/^orchestrate: ORCH_DOC_LOCATION_INVALID: /);
+  });
+
+  it('[O5] refuses without a docs agent definition', () => {
+    docsRepo();
+    const r = orch(['envelope', 'docs']);
+    expect(r.status).toBe(2);
+    expect(r.err).toBe('orchestrate: ORCH_AGENT_MISSING: no agent definition named docs in .claude/agents/ or ~/.claude/agents/');
+  });
+
+  it('[O6] install docs inside a run is refused: no run routes to docs', () => {
+    agents([...ROLES, 'docs']);
+    expect(orch(['start', 'FEAT-011']).status).toBe(0);
+    const r = orch(['install', 'docs']);
+    expect(r.status).toBe(2);
+    expect(r.err).toMatch(/^orchestrate: install docs: the next step is /);
   });
 });
