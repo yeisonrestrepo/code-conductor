@@ -107,6 +107,14 @@ The fail-open shape follows `scripts/conductor-db.mjs:7`: a missing capability w
 - `tests/installer/cli.test.js`: which assertions pin exact output or `USAGE`.
 - `lib/installer/heal.mjs`: the `{ status, lines }` return shape that `plugins.mjs` mirrors.
 
+## Owner decisions
+
+The questions this spec left open were decided as follows. The rest of the spec stands as written, including the 60 s timeout, stdin `'ignore'` with file-descriptor stdio (no pipes), the `already installed` check before the failure classification, and `--no-deps` staying a no-op that does not touch this step.
+
+1. **Consent.** An interactive TTY run asks with a default-No `[y/N]` prompt (Main path, step 3). A non-interactive run installs only when the flag is given. Every other outcome prints the one-line fallback with `/plugin install superpowers@claude-plugins-official` (Error cases).
+2. **Flag name.** `--with-plugins`.
+3. **Approval.** These decisions settle the installer network and security posture. The spec and the plan still need an owner approval, not a delegated one.
+
 ## Complexity Estimate
 
 M: one new module of about 80 lines and a small CLI change, but it needs a cross-platform stub binary, an injectable prompt and spawn, and adjustments to existing CLI output assertions.
