@@ -1,6 +1,6 @@
 # FEAT-039: Superpowers auto-install via the Claude Code plugin CLI
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-21 by the owner
 
 **Item:** `[FEAT-039]` (issue #148). This spec answers the item's backlog entry; where the entry leaves a choice open, the choice and its reason are named in place.
 
