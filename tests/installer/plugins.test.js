@@ -43,10 +43,13 @@ function stubClaude(body) {
 }
 
 // Windows env keys are case-insensitive and the copy carries Path: drop every spelling.
+// win32 keeps System32 after the stub dir: with shell: true Node may resolve plain
+// 'cmd.exe' through the child's PATH, and System32 holds no claude to reach.
 function pathOnly(dir) {
   const env = { ...process.env };
   for (const key of Object.keys(env)) if (/^path$/i.test(key)) delete env[key];
-  return { ...env, PATH: dir };
+  if (process.platform !== 'win32') return { ...env, PATH: dir };
+  return { ...env, PATH: `${dir};${join(process.env.SystemRoot ?? 'C:\\Windows', 'System32')}` };
 }
 
 const failing = (message, code = 1) => () => `process.stderr.write(${JSON.stringify(`${message}\n`)}); process.exit(${code});\n`;
@@ -55,7 +58,9 @@ const writeRegistry = (home, plugins) => { mkdirSync(dirname(registryPath(home))
 
 // Relative path -> content, with the home path masked so two homes compare equal.
 function snapshot(home) {
-  const mask = (s) => s.split(home).join('<home>').split(JSON.stringify(home).slice(1, -1)).join('<home>');
+  // Three spellings: native, JSON-escaped, and the forward-slash form hook commands use on win32.
+  const spellings = [JSON.stringify(home).slice(1, -1), home, home.replaceAll('\\', '/')];
+  const mask = (s) => spellings.reduce((acc, h) => acc.split(h).join('<home>'), s);
   return Object.fromEntries(readdirSync(home, { recursive: true }).map(String).sort()
     .filter((p) => statSync(join(home, p)).isFile())
     .map((p) => [p.replaceAll('\\', '/'), mask(readFileSync(join(home, p), 'utf8'))]));
