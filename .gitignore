@@ -39,6 +39,7 @@ tests/.tmp/
 !/.claude/agents/audit.md
 !/.claude/agents/code.md
 !/.claude/agents/define-review.md
+!/.claude/agents/docs.md
 !/.claude/agents/plan.md
 !/.claude/agents/qa.md
 !/.claude/agents/security.md

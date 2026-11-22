@@ -11,8 +11,11 @@ During orchestrated runs, five role agents handle specific phases. Each is defin
 | `code.md` | code | build | RW | Test command only | Task scope from envelope |
 | `audit.md` | audit | verify | R | No (Guard 7) | Nothing (no write tools; Guard 5 denies `tk: R`) |
 | `qa.md` | qa | verify | X | Test command only | Nothing (no write tools; Guard 5 denies `tk: X`) |
+| `docs.md` | docs | ship | RW | No (Guard 7) | Documentation surface only |
 
 A sixth agent, `define-review.md`, is a non-band advisory reviewer for the review loop.
+
+`docs.md` is not seated in a run: `/cc-docs --release <ref>` dispatches it against one shipped release, outside any run. It exists only in SNAP v5 envelopes, claims only `verify_pass`, and leaves its edits uncommitted for you to review.
 
 ## Agent Constraints
 

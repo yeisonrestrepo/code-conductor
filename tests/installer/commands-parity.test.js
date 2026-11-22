@@ -545,6 +545,7 @@ describe('role dispatch from the phase commands [FEAT-061]', () => {
     ...PLAN_MIRRORS.map((rel) => [rel, 'plan', 'envelope plan --item <ID-or-adhoc>']),
     ['project-template/.claude/commands/cc-review.md', 'audit', 'envelope audit --item <ID-or-adhoc>'],
     ['project-template/.claude/commands/cc-test.md', 'qa', 'envelope qa'],
+    ['project-template/.claude/commands/cc-docs.md', 'docs', 'envelope docs --item <label>'],
   ];
 
   it.each(DISPATCH)('[AC1] %s installs the %s envelope, dispatches the role, clears it and names its fallback', (rel, role, call) => {
@@ -569,6 +570,17 @@ describe('role dispatch from the phase commands [FEAT-061]', () => {
     expect(text).toContain('audit not dispatched: name --spec and --plan to review against them');
     expect(text).toContain('Want me to fix the blocker and major findings?');
     expect(text).toContain('Do not run Phase 0 or the three-layer review below.');
+  });
+
+  it('[FEAT-036] cc-docs reconciles a release only with --release, judges the report and never commits', () => {
+    const text = read('project-template/.claude/commands/cc-docs.md');
+    expect(text).toContain('Without `--release <ref>` in `$ARGUMENTS`, skip this section');
+    expect(text).toContain('node "$S/docs-sync.mjs" digest --release <ref> [--since <ref>]');
+    expect(text).toContain('node "$S/docs-sync.mjs" check --release <ref> [--since <ref>] < .conductor/handback/docs.txt');
+    expect(text).toContain('git diff --stat');
+    expect(text).toContain('git checkout -- <files>');
+    expect(text).toContain('This command never commits, stages or reverts anything.');
+    expect(text).toContain('Preview all doc changes before writing to files.');
   });
 
   it('[AC1] cc-test writes no test during a live run and never replaces qa\'s answer', () => {

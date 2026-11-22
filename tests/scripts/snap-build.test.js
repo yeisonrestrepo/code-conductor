@@ -294,3 +294,12 @@ describe('snap-build.mjs v4 [FEAT-034]', () => {
     expect(r.stdout.trim()).toBe('{"v":4,"sys":{"ph":"rev","c":"abc1234","s":"feat034","role":"security","tk":"X"},"ops":{"n":[],"f":[],"gate":"build_executed"},"mem":{"d":[],"x":[]},"pr":""}');
   });
 });
+
+describe('snap-build.mjs v5 [FEAT-036]', () => {
+  it('writes v5 for docs, keeps the v3 key order, and the line validates', () => {
+    const r = build(JSON.stringify({ ph: 'rev', c: 'abc1234', s: 'feat036', n: [], f: [], d: [], x: [], role: 'docs', tk: 'RW', scope: ['README.md'], gate: 'verify_pass' }));
+    expect(r.status).toBe(0);
+    expect(r.stdout.trim()).toBe('{"v":5,"sys":{"ph":"rev","c":"abc1234","s":"feat036","role":"docs","tk":"RW"},"ops":{"n":[],"f":[],"scope":["README.md"],"gate":"verify_pass"},"mem":{"d":[],"x":[]},"pr":""}');
+    expect(validate(r.stdout.trim()).status).toBe(0);
+  });
+});
