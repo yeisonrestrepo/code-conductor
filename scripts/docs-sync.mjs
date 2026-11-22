@@ -184,7 +184,10 @@ function resolveRange(root, { release, since: sinceRef }, { clean }) {
 
 function rangeCommits(root, range) {
   const log = git(root, ['log', '--reverse', '--no-show-signature', '--format=%H%x09%s', `${range.sinceSha}..${range.releaseSha}`]);
-  return log.out.split('\n').filter(Boolean).map((row) => `COMMIT ${row.replace('\t', ' ')}`);
+  return log.out.split('\n').filter(Boolean).map((row) => {
+    const tab = row.indexOf('\t');
+    return `COMMIT ${row.slice(0, tab)} ${row.slice(tab + 1)}`;
+  });
 }
 
 function changedPaths(root, range) {

@@ -190,7 +190,7 @@ function readEnvelope(path) {
     env = JSON.parse(readFileSync(path, 'utf8'));
   } catch { return null; }
   // FEAT-034, FEAT-036: security exists from v4 and docs only at v5; snap-validate already bound each role to its version.
-  if (!isPlainObject(env) || ![3, 4, 5].includes(env.v) ||!isPlainObject(env.sys) || !isPlainObject(env.ops)) return null;
+  if (!isPlainObject(env) || ![3, 4, 5].includes(env.v) || !isPlainObject(env.sys) || !isPlainObject(env.ops)) return null;
   if (!BAND_ROLES.includes(env.sys.role) || !BAND_TOOL_KINDS.includes(env.sys.tk)) return null;
   const scope = env.ops.scope;
   if (env.sys.tk === 'RW' && !(Array.isArray(scope) && scope.every((g) => typeof g === 'string'))) return null;
