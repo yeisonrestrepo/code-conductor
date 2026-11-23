@@ -119,10 +119,10 @@ Mapping:
 **Files (deny proven):** Create `project-template/.codex/hooks.json` pointing `PreToolUse` at `node <path-to>/.claude/hooks/pre-tool-use.mjs` relative to the cwd measured in T-004-B (or a Codex adapter beside it if the payload differs from Claude's); modify `lib/installer/deploy.mjs`, `bin/code-conductor.mjs`, tests as in Task 2 with fingerprint `pre-tool-use.mjs`, flag `--codex`.
 **Files (no deny):** none; README states Codex is workflow only.
 
-- [>] [T-005] Ship `--codex` or record the gap
+- [X] [T-005] Ship `--codex` or record the gap
   - [X] [T-005-A] If T-004-C proved a deny: repeat T-002-A..E for `--codex` (deploy/CLI tests first, red, then implementation, then `npm test` PASS), plus one live Codex transcript showing a Guard 3 block.
-  - [ ] [T-005-B] If not: no code; carry the measured reason into Task 6.
-  - [ ] [T-005-C] Stage the touched files with explicit paths (`git add` new, `git add -u` tracked, including the plan file) and `git commit -m "feat: install the Codex CLI guard with --codex [FEAT-048]"` (skip when T-005-B applies).
+  - [X] [T-005-B] If not: no code; carry the measured reason into Task 6.
+  - [X] [T-005-C] Stage the touched files with explicit paths (`git add` new, `git add -u` tracked, including the plan file) and `git commit -m "feat: install the Codex CLI guard with --codex [FEAT-048]"` (skip when T-005-B applies).
 
 ### Task 6: documentation
 
@@ -131,10 +131,10 @@ Mapping:
 - Modify: `.github/wiki/pages/Getting-Started.md` (flag mention next to `--opencode`)
 - Modify: `AGENT-READABLE BACKLOG.md` (FEAT-048 entry: slice 2 status)
 
-- [ ] [T-006] Document both harnesses
-  - [ ] [T-006-A] Write the README and wiki changes; the Antigravity table lists: no `UserPromptSubmit` context injection, no `cc-*` commands or agents, Guards 5–7 not enforced, needs `node` on `PATH`, unknown tools blocked.
-  - [ ] [T-006-B] Run `npm test`; expected: full suite PASS (doc-parity tests included).
-  - [ ] [T-006-C] `git add -u README.md .github/wiki/pages/Getting-Started.md "AGENT-READABLE BACKLOG.md" docs/superpowers/plans/2026-11-23-feat048-codex-antigravity-guards.md`
+- [>] [T-006] Document both harnesses
+  - [X] [T-006-A] Write the README and wiki changes; the Antigravity table lists: no `UserPromptSubmit` context injection, no `cc-*` commands or agents, Guards 5–7 not enforced, needs `node` on `PATH`, unknown tools blocked.
+  - [X] [T-006-B] Run `npm test`; expected: full suite PASS (doc-parity tests included).
+  - [X] [T-006-C] `git add -u README.md .github/wiki/pages/Getting-Started.md "AGENT-READABLE BACKLOG.md" docs/superpowers/plans/2026-11-23-feat048-codex-antigravity-guards.md`
   - [ ] [T-006-D] `git commit -m "docs: document the Antigravity and Codex guards [FEAT-048]"`
 
 ### Task 7: PR

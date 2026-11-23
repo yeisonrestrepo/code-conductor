@@ -390,6 +390,8 @@ By default, only the global core files are installed. Flags extend that:
 | `--no-deps` / `-NoDeps` | Accepted for compatibility with the retired shell installers; a no-op that copies agent files only and does not affect the superpowers offer (see `--with-plugins`) |
 | `--verbosity MIN\|INFO\|VERBOSE` / `-Verbosity LEVEL` | Default response verbosity (default `MIN`). `MIN` = one sentence per response, `INFO` = bullet list, `VERBOSE` = full explanation. Re-run the installer to change it. PowerShell's `-Verbosity:INFO` form is not supported; it warns and the level stays `MIN`. |
 | `--opencode` | With `--project`, also install the OpenCode guard plugin at `.opencode/plugin/conductor-guard.js` (see [OpenCode](#opencode)). Without `--project` it warns and writes nothing for OpenCode |
+| `--antigravity` | With `--project`, also install the Antigravity CLI guard: `.agents/hooks/conductor-guard.mjs` and a `PreToolUse` entry merged into `.agents/hooks.json` (see [Antigravity CLI](#antigravity-cli)). Without `--project` it warns and writes nothing for Antigravity |
+| `--codex` | With `--project`, also merge a `PreToolUse` entry into `.codex/hooks.json` that runs the project's guard (see [Codex CLI](#codex-cli)). Without `--project` it warns and writes nothing for Codex |
 | `--with-plugins` | Install the superpowers plugin without asking, through `claude plugin install superpowers@claude-plugins-official` (60 s timeout). A non-interactive run installs it only with this flag; an interactive run asks instead. If the install cannot run, the installer prints `/plugin install superpowers@claude-plugins-official` and still exits 0 |
 
 **Updating:** re-run the same install command. User-configured files are never overwritten; agent-managed files are always updated.
@@ -416,7 +418,35 @@ This is the first slice of `[FEAT-048]` (issue #97), and it covers enforcement o
 | `glob`, `grep`, `list`, `webfetch`, `websearch`, `codesearch` and other read-only tools | Allowed, as on Claude Code |
 | `cc-*` commands, band agents, verbosity and context hooks | Not installed for OpenCode yet. OpenCode reads `CLAUDE.md` when there is no `AGENTS.md`, and loads `.claude/skills` |
 
-The plugin needs `node` on `PATH`. If the guard cannot run, the call is blocked and the reason names the guard's path. Checked against OpenCode 1.18.33 during the proof of concept; Codex CLI and Antigravity are not supported yet.
+The plugin needs `node` on `PATH`. If the guard cannot run, the call is blocked and the reason names the guard's path. Checked against OpenCode 1.18.33 during the proof of concept.
+
+### Antigravity CLI
+
+`--project --antigravity` adds `.agents/hooks/conductor-guard.mjs` and merges one `PreToolUse` entry (`node hooks/conductor-guard.mjs`) into `.agents/hooks.json`, keeping any entries already there. Google's [Antigravity CLI](https://antigravity.google) (`agy`) runs the adapter before every tool call; the adapter maps `run_command` to `Bash`, `read_file` to `Read` (with `StartLine`/`EndLine` as offset and limit), `write_file` to `Write` and `edit_file` to `Edit`, runs the project's own `.claude/hooks/pre-tool-use.mjs`, and replies `{"decision":"deny"}` when the guard denies or asks. Only the `agy` CLI is covered, not the Antigravity IDE or app.
+
+| On Antigravity CLI | Status |
+|---|---|
+| Guards 1, 2, 3 and 4 | Enforced. Guard 2's question blocks the write, because a hook cannot ask you |
+| Guards 5, 6 and 7 (band roles, orchestrator run) | Not enforced: agy does not tell the hook which agent made the call |
+| `run_command` with an argument outside `CommandLine`, `toolSummary`, `WaitMsBeforeAsync`, `BypassSandbox` and `IsDaemon` | Blocked, naming the argument |
+| Any other tool (browser, MCP, subagents, a tool a later agy adds) | Blocked: the guard cannot inspect it |
+| Guard warnings and `UserPromptSubmit` context injection | Not available |
+| `cc-*` commands, band agents, verbosity hooks | Not installed for Antigravity |
+
+The adapter needs `node` on `PATH`. If the guard cannot run, crashes or prints something that is not JSON, the call is blocked. Checked live against agy 1.5.15: `cat *.log` was denied by Guard 3, a read under `node_modules/` by Guard 4, and `echo ok` ran.
+
+### Codex CLI
+
+`--project --codex` merges one `PreToolUse` entry (`node .claude/hooks/pre-tool-use.mjs`) into `.codex/hooks.json`, keeping any entries already there. OpenAI's [Codex CLI](https://github.com/openai/codex) sends Claude Code's own payload and honours its deny, so no adapter is needed. **Codex runs a project's hooks only after you trust them once:** open `codex` in the project and approve them in `/hooks`. Until then nothing is enforced.
+
+| On Codex CLI | Status |
+|---|---|
+| Guard 3 on shell commands | Enforced after hook trust |
+| Guards 1, 2 and 4 | Not reached: Codex has no separate read tool, so reads go through the shell, where Guard 3 applies |
+| Guards 5, 6 and 7, guard warnings, context injection | Not available |
+| `cc-*` commands, band agents, verbosity hooks | Not installed for Codex |
+
+Checked live against Codex CLI 0.171.0: after trust, `cat *.log` was refused with `Command blocked by PreToolUse hook: BASH SCAN BLOCKED`. Editing `.codex/hooks.json` later makes Codex ask for trust again.
 
 ### How the installer treats your CLAUDE.md
 
@@ -559,6 +589,9 @@ code-conductor/
 |   +-- CLAUDE.md
 |   +-- gitignore                  Merged into the host project's .gitignore
 |   +-- .opencode/plugin/conductor-guard.js  OpenCode guard plugin, only with --opencode (FEAT-048)
+|   +-- .agents/hooks/conductor-guard.mjs    Antigravity CLI guard adapter, only with --antigravity (FEAT-048)
+|   +-- .agents/hooks.json                   Antigravity hook entry, merged, only with --antigravity
+|   +-- .codex/hooks.json                    Codex hook entry, merged, only with --codex (FEAT-048)
 |   +-- .claude/
 |       +-- settings.json          Hooks wiring
 |       +-- review-loop.settings.json  Auto mode exception for the review loop (FEAT-041)
