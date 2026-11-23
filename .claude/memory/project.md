@@ -3529,3 +3529,17 @@ Known limits: unchanged; FEAT-035 is not a defect line.
 Not verified by the PR: no live `/cc-release` dispatch of the `release` agent against a real release is reported; `release.mjs` is exercised in fixture repositories, and its Windows `.cmd` path only on the Windows CI leg.
 
 Upgrade note: reinstalling ships the `release` profile, `scripts/release.mjs`, `/cc-release` and the updated hooks; a project gets no release profile until it runs `/cc-release --init` and confirms. #297 reports two `tests/unit/staging-convention.test.js` tests failing in its sandbox's git, as #279–#293 did, and two `tests/unit/gitignore-block-parity.test.js` tests failing only while the new files were uncommitted. CI on the release PR is the authority.
+
+## Release: 1.57.0 batch landing 2026-11-23
+
+One PR merged since `v1.56.0`. Existing id closed:
+
+- FEAT-030 (#301 by `cc-lane-bot[bot]`, the `snapshots` table bounded by row count but never by size, ~5 GB theoretical ceiling). `purgeTable` in `scripts/conductor-db.mjs` gains bound 4, run after the three FEAT-025 row bounds only when the caller passes `byteBound`; the `snapshots` write passes it via the new exported `SNAPSHOT_RETENTION` (256 MiB budget on `snap_json`, `maxRowBytes` = `PRE_PARSE_MAX_BYTES`, 10 MiB), `raw_history` passes none. Precondition `n * maxRowBytes > budget`, so no size scan at 25 rows or fewer; past it, `SUM(LENGTH(CAST(snap_json AS BLOB)))` counts UTF-8 bytes and, over budget, one DELETE takes the shortest oldest-first non-floor prefix covering the excess, keeping bound 2's newest-per-hash floor. Failures stay inside the existing `retention purge skipped (snapshots)` catch: row kept, exit 0. The CLI is now guarded to run only as the invoked script, so tests import `purgeTable`. No schema version or dependency change. Tests: three `[FEAT-030]` describes in `tests/scripts/conductor-db.test.js` (12 tests); the ten `node:sqlite`-gated identities join `ci-node20` in `tools/skip-baseline.json`. Intake of issue #146. Spec approved by independent review, round 1; plan by independent review, round 1. The PR also adds the spec and plan leaves to the `.gitignore` tracked-surface block.
+
+Nothing minted: FEAT-030 was filed at the FEAT-025 closeout (1.25.0). BUG-090 (triage #299) stays reserved and is not touched by this release; FEAT-062 (triage #295) and BUG-089 (triage #284) likewise.
+
+Known limits: unchanged; FEAT-030 is not a defect line.
+
+Not verified by the PR: the backlog's pick-up condition ("only if a real `.conductor/cache.db` is observed above a few hundred MB", 28 KB measured 2026-09-22) is not addressed; no measurement of a real cache DB is reported. The bound is exercised only against in-process and fixture databases.
+
+Upgrade note: reinstalling ships the updated `scripts/conductor-db.mjs`; an existing cache DB over 256 MiB in `snapshots` is trimmed on its next snapshot write. CI on the release PR is the authority.
