@@ -26,9 +26,9 @@
 
 ---
 
-- [ ] [T-000] Commit the spec and plan
+- [X] [T-000] Commit the spec and plan
   - [X] [T-000-A] Add the two `!/docs/superpowers/...` leaves to `.gitignore` in sorted position.
-  - [ ] [T-000-B] `git add -f` the spec and plan, `git add -u .gitignore`, `git commit -m "docs: add the FEAT-048 slice 3 harness commands spec and plan"`
+  - [X] [T-000-B] `git add -f` the spec and plan, `git add -u .gitignore`, `git commit -m "docs: add the FEAT-048 slice 3 harness commands spec and plan"`
 
 ### Task 1: Renderer and drift test
 
@@ -38,9 +38,9 @@
 - CLI: `node lib/installer/harness-commands.mjs --write` writes `renderAll` into `project-template/` and removes stale `cc-*` renders.
 
 - [ ] [T-001] Renderer, generated files and drift test
-  - [ ] [T-001-A] Write `tests/installer/harness-commands.test.js`: frontmatter shape for workflow and skill; preamble present once; body after frontmatter equals the source body; CRLF source equals LF; missing description throws naming the file; quoted description stays parseable; drift: every `renderAll` entry equals the committed file and no extra `cc-*` render exists.
-  - [ ] [T-001-B] Implement `lib/installer/harness-commands.mjs`; run `--write`.
-  - [ ] [T-001-C] Run `npx vitest run tests/installer/harness-commands.test.js`; expected PASS.
+  - [X] [T-001-A] Write `tests/installer/harness-commands.test.js`: frontmatter shape for workflow and skill; preamble present once; body after frontmatter equals the source body; CRLF source equals LF; missing description throws naming the file; quoted description stays parseable; drift: every `renderAll` entry equals the committed file and no extra `cc-*` render exists.
+  - [X] [T-001-B] Implement `lib/installer/harness-commands.mjs`; run `--write`.
+  - [X] [T-001-C] Run `npx vitest run tests/installer/harness-commands.test.js`; expected PASS.
   - [ ] [T-001-D] Stage the renderer, test, `project-template/.agents/workflows`, `project-template/.agents/skills` and the plan; `git commit -m "feat: render cc-* commands as Antigravity workflows and Codex skills [FEAT-048]"`
 
 ### Task 2: Install under the flags
