@@ -37,19 +37,19 @@
 - `renderAll(repoRoot) -> Map<relPath, text>` with keys `.agents/workflows/cc-<x>.md` and `.agents/skills/cc-<x>/SKILL.md`.
 - CLI: `node lib/installer/harness-commands.mjs --write` writes `renderAll` into `project-template/` and removes stale `cc-*` renders.
 
-- [ ] [T-001] Renderer, generated files and drift test
+- [X] [T-001] Renderer, generated files and drift test
   - [X] [T-001-A] Write `tests/installer/harness-commands.test.js`: frontmatter shape for workflow and skill; preamble present once; body after frontmatter equals the source body; CRLF source equals LF; missing description throws naming the file; quoted description stays parseable; drift: every `renderAll` entry equals the committed file and no extra `cc-*` render exists.
   - [X] [T-001-B] Implement `lib/installer/harness-commands.mjs`; run `--write`.
   - [X] [T-001-C] Run `npx vitest run tests/installer/harness-commands.test.js`; expected PASS.
-  - [ ] [T-001-D] Stage the renderer, test, `project-template/.agents/workflows`, `project-template/.agents/skills` and the plan; `git commit -m "feat: render cc-* commands as Antigravity workflows and Codex skills [FEAT-048]"`
+  - [X] [T-001-D] Stage the renderer, test, `project-template/.agents/workflows`, `project-template/.agents/skills` and the plan; `git commit -m "feat: render cc-* commands as Antigravity workflows and Codex skills [FEAT-048]"`
 
 ### Task 2: Install under the flags
 
 - [ ] [T-002] Copy the rendered folders in `deployProject`
-  - [ ] [T-002-A] Add deploy tests: workflows only with `antigravity`, skills only with `codex`, host `mine.md` / `mine/` kept, neither folder without a flag.
-  - [ ] [T-002-B] Implement in `lib/installer/deploy.mjs` (copy `.agents/workflows` under `antigravity`, `.agents/skills` under `codex`).
-  - [ ] [T-002-C] Run `npx vitest run tests/installer/deploy.test.js tests/installer/cli.test.js`; expected PASS.
-  - [ ] [T-002-D] Live: install into a scratch project, `agy -p "/cc-lang es"`-style run of a rendered workflow, and Codex listing `cc-spec` among its skills.
+  - [X] [T-002-A] Add deploy tests: workflows only with `antigravity`, skills only with `codex`, host `mine.md` / `mine/` kept, neither folder without a flag.
+  - [X] [T-002-B] Implement in `lib/installer/deploy.mjs` (copy `.agents/workflows` under `antigravity`, `.agents/skills` under `codex`).
+  - [X] [T-002-C] Run `npx vitest run tests/installer/deploy.test.js tests/installer/cli.test.js`; expected PASS.
+  - [X] [T-002-D] Live: install into a scratch project, `agy -p "/cc-lang es"`-style run of a rendered workflow, and Codex listing `cc-spec` among its skills.
   - [ ] [T-002-E] Stage `lib/installer/deploy.mjs`, `tests/installer/deploy.test.js` and the plan; `git commit -m "feat: install the cc-* commands for Antigravity and Codex [FEAT-048]"`
 
 ### Task 3: Docs and PR
