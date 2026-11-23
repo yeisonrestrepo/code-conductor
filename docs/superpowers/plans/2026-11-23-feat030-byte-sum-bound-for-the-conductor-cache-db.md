@@ -353,17 +353,17 @@
 
 ## Test List
 
-- [ ] Unit, AC1 and AC2: `over the budget: the shortest oldest-first non-floor prefix goes…` (ids 1-3 of a 170-byte table under a 100 budget go; without id 3 the sum would be 110).
-- [ ] Unit, AC3: `floor rows alone over the budget…` (the only non-floor row goes, three hashes keep their newest row, the sum stays 150).
-- [ ] Unit, AC4: `a sum exactly at the budget deletes nothing` (the sum query ran once and nothing was deleted).
-- [ ] Unit, AC5: `size is counted in UTF-8 bytes, not characters` (130 bytes / 70 characters; one row goes, ending at 90 bytes).
-- [ ] Unit, AC6: `row count at the precondition threshold…` (no statement mentions `CAST(snap_json AS BLOB)`, 10 rows of 50 bytes untouched) and `one row past the precondition threshold…` (the scan runs, the sum ends at 100).
-- [ ] Unit, AC7: `without byteBound, purgeTable never measures size (the raw_history shape)`, plus the 74 existing tests unmodified (T-208, T-402).
-- [ ] Unit, AC8: `SNAPSHOT_RETENTION pins the snapshots call site…` (`toEqual` against the 256 MiB budget and `PRE_PARSE_MAX_BYTES`); the CLI pair pins that the write really uses those values (threshold between 25 and 26 rows).
-- [ ] Unit and integration (CLI), AC9: `a throw in the byte bound leaves purgeTable…` (throws `boom`, bound 1's DELETE stands) and `CLI: a byte-bound failure at 26 rows exits 0…` (status 0, empty stdout, one `retention purge skipped (snapshots):` line, the inserted row stored).
-- [ ] Integration (CLI), AC10: `importing the module does not run the CLI` (empty stdout and stderr, no `.conductor/`); the 74 existing CLI tests cover running it as a script.
-- [ ] AC11: `npm test` (T-401); no dependency change, `SCHEMA_VERSION` unchanged (T-402).
-- [ ] No E2E/UI test: the change is a CLI-internal bound with no UI.
+- [X] Unit, AC1 and AC2: `over the budget: the shortest oldest-first non-floor prefix goes…` (ids 1-3 of a 170-byte table under a 100 budget go; without id 3 the sum would be 110).
+- [X] Unit, AC3: `floor rows alone over the budget…` (the only non-floor row goes, three hashes keep their newest row, the sum stays 150).
+- [X] Unit, AC4: `a sum exactly at the budget deletes nothing` (the sum query ran once and nothing was deleted).
+- [X] Unit, AC5: `size is counted in UTF-8 bytes, not characters` (130 bytes / 70 characters; one row goes, ending at 90 bytes).
+- [X] Unit, AC6: `row count at the precondition threshold…` (no statement mentions `CAST(snap_json AS BLOB)`, 10 rows of 50 bytes untouched) and `one row past the precondition threshold…` (the scan runs, the sum ends at 100).
+- [X] Unit, AC7: `without byteBound, purgeTable never measures size (the raw_history shape)`, plus the 74 existing tests unmodified (T-208, T-402).
+- [X] Unit, AC8: `SNAPSHOT_RETENTION pins the snapshots call site…` (`toEqual` against the 256 MiB budget and `PRE_PARSE_MAX_BYTES`); the CLI pair pins that the write really uses those values (threshold between 25 and 26 rows).
+- [X] Unit and integration (CLI), AC9: `a throw in the byte bound leaves purgeTable…` (throws `boom`, bound 1's DELETE stands) and `CLI: a byte-bound failure at 26 rows exits 0…` (status 0, empty stdout, one `retention purge skipped (snapshots):` line, the inserted row stored).
+- [X] Integration (CLI), AC10: `importing the module does not run the CLI` (empty stdout and stderr, no `.conductor/`); the 74 existing CLI tests cover running it as a script.
+- [X] AC11: `npm test` (T-401); no dependency change, `SCHEMA_VERSION` unchanged (T-402).
+- [X] No E2E/UI test: the change is a CLI-internal bound with no UI.
 
 ## Commit Order
 
