@@ -131,17 +131,17 @@ Mapping:
 - Modify: `.github/wiki/pages/Getting-Started.md` (flag mention next to `--opencode`)
 - Modify: `AGENT-READABLE BACKLOG.md` (FEAT-048 entry: slice 2 status)
 
-- [>] [T-006] Document both harnesses
+- [X] [T-006] Document both harnesses
   - [X] [T-006-A] Write the README and wiki changes; the Antigravity table lists: no `UserPromptSubmit` context injection, no `cc-*` commands or agents, Guards 5–7 not enforced, needs `node` on `PATH`, unknown tools blocked.
   - [X] [T-006-B] Run `npm test`; expected: full suite PASS (doc-parity tests included).
   - [X] [T-006-C] `git add -u README.md .github/wiki/pages/Getting-Started.md "AGENT-READABLE BACKLOG.md" docs/superpowers/plans/2026-11-23-feat048-codex-antigravity-guards.md`
-  - [ ] [T-006-D] `git commit -m "docs: document the Antigravity and Codex guards [FEAT-048]"`
+  - [X] [T-006-D] `git commit -m "docs: document the Antigravity and Codex guards [FEAT-048]"`
 
 ### Task 7: PR
 
-- [ ] [T-007] Open the PR and report on #97
-  - [ ] [T-007-A] Push the branch; `gh pr create` with `Closes` only if Codex shipped, else `Refs #97`; body has the evidence screenshots and ends with `Code created by Claude Code (Claude Opus 5.5)`.
-  - [ ] [T-007-B] Comment on #97 with the Claude / Codex / agy sample images and the measured contract table.
+- [X] [T-007] Open the PR and report on #97
+  - [X] [T-007-A] Push the branch; `gh pr create` with `Closes` only if Codex shipped, else `Refs #97`; body has the evidence screenshots and ends with `Code created by Claude Code (Claude Opus 5.5)`.
+  - [X] [T-007-B] Comment on #97 with the Claude / Codex / agy sample images and the measured contract table.
 
 ## Test List
 - Unit: adapter mapping and fail-closed cases (Task 1)
