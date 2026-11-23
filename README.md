@@ -431,7 +431,8 @@ The plugin needs `node` on `PATH`. If the guard cannot run, the call is blocked 
 | `run_command` with an argument outside `CommandLine`, `toolSummary`, `WaitMsBeforeAsync`, `BypassSandbox` and `IsDaemon` | Blocked, naming the argument |
 | Any other tool (browser, MCP, subagents, a tool a later agy adds) | Blocked: the guard cannot inspect it |
 | Guard warnings and `UserPromptSubmit` context injection | Not available |
-| `cc-*` commands, band agents, verbosity hooks | Not installed for Antigravity |
+| `cc-*` commands | Installed as workflows in `.agents/workflows/`; run them as `/cc-spec`, `/cc-plan` and so on. They are rendered from the Claude Code commands by `lib/installer/harness-commands.mjs`, so they still name Claude Code tools and the agent uses its closest equivalent |
+| Band agents, verbosity hooks | Not installed for Antigravity |
 
 The adapter needs `node` on `PATH`. If the guard cannot run, crashes or prints something that is not JSON, the call is blocked. Checked live against agy 1.5.15: `cat *.log` was denied by Guard 3, a read under `node_modules/` by Guard 4, and `echo ok` ran.
 
@@ -444,7 +445,8 @@ The adapter needs `node` on `PATH`. If the guard cannot run, crashes or prints s
 | Guard 3 on shell commands | Enforced after hook trust |
 | Guards 1, 2 and 4 | Not reached: Codex has no separate read tool, so reads go through the shell, where Guard 3 applies |
 | Guards 5, 6 and 7, guard warnings, context injection | Not available |
-| `cc-*` commands, band agents, verbosity hooks | Not installed for Codex |
+| `cc-*` commands | Installed as skills in `.agents/skills/cc-*/`; ask Codex to use `cc-spec`, `cc-plan` and so on (Codex has no project-level slash commands). Rendered from the Claude Code commands, as for Antigravity |
+| Band agents, verbosity hooks | Not installed for Codex |
 
 Checked live against Codex CLI 0.171.0: after trust, `cat *.log` was refused with `Command blocked by PreToolUse hook: BASH SCAN BLOCKED`. Editing `.codex/hooks.json` later makes Codex ask for trust again.
 
@@ -592,6 +594,8 @@ code-conductor/
 |   +-- .agents/hooks/conductor-guard.mjs    Antigravity CLI guard adapter, only with --antigravity (FEAT-048)
 |   +-- .agents/hooks.json                   Antigravity hook entry, merged, only with --antigravity
 |   +-- .codex/hooks.json                    Codex hook entry, merged, only with --codex (FEAT-048)
+|   +-- .agents/workflows/cc-*.md            cc-* commands as Antigravity workflows, only with --antigravity
+|   +-- .agents/skills/cc-*/SKILL.md         cc-* commands as Codex skills, only with --codex
 |   +-- .claude/
 |       +-- settings.json          Hooks wiring
 |       +-- review-loop.settings.json  Auto mode exception for the review loop (FEAT-041)

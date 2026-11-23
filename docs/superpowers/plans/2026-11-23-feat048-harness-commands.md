@@ -45,15 +45,15 @@
 
 ### Task 2: Install under the flags
 
-- [ ] [T-002] Copy the rendered folders in `deployProject`
+- [X] [T-002] Copy the rendered folders in `deployProject`
   - [X] [T-002-A] Add deploy tests: workflows only with `antigravity`, skills only with `codex`, host `mine.md` / `mine/` kept, neither folder without a flag.
   - [X] [T-002-B] Implement in `lib/installer/deploy.mjs` (copy `.agents/workflows` under `antigravity`, `.agents/skills` under `codex`).
   - [X] [T-002-C] Run `npx vitest run tests/installer/deploy.test.js tests/installer/cli.test.js`; expected PASS.
   - [X] [T-002-D] Live: install into a scratch project, `agy -p "/cc-lang es"`-style run of a rendered workflow, and Codex listing `cc-spec` among its skills.
-  - [ ] [T-002-E] Stage `lib/installer/deploy.mjs`, `tests/installer/deploy.test.js` and the plan; `git commit -m "feat: install the cc-* commands for Antigravity and Codex [FEAT-048]"`
+  - [X] [T-002-E] Stage `lib/installer/deploy.mjs`, `tests/installer/deploy.test.js` and the plan; `git commit -m "feat: install the cc-* commands for Antigravity and Codex [FEAT-048]"`
 
 ### Task 3: Docs and PR
 
 - [ ] [T-003] Document and open the PR
-  - [ ] [T-003-A] README Antigravity/Codex rows for commands; backlog slice 3 line.
+  - [X] [T-003-A] README Antigravity/Codex rows for commands; backlog slice 3 line.
   - [ ] [T-003-B] `git commit -m "docs: document the cc-* commands on Antigravity and Codex [FEAT-048]"`; push; draft PR based on `feat/feat-048-codex-antigravity-guards`, body ending `Code created by Claude Code (Claude Opus 5.5)`.
