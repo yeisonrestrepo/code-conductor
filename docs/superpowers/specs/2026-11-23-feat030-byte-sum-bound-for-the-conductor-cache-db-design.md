@@ -22,10 +22,7 @@ One hash can therefore hold 30 MiB, and 500 rows can hold about 5 GB. A reposito
 prose often grows its cache file far past anything the cache needs, with no signal: the plan markdown stays
 the authoritative record, so nothing breaks, the disk just fills.
 
-**Pickup condition.** The entry says to pick this up only once a real `.conductor/cache.db` is observed above a
-few hundred MB (28 KB measured 2026-09-22). This spec records no such observation; the item was scheduled, and
-whether that condition still gates it is the owner's call (see Owner questions). The design below is cheap
-enough that it costs nothing measurable on a small cache either way.
+Pickup condition waived by the owner 2026-11-23: the script ships to every installed project, so this repository's cache size does not gate it.
 
 ## Solution
 
@@ -182,7 +179,8 @@ one test pins the values the `snapshots` call site uses. CLI behavior is unchang
 S — one new bound in one helper plus a main guard, with unit tests on a small in-process database; no schema,
 interface or dependency change.
 
-## Owner questions
+## Owner decisions
 
-- The entry gates pickup on observing a cache above a few hundred MB; none is recorded. Proceed anyway (the
-  recommendation: the change is small and inert on a small cache), or park the item until such an observation.
+- Pickup condition (decided 2026-11-23): proceed now. The entry's gate on observing a cache above a few hundred
+  MB is waived: `scripts/conductor-db.mjs` ships to every installed project, and the 28 KB figure measures only
+  this repository's cache. The rest of the spec stands as written.
