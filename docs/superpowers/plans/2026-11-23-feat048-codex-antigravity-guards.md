@@ -86,41 +86,41 @@ Mapping:
 - Consumes: `mergeSettingsFile(templatePath, settingsPath, ['conductor-guard.mjs'])` from `lib/installer/settings-merge.mjs`; the adapter file goes through the same `removePluginSymlink` + `mergeFileInto(..., replaceWithTemplate)` path the OpenCode plugin uses (generalize the two helpers to take the relative path instead of the `OPENCODE_PLUGIN` constant).
 - Produces: `deployProject(assetRoot, cwd, { …, antigravity = false })`; report line `code-conductor: installed the Antigravity guard at .agents/hooks/conductor-guard.mjs`; CLI warning `code-conductor: --antigravity needs --project; no Antigravity files were written`.
 
-- [>] [T-002] Wire `--antigravity` through the installer
+- [X] [T-002] Wire `--antigravity` through the installer
   - [X] [T-002-A] Add deploy tests: no `.agents/` without the option (and full tree identical to a pre-change install); adapter byte-for-byte + hooks.json created with the option; host `.agents/hooks.json` with its own `PreToolUse` entry keeps it and gains ours once; second run reports `unchanged`; malformed host hooks.json is backed up; host `.agents/other.md` untouched; symlinked adapter path replaced, target untouched.
   - [X] [T-002-B] Add CLI tests: `--antigravity` without `--project` warns and writes nothing; usage line lists `--antigravity`.
   - [X] [T-002-C] Run `npx vitest run tests/installer/deploy.test.js tests/installer/cli.test.js`; expected: the new tests FAIL, existing ones PASS.
   - [X] [T-002-D] Create `project-template/.agents/hooks.json`; implement the deploy and CLI changes.
   - [X] [T-002-E] Run `npm test`; expected: full suite PASS (templates/parity tests updated only if they enumerate template files).
   - [X] [T-002-F] `git add project-template/.agents/hooks.json` and `git add -u lib/installer/deploy.mjs bin/code-conductor.mjs tests/installer/deploy.test.js tests/installer/cli.test.js docs/superpowers/plans/2026-11-23-feat048-codex-antigravity-guards.md`
-  - [ ] [T-002-G] `git commit -m "feat: install the Antigravity guard with --antigravity [FEAT-048]"`
+  - [X] [T-002-G] `git commit -m "feat: install the Antigravity guard with --antigravity [FEAT-048]"`
 
 ### Task 3: live Antigravity evidence
 
 **Files:** none in the repo; transcripts in the scratchpad, attached to the PR.
 
-- [ ] [T-003] Prove the install on agy 1.5.15
-  - [ ] [T-003-A] In a fresh scratch git project run `node <repo>/bin/code-conductor.mjs --project --antigravity`.
-  - [ ] [T-003-B] `agy -p` asking it to run `cat big.log` (Guard 3) → transcript shows `tool call denied by pre-tool hook: … Guard 3`.
-  - [ ] [T-003-C] `agy -p` asking it to read `node_modules/x/index.js` → Guard 4 denial; `echo ok` → runs.
-  - [ ] [T-003-D] Save the three transcripts and a screenshot under the scratchpad `evidence/` folder.
+- [X] [T-003] Prove the install on agy 1.5.15
+  - [X] [T-003-A] In a fresh scratch git project run `node <repo>/bin/code-conductor.mjs --project --antigravity`.
+  - [X] [T-003-B] `agy -p` asking it to run `cat *.log` (Guard 3 blocks glob dumps; a single-file `cat` is allowed by design) → transcript shows `tool call denied by pre-tool hook: … Guard 3`.
+  - [X] [T-003-C] `agy -p` asking it to read `node_modules/x/index.js` → Guard 4 denial; `echo ok` → runs.
+  - [X] [T-003-D] Save the three transcripts and a screenshot under the scratchpad `evidence/` folder.
 
 ### Task 4: Codex live check (gate)
 
 **Files:** none in the repo.
 
-- [ ] [T-004] Measure Codex 0.171 hooks live
-  - [ ] [T-004-A] Ask the user to open `codex` in scratchpad `probe/proj`, trust the hooks in `/hooks`, and ask Codex to run `echo hi`.
-  - [ ] [T-004-B] Read `probe/codex.log`: record the payload shape, the hook command cwd, and the tool name for shell calls.
-  - [ ] [T-004-C] Swap the probe hook for one printing Claude's `hookSpecificOutput.permissionDecision: deny` and confirm Codex blocks the call. If the Windows sandbox blocks every shell call before the hook, or no deny is observed, Task 5 takes its "workflow only" branch.
+- [X] [T-004] Measure Codex 0.171 hooks live
+  - [X] [T-004-A] Ask the user to open `codex` in scratchpad `probe/proj`, trust the hooks in `/hooks`, and ask Codex to run `echo hi`.
+  - [X] [T-004-B] Read `probe/codex.log`: record the payload shape, the hook command cwd, and the tool name for shell calls.
+  - [X] [T-004-C] Swap the probe hook for one printing Claude's `hookSpecificOutput.permissionDecision: deny` and confirm Codex blocks the call. If the Windows sandbox blocks every shell call before the hook, or no deny is observed, Task 5 takes its "workflow only" branch.
 
 ### Task 5: Codex install or documented gap
 
 **Files (deny proven):** Create `project-template/.codex/hooks.json` pointing `PreToolUse` at `node <path-to>/.claude/hooks/pre-tool-use.mjs` relative to the cwd measured in T-004-B (or a Codex adapter beside it if the payload differs from Claude's); modify `lib/installer/deploy.mjs`, `bin/code-conductor.mjs`, tests as in Task 2 with fingerprint `pre-tool-use.mjs`, flag `--codex`.
 **Files (no deny):** none; README states Codex is workflow only.
 
-- [ ] [T-005] Ship `--codex` or record the gap
-  - [ ] [T-005-A] If T-004-C proved a deny: repeat T-002-A..E for `--codex` (deploy/CLI tests first, red, then implementation, then `npm test` PASS), plus one live Codex transcript showing a Guard 3 block.
+- [>] [T-005] Ship `--codex` or record the gap
+  - [X] [T-005-A] If T-004-C proved a deny: repeat T-002-A..E for `--codex` (deploy/CLI tests first, red, then implementation, then `npm test` PASS), plus one live Codex transcript showing a Guard 3 block.
   - [ ] [T-005-B] If not: no code; carry the measured reason into Task 6.
   - [ ] [T-005-C] Stage the touched files with explicit paths (`git add` new, `git add -u` tracked, including the plan file) and `git commit -m "feat: install the Codex CLI guard with --codex [FEAT-048]"` (skip when T-005-B applies).
 

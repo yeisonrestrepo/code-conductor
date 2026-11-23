@@ -881,3 +881,41 @@ describe('deployProject: Antigravity guard (FEAT-048)', () => {
     expect(existsSync(join(ROOT, 'project-template', HOOKS_REL))).toBe(true);
   });
 });
+
+// FEAT-048 slice 2 (#97): Codex sends Claude's own payload and honours its deny (measured
+// live on 0.171), so --codex only merges .codex/hooks.json pointing at the unchanged guard.
+describe('deployProject: Codex hook (FEAT-048)', () => {
+  const HOOKS_REL = join('.codex', 'hooks.json');
+  const OURS = { matcher: '.*', hooks: [{ type: 'command', command: 'node .claude/hooks/pre-tool-use.mjs' }] };
+  const SHIPPED_HOOKS = `${JSON.stringify({ hooks: { PreToolUse: [OURS] } }, null, 2)}\n`;
+  const INSTALLED = 'code-conductor: installed the Codex guard hook in .codex/hooks.json; trust it once in Codex with /hooks';
+  beforeEach(() => {
+    mkdirSync(join(asset, 'project-template', '.codex'), { recursive: true });
+    writeFileSync(join(asset, 'project-template', HOOKS_REL), SHIPPED_HOOKS);
+  });
+  it('writes no .codex/ without the codex option', () => {
+    const out = capture();
+    deployProject(asset, home, out.opts);
+    expect(existsSync(join(home, '.codex'))).toBe(false);
+    expect(out.said.some((m) => /Codex/.test(m))).toBe(false);
+  });
+  it('creates hooks.json and tells the user to trust it with the codex option', () => {
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, codex: true });
+    expect(readFileSync(join(home, HOOKS_REL), 'utf8')).toBe(SHIPPED_HOOKS);
+    expect(out.said).toContain(INSTALLED);
+  });
+  it('keeps host hooks, adds ours once and leaves a re-run unchanged', () => {
+    const host = { matcher: 'Bash', hooks: [{ type: 'command', command: 'node mine.mjs' }] };
+    mkdirSync(join(home, '.codex'), { recursive: true });
+    writeFileSync(join(home, HOOKS_REL), JSON.stringify({ hooks: { PreToolUse: [host] } }));
+    deployProject(asset, home, { ...capture().opts, codex: true });
+    const first = readFileSync(join(home, HOOKS_REL), 'utf8');
+    expect(JSON.parse(first).hooks.PreToolUse).toEqual([host, OURS]);
+    deployProject(asset, home, { ...capture().opts, codex: true });
+    expect(readFileSync(join(home, HOOKS_REL), 'utf8')).toBe(first);
+  });
+  it('ships the real hooks.json in the template, pointing at the guard', () => {
+    expect(readFileSync(join(ROOT, 'project-template', HOOKS_REL), 'utf8')).toContain('node .claude/hooks/pre-tool-use.mjs');
+  });
+});
