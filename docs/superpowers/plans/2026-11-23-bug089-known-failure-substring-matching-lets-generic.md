@@ -288,17 +288,17 @@ Everything else stands as first proposed, including `changeList`, `changeNote`, 
 
 ## Test List
 
-- [ ] Integration, AC1: the eight N1 refusals (`a`, `FAIL`, 11 code points, padded with spaces, `AssertionError`, a long single word, `autenticación`, `autenticación_de_usuarios`).
-- [ ] Integration, AC2: the four N2 acceptances (exactly 12, a test path, `suite > title`, exactly 200 with a space) and the BUG-074 rows with their new values (plan decision 6).
-- [ ] Parity, AC3: the new `commands-parity` row and the existing byte-identical mirror row.
-- [ ] Integration, AC4: N3 (created, modified, renamed, untracked, a path with a space; deleted and ignored left out; sorted), N4 (`--check` writes nothing), N5 (overwrite), N6 (removal when unavailable).
-- [ ] Integration, AC5: N7 (no known failures, output unchanged), the three N8 rows (null base, no security record, git failing), N9 (`end`), N10 (`start` over a previous run).
-- [ ] Unit, AC6: the four `[AC6]` rule rows and the qa and code rows of the new role-profiles block.
-- [ ] Unit, AC7: the BUG-074 `GREEN` and `KNOWN_MATCH` pins pass unchanged; the `[AC7]` plan row; the `plan` sha row unchanged.
-- [ ] AC8: N12a, N12b and the unchanged BUG-074 `isValidRun` rows.
-- [ ] AC9: N11; the existing hand-back, router and SNAP suites pass unchanged in T-501.
-- [ ] AC10: the token-cap, mirror and sha rows of `role-profiles.test.js`; `npm test` (T-501).
-- [ ] No E2E/UI test: there is no UI. CI legs: no new test is conditionally skipped, so no leg's skipped set in `tools/skip-baseline.json` changes.
+- [X] Integration, AC1: the eight N1 refusals (`a`, `FAIL`, 11 code points, padded with spaces, `AssertionError`, a long single word, `autenticación`, `autenticación_de_usuarios`).
+- [X] Integration, AC2: the four N2 acceptances (exactly 12, a test path, `suite > title`, exactly 200 with a space) and the BUG-074 rows with their new values (plan decision 6).
+- [X] Parity, AC3: the new `commands-parity` row and the existing byte-identical mirror row.
+- [X] Integration, AC4: N3 (created, modified, renamed, untracked, a path with a space; deleted and ignored left out; sorted), N4 (`--check` writes nothing), N5 (overwrite), N6 (removal when unavailable).
+- [X] Integration, AC5: N7 (no known failures, output unchanged), the three N8 rows (null base, no security record, git failing), N9 (`end`), N10 (`start` over a previous run).
+- [X] Unit, AC6: the four `[AC6]` rule rows and the qa and code rows of the new role-profiles block.
+- [X] Unit, AC7: the BUG-074 `GREEN` and `KNOWN_MATCH` pins pass unchanged; the `[AC7]` plan row; the `plan` sha row unchanged.
+- [X] AC8: N12a, N12b and the unchanged BUG-074 `isValidRun` rows.
+- [X] AC9: N11; the existing hand-back, router and SNAP suites pass unchanged in T-501.
+- [X] AC10: the token-cap, mirror and sha rows of `role-profiles.test.js`; `npm test` (T-501).
+- [X] No E2E/UI test: there is no UI. CI legs: no new test is conditionally skipped, so no leg's skipped set in `tools/skip-baseline.json` changes.
 
 ## Commit Order
 
