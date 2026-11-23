@@ -14,7 +14,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, existsSync, renameSync, unlinkSync, statSync, readSync, realpathSync } from 'node:fs';
 import { dirname, basename, join, resolve, relative, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { PRE_PARSE_MAX_BYTES as MAX_SNAP_BYTES } from './snap-contract.mjs';
 
 const PREFIX = 'CONDUCTOR_DB:';
@@ -33,6 +33,8 @@ const STDIN_CHUNK = 65536;
 const SNAPSHOT_KEEP_PER_HASH = 3;
 const SNAPSHOT_SOFT_CAP = 200;
 const SNAPSHOT_HARD_MAX = 500;
+// FEAT-030: the row bounds never look at size, and 500 rows of up to 10 MiB each reach ~5 GB.
+const SNAPSHOT_BYTE_BUDGET = 256 * 1024 * 1024;
 const HISTORY_KEEP_PER_SESSION = null;   // an ordered log is truncated, never thinned
 const HISTORY_SOFT_CAP = 1000;
 const HISTORY_HARD_MAX = 2000;
@@ -41,6 +43,16 @@ const U_GET_SESSION = 'usage: conductor-db.mjs get-session <session_id>';
 const U_SNAPSHOT = 'usage: conductor-db.mjs snapshot <git_commit_hash>';
 const U_GET_SNAPSHOT = 'usage: conductor-db.mjs get-snapshot <git_commit_hash>';
 const U_HISTORY = 'usage: conductor-db.mjs history <session_id> <kind>';
+
+// What the snapshots write passes to purgeTable. `maxRowBytes` is the intake cap the byte
+// bound's precondition relies on, so the two are named together here.
+export const SNAPSHOT_RETENTION = Object.freeze({
+  table: 'snapshots', key: 'git_commit_hash',
+  keepPerKey: SNAPSHOT_KEEP_PER_HASH,
+  softCap: SNAPSHOT_SOFT_CAP,
+  hardMax: SNAPSHOT_HARD_MAX,
+  byteBound: Object.freeze({ column: 'snap_json', budget: SNAPSHOT_BYTE_BUDGET, maxRowBytes: MAX_SNAP_BYTES }),
+});
 
 function validateKey(name, value, usage = USAGE) {
   const v = String(value ?? '').trim();       // 1. trim FIRST (whitespace never counts)
@@ -305,7 +317,7 @@ function upsertSession(db, sessionId, phase, spec, gitHash) {
 // deleting the highest row would let the next insert reuse its id and silently
 // break `ORDER BY id DESC LIMIT 1` as a recency ordering. Every bound deletes
 // oldest-first only, which is what keeps that ordering true.
-function purgeTable(db, { table, key, keepPerKey, softCap, hardMax }) {
+export function purgeTable(db, { table, key, keepPerKey, softCap, hardMax, byteBound }) {
   const count = () => db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n;
   let n = count();
 
@@ -348,7 +360,27 @@ function purgeTable(db, { table, key, keepPerKey, softCap, hardMax }) {
     db.prepare(
       `DELETE FROM ${table} WHERE id IN (SELECT id FROM ${table} ORDER BY id ASC LIMIT $excess)`
     ).run({ $excess: excess });
+    n = count();
   }
+
+  if (byteBound) purgeBytes(db, { table, key, ...byteBound }, n);
+}
+
+// Bound 4 (FEAT-030) — byte budget with bound 2's newest-per-key floor. Every row
+// the CLI writes is at most `maxRowBytes`, so while `n * maxRowBytes` is within the
+// budget the sum cannot be over it and is never scanned. Over it, one DELETE takes
+// the shortest oldest-first run of non-floor rows whose sizes cover the excess.
+function purgeBytes(db, { table, key, column, budget, maxRowBytes }, n) {
+  if (n * maxRowBytes <= budget) return;
+  const size = `LENGTH(CAST(${column} AS BLOB))`;   // bytes; LENGTH on TEXT counts characters
+  const sum = db.prepare(`SELECT SUM(${size}) AS s FROM ${table}`).get().s ?? 0;
+  if (sum <= budget) return;
+  db.prepare(
+    `DELETE FROM ${table} WHERE id IN (SELECT id FROM (` +
+    `SELECT id, SUM(${size}) OVER (ORDER BY id ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS before ` +
+    `FROM ${table} WHERE id NOT IN (SELECT MAX(id) FROM ${table} GROUP BY ${key})` +
+    `) WHERE COALESCE(before, 0) < $excess)`
+  ).run({ $excess: sum - budget });
 }
 
 async function withDb(root, fn) {
@@ -468,12 +500,7 @@ async function cmdSnapshot(args) {
     // The catch wraps the purge ALONE: a throw reaching withDb's catch would
     // misreport this committed write as "skipping cache write".
     try {
-      purgeTable(db, {
-        table: 'snapshots', key: 'git_commit_hash',
-        keepPerKey: SNAPSHOT_KEEP_PER_HASH,
-        softCap: SNAPSHOT_SOFT_CAP,
-        hardMax: SNAPSHOT_HARD_MAX,
-      });
+      purgeTable(db, SNAPSHOT_RETENTION);
     } catch (e) {
       warn(`retention purge skipped (snapshots): ${(e && e.code) || (e && e.message)}`);
     }
@@ -543,7 +570,13 @@ async function main() {
 // process.exit would truncate the unflushed tail. The db is already closed in
 // withDb's finally and no timers/handles linger, so the event loop drains
 // stdout and exits 0 on its own.
-main().then(() => { process.exitCode = 0; }).catch((e) => {
-  warn(`unexpected: ${e && e.message}`);
-  process.exitCode = 0;
-});
+// FEAT-030: the tests import purgeTable, so the CLI runs only when this file is the invoked script.
+function invokedDirectly() {
+  try { return Boolean(process.argv[1]) && pathToFileURL(realpathSync(process.argv[1])).href === import.meta.url; } catch { return false; }
+}
+if (invokedDirectly()) {
+  main().then(() => { process.exitCode = 0; }).catch((e) => {
+    warn(`unexpected: ${e && e.message}`);
+    process.exitCode = 0;
+  });
+}

@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { cleanGitEnv } from '../helpers/git-env.js';
 
 const SCRIPT = fileURLToPath(new URL('../../scripts/conductor-db.mjs', import.meta.url));
@@ -936,5 +936,171 @@ describe.skipIf(!HAS_SQLITE)('conductor-db retention purge', () => {
     expect(await countOf('snapshots')).toBe(2);
     expect(await countOf('sessions')).toBe(1);
     expect(await countOf('task_state')).toBe(1);
+  });
+});
+
+// FEAT-030: purgeTable is driven in-process, because an end-to-end test of the real
+// 256 MiB budget would have to write over 256 MiB. Small budgets exercise the same SQL.
+const SCRIPT_URL = pathToFileURL(SCRIPT).href;
+const SNAPSHOTS_DDL = 'CREATE TABLE snapshots (id INTEGER PRIMARY KEY, git_commit_hash TEXT NOT NULL, created_at TEXT NOT NULL, snap_json TEXT NOT NULL);';
+
+describe('conductor-db module surface [FEAT-030]', () => {
+  it('SNAPSHOT_RETENTION pins the snapshots call site: a 256 MiB budget over PRE_PARSE_MAX_BYTES rows', async () => {
+    const { SNAPSHOT_RETENTION } = await import(SCRIPT_URL);
+    const { PRE_PARSE_MAX_BYTES } = await import(pathToFileURL(CONTRACT).href);
+    expect(SNAPSHOT_RETENTION).toEqual({
+      table: 'snapshots', key: 'git_commit_hash', keepPerKey: 3, softCap: 200, hardMax: 500,
+      byteBound: { column: 'snap_json', budget: 256 * 1024 * 1024, maxRowBytes: PRE_PARSE_MAX_BYTES },
+    });
+  });
+
+  it('importing the module does not run the CLI', () => {
+    const r = spawnSync(process.execPath, [...FLAG, '--input-type=module', '-e', `await import(${JSON.stringify(SCRIPT_URL)});`], {
+      cwd: repo, encoding: 'utf8', env: CLEAN_ENV,
+    });
+    expect(r.status).toBe(0);
+    expect(r.stderr).toBe('');   // an unguarded main() would warn `unknown subcommand ""`
+    expect(r.stdout).toBe('');
+    expect(existsSync(join(repo, '.conductor'))).toBe(false);
+  });
+});
+
+describe.skipIf(!HAS_SQLITE)('conductor-db byte budget [FEAT-030]', () => {
+  let db, purgeTable, seen;
+  beforeEach(async () => {
+    ({ purgeTable } = await import(SCRIPT_URL));
+    const { DatabaseSync } = await import('node:sqlite');
+    db = new DatabaseSync(':memory:');
+    db.exec(SNAPSHOTS_DDL);
+    seen = [];
+  });
+  afterEach(() => { db.close(); });
+
+  // Rows are [hash, snap_json] in insertion (id) order.
+  const seed = (rows) => {
+    const st = db.prepare("INSERT INTO snapshots (git_commit_hash, created_at, snap_json) VALUES (?, 'c', ?)");
+    for (const [h, j] of rows) st.run(h, j);
+  };
+  // Records every statement purgeTable prepares; `failOn` makes the matching one throw.
+  const spy = (failOn) => ({
+    prepare(sql) {
+      seen.push(sql);
+      if (failOn && sql.includes(failOn)) throw new Error('boom');
+      return db.prepare(sql);
+    },
+  });
+  const opts = (budget, maxRowBytes, rowBounds = {}) => ({
+    table: 'snapshots', key: 'git_commit_hash', keepPerKey: null, softCap: 1000, hardMax: 1000,
+    ...rowBounds, byteBound: { column: 'snap_json', budget, maxRowBytes },
+  });
+  const ids = () => db.prepare('SELECT id FROM snapshots ORDER BY id').all().map((r) => r.id);
+  const byteSum = () => db.prepare('SELECT SUM(LENGTH(CAST(snap_json AS BLOB))) AS s FROM snapshots').get().s;
+  const charSum = () => db.prepare('SELECT SUM(LENGTH(snap_json)) AS s FROM snapshots').get().s;
+  const sizeQueries = () => seen.filter((sql) => sql.includes('CAST(snap_json AS BLOB)'));
+  const x = (n) => 'x'.repeat(n);
+
+  it('over the budget: the shortest oldest-first non-floor prefix goes and the sum ends at or under it', () => {
+    seed([['a', x(30)], ['a', x(30)], ['a', x(30)], ['a', x(30)], ['a', x(30)], ['b', x(20)]]);   // 170 bytes; floors are ids 5 and 6
+    purgeTable(db, opts(100, 40));
+    expect(ids()).toEqual([4, 5, 6]);   // ids 1-3 cover the 70-byte excess; without id 3 the sum would be 110
+    expect(byteSum()).toBe(80);
+  });
+
+  it('floor rows alone over the budget: every non-floor row goes, every hash keeps its newest row', () => {
+    seed([['a', x(50)], ['a', x(50)], ['b', x(50)], ['c', x(50)]]);
+    purgeTable(db, opts(100, 50));
+    expect(ids()).toEqual([2, 3, 4]);
+    expect(byteSum()).toBe(150);   // still over: the floor is never byte-bounded
+  });
+
+  it('a sum exactly at the budget deletes nothing', () => {
+    seed([['a', x(25)], ['a', x(25)], ['a', x(25)], ['a', x(25)]]);
+    purgeTable(spy(), opts(100, 50));
+    expect(sizeQueries()).toHaveLength(1);   // the sum was measured, then left alone
+    expect(ids()).toEqual([1, 2, 3, 4]);
+  });
+
+  it('size is counted in UTF-8 bytes, not characters', () => {
+    const e = 'é'.repeat(20);   // 20 characters, 40 bytes
+    seed([['a', e], ['a', e], ['a', e], ['b', x(10)]]);   // 130 bytes, 70 characters
+    purgeTable(db, opts(100, 40));
+    expect(ids()).toEqual([2, 3, 4]);
+    expect(byteSum()).toBe(90);
+    expect(charSum()).toBeLessThanOrEqual(100);
+  });
+
+  it('row count at the precondition threshold: no size query runs and an over-budget table is untouched', () => {
+    seed(Array.from({ length: 10 }, (_, i) => [`h${i}`, x(50)]));   // 500 bytes, but 10 rows x 10 = 100
+    purgeTable(spy(), opts(100, 10));
+    expect(sizeQueries()).toEqual([]);
+    expect(ids()).toHaveLength(10);
+  });
+
+  it('one row past the precondition threshold: the size query runs and the bound applies', () => {
+    seed([...Array.from({ length: 10 }, () => ['a', x(50)]), ['b', x(50)]]);   // 11 rows x 10 = 110
+    purgeTable(spy(), opts(100, 10));
+    expect(sizeQueries().length).toBeGreaterThan(0);
+    expect(byteSum()).toBe(100);   // ids 1-9 go, the floors of a and b stay
+  });
+
+  it('without byteBound, purgeTable never measures size (the raw_history shape)', () => {
+    seed(Array.from({ length: 30 }, (_, i) => [`h${i}`, x(1000)]));
+    const { byteBound, ...rowOnly } = opts(1, 1);
+    purgeTable(spy(), rowOnly);
+    expect(byteBound).toBeDefined();
+    expect(sizeQueries()).toEqual([]);
+    expect(ids()).toHaveLength(30);
+  });
+
+  it("a throw in the byte bound leaves purgeTable and keeps the row bounds' deletions", () => {
+    seed([['a', x(10)], ['a', x(10)], ['a', x(10)], ['a', x(10)], ['a', x(10)]]);
+    expect(() => purgeTable(spy('CAST('), opts(1, 10, { keepPerKey: 3 }))).toThrow('boom');
+    expect(ids()).toEqual([3, 4, 5]);   // bound 1 ran and its DELETE stands
+  });
+});
+
+describe.skipIf(!HAS_SQLITE)('conductor-db byte budget through the CLI [FEAT-030]', () => {
+  const dbPath = () => join(repo, '.conductor', 'cache.db');
+  async function withRunnerDb(fn) {
+    const { DatabaseSync } = await import('node:sqlite');
+    const db = new DatabaseSync(dbPath());
+    try { return fn(db); } finally { db.close(); }
+  }
+  // The real budget cannot be reached cheaply, so `snapshots` becomes a view whose
+  // `snap_json` is json() of a non-JSON value: only the byte bound reads that column,
+  // so only the byte bound throws ("malformed JSON"). Rows live in `snap_store`.
+  const seedThrowingView = (count) => withRunnerDb((db) => {
+    db.exec(
+      'ALTER TABLE snapshots RENAME TO snap_store;' +
+      'CREATE VIEW snapshots AS SELECT id, git_commit_hash, created_at, json(snap_json) AS snap_json FROM snap_store;' +
+      'CREATE TRIGGER snap_ins INSTEAD OF INSERT ON snapshots BEGIN ' +
+      'INSERT INTO snap_store (git_commit_hash, created_at, snap_json) VALUES (NEW.git_commit_hash, NEW.created_at, NEW.snap_json); END;' +
+      'CREATE TRIGGER snap_del INSTEAD OF DELETE ON snapshots BEGIN DELETE FROM snap_store WHERE id = OLD.id; END;'
+    );
+    const st = db.prepare("INSERT INTO snap_store (git_commit_hash, created_at, snap_json) VALUES (?, 'c', 'not json')");
+    for (let i = 0; i < count; i++) st.run(`v${i}`);
+  });
+  const stored = () => withRunnerDb((db) => db.prepare('SELECT git_commit_hash, snap_json FROM snap_store ORDER BY id').all());
+  const purgeWarns = (stderr) => stderr.split('\n').filter((l) => l.includes('retention purge skipped (snapshots):'));
+
+  beforeEach(() => { runDb(['init'], { cwd: repo }); });
+
+  it('CLI: 25 rows after the write stay under the threshold, so no size query and no warning', async () => {
+    await seedThrowingView(24);
+    const w = runDb(['snapshot', 'last'], { cwd: repo, input: 'survivor' });
+    expect(w.status).toBe(0);
+    expect(purgeWarns(w.stderr)).toEqual([]);   // 25 x 10 MiB is under 256 MiB
+    expect(await stored()).toHaveLength(25);
+  });
+
+  it('CLI: a byte-bound failure at 26 rows exits 0, keeps the inserted row, and warns exactly once', async () => {
+    await seedThrowingView(25);
+    const w = runDb(['snapshot', 'last'], { cwd: repo, input: 'survivor' });
+    expect(w.status).toBe(0);
+    expect(w.stdout).toBe('');
+    expect(purgeWarns(w.stderr)).toHaveLength(1);   // 26 x 10 MiB is over 256 MiB
+    const rows = await stored();
+    expect(rows).toHaveLength(26);
+    expect(rows.at(-1)).toEqual({ git_commit_hash: 'last', snap_json: 'survivor' });
   });
 });
