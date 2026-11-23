@@ -1,6 +1,6 @@
 # BUG-089 — Known-failure substring matching lets generic entries or newly added failing tests pass a red suite
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-23 by the owner
 
 **Item:** `[BUG-089]` (intake of issue #284, follow-up of `[BUG-074]`). Pillar 5: infrastructure, ecosystem and quality
 assurance.
