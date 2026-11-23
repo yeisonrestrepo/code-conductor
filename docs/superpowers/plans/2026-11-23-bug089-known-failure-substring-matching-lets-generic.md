@@ -26,6 +26,17 @@
 - `tests/installer/commands-parity.test.js`: `ORCH_MIRRORS` (`:197`), the byte-identical row, and the BUG-074 row (`:342-368`) whose phrases all survive the edits below; `describe('cc-orchestrate mirrors [FEAT-011 AC10]')` closes at `:369`.
 - `.claude/commands/cc-orchestrate.md` (mirror byte-identical): the `--known-failure` bullet of the Start step (`:63`), the Verify step (`:90`) with its BUG-074 sentence ``When the run file's `known_failures` is non-empty, take from `.conductor/handback/qa.txt` …``.
 
+## Owner decisions (plan review)
+
+The owner reviewed the first version of this plan and asked for these changes, which the plan below already carries:
+
+1. **Test count.** N1-N12 as first written were 24 tests, not 25. N12 is split into two tests: N12a `'[AC8] a run file holding a short entry still validates'` (`isValidRun` only, green today) and N12b `'[AC8] such a run installs qa with the list'` (red today). That makes 25 tests, so the Task 1 prediction of **18 failed | 7 passed** and the full-file count of **1207** hold as written (plan decisions 7 and 11).
+2. **Wording.** In `FILE_RULE` and `PATH_MATCH`, "is red" becomes "is never known"; in `QA_NAMED`, "but is red because" becomes "but is not known because" (plan decision 4). The `[AC6]` qa test title in plan decision 5 follows the same wording.
+3. **Position suffix.** `FILE_RULE` also says that a `:line` or `:line:column` suffix after the printed path is not part of the path (plan decision 4).
+4. **Hashes.** The bytes, tokens and sha256 of decision 4's table are re-measured after these edits. The pins that quote the sentences follow: plan decision 5 takes its five constants and both `PROFILE_SHA256_1_37_0` rows from decision 4 as amended. Plan decision 10 quotes only command and README text, none of which these edits change, so its expected strings stay as written.
+
+Everything else stands as first proposed, including `changeList`, `changeNote`, the `change files:` line placed before `model:`, and the single build commit.
+
 ## Plan decisions
 
 1. **The `start` rule (AC1, AC2).** Above `KNOWN_FAILURE_MAX` (`scripts/orchestrate.mjs:1492`), after the BUG-074 comment lines:
@@ -84,10 +95,10 @@
 
 4. **The profile text (AC6, AC7, AC10).** Five sentences, word for word (`\` is one backslash in the Markdown; in a JS single-quoted string it is written `\\`):
 
-   - `FILE_RULE` (both): ``Take a failing test's file only from the runner's output, the path printed on its line or on the file header above it, never from a search with Read, Grep or Glob; a failing test whose file the output does not print is red.``
-   - `PATH_MATCH` (both): ``Two paths match when, after every `\` is turned into `/`, they are equal or one ends with `/` followed by the other; a failing test whose file this rule cannot settle is red.``
+   - `FILE_RULE` (both): ``Take a failing test's file only from the runner's output, the path printed on its line or on the file header above it, never from a search with Read, Grep or Glob; a `:line` or `:line:column` suffix after the printed path is not part of the path, and a failing test whose file the output does not print is never known.``
+   - `PATH_MATCH` (both): ``Two paths match when, after every `\` is turned into `/`, they are equal or one ends with `/` followed by the other; a failing test whose file this rule cannot settle is never known.``
    - `QA_LIST` (qa): ``A failing test whose file matches a path `.conductor/handback/qa-change.txt` lists (`A <path>` created, `M <path>` modified by the change) is never known, even when its line contains a declared entry; if that file is absent or unreadable, no failing test is known.``
-   - `QA_NAMED` (qa): ``Also name each failing test that matched a declared entry but is red because that list names its file.``
+   - `QA_NAMED` (qa): ``Also name each failing test that matched a declared entry but is not known because that list names its file.``
    - `CODE_LIST` (code): ``A failing test whose file matches a file you created or edited in this task is never known, even when its line contains a declared entry.``
 
    Each profile gets exactly one replacement on its Success-condition line (line 21); nothing else changes, and `KNOWN_MATCH` and `GREEN` stay byte-identical (AC7):
@@ -95,18 +106,18 @@
    - **`qa.md`:** `<KNOWN_MATCH> Report its exact exit status and summary line and, when the exit status is non-zero, each failing test with the entry it matched.` → `<KNOWN_MATCH> <QA_LIST> <FILE_RULE> <PATH_MATCH> Report its exact exit status and summary line and, when the exit status is non-zero, each failing test with the entry it matched. <QA_NAMED>`
    - **`code.md`:** `<KNOWN_MATCH> When the exit status is non-zero,` → `<KNOWN_MATCH> <CODE_LIST> <FILE_RULE> <PATH_MATCH> When the exit status is non-zero,`
 
-   **Measured on this branch** (HEAD `ed81cfd`) by applying exactly these replacements to copies in tmp:
+   **Measured on this branch** (HEAD `6c3e2c3`; both profiles are unchanged since `ed81cfd`) by applying exactly these replacements, with the sentences as amended by the owner decisions below, to copies in tmp:
 
    | Profile | Bytes before → after | Tokens (`ceil(bytes / 4)`) | New sha256 |
    |---|---|---|---|
-   | `code.md` | 2751 → 3288 | 822 | `0352ff8abfc0c18603011e0f4f8ecf345a48764f7a8f645dc012b19e027aadf5` |
-   | `qa.md` | 2588 → 3355 | 839 | `a5f100b55d8f75f3b973e2b35357ab9a0b418f3e1d3ac7237b8b3483a91a9709` |
+   | `code.md` | 2751 → 3391 | 848 | `497513adb7e3c6c6458b808b49114018b6724c735f0e82db3435306fb2815253` |
+   | `qa.md` | 2588 → 3464 | 866 | `1bcbbaf0d42e5abd8c3b22ae0729118e8d948b3f07127bad1e5c990fca595af0` |
 
    Both stay under 999 tokens (AC10). Neither new sentence names a gate, so the `[AC5]` rows stay green; every `D5` phrase and the BUG-074 pins survive. A hash that differs after the edit means the edit differs from this decision: fix the edit, not the pin.
 
 5. **`tests/unit/role-profiles.test.js` (AC6, AC7, AC10).** After `KNOWN_MATCH` (`:124`), the comment `// BUG-089: a failing test in a file the change touched is never known, and its file comes only from the runner's output.` and the five constants of decision 4. A new `describe('known failures in changed files [BUG-089]', …)` after the BUG-074 block (`:226`), 7 tests:
    - `it.each([TEMPLATE, MIRROR].flatMap((dir) => ['code', 'qa'].map((role) => [`${dir}/${role}.md`])))('[AC6] %s takes a failing test\'s file only from the runner output and matches paths by one rule', …)`: `read(rel)` contains `FILE_RULE` and `PATH_MATCH`. 4 rows.
-   - `'[AC6] qa never knows a failing test in a file qa-change.txt lists, knows none without it, and names each one made red'`: `profile('qa')` contains `QA_LIST` and `QA_NAMED`.
+   - `'[AC6] qa never knows a failing test in a file qa-change.txt lists, knows none without it, and names each one it does not know'`: `profile('qa')` contains `QA_LIST` and `QA_NAMED`.
    - `'[AC6] code never knows a failing test in a file it created or edited in its task'`: `profile('code')` contains `CODE_LIST`.
    - `'[AC7] plan carries neither rule'`: `profile('plan')` contains neither `FILE_RULE` nor `PATH_MATCH`.
    - `PROFILE_SHA256_1_37_0`: the `code` row takes decision 4's hash under a new comment line after the BUG-074 one, `// BUG-089 changed code on purpose: a failing test in a file code created or edited is never known, and its file comes only from the runner's output.`; the `qa` row likewise, `// BUG-089 changed qa on purpose: a failing test in a file qa-change.txt lists is never known, and its file comes only from the runner's output.` Every other row is unchanged (AC10).
@@ -145,7 +156,8 @@
    - **N9** `'[AC5] end --abandon removes the list with the hand-back folder'`: `driveTo('qa', QA_RUN)`; `install qa`; the list exists; `orch(['end', '--abandon'])` status 0; the list does not exist.
    - **N10** `'[AC5] start over a previous run removes the list'`: `driveTo('qa', QA_RUN)`; `install qa`; the list exists; `orch(['start', 'FEAT-011'], { sid: 'sess-2' })` status 0; the list does not exist.
    - **N11** `'[AC9] the qa envelope is the one install printed, with no change list in it'`: `driveTo('qa', QA_RUN)`; `r = orch(['install', 'qa'])`; `r.out.startsWith(envelopeText().trim())` is true and `envelopeText()` does not contain `'qa-change'`.
-   - **N12** `'[AC8] a run file holding a short entry from before BUG-089 still validates and installs qa with the list'`: `isValidRun({ ...RUN_OK, known_failures: ['a'] })` is true; `driveTo('qa', QA_RUN)`; `runFileText(JSON.stringify({ ...runFile(), known_failures: ['a'] }))`; `install qa` status 0, last line `'change files: 1 created, 0 modified (.conductor/handback/qa-change.txt)'`; `listText()` is `SPEC_ONLY`.
+   - **N12a** `'[AC8] a run file holding a short entry still validates'`: `isValidRun({ ...RUN_OK, known_failures: ['a'] })` is true (green today: `isValidRun` does not change).
+   - **N12b** `'[AC8] such a run installs qa with the list'`: `driveTo('qa', QA_RUN)`; `runFileText(JSON.stringify({ ...runFile(), known_failures: ['a'] }))`; `install qa` status 0, last line `'change files: 1 created, 0 modified (.conductor/handback/qa-change.txt)'`; `listText()` is `SPEC_ONLY`.
 
    "Last line" is `r.out.split('\n').at(-1)`: none of these fixtures configures role models, so no `model:` line follows. Every qa fixture's list holds `A docs/specs/demo-design.md`, the spec fixture `approveArgs` writes after `start`; `.conductor/` and `.claude/memory/` are ignored by `QA_RUN`'s `.gitignore`, so the run file, the envelope and the hand-back reports are not listed. If a measured list holds another router-written path, the fixture is wrong, not the script: add that path to `QA_RUN`'s `.gitignore`.
 
@@ -172,7 +184,7 @@
     On `read('README.md')` it expects `` 'A value must be at least 12 characters and more than one word, or `start` refuses it.' ``. The byte-identical mirror row covers the copy.
 
 11. **Red predictions, reasoned against the current code.**
-    - Task 1 (orchestrate tests before the script change): with `-t 'BUG-089'`, **red** the eight N1 rows (every value is accepted today), N3, N4, N5, N6, the three N8 rows (no `change files:` line, no list), N9, N10 (they assert the list exists first) and N12 (no list): 18. **Green** the four N2 rows (accepted today), N7 (no line, no list today), N11 (the envelope is unchanged) and its `isValidRun` half: 7. With `-t 'BUG-074'`, the 25 BUG-074 tests stay green: their new values pass both the old and the new rule.
+    - Task 1 (orchestrate tests before the script change): with `-t 'BUG-089'`, **red** the eight N1 rows (every value is accepted today), N3, N4, N5, N6, the three N8 rows (no `change files:` line, no list), N9, N10 (they assert the list exists first) and N12b (no list): 18. **Green** the four N2 rows (accepted today), N7 (no line, no list today), N11 (the envelope is unchanged) and N12a (`isValidRun` is unchanged): 7. With `-t 'BUG-074'`, the 25 BUG-074 tests stay green: their new values pass both the old and the new rule.
     - Task 3 (role-profile tests before the profile edits): **red** the four `[AC6]` rule rows, the qa row and the code row: 6. **Green** the `[AC7]` plan row and every existing row, the sha rows included (they are edited after the profiles, T-306).
     - Task 4 (parity row before the command edits): **red** the new row only.
 
@@ -206,7 +218,7 @@
 - Test: `tests/scripts/orchestrate.test.js`
 
 - [ ] [T-101] `tests/scripts/orchestrate.test.js`: the three BUG-074 value changes of plan decision 6. Depends on T-004.
-- [ ] [T-102] `tests/scripts/orchestrate.test.js`: append `describe('known failures in changed files [BUG-089]')` with its constants and rows N1-N12 (plan decision 7). Depends on T-101.
+- [ ] [T-102] `tests/scripts/orchestrate.test.js`: append `describe('known failures in changed files [BUG-089]')` with its constants and rows N1-N12 (N12 as N12a and N12b; plan decision 7). Depends on T-101.
 - [ ] [T-103] Run: `npx vitest run tests/scripts/orchestrate.test.js -t 'BUG-074'`. Predicted: **25 passed** of the 25, every other test of the file skipped. Depends on T-102.
 - [ ] [T-104] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t 'BUG-089'`. Its full match set is the 25 new tests. Predicted: **18 failed | 7 passed** of the 25, every other test of the file skipped (plan decision 11). Any other split means a test is wrong: fix the test, not the prediction. Depends on T-103.
 
@@ -283,7 +295,7 @@
 - [ ] Integration, AC5: N7 (no known failures, output unchanged), the three N8 rows (null base, no security record, git failing), N9 (`end`), N10 (`start` over a previous run).
 - [ ] Unit, AC6: the four `[AC6]` rule rows and the qa and code rows of the new role-profiles block.
 - [ ] Unit, AC7: the BUG-074 `GREEN` and `KNOWN_MATCH` pins pass unchanged; the `[AC7]` plan row; the `plan` sha row unchanged.
-- [ ] AC8: N12 and the unchanged BUG-074 `isValidRun` rows.
+- [ ] AC8: N12a, N12b and the unchanged BUG-074 `isValidRun` rows.
 - [ ] AC9: N11; the existing hand-back, router and SNAP suites pass unchanged in T-501.
 - [ ] AC10: the token-cap, mirror and sha rows of `role-profiles.test.js`; `npm test` (T-501).
 - [ ] No E2E/UI test: there is no UI. CI legs: no new test is conditionally skipped, so no leg's skipped set in `tools/skip-baseline.json` changes.
@@ -300,6 +312,6 @@
 - **A host project that does not ignore `.conductor/`.** Its list also names the router's own files (`A .conductor/handback/…`). That only widens the list: no test lives there, and Guard 6 keeps every role from writing there, so no failing test is wrongly known.
 - **The orchestrator editing the list.** `.conductor/**` is the orchestrator's write surface (Guard 6), so the script cannot stop it; the command says only `install qa` writes the file (decision 8), and every `install qa` rewrites it.
 - **`model:` no longer being the last line of `install qa`.** The change line goes before it (decision 3); T-205 runs the last-line checks.
-- **A run started before this item with a short entry.** Still valid (AC8, N12); `qa` applies the file rule at its next `install qa`.
+- **A run started before this item with a short entry.** Still valid (AC8, N12a); `qa` applies the file rule at its next `install qa`.
 - **A declared file-path entry covering a broken test in an untouched file.** Accepted by the owner as a known limit (spec, Owner decisions 6); the start line and the final report keep the match visible.
 - **The long suite timing out the shell.** T-501 notes the duration; a timeout is not a red.
