@@ -66,13 +66,13 @@ Mapping:
 - Any other name → `code-conductor guard does not cover the Antigravity tool "<name>"; it is blocked until the guard maps it`.
 - Guard decision parsing mirrors `readDecision` in `project-template/.opencode/plugin/conductor-guard.js:129-141` (deny and ask both block).
 
-- [>] [T-001] Write the Antigravity adapter tests and adapter
+- [X] [T-001] Write the Antigravity adapter tests and adapter
   - [X] [T-001-A] Write `tests/hooks/antigravity-guard.test.js`: scaffold a temp project (copy guard + adapter into `.claude/hooks/` and `.agents/hooks/`), run `node .agents/hooks/conductor-guard.mjs` with cwd `<tmp>/.agents` and the payload on stdin. Tests: (1) every Bash row of `CORPUS`/`DIALECT` from `tests/fixtures/guard3-corpus.js` gives the same allow/deny as the Claude hook; (2) recorded `run_command "echo probe-ok"` → empty stdout; (3) `read_file` of a 300-line file with no range → deny naming Guard 1; with `StartLine:10, EndLine:20` → allow; (4) `read_file` under `node_modules/` → Guard 4 deny; (5) `write_file`/`edit_file` recorded payloads → allow; (6) unknown tool `browser_open` → deny with the uncovered reason; (7) `run_command` with `Cwd` → deny naming `"Cwd"`; (8) `run_command` with `CommandLine: 5` → deny; (9) missing `toolCall` → deny; (10) non-JSON stdin → deny; (11) guard file removed → deny naming the guard path; (12) guard replaced by a script printing `not json` → deny.
   - [X] [T-001-B] Run `npx vitest run tests/hooks/antigravity-guard.test.js`; expected: all FAIL (adapter missing).
   - [X] [T-001-C] Implement `project-template/.agents/hooks/conductor-guard.mjs` and `tests/fixtures/antigravity-payloads.js` per Interfaces; a top-level try/catch turns any throw into a deny JSON.
   - [X] [T-001-D] Run `npx vitest run tests/hooks/antigravity-guard.test.js tests/hooks/opencode-guard.test.js`; expected: all PASS.
   - [X] [T-001-E] `git add project-template/.agents/hooks/conductor-guard.mjs tests/hooks/antigravity-guard.test.js tests/fixtures/antigravity-payloads.js` and `git add -u docs/superpowers/plans/2026-11-23-feat048-codex-antigravity-guards.md`
-  - [ ] [T-001-F] `git commit -m "feat: add the Antigravity CLI guard adapter [FEAT-048]"`
+  - [X] [T-001-F] `git commit -m "feat: add the Antigravity CLI guard adapter [FEAT-048]"`
 
 ### Task 2: `--antigravity` installer flag
 
@@ -86,13 +86,13 @@ Mapping:
 - Consumes: `mergeSettingsFile(templatePath, settingsPath, ['conductor-guard.mjs'])` from `lib/installer/settings-merge.mjs`; the adapter file goes through the same `removePluginSymlink` + `mergeFileInto(..., replaceWithTemplate)` path the OpenCode plugin uses (generalize the two helpers to take the relative path instead of the `OPENCODE_PLUGIN` constant).
 - Produces: `deployProject(assetRoot, cwd, { …, antigravity = false })`; report line `code-conductor: installed the Antigravity guard at .agents/hooks/conductor-guard.mjs`; CLI warning `code-conductor: --antigravity needs --project; no Antigravity files were written`.
 
-- [ ] [T-002] Wire `--antigravity` through the installer
-  - [ ] [T-002-A] Add deploy tests: no `.agents/` without the option (and full tree identical to a pre-change install); adapter byte-for-byte + hooks.json created with the option; host `.agents/hooks.json` with its own `PreToolUse` entry keeps it and gains ours once; second run reports `unchanged`; malformed host hooks.json is backed up; host `.agents/other.md` untouched; symlinked adapter path replaced, target untouched.
-  - [ ] [T-002-B] Add CLI tests: `--antigravity` without `--project` warns and writes nothing; usage line lists `--antigravity`.
-  - [ ] [T-002-C] Run `npx vitest run tests/installer/deploy.test.js tests/installer/cli.test.js`; expected: the new tests FAIL, existing ones PASS.
-  - [ ] [T-002-D] Create `project-template/.agents/hooks.json`; implement the deploy and CLI changes.
-  - [ ] [T-002-E] Run `npm test`; expected: full suite PASS (templates/parity tests updated only if they enumerate template files).
-  - [ ] [T-002-F] `git add project-template/.agents/hooks.json` and `git add -u lib/installer/deploy.mjs bin/code-conductor.mjs tests/installer/deploy.test.js tests/installer/cli.test.js docs/superpowers/plans/2026-11-23-feat048-codex-antigravity-guards.md`
+- [>] [T-002] Wire `--antigravity` through the installer
+  - [X] [T-002-A] Add deploy tests: no `.agents/` without the option (and full tree identical to a pre-change install); adapter byte-for-byte + hooks.json created with the option; host `.agents/hooks.json` with its own `PreToolUse` entry keeps it and gains ours once; second run reports `unchanged`; malformed host hooks.json is backed up; host `.agents/other.md` untouched; symlinked adapter path replaced, target untouched.
+  - [X] [T-002-B] Add CLI tests: `--antigravity` without `--project` warns and writes nothing; usage line lists `--antigravity`.
+  - [X] [T-002-C] Run `npx vitest run tests/installer/deploy.test.js tests/installer/cli.test.js`; expected: the new tests FAIL, existing ones PASS.
+  - [X] [T-002-D] Create `project-template/.agents/hooks.json`; implement the deploy and CLI changes.
+  - [X] [T-002-E] Run `npm test`; expected: full suite PASS (templates/parity tests updated only if they enumerate template files).
+  - [X] [T-002-F] `git add project-template/.agents/hooks.json` and `git add -u lib/installer/deploy.mjs bin/code-conductor.mjs tests/installer/deploy.test.js tests/installer/cli.test.js docs/superpowers/plans/2026-11-23-feat048-codex-antigravity-guards.md`
   - [ ] [T-002-G] `git commit -m "feat: install the Antigravity guard with --antigravity [FEAT-048]"`
 
 ### Task 3: live Antigravity evidence

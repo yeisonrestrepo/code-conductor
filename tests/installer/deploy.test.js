@@ -811,3 +811,73 @@ describe('deployProject: OpenCode plugin (FEAT-048)', () => {
     expect(existsSync(join(ROOT, 'project-template', PLUGIN_REL))).toBe(true);
   });
 });
+
+// FEAT-048 slice 2 (#97): the Antigravity guard ships inside project-template/.agents/
+// but lands only with the antigravity option; its hooks.json is merged, never replaced.
+describe('deployProject: Antigravity guard (FEAT-048)', () => {
+  const GUARD_REL = join('.agents', 'hooks', 'conductor-guard.mjs');
+  const HOOKS_REL = join('.agents', 'hooks.json');
+  const SHIPPED = '// shipped agy guard\n';
+  const OURS = { matcher: '.*', hooks: [{ type: 'command', command: 'node hooks/conductor-guard.mjs' }] };
+  const SHIPPED_HOOKS = `${JSON.stringify({ hooks: { PreToolUse: [OURS] } }, null, 2)}\n`;
+  const INSTALLED = 'code-conductor: installed the Antigravity guard at .agents/hooks/conductor-guard.mjs';
+  const hooksOf = (dir) => JSON.parse(readFileSync(join(dir, HOOKS_REL), 'utf8'));
+  beforeEach(() => {
+    mkdirSync(join(asset, 'project-template', '.agents', 'hooks'), { recursive: true });
+    writeFileSync(join(asset, 'project-template', GUARD_REL), SHIPPED);
+    writeFileSync(join(asset, 'project-template', HOOKS_REL), SHIPPED_HOOKS);
+  });
+  it('writes no .agents/ without the antigravity option', () => {
+    const out = capture();
+    deployProject(asset, home, out.opts);
+    expect(existsSync(join(home, '.agents'))).toBe(false);
+    expect(out.said.some((m) => /Antigravity/.test(m))).toBe(false);
+  });
+  it('installs the guard byte for byte and creates hooks.json with the antigravity option', () => {
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, antigravity: true });
+    expect(readFileSync(join(home, GUARD_REL), 'utf8')).toBe(SHIPPED);
+    expect(readFileSync(join(home, HOOKS_REL), 'utf8')).toBe(SHIPPED_HOOKS);
+    expect(out.said).toContain(INSTALLED);
+  });
+  it('keeps a host PreToolUse entry, adds ours once and leaves a re-run unchanged', () => {
+    const host = { matcher: 'run_command', hooks: [{ type: 'command', command: 'node mine.mjs' }] };
+    mkdirSync(join(home, '.agents'), { recursive: true });
+    writeFileSync(join(home, HOOKS_REL), JSON.stringify({ hooks: { PreToolUse: [host] } }));
+    deployProject(asset, home, { ...capture().opts, antigravity: true });
+    const first = readFileSync(join(home, HOOKS_REL), 'utf8');
+    expect(hooksOf(home).hooks.PreToolUse).toEqual([host, OURS]);
+    deployProject(asset, home, { ...capture().opts, antigravity: true });
+    expect(readFileSync(join(home, HOOKS_REL), 'utf8')).toBe(first);
+  });
+  it('backs up a malformed host hooks.json and writes the shipped one', () => {
+    mkdirSync(join(home, '.agents'), { recursive: true });
+    writeFileSync(join(home, HOOKS_REL), '{ not json');
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, antigravity: true });
+    expect(readFileSync(join(home, HOOKS_REL), 'utf8')).toBe(SHIPPED_HOOKS);
+    expect(readdirSync(join(home, '.agents')).some((n) => n.startsWith('hooks.json.') && n !== 'hooks.json')).toBe(true);
+    expect(out.warned.some((m) => /hooks\.json was not valid JSON/.test(m))).toBe(true);
+  });
+  it('keeps the host project\'s own .agents/ files', () => {
+    mkdirSync(join(home, '.agents'), { recursive: true });
+    writeFileSync(join(home, '.agents', 'other.md'), 'host');
+    deployProject(asset, home, { ...capture().opts, antigravity: true });
+    expect(readFileSync(join(home, '.agents', 'other.md'), 'utf8')).toBe('host');
+  });
+  it.skipIf(!CAN_SYMLINK)('replaces a symlinked guard path and leaves the link target untouched', () => {
+    const outside = join(home, 'outside.mjs');
+    writeFileSync(outside, '// outside\n');
+    mkdirSync(join(home, '.agents', 'hooks'), { recursive: true });
+    symlinkSync(outside, join(home, GUARD_REL));
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, antigravity: true });
+    expect(lstatSync(join(home, GUARD_REL)).isSymbolicLink()).toBe(false);
+    expect(readFileSync(join(home, GUARD_REL), 'utf8')).toBe(SHIPPED);
+    expect(readFileSync(outside, 'utf8')).toBe('// outside\n');
+  });
+  it('ships the real guard and hooks.json in the template', () => {
+    expect(existsSync(join(ROOT, 'project-template', GUARD_REL))).toBe(true);
+    expect(existsSync(join(ROOT, 'project-template', HOOKS_REL))).toBe(true);
+  });
+});
