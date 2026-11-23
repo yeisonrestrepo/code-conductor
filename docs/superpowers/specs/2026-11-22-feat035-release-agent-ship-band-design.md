@@ -1,6 +1,6 @@
 # FEAT-035: Release Agent (Ship Band)
 
-**Status:** Draft (amended by the owner 2026-11-23, pending independent review)
+**Status:** Approved 2026-11-23 by the owner
 
 Source: the `[FEAT-035]` entry in `AGENT-READABLE BACKLOG.md` (PILLAR 3), the intake of issue #143. Its three acceptance criteria are answered in "Acceptance Criteria" below, tagged `[E1]`-`[E3]`. The rows tagged `[D1]`-`[D3]` answer the entry's description: the ritual's steps (version bump, `CHANGELOG.md` entry, both instruments green, tag, CI handoff), "a checklist it cannot skip", and "the instruments shipped by `[BUG-046]` are this agent's tools, not new work". The rows tagged `[O1]`-`[O8]` answer the owner decisions below, `[O7]` and `[O8]` the amendments of 2026-11-23.
 
