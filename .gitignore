@@ -42,6 +42,7 @@ tests/.tmp/
 !/.claude/agents/docs.md
 !/.claude/agents/plan.md
 !/.claude/agents/qa.md
+!/.claude/agents/release.md
 !/.claude/agents/security.md
 !/.claude/agents/spec.md
 !/.claude/commands/cc-implement.md
@@ -49,6 +50,7 @@ tests/.tmp/
 !/.claude/commands/cc-metrics.md
 !/.claude/commands/cc-orchestrate.md
 !/.claude/commands/cc-plan.md
+!/.claude/commands/cc-release.md
 !/.claude/commands/cc-resume.md
 !/.claude/commands/cc-spec.md
 !/.claude/hooks/context-guard.ps1
@@ -57,6 +59,7 @@ tests/.tmp/
 !/.claude/hooks/post-compact.sh
 !/.claude/hooks/pre-tool-use.mjs
 !/.claude/memory/project.md
+!/.claude/release-profile.json
 !/.claude/settings.json
 /docs/*
 !/docs/149/

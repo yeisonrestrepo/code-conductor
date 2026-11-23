@@ -12,10 +12,13 @@ During orchestrated runs, five role agents handle specific phases. Each is defin
 | `audit.md` | audit | verify | R | No (Guard 7) | Nothing (no write tools; Guard 5 denies `tk: R`) |
 | `qa.md` | qa | verify | X | Test command only | Nothing (no write tools; Guard 5 denies `tk: X`) |
 | `docs.md` | docs | ship | RW | No (Guard 7) | Documentation surface only |
+| `release.md` | release | ship | RW | No (Guard 7) | Release surface from the project's release profile only |
 
 A sixth agent, `define-review.md`, is a non-band advisory reviewer for the review loop.
 
 `docs.md` is not seated in a run: `/cc-docs --release <ref>` dispatches it against one shipped release, outside any run. It exists only in SNAP v5 envelopes, claims only `verify_pass`, and leaves its edits uncommitted for you to review.
+
+`release.md` is not seated in a run either: `/cc-release <version>` dispatches it outside any run, in every installed project, driven by that project's committed release profile (`.claude/release-profile.json`, written by `/cc-release --init`). It exists only in SNAP v6 envelopes, claims only `verify_pass`, and edits only the profile's version locations, changelog and, when bound, backlog; `release.mjs check` judges the diff and runs the profile's checks before you commit it.
 
 ## Agent Constraints
 

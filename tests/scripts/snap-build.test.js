@@ -303,3 +303,12 @@ describe('snap-build.mjs v5 [FEAT-036]', () => {
     expect(validate(r.stdout.trim()).status).toBe(0);
   });
 });
+
+describe('snap-build.mjs v6 [FEAT-035]', () => {
+  it('writes v6 for release, keeps the v3 key order, and the line validates', () => {
+    const r = build(JSON.stringify({ ph: 'impl', c: 'abc1234', s: '1.56.0', n: [], f: [], d: [], x: [], role: 'release', tk: 'RW', scope: ['VERSION', 'CHANGELOG.md'], gate: 'verify_pass' }));
+    expect(r.status).toBe(0);
+    expect(r.stdout.trim()).toBe('{"v":6,"sys":{"ph":"impl","c":"abc1234","s":"1.56.0","role":"release","tk":"RW"},"ops":{"n":[],"f":[],"scope":["VERSION","CHANGELOG.md"],"gate":"verify_pass"},"mem":{"d":[],"x":[]},"pr":""}');
+    expect(validate(r.stdout.trim()).status).toBe(0);
+  });
+});

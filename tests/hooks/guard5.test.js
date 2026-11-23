@@ -221,6 +221,27 @@ describe('Guard 5: band scope for role agents [ARCH-010]', () => {
     });
   });
 
+  describe('[FEAT-035] the release role under a v6 envelope', () => {
+    const releaseEnvelope = () => writeFileSync(envelopePath(), JSON.stringify({
+      v: 6,
+      sys: { ph: 'impl', c: 'abc1234', s: '1.56.0', role: 'release', tk: 'RW' },
+      ops: { n: [], f: [], scope: ['VERSION', 'CHANGELOG.md'], gate: 'verify_pass' },
+      mem: { d: [], x: [] },
+    }));
+    const asRelease = (file) => fire(payload('Edit', file, { cwd: root, agent: 'release' }));
+
+    it('[G5-1] allows an Edit inside the release surface', () => {
+      releaseEnvelope();
+      expect(asRelease(join(root, 'VERSION'))).toBeNull();
+    });
+
+    it('[G5-2] denies an Edit of the release profile, which is never on the surface', () => {
+      releaseEnvelope();
+      const profile = join(root, '.claude', 'release-profile.json');
+      expect(asRelease(profile).permissionDecisionReason).toBe(violation(profile, 'VERSION, CHANGELOG.md'));
+    });
+  });
+
   it('[AC10] carries band constants equal to scripts/snap-contract.mjs (D7)', () => {
     const text = readFileSync(HOOK, 'utf8');
     const list = (name) => JSON.parse(text.match(new RegExp(`const ${name} = (\\[[^\\]]*\\]);`))[1].replace(/'/g, '"'));
