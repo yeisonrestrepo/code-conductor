@@ -299,9 +299,9 @@
 **Files:**
 - Modify: `tests/scripts/conductor-db.test.js:7`, end of file
 
-- [ ] [T-101] `tests/scripts/conductor-db.test.js:7`: add `pathToFileURL` to the `node:url` import (plan decision 7). Depends on T-004.
-- [ ] [T-102] `tests/scripts/conductor-db.test.js`: append the FEAT-030 block of plan decision 7 after the last line. Depends on T-101.
-- [ ] [T-103] Red run: `npx vitest run tests/scripts/conductor-db.test.js -t 'FEAT-030'`. Its full match set is the 12 new tests; no existing title contains `FEAT-030`. Predicted: **11 failed | 1 passed | 74 skipped (86)**, the pass being `CLI: 25 rows after the write stay under the threshold, so no size query and no warning`, with the failure messages listed under Baseline. Any other split means a test is wrong: fix the test, not the prediction. Depends on T-102.
+- [X] [T-101] `tests/scripts/conductor-db.test.js:7`: add `pathToFileURL` to the `node:url` import (plan decision 7). Depends on T-004.
+- [X] [T-102] `tests/scripts/conductor-db.test.js`: append the FEAT-030 block of plan decision 7 after the last line. Depends on T-101.
+- [X] [T-103] Red run: `npx vitest run tests/scripts/conductor-db.test.js -t 'FEAT-030'`. Its full match set is the 12 new tests; no existing title contains `FEAT-030`. Predicted: **11 failed | 1 passed | 74 skipped (86)**, the pass being `CLI: 25 rows after the write stay under the threshold, so no size query and no warning`, with the failure messages listed under Baseline. Any other split means a test is wrong: fix the test, not the prediction. Depends on T-102.
 
 ---
 
@@ -310,15 +310,15 @@
 **Files:**
 - Modify: `scripts/conductor-db.mjs:17`, `:35`, `:43`, `:308`-`:355`, `:471`-`:476`, `:546`-`:549`
 
-- [ ] [T-201] `scripts/conductor-db.mjs:17`: add `pathToFileURL` to the `node:url` import (plan decision 1). Depends on T-103.
-- [ ] [T-202] `scripts/conductor-db.mjs:35`: add `SNAPSHOT_BYTE_BUDGET` with its comment after `SNAPSHOT_HARD_MAX` (plan decision 2). Depends on T-201.
-- [ ] [T-203] `scripts/conductor-db.mjs` after the `U_HISTORY` line (now `:45`): add `SNAPSHOT_RETENTION` (plan decision 3). Depends on T-202.
-- [ ] [T-204] `purgeTable` (now about `:320`): export it, add `byteBound` to its parameters, recount `n` inside bound 3, call `purgeBytes`, and add the `purgeBytes` helper after it (plan decision 4). Depends on T-203.
-- [ ] [T-205] The `snapshots` call site in `cmdSnapshot` (now about `:503`): replace the inline options with `SNAPSHOT_RETENTION` (plan decision 5). Depends on T-204.
-- [ ] [T-206] The file's tail (now about `:568`): wrap the `main()` call in the `invokedDirectly()` guard (plan decision 6). Depends on T-205.
-- [ ] [T-207] Green run: the T-103 command. Predicted: **12 passed | 74 skipped (86)**. Depends on T-206.
-- [ ] [T-208] `npx vitest run tests/scripts/conductor-db.test.js`. Predicted: **86 passed (86)**: the 74 FEAT-025 and earlier tests unmodified and green (spec, AC7) plus the 12 new. Depends on T-207.
-- [ ] [T-209] `npx vitest run tests/unit/snap-contract.test.js tests/scripts/resume-read.test.js tests/scripts/handoff-cycle.test.js tests/installer/deploy.test.js`. Predicted: **116 passed (116)**: the literal-cap check, the CLI's callers and the installer copy are unaffected (spec, System Impact). Depends on T-208.
+- [X] [T-201] `scripts/conductor-db.mjs:17`: add `pathToFileURL` to the `node:url` import (plan decision 1). Depends on T-103.
+- [X] [T-202] `scripts/conductor-db.mjs:35`: add `SNAPSHOT_BYTE_BUDGET` with its comment after `SNAPSHOT_HARD_MAX` (plan decision 2). Depends on T-201.
+- [X] [T-203] `scripts/conductor-db.mjs` after the `U_HISTORY` line (now `:45`): add `SNAPSHOT_RETENTION` (plan decision 3). Depends on T-202.
+- [X] [T-204] `purgeTable` (now about `:320`): export it, add `byteBound` to its parameters, recount `n` inside bound 3, call `purgeBytes`, and add the `purgeBytes` helper after it (plan decision 4). Depends on T-203.
+- [X] [T-205] The `snapshots` call site in `cmdSnapshot` (now about `:503`): replace the inline options with `SNAPSHOT_RETENTION` (plan decision 5). Depends on T-204.
+- [X] [T-206] The file's tail (now about `:568`): wrap the `main()` call in the `invokedDirectly()` guard (plan decision 6). Depends on T-205.
+- [X] [T-207] Green run: the T-103 command. Predicted: **12 passed | 74 skipped (86)**. Depends on T-206.
+- [X] [T-208] `npx vitest run tests/scripts/conductor-db.test.js`. Predicted: **86 passed (86)**: the 74 FEAT-025 and earlier tests unmodified and green (spec, AC7) plus the 12 new. Depends on T-207.
+- [X] [T-209] `npx vitest run tests/unit/snap-contract.test.js tests/scripts/resume-read.test.js tests/scripts/handoff-cycle.test.js tests/installer/deploy.test.js`. Predicted: **116 passed (116)**: the literal-cap check, the CLI's callers and the installer copy are unaffected (spec, System Impact). Depends on T-208.
 
 ---
 
@@ -327,8 +327,8 @@
 **Files:**
 - Modify: `tools/skip-baseline.json:33`
 
-- [ ] [T-301] `tools/skip-baseline.json`: insert the ten `ci-node20` lines of plan decision 8 between lines 33 and 34. Depends on T-209.
-- [ ] [T-302] Check: `node -e "const d=require('./tools/skip-baseline.json');for(const[k,v]of Object.entries(d)){const s=[...v].sort();if(JSON.stringify(s)!==JSON.stringify(v)||new Set(v).size!==v.length)throw new Error(k)}console.log(d['ci-node20'].length)"` prints `119` (109 + 10) and throws for no key. Then `npx vitest run tests/tools/skip-baseline.test.js` passes. Depends on T-301.
+- [X] [T-301] `tools/skip-baseline.json`: insert the ten `ci-node20` lines of plan decision 8 between lines 33 and 34. Depends on T-209.
+- [X] [T-302] Check: `node -e "const d=require('./tools/skip-baseline.json');for(const[k,v]of Object.entries(d)){const s=[...v].sort();if(JSON.stringify(s)!==JSON.stringify(v)||new Set(v).size!==v.length)throw new Error(k)}console.log(d['ci-node20'].length)"` prints `119` (109 + 10) and throws for no key. Then `npx vitest run tests/tools/skip-baseline.test.js` passes. Depends on T-301.
 
 ---
 
@@ -337,17 +337,17 @@
 **Files:**
 - Modify: `scripts/conductor-db.mjs`, `tests/scripts/conductor-db.test.js`, `tools/skip-baseline.json` (staged), this plan (checkboxes)
 
-- [ ] [T-401] Run `npm test`. Predicted: every file green, apart from environment failures in files this plan does not touch. On CI the exit status is 0 (spec, AC11). A red counts as ENV only if the sandbox causes it (network, tmp permissions, uid) and the test's file is not one this plan touches; report it with its name. Any other red is fixed. Depends on T-302.
-- [ ] [T-402] Scope check:
+- [X] [T-401] Run `npm test`. Predicted: every file green, apart from environment failures in files this plan does not touch. On CI the exit status is 0 (spec, AC11). A red counts as ENV only if the sandbox causes it (network, tmp permissions, uid) and the test's file is not one this plan touches; report it with its name. Any other red is fixed. Depends on T-302.
+- [X] [T-402] Scope check:
   - `git status --porcelain` lists exactly `scripts/conductor-db.mjs`, `tests/scripts/conductor-db.test.js`, `tools/skip-baseline.json` and this plan as modified.
   - `git diff -U0 HEAD -- tests/scripts/conductor-db.test.js | grep '^-[^-]'` prints only the old line 7 import (no existing test edited, spec AC7).
   - `git diff -U0 HEAD -- tools/skip-baseline.json | grep -c '^+[^+]'` prints `10` and `git diff -U0 HEAD -- tools/skip-baseline.json | grep '^-[^-]'` prints nothing.
   - `grep -n "SCHEMA_VERSION = 2;\|HISTORY_HARD_MAX = 2000;\|table: 'raw_history'" scripts/conductor-db.mjs` prints all three (schema and the `raw_history` call site unchanged, spec AC7 and AC11).
   - `git diff --quiet HEAD -- VERSION CHANGELOG.md package.json package-lock.json README.md "AGENT-READABLE BACKLOG.md" .claude .github project-template lib bin scripts/snap-contract.mjs` exits 0.
   - Depends on T-401.
-- [ ] [T-403] Stage: `git add -u scripts/conductor-db.mjs tests/scripts/conductor-db.test.js tools/skip-baseline.json` (all tracked). Depends on T-402.
-- [ ] [T-404] Stage: `git add -u docs/superpowers/plans/2026-11-23-feat030-byte-sum-bound-for-the-conductor-cache-db.md` (carries the ticks for T-101 to T-403). Depends on T-403.
-- [ ] [T-405] Commit: `feat: bound the conductor cache DB snapshots table by byte sum [FEAT-030]`. Depends on T-404.
+- [X] [T-403] Stage: `git add -u scripts/conductor-db.mjs tests/scripts/conductor-db.test.js tools/skip-baseline.json` (all tracked). Depends on T-402.
+- [X] [T-404] Stage: `git add -u docs/superpowers/plans/2026-11-23-feat030-byte-sum-bound-for-the-conductor-cache-db.md` (carries the ticks for T-101 to T-403). Depends on T-403.
+- [X] [T-405] Commit: `feat: bound the conductor cache DB snapshots table by byte sum [FEAT-030]`. Depends on T-404.
 
 ---
 
