@@ -4,7 +4,7 @@
 
 **Goal:** an eighth band role, `release`, seated in the Ship band and existing only at SNAP `v: 6`, shipped to every installed project with a new zero-dependency driver, `scripts/release.mjs`, that hardcodes no project fact. Every fact about how a project releases lives in its committed release profile, `.claude/release-profile.json`. `/cc-release --init` proposes the profile from the project's files and writes it only on the owner's confirmation; `/cc-release <version> [--items <IDs>]` runs `digest` (clean tree, green checks, an advancing version), dispatches the `release` agent (`Read, Grep, Glob, Edit`) inside an envelope whose `ops.scope` is the profile's surface, and judges the uncommitted diff with `check` (line by line against `HEAD`, then the profile's checks in order, halting `RELEASE_HALT <name>: exit <rc>` on the first red one); `/cc-release --handoff <version> [--pr <N>]` re-runs the checks at the merged `HEAD` and prints the tag, push, publish and ticket writeback `STEP` lines the command runs one owner confirmation at a time. This repository commits its own profile, whose checks are `tools/version-gate.mjs` then `tools/record-parity.mjs`, unchanged and unshipped.
 
-**Spec:** `docs/superpowers/specs/2026-11-22-feat035-release-agent-ship-band-design.md`, as amended 2026-11-23 with the owner's amendments A1-A4 (its "Owner decisions" section); sha256 `a272469b704c8b3c94b728956b66c5af7ad7cce1cc1f13971000bb959a1cc357`. This plan was first written against the 2026-11-22 text (sha256 `688591ec…`) and is revised here against the amended one. Issue #143.
+**Spec:** `docs/superpowers/specs/2026-11-22-feat035-release-agent-ship-band-design.md`, as amended 2026-11-23 with the owner's amendments A1-A4 (its "Owner decisions" section); sha256 `18e2c5c467f307f176a49e1f2f7395af2d4c9bd044b8904adc2176e88b55e852`. This plan was first written against the 2026-11-22 text (sha256 `688591ec…`) and is revised here against the amended one. Issue #143.
 
 **Approval:** this item gives a role write access to the records `CONTRIBUTING.md` calls owner-side, ships that role to every installed project, and sequences the outward acts of a release (tag, publish, ticket writeback). That is the surface that escalates to the owner, so **the spec and the plan need an owner approval, not a delegated one.** An independent review may review this plan; it does not approve it.
 
@@ -22,6 +22,12 @@ The owner did not approve the first version of this plan, because it was written
 | A4 | **`CONTROL_PLANE`.** Decision 19 is confirmed: `scripts/release.mjs` and `.claude/release-profile.json` join it as planned. | Decision 19, T-301, T-304, unchanged. |
 
 The rest of the plan stands where these decisions do not touch it. The spec and the plan need an owner approval, not a delegated one.
+
+The owner then decided three further points on the revised plan:
+
+- **The amended spec is committed first.** The spec carries A1-A4 in its "Owner decisions" section (as "Amendments (2026-11-23)"), the affected rows (C2, C3, C4, C6, C9, C13, C14, the `init` and `handoff` verbs, the alternative paths, the error cases, the acceptance criteria with `[O7]` and `[O8]`) and `[FEAT-062]` in Out of Scope, with its status reading "Approved 2026-11-22 by the owner; amended 2026-11-23 by the owner". The owner's approval covers that amended text with no new spec gate.
+- **This plan is approved on one condition:** its Spec line cites the sha256 of the spec as committed. The amended spec as committed is `18e2c5c4…`, not the `a272469b…` an earlier revision cited, so only that citation (and T-001's copy of it) changed; nothing else in the plan did.
+- **A1's escaping is confirmed as decision 11 states it:** the `cross-spawn` escaping with no dependency, the root never searched for a bare name, and only a `.cmd` or `.bat` program run through `cmd.exe`.
 
 ## Global Constraints
 
@@ -275,7 +281,7 @@ and, after the `docs.md` paragraph (`:18`), the paragraph:
 
 **Files:** `docs/superpowers/plans/2026-11-22-feat035-release-agent-ship-band.md`, `.gitignore`
 
-- [X] [T-001] Create this plan file from the spec (`688591ec…`), revised in place against the amended spec (`a272469b…`). No dependency.
+- [X] [T-001] Create this plan file from the spec (`688591ec…`), revised in place against the amended spec (`18e2c5c4…`). No dependency.
 - [X] [T-002] `.gitignore`: insert the leaf `!/docs/superpowers/plans/2026-11-22-feat035-release-agent-ship-band.md` in sorted position, after the `2026-11-21-feat052-…` plan leaf (`:197`) and before the first spec leaf (`:198`). Depends on T-001.
 - [X] [T-003] Stage: `git add -u .gitignore` (tracked) and `git add -f docs/superpowers/plans/2026-11-22-feat035-release-agent-ship-band.md` (new, under the ignored `docs/superpowers/plans/` until its leaf is committed). Depends on T-002.
 - [X] [T-004] Commit: `docs: plan the release agent in the Ship band [FEAT-035]`. Depends on T-003.
