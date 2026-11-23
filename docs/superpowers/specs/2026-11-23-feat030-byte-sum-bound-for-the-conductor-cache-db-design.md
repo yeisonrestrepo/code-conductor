@@ -1,6 +1,6 @@
 # FEAT-030 — Byte-Sum Bound for the Conductor Cache DB `snapshots` Table
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-23 by independent review (round 1)
 
 **Item:** `[FEAT-030]` (intake of issue #146). Pillar 5: infrastructure, ecosystem and quality assurance.
 Components named by the entry: `scripts/conductor-db.mjs` (`purgeTable`), `tests/scripts/conductor-db.test.js`.
