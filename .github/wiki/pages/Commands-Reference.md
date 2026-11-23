@@ -43,6 +43,7 @@ All commands are tagged `(Conductor)` in the Claude Code command palette.
 | `/cc-refactor [file\|module]` | Diagnose complexity, plan changes, apply one step at a time, verify tests after each. |
 | `/cc-test [scope]` | Find coverage gaps, write AAA-pattern tests, run after confirmation, report results. |
 | `/cc-docs [scope]` or `/cc-docs --release <ref> [--since <ref>]` | Audit documentation, write inline docs (JSDoc / docstrings / JavaDoc / GoDoc), preview before writing. With `--release`, the `docs` agent reconciles user-facing docs with that shipped release; each changed line cites its source, and the uncommitted diff is the proposal. |
+| `/cc-release --init`, `/cc-release <version> [--items <IDs>]` or `/cc-release --handoff <version> [--pr <N>]` | Cut a release from the project's release profile: configure it, let the `release` agent edit exactly the release surface while the profile's checks halt on the first red one, then run the tag, push, publish and writeback steps one confirmation at a time. |
 | `/cc-metrics [--dir <path>]` | Read-only report of token and time spend from local session logs, by tool, command, phase, branch, pillar and session, with recommendations that quote their numbers. |
 | `/cc-flow` | Print the guard lanes with per-guard pass, deny and ask counts, then the newest 20 hook decisions. The same log drives the flow status line. |
 

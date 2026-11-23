@@ -101,6 +101,7 @@
     "tests/scripts/handoff-cycle.test.js > the checkpoint-to-resume handoff cycle records the phase that just completed, not the one the last compaction left",
     "tests/scripts/handoff-cycle.test.js > the checkpoint-to-resume handoff cycle resumes the phase the boundary wrote, through a blob the old cap discarded",
     "tests/scripts/handoff-cycle.test.js > the checkpoint-to-resume handoff cycle survives a DB write failure at the boundary: no row, no crash, exit 0",
+    "tests/scripts/release.test.js > release.mjs on win32 [FEAT-035] [O8] the npm test check --init proposes starts, passes when green and halts by name when red",
     "tests/scripts/resume-read.test.js > resume-read.mjs DB branch DB hit + valid blob → source: db, deletes handoff, exit 0",
     "tests/scripts/resume-read.test.js > resume-read.mjs DB branch DB miss + valid handoff → falls through to file branch (source: file)",
     "tests/scripts/resume-read.test.js > resume-read.mjs DB branch an oversize v1 blob degrades LOUDLY: reason, size, cap, exit 3",
@@ -134,6 +135,7 @@
     "tests/plugin/code-conductor-plugin.test.js > code-conductor personal skills SKILL.md for verbosity has name and description frontmatter",
     "tests/plugin/code-conductor-plugin.test.js > code-conductor personal skills dead enabledPlugins key is removed from settings.json",
     "tests/plugin/code-conductor-plugin.test.js > code-conductor personal skills old plugin cache dir is cleaned up",
+    "tests/scripts/release.test.js > release.mjs on win32 [FEAT-035] [O8] the npm test check --init proposes starts, passes when green and halts by name when red",
     "tests/unit/bash-helper.test.js > bash helper falls back to Git for Windows bash rather than skipping"
   ],
   "ci-windows-node24": [

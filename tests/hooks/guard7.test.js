@@ -69,6 +69,11 @@ describe('Guard 7: a band role runs the recorded test command or nothing [FEAT-0
     expect(as('docs', 'npm test')).toEqual(denied('Guard 7: ROLE_SHELL_DENIED: docs has no shell.'));
   });
 
+  it.each([['no run file', false], ['a live run', true]])('[FEAT-035] denies release any shell with %s', (_label, live) => {
+    if (live) runFile();
+    expect(as('release', 'node tools/version-gate.mjs')).toEqual(denied('Guard 7: ROLE_SHELL_DENIED: release has no shell.'));
+  });
+
   it.each(SHELL_METACHARACTERS)('[R2] denies a command carrying %j', (m) => {
     runFile();
     expect(as('code', `npm test ${m} x`)).toEqual(chaining(m));

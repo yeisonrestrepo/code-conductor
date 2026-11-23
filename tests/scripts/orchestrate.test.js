@@ -15,6 +15,7 @@ import {
 } from '../../scripts/orchestrate.mjs';
 import { CANDIDATE_PAIRS, DEFAULT_PAIR } from '../../scripts/doc-locations.mjs';
 import { docSurface } from '../../scripts/docs-sync.mjs';
+import { releaseSurface, validateProfile } from '../../scripts/release.mjs';
 
 const SEC_NONE = '; security: threshold high, dependency scan not covered for no lockfile';
 const START_USAGE = 'orchestrate: usage: orchestrate.mjs start <ITEM> [--auto] [--ticket <N|issue URL>] [--audit-rounds <0-5>] [--security-threshold <low|moderate|high|critical>] [--no-dependency-audit] [--unattended] [--known-failure \'<text>\']...';
@@ -157,7 +158,7 @@ describe('router [FEAT-011 AC7]', () => {
     expect(MAY_HAND_BACK).toEqual({
       spec: ['boundary_routed'], plan: ['boundary_routed'], code: ['build_executed'],
       audit: ['build_executed'], qa: ['verify_pass'], security: ['build_executed'],
-      docs: ['verify_pass'],
+      docs: ['verify_pass'], release: ['verify_pass'],
     });
   });
 
@@ -170,6 +171,7 @@ describe('router [FEAT-011 AC7]', () => {
       qa: { tk: 'X', scope: null },
       security: { tk: 'X', scope: null },
       docs: { tk: 'RW', scope: null },
+      release: { tk: 'RW', scope: null },
     });
   });
 
@@ -508,10 +510,10 @@ describe('write surface [FEAT-011 AC4]', () => {
       '.claude/commands/**', 'project-template/.claude/commands/**',
       '.claude/skills/**', 'project-template/.claude/skills/**',
       'claude.md', 'claude.local.md', '.claude/claude.md', 'project-template/claude.md',
-      'scripts/orchestrate.mjs', 'scripts/snap-contract.mjs', 'scripts/ticket.mjs', 'scripts/doc-locations.mjs', 'scripts/security-scan.mjs', 'scripts/docs-sync.mjs',
+      'scripts/orchestrate.mjs', 'scripts/snap-contract.mjs', 'scripts/ticket.mjs', 'scripts/doc-locations.mjs', 'scripts/security-scan.mjs', 'scripts/docs-sync.mjs', 'scripts/release.mjs',
       '.claude/scripts/**',
       '.git/**', '.husky/**', '.githooks/**', '.mcp.json', 'opencode.json', 'opencode.jsonc',
-      '.claude/flow-status.mjs', 'project-template/.claude/flow-status.mjs',
+      '.claude/flow-status.mjs', 'project-template/.claude/flow-status.mjs', '.claude/release-profile.json',
       '.github/workflows/**', '.github/actions/**',
       'package.json', 'package-lock.json', 'npm-shrinkwrap.json', '.npmrc',
       '.pre-commit-config.yaml',
@@ -2852,7 +2854,7 @@ describe('pre-existing findings never reach the public part [FEAT-059]', () => {
 });
 
 describe('envelope verb outside a run [FEAT-061]', () => {
-  const ENV_USAGE = 'orchestrate: usage: orchestrate.mjs envelope <spec|plan|audit|qa|docs> [--item <label>] | --clear';
+  const ENV_USAGE = 'orchestrate: usage: orchestrate.mjs envelope <spec|plan|audit|qa|docs|release> [--item <label>] | --clear';
   const INSTALLED = (role) => `installed: ${role} envelope at ${ENVELOPE_FILE}`;
   const validates = (role) => spawnSync(process.execPath, [join(REPO_ROOT, 'scripts/snap-validate.mjs'), join(root, ENVELOPE_FILE), '--to', role], { encoding: 'utf8' }).status;
   const walk = (dir) => (existsSync(dir) ? readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)])) : []);
@@ -2943,7 +2945,7 @@ describe('envelope verb outside a run [FEAT-061]', () => {
     expect(orch(['envelope', '--clear'])).toEqual({ status: 0, out: 'no envelope', err: '' });
   });
 
-  it.each([[['code']], [['security']], [['nope']], [[]], [['spec', '--item', 'a b']], [['spec', '--item', '../x']], [['spec', '--item']], [['audit', '--label', 'x']], [['qa', '--item', 'x', 'extra']], [['docs', '--item', 'a b']]])(
+  it.each([[['code']], [['security']], [['nope']], [[]], [['spec', '--item', 'a b']], [['spec', '--item', '../x']], [['spec', '--item']], [['audit', '--label', 'x']], [['qa', '--item', 'x', 'extra']], [['docs', '--item', 'a b']], [['release', '--item', 'a b']]])(
     '[AC1] envelope %j is refused with the usage line and writes nothing', (args) => {
       agents();
       const r = orch(['envelope', ...args]);
@@ -2961,6 +2963,7 @@ describe('envelope verb outside a run [FEAT-061]', () => {
       [state, ['spec'], 2, refuse],
       [state, ['plan'], 2, refuse],
       [state, ['docs'], 2, state === 'L' ? 'envelope docs: run FEAT-011 is live in this session; reconcile documentation after a release, not inside a run' : OTHER],
+      [state, ['release'], 2, state === 'L' ? 'envelope release: run FEAT-011 is live in this session; cut a release after the run, not inside it' : OTHER],
       [state, ['audit'], 0, state === 'L' ? 'not-installed: live run FEAT-011; audit has no write tool' : 'not-installed: a run file at '],
       state === 'L' ? [state, ['qa'], 0, 'not-installed: live run FEAT-011; qa runs npm test'] : [state, ['qa'], 2, OTHER],
       [state, ['--clear'], 2, 'envelope --clear: a run file exists at '],
@@ -4025,6 +4028,8 @@ describe('unattended mode [FEAT-054]', () => {
     'scripts/doc-locations.mjs',
     'scripts/security-scan.mjs',
     'scripts/docs-sync.mjs',
+    'scripts/release.mjs',
+    '.claude/release-profile.json',
     '.claude/scripts/orchestrate.mjs',
   ])('U41 [BUG-080 AC1] delegate plan over an APPROVE report escalates a task that declares the control-plane file %s', (path) => {
     expectEscalation(path, 'control-plane files');
@@ -4970,5 +4975,98 @@ describe('docs envelope [FEAT-036]', () => {
     const r = orch(['install', 'docs']);
     expect(r.status).toBe(2);
     expect(r.err).toMatch(/^orchestrate: install docs: the next step is /);
+  });
+});
+
+describe('release envelope [FEAT-035]', () => {
+  const MINI = {
+    versions: [{ path: 'VERSION', line: '{version}' }],
+    changelog: { path: 'CHANGELOG.md', heading: '## [{version}] - {date}' },
+    tag: 'v{version}', remote: 'origin', mainline: 'main',
+    checks: [{ name: 'ok', argv: ['node', '-e', '0'] }],
+    publish: null,
+  };
+  // A repository whose HEAD holds the release files and, when commitIt, the profile; a null profile writes none,
+  // and commitIt false writes it after the commit, so it is in the work tree but not at HEAD.
+  function releaseRepo(profile = MINI, commitIt = true) {
+    fixtureGit('init', '-q');
+    writeFileSync(join(root, 'VERSION'), '1.55.0\n');
+    writeFileSync(join(root, 'CHANGELOG.md'), '# Changelog\n');
+    const write = () => profile && writeFileSync(join(root, '.claude', 'release-profile.json'), JSON.stringify(profile));
+    if (commitIt) write();
+    fixtureCommit();
+    if (!commitIt) write();
+  }
+  const wide = (count) => ({ ...MINI, versions: Array.from({ length: count - 1 }, (_, i) => ({ path: `v${i}.txt`, line: '{version}' })) });
+
+  it('[R1] installs a v6 release envelope whose scope is the profile surface', () => {
+    agents(['release']);
+    releaseRepo();
+    const r = orch(['envelope', 'release', '--item', '1.56.0']);
+    expect(r.status).toBe(0);
+    expect(r.out.split('\n')[0]).toBe(`installed: release envelope at ${ENVELOPE_FILE}`);
+    expect(spawnSync(process.execPath, [join(REPO_ROOT, 'scripts/snap-validate.mjs'), join(root, ENVELOPE_FILE), '--to', 'release'], { encoding: 'utf8' }).status).toBe(0);
+    expect(envelope()).toMatchObject({ v: 6, sys: { ph: 'impl', s: '1.56.0', role: 'release', tk: 'RW' }, ops: { gate: 'verify_pass' } });
+    expect(envelope().ops.scope).toEqual(releaseSurface(validateProfile(MINI)));
+    expect(envelope().ops.scope).toEqual(['VERSION', 'CHANGELOG.md']);
+    expect(existsSync(join(root, RUN_FILE))).toBe(false);
+  });
+
+  it('[R2] refuses when the repository has no release profile', () => {
+    agents(['release']);
+    releaseRepo(null);
+    const r = orch(['envelope', 'release']);
+    expect(r).toMatchObject({ status: 2, err: 'orchestrate: RELEASE_NOT_CONFIGURED: no release profile at HEAD; run /cc-release --init' });
+    expect(existsSync(join(root, ENVELOPE_FILE))).toBe(false);
+  });
+
+  it('[R3] refuses a profile that is written but not committed', () => {
+    agents(['release']);
+    releaseRepo(MINI, false);
+    const r = orch(['envelope', 'release']);
+    expect(r).toMatchObject({ status: 2, err: 'orchestrate: RELEASE_NOT_CONFIGURED: no release profile at HEAD; run /cc-release --init' });
+    expect(existsSync(join(root, ENVELOPE_FILE))).toBe(false);
+  });
+
+  it('[R4] refuses a committed profile that is invalid', () => {
+    agents(['release']);
+    releaseRepo({ ...MINI, checks: [] });
+    const r = orch(['envelope', 'release']);
+    expect(r.status).toBe(2);
+    expect(r.err).toContain('orchestrate: RELEASE_PROFILE_INVALID: checks: ');
+  });
+
+  it('[R5] refuses a 21-path surface', () => {
+    agents(['release']);
+    releaseRepo(wide(21));
+    expect(orch(['envelope', 'release'])).toMatchObject({ status: 2, err: 'orchestrate: RELEASE_SURFACE_TOO_WIDE: 21 paths exceeds ops.scope cap 20' });
+  });
+
+  it('[R6] installs a 20-path surface', () => {
+    agents(['release']);
+    releaseRepo(wide(20));
+    expect(orch(['envelope', 'release']).status).toBe(0);
+    expect(envelope().ops.scope).toHaveLength(20);
+  });
+
+  it('[R7] refuses when no release agent is defined', () => {
+    agents(['spec']);
+    releaseRepo();
+    expect(orch(['envelope', 'release'])).toMatchObject({ status: 2, err: 'orchestrate: ORCH_AGENT_MISSING: no agent definition named release in .claude/agents/ or ~/.claude/agents/' });
+  });
+
+  it('[R8] refuses outside a repository', () => {
+    agents(['release']);
+    const r = orch(['envelope', 'release']);
+    expect(r.status).toBe(2);
+    expect(r.err).toContain('orchestrate: RELEASE_NOT_A_REPO: ');
+  });
+
+  it('[R9] no run routes to release: install release is refused inside a run', () => {
+    agents([...ROLES, 'release']);
+    expect(orch(['start', 'FEAT-011']).status).toBe(0);
+    const r = orch(['install', 'release']);
+    expect(r.status).toBe(2);
+    expect(r.err).toContain('orchestrate: install release: the next step is ');
   });
 });

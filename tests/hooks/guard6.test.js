@@ -77,6 +77,21 @@ describe('Guard 6: the orchestrator holds no repository write access [FEAT-011]'
     expect(d.permissionDecisionReason).toBe("Guard 5: BAND_ROLE_MISMATCH: agent docs is not the envelope's role code.");
   });
 
+  it('[FEAT-035 G6-1] steps aside for the release band role, which holds no envelope-free write', () => {
+    liveRun();
+    expect(fire(payload('Write', tracked(), { cwd: root, agentId: 'a9', agentType: 'release' })).decision).toBeNull();
+  });
+
+  it('[FEAT-035 G6-2] denies release BAND_ROLE_MISMATCH under a live run whose envelope names another role', () => {
+    liveRun();
+    writeFileSync(join(root, '.claude', 'memory', 'band-envelope.json'), JSON.stringify({
+      v: 3, sys: { ph: 'impl', c: 'abc1234', s: 'FEAT-011', role: 'code', tk: 'RW' },
+      ops: { n: [], f: [], scope: ['sub/src/**'], gate: 'define_approved' }, mem: { d: [], x: [] },
+    }));
+    const d = fire(payload('Edit', tracked(), { cwd: root, agentId: 'a9', agentType: 'release' })).decision;
+    expect(d.permissionDecisionReason).toBe("Guard 5: BAND_ROLE_MISMATCH: agent release is not the envelope's role code.");
+  });
+
   it('[R2] allows every write when no run file exists', () => {
     const r = asMain(tracked());
     expect(r.decision).toBeNull();

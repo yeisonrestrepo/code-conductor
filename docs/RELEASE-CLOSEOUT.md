@@ -2,6 +2,8 @@
 
 **Halt semantics come from the merge gate, not from this document.** `CONTRIBUTING.md` states the GitHub Actions CI gate is unconditional, and `tests/tools/repo-invariants.test.js` asserts the version and record invariants against the live repository on every push and pull request. Each CI leg also asserts its exact skipped-test set against `tools/skip-baseline.json` (`tools/skip-baseline.mjs`, `[BUG-048]`), so a change in what CI skips is red at the same gate. So steps 3 and 4 below are **CI-backed**: skipping them does not let a divergence through, it only delays finding it.
 
+**`/cc-release` adds an earlier halt; it does not replace the merge gate.** This repository's release profile, `.claude/release-profile.json`, names `tools/version-gate.mjs` then `tools/record-parity.mjs` as its checks, so `release.mjs` runs both on the untouched tree before the `release` agent edits anything, again on its diff, and again at the merged commit before the tag, halting with `RELEASE_HALT <name>` on the first red one. The manual commands below remain the fallback.
+
 Step 8 is **not** CI-backed, and the reason is named rather than left implicit: the ceiling's `origin/main` leg needs a ref `actions/checkout@v7` does not fetch at its default depth. `fetch-depth: 0` was declined, because the filing ritual's both-legs rule already protects it and a slower clone on every CI run buys nothing that rule does not give.
 
 This document exists because the sentence "run it as a closeout step the ritual cannot skip" was written against a checklist that did not exist. A sentence binding an artifact into a document that is not there is unenforceable, and an unenforceable sentence claiming enforcement is the same class of defect `[BUG-044]` shipped to fix.
@@ -12,7 +14,7 @@ This document exists because the sentence "run it as a closeout step the ritual 
 
 1. **Open the release pull request** from the item's branch.
 
-2. **Move all five version locations in one commit**, together with the `CHANGELOG` entry, the backlog heading flip and its DONE bullet. See *Why the heading flip lives in the release commit*, below. The five locations are `VERSION`, `package.json` `version`, `package-lock.json` `version`, `package-lock.json` `packages[""].version`, and the `CHANGELOG.md` first heading. npm updates the third and fourth separately, which is why the gate reads both.
+2. **Move all five version locations in one commit**, together with the `CHANGELOG` entry, the backlog heading flip and its DONE bullet. See *Why the heading flip lives in the release commit*, below. The five locations are `VERSION`, `package.json` `version`, `package-lock.json` `version`, `package-lock.json` `packages[""].version`, and the `CHANGELOG.md` first heading. npm updates the third and fourth separately, which is why the gate reads both. On a release branch, `/cc-release <version> --items <IDs>` performs steps 2 to 4: the `release` role agent writes this step from the digest, and `release.mjs check` confines the diff to the profile's release surface (`VERSION`, `package.json`, `package-lock.json`, `CHANGELOG.md`, `AGENT-READABLE BACKLOG.md`), judges each file line by line, then runs the two instruments in order.
 
 3. **Run the version gate.**
 
@@ -20,7 +22,7 @@ This document exists because the sentence "run it as a closeout step the ritual 
    node tools/version-gate.mjs
    ```
 
-   Expect five `ok` lines and `VERSION_GATE_OK <version>` at rc 0. A `FAIL` names the location that did not move, and the fix is that location, never the gate. **CI-backed.**
+   Expect five `ok` lines and `VERSION_GATE_OK <version>` at rc 0. A `FAIL` names the location that did not move, and the fix is that location, never the gate. **CI-backed.** `/cc-release` already ran it; run it by hand on the fallback path.
 
 4. **Run record parity.**
 
@@ -28,7 +30,7 @@ This document exists because the sentence "run it as a closeout step the ritual 
    node tools/record-parity.mjs
    ```
 
-   Expect `RECORD_PARITY_OK` at rc 0. **CI-backed.**
+   Expect `RECORD_PARITY_OK` at rc 0. **CI-backed.** `/cc-release` already ran it; run it by hand on the fallback path.
 
 5. **Merge on green**: both legs of the Test workflow green, each printing `SKIP_BASELINE_OK`.
 
@@ -43,6 +45,8 @@ This document exists because the sentence "run it as a closeout step the ritual 
    ```
 
    `0 ahead / 1 behind` is a clean squash sync. **A clean sync is a measurement, not an absence:** reporting the counts before fast-forwarding is what distinguishes "nothing stranded" from "nothing checked". Anything else is the stranding case and gets the rebase-and-skip ritual with upstream-superset evidence gathered first.
+
+**6a. Hand off the tag, the publish and the writeback.** After the sync, `/cc-release --handoff <version> --pr <number>` refuses unless the tree is clean, every version location reads `<version>` at `HEAD`, `HEAD` equals the local `refs/remotes/origin/main` and the tag `v<version>` does not exist; it runs both instruments again, writes `.conductor/release/<version>/notes.md` from the version's `CHANGELOG.md` section, and prints the steps `git tag -a`, `git push origin v<version>` and `gh release create v<version> --verify-tag --title v<version> --notes-file .conductor/release/<version>/notes.md`, then step 11's writeback. It runs each one only after you confirm it, and the publish question says the step publishes to npm and cannot be undone. **Not CI-backed**: these are outward writes.
 
 7. **Append the closeout record** to `.claude/memory/project.md`, **stating the instruments' output rather than asserting that the records agree.** The difference is the whole point: an assertion is a claim, an output is evidence.
 
@@ -77,7 +81,7 @@ This document exists because the sentence "run it as a closeout step the ritual 
     node scripts/ticket.mjs writeback <ITEM> --version <version> --pr <number> [--changelog <file>] [--close]
     ```
 
-    Expect `posted to <owner>/<repo>#<n> (bound <fetched>)` at rc 0, or `already written to <owner>/<repo>#<n>` on a re-run: the hidden marker `<!-- conductor:writeback <ITEM>@<version> -->` makes the verb idempotent per version. `--changelog` takes a file holding the excerpt to quote, 32768 bytes at most; this repository extracts it from the version's `CHANGELOG.md` entry by hand. `--close` closes the issue as completed, and is a no-op on a closed one. The verb is the owner's, never a role's, and nothing runs it automatically. **Not CI-backed**: it is an outward write to the tracker.
+    Expect `posted to <owner>/<repo>#<n> (bound <fetched>)` at rc 0, or `already written to <owner>/<repo>#<n>` on a re-run: the hidden marker `<!-- conductor:writeback <ITEM>@<version> -->` makes the verb idempotent per version. `--changelog` takes a file holding the excerpt to quote, 32768 bytes at most; `/cc-release --handoff` writes it as `.conductor/release/<version>/<ITEM>.md`, the item's claim bullet from the version's `CHANGELOG.md` entry, and prints this step last, one per claimed item whose ticket is bound, never with `--close`. `--close` closes the issue as completed, and is a no-op on a closed one. The verb is the owner's, never a role's, and nothing runs it automatically. **Not CI-backed**: it is an outward write to the tracker.
 
 ---
 

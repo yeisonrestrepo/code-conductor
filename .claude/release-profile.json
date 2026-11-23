@@ -1,0 +1,28 @@
+{
+  "versions": [
+    { "path": "VERSION", "line": "{version}" },
+    { "path": "package.json", "json": ["version"] },
+    { "path": "package-lock.json", "json": ["version"] },
+    { "path": "package-lock.json", "json": ["packages", "", "version"] }
+  ],
+  "changelog": { "path": "CHANGELOG.md", "heading": "## [{version}] - {date}" },
+  "tag": "v{version}",
+  "remote": "origin",
+  "mainline": "main",
+  "checks": [
+    { "name": "version-gate", "argv": ["node", "tools/version-gate.mjs"] },
+    { "name": "record-parity", "argv": ["node", "tools/record-parity.mjs"] }
+  ],
+  "publish": {
+    "target": "npm, through the GitHub Release publish.yml listens for",
+    "argv": ["gh", "release", "create", "{tag}", "--verify-tag", "--title", "{tag}", "--notes-file", "{notes}"]
+  },
+  "backlog": {
+    "path": "AGENT-READABLE BACKLOG.md",
+    "open": "### [ ] `[{id}]` {title}",
+    "closed": "### [X] `[{id}]` {title}",
+    "done": "* **DONE, shipped as `{version}` on {date}.**",
+    "claim": "**[{id}]**"
+  },
+  "ticket": { "writeback": true }
+}

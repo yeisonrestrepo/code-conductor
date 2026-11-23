@@ -590,3 +590,61 @@ describe('role dispatch from the phase commands [FEAT-061]', () => {
     expect(text).toContain('never rerun the suite in this session to replace qa\'s answer');
   });
 });
+
+const RELEASE_MIRRORS = ['.claude/commands/cc-release.md', 'project-template/.claude/commands/cc-release.md'];
+
+describe('cc-release [FEAT-035]', () => {
+  it('[P1] the two copies are byte-identical', () => {
+    expect(read(RELEASE_MIRRORS[1])).toBe(read(RELEASE_MIRRORS[0]));
+  });
+
+  it.each(RELEASE_MIRRORS)('[P2] %s dispatches release only through its envelope and judges the diff', (rel) => {
+    const text = read(rel);
+    for (const phrase of [
+      'S=.claude/scripts; [ -f "$S/release.mjs" ] || S=scripts',
+      'node "$S/release.mjs" digest --version <version> [--items <IDs>] [--date <YYYY-MM-DD>]',
+      'node "$S/orchestrate.mjs" envelope release --item <version>',
+      'Agent({ subagent_type: "release"',
+      'node "$S/orchestrate.mjs" envelope --clear',
+      'release not dispatched: <the verb\'s stderr line>',
+      '`installed:`',
+      'a phase command, not a run, dispatched the agent',
+      'node "$S/release.mjs" check --version <version> [--items <IDs>] --date <DATE> < .conductor/handback/release.txt',
+      'git diff --stat',
+      'git checkout -- <files>',
+      'This command never commits, stages or reverts anything.',
+      'node "$S/release.mjs" init --confirm',
+      'No confirmation, no profile.',
+    ]) expect(text).toContain(phrase);
+  });
+
+  it.each(RELEASE_MIRRORS)('[O6] %s runs only the printed STEP lines, one confirmation each', (rel) => {
+    const text = read(rel);
+    for (const phrase of [
+      'Run only the printed `STEP` lines, verbatim, one per explicit owner confirmation.',
+      '"this publishes to `<PUBLISH-TARGET>` and cannot be undone"',
+      'never with `--close`',
+      'Stop at the first non-zero exit, naming the step; an unconfirmed step stops the flow.',
+      'Never run a command that is not a printed `STEP` line.',
+      'The writeback steps print last, so the writeback runs last.',
+    ]) expect(text).toContain(phrase);
+  });
+});
+
+describe('the release role ships [FEAT-035 O5]', () => {
+  let cwd;
+  beforeAll(() => {
+    cwd = mkdtempSync(join(tmpdir(), 'cc-release-ship-'));
+    deployProject(root, cwd, { warn: () => {}, report: () => {} });
+  });
+  afterAll(() => rmSync(cwd, { recursive: true, force: true }));
+
+  it('[P4] an install gets the driver, its ticket helper, the agent and the command, and no profile or tools', () => {
+    for (const rel of ['.claude/scripts/release.mjs', '.claude/scripts/ticket.mjs', '.claude/agents/release.md', '.claude/commands/cc-release.md']) {
+      expect(existsSync(join(cwd, rel)), rel).toBe(true);
+    }
+    for (const rel of ['.claude/release-profile.json', 'tools', '.claude/tools']) {
+      expect(existsSync(join(cwd, rel)), rel).toBe(false);
+    }
+  });
+});
