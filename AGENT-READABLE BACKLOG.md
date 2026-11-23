@@ -1611,6 +1611,29 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #284; reported by the automated security review of
   #283.
 
+### [ ] `[BUG-090]` Release command leaves a rejected diff on package manifests without a discard-before-tooling warning
+
+- Symptom: when `release.mjs check` rejects the release role's edits,
+  step 6 of `/cc-release` (.claude/commands/cc-release.md:30 and its
+  `project-template/` copy, per the issue) leaves the diff in the work
+  tree and only suggests `git checkout -- <files>`. The release surface
+  can include package manifests such as `package.json` and
+  `package-lock.json`.
+- Impact per the issue: the release role reads commit subjects and
+  backlog text, which may be attacker-influenced, so a rejected diff
+  could carry an injected npm lifecycle or test script. `check` already
+  rejects that diff before running any check (`judgeJsonFile` in
+  `scripts/release.mjs`), so the risk is limited to the owner running a
+  package-manager command before cleaning up.
+- Fix shape suggested by the issue: when any `RELEASE_LOCATION_SHAPE`
+  or `RELEASE_OUT_OF_SCOPE` line names a manifest or another
+  control-plane path, have step 6 say plainly that the diff must be
+  discarded before running any project tooling, and print the exact
+  `git checkout -- <paths>` command for the rejected files.
+- Follow-up of `[FEAT-035]`.
+- Intake of issue #299; reported by the automated security review of
+  the 1.56.0 release candidate (#298).
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
