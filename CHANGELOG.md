@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.57.0] - 2026-11-23
+
+### Added
+- **[FEAT-030]** The conductor cache DB now bounds its `snapshots` table by size as well as by row count, closing the growth mode FEAT-025 left open (500 rows of up to 10 MiB each, ~5 GB). `purgeTable` in `scripts/conductor-db.mjs` gains a fourth bound, run after the three row bounds only when the caller passes `byteBound`: the `snapshots` write passes it through the new exported `SNAPSHOT_RETENTION`, with a 256 MiB budget on `snap_json` and the 10 MiB intake cap (`PRE_PARSE_MAX_BYTES`) as the per-row maximum, and `raw_history` passes none, so its behavior is unchanged. While the row count times that per-row maximum is within the budget (25 rows or fewer) the sum is never scanned. Past it, the size is summed in UTF-8 bytes (`LENGTH(CAST(snap_json AS BLOB))`), and when the sum is over budget one DELETE removes the shortest oldest-first run of rows outside the newest-per-hash floor whose sizes cover the excess, so every hash keeps the row `get-snapshot` reads. A failure in the bound is reported by the existing `retention purge skipped (snapshots)` warning, the inserted row is kept and the CLI exits 0. The CLI now runs only when the file is the invoked script, so importing the module runs nothing. No schema version or dependency change. Pinned by `conductor-db module surface [FEAT-030]`, `conductor-db byte budget [FEAT-030]` and `conductor-db byte budget through the CLI [FEAT-030]` in `tests/scripts/conductor-db.test.js`; the ten `node:sqlite`-gated rows join the `ci-node20` entry of `tools/skip-baseline.json`. Landed from PR #301 (cc-lane-bot), intake of issue #146.
+
 ## [1.56.0] - 2026-11-23
 
 ### Added
