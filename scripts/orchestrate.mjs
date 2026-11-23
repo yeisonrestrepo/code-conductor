@@ -97,6 +97,8 @@ export const CONTROL_PLANE_NAMES = [
 // Where /cc-orchestrate writes each agent's final message for `handback` to read: inside
 // the surface, and cleared with the run so file names never collide across runs.
 export const HANDBACK_DIR = '.conductor/handback';
+// BUG-089: the files the change created or modified, written by install qa in a run that declares known failures.
+const CHANGE_LIST_FILE = `${HANDBACK_DIR}/qa-change.txt`;
 // FEAT-059 C5, C7: owner-only; outside the hand-back directory so it outlives end.
 const OWNER_FILE = '.conductor/security-pre-existing.txt';
 // FEAT-041: the Define review loop's reports, cleared with the run like the hand-backs.
@@ -637,6 +639,33 @@ function dispatchModel(run, step) {
   return step.fix === undefined ? run.models[step.role] : fixDue(run).model ?? run.models.code;
 }
 
+// BUG-089: the files the change created (A) or modified (M) against the base start recorded, sorted by path.
+// --no-renames makes a rename a delete plus a create; a deleted file holds no test that can fail, so it is left out.
+function changeList(root, security) {
+  if (!isPlainObject(security)) return { reason: 'the run has no security record (started before FEAT-034)' };
+  if (security.base === null) return { reason: 'the run recorded no base commit' };
+  const git = (args) => spawnSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 1 << 30 });
+  const diff = git(['diff', '--name-status', '--no-renames', '--relative', '-z', security.base]);
+  const others = git(['ls-files', '--others', '--exclude-standard', '-z']);
+  if (diff.status !== 0 || others.status !== 0) return { reason: 'git cannot compare the work tree with the base commit' };
+  const status = new Map();
+  const fields = diff.stdout.split('\0');
+  for (let i = 0; i + 1 < fields.length; i += 2) if (fields[i] !== 'D') status.set(fields[i + 1], fields[i] === 'A' ? 'A' : 'M');
+  for (const path of others.stdout.split('\0').filter(Boolean)) status.set(path, 'A');
+  return { lines: [...status.keys()].sort().map((path) => `${status.get(path)} ${path}`) };
+}
+
+// BUG-089: every install qa rewrites the list, and removes it when it cannot be computed, so qa never reads an older one.
+function changeNote(root, run, check) {
+  if (!Array.isArray(run.known_failures) || run.known_failures.length === 0) return '';
+  const { lines, reason } = changeList(root, run.security);
+  if (!check && lines) writeAtomic(join(root, CHANGE_LIST_FILE), lines.map((line) => `${line}\n`).join(''));
+  if (!check && !lines) rmSync(join(root, CHANGE_LIST_FILE), { force: true });
+  if (!lines) return `\nchange files: unavailable (${reason}); no failing test is known`;
+  const created = lines.filter((line) => line.startsWith('A ')).length;
+  return `\nchange files: ${created} created, ${lines.length - created} modified (${CHANGE_LIST_FILE})`;
+}
+
 // Builds and validates the next envelope with --to; installs it unless only checking.
 function install(root, sessionId, role, check) {
   const run = liveRun(root, sessionId);
@@ -651,7 +680,8 @@ function install(root, sessionId, role, check) {
   const error = validate(built.out, role);
   if (error) throw new Halt(error.includes('SNAP_GATE_MISMATCH') ? 'SNAP_GATE_MISMATCH' : 'SNAP_ERROR', error);
   const model = dispatchModel(run, step);
-  const out = built.out.trim() + (step.fix === undefined ? '' : `\n${fixNote(run)}`) + (model ? `\nmodel: ${model}` : '');
+  const change = role === 'qa' ? changeNote(root, run, check) : '';
+  const out = built.out.trim() + (step.fix === undefined ? '' : `\n${fixNote(run)}`) + change + (model ? `\nmodel: ${model}` : '');
   if (check) return out;
   writeAtomic(join(root, ENVELOPE_FILE), built.out);
   saveRun(root, { ...run, band: ROLE_BAND[role], role, ...(model ? { dispatch_model: model } : {}) });
@@ -1489,9 +1519,14 @@ const START_USAGE = 'usage: orchestrate.mjs start <ITEM> [--auto] [--ticket <N|i
 // A --ticket with no value reaches intake as '' and halts there (FEAT-031 B1.1).
 // BUG-074: a declared known failure is a fragment of one runner failure line. A blank value, a line break,
 // more than 200 characters, a repeat, or a leading -- (a missing value swallowing the next flag) is a usage error.
+// BUG-089: a value under 12 code points once trimmed, or one word of letters, digits, _ and -, is contained in
+// almost every failure line a runner prints, so it is a usage error too. \p{L} and \p{N} make a non-ASCII word one word.
+const KNOWN_FAILURE_MIN = 12;
+const ONE_WORD = /^[\p{L}\p{N}_-]+$/u;
+const isSpecificEntry = (value) => [...value.trim()].length >= KNOWN_FAILURE_MIN && !ONE_WORD.test(value.trim());
 const KNOWN_FAILURE_MAX = 200;
 const isKnownFailureArg = (value, seen) => typeof value === 'string' && value.trim() !== '' && !/[\r\n]/.test(value)
-  && [...value].length <= KNOWN_FAILURE_MAX && !value.startsWith('--') && !seen.includes(value);
+  && [...value].length <= KNOWN_FAILURE_MAX && !value.startsWith('--') && !seen.includes(value) && isSpecificEntry(value);
 function parseStartArgs(args) {
   const [item, ...rest] = args;
   const opts = { item, auto: false, ticket: undefined, auditRounds: undefined, threshold: undefined, dependencyAudit: true, unattended: false, knownFailures: [] };
