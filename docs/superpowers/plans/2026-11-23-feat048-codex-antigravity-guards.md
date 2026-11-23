@@ -42,11 +42,11 @@
 
 ---
 
-- [ ] [T-000] Task 0: commit the spec and plan
+- [X] [T-000] Task 0: commit the spec and plan
   - [X] [T-000-A] Add leaves `!/docs/superpowers/plans/2026-11-23-feat048-codex-antigravity-guards.md` and `!/docs/superpowers/specs/2026-11-23-feat048-codex-antigravity-guards-design.md` to `.gitignore` in sorted position.
   - [X] [T-000-B] Run `npx vitest run tests/unit/gitignore-block-parity.test.js` after staging; expected PASS.
   - [X] [T-000-C] `git add -f docs/superpowers/specs/2026-11-23-feat048-codex-antigravity-guards-design.md docs/superpowers/plans/2026-11-23-feat048-codex-antigravity-guards.md` then `git add -u .gitignore .claude/memory/project.md`
-  - [ ] [T-000-D] `git commit -m "docs: add the FEAT-048 slice 2 Antigravity and Codex guard spec and plan"`
+  - [X] [T-000-D] `git commit -m "docs: add the FEAT-048 slice 2 Antigravity and Codex guard spec and plan"`
 
 ### Task 1: Antigravity adapter
 
@@ -66,12 +66,12 @@ Mapping:
 - Any other name → `code-conductor guard does not cover the Antigravity tool "<name>"; it is blocked until the guard maps it`.
 - Guard decision parsing mirrors `readDecision` in `project-template/.opencode/plugin/conductor-guard.js:129-141` (deny and ask both block).
 
-- [ ] [T-001] Write the Antigravity adapter tests and adapter
-  - [ ] [T-001-A] Write `tests/hooks/antigravity-guard.test.js`: scaffold a temp project (copy guard + adapter into `.claude/hooks/` and `.agents/hooks/`), run `node .agents/hooks/conductor-guard.mjs` with cwd `<tmp>/.agents` and the payload on stdin. Tests: (1) every Bash row of `CORPUS`/`DIALECT` from `tests/fixtures/guard3-corpus.js` gives the same allow/deny as the Claude hook; (2) recorded `run_command "echo probe-ok"` → empty stdout; (3) `read_file` of a 300-line file with no range → deny naming Guard 1; with `StartLine:10, EndLine:20` → allow; (4) `read_file` under `node_modules/` → Guard 4 deny; (5) `write_file`/`edit_file` recorded payloads → allow; (6) unknown tool `browser_open` → deny with the uncovered reason; (7) `run_command` with `Cwd` → deny naming `"Cwd"`; (8) `run_command` with `CommandLine: 5` → deny; (9) missing `toolCall` → deny; (10) non-JSON stdin → deny; (11) guard file removed → deny naming the guard path; (12) guard replaced by a script printing `not json` → deny.
-  - [ ] [T-001-B] Run `npx vitest run tests/hooks/antigravity-guard.test.js`; expected: all FAIL (adapter missing).
-  - [ ] [T-001-C] Implement `project-template/.agents/hooks/conductor-guard.mjs` and `tests/fixtures/antigravity-payloads.js` per Interfaces; a top-level try/catch turns any throw into a deny JSON.
-  - [ ] [T-001-D] Run `npx vitest run tests/hooks/antigravity-guard.test.js tests/hooks/opencode-guard.test.js`; expected: all PASS.
-  - [ ] [T-001-E] `git add project-template/.agents/hooks/conductor-guard.mjs tests/hooks/antigravity-guard.test.js tests/fixtures/antigravity-payloads.js` and `git add -u docs/superpowers/plans/2026-11-23-feat048-codex-antigravity-guards.md`
+- [>] [T-001] Write the Antigravity adapter tests and adapter
+  - [X] [T-001-A] Write `tests/hooks/antigravity-guard.test.js`: scaffold a temp project (copy guard + adapter into `.claude/hooks/` and `.agents/hooks/`), run `node .agents/hooks/conductor-guard.mjs` with cwd `<tmp>/.agents` and the payload on stdin. Tests: (1) every Bash row of `CORPUS`/`DIALECT` from `tests/fixtures/guard3-corpus.js` gives the same allow/deny as the Claude hook; (2) recorded `run_command "echo probe-ok"` → empty stdout; (3) `read_file` of a 300-line file with no range → deny naming Guard 1; with `StartLine:10, EndLine:20` → allow; (4) `read_file` under `node_modules/` → Guard 4 deny; (5) `write_file`/`edit_file` recorded payloads → allow; (6) unknown tool `browser_open` → deny with the uncovered reason; (7) `run_command` with `Cwd` → deny naming `"Cwd"`; (8) `run_command` with `CommandLine: 5` → deny; (9) missing `toolCall` → deny; (10) non-JSON stdin → deny; (11) guard file removed → deny naming the guard path; (12) guard replaced by a script printing `not json` → deny.
+  - [X] [T-001-B] Run `npx vitest run tests/hooks/antigravity-guard.test.js`; expected: all FAIL (adapter missing).
+  - [X] [T-001-C] Implement `project-template/.agents/hooks/conductor-guard.mjs` and `tests/fixtures/antigravity-payloads.js` per Interfaces; a top-level try/catch turns any throw into a deny JSON.
+  - [X] [T-001-D] Run `npx vitest run tests/hooks/antigravity-guard.test.js tests/hooks/opencode-guard.test.js`; expected: all PASS.
+  - [X] [T-001-E] `git add project-template/.agents/hooks/conductor-guard.mjs tests/hooks/antigravity-guard.test.js tests/fixtures/antigravity-payloads.js` and `git add -u docs/superpowers/plans/2026-11-23-feat048-codex-antigravity-guards.md`
   - [ ] [T-001-F] `git commit -m "feat: add the Antigravity CLI guard adapter [FEAT-048]"`
 
 ### Task 2: `--antigravity` installer flag
