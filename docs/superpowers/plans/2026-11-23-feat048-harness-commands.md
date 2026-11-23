@@ -54,6 +54,6 @@
 
 ### Task 3: Docs and PR
 
-- [ ] [T-003] Document and open the PR
+- [X] [T-003] Document and open the PR
   - [X] [T-003-A] README Antigravity/Codex rows for commands; backlog slice 3 line.
-  - [ ] [T-003-B] `git commit -m "docs: document the cc-* commands on Antigravity and Codex [FEAT-048]"`; push; draft PR based on `feat/feat-048-codex-antigravity-guards`, body ending `Code created by Claude Code (Claude Opus 5.5)`.
+  - [X] [T-003-B] `git commit -m "docs: document the cc-* commands on Antigravity and Codex [FEAT-048]"`; push; draft PR based on `feat/feat-048-codex-antigravity-guards`, body ending `Code created by Claude Code (Claude Opus 5.5)`.
