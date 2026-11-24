@@ -119,7 +119,7 @@ Insert after `Guard 5 denies a write anywhere else.`: ` Do not edit files in the
 
 The test list is the handoff to the tests' author. In an orchestrated run the `test-writer` role writes every declared file inside the project's test surface, before `code` implements the task, and `code` writes the rest. The test surface is the globs of the `- Test files:` line in the project `CLAUDE.md`, `tests/**` when the line is absent. Declare each test file on a `- Test:` line in the `**Files:**` block of the task that needs it, and only a file inside the test surface: `approve plan` refuses a `Test:` line outside it (`ORCH_TEST_OUTSIDE_SURFACE`). A `- Create:` or `- Modify:` line inside the test surface, such as a fixture or a helper, belongs to `test-writer` too. Each row names its file and its task; add an E2E row when the UI is affected:
 
-- [ ] [T-NNN] <test path> (Task N): <cases>
+- [X] [T-NNN] <test path> (Task N): <cases>
 ```
 
 `:147`: `with a \`**Files:**\` block under each task.` becomes `with a \`**Files:**\` block under each task whose \`- Test:\` lines name only files inside the project's test surface, as the Test List section says.`
