@@ -37,10 +37,10 @@ const GROUP_RE = /^(#{1,5})\s+(phase|epic|pillar)\b[\s:#-]*(\d+)?[\s:.-]*(.*)$/i
 const HEADING_RE = /^(#{1,6})\s/;
 
 export class DocLocationError extends Error {
-  constructor(reason) {
-    super(`${CODE}: ${reason}`);
+  constructor(reason, code = CODE) {
+    super(`${code}: ${reason}`);
     this.name = 'DocLocationError';
-    this.code = CODE;
+    this.code = code;
     this.reason = reason;
   }
 }
@@ -100,6 +100,62 @@ export function readRecordedPair(root) {
   const pair = { specs: stripSlash(specs), plans: stripSlash(plans) };
   if (overlaps(pair.specs, pair.plans)) throw new DocLocationError('`- Specs:` and `- Plans:` overlap; use two disjoint folders');
   return pair;
+}
+
+// FEAT-033: the globs the test-writer role may write, recorded the way the spec and plan
+// folders are. The default is what a project with no recorded line gets.
+export const DEFAULT_TEST_SURFACE = ['tests/**'];
+const TEST_CODE = 'ORCH_TEST_SURFACE_INVALID';
+const TEST_LINE = /^- Test files: (.+)$/gm;
+const testError = (reason) => new DocLocationError(reason, TEST_CODE);
+
+// The segments before the first wildcard: the folder a glob is anchored in.
+const literalPrefix = (glob) => {
+  const segments = glob.split('/');
+  const wild = segments.findIndex((seg) => seg.includes('*'));
+  return (wild === -1 ? segments : segments.slice(0, wild)).join('/');
+};
+
+function docOverlap(prefix, docs) {
+  const folded = prefix.toLowerCase();
+  if (overlaps(folded, docs.specs.toLowerCase())) return `overlaps the spec folder ${docs.specs}`;
+  if (overlaps(folded, docs.plans.toLowerCase())) return `overlaps the plan folder ${docs.plans}`;
+  return '';
+}
+
+function shapeReason(glob) {
+  if (glob === '' || glob === '<command>') return 'is empty or the template placeholder';
+  if (glob.startsWith('/') || /^[A-Za-z]:/.test(glob)) return 'is absolute; use a path relative to the repository root';
+  if (glob.split('/').includes('..')) return 'climbs out with a `..` segment';
+  if (glob.includes('\\')) return 'uses `\\`; separate segments with `/`';
+  if (/[?[\]{}]/.test(glob)) return 'carries `?`, `[]` or `{}`; only `*` and `**` are wildcards';
+  if (glob.split('/').some((seg) => seg === '' || seg === '.')) return 'carries an empty or `.` segment; write the plain path from the repository root';
+  const cap = V3_CAPS['ops.scope'][1];
+  if (glob.length > cap) return `is ${glob.length} characters; the cap is ${cap}`;
+  return '';
+}
+
+export function checkTestGlob(glob, docs = DEFAULT_PAIR) {
+  const shape = shapeReason(glob);
+  if (shape) return shape;
+  if (glob.split('/')[0].includes('*')) return 'starts with a wildcard, so its literal prefix is the repository root, which covers every reserved folder';
+  const prefix = literalPrefix(glob);
+  return reservedReason(prefix) || docOverlap(prefix, docs);
+}
+
+export function readTestSurface(root, docs) {
+  const lines = [...(readText(join(root, 'CLAUDE.md')) ?? '').matchAll(TEST_LINE)];
+  if (lines.length === 0) return { globs: [...DEFAULT_TEST_SURFACE], source: 'default' };
+  if (lines.length > 1) throw testError('CLAUDE.md records `- Test files:` more than once; keep one line');
+  const value = lines[0][1];
+  const globs = value.split(',').map((glob) => glob.trim());
+  const cap = V3_CAPS['ops.scope'][0];
+  if (globs.length > cap) throw testError(`\`- Test files: ${value}\` lists ${globs.length} globs; the cap is ${cap}; fix that line`);
+  for (const glob of globs) {
+    const why = checkTestGlob(glob, docs);
+    if (why) throw testError(`\`- Test files: ${value}\`: \`${glob}\` ${why}; fix that line`);
+  }
+  return { globs, source: 'claude-md' };
 }
 
 function isDir(path) {

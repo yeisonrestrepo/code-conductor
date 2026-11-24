@@ -8,6 +8,7 @@ import {
   CANDIDATE_PAIRS, DEFAULT_PAIR, DIR_MAX, DocLocationError, GROUP_MAX,
   backlogGroup, checkDocDir, discoverPair, readRecordedPair, resolveDocLocations,
 } from '../../scripts/doc-locations.mjs';
+import * as docLocations from '../../scripts/doc-locations.mjs';
 import { V3_CAPS } from '../../scripts/snap-contract.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -444,5 +445,83 @@ process.stderr.write(JSON.stringify({ before, after: count(), exitCode: process.
     for (const call of ['writeFileSync', 'appendFileSync', 'mkdirSync', 'rmSync', 'renameSync', 'createWriteStream']) {
       expect(text.includes(call)).toBe(false);
     }
+  });
+});
+
+describe('recorded test surface [FEAT-033]', () => {
+  const surface = (line) => {
+    claudeMd(`## Development Commands\n${line}\n`);
+    return docLocations.readTestSurface(root, DOCS);
+  };
+  const refused = (line) => invalid(() => surface(line));
+
+  it('[D1] gives tests/** from the default when no line is recorded', () => {
+    expect(docLocations.readTestSurface(root, DOCS)).toEqual({ globs: ['tests/**'], source: 'default' });
+    claudeMd('## Development Commands\n- Test: npm test\n');
+    expect(docLocations.readTestSurface(root, DOCS)).toEqual({ globs: ['tests/**'], source: 'default' });
+    expect(docLocations.DEFAULT_TEST_SURFACE).toEqual(['tests/**']);
+  });
+
+  it('[D2] reads every glob of a recorded line', () => {
+    expect(surface('- Test files: src/**/*.test.ts, e2e/**')).toEqual({ globs: ['src/**/*.test.ts', 'e2e/**'], source: 'claude-md' });
+  });
+
+  it.each(['tests/**', 'src/**/*.test.ts', 'test/unit/*.spec.js', 'packages/a/tests/**'])('[D3] accepts %s', (glob) => {
+    expect(surface(`- Test files: ${glob}`).globs).toEqual([glob]);
+  });
+
+  const LONG = `tests/${'a'.repeat(295)}`;
+  const MANY = Array.from({ length: 21 }, (_, i) => `t${i}/**`).join(', ');
+  it.each([
+    ['<command>', '<command>', /placeholder/],
+    ['/abs/**', '/abs/**', /absolute/],
+    ['C:/x/**', 'C:/x/**', /absolute/],
+    ['../t/**', '../t/**', /\.\./],
+    ['a\\b/**', 'a\\b/**', /`\\`/],
+    ['tests/[ab]/**', 'tests/[ab]/**', /only `\*` and `\*\*`/],
+    ['tests/?.js', 'tests/?.js', /only `\*`/],
+    ['tests/{a}/**', 'tests/{a}/**', /only `\*`/],
+    ['tests//x', 'tests//x', /empty or `\.`/],
+    ['./tests/**', './tests/**', /empty or `\.`/],
+    ['**/__tests__/**', '**/__tests__/**', /starts with a wildcard/],
+    ['*.test.js', '*.test.js', /starts with a wildcard/],
+    ['scripts/**', 'scripts/**', /reserved `scripts`/],
+    ['.claude/hooks/**', '.claude/hooks/**', /reserved `\.claude\/hooks`/],
+    ['.github/**', '.github/**', /reserved `\.github`/],
+    ['.vscode/**', '.vscode/**', /root dot-directory/],
+    ['docs/specs/**', 'docs/specs/**', /spec folder docs\/specs/],
+    ['docs/**', 'docs/**', /spec folder/],
+    ['a 301-character glob', LONG, /the cap is 300/],
+    ['21 globs', MANY, /the cap is 20/],
+    ['an empty middle glob', 'a/**, , b/**', /placeholder/],
+  ])('[D4] refuses %s', (_name, value, reason) => {
+    const e = refused(`- Test files: ${value}`);
+    expect(e.code).toBe('ORCH_TEST_SURFACE_INVALID');
+    expect(e.reason).toMatch(reason);
+  });
+
+  it('[D4] refuses two Test files lines', () => {
+    claudeMd('## Development Commands\n- Test files: a/**\n- Test files: b/**\n');
+    const e = invalid(() => docLocations.readTestSurface(root, DOCS));
+    expect(e.code).toBe('ORCH_TEST_SURFACE_INVALID');
+    expect(e.reason).toMatch(/more than once/);
+  });
+
+  it('[D5] names the line and the glob, and keeps the default code of every other error', () => {
+    const e = refused('- Test files: scripts/**');
+    expect(e.message).toBe(`ORCH_TEST_SURFACE_INVALID: ${e.reason}`);
+    expect(e.reason.startsWith('`- Test files: scripts/**`: `scripts/**` ')).toBe(true);
+    expect(e.reason.endsWith('; fix that line')).toBe(true);
+    expect(new docLocations.DocLocationError('x').code).toBe('ORCH_DOC_LOCATION_INVALID');
+  });
+
+  it('[D6] folds the case of the reserved check', () => {
+    expect(refused('- Test files: Scripts/**').reason).toMatch(/reserved `scripts`/);
+  });
+
+  it('[D7] leaves the spec and plan folders alone', () => {
+    const before = resolveDocLocations(root, null);
+    claudeMd('## Development Commands\n- Test files: src/**/*.test.ts\n');
+    expect(resolveDocLocations(root, null)).toEqual(before);
   });
 });

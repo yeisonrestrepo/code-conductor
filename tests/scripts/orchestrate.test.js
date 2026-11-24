@@ -86,7 +86,7 @@ function plan(body) {
   writeFileSync(join(root, PLAN), body);
 }
 const task = (n, files) => `### Task ${n}: thing ${n}\n\n**Files:**\n${files.map((f) => `- Modify: \`${f}\``).join('\n')}\n\n- [ ] **Step 1: do it**\n`;
-const TWO_TASKS = `# Demo Plan\n\n${task(1, ['src/a.js:10-20', 'tests/a.test.js'])}\n${task(2, ['src/b.js'])}\n## Test List\n`;
+const TWO_TASKS = `# Demo Plan\n\n${task(1, ['src/a.js:10-20', 'src/a.test.js'])}\n${task(2, ['src/b.js'])}\n## Test List\n`;
 // BUG-075: a role copies its installed envelope's ops.scope verbatim, so the fixture does too; extra.scope overrides it.
 const installedScope = (role) => { try { const env = envelope(); return env.sys.role === role ? env.ops.scope : undefined; } catch { return undefined; } };
 const handbackLine = (role, gate, extra = {}) => {
@@ -158,7 +158,7 @@ describe('router [FEAT-011 AC7]', () => {
     expect(MAY_HAND_BACK).toEqual({
       spec: ['boundary_routed'], plan: ['boundary_routed'], code: ['build_executed'],
       audit: ['build_executed'], qa: ['verify_pass'], security: ['build_executed'],
-      docs: ['verify_pass'], release: ['verify_pass'],
+      docs: ['verify_pass'], release: ['verify_pass'], 'test-writer': ['build_executed'],
     });
   });
 
@@ -172,6 +172,7 @@ describe('router [FEAT-011 AC7]', () => {
       security: { tk: 'X', scope: null },
       docs: { tk: 'RW', scope: null },
       release: { tk: 'RW', scope: null },
+      'test-writer': { tk: 'RW', scope: null },
     });
   });
 
@@ -230,7 +231,7 @@ describe('scope [FEAT-011 AC8]', () => {
   it('extracts the Files block of each task, strips line suffixes and adds the plan file', () => {
     const tasks = extractTasks(TWO_TASKS);
     expect(tasks.map((t) => t.id)).toEqual(['Task 1', 'Task 2']);
-    expect(taskScope(tasks[0], PLAN)).toEqual(['src/a.js', 'tests/a.test.js', PLAN]);
+    expect(taskScope(tasks[0], PLAN)).toEqual(['src/a.js', 'src/a.test.js', PLAN]);
     expect(taskScope(tasks[1], PLAN)).toEqual(['src/b.js', PLAN]);
   });
 
@@ -283,7 +284,7 @@ describe('scope [FEAT-011 AC8]', () => {
     driveTo('code');
     expect(orch(['install', 'code']).status).toBe(0);
     expect(envelope().sys).toMatchObject({ role: 'code', tk: 'RW', ph: 'impl' });
-    expect(envelope().ops).toMatchObject({ scope: ['src/a.js', 'tests/a.test.js', PLAN], gate: 'define_approved' });
+    expect(envelope().ops).toMatchObject({ scope: ['src/a.js', 'src/a.test.js', PLAN], gate: 'define_approved' });
   });
 });
 
@@ -320,7 +321,7 @@ describe('run file [FEAT-011 AC9]', () => {
     writeFileSync(join(root, HANDBACK_DIR, 'spec.txt'), 'stale\n');
     const r = orch(['start', 'FEAT-012']);
     expect(r.status).toBe(0);
-    expect(r.out).toBe(`replaced the stale run FEAT-011 started ${started}; docs: specs docs/specs, plans docs/plans (default); test command: npm test; audit rounds: 2${SEC_NONE}`);
+    expect(r.out).toBe(`replaced the stale run FEAT-011 started ${started}; docs: specs docs/specs, plans docs/plans (default); test command: npm test; test surface tests/** (default); audit rounds: 2${SEC_NONE}`);
     expect(runFile()).toMatchObject({ item: 'FEAT-012', session_id: 'sess-1' });
     expect(existsSync(join(root, ENVELOPE_FILE))).toBe(false);
     expect(existsSync(join(root, HANDBACK_DIR))).toBe(false);
@@ -591,12 +592,12 @@ describe('test command [FEAT-012 AC8, AC9]', () => {
     files({ [lock]: '' });
     const r = start();
     expect(r.status).toBe(0);
-    expect(r.out).toBe(`run FEAT-012 started; docs: specs docs/specs, plans docs/plans (default); test command: ${expected}; audit rounds: 2${suffix}`);
+    expect(r.out).toBe(`run FEAT-012 started; docs: specs docs/specs, plans docs/plans (default); test command: ${expected}; test surface tests/** (default); audit rounds: 2${suffix}`);
     expect(runFile().test_command).toBe(expected);
   });
 
   it('[AC8] records npm test with no lockfile, the stated default', () => {
-    expect(start().out).toBe('run FEAT-012 started; docs: specs docs/specs, plans docs/plans (default); test command: npm test; audit rounds: 2' + SEC_NONE);
+    expect(start().out).toBe('run FEAT-012 started; docs: specs docs/specs, plans docs/plans (default); test command: npm test; test surface tests/** (default); audit rounds: 2' + SEC_NONE);
     expect(runFile().test_command).toBe('npm test');
   });
 
@@ -703,7 +704,7 @@ describe('ticket intake [FEAT-031 AC1-AC5, AC12]', () => {
     gh = withIssues(iss);
     const r = orchGh(['start', 'FEAT-031', '--ticket', '5']);
     const hash = sha(iss.body);
-    expect(r.out).toBe(`run FEAT-031 started; ticket ${REPO}#5 "Add widgets"; snapshot ${SNAP} sha256 ${hash}; docs: specs docs/specs, plans docs/plans (default); test command: npm test; audit rounds: 2${SEC_NONE}`);
+    expect(r.out).toBe(`run FEAT-031 started; ticket ${REPO}#5 "Add widgets"; snapshot ${SNAP} sha256 ${hash}; docs: specs docs/specs, plans docs/plans (default); test command: npm test; test surface tests/** (default); audit rounds: 2${SEC_NONE}`);
     expect(gh.calls()).toEqual([['api', 'repos/{owner}/{repo}/issues/5']]);
     const url = `https://github.com/${REPO}/issues/5`;
     expect(runFile().ticket).toEqual({ repo: REPO, number: 5, url, sha256: hash, snapshot: SNAP });
@@ -1316,7 +1317,7 @@ describe('doc locations [FEAT-047]', () => {
       specs: '.claude/specs', plans: '.claude/plans', group: 'pillar-3', source: 'discovered',
       scopes: { spec: ['.claude/specs/pillar-3/**'], plan: ['.claude/plans/pillar-3/**'] },
     });
-    expect(r.out.endsWith('docs: specs .claude/specs, plans .claude/plans (discovered); group pillar-3; test command: npm test; audit rounds: 2' + SEC_NONE)).toBe(true);
+    expect(r.out.endsWith('docs: specs .claude/specs, plans .claude/plans (discovered); group pillar-3; test command: npm test; test surface tests/** (default); audit rounds: 2' + SEC_NONE)).toBe(true);
     expect(scopeOf('spec')).toEqual(['.claude/specs/pillar-3/**']);
     approveSpec('.claude/specs/pillar-3/demo-design.md');
     expect(scopeOf('plan')).toEqual(['.claude/plans/pillar-3/**']);
@@ -1816,7 +1817,7 @@ describe('approve spec binds the spec hand-back [BUG-077]', () => {
 });
 
 describe('hand-back claims, end and approver [BUG-075]', () => {
-  const TASK1 = ['src/a.js', 'tests/a.test.js', PLAN];
+  const TASK1 = ['src/a.js', 'src/a.test.js', PLAN];
   const codeSay = (extra) => `Done.\nObservation: fine.\n${handbackLine('code', 'build_executed', extra)}\n`;
   const atCode = () => { driveTo('code'); expect(orch(['install', 'code']).status).toBe(0); };
   // A refused claim halts with its code and leaves the record as it was, apart from the halt.
@@ -1856,7 +1857,7 @@ describe('hand-back claims, end and approver [BUG-075]', () => {
 
   it('C4 [AC4] a conforming code hand-back is recorded as before', () => {
     atCode();
-    const r = orch(['handback', 'code'], { input: codeSay({ f: ['src/a.js:M', 'tests/a.test.js:C', `${PLAN}:M`] }) });
+    const r = orch(['handback', 'code'], { input: codeSay({ f: ['src/a.js:M', 'src/a.test.js:C', `${PLAN}:M`] }) });
     expect(r).toMatchObject({ status: 0, out: 'code handed back build_executed' });
     expect(runFile().tasks.done).toBe(1);
     expect(runFile().halt).toBeNull();
@@ -5200,5 +5201,358 @@ describe('known failures in changed files [BUG-089]', () => {
     expect(r.status).toBe(0);
     expect(lastLine(r)).toBe(changeLine(1, 0));
     expect(listText()).toBe(SPEC_ONLY);
+  });
+});
+
+describe('test-writer in the Build band [FEAT-033]', () => {
+  const claudeMd = (line) => writeFileSync(join(root, 'CLAUDE.md'), `## Development Commands\n${line}\n`);
+
+  it('[O1] start with no Test files line records the default surface', () => {
+    const r = orch(['start', 'FEAT-033']);
+    expect(r.status).toBe(0);
+    expect(runFile().test_surface).toEqual(['tests/**']);
+    expect(r.out).toContain('; test command: npm test; test surface tests/** (default); audit rounds: 2');
+  });
+
+  it('[O2] start records the globs of a CLAUDE.md Test files line', () => {
+    claudeMd('- Test files: src/**/*.test.ts, e2e/**');
+    const r = orch(['start', 'FEAT-033']);
+    expect(r.status).toBe(0);
+    expect(runFile().test_surface).toEqual(['src/**/*.test.ts', 'e2e/**']);
+    expect(r.out).toContain('; test surface src/**/*.test.ts, e2e/** (claude-md);');
+  });
+
+  it.each(['scripts/**', '.claude/hooks/**', '**/__tests__/**', '../t/**', 'tests/[ab]/**', 'docs/specs/**'])('[O3] start refuses `- Test files: %s`', (glob) => {
+    claudeMd(`- Test files: ${glob}`);
+    const r = orch(['start', 'FEAT-033']);
+    expect(r.status).toBe(1);
+    expect(r.err.startsWith(`ORCH_TEST_SURFACE_INVALID: \`- Test files: ${glob}\`: \`${glob}\``)).toBe(true);
+    expect(existsSync(join(root, RUN_FILE))).toBe(false);
+  });
+
+  // ---- the router: the split, the order, the scopes (Task 4) ----
+  const testTask = (n, lines) => `### Task ${n}: thing ${n}\n\n**Files:**\n${lines.join('\n')}\n\n- [ ] **Step 1: do it**\n`;
+  const TESTED = '# Demo Plan\n\n' + testTask(1, ['- Create: `scripts/foo.mjs`', '- Test: `tests/scripts/foo.test.js`']) + '\n' + task(2, ['src/b.js']) + '\n## Test List\n';
+  const ONE_TEST = '# Demo Plan\n\n' + testTask(1, ['- Modify: `src/a.js`', '- Test: `tests/a.test.js`']) + '\n## Test List\n';
+  const withPrep = (extra = () => {}) => () => { agents(['test-writer']); extra(); };
+  const atBuild = (planText, opts = {}) => driveTo('code', { planText, prep: withPrep(), ...opts });
+  const writerSay = (f, extra) => `Done.\nObservation: fine.\n${handbackLine('test-writer', 'build_executed', { v: 7, f, ...extra })}\n`;
+  const codeSay = (f, extra) => `Done.\nObservation: fine.\n${handbackLine('code', 'build_executed', { f, ...extra })}\n`;
+  const patchRun = (edit) => { const run = runFile(); edit(run); runFileText(JSON.stringify(run, null, 2) + '\n'); };
+  const NEXT = (role, what) => `orchestrate: install ${role}: the next step is ${what}`;
+  // The plan step of driveTo, up to the approval, whose result is returned.
+  function approveTo(planText, { before = () => {}, ...opts } = {}) {
+    driveTo('plan', { planText, prep: withPrep(), ...opts });
+    orch(['install', 'plan']);
+    orch(['handback', 'plan'], { input: say('plan', 'boundary_routed') });
+    skipLoop('plan');
+    before();
+    return orch(approveArgs('plan'));
+  }
+  const installed = (role) => { const r = orch(['install', role]); expect(r.status).toBe(0); return envelope().ops.scope; };
+  const handed = (role, input) => { const r = orch(['handback', role], { input }); expect(r.status).toBe(0); return r; };
+  const anchored = () => ({ sys: { c: envelope().sys.c } });
+  const gitRoot = () => { fixtureGit('init', '-q'); fixtureCommit(); };
+  const surfaceMd = (line) => writeFileSync(join(root, 'CLAUDE.md'), `## Development Commands\n${line}\n`);
+
+  it('[R1] splitTask separates the task\'s tests from its other files', () => {
+    const [task1] = extractTasks(TESTED);
+    expect(orchestrateModule.splitTask(task1, ['tests/**'])).toEqual({ tests: ['tests/scripts/foo.test.js'], files: ['scripts/foo.mjs'], outside: undefined });
+  });
+
+  it('[R2] splitTask reads the surface it is given, and folds case', () => {
+    const typed = extractTasks(testTask(1, ['- Create: `src/a.ts`', '- Test: `src/a.test.ts`', '- Modify: `e2e/x.spec.ts`']))[0];
+    expect(orchestrateModule.splitTask(typed, ['src/**/*.test.ts', 'e2e/**'])).toMatchObject({ tests: ['src/a.test.ts', 'e2e/x.spec.ts'], files: ['src/a.ts'] });
+    const cased = extractTasks(testTask(1, ['- Modify: `Tests/A.test.js`']))[0];
+    expect(orchestrateModule.splitTask(cased, ['tests/**']).tests).toEqual(['Tests/A.test.js']);
+  });
+
+  it('[R3] splitTask names a Test: line outside the surface', () => {
+    const stray = extractTasks(testTask(1, ['- Test: `src/a.test.ts`']))[0];
+    expect(orchestrateModule.splitTask(stray, ['tests/**']).outside).toBe('src/a.test.ts');
+  });
+
+  const R4 = { ...blank, gate: 'define_approved', approvals: { spec: {}, plan: {} }, test_surface: ['tests/**'], tasks: { ids: ['Task 1', 'Task 2'], done: 0, tested: ['Task 1'] } };
+  const TASK_DONE = [{ role: 'test-writer', task: 'Task 1' }, { role: 'code', task: 'Task 1' }];
+  const FIX_BOTH = { role: 'audit', verdict: 'RETURN', round: 1, fix: { round: 1, files: ['src/a.js', 'tests/a.test.js'], review: '.conductor/handback/audit-1.txt', sha256: 'a'.repeat(64) } };
+  const FIX_SRC = { ...FIX_BOTH, fix: { ...FIX_BOTH.fix, files: ['src/a.js'] } };
+  const BUILT = [...hb('spec', 'plan'), ...TASK_DONE, { role: 'code', task: 'Task 2' }];
+  const { test_surface: _dropped, ...NO_SURFACE_RUN } = R4;
+  it.each([
+    ['(a) no writer entry yet', R4, hb('spec', 'plan'), { role: 'test-writer', task: 'Task 1' }],
+    ['(b) after the writer', R4, [...hb('spec', 'plan'), TASK_DONE[0]], { role: 'code', task: 'Task 1' }],
+    ['(c) the next task is untested', { ...R4, tasks: { ...R4.tasks, done: 1 } }, [...hb('spec', 'plan'), ...TASK_DONE], { role: 'code', task: 'Task 2' }],
+    ['(d) a run with no surface', NO_SURFACE_RUN, hb('spec', 'plan'), { role: 'code', task: 'Task 1' }],
+    ['(e) a fix naming a test file', { ...R4, tasks: { ...R4.tasks, done: 2 } }, [...BUILT, FIX_BOTH], { role: 'test-writer', fix: 1 }],
+    ['(f) after that fix round\'s writer', { ...R4, tasks: { ...R4.tasks, done: 2 } }, [...BUILT, FIX_BOTH, { role: 'test-writer', fix: 1 }], { role: 'code', fix: 1 }],
+    ['(g) a fix naming only source', { ...R4, tasks: { ...R4.tasks, done: 2 } }, [...BUILT, FIX_SRC], { role: 'code', fix: 1 }],
+    ['(h) (e) on a run with no surface', { ...NO_SURFACE_RUN, tasks: { ...R4.tasks, done: 2 } }, [...BUILT, FIX_BOTH], { role: 'code', fix: 1 }],
+  ])('[R4] nextStep %s', (_name, run, handbacks, expected) => {
+    expect(nextStep({ ...run, handbacks })).toEqual(expected);
+  });
+
+  it('[R5] the writer\'s hand-back never crosses the band boundary', () => {
+    expect(forwardGate({ gate: 'define_approved', tasks: { ids: ['Task 1'], done: 0 } }, 'test-writer', 'build_executed')).toBe('define_approved');
+  });
+
+  it('[R6] approve plan records the tasks that carry a test, and its line is unchanged', () => {
+    const r = approveTo(TESTED);
+    expect(r.out).toMatch(/^plan approved: define_approved, 2 task\(s\); sha256 [0-9a-f]{64}$/);
+    expect(runFile().tasks).toEqual({ ids: ['Task 1', 'Task 2'], done: 0, tested: ['Task 1'] });
+  });
+
+  it('[R7] code waits for the writer of a tested task', () => {
+    atBuild(TESTED);
+    const r = orch(['install', 'code', '--check']);
+    expect(r.status).toBe(2);
+    expect(r.err).toBe(NEXT('code', 'install test-writer'));
+  });
+
+  it('[R8] install test-writer holds only the task\'s test files and names no model', () => {
+    atBuild(TESTED);
+    const r = orch(['install', 'test-writer']);
+    expect(r.status).toBe(0);
+    expect(envelope()).toMatchObject({ v: 7, sys: { role: 'test-writer', tk: 'RW', ph: 'impl' }, ops: { scope: ['tests/scripts/foo.test.js'], gate: 'define_approved' } });
+    expect(r.out).not.toContain('model:');
+  });
+
+  it('[R9] the writer\'s hand-back is recorded for its task and moves neither gate nor task', () => {
+    atBuild(TESTED);
+    orch(['install', 'test-writer']);
+    const r = handed('test-writer', writerSay(['tests/scripts/foo.test.js:C']));
+    expect(r.out).toBe('test-writer handed back build_executed');
+    expect(runFile().handbacks.at(-1)).toMatchObject({ role: 'test-writer', gate: 'build_executed', task: 'Task 1' });
+    expect(runFile().gate).toBe('define_approved');
+    expect(runFile().tasks.done).toBe(0);
+  });
+
+  it('[R10] code follows the writer with the task\'s other files, and the next task has no writer', () => {
+    atBuild(TESTED);
+    orch(['install', 'test-writer']);
+    handed('test-writer', writerSay(['tests/scripts/foo.test.js:C']));
+    expect(installed('code')).toEqual(['scripts/foo.mjs', PLAN]);
+    handed('code', codeSay(['scripts/foo.mjs:C']));
+    expect(runFile().tasks.done).toBe(1);
+    const r = orch(['install', 'test-writer', '--check']);
+    expect(r.status).toBe(2);
+    expect(r.err).toBe(NEXT('test-writer', 'install code'));
+    expect(installed('code')).toEqual(['src/b.js', PLAN]);
+  });
+
+  const THREE = '# Demo Plan\n\n' + testTask(1, ['- Create: `scripts/foo.mjs`', '- Test: `tests/scripts/foo.test.js`']) + '\n' + task(2, ['src/b.js'])
+    + '\n' + testTask(3, ['- Modify: `src/c.js`', '- Create: `tests/fixtures/c.json`', '- Test: `tests/c.test.js`']) + '\n## Test List\n';
+  it('[R11] [E2] no code envelope holds a test-surface path and no writer envelope holds any other', () => {
+    atBuild(THREE);
+    const seen = [];
+    for (let step = nextStep(runFile()); step.role === 'code' || step.role === 'test-writer'; step = nextStep(runFile())) {
+      seen.push([step.role, installed(step.role)]);
+      handed(step.role, step.role === 'code' ? say('code', 'build_executed') : writerSay([]));
+    }
+    expect(seen.map(([role]) => role)).toEqual(['test-writer', 'code', 'code', 'test-writer', 'code']);
+    for (const [role, scope] of seen) {
+      for (const p of scope) expect(/^tests\//i.test(p)).toBe(role === 'test-writer');
+    }
+  });
+
+  it('[R12] a recorded surface drives the split', () => {
+    const plan1 = '# Demo Plan\n\n' + testTask(1, ['- Create: `src/a.ts`', '- Test: `src/a.test.ts`']) + '\n## Test List\n';
+    atBuild(plan1, { prep: withPrep(() => surfaceMd('- Test files: src/**/*.test.ts')) });
+    expect(installed('test-writer')).toEqual(['src/a.test.ts']);
+    handed('test-writer', writerSay(['src/a.test.ts:C']));
+    expect(installed('code')).toEqual(['src/a.ts', PLAN]);
+  });
+
+  it('[R13] approve plan refuses a Test: line outside the surface', () => {
+    const r = approveTo('# Demo Plan\n\n' + testTask(1, ['- Test: `src/a.test.ts`']) + '\n## Test List\n');
+    expect(r.status).toBe(1);
+    expect(r.err).toBe('ORCH_TEST_OUTSIDE_SURFACE: Task 1 declares src/a.test.ts with Test: outside the test surface [tests/**]');
+    expect(runFile().approvals.plan).toBeNull();
+    expect(runFile().halt.code).toBe('ORCH_TEST_OUTSIDE_SURFACE');
+  });
+
+  it('[R14] a Create: line inside the surface belongs to the writer', () => {
+    approveTo('# Demo Plan\n\n' + testTask(1, ['- Modify: `src/a.js`', '- Create: `tests/fixtures/x.json`']) + '\n## Test List\n');
+    expect(runFile().tasks.tested).toEqual(['Task 1']);
+    expect(installed('test-writer')).toEqual(['tests/fixtures/x.json']);
+  });
+
+  it('[R15] a tests-only task gives code the plan alone', () => {
+    atBuild('# Demo Plan\n\n' + testTask(1, ['- Test: `tests/only.test.js`']) + '\n## Test List\n');
+    expect(installed('test-writer')).toEqual(['tests/only.test.js']);
+    handed('test-writer', writerSay(['tests/only.test.js:C']));
+    expect(installed('code')).toEqual([PLAN]);
+  });
+
+  it('[R16] a task with an empty Files block still halts approve plan', () => {
+    const r = approveTo('# Demo Plan\n\n' + testTask(1, []) + '\n## Test List\n');
+    expect(r.status).toBe(1);
+    expect(r.err).toBe('ORCH_EMPTY_SCOPE: Task 1 declares no files');
+  });
+
+  it('[R17] twenty-one test files halt over the scope cap', () => {
+    const lines = Array.from({ length: 21 }, (_, i) => `- Test: \`tests/t${i}.test.js\``);
+    const r = approveTo('# Demo Plan\n\n' + testTask(1, lines) + '\n## Test List\n');
+    expect(r.status).toBe(1);
+    expect(r.err).toBe('ORCH_SCOPE_OVER_CAP: Task 1 needs 21 scope entries; the cap is 20');
+  });
+
+  const RETURN_BOTH = auditReport('VERDICT: RETURN', ['- [blocker] src/a.js:10 — breaks AC1', '- [major] tests/a.test.js:3 — misses a case']);
+  const RETURN_TEST = auditReport('VERDICT: RETURN', ['- [blocker] tests/a.test.js:3 — misses a case']);
+  // A one-task plan built through the writer and code, with the audit installed.
+  function atAudit() {
+    atBuild(ONE_TEST);
+    orch(['install', 'test-writer']);
+    handed('test-writer', writerSay(['tests/a.test.js:C']));
+    orch(['install', 'code']);
+    handed('code', codeSay(['src/a.js:M']));
+    orch(['install', 'audit']);
+  }
+
+  it('[R18] a fix round naming both kinds of file runs the writer, then code with the source', () => {
+    atAudit();
+    expect(orch(['handback', 'audit'], { input: RETURN_BOTH }).status).toBe(0);
+    const check = orch(['install', 'test-writer', '--check']);
+    expect(check.status).toBe(0);
+    const [json, note] = check.out.split('\n');
+    expect(JSON.parse(json).ops.scope).toEqual(['tests/a.test.js']);
+    expect(note).toMatch(/^fix round 1 of 2: review /);
+    expect(installed('test-writer')).toEqual(['tests/a.test.js']);
+    handed('test-writer', writerSay(['tests/a.test.js:M']));
+    expect(runFile().handbacks.at(-1)).toMatchObject({ role: 'test-writer', fix: 1 });
+    expect(installed('code')).toEqual(['src/a.js']);
+    handed('code', codeSay(['src/a.js:M']));
+    expect(runFile().handbacks.at(-1)).toMatchObject({ role: 'code', fix: 1 });
+    expect(orch(['install', 'audit', '--check']).status).toBe(0);
+  });
+
+  it('[R19] a fix round naming only tests leaves code an empty scope', () => {
+    atAudit();
+    expect(orch(['handback', 'audit'], { input: RETURN_TEST }).status).toBe(0);
+    orch(['install', 'test-writer']);
+    handed('test-writer', writerSay(['tests/a.test.js:M']));
+    expect(installed('code')).toEqual([]);
+    handed('code', codeSay([], { scope: [] }));
+    expect(runFile().handbacks.at(-1)).toMatchObject({ role: 'code', fix: 1 });
+  });
+
+  it('[R20] a fix round with no test file is today\'s', () => {
+    driveTo('audit');
+    orch(['install', 'audit']);
+    expect(orch(['handback', 'audit'], { input: auditReport('VERDICT: RETURN', ['- [blocker] src/a.js:10 — breaks AC1']) }).status).toBe(0);
+    const r = orch(['install', 'test-writer', '--check']);
+    expect(r.status).toBe(2);
+    expect(r.err).toBe(NEXT('test-writer', 'install code'));
+  });
+
+  const LEGACY = 'not-configured (run predates FEAT-033)';
+  it('[R21] a run from before FEAT-033 keeps code alone, with today\'s scopes and a note', () => {
+    approveTo(TESTED, { before: () => patchRun((run) => { delete run.test_surface; }) });
+    expect(runFile().tasks).not.toHaveProperty('tested');
+    expect(installed('code')).toEqual(['scripts/foo.mjs', 'tests/scripts/foo.test.js', PLAN]);
+    const r = handed('code', codeSay(['scripts/foo.mjs:C']));
+    expect(r.out).toBe(`code handed back build_executed; test-writer=${LEGACY}`);
+    expect(runFile().handbacks.at(-1).test_writer).toBe(LEGACY);
+    expect(orch(['install', 'test-writer', '--check']).err).toBe(NEXT('test-writer', 'install code'));
+  });
+
+  it('[R22] the build review line of a run from before FEAT-033 carries the note', () => {
+    driveTo('qa', { start: ['--unattended'] });
+    patchRun((run) => { delete run.test_surface; });
+    const r = orch(['delegate', 'build', '--check']);
+    expect(r.status).toBe(0);
+    expect(r.out).toContain(`; test-writer=${LEGACY}; source `);
+  });
+
+  it('[R23] the build review lists the writer\'s files first, in record order, with no note', () => {
+    atBuild(TESTED, { start: ['--unattended'], seat: true });
+    orch(['install', 'test-writer']);
+    handed('test-writer', writerSay(['tests/scripts/foo.test.js:C']));
+    orch(['install', 'code']);
+    handed('code', codeSay(['scripts/foo.mjs:C', `${PLAN}:M`]));
+    orch(['install', 'code']);
+    handed('code', say('code', 'build_executed'));
+    orch(['install', 'audit']);
+    handed('audit', say('audit', 'build_executed'));
+    orch(['install', 'security']);
+    handed('security', securityReport());
+    const r = orch(['delegate', 'build', '--check']);
+    expect(r.status).toBe(0);
+    expect(r.out).toContain(`files tests/scripts/foo.test.js, scripts/foo.mjs, ${PLAN}`);
+    expect(r.out).not.toContain('test-writer=');
+  });
+
+  it('[R24] a test_surface that is not a list halts approve plan and install test-writer', () => {
+    const r = approveTo(TESTED, { before: () => patchRun((run) => { run.test_surface = 'tests/**'; }) });
+    expect(r.status).toBe(1);
+    expect(r.err).toMatch(/^ORCH_TEST_SURFACE_INVALID: /);
+    expect(orch(['end', '--abandon']).status).toBe(0);
+    atBuild(TESTED);
+    patchRun((run) => { run.test_surface = 'tests/**'; });
+    expect(orch(['install', 'test-writer']).err).toMatch(/^ORCH_TEST_SURFACE_INVALID: /);
+  });
+
+  it('[R25] a writer hand-back below v7 halts', () => {
+    atBuild(TESTED);
+    orch(['install', 'test-writer']);
+    const r = orch(['handback', 'test-writer'], { input: writerSay(['tests/scripts/foo.test.js:C'], { v: 3 }) });
+    expect(r.status).toBe(1);
+    expect(r.err).toBe('ORCH_HANDBACK_INVALID: a test-writer hand-back must be a v7 envelope, got v3');
+  });
+
+  it('[R26] a writer hand-back listing a source file halts', () => {
+    atBuild(TESTED);
+    orch(['install', 'test-writer']);
+    const r = orch(['handback', 'test-writer'], { input: writerSay(['src/x.js:C']) });
+    expect(r.status).toBe(1);
+    expect(r.err).toMatch(/^ORCH_HANDBACK_OUT_OF_SCOPE: test-writer lists src\/x\.js in ops\.f/);
+  });
+
+  it('[R27] a writer report with no hand-back line halts', () => {
+    atBuild(TESTED);
+    orch(['install', 'test-writer']);
+    const r = orch(['handback', 'test-writer'], { input: 'Done.\n' });
+    expect(r.status).toBe(1);
+    expect(r.err).toMatch(/^ORCH_HANDBACK_MISSING: /);
+  });
+
+  it('[R28] resume after a halted writer keeps both approvals and re-dispatches it', () => {
+    atBuild(TESTED, { prep: withPrep(gitRoot) });
+    orch(['install', 'test-writer']);
+    expect(orch(['handback', 'test-writer'], { input: writerSay(['src/x.js:C']) }).err).toMatch(/^ORCH_HANDBACK_OUT_OF_SCOPE: /);
+    const r = orch(['resume']);
+    expect(r.status).toBe(0);
+    expect(r.out).toContain('kept 4 record(s), dropped 0');
+    expect(r.out).toContain('next: install test-writer (task 1 of 2)');
+  });
+
+  it('[R29] resume keeps a finished task\'s writer and code entries, in record order', () => {
+    atBuild(TESTED, { prep: withPrep(gitRoot) });
+    orch(['install', 'test-writer']);
+    handed('test-writer', writerSay(['tests/scripts/foo.test.js:C'], anchored()));
+    orch(['install', 'code']);
+    handed('code', codeSay(['scripts/foo.mjs:C'], anchored()));
+    orch(['install', 'code']);
+    expect(orch(['handback', 'code'], { input: codeSay(['src/z.js:C'], anchored()) }).err).toMatch(/^ORCH_HANDBACK_OUT_OF_SCOPE: /);
+    const r = orch(['resume']);
+    expect(r.status).toBe(0);
+    expect(r.out).toContain('next: install code (task 2 of 2)');
+    expect(runFile().handbacks.map((h) => h.role)).toEqual(['spec', 'plan', 'test-writer', 'code']);
+  });
+
+  it('[R30] test-writer takes no model of its own and does not hand code its model', () => {
+    atBuild(TESTED, { prep: withPrep(() => configured('default')()) });
+    const w = orch(['install', 'test-writer']);
+    expect(w.status).toBe(0);
+    expect(w.out).not.toContain('model:');
+    handed('test-writer', writerSay(['tests/scripts/foo.test.js:C']));
+    expect(runFile().handbacks.at(-1)).not.toHaveProperty('model');
+    expect(lastLine(orch(['install', 'code']).out)).toBe('model: sonnet');
+  });
+
+  it('[R31] there is no ad-hoc test-writer envelope', () => {
+    agents();
+    const r = orch(['envelope', 'test-writer']);
+    expect(r.status).toBe(2);
+    expect(r.err).toBe('orchestrate: usage: orchestrate.mjs envelope <spec|plan|audit|qa|docs|release> [--item <label>] | --clear');
   });
 });

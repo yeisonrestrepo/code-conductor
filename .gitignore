@@ -45,6 +45,7 @@ tests/.tmp/
 !/.claude/agents/release.md
 !/.claude/agents/security.md
 !/.claude/agents/spec.md
+!/.claude/agents/test-writer.md
 !/.claude/commands/cc-implement.md
 !/.claude/commands/cc-init.md
 !/.claude/commands/cc-metrics.md

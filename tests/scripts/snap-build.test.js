@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CAPS, elementLength } from '../../scripts/snap-contract.mjs';
+import { CAPS, elementLength, expectedGate } from '../../scripts/snap-contract.mjs';
 
 const SCRIPT = fileURLToPath(new URL('../../scripts/snap-build.mjs', import.meta.url));
 const VALIDATOR = fileURLToPath(new URL('../../scripts/snap-validate.mjs', import.meta.url));
@@ -310,5 +310,23 @@ describe('snap-build.mjs v6 [FEAT-035]', () => {
     expect(r.status).toBe(0);
     expect(r.stdout.trim()).toBe('{"v":6,"sys":{"ph":"impl","c":"abc1234","s":"1.56.0","role":"release","tk":"RW"},"ops":{"n":[],"f":[],"scope":["VERSION","CHANGELOG.md"],"gate":"verify_pass"},"mem":{"d":[],"x":[]},"pr":""}');
     expect(validate(r.stdout.trim()).status).toBe(0);
+  });
+});
+
+describe('snap-build.mjs v7 [FEAT-033]', () => {
+  it('[B1] writes v7 for test-writer, keeps the v3 key order, and the line validates', () => {
+    const r = build(JSON.stringify({ ph: 'impl', c: 'abc1234', s: 'FEAT-033', n: [], f: [], d: [], x: [], role: 'test-writer', tk: 'RW', scope: ['tests/a.test.js'], gate: 'define_approved' }));
+    expect(r.status).toBe(0);
+    expect(r.stdout.trim()).toBe('{"v":7,"sys":{"ph":"impl","c":"abc1234","s":"FEAT-033","role":"test-writer","tk":"RW"},"ops":{"n":[],"f":[],"scope":["tests/a.test.js"],"gate":"define_approved"},"mem":{"d":[],"x":[]},"pr":""}');
+    expect(validate(r.stdout.trim()).status).toBe(0);
+  });
+
+  it('[B2] keeps each of the eight v6 roles at its lowest version', () => {
+    const lowest = { spec: 3, plan: 3, code: 3, audit: 3, qa: 3, security: 4, docs: 5, release: 6 };
+    for (const [role, v] of Object.entries(lowest)) {
+      const r = build(JSON.stringify({ ph: 'impl', c: 'abc1234', s: 'FEAT-033', n: [], f: [], d: [], x: [], role, tk: 'X', gate: expectedGate(role) }));
+      expect(r.status).toBe(0);
+      expect(JSON.parse(r.stdout).v).toBe(v);
+    }
   });
 });

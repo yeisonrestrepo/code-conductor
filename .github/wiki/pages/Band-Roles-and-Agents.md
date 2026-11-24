@@ -9,12 +9,15 @@ During orchestrated runs, five role agents handle specific phases. Each is defin
 | `spec.md` | spec | define | RW | No (Guard 7) | Spec files only |
 | `plan.md` | plan | define | RW | No (Guard 7) | Plan files only |
 | `code.md` | code | build | RW | Test command only | Task scope from envelope |
+| `test-writer.md` | test-writer | build | RW | Test command only | The task's files inside the run's test surface only |
 | `audit.md` | audit | verify | R | No (Guard 7) | Nothing (no write tools; Guard 5 denies `tk: R`) |
 | `qa.md` | qa | verify | X | Test command only | Nothing (no write tools; Guard 5 denies `tk: X`) |
 | `docs.md` | docs | ship | RW | No (Guard 7) | Documentation surface only |
 | `release.md` | release | ship | RW | No (Guard 7) | Release surface from the project's release profile only |
 
 A sixth agent, `define-review.md`, is a non-band advisory reviewer for the review loop.
+
+`test-writer.md` is seated in a run, before `code`, for every plan task that declares a file in the run's test surface: the `- Test files:` globs of the project `CLAUDE.md`, `tests/**` by default; a glob that starts with a wildcard, reaches a reserved folder or overlaps the spec or plan folder halts `start`. It exists only in SNAP v7 envelopes, claims only `build_executed`, ticks no box, and runs the recorded test command expecting a red suite. Guard 5 denies `BAND_TEST_SURFACE` to a `code` write inside the surface and to a `test-writer` write outside it, whatever the envelope's scope lists.
 
 `docs.md` is not seated in a run: `/cc-docs --release <ref>` dispatches it against one shipped release, outside any run. It exists only in SNAP v5 envelopes, claims only `verify_pass`, and leaves its edits uncommitted for you to review.
 
