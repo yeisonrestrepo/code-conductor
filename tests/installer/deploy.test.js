@@ -919,3 +919,44 @@ describe('deployProject: Codex hook (FEAT-048)', () => {
     expect(readFileSync(join(ROOT, 'project-template', HOOKS_REL), 'utf8')).toContain('node .claude/hooks/pre-tool-use.mjs');
   });
 });
+
+// FEAT-048 slice 3 (#97): the rendered cc-* commands land only with their harness flag.
+describe('deployProject: cc-* commands for Antigravity and Codex (FEAT-048)', () => {
+  const WORKFLOW = join('.agents', 'workflows', 'cc-spec.md');
+  const SKILL = join('.agents', 'skills', 'cc-spec', 'SKILL.md');
+  beforeEach(() => {
+    mkdirSync(join(asset, 'project-template', '.agents', 'workflows'), { recursive: true });
+    mkdirSync(join(asset, 'project-template', '.agents', 'skills', 'cc-spec'), { recursive: true });
+    writeFileSync(join(asset, 'project-template', WORKFLOW), 'workflow\n');
+    writeFileSync(join(asset, 'project-template', SKILL), 'skill\n');
+  });
+  it('installs neither folder without a flag', () => {
+    deployProject(asset, home, capture().opts);
+    expect(existsSync(join(home, '.agents'))).toBe(false);
+  });
+  it('installs only the workflows with antigravity', () => {
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, antigravity: true });
+    expect(readFileSync(join(home, WORKFLOW), 'utf8')).toBe('workflow\n');
+    expect(existsSync(join(home, '.agents', 'skills'))).toBe(false);
+    expect(out.said).toContain('code-conductor: installed the cc-* commands as Antigravity workflows in .agents/workflows/');
+  });
+  it('installs only the skills with codex', () => {
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, codex: true });
+    expect(readFileSync(join(home, SKILL), 'utf8')).toBe('skill\n');
+    expect(existsSync(join(home, '.agents', 'workflows'))).toBe(false);
+    expect(out.said).toContain('code-conductor: installed the cc-* commands as Codex skills in .agents/skills/');
+  });
+  it('keeps the host\'s own workflows and skills and overwrites ours', () => {
+    mkdirSync(join(home, '.agents', 'workflows'), { recursive: true });
+    mkdirSync(join(home, '.agents', 'skills', 'mine'), { recursive: true });
+    writeFileSync(join(home, '.agents', 'workflows', 'mine.md'), 'host');
+    writeFileSync(join(home, '.agents', 'skills', 'mine', 'SKILL.md'), 'host');
+    writeFileSync(join(home, WORKFLOW), 'stale');
+    deployProject(asset, home, { ...capture().opts, antigravity: true, codex: true });
+    expect(readFileSync(join(home, '.agents', 'workflows', 'mine.md'), 'utf8')).toBe('host');
+    expect(readFileSync(join(home, '.agents', 'skills', 'mine', 'SKILL.md'), 'utf8')).toBe('host');
+    expect(readFileSync(join(home, WORKFLOW), 'utf8')).toBe('workflow\n');
+  });
+});
