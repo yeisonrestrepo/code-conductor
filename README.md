@@ -450,6 +450,8 @@ The adapter needs `node` on `PATH`. If the guard cannot run, crashes or prints s
 
 Checked live against Codex CLI 0.171.0: after trust, `cat *.log` was refused with `Command blocked by PreToolUse hook: BASH SCAN BLOCKED`. Editing `.codex/hooks.json` later makes Codex ask for trust again.
 
+Launch `codex` from the project root. The entry is a relative path resolved against the directory Codex runs the hook from, and there is no adapter on this route to fail closed: if `codex` is started from a subdirectory where `.claude/hooks/pre-tool-use.mjs` does not resolve, or `node` is not on `PATH`, the hook cannot run and the guards must be treated as not enforced.
+
 ### How the installer treats your CLAUDE.md
 
 `CLAUDE.md` and `.gitignore` are **merged**, never overwritten. Everything else the installer ships (`settings.json`, hooks, commands, `scripts/`) is replaced on every run.

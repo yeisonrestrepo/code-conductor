@@ -3544,10 +3544,6 @@ Not verified by the PR: the backlog's pick-up condition ("only if a real `.condu
 
 Upgrade note: reinstalling ships the updated `scripts/conductor-db.mjs`; an existing cache DB over 256 MiB in `snapshots` is trimmed on its next snapshot write. CI on the release PR is the authority.
 
-## Spec: FEAT-048 slice 2 Codex and Antigravity guards [2026-11-23]
-- Spec: docs/superpowers/specs/2026-11-23-feat048-codex-antigravity-guards-design.md (approved by owner 2026-11-23). Branch feat/feat-048-codex-antigravity-guards, issue #97.
-- Thin adapters around the unchanged pre-tool-use.mjs for agy 1.5.15 (.agents/hooks.json, measured live: run_command/CommandLine, read_file/Path, stdout {decision:deny,reason} blocks) and Codex 0.171 (.codex/hooks.json, guarded only after a live deny, else documented workflow-only). Fail closed like OpenCode; installer flags --antigravity/--codex with --project; Claude install byte-identical; Gemini CLI out (Google retired personal sign-in).
-
 ## Release: 1.57.1 batch landing 2026-11-24
 
 One PR merged since `v1.57.0`. Existing id closed:
