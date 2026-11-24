@@ -9,7 +9,7 @@ import { healGraphifyHook } from '../lib/installer/heal.mjs';
 import { writeVerbosity, writeVersionFile } from '../lib/installer/config.mjs';
 import { offerSuperpowers, NOTICES } from '../lib/installer/plugins.mjs';
 
-const USAGE = `Usage: code-conductor [--project|-Project] [--no-deps|-NoDeps] [--verbosity|-Verbosity MIN|INFO|VERBOSE] [--opencode] [--with-plugins] [--version] [--help]`;
+const USAGE = `Usage: code-conductor [--project|-Project] [--no-deps|-NoDeps] [--verbosity|-Verbosity MIN|INFO|VERBOSE] [--opencode] [--antigravity] [--codex] [--with-plugins] [--version] [--help]`;
 
 // -Verbosity is the spelling the retired install.ps1 documented. Both spellings share
 // every form (space-separated, inline `=`, missing value) and last-wins across them.
@@ -24,7 +24,7 @@ const isVerbosityFlag = (a) => VERBOSITY_FLAGS.some((f) => a === f || a.startsWi
 // is idempotent. No "conflicting flags" error is raised — last-wins is the least
 // surprising CLI convention and keeps the parser branchless.
 function parseArgs(argv) {
-  const opts = { project: false, opencode: false, noDeps: false, withPlugins: false, verbosity: undefined, verbosityGiven: false, version: false, help: false, unknown: [] };
+  const opts = { project: false, opencode: false, antigravity: false, codex: false, noDeps: false, withPlugins: false, verbosity: undefined, verbosityGiven: false, version: false, help: false, unknown: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     // -Project is the spelling the retired install.ps1 documented; matched exact-case
@@ -36,6 +36,10 @@ function parseArgs(argv) {
     else if (a === '--no-deps' || a === '-NoDeps') opts.noDeps = true;
     // FEAT-048: also install the OpenCode guard plugin; meaningful only with --project.
     else if (a === '--opencode') opts.opencode = true;
+    // FEAT-048 slice 2: also install the Antigravity CLI guard; meaningful only with --project.
+    else if (a === '--antigravity') opts.antigravity = true;
+    // FEAT-048 slice 2: also wire the Codex CLI hook to the guard; meaningful only with --project.
+    else if (a === '--codex') opts.codex = true;
     // FEAT-039: consent to install the superpowers plugin without asking; the only way a
     // non-interactive run installs it. Matched exact-case like every other flag.
     else if (a === '--with-plugins') opts.withPlugins = true;
@@ -100,6 +104,8 @@ export function run(argv, env = process.env, { cwd = process.cwd(), log, nodeVer
 
   if (opts.unknown.length) emit('stderr', `code-conductor: ignoring unrecognized argument(s): ${opts.unknown.join(' ')}`);
   if (opts.opencode && !opts.project) emit('stderr', 'code-conductor: --opencode needs --project; no OpenCode files were written');
+  if (opts.antigravity && !opts.project) emit('stderr', 'code-conductor: --antigravity needs --project; no Antigravity files were written');
+  if (opts.codex && !opts.project) emit('stderr', 'code-conductor: --codex needs --project; no Codex files were written');
 
   // --help and --version are explicit informational OUTPUT (not diagnostics), so they
   // go to STDOUT and exit 0 — this lets `code-conductor --version` be captured in a
@@ -136,7 +142,7 @@ export function run(argv, env = process.env, { cwd = process.cwd(), log, nodeVer
     if (heal.status === 'removed') emit('stdout', 'code-conductor: removed the retired graphify-ast-refresh hook from settings.json (backup written beside it)');
     for (const line of heal.lines) emit('stderr', `code-conductor: ${line}`);
     writeVersionFile(home, pkgVersion(assetRoot));
-    if (opts.project) deployProject(assetRoot, cwd, { warn: (m) => emit('stderr', m), report: (m) => emit('stdout', m), home, opencode: opts.opencode });
+    if (opts.project) deployProject(assetRoot, cwd, { warn: (m) => emit('stderr', m), report: (m) => emit('stdout', m), home, opencode: opts.opencode, antigravity: opts.antigravity, codex: opts.codex });
     offerPlugins(emit, { home, withPlugins: opts.withPlugins, isInteractive, ask, spawn, timeoutMs: pluginTimeoutMs, env: pluginEnv });
     return 0;
   } catch (err) {
