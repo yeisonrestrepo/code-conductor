@@ -311,6 +311,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-11-21-feat052-orchestrate-role-subagents-omit-inherited-design.md
 !/docs/superpowers/specs/2026-11-22-feat035-release-agent-ship-band-design.md
 !/docs/superpowers/specs/2026-11-23-bug089-known-failure-substring-matching-lets-generic-design.md
+!/docs/superpowers/specs/2026-11-23-bug090-release-command-leaves-a-rejected-diff-on-design.md
 !/docs/superpowers/specs/2026-11-23-feat030-byte-sum-bound-for-the-conductor-cache-db-design.md
 !/docs/superpowers/specs/2026-11-23-feat033-test-writer-agent-build-band-design.md
 # --- END tracked-surface block (BUG-042) ---
