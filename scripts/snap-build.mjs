@@ -112,8 +112,8 @@ if (pr === '' && !band) {
   writeOut(line);
 } else {
   // ---- v2 and v3: 10 MiB cap, truncate raw pr before serialize ----
-  // FEAT-034, FEAT-036, FEAT-035: the lowest version whose roster names the role, so every existing envelope stays byte-identical.
-  const v = !band ? 2 : [3, 4, 5].find((n) => ROLES_BY_VERSION[n].includes(obj.role)) ?? MAX_VERSION;
+  // FEAT-034, FEAT-036, FEAT-035, FEAT-033: the lowest version whose roster names the role, so every existing envelope stays byte-identical.
+  const v = !band ? 2 : [3, 4, 5, 6].find((n) => ROLES_BY_VERSION[n].includes(obj.role)) ?? MAX_VERSION;
   const skeletonBytes = byteLen(JSON.stringify({ v, sys, ops, mem, pr: '' }));
   if (skeletonBytes > MAX_SNAP_BYTES) die('skeleton exceeds cap even without prose');
 

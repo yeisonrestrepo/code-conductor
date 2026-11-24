@@ -160,7 +160,7 @@ function guard2DuplicateWrite(input) {
 // Copies of scripts/snap-contract.mjs values (ARCH-010 D7). This file is mirrored to two
 // locations and the contract sits at a different relative path from each, so no import is
 // correct in both; tests/hooks/guard5.test.js pins every copy to the contract instead.
-const BAND_ROLES = ['spec', 'plan', 'code', 'audit', 'qa', 'security', 'docs', 'release'];
+const BAND_ROLES = ['spec', 'plan', 'code', 'audit', 'qa', 'security', 'docs', 'release', 'test-writer'];
 const BAND_TOOL_KINDS = ['R', 'RW', 'X'];
 const BAND_WRITE_TOOLS = ['Write', 'Edit', 'create_file', 'write_file'];
 const BAND_ENVELOPE_MAX_BYTES = 10485760;
@@ -189,8 +189,8 @@ function readEnvelope(path) {
     if (statSync(path).size > BAND_ENVELOPE_MAX_BYTES) return null;
     env = JSON.parse(readFileSync(path, 'utf8'));
   } catch { return null; }
-  // FEAT-034, FEAT-036, FEAT-035: security exists from v4, docs from v5 and release only at v6; snap-validate already bound each role to its version.
-  if (!isPlainObject(env) || ![3, 4, 5, 6].includes(env.v) || !isPlainObject(env.sys) || !isPlainObject(env.ops)) return null;
+  // FEAT-034, FEAT-036, FEAT-035, FEAT-033: security exists from v4, docs from v5, release from v6 and test-writer only at v7; snap-validate already bound each role to its version.
+  if (!isPlainObject(env) || ![3, 4, 5, 6, 7].includes(env.v) || !isPlainObject(env.sys) || !isPlainObject(env.ops)) return null;
   if (!BAND_ROLES.includes(env.sys.role) || !BAND_TOOL_KINDS.includes(env.sys.tk)) return null;
   const scope = env.ops.scope;
   if (env.sys.tk === 'RW' && !(Array.isArray(scope) && scope.every((g) => typeof g === 'string'))) return null;
@@ -225,6 +225,8 @@ function guard5BandScope(input, payload) {
   const target = targetPath(input);
   const rel = relative(root, resolve(cwd, target)).split(sep).join('/');
   const inside = target !== '' && rel !== '' && rel !== '..' && !rel.startsWith('../') && !isAbsolute(rel);
+  const surfaceDenial = testSurfaceDenial(role, rel, inside, target, payload);
+  if (surfaceDenial) return surfaceDenial;
   if (inside && env.ops.scope.some((g) => globToRegExp(g).test(rel))) return null;
   return deny(`Guard 5: BAND_SCOPE_VIOLATION: ${target || '<no path>'} is outside the declared scope [${env.ops.scope.join(', ')}]`, 'BAND_SCOPE_VIOLATION');
 }
@@ -287,7 +289,7 @@ function guard6OrchestratorRun(input, payload) {
 // A copy of scripts/orchestrate.mjs SHELL_METACHARACTERS (FEAT-012 D10), carried for Guard
 // 5's reason: no import resolves from both install locations. tests/hooks/guard7.test.js pins it.
 const ROLE_SHELL_METACHARACTERS = [';', '&', '|', '`', '$(', '<', '>', '\n', '\r'];
-const ROLE_SHELL_ROLES = ['code', 'qa', 'security'];
+const ROLE_SHELL_ROLES = ['code', 'qa', 'security', 'test-writer'];
 
 // R3: the live run of this session, or null. The run root is found by Guard 5's walk and the
 // file read by Guard 6's reader.
@@ -299,6 +301,24 @@ function liveRunOf(payload) {
 }
 
 const nonEmptyString = (x) => typeof x === 'string' && x !== '';
+
+// FEAT-033: the run's test surface splits Build by path, whatever the envelope's scope lists.
+// Case-folded, so `Tests/a.test.js` on a case-insensitive file system is a test file too.
+const isSurfaceList = (x) => Array.isArray(x) && x.length > 0 && x.every(nonEmptyString);
+const inTestSurface = (rel, surface) => surface.some((g) => globToRegExp(g.toLowerCase()).test(rel.toLowerCase()));
+
+function testSurfaceDenial(role, rel, inside, target, payload) {
+  if (role !== 'code' && role !== 'test-writer') return null;
+  const surface = liveRunOf(payload)?.test_surface;
+  if (surface === undefined) {
+    return role === 'code' ? null : deny('Guard 5: BAND_TEST_SURFACE: test-writer has no recorded test surface', 'BAND_TEST_SURFACE');
+  }
+  if (!isSurfaceList(surface)) return deny('Guard 5: BAND_TEST_SURFACE: the test_surface of .claude/memory/orchestrator-run.json is not a list of globs', 'BAND_TEST_SURFACE');
+  const hit = inside && inTestSurface(rel, surface);
+  if (role === 'code' && hit) return deny(`Guard 5: BAND_TEST_SURFACE: code may not write ${rel}; files in the test surface [${surface.join(', ')}] are the test-writer's`, 'BAND_TEST_SURFACE');
+  if (role === 'test-writer' && !hit) return deny(`Guard 5: BAND_TEST_SURFACE: test-writer may write only in the test surface [${surface.join(', ')}], not ${inside ? rel : target || '<no path>'}`, 'BAND_TEST_SURFACE');
+  return null;
+}
 
 // FEAT-034: the two commands start fixed; the test command is not among them.
 function allowedCommands(role, run) {
