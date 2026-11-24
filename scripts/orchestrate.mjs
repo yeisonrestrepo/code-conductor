@@ -12,7 +12,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { GATES, ROLE_BAND, V3_CAPS, elementLength, expectedGate } from './snap-contract.mjs';
 // Imported, not spawned: ticket.mjs holds the four import-safety conditions (FEAT-031 B1.7, T2).
 import { TicketHalt, intake, writeSnapshot } from './ticket.mjs';
-import { DocLocationError, resolveDocLocations } from './doc-locations.mjs';
+import { DocLocationError, readTestSurface, resolveDocLocations } from './doc-locations.mjs';
 import { DocsSyncError, docSurface } from './docs-sync.mjs';
 import { ReleaseError, loadProfile, releaseSurface } from './release.mjs';
 
@@ -145,6 +145,8 @@ export const ROLE_ARTIFACTS = {
   security: { tk: 'X', scope: null },
   docs: { tk: 'RW', scope: null },
   release: { tk: 'RW', scope: null },
+  // Test-writer's scope comes from its plan task, as code's does (FEAT-033).
+  'test-writer': { tk: 'RW', scope: null },
 };
 // The router table's "may hand back" column.
 // FEAT-036 C9, FEAT-035 C7: docs and release claim their entry gate; no role claims ship_released.
@@ -153,8 +155,9 @@ export const MAY_HAND_BACK = {
   audit: ['build_executed'], qa: ['verify_pass'], security: ['build_executed'],
   docs: ['verify_pass'],
   release: ['verify_pass'],
+  'test-writer': ['build_executed'],
 };
-const PHASE = { spec: 'spec', plan: 'plan', code: 'impl', audit: 'rev', qa: 'rev', security: 'rev', docs: 'rev', release: 'impl' };
+const PHASE = { spec: 'spec', plan: 'plan', code: 'impl', audit: 'rev', qa: 'rev', security: 'rev', docs: 'rev', release: 'impl', 'test-writer': 'impl' };
 // Guard 7's chaining set (FEAT-012 D7). The hook carries a copy pinned to this one (D10).
 export const SHELL_METACHARACTERS = [';', '&', '|', '`', '$(', '<', '>', '\n', '\r'];
 // D6: each package manager's invocation of the owner's `test` script. `bun test` would run
@@ -281,7 +284,21 @@ function liveRun(root, sessionId) {
 const handedBack = (run, role) => run.handbacks.some((h) => h.role === role);
 
 // FEAT-057: a fix is due exactly when the last hand-back is an audit the script granted one.
-const fixDue = (run) => { const last = run.handbacks.at(-1); return last?.role === 'audit' && isPlainObject(last.fix) ? last.fix : null; };
+// FEAT-033: the round's test-writer entry sits after that audit and does not close the round; only code does.
+const fixDue = (run) => { const last = run.handbacks.findLast((h) => h.role !== 'test-writer'); return last?.role === 'audit' && isPlainObject(last.fix) ? last.fix : null; };
+
+// FEAT-033: what a run recorded before the test-writer role existed says in its entries and its build review.
+export const TEST_WRITER_NOT_CONFIGURED = 'not-configured (run predates FEAT-033)';
+const isSurfaceList = (x) => Array.isArray(x) && x.length > 0 && x.every((g) => typeof g === 'string' && g !== '');
+// Case-folded, as the hook does: `Tests/a.test.js` is `tests/a.test.js` on a case-insensitive file system.
+export const matchesSurface = (path, surface) => surface.some((g) => globToRegExp(g.toLowerCase()).test(path.toLowerCase()));
+
+// undefined for a run from before FEAT-033, which keeps today's routing; a malformed record halts.
+export function surfaceOf(run) {
+  if (run.test_surface === undefined) return undefined;
+  if (!isSurfaceList(run.test_surface)) throw new Halt('ORCH_TEST_SURFACE_INVALID', 'the run file\'s test_surface is not a list of globs; end, then start');
+  return run.test_surface;
+}
 
 // FEAT-054: an unattended run puts the delegated build review between the approving seat and qa (D7).
 function afterSeat(run) {
@@ -291,15 +308,33 @@ function afterSeat(run) {
   return verdict === 'APPROVE' ? { role: 'qa' } : { end: true };
 }
 
+// FEAT-033: a tested task goes to the writer first, once.
+function taskStep(run) {
+  const id = run.tasks.ids[run.tasks.done];
+  const tested = Array.isArray(run.tasks.tested) ? run.tasks.tested : [];
+  const written = run.handbacks.some((h) => h.role === 'test-writer' && h.task === id);
+  if (isSurfaceList(run.test_surface) && tested.includes(id) && !written) return { role: 'test-writer', task: id };
+  return { role: 'code', task: id };
+}
+
+// FEAT-033: a fix round that names a file in the surface goes to the writer first, once.
+function fixStep(run, fix) {
+  const files = Array.isArray(fix.files) ? fix.files : [];
+  const last = run.handbacks.at(-1);
+  const written = last?.role === 'test-writer' && last.fix === fix.round;
+  if (isSurfaceList(run.test_surface) && !written && files.some((f) => matchesSurface(f, run.test_surface))) return { role: 'test-writer', fix: fix.round };
+  return { role: 'code', fix: fix.round };
+}
+
 // The band sequence, read off the run's record.
 export function nextStep(run) {
   if (!handedBack(run, 'spec')) return { role: 'spec' };
   if (!run.approvals.spec) return { await: 'spec' };
   if (!handedBack(run, 'plan')) return { role: 'plan' };
   if (!run.approvals.plan) return { await: 'plan' };
-  if (run.tasks.done < run.tasks.ids.length) return { role: 'code', task: run.tasks.ids[run.tasks.done] };
+  if (run.tasks.done < run.tasks.ids.length) return taskStep(run);
   const fix = fixDue(run);
-  if (fix) return { role: 'code', fix: fix.round };
+  if (fix) return fixStep(run, fix);
   const last = run.handbacks.at(-1)?.role;
   if (last === 'audit') return isPlainObject(run.security) ? { role: 'security' } : afterSeat(run);
   // Only an approving verdict routes to qa (FEAT-059); a blocked or failed seat never does, and the halt already names end (FEAT-034).
@@ -325,21 +360,25 @@ export function extractTasks(planText) {
   let inFiles = false;
   for (const line of planText.split(/\r?\n/)) {
     const head = line.match(/^### (Task \d+)\b/);
-    if (head) { current = { id: head[1], files: [] }; tasks.push(current); inFiles = false; continue; }
+    if (head) { current = { id: head[1], files: [], declaredTests: [] }; tasks.push(current); inFiles = false; continue; }
     if (/^#{1,3} /.test(line)) { current = null; continue; }
     if (!current) continue;
     if (line.trim() === '**Files:**') { inFiles = true; continue; }
-    const entry = inFiles && line.match(/^\s*- (?:Create|Modify|Test): (.*)$/);
+    const entry = inFiles && line.match(/^\s*- (Create|Modify|Test): (.*)$/);
     if (!entry) { inFiles = false; continue; }
-    for (const m of entry[1].matchAll(/`([^`]+)`/g)) current.files.push(m[1].replace(/:\d+(-\d+)?$/, '').replace(/^\.\//, ''));
+    for (const m of entry[2].matchAll(/`([^`]+)`/g)) {
+      const file = m[1].replace(/:\d+(-\d+)?$/, '').replace(/^\.\//, '');
+      current.files.push(file);
+      if (entry[1] === 'Test') current.declaredTests.push(file);
+    }
   }
   return tasks;
 }
 
 // D9: an empty scope is a plan defect, never a read-only fallback; scopes are never truncated.
 // The empty check reads the declared files, so the plan alone never passes as a task's scope.
-function checkedScope(id, files, added) {
-  if (files.length === 0) throw new Halt('ORCH_EMPTY_SCOPE', `${id} declares no files`);
+function checkedScope(id, files, added, declared = files) {
+  if (declared.length === 0) throw new Halt('ORCH_EMPTY_SCOPE', `${id} declares no files`);
   const scope = [...new Set([...files, ...added])];
   const [cap, elemCap] = V3_CAPS['ops.scope'];
   if (scope.length > cap) throw new Halt('ORCH_SCOPE_OVER_CAP', `${id} needs ${scope.length} scope entries; the cap is ${cap}`);
@@ -351,6 +390,20 @@ function checkedScope(id, files, added) {
 export function taskScope(task, planRel) {
   return checkedScope(task.id, task.files, [planRel]);
 }
+
+// FEAT-033: a task's declared files by owner; `outside` is the first Test: file the surface does not hold.
+export function splitTask(task, surface) {
+  const tests = task.files.filter((f) => matchesSurface(f, surface));
+  const files = task.files.filter((f) => !matchesSurface(f, surface));
+  return { tests, files, outside: task.declaredTests.find((f) => !matchesSurface(f, surface)) };
+}
+
+// Code's half of a task, plus the plan; the empty check reads everything the task declares, so a tests-only task still passes.
+function codeTaskScope(task, planRel, surface) {
+  if (surface === undefined) return taskScope(task, planRel);
+  return checkedScope(task.id, splitTask(task, surface).files, [planRel], task.files);
+}
+const testTaskScope = (task, surface) => checkedScope(task.id, splitTask(task, surface).tests, []);
 
 // FEAT-057: the audit text is not owner-approved, so it may name only files the approved plan's tasks
 // declare, never the approved documents themselves (owner decision, 2026-11-13).
@@ -387,6 +440,15 @@ function resolveDocs(root, item) {
     throw e;
   }
 }
+
+// FEAT-033: the recorded test surface, refused before any run file is written.
+function resolveTestSurface(root, docs) {
+  try { return readTestSurface(root, docs); } catch (e) {
+    if (e instanceof DocLocationError) throw new Halt(e.code, e.reason);
+    throw e;
+  }
+}
+const testSurfaceNote = (s) => `; test surface ${s.globs.join(', ')} (${s.source})`;
 
 const docsNote = (d) => `docs: specs ${d.specs}, plans ${d.plans} (${d.source})${d.group ? `; group ${d.group}` : ''}; `;
 
@@ -581,10 +643,21 @@ const headCommit = (root) => {
 const headObject = (root) => { const head = gitValue(root, ['rev-parse', 'HEAD'], ''); return OBJECT_NAME.test(head) ? head : null; };
 
 // A fix step's files come from the record, re-checked against the plan because the run file is writable.
-function codeScope(root, run, step) {
-  if (step.fix !== undefined) { const { files } = fixDue(run); return fixScope(root, run, Array.isArray(files) ? files : [], step.fix); }
-  const task = extractTasks(readDoc(root, run.plan, `cannot read ${run.plan}`).toString('utf8')).find((t) => t.id === step.task);
-  return taskScope(task ?? { id: step.task, files: [] }, run.plan);
+// FEAT-033: on a run with a test surface the whole list is still checked, and each role gets its half.
+function fixHalf(root, run, step, surface) {
+  const { files } = fixDue(run);
+  const whole = fixScope(root, run, Array.isArray(files) ? files : [], step.fix);
+  if (surface === undefined) return whole;
+  return whole.filter((f) => matchesSurface(f, surface) === (step.role === 'test-writer'));
+}
+
+// The scope a build-band step installs and a hand-back must claim, for code and for test-writer.
+function buildScope(root, run, step) {
+  const surface = surfaceOf(run);
+  if (step.fix !== undefined) return fixHalf(root, run, step, surface);
+  const task = extractTasks(readDoc(root, run.plan, `cannot read ${run.plan}`).toString('utf8')).find((t) => t.id === step.task)
+    ?? { id: step.task, files: [], declaredTests: [] };
+  return step.role === 'test-writer' ? testTaskScope(task, surface) : codeTaskScope(task, run.plan, surface);
 }
 
 const docLocationHalt = (run) => new Halt('ORCH_DOC_LOCATION_UNRESOLVED', `run ${run.item} records no docs location (started before FEAT-047); run end, then start`);
@@ -596,7 +669,7 @@ function envelopeFields(run, root, step) {
     // A fix re-enters Build, so it carries Build's entry gate, the one --to code checks (D6).
     n: [], f: [], d: [], x: [], role: step.role, tk, gate: step.fix === undefined ? run.gate : expectedGate('code'),
   };
-  if (step.role === 'code') fields.scope = codeScope(root, run, step);
+  if (step.role === 'code' || step.role === 'test-writer') fields.scope = buildScope(root, run, step);
   else if (step.role === 'spec' || step.role === 'plan') {
     // Read as pinned, never re-checked: the cap was enforced once, at start.
     if (!isPlainObject(run.docs?.scopes) || !Array.isArray(run.docs.scopes[step.role])) throw docLocationHalt(run);
@@ -634,8 +707,9 @@ function checkApprovedDocs(root, run) {
 const fixNote = (run) => { const f = fixDue(run); return `fix round ${f.round} of ${run.audit_rounds ?? 0}: review ${f.review} sha256 ${f.sha256}`; };
 
 // FEAT-053: what the script says this dispatch runs on, never the orchestrator's choice; null in a run without models.
+// FEAT-033: test-writer has no model of its own, so it never carries one over from the code install before it.
 function dispatchModel(run, step) {
-  if (!isPlainObject(run.models)) return null;
+  if (!isPlainObject(run.models) || !MODEL_ROLES.includes(step.role)) return null;
   return step.fix === undefined ? run.models[step.role] : fixDue(run).model ?? run.models.code;
 }
 
@@ -669,6 +743,7 @@ function changeNote(root, run, check) {
 // Builds and validates the next envelope with --to; installs it unless only checking.
 function install(root, sessionId, role, check) {
   const run = liveRun(root, sessionId);
+  surfaceOf(run); // a malformed record halts every install, not only the build roles'
   const step = nextStep(run);
   if (step.role !== role) throw new Refusal(`install ${role}: the next step is ${describeStep(step)}`);
   if (run.approvals.plan) checkApprovedDocs(root, run);
@@ -684,7 +759,8 @@ function install(root, sessionId, role, check) {
   const out = built.out.trim() + (step.fix === undefined ? '' : `\n${fixNote(run)}`) + change + (model ? `\nmodel: ${model}` : '');
   if (check) return out;
   writeAtomic(join(root, ENVELOPE_FILE), built.out);
-  saveRun(root, { ...run, band: ROLE_BAND[role], role, ...(model ? { dispatch_model: model } : {}) });
+  const { dispatch_model: _previous, ...kept } = run;
+  saveRun(root, { ...kept, band: ROLE_BAND[role], role, ...(model ? { dispatch_model: model } : {}) });
   return out;
 }
 
@@ -704,9 +780,10 @@ function withholdUnlessApproved(run) {
 
 // FEAT-057: a fix re-enters Build with no task, so it never advances tasks.done; audits carry their round.
 function entryFields(run, role) {
-  const fix = role === 'code' ? fixDue(run) : null;
-  if (fix) return { fix: fix.round };
-  if (role === 'code') return { task: run.tasks.ids[run.tasks.done] };
+  const legacy = role === 'code' && run.test_surface === undefined ? { test_writer: TEST_WRITER_NOT_CONFIGURED } : {};
+  const fix = role === 'code' || role === 'test-writer' ? fixDue(run) : null;
+  if (fix) return { fix: fix.round, ...legacy };
+  if (role === 'code' || role === 'test-writer') return { task: run.tasks.ids[run.tasks.done], ...legacy };
   if (role === 'audit') return { round: run.handbacks.filter((h) => h.role === 'audit').length + 1 };
   // FEAT-034 C13: a run from before the seat records that the qa gate was not covered by it.
   if (role === 'qa' && !isPlainObject(run.security)) return { security: SECURITY_NOT_CONFIGURED };
@@ -724,7 +801,13 @@ export function recordHandback(run, role, gate, verdict, extra = {}) {
 }
 
 // FEAT-055: the validated text is returned too, so resume can validate the same bytes again.
-function parseHandback(text) {
+function versionHalt(role, v) {
+  if (role === 'test-writer') return v === 7 ? null : new Halt('ORCH_HANDBACK_INVALID', `a test-writer hand-back must be a v7 envelope, got v${v}`);
+  return v === 3 || v === 4 ? null : new Halt('ORCH_HANDBACK_INVALID', `a hand-back must be a v3 or v4 envelope, got v${v}`);
+}
+const claimedVersion = (json) => { try { return JSON.parse(json)?.v; } catch { return undefined; } };
+
+function parseHandback(text, role) {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.startsWith('SNAP_HANDBACK '));
   if (lines.length !== 1) throw new Halt('ORCH_HANDBACK_MISSING', `expected exactly one SNAP_HANDBACK line, found ${lines.length}`);
   const json = lines[0].slice('SNAP_HANDBACK '.length).trim();
@@ -732,10 +815,14 @@ function parseHandback(text) {
   if (Buffer.byteLength(json) > SNAP_STORE_MAX_BYTES) {
     throw new Halt('ORCH_HANDBACK_INVALID', `the hand-back SNAP is larger than ${SNAP_STORE_MAX_BYTES} bytes`);
   }
+  // The writer's version is named before the validator's role roster refuses it for an older one.
+  const claimed = claimedVersion(json);
+  if (role === 'test-writer' && claimed !== undefined) { const early = versionHalt(role, claimed); if (early) throw early; }
   const error = validate(json + '\n');
   if (error) throw new Halt('ORCH_HANDBACK_INVALID', error);
   const env = JSON.parse(json);
-  if (env.v !== 3 && env.v !== 4) throw new Halt('ORCH_HANDBACK_INVALID', `a hand-back must be a v3 or v4 envelope, got v${env.v}`);
+  const wrong = versionHalt(role, env.v);
+  if (wrong) throw wrong;
   return { env, snap: json };
 }
 
@@ -1034,7 +1121,7 @@ async function securityHandback(root, run, gate, text) {
 
 // BUG-075: recomputed as install computed it, never read back from the envelope file, which the orchestrator can write.
 function expectedScope(root, run, role) {
-  if (role === 'code') return codeScope(root, run, nextStep(run));
+  if (role === 'code' || role === 'test-writer') return buildScope(root, run, { ...nextStep(run), role });
   if (role !== 'spec' && role !== 'plan') return null;
   if (!isPlainObject(run.docs)) throw docLocationHalt(run);
   return docScopes(run.docs)[role];
@@ -1067,7 +1154,7 @@ async function handback(root, sessionId, role, bytes) {
     throw new Halt('ORCH_HANDBACK_CONFLICT', `${role} already handed back for this position; a second report is not routed`);
   }
   if (!run.role || run.role !== role) throw new Refusal(`handback ${role}: the dispatched role is ${run.role ?? 'none'}`);
-  const { env, snap } = parseHandback(text);
+  const { env, snap } = parseHandback(text, role);
   if (env.sys.role !== role) throw new Halt('ORCH_HANDBACK_ROLE_MISMATCH', `dispatched ${role}, the hand-back names ${env.sys.role}`);
   if (!MAY_HAND_BACK[role].includes(env.ops.gate)) {
     throw new Halt('ORCH_GATE_UNEARNED', `${role} may hand back ${MAY_HAND_BACK[role].join('|')}, not ${env.ops.gate}`);
@@ -1080,7 +1167,9 @@ async function handback(root, sessionId, role, bytes) {
   saveHandedBackRun(root, recorded, role);
   // Saved first, so the halt cli records lands on top of the audit entry (FEAT-060, FEAT-057).
   if (verdict && verdict.verdict !== 'APPROVE') return auditFix(root, recorded, verdict, bytes);
-  const note = recorded.handbacks.at(-1).security === SECURITY_NOT_CONFIGURED ? `; security=${SECURITY_NOT_CONFIGURED}` : '';
+  const entry = recorded.handbacks.at(-1);
+  const note = (entry.security === SECURITY_NOT_CONFIGURED ? `; security=${SECURITY_NOT_CONFIGURED}` : '')
+    + (entry.test_writer === TEST_WRITER_NOT_CONFIGURED ? `; test-writer=${TEST_WRITER_NOT_CONFIGURED}` : '');
   return `${role} handed back ${env.ops.gate}${note}`;
 }
 
@@ -1114,12 +1203,27 @@ function approve(root, sessionId, what, rel, shown) {
   return `spec approved: sha256 ${sha256}`;
 }
 
+// FEAT-033: on a run with a test surface, each task's two scopes are checked and the tasks that carry tests are recorded.
+function checkPlanScopes(tasks, planRel, surface) {
+  if (surface === undefined) { for (const t of tasks) taskScope(t, planRel); return undefined; }
+  const tested = [];
+  for (const t of tasks) {
+    const { tests, outside } = splitTask(t, surface);
+    if (outside !== undefined) throw new Halt('ORCH_TEST_OUTSIDE_SURFACE', `${t.id} declares ${outside} with Test: outside the test surface [${surface.join(', ')}]`);
+    codeTaskScope(t, planRel, surface);
+    if (tests.length === 0) continue;
+    testTaskScope(t, surface);
+    tested.push(t.id);
+  }
+  return tested;
+}
+
 function approvePlan(root, run, text, approval, head = 'plan approved') {
   const tasks = extractTasks(text);
   if (tasks.length === 0) throw new Halt('ORCH_EMPTY_SCOPE', `${approval.path} holds no "### Task N" section`);
-  for (const t of tasks) taskScope(t, approval.path);
+  const tested = checkPlanScopes(tasks, approval.path, surfaceOf(run));
   saveRun(root, {
-    ...run, gate: 'define_approved', plan: approval.path, tasks: { ids: tasks.map((t) => t.id), done: 0 },
+    ...run, gate: 'define_approved', plan: approval.path, tasks: { ids: tasks.map((t) => t.id), done: 0, ...(tested ? { tested } : {}) },
     approvals: { ...run.approvals, plan: approval },
   });
   return `${head}: define_approved, ${tasks.length} task(s); sha256 ${approval.sha256}`;
@@ -1184,9 +1288,9 @@ const securityLine = ({ verdict, threshold, counts: c, scans: s }) => `VERDICT: 
 
 function buildValues(run) {
   const { spec, plan } = run.approvals;
-  const files = [...new Set(run.handbacks.filter((h) => h.role === 'code').flatMap((h) => snapFiles(h).map((f) => f.replace(/:[CMD]$/, ''))))];
+  const files = [...new Set(run.handbacks.filter((h) => h.role === 'code' || h.role === 'test-writer').flatMap((h) => snapFiles(h).map((f) => f.replace(/:[CMD]$/, ''))))];
   const seat = run.handbacks.findLast((h) => h.role === 'security')?.security;
-  return `spec ${spec.path} sha256 ${spec.sha256}; plan ${plan.path} sha256 ${plan.sha256}; files ${files.length ? files.join(', ') : 'none'}; security ${seat ? securityLine(seat) : SECURITY_NOT_CONFIGURED}; source ${sourceNote(run)}`;
+  return `spec ${spec.path} sha256 ${spec.sha256}; plan ${plan.path} sha256 ${plan.sha256}; files ${files.length ? files.join(', ') : 'none'}; security ${seat ? securityLine(seat) : SECURITY_NOT_CONFIGURED}${run.test_surface === undefined ? `; test-writer=${TEST_WRITER_NOT_CONFIGURED}` : ''}; source ${sourceNote(run)}`;
 }
 
 // D8: the script prints what the brief carries, so the orchestrator copies values and never reads them from its own context.
@@ -1368,15 +1472,22 @@ function candidateEntries(run) {
 
 // A task entry still describes the repository: its position, its SNAP and its commit all hold.
 // BUG-075: and it still names the scope its task installs, over paths inside it.
-function taskEntryHolds(root, run, entry, taskId) {
+function taskEntryHolds(root, run, entry, taskId, role = 'code') {
   if (entry.task !== taskId || typeof entry.snap !== 'string' || validate(`${entry.snap}\n`) !== '') return false;
   let env = null;
   try { env = JSON.parse(entry.snap); } catch { return false; }
-  if (env?.sys?.role !== 'code' || ancestry(root, env.sys.c) !== 0) return false;
-  try { return claimHalt(env, 'code', codeScope(root, run, { task: taskId })) === null; } catch (e) {
+  if (env?.sys?.role !== role || ancestry(root, env.sys.c) !== 0) return false;
+  try { return claimHalt(env, role, buildScope(root, run, { role, task: taskId })) === null; } catch (e) {
     if (e instanceof Halt) return false;
     throw e;
   }
+}
+
+// FEAT-033: the writer entry a tested task needs, undefined when it needs none, null when it is missing.
+function writerEntryFor(entries, run, taskId) {
+  const tested = Array.isArray(run.tasks.tested) ? run.tasks.tested : [];
+  if (!isSurfaceList(run.test_surface) || !tested.includes(taskId)) return undefined;
+  return entries.find((h) => h.role === 'test-writer' && !('fix' in h) && h.task === taskId) ?? null;
 }
 
 // Each approved document's entry, then Build's task entries up to the first that fails; Verify is always redone.
@@ -1385,9 +1496,16 @@ function keptEntries(root, run) {
   const approved = RECORD_KINDS.filter((k) => run.approvals[k]).map((k) => entries.find((h) => h.role === k)).filter(Boolean);
   if (!run.approvals.plan) return { kept: approved, tasks: 0 };
   const tasks = entries.filter((h) => h.role === 'code' && !('fix' in h));
+  const kept = [...approved];
   let n = 0;
-  while (n < tasks.length && n < run.tasks.ids.length && taskEntryHolds(root, run, tasks[n], run.tasks.ids[n])) n += 1;
-  return { kept: [...approved, ...tasks.slice(0, n)], tasks: n };
+  while (n < tasks.length && n < run.tasks.ids.length) {
+    const writer = writerEntryFor(entries, run, run.tasks.ids[n]);
+    if (writer === null || !taskEntryHolds(root, run, tasks[n], run.tasks.ids[n])) break;
+    if (writer && !taskEntryHolds(root, run, writer, run.tasks.ids[n], 'test-writer')) break;
+    kept.push(...(writer ? [writer] : []), tasks[n]);
+    n += 1;
+  }
+  return { kept, tasks: n };
 }
 
 // Only approvePlan writes define_approved, and only the last task's hand-back forwards build_executed.
@@ -1566,6 +1684,7 @@ function start(root, sessionId, args) {
   const stack = () => (detected ??= detectStack(root));
   const testCommand = checkTestCommand(resolveTestCommand(root, stack));
   const docs = resolveDocs(root, item);
+  const surface = resolveTestSurface(root, docs);
   const models = resolveRoleModels(root);
   const security = resolveSecurity(root, stack(), { threshold, dependencyAudit });
   const bound = ticket === undefined ? null : ticketIntake(root, item, ticket);
@@ -1578,13 +1697,13 @@ function start(root, sessionId, args) {
   saveRun(root, {
     v: 1, session_id: sessionId, item, mode: auto || unattended ? 'auto' : 'step', started: new Date().toISOString(),
     band: 'boundary', role: null, gate: 'boundary_routed', approvals: { spec: null, plan: null },
-    plan: null, tasks: { ids: [], done: 0 }, handbacks: [], halt: null, test_command: testCommand, audit_rounds: auditRounds, security, docs, known_failures: knownFailures,
+    plan: null, tasks: { ids: [], done: 0 }, handbacks: [], halt: null, test_command: testCommand, audit_rounds: auditRounds, security, docs, test_surface: surface.globs, known_failures: knownFailures,
     ...(unattended ? { unattended: true } : {}),
     ...(models ? { models } : {}),
     ...(bound ? { ticket: { ...bound.binding, snapshot: bound.path } } : {}),
   });
   const begun = old ? `replaced the stale run ${old.item} started ${old.started}` : `run ${item} started`;
-  return `${begun}; ${bound ? ticketNote(bound) : ''}${docsNote(docs)}test command: ${testCommand}; audit rounds: ${auditRounds}${securityNote(security, root, stack())}${modelsNote(models)}${knownFailuresNote(knownFailures)}${unattended ? UNATTENDED_NOTE : ''}`;
+  return `${begun}; ${bound ? ticketNote(bound) : ''}${docsNote(docs)}test command: ${testCommand}${testSurfaceNote(surface)}; audit rounds: ${auditRounds}${securityNote(security, root, stack())}${modelsNote(models)}${knownFailuresNote(knownFailures)}${unattended ? UNATTENDED_NOTE : ''}`;
 }
 
 // BUG-074: the echo shows the values exactly as start received them, so a value the shell cut short is visible.

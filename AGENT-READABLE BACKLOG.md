@@ -197,7 +197,8 @@ The factory is five bands. Work enters through the Boundary band, flows Define, 
 * **Components Affected:** Agent profile manifests, `/cc-spec` intake (accepts an Analyst handoff as pre-answered context), SNAP role enum (versioned change per the `[FEAT-012]` amendment), `project-template/CLAUDE.md` delegation table.
 * **Acceptance Criteria:** Analyst output is a fixed-shape requirements document the Spec agent consumes without re-asking answered questions. UX agent holds read-only access plus the skill stack; it cannot write source files. Both roles are skippable: a backend-only ticket never instantiates UX, and a ticket that arrives as a finished requirements doc skips Analyst.
 
-### [ ] `[FEAT-033]` Test Writer Agent (Build Band)
+### [X] `[FEAT-033]` Test Writer Agent (Build Band)
+* **DONE, shipped as `1.58.0` on 2026-11-24.** A ninth band role, `test-writer`, seated in the Build band before `code` on every plan task that declares a test file. The test surface is a recorded project setting, not a constant: one `- Test files:` line of globs in the project `CLAUDE.md`, read by `readTestSurface` in `scripts/doc-locations.mjs` (default `DEFAULT_TEST_SURFACE`, `tests/**`), each glob refused by `checkTestGlob` with `ORCH_TEST_SURFACE_INVALID` for a reserved-folder or root prefix, a spec or plan folder overlap, or a bad shape, and pinned by `start` as the run's `test_surface`. `approve plan` splits each task's files by path into a `test-writer` scope (inside the surface) and a `code` scope (the rest plus the plan), halts `ORCH_TEST_OUTSIDE_SURFACE` on a `Test:` line outside it, and records `tasks.tested`; `nextStep` routes `test-writer` then `code` per tested task and per fix round with test files, `code` alone otherwise, and `code` with scope `[<plan>]` on a tests-only task. `test-writer` hands back `build_executed` at SNAP v7 without crossing the band; the build review and `resume` include its hand-backs. The criterion's tool-layer clause holds through Guard 5's `BAND_TEST_SURFACE`, which reads the live run's `test_surface` and denies a `code` write inside it and a `test-writer` write outside it whatever the envelope lists; Guard 7 allows `test-writer` only the recorded test command; both hook copies. A run file without `test_surface` runs `code` alone with today's scopes and records `test-writer=not-configured (run predates FEAT-033)`. SNAP `MAX_VERSION` is 7 with no new field and `release` stays at v6, so v1-v6 envelopes are byte-identical. The profile holds `Read, Grep, Glob, Write, Edit, Bash` and `default-model: sonnet`, outside `MODEL_ROLES` and with no ad-hoc envelope. `/cc-plan` states the test list as `- Test:` lines inside the surface; `/cc-implement` keeps its main-session flow, the entry's "task routing" landing in `nextStep`. Out of scope, as specified: `/cc-stack` writing the line, `/cc-implement --delegate`, per-role model selection for `test-writer`, and files the test command itself writes. Pinned by `tests/scripts/doc-locations.test.js`, `tests/scripts/orchestrate.test.js`, `tests/hooks/guard5.test.js`, `tests/hooks/guard6.test.js`, `tests/hooks/guard7.test.js`, `tests/unit/snap-contract.test.js`, `tests/unit/snap-validate.test.js`, `tests/scripts/snap-build.test.js`, `tests/unit/role-profiles.test.js` and `tests/installer/commands-parity.test.js`. Landed from PR #310 (cc-lane-bot), intake of issue #141; the id was filed at intake and is owner-minted at landing. Spec: `docs/superpowers/specs/2026-11-23-feat033-test-writer-agent-build-band-design.md` (approved 2026-11-23 by independent review, round 1). Plan: `docs/superpowers/plans/2026-11-23-feat033-test-writer-agent-build-band.md` (approved by independent review, round 1).
 * **Description:** Split test authorship out of the Code agent. The Test Writer receives the approved plan's test list and writes the suites; the Code agent writes the implementation; neither edits the other's files. Write scopes are disjoint by construction (`tests/**` vs the plan's declared source paths) (intake of issue #141).
 * **Impact:** Restores the adversarial gap that makes tests worth running: the author of the code is not the author of its proof. Pairs naturally with the superpowers TDD flow already in use.
 * **Components Affected:** Agent profile manifests, `/cc-plan` output (test list becomes a first-class handoff artifact), `/cc-implement` task routing, SNAP `scope` field.
@@ -1588,7 +1589,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #265; reported by the automated security review of
   #264.
 
-### [ ] `[BUG-089]` Known-failure substring matching lets generic entries or newly added failing tests pass a red suite
+### [X] `[BUG-089]` Known-failure substring matching lets generic entries or newly added failing tests pass a red suite
+* **DONE, shipped as `1.57.1` on 2026-11-24.** `isKnownFailureArg` in `scripts/orchestrate.mjs` gains an `isSpecificEntry` conjunct: `start` refuses, as a usage error, a `--known-failure` value shorter than 12 code points once trimmed (`KNOWN_FAILURE_MIN`) or made of one word of letters, digits, `_` and `-` in any script (`ONE_WORD`, `/^[\p{L}\p{N}_-]+$/u`); the 200-character ceiling and the repeat rule are unchanged, and a run file already holding a short entry still validates. In a run that declares known failures, `install qa` writes the files the change created (`A`) or modified (`M`) against the base commit `start` recorded, sorted by path, to `.conductor/handback/qa-change.txt` (`git diff --name-status --no-renames` plus untracked, non-ignored files; deletions left out), and prints one `change files: <n> created, <m> modified (…)` line before any `model:` line; when the list cannot be computed it removes the old file and prints `change files: unavailable (<reason>); no failing test is known`. `--check` writes nothing, `end` and a new `start` clear the list with the hand-back folder, and the qa envelope is unchanged. The `qa` profile never counts a failing test in a listed file as known, counts none as known when the list is missing, and names each test that matched an entry but is not known for this reason; the `code` profile never counts one in a file it created or edited in its task. Both take a test's file only from the runner's output and compare paths by one rule (`\` becomes `/`, then equal or a `/` suffix match, a `:line` or `:line:column` suffix excluded). Both `cc-orchestrate.md` copies and the README command row state the value rule and the change list. Residual, out of scope: an entry that is a file path still covers an existing test in an untouched file the change broke. Pinned by `known failures in changed files [BUG-089]` in `tests/scripts/orchestrate.test.js` and `tests/unit/role-profiles.test.js` (with the new `code` and `qa` profile hashes) and the `[BUG-089]` row of `tests/installer/commands-parity.test.js`. Landed from PR #304 (cc-lane-bot), intake of issue #284; the id was reserved by the triage and is owner-minted at landing. Spec: `docs/superpowers/specs/2026-11-23-bug089-known-failure-substring-matching-lets-generic-design.md` (approved by the owner). Plan: `docs/superpowers/plans/2026-11-23-bug089-known-failure-substring-matching-lets-generic.md` (approved by the owner).
 
 - Symptom: since `[BUG-074]`, `isKnownFailureArg`
   (scripts/orchestrate.mjs:1484, per the issue) accepts any non-blank
@@ -1634,6 +1636,54 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Follow-up of `[FEAT-035]`.
 - Intake of issue #299; reported by the automated security review of
   the 1.56.0 release candidate (#298).
+
+### [ ] `[BUG-091]` Known-failure change list omits new files created under ignored paths
+
+- Symptom: `scripts/orchestrate.mjs:649` (per the issue) builds the qa
+  change list from `git diff --name-status` plus
+  `git ls-files --others --exclude-standard`, so a new file that
+  matches a `.gitignore` rule is not listed.
+- Impact per the issue: if a build step creates a failing test in an
+  ignored path that the test runner still executes (or adds such a path
+  to `.gitignore`), and that test's runner line contains a declared
+  `--known-failure` entry, `qa` can count the failure as known and the
+  suite reads green. Impact is limited: entries must be at least 12
+  characters and more than one word, a declared entry must match, and a
+  `.gitignore` edit itself shows up in the list as `M .gitignore`, so
+  this is defense-in-depth for the `[BUG-089]` rule, not a bypass of
+  owner intent.
+- Fix shape suggested by the issue: include newly created ignored files
+  (`git ls-files --others --ignored --exclude-standard`) restricted to
+  paths outside `.conductor/`, or have `qa` treat no failure as known
+  whenever the list contains `M .gitignore`.
+- Follow-up of `[BUG-089]`.
+- Intake of issue #306; reported by the automated security review of
+  #304.
+
+### [ ] `[BUG-092]` Test-surface split bypassable through the recorded test command
+
+- Symptom: Guard 5 (`.claude/hooks/pre-tool-use.mjs:310`,
+  `testSurfaceDenial`, per the issue) stops `test-writer` from writing
+  outside the run's test surface and stops `code` from writing inside
+  it, but only for the Write/Edit tool family. Both roles may run the
+  run's recorded test command (Guard 7), and that command executes the
+  files the role just wrote.
+- Impact per the issue: a `test-writer` could write a test that changes
+  source files when it runs, and `code` could write source that changes
+  test files when the suite loads it, getting past the split described
+  in `.claude/agents/test-writer.md:32` and `.claude/agents/code.md:10`.
+  Not a regression: before `[FEAT-033]`, `code` already wrote and ran
+  tests with no split at all. The risk is that the docs present the
+  split as a guard-enforced boundary while it only holds against direct
+  tool writes.
+- Fix shape suggested by the issue: (a) state the limit in both agent
+  profiles and in the `[FEAT-033]` spec; or (b) have the audit role
+  compare each hand-back's `ops.f` against the files actually changed
+  in the commit, by role, so any write made through the test command
+  shows up.
+- Follow-up of `[FEAT-033]`.
+- Intake of issue #312; reported by the automated security review of
+  the 1.58.0 release candidate (#311).
 
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 

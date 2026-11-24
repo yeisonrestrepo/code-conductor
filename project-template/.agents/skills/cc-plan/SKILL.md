@@ -123,9 +123,10 @@ Each step must include:
   predict, and the mismatch halts a run that is otherwise correct.
 
 ## Test List
-- [ ] Unit tests for [unit]
-- [ ] Integration test for [seam]
-- [ ] E2E test if UI is affected
+
+The test list is the handoff to the tests' author. In an orchestrated run the `test-writer` role writes every declared file inside the project's test surface, before `code` implements the task, and `code` writes the rest. The test surface is the globs of the `- Test files:` line in the project `CLAUDE.md`, `tests/**` when the line is absent. Declare each test file on a `- Test:` line in the `**Files:**` block of the task that needs it, and only a file inside the test surface: `approve plan` refuses a `Test:` line outside it (`ORCH_TEST_OUTSIDE_SURFACE`). A `- Create:` or `- Modify:` line inside the test surface, such as a fixture or a helper, belongs to `test-writer` too. Each row names its file and its task; add an E2E row when the UI is affected:
+
+- [ ] [T-NNN] <test path> (Task N): <cases>
 
 ## Commit Order
 [Which steps to group into commits]
@@ -148,7 +149,7 @@ Without `--delegate` in `$ARGUMENTS`, skip this section: this session writes the
 
    `<ID-or-adhoc>` is the item's backlog id (for example `FEAT-061`), else `adhoc`.
 2. Only a first stdout line that starts with `installed:` allows the dispatch; the envelope's `ops.scope` is the folder the plan goes in. If the verb's stderr says the run `is live in this session`, stop: that run's Define band writes this document; continue with `/cc-orchestrate`, or end the run. On any other non-zero exit or first line, print `plan not dispatched: <the verb's stderr line>` and write the plan in this session, as above.
-3. Dispatch `Agent({ subagent_type: "plan", description: "write plan", prompt })`. The brief names the item, the approved spec's path and the folder from the envelope's scope. As the content to write, it gives the Task ID Requirements and the Ordered Steps, Test List, Commit Order and Identified Risks sections above, with a `**Files:**` block under each task. It says that a phase command, not a run, dispatched the agent, and that the envelope is installed at `.claude/memory/band-envelope.json`.
+3. Dispatch `Agent({ subagent_type: "plan", description: "write plan", prompt })`. The brief names the item, the approved spec's path and the folder from the envelope's scope. As the content to write, it gives the Task ID Requirements and the Ordered Steps, Test List, Commit Order and Identified Risks sections above, with a `**Files:**` block under each task whose `- Test:` lines name only files inside the project's test surface, as the Test List section says. It says that a phase command, not a run, dispatched the agent, and that the envelope is installed at `.claude/memory/band-envelope.json`.
 4. Show the agent's report and its `SNAP_HANDBACK` line; do not record the hand-back. A guard denial or a report without a hand-back is shown as it is, never retried another way.
 5. Run `node "$S/orchestrate.mjs" envelope --clear`, also when the agent was denied or ended without a hand-back. If it refuses, report the refusal and leave the file alone: a run now owns it.
 6. Check the written plan's task ids as Task ID Requirements says. The plan then goes through the approval and the Phase exit branch gate, as a plan written in this session would.

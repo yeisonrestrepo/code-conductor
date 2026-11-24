@@ -8,6 +8,7 @@ import { PRE_PARSE_MAX_BYTES, ROLES, TOOL_KINDS, WRITE_TOOLS } from '../../scrip
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const HOOK = join(REPO_ROOT, '.claude/hooks/pre-tool-use.mjs');
+const TEMPLATE_HOOK = join(REPO_ROOT, 'project-template/.claude/hooks/pre-tool-use.mjs');
 
 // The keys the 2026-09-30 spike measured on a subagent's Write (claude 2.1.286). The main
 // session sends the same set without agent_id and agent_type.
@@ -21,8 +22,9 @@ function payload(tool, filePath, { cwd, agent } = {}) {
 }
 
 // Through the hook's real contract: JSON on stdin, a decision on stdout, exit 0 always.
-function fire(p) {
-  const r = spawnSync(process.execPath, [HOOK], { input: JSON.stringify(p), cwd: p.cwd, encoding: 'utf8', timeout: 15000 });
+function fire(p) { return fireWith(HOOK, p); }
+function fireWith(hook, p) {
+  const r = spawnSync(process.execPath, [hook], { input: JSON.stringify(p), cwd: p.cwd, encoding: 'utf8', timeout: 15000 });
   if (r.error) throw new Error(`hook spawn failed: ${r.error.message}`);
   expect(r.status).toBe(0);
   return r.stdout.trim() === '' ? null : JSON.parse(r.stdout).hookSpecificOutput;
@@ -239,6 +241,127 @@ describe('Guard 5: band scope for role agents [ARCH-010]', () => {
       releaseEnvelope();
       const profile = join(root, '.claude', 'release-profile.json');
       expect(asRelease(profile).permissionDecisionReason).toBe(violation(profile, 'VERSION, CHANGELOG.md'));
+    });
+  });
+
+  describe('[FEAT-033] the test-writer role under a v7 envelope', () => {
+    const writerEnvelope = (scope = ['tests/a.test.js']) => writeFileSync(envelopePath(), JSON.stringify({
+      v: 7,
+      sys: { ph: 'impl', c: 'abc1234', s: 'FEAT-033', role: 'test-writer', tk: 'RW' },
+      ops: { n: [], f: [], scope, gate: 'define_approved' },
+      mem: { d: [], x: [] },
+    }));
+    const liveRun = (fields = {}) => writeFileSync(join(root, '.claude', 'memory', 'orchestrator-run.json'), JSON.stringify({
+      v: 1, session_id: 'sess-1', item: 'FEAT-033', started: '2026-11-24T00:00:00.000Z', gate: 'define_approved', test_command: 'npm test', test_surface: ['tests/**'], ...fields,
+    }));
+    const asWriter = (tool, file) => fire(payload(tool, file, { cwd: root, agent: 'test-writer' }));
+
+    it('[G5-1] allows a Write inside the writer\'s scope and the test surface', () => {
+      writerEnvelope();
+      liveRun();
+      expect(asWriter('Write', join(root, 'tests', 'a.test.js'))).toBeNull();
+    });
+
+    it('[G5-2] denies a Write inside the surface but outside the writer\'s scope', () => {
+      writerEnvelope();
+      liveRun();
+      const outside = join(root, 'tests', 'b.test.js');
+      expect(asWriter('Write', outside).permissionDecisionReason).toBe(violation(outside, 'tests/a.test.js'));
+    });
+
+    // The run's test surface splits Build by path, whatever the envelope's scope lists.
+    const codeEnvelope = (scope) => envelope({ ops: { scope } });
+    const writerScope = (scope) => writerEnvelope(scope);
+    const as = (role, tool, file, hook = HOOK) => fireWith(hook, payload(tool, file, { cwd: root, agent: role }));
+    const reason = (d) => d?.permissionDecisionReason;
+    const SURFACE_CODE = (p, g) => `Guard 5: BAND_TEST_SURFACE: code may not write ${p}; files in the test surface [${g}] are the test-writer's`;
+    const SURFACE_WRITER = (p, g) => `Guard 5: BAND_TEST_SURFACE: test-writer may write only in the test surface [${g}], not ${p}`;
+    const NO_SURFACE = 'Guard 5: BAND_TEST_SURFACE: test-writer has no recorded test surface';
+    const BAD_SURFACE = 'Guard 5: BAND_TEST_SURFACE: the test_surface of .claude/memory/orchestrator-run.json is not a list of globs';
+    const at = (rel) => join(root, ...rel.split('/'));
+
+    it.each(WRITE_TOOLS)('[S1] denies code a %s of a file inside the test surface', (tool) => {
+      liveRun();
+      codeEnvelope(['tests/a.test.js', 'src/a.js']);
+      expect(reason(as('code', tool, at('tests/a.test.js')))).toBe(SURFACE_CODE('tests/a.test.js', 'tests/**'));
+    });
+
+    it('[S2] allows code a file outside the test surface', () => {
+      liveRun();
+      codeEnvelope(['tests/a.test.js', 'src/a.js']);
+      expect(as('code', 'Write', at('src/a.js'))).toBeNull();
+    });
+
+    it('[S3] denies test-writer a file outside the test surface, though its scope lists it', () => {
+      liveRun();
+      writerScope(['tests/a.test.js', 'src/a.js']);
+      expect(reason(as('test-writer', 'Write', at('src/a.js')))).toBe(SURFACE_WRITER('src/a.js', 'tests/**'));
+    });
+
+    it('[S4] denies test-writer the plan, though its scope lists it', () => {
+      liveRun();
+      writerScope(['docs/plans/demo.md']);
+      expect(reason(as('test-writer', 'Write', at('docs/plans/demo.md')))).toBe(SURFACE_WRITER('docs/plans/demo.md', 'tests/**'));
+    });
+
+    it('[S5] allows test-writer a file in its scope inside the test surface', () => {
+      liveRun();
+      writerScope(['tests/a.test.js']);
+      expect(as('test-writer', 'Write', at('tests/a.test.js'))).toBeNull();
+    });
+
+    it('[S6] reads a recorded surface from the run file, not a constant', () => {
+      liveRun({ test_surface: ['src/**/*.test.ts'] });
+      const scope = ['src/a.test.ts', 'tests/x.test.js'];
+      codeEnvelope(scope);
+      expect(reason(as('code', 'Write', at('src/a.test.ts')))).toBe(SURFACE_CODE('src/a.test.ts', 'src/**/*.test.ts'));
+      expect(as('code', 'Write', at('tests/x.test.js'))).toBeNull();
+      writerScope(scope);
+      expect(as('test-writer', 'Write', at('src/a.test.ts'))).toBeNull();
+      expect(reason(as('test-writer', 'Write', at('tests/x.test.js')))).toBe(SURFACE_WRITER('tests/x.test.js', 'src/**/*.test.ts'));
+    });
+
+    it('[S7] folds the case of the path, as a case-insensitive file system does', () => {
+      liveRun();
+      codeEnvelope(['Tests/A.test.js']);
+      expect(reason(as('code', 'Write', at('Tests/A.test.js')))).toBe(SURFACE_CODE('Tests/A.test.js', 'tests/**'));
+    });
+
+    it('[S8] a run before FEAT-033 leaves code alone and gives the writer nothing', () => {
+      liveRun({ test_surface: undefined });
+      codeEnvelope(['tests/a.test.js']);
+      expect(as('code', 'Write', at('tests/a.test.js'))).toBeNull();
+      writerScope(['tests/a.test.js']);
+      expect(reason(as('test-writer', 'Write', at('tests/a.test.js')))).toBe(NO_SURFACE);
+    });
+
+    it('[S9] with no run file code is unchecked and the writer has no surface', () => {
+      codeEnvelope(['tests/a.test.js']);
+      expect(as('code', 'Write', at('tests/a.test.js'))).toBeNull();
+      writerScope(['tests/a.test.js']);
+      expect(reason(as('test-writer', 'Write', at('tests/a.test.js')))).toBe(NO_SURFACE);
+    });
+
+    it('[S10] a run of another session gives the writer no surface', () => {
+      liveRun({ session_id: 'other' });
+      writerScope(['tests/a.test.js']);
+      expect(reason(as('test-writer', 'Write', at('tests/a.test.js')))).toBe(NO_SURFACE);
+    });
+
+    it('[S11] a test_surface that is not a list denies both roles', () => {
+      liveRun({ test_surface: 'tests/**' });
+      codeEnvelope(['src/a.js']);
+      expect(reason(as('code', 'Write', at('src/a.js')))).toBe(BAD_SURFACE);
+      writerScope(['tests/a.test.js']);
+      expect(reason(as('test-writer', 'Write', at('tests/a.test.js')))).toBe(BAD_SURFACE);
+    });
+
+    it('[S12] the installed hook copy denies the same writes', () => {
+      liveRun();
+      codeEnvelope(['tests/a.test.js', 'src/a.js']);
+      expect(reason(as('code', 'Write', at('tests/a.test.js'), TEMPLATE_HOOK))).toBe(SURFACE_CODE('tests/a.test.js', 'tests/**'));
+      writerScope(['tests/a.test.js', 'src/a.js']);
+      expect(reason(as('test-writer', 'Write', at('src/a.js'), TEMPLATE_HOOK))).toBe(SURFACE_WRITER('src/a.js', 'tests/**'));
     });
   });
 

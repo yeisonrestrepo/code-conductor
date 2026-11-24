@@ -74,6 +74,34 @@ describe('Guard 7: a band role runs the recorded test command or nothing [FEAT-0
     expect(as('release', 'node tools/version-gate.mjs')).toEqual(denied('Guard 7: ROLE_SHELL_DENIED: release has no shell.'));
   });
 
+  it('[FEAT-033 W1] allows test-writer exactly the live run\'s test command', () => {
+    runFile();
+    expect(as('test-writer', 'npm test')).toBeNull();
+  });
+
+  it('[FEAT-033 W2] denies test-writer any other command', () => {
+    runFile();
+    expect(as('test-writer', 'npm run build')).toEqual(NOT_ALLOWED);
+  });
+
+  it('[FEAT-033 W3] denies test-writer a chained command', () => {
+    runFile();
+    expect(as('test-writer', 'npm test; rm -rf x')).toEqual(chaining(';'));
+  });
+
+  it.each([['no run file', null], ['a run of another session', 'other']])('[FEAT-033] denies test-writer a shell with %s', (_label, sid) => {
+    if (sid) runFile({ session_id: sid });
+    expect(as('test-writer', 'npm test')).toEqual(denied('Guard 7: ROLE_SHELL_UNRESOLVED: no live run in this session records a test command, so test-writer has no shell.'));
+  });
+
+  it('[FEAT-033] gives test-writer no envelope fallback when no run file exists', () => {
+    writeFileSync(join(root, '.claude', 'memory', 'band-envelope.json'), JSON.stringify({
+      v: 7, sys: { ph: 'impl', c: 'abc1234', s: 'FEAT-033', role: 'test-writer', tk: 'RW' },
+      ops: { n: [], f: [], scope: ['tests/a.test.js'], gate: 'define_approved' }, mem: { d: [], x: [], p: { test_command: 'npm test' } },
+    }));
+    expect(as('test-writer', 'npm test')).toEqual(denied('Guard 7: ROLE_SHELL_UNRESOLVED: no live run in this session records a test command, so test-writer has no shell.'));
+  });
+
   it.each(SHELL_METACHARACTERS)('[R2] denies a command carrying %j', (m) => {
     runFile();
     expect(as('code', `npm test ${m} x`)).toEqual(chaining(m));

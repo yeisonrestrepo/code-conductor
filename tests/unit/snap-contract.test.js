@@ -81,12 +81,13 @@ describe('snap-contract.mjs', () => {
     expect(POST_PARSE_MAX[4]).toBe(PRE_PARSE_MAX_BYTES)
     expect(POST_PARSE_MAX[5]).toBe(PRE_PARSE_MAX_BYTES)
     expect(POST_PARSE_MAX[6]).toBe(PRE_PARSE_MAX_BYTES)
-    expect(MAX_VERSION).toBe(6)
-    expect(Object.keys(POST_PARSE_MAX).map(Number)).toEqual([1, 2, 3, 4, 5, MAX_VERSION])
+    expect(POST_PARSE_MAX[7]).toBe(PRE_PARSE_MAX_BYTES)
+    expect(MAX_VERSION).toBe(7)
+    expect(Object.keys(POST_PARSE_MAX).map(Number)).toEqual([1, 2, 3, 4, 5, 6, MAX_VERSION])
   })
 
   it('[AC1] defines v3: the version ceiling, its top-level fields and its post-parse cap', () => {
-    expect(contract.MAX_VERSION).toBe(6)
+    expect(contract.MAX_VERSION).toBe(7)
     expect(contract.TOP_FIELDS[3]).toEqual(['v', 'sys', 'ops', 'mem', 'pr'])
     expect(contract.POST_PARSE_MAX[3]).toBe(contract.PRE_PARSE_MAX_BYTES)
   })
@@ -98,18 +99,18 @@ describe('snap-contract.mjs', () => {
     expect(contract.BLOCK_FIELDS[3]).toEqual({
       sys: ['ph', 'c', 's', 'role', 'tk'], ops: ['n', 'f', 'scope', 'gate'], mem: ['d', 'x', 'p'],
     })
-    expect(Object.keys(contract.BLOCK_FIELDS).map(Number)).toEqual([1, 2, 3, 4, 5, 6])
+    expect(Object.keys(contract.BLOCK_FIELDS).map(Number)).toEqual([1, 2, 3, 4, 5, 6, 7])
   })
 
   it('holds the band enums, the band order and the handoff map [ARCH-010]', () => {
-    expect(contract.ROLES).toEqual(['spec', 'plan', 'code', 'audit', 'qa', 'security', 'docs', 'release'])
+    expect(contract.ROLES).toEqual(['spec', 'plan', 'code', 'audit', 'qa', 'security', 'docs', 'release', 'test-writer'])
     expect(contract.TOOL_KINDS).toEqual(['R', 'RW', 'X'])
     expect(contract.BANDS).toEqual(['boundary', 'define', 'build', 'verify', 'ship'])
     expect(contract.GATES).toEqual(['boundary_routed', 'define_approved', 'build_executed', 'verify_pass', 'ship_released'])
     expect(contract.WRITE_TOOLS).toEqual(['Write', 'Edit', 'create_file', 'write_file'])
     expect(contract.V3_CAPS).toEqual({ 'ops.scope': [20, 300] })
     expect(Object.fromEntries(contract.ROLES.map(r => [r, contract.expectedGate(r)]))).toEqual({
-      spec: 'boundary_routed', plan: 'boundary_routed', code: 'define_approved', audit: 'build_executed', qa: 'build_executed', security: 'build_executed', docs: 'verify_pass', release: 'verify_pass',
+      spec: 'boundary_routed', plan: 'boundary_routed', code: 'define_approved', audit: 'build_executed', qa: 'build_executed', security: 'build_executed', docs: 'verify_pass', release: 'verify_pass', 'test-writer': 'define_approved',
     })
   })
 })
@@ -174,5 +175,31 @@ describe('SNAP v6: the release role [FEAT-035]', () => {
     expect(contract.expectedGate('release')).toBe('verify_pass')
     expect(contract.BANDS).toEqual(['boundary', 'define', 'build', 'verify', 'ship'])
     expect(contract.GATES).toEqual(['boundary_routed', 'define_approved', 'build_executed', 'verify_pass', 'ship_released'])
+  })
+})
+
+describe('SNAP v7: the test-writer role [FEAT-033]', () => {
+  it('[C1] v7 equals v6 in top fields, block fields and post-parse cap', () => {
+    expect(contract.TOP_FIELDS[7]).toEqual(contract.TOP_FIELDS[6])
+    expect(contract.BLOCK_FIELDS[7]).toEqual(contract.BLOCK_FIELDS[6])
+    expect(contract.POST_PARSE_MAX[7]).toBe(contract.POST_PARSE_MAX[6])
+  })
+
+  it('[C2] v6 keeps its eight-role roster, v7 adds test-writer, and ROLES is the MAX_VERSION roster', () => {
+    const V6 = ['spec', 'plan', 'code', 'audit', 'qa', 'security', 'docs', 'release']
+    expect(contract.ROLES_BY_VERSION[6]).toEqual(V6)
+    expect(contract.ROLES_BY_VERSION[7]).toEqual([...V6, 'test-writer'])
+    expect(contract.ROLES).toEqual(contract.ROLES_BY_VERSION[contract.MAX_VERSION])
+  })
+
+  it('[C3] test-writer belongs to build and receives define_approved', () => {
+    expect(contract.ROLE_BAND['test-writer']).toBe('build')
+    expect(contract.expectedGate('test-writer')).toBe('define_approved')
+    expect(contract.BANDS).toEqual(['boundary', 'define', 'build', 'verify', 'ship'])
+    expect(contract.GATES).toEqual(['boundary_routed', 'define_approved', 'build_executed', 'verify_pass', 'ship_released'])
+  })
+
+  it('[C4] the test surface lives in the run file, not in the contract', () => {
+    expect(Object.keys(contract).filter((name) => /TEST_SURFACE/i.test(name))).toEqual([])
   })
 })

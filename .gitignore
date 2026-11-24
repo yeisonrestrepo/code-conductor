@@ -45,6 +45,7 @@ tests/.tmp/
 !/.claude/agents/release.md
 !/.claude/agents/security.md
 !/.claude/agents/spec.md
+!/.claude/agents/test-writer.md
 !/.claude/commands/cc-implement.md
 !/.claude/commands/cc-init.md
 !/.claude/commands/cc-metrics.md
@@ -201,6 +202,7 @@ tests/.tmp/
 !/docs/superpowers/plans/2026-11-22-feat035-release-agent-ship-band.md
 !/docs/superpowers/plans/2026-11-23-bug089-known-failure-substring-matching-lets-generic.md
 !/docs/superpowers/plans/2026-11-23-feat030-byte-sum-bound-for-the-conductor-cache-db.md
+!/docs/superpowers/plans/2026-11-23-feat033-test-writer-agent-build-band.md
 !/docs/superpowers/plans/2026-11-23-feat048-codex-antigravity-guards.md
 !/docs/superpowers/plans/2026-11-23-feat048-harness-commands.md
 !/docs/superpowers/specs/2026-06-09-bug001-cc-compact-design.md
@@ -312,6 +314,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-11-22-feat035-release-agent-ship-band-design.md
 !/docs/superpowers/specs/2026-11-23-bug089-known-failure-substring-matching-lets-generic-design.md
 !/docs/superpowers/specs/2026-11-23-feat030-byte-sum-bound-for-the-conductor-cache-db-design.md
+!/docs/superpowers/specs/2026-11-23-feat033-test-writer-agent-build-band-design.md
 !/docs/superpowers/specs/2026-11-23-feat048-codex-antigravity-guards-design.md
 !/docs/superpowers/specs/2026-11-23-feat048-harness-commands-design.md
 # --- END tracked-surface block (BUG-042) ---
