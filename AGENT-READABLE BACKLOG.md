@@ -1636,6 +1636,29 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #299; reported by the automated security review of
   the 1.56.0 release candidate (#298).
 
+### [ ] `[BUG-091]` Known-failure change list omits new files created under ignored paths
+
+- Symptom: `scripts/orchestrate.mjs:649` (per the issue) builds the qa
+  change list from `git diff --name-status` plus
+  `git ls-files --others --exclude-standard`, so a new file that
+  matches a `.gitignore` rule is not listed.
+- Impact per the issue: if a build step creates a failing test in an
+  ignored path that the test runner still executes (or adds such a path
+  to `.gitignore`), and that test's runner line contains a declared
+  `--known-failure` entry, `qa` can count the failure as known and the
+  suite reads green. Impact is limited: entries must be at least 12
+  characters and more than one word, a declared entry must match, and a
+  `.gitignore` edit itself shows up in the list as `M .gitignore`, so
+  this is defense-in-depth for the `[BUG-089]` rule, not a bypass of
+  owner intent.
+- Fix shape suggested by the issue: include newly created ignored files
+  (`git ls-files --others --ignored --exclude-standard`) restricted to
+  paths outside `.conductor/`, or have `qa` treat no failure as known
+  whenever the list contains `M .gitignore`.
+- Follow-up of `[BUG-089]`.
+- Intake of issue #306; reported by the automated security review of
+  #304.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
