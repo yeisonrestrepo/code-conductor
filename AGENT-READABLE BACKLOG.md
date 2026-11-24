@@ -1660,6 +1660,31 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #306; reported by the automated security review of
   #304.
 
+### [ ] `[BUG-092]` Test-surface split bypassable through the recorded test command
+
+- Symptom: Guard 5 (`.claude/hooks/pre-tool-use.mjs:310`,
+  `testSurfaceDenial`, per the issue) stops `test-writer` from writing
+  outside the run's test surface and stops `code` from writing inside
+  it, but only for the Write/Edit tool family. Both roles may run the
+  run's recorded test command (Guard 7), and that command executes the
+  files the role just wrote.
+- Impact per the issue: a `test-writer` could write a test that changes
+  source files when it runs, and `code` could write source that changes
+  test files when the suite loads it, getting past the split described
+  in `.claude/agents/test-writer.md:32` and `.claude/agents/code.md:10`.
+  Not a regression: before `[FEAT-033]`, `code` already wrote and ran
+  tests with no split at all. The risk is that the docs present the
+  split as a guard-enforced boundary while it only holds against direct
+  tool writes.
+- Fix shape suggested by the issue: (a) state the limit in both agent
+  profiles and in the `[FEAT-033]` spec; or (b) have the audit role
+  compare each hand-back's `ops.f` against the files actually changed
+  in the commit, by role, so any write made through the test command
+  shows up.
+- Follow-up of `[FEAT-033]`.
+- Intake of issue #312; reported by the automated security review of
+  the 1.58.0 release candidate (#311).
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
