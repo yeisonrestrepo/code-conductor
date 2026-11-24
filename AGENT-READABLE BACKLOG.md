@@ -1588,7 +1588,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #265; reported by the automated security review of
   #264.
 
-### [ ] `[BUG-089]` Known-failure substring matching lets generic entries or newly added failing tests pass a red suite
+### [X] `[BUG-089]` Known-failure substring matching lets generic entries or newly added failing tests pass a red suite
+* **DONE, shipped as `1.57.1` on 2026-11-24.** `isKnownFailureArg` in `scripts/orchestrate.mjs` gains an `isSpecificEntry` conjunct: `start` refuses, as a usage error, a `--known-failure` value shorter than 12 code points once trimmed (`KNOWN_FAILURE_MIN`) or made of one word of letters, digits, `_` and `-` in any script (`ONE_WORD`, `/^[\p{L}\p{N}_-]+$/u`); the 200-character ceiling and the repeat rule are unchanged, and a run file already holding a short entry still validates. In a run that declares known failures, `install qa` writes the files the change created (`A`) or modified (`M`) against the base commit `start` recorded, sorted by path, to `.conductor/handback/qa-change.txt` (`git diff --name-status --no-renames` plus untracked, non-ignored files; deletions left out), and prints one `change files: <n> created, <m> modified (…)` line before any `model:` line; when the list cannot be computed it removes the old file and prints `change files: unavailable (<reason>); no failing test is known`. `--check` writes nothing, `end` and a new `start` clear the list with the hand-back folder, and the qa envelope is unchanged. The `qa` profile never counts a failing test in a listed file as known, counts none as known when the list is missing, and names each test that matched an entry but is not known for this reason; the `code` profile never counts one in a file it created or edited in its task. Both take a test's file only from the runner's output and compare paths by one rule (`\` becomes `/`, then equal or a `/` suffix match, a `:line` or `:line:column` suffix excluded). Both `cc-orchestrate.md` copies and the README command row state the value rule and the change list. Residual, out of scope: an entry that is a file path still covers an existing test in an untouched file the change broke. Pinned by `known failures in changed files [BUG-089]` in `tests/scripts/orchestrate.test.js` and `tests/unit/role-profiles.test.js` (with the new `code` and `qa` profile hashes) and the `[BUG-089]` row of `tests/installer/commands-parity.test.js`. Landed from PR #304 (cc-lane-bot), intake of issue #284; the id was reserved by the triage and is owner-minted at landing. Spec: `docs/superpowers/specs/2026-11-23-bug089-known-failure-substring-matching-lets-generic-design.md` (approved by the owner). Plan: `docs/superpowers/plans/2026-11-23-bug089-known-failure-substring-matching-lets-generic.md` (approved by the owner).
 
 - Symptom: since `[BUG-074]`, `isKnownFailureArg`
   (scripts/orchestrate.mjs:1484, per the issue) accepts any non-blank
@@ -1634,6 +1635,29 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Follow-up of `[FEAT-035]`.
 - Intake of issue #299; reported by the automated security review of
   the 1.56.0 release candidate (#298).
+
+### [ ] `[BUG-091]` Known-failure change list omits new files created under ignored paths
+
+- Symptom: `scripts/orchestrate.mjs:649` (per the issue) builds the qa
+  change list from `git diff --name-status` plus
+  `git ls-files --others --exclude-standard`, so a new file that
+  matches a `.gitignore` rule is not listed.
+- Impact per the issue: if a build step creates a failing test in an
+  ignored path that the test runner still executes (or adds such a path
+  to `.gitignore`), and that test's runner line contains a declared
+  `--known-failure` entry, `qa` can count the failure as known and the
+  suite reads green. Impact is limited: entries must be at least 12
+  characters and more than one word, a declared entry must match, and a
+  `.gitignore` edit itself shows up in the list as `M .gitignore`, so
+  this is defense-in-depth for the `[BUG-089]` rule, not a bypass of
+  owner intent.
+- Fix shape suggested by the issue: include newly created ignored files
+  (`git ls-files --others --ignored --exclude-standard`) restricted to
+  paths outside `.conductor/`, or have `qa` treat no failure as known
+  whenever the list contains `M .gitignore`.
+- Follow-up of `[BUG-089]`.
+- Intake of issue #306; reported by the automated security review of
+  #304.
 
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
