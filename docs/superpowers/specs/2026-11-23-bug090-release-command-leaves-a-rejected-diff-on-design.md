@@ -6,7 +6,8 @@
 quality assurance.
 
 The spec and the plan need an owner approval, not a delegated one: the change edits control-plane files
-(`scripts/release.mjs`, `.claude/commands/cc-release.md` and its `project-template/` copy), which a delegated plan
+(`scripts/release.mjs`, `scripts/orchestrate.mjs`, `.claude/commands/cc-release.md` and its `project-template/` copy),
+which a delegated plan
 review escalates (BUG-080), and it changes what the release command tells the owner to do with a diff written by an
 agent that reads attacker-influenceable text.
 
@@ -45,12 +46,13 @@ never runs, stages or reverts anything itself.
 | # | Open point in the entry | Decision | Why |
 |---|---|---|---|
 | D1 | Where the warning and the command come from | `release.mjs check` prints them; the command file relays them | The paths and their git state are facts the driver already computes (`changedPaths`); a printed line is deterministic and pinned by `tests/scripts/release.test.js`, while prose asking the session to assemble a command is neither. It matches how every other `/cc-release` outcome is a driver line the command shows. |
-| D2 | What "another control-plane path" means | A path matched by `CONTROL_PLANE` or whose last segment is in `CONTROL_PLANE_NAMES` (`scripts/orchestrate.mjs`), with the same case folding as the existing matcher | It is the repository's one definition of "files that run code or steer the run", set by owner decisions BUG-080/081/082/085. It already lists `package.json`, `package-lock.json`, every other package manager's manifests and lockfiles, CI files, git hook runners and `.claude/release-profile.json`. A second list in `release.mjs` would drift from it. The list's membership is not changed here. |
+| D2 | What "another control-plane path" means | A path matched by `CONTROL_PLANE` or whose last segment is in `CONTROL_PLANE_NAMES` (`scripts/orchestrate.mjs`), with the same case folding as the existing matcher. The exported predicate also counts as control-plane every path with a character outside printable ASCII or a segment that `ntfsAlias` flags (`:`, `~`, a trailing dot or space), reusing those two existing tests | It is the repository's one definition of "files that run code or steer the run", set by owner decisions BUG-080/081/082/085. It already lists `package.json`, `package-lock.json`, every other package manager's manifests and lockfiles, CI files, git hook runners and `.claude/release-profile.json`. A second list in `release.mjs` would drift from it. The list's membership is not changed here. `inControlPlane` alone leaves aliases and non-ASCII names to `inSurface` (`orchestrate.mjs:1353`), so on its own it would miss `package.json.` or a look-alike spelling that a case-insensitive or NTFS filesystem resolves to the manifest. The conservative reading costs at most an extra warning line on an already rejected diff, while a miss drops the warning where it matters. |
 | D3 | Which paths the discard commands name | Every path in the judged diff (`changedPaths`: tracked changes against `HEAD` plus untracked, non-ignored files), not only the ones a failure line names | A rejected release is redone from a clean tree (`digest` refuses a dirty one with `RELEASE_TREE_DIRTY`), so the owner has to drop the whole diff anyway; naming every path yields one set of commands that leaves the tree clean. It is a superset of "the rejected files" the entry asks for. |
 | D4 | Commands per git state | Paths present in `HEAD`: `git checkout HEAD -- <paths>`. Paths in the index but not in `HEAD`: `git rm -f -- <paths>`. Untracked paths: `git clean -f -- <paths>` | `git checkout --` restores from the index and is a no-op on an untracked file, so the single form the command suggests today misses a new file, which is exactly the shape an injected out-of-scope config takes. `HEAD` as the source also undoes a staged change. Each form errors on paths of another state, hence the split. |
 | D5 | When the warning line appears | Only when a rejected path is control-plane (D2); the `DISCARD` lines appear on every judgment failure with a non-empty diff | The entry scopes the warning to manifests and control-plane paths; a failure that names only the changelog or backlog shape leaves version files that passed `judgeJsonFile`, so the stronger wording there would be noise. The discard commands are useful on every failure. |
 | D6 | Paths a shell line cannot carry safely | A path is quoted with the existing `shellQuote`. A path containing a control character (including a newline) or a single quote is left off every command and printed on its own `DISCARD_BY_HAND` line as a JSON string | A newline in a file name would split a printed command or forge a line of `check` output, and a single quote is the one character whose POSIX escape (`'\''`) does not carry over to PowerShell. The agent can create a file name; the printed commands must not be a way to inject one. |
 | D7 | A `RELEASE_HALT` (a profile check went red after the judgment passed) | No `RELEASE_DISCARD_FIRST` and no `DISCARD` lines | The diff passed the judgment, so the tooling already ran on an accepted diff; the halt is a red check, not a rejected edit. Step 6 keeps saying the diff is left in place. |
+| D8 | How `release.mjs` reaches the matcher, given that `orchestrate.mjs` already imports `release.mjs` (`orchestrate.mjs:17`) | Accept the import cycle `release.mjs ↔ orchestrate.mjs`, under one rule: neither module reads a binding of the other while it evaluates; each uses the other's exports only inside functions | Moving the lists to a new leaf module would make that module part of "the router [and] the modules it imports at load time", which `CONTROL_PLANE` lists file by file (`orchestrate.mjs:40-41`, pinned by `orchestrate.test.js:514` and the U41 rows at `:4026-4034`); leaving it out would unprotect the list itself, and adding it changes the list's membership, an owner decision this item does not take. The cycle is safe today: `orchestrate.mjs` touches `ReleaseError`, `loadProfile` and `releaseSurface` only inside a function (`:1810-1811`), `release.mjs` will touch the predicate only inside `check`, and both entry guards (`release.mjs:970`, `orchestrate.mjs:1889`) run after every import has evaluated. A scratch copy of `scripts/` with the import added ran `node release.mjs` and `node orchestrate.mjs` (both printed their usage line and exited 2) and imported the modules in both orders without a TDZ error. Acceptance criteria pin all of this so a later top-level use fails a test. |
 
 ## Behavior
 
@@ -92,8 +94,8 @@ never runs, stages or reverts anything itself.
 
 - **`git` fails while classifying paths** (the `HEAD` or index lookup): `check` reports through the existing error
   path (`ReleaseError`, printed as `release: <message>`, non-zero exit) rather than printing a partial or wrong command.
-- **The owner runs tooling anyway**: out of the command's control; the warning and the README line are the mitigation,
-  and `check` still refuses the diff on a later run.
+- **The owner runs tooling anyway**: out of the command's control. This item's mitigation is the warning and the exact
+  discard commands; `check` still refuses the diff on a later run.
 
 ## Acceptance Criteria
 
@@ -121,6 +123,16 @@ never runs, stages or reverts anything itself.
       wording.
 - [ ] `CONTROL_PLANE` and `CONTROL_PLANE_NAMES` are read from `scripts/orchestrate.mjs`, not copied: the
       `orchestrate.test.js` rows that pin both lists stay unchanged and green.
+- [ ] The exported predicate returns true for a path with a non-ASCII character and for an NTFS alias of a manifest
+      (`package.json.`, `package.json::$DATA`), and `check` prints the `RELEASE_DISCARD_FIRST` line for such an
+      out-of-scope path.
+- [ ] The cycle (D8) loads in every order: a row spawns `node scripts/release.mjs` and `node scripts/orchestrate.mjs`
+      with no arguments and gets each usage line and exit 2 (no module or TDZ error), and a row imports
+      `orchestrate.mjs` first and `release.mjs` first, in fresh processes, and calls the predicate.
+- [ ] The release ship test (`commands-parity.test.js`, `the release role ships [FEAT-035 O5]`) also requires
+      `.claude/scripts/orchestrate.mjs` and the modules it imports at load time (`snap-contract.mjs`, `ticket.mjs`,
+      `doc-locations.mjs`, `docs-sync.mjs`) in the install, and runs the deployed `.claude/scripts/release.mjs` with no
+      arguments to its usage line and exit 2.
 - [ ] `dependencies` in `package.json` stays `{}`; `npm test` is green.
 
 ## Out of Scope
@@ -137,28 +149,36 @@ never runs, stages or reverts anything itself.
 ## System Impact
 
 - `scripts/release.mjs` — `checkVerb`/`judge` gain the discard lines; new small helpers to classify the diff's paths by
-  git state and to format the commands; imports the control-plane matcher from `scripts/orchestrate.mjs` (needs an
-  exported path-level predicate; `orchestrate.mjs` does not import `release.mjs`, so there is no cycle).
+  git state and to format the commands; imports the control-plane predicate from `scripts/orchestrate.mjs`, which
+  already imports `release.mjs` (`orchestrate.mjs:17`), so the two form an import cycle (D8). From then on, loading
+  `release.mjs`, in the repository or deployed under `.claude/scripts/`, also loads `orchestrate.mjs` and its load-time
+  imports (`snap-contract.mjs`, `ticket.mjs`, `doc-locations.mjs`, `docs-sync.mjs`). All of them are already in
+  `CONTROL_PLANE`, and the installer already copies the whole `scripts/` directory (`lib/installer/deploy.mjs:330`).
 - `scripts/orchestrate.mjs` — export a path predicate built from the existing `CONTROL_PLANE`/`CONTROL_PLANE_NAMES`
-  matcher, without changing either list or any current caller.
+  matcher plus the `nonAscii` and `ntfsAlias` tests (D2), without changing either list or any current caller. Its
+  top level must keep reading no `release.mjs` binding (D8).
 - `.claude/commands/cc-release.md` and `project-template/.claude/commands/cc-release.md` — step 6 wording.
 - `tests/scripts/release.test.js` — new `[BUG-090]` rows in the `check` describe block, using the existing fixture
   helpers.
-- `tests/installer/commands-parity.test.js` — one `[BUG-090]` row on step 6's wording in both mirrors.
-- The installer already deploys both scripts to `.claude/scripts/`; the plan confirms the deployed `release.mjs` can
-  import the deployed `orchestrate.mjs` (the ship test at `commands-parity.test.js:649`).
+- `tests/installer/commands-parity.test.js` — one `[BUG-090]` row on step 6's wording in both mirrors, and the release
+  ship test (`:646-660`) extended to the deployed `orchestrate.mjs` and its imports, and to loading the deployed
+  `release.mjs`.
+- `tests/scripts/orchestrate.test.js` — rows for the exported predicate and the cycle's load order; the rows that pin
+  `CONTROL_PLANE` and `CONTROL_PLANE_NAMES` stay unchanged.
 
 ### Files Requiring Full Read (deferred to /cc-plan)
 
 - `scripts/release.mjs` (970 lines): `changedPaths`, `scopeFailures`, `judgeVersionFiles`, `judge`, `checkVerb`,
   `shellQuote`, `ReleaseError`.
-- `scripts/orchestrate.mjs` (only lines 20-100 and 1300-1360): `CONTROL_PLANE`, `CONTROL_PLANE_NAMES`,
-  `globToRegExp`, `reachesList`, `namesControlFile`, `inControlPlane`, and its `invokedDirectly` guard (importing it
-  must have no side effect).
+- `scripts/orchestrate.mjs` (only lines 1-100, 1300-1360, 1805-1815 and 1880-1889): its imports, `CONTROL_PLANE`,
+  `CONTROL_PLANE_NAMES`, `globToRegExp`, `reachesList`, `ntfsAlias`, `nonAscii`, `namesControlFile`,
+  `inControlPlane`, the only uses of the `release.mjs` bindings, and its entry guard (importing it must have no side
+  effect).
 - `tests/scripts/release.test.js` (the fixture helpers and the `check` block from line 718).
 - `tests/installer/commands-parity.test.js` (the `cc-release` block from line 606).
 
 ## Complexity Estimate
 
-S — one new output block in one verb of one script, an exported predicate over an existing matcher, one sentence in
-two mirrored command files, and test rows in two existing suites.
+S — one new output block in one verb of one script, an exported predicate over an existing matcher (closing an
+import cycle that already loads safely), one sentence in two mirrored command files, and test rows in three existing
+suites.
