@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.57.1] - 2026-11-24
+
+### Fixed
+- **[BUG-089]** A `--known-failure` entry can no longer be generic enough to make almost any red suite read as green, and a failing test in a file the change touched is never counted as known. `start` in `scripts/orchestrate.mjs` now refuses, as a usage error, a value shorter than 12 code points once trimmed or made of a single word of letters, digits, `_` and `-` in any script (for example `autenticación`); the 200-character ceiling and the repeat rule are unchanged, and a run file that already holds a short entry still validates. In a run that declares known failures, `install qa` writes the files the change created or modified against the base commit `start` recorded to `.conductor/handback/qa-change.txt` and prints one `change files: …` line before any `model:` line; when the list cannot be computed it removes the old file and prints `change files: unavailable (<reason>); no failing test is known`. `--check` writes nothing, `end` and a new `start` clear the list with the hand-back folder, and the qa envelope is unchanged. The `qa` profile never counts a failing test in a listed file as known, counts none as known when the list is missing, and names each test that matched an entry but is not known for this reason; the `code` profile never counts one in a file it created or edited in its task. Both take a test's file only from the runner's output and compare paths by one fixed rule (`\` becomes `/`, then equal or a `/` suffix match; a `:line` or `:line:column` suffix is not part of the path). Both `cc-orchestrate.md` copies and the README command row state the value rule and the change list. Still open: an entry that is a file path covers an existing test in an untouched file that the change broke. Pinned by `known failures in changed files [BUG-089]` in `tests/scripts/orchestrate.test.js` and `tests/unit/role-profiles.test.js` (with the new `code` and `qa` profile hashes) and the `[BUG-089]` row of `tests/installer/commands-parity.test.js`. Landed from PR #304 (cc-lane-bot), intake of issue #284.
+
 ## [1.57.0] - 2026-11-23
 
 ### Added
