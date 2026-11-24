@@ -201,6 +201,7 @@ tests/.tmp/
 !/docs/superpowers/plans/2026-11-22-feat035-release-agent-ship-band.md
 !/docs/superpowers/plans/2026-11-23-bug089-known-failure-substring-matching-lets-generic.md
 !/docs/superpowers/plans/2026-11-23-feat030-byte-sum-bound-for-the-conductor-cache-db.md
+!/docs/superpowers/plans/2026-11-23-feat033-test-writer-agent-build-band.md
 !/docs/superpowers/specs/2026-06-09-bug001-cc-compact-design.md
 !/docs/superpowers/specs/2026-06-09-bug002-spec-read-budget-design.md
 !/docs/superpowers/specs/2026-06-11-bug006-feat018-bash-scan-guard-design.md
