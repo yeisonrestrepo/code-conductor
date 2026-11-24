@@ -366,6 +366,18 @@ describe('cc-orchestrate mirrors [FEAT-011 AC10]', () => {
     expect(readme).toContain("[--no-dependency-audit] [--known-failure '<text>']...");
     expect(readme).toContain('quote a value that holds a space or a shell character');
   });
+
+  it('states the known-failure value rule and the qa change list [BUG-089]', () => {
+    const text = read(ORCH_MIRRORS[0]);
+    for (const phrase of [
+      'A value must be at least 12 characters once trimmed and more than one word',
+      "That refusal is the owner's to fix: name the rule and ask them for a longer, more specific value; never lengthen or edit one yourself.",
+      'change files: <a> created, <m> modified (.conductor/handback/qa-change.txt)',
+      'change files: unavailable (<reason>); no failing test is known',
+      'Never write or edit `.conductor/handback/qa-change.txt` yourself: only `install qa` writes it.',
+    ]) expect(text).toContain(phrase);
+    expect(read('README.md')).toContain('A value must be at least 12 characters and more than one word, or `start` refuses it.');
+  });
 });
 
 describe('cc-orchestrate review loop [FEAT-041 AC5, AC6, FEAT-058]', () => {

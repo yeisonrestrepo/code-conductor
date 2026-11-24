@@ -4815,11 +4815,11 @@ describe('known failures [BUG-074]', () => {
   });
 
   it('[AC5] two values are recorded in order, in any position after the item', () => {
-    const r = orch(['start', 'FEAT-011', '--known-failure', 'a', '--auto', '--known-failure', 'b']);
+    const r = orch(['start', 'FEAT-011', '--known-failure', 'tests/a.test.js', '--auto', '--known-failure', 'tests/b.test.js']);
     expect(r.status).toBe(0);
-    expect(runFile().known_failures).toEqual(['a', 'b']);
+    expect(runFile().known_failures).toEqual(['tests/a.test.js', 'tests/b.test.js']);
     expect(runFile().mode).toBe('auto');
-    expect(r.out.endsWith('; known failures: 2 ["a","b"]')).toBe(true);
+    expect(r.out.endsWith('; known failures: 2 ["tests/a.test.js","tests/b.test.js"]')).toBe(true);
   });
 
   it('[AC5] a value holding spaces and > passed as one argument is recorded and echoed byte for byte', () => {
@@ -4845,7 +4845,7 @@ describe('known failures [BUG-074]', () => {
     [['--known-failure', 'a\rb']],
     [['--known-failure', 'a'.repeat(201)]],
     [['--known-failure', '--auto']],
-    [['--known-failure', 'a', '--known-failure', 'a']],
+    [['--known-failure', 'tests/a.test.js', '--known-failure', 'tests/a.test.js']],
     [['--known-failure', 'tests/x.test.js', 'isolated', 'store']],
   ])('[AC6] start FEAT-011 %j refuses START_USAGE, exit 2, writing nothing', (args) => {
     expect(orch(['start', 'FEAT-011', ...args])).toMatchObject({ status: 2, err: START_USAGE });
@@ -4853,7 +4853,7 @@ describe('known failures [BUG-074]', () => {
   });
 
   it('[AC6] a value of exactly 200 characters is accepted', () => {
-    const value = 'a'.repeat(200);
+    const value = `${'a'.repeat(99)} ${'b'.repeat(100)}`;
     expect(orch(['start', 'FEAT-011', '--known-failure', value]).status).toBe(0);
     expect(runFile().known_failures).toEqual([value]);
   });
@@ -5068,5 +5068,137 @@ describe('release envelope [FEAT-035]', () => {
     const r = orch(['install', 'release']);
     expect(r.status).toBe(2);
     expect(r.err).toContain('orchestrate: install release: the next step is ');
+  });
+});
+
+describe('known failures in changed files [BUG-089]', () => {
+  const KF = 'tests/contract/x.test.js > isolated store';
+  const LIST = '.conductor/handback/qa-change.txt';
+  const listText = () => readFileSync(join(root, LIST), 'utf8');
+  const lastLine = (r) => r.out.split('\n').at(-1);
+  const changeLine = (created, modified) => `change files: ${created} created, ${modified} modified (${LIST})`;
+  // The base commit holds three tests and an ignore file that keeps the router's own files out of the list.
+  const QA_RUN = { start: ['--known-failure', KF], prep: () => {
+    writeFileSync(join(root, '.gitignore'), '.conductor/\n.claude/memory/\nignored.txt\n');
+    mkdirSync(join(root, 'tests'), { recursive: true });
+    for (const name of ['old', 'kept', 'gone']) writeFileSync(join(root, 'tests', `${name}.test.js`), 'x\n');
+    fixtureCommit();
+  } };
+  const SPEC_ONLY = 'A docs/specs/demo-design.md\n';
+  const withBase = (base) => ({ ...runFile(), security: { ...runFile().security, base } });
+
+  it.each(['a', 'FAIL', 'tests/ab.js', '   tests/a.js   ', 'AssertionError', 'authentication_tests_for_the_store', 'autenticación', 'autenticación_de_usuarios'])(
+    '[AC1] start refuses the generic entry %j with START_USAGE, exit 2, writing nothing', (value) => {
+      expect(orch(['start', 'FEAT-011', '--known-failure', value])).toMatchObject({ status: 2, err: START_USAGE });
+      expect(existsSync(join(root, RUN_FILE))).toBe(false);
+    });
+
+  it.each(['tests/a.spec', 'tests/a.test.js', 'suite > title', `${'a'.repeat(99)} ${'b'.repeat(100)}`])(
+    '[AC2] start accepts, records and echoes %j byte for byte', (value) => {
+      const r = orch(['start', 'FEAT-011', '--known-failure', value]);
+      expect(r.status).toBe(0);
+      expect(runFile().known_failures).toEqual([value]);
+      expect(r.out.endsWith(`; known failures: 1 ${JSON.stringify([value])}`)).toBe(true);
+    });
+
+  it('[AC4] install qa lists created, modified, renamed and untracked files, sorted, leaving out deleted and ignored ones', () => {
+    driveTo('qa', QA_RUN);
+    writeFileSync(join(root, 'tests/kept.test.js'), 'y\n');
+    fixtureGit('mv', 'tests/old.test.js', 'tests/new.test.js');
+    rmSync(join(root, 'tests/gone.test.js'));
+    writeFileSync(join(root, 'tests/a b.test.js'), 'z\n');
+    writeFileSync(join(root, 'ignored.txt'), 'i\n');
+    const r = orch(['install', 'qa']);
+    expect(r.status).toBe(0);
+    expect(lastLine(r)).toBe(changeLine(3, 1));
+    expect(listText()).toBe('A docs/specs/demo-design.md\nA tests/a b.test.js\nM tests/kept.test.js\nA tests/new.test.js\n');
+  });
+
+  it('[AC4] install qa --check prints the change line and writes nothing', () => {
+    driveTo('qa', QA_RUN);
+    const r = orch(['install', 'qa', '--check']);
+    expect(r.status).toBe(0);
+    expect(lastLine(r)).toBe(changeLine(1, 0));
+    expect(existsSync(join(root, LIST))).toBe(false);
+  });
+
+  it('[AC4] a second install qa overwrites the list with the current work tree', () => {
+    driveTo('qa', QA_RUN);
+    writeFileSync(join(root, 'tests/first.test.js'), 'x\n');
+    expect(orch(['install', 'qa']).status).toBe(0);
+    expect(listText()).toContain('A tests/first.test.js\n');
+    rmSync(join(root, 'tests/first.test.js'));
+    writeFileSync(join(root, 'tests/second.test.js'), 'x\n');
+    expect(orch(['install', 'qa']).status).toBe(0);
+    expect(listText()).toBe(`${SPEC_ONLY}A tests/second.test.js\n`);
+  });
+
+  it('[AC4] a second install qa that finds the list unavailable removes the earlier file', () => {
+    driveTo('qa', QA_RUN);
+    expect(orch(['install', 'qa']).status).toBe(0);
+    expect(existsSync(join(root, LIST))).toBe(true);
+    runFileText(JSON.stringify(withBase(null)));
+    const r = orch(['install', 'qa']);
+    expect(r.status).toBe(0);
+    expect(lastLine(r)).toBe('change files: unavailable (the run recorded no base commit); no failing test is known');
+    expect(existsSync(join(root, LIST))).toBe(false);
+  });
+
+  it('[AC5] install qa without known failures writes no list and prints what it printed before', () => {
+    driveTo('qa');
+    const r = orch(['install', 'qa']);
+    expect(r.status).toBe(0);
+    expect(r.out).not.toContain('change files');
+    expect(r.out).toBe(envelopeText().trim());
+    expect(existsSync(join(root, LIST))).toBe(false);
+  });
+
+  it.each([
+    ['a null base', (run) => ({ ...run, security: { ...run.security, base: null } }), 'the run recorded no base commit'],
+    ['no security record', ({ security, ...run }) => run, 'the run has no security record (started before FEAT-034)'],
+    ['a base git cannot read', (run) => ({ ...run, security: { ...run.security, base: '0'.repeat(40) } }), 'git cannot compare the work tree with the base commit'],
+  ])('[AC5] with %s, install qa writes no list and says no failing test is known', (_name, edit, reason) => {
+    driveTo('qa', QA_RUN);
+    runFileText(JSON.stringify(edit(runFile())));
+    const r = orch(['install', 'qa']);
+    expect(r.status).toBe(0);
+    expect(lastLine(r)).toBe(`change files: unavailable (${reason}); no failing test is known`);
+    expect(existsSync(join(root, LIST))).toBe(false);
+  });
+
+  it('[AC5] end --abandon removes the list with the hand-back folder', () => {
+    driveTo('qa', QA_RUN);
+    expect(orch(['install', 'qa']).status).toBe(0);
+    expect(existsSync(join(root, LIST))).toBe(true);
+    expect(orch(['end', '--abandon']).status).toBe(0);
+    expect(existsSync(join(root, LIST))).toBe(false);
+  });
+
+  it('[AC5] start over a previous run removes the list', () => {
+    driveTo('qa', QA_RUN);
+    expect(orch(['install', 'qa']).status).toBe(0);
+    expect(existsSync(join(root, LIST))).toBe(true);
+    expect(orch(['start', 'FEAT-011'], { sid: 'sess-2' }).status).toBe(0);
+    expect(existsSync(join(root, LIST))).toBe(false);
+  });
+
+  it('[AC9] the qa envelope is the one install printed, with no change list in it', () => {
+    driveTo('qa', QA_RUN);
+    const r = orch(['install', 'qa']);
+    expect(r.out.startsWith(envelopeText().trim())).toBe(true);
+    expect(envelopeText()).not.toContain('qa-change');
+  });
+
+  it('[AC8] a run file holding a short entry still validates', () => {
+    expect(isValidRun({ ...RUN_OK, known_failures: ['a'] })).toBe(true);
+  });
+
+  it('[AC8] such a run installs qa with the list', () => {
+    driveTo('qa', QA_RUN);
+    runFileText(JSON.stringify({ ...runFile(), known_failures: ['a'] }));
+    const r = orch(['install', 'qa']);
+    expect(r.status).toBe(0);
+    expect(lastLine(r)).toBe(changeLine(1, 0));
+    expect(listText()).toBe(SPEC_ONLY);
   });
 });

@@ -122,6 +122,12 @@ const QA_OUTSIDE = 'Outside a run, it is the `mem.p.test_command` field of your 
 // BUG-074: one definition of a green suite for the three roles that judge one, and how code and qa match a declared failure.
 const GREEN = 'The suite is green when the test command exits with status 0, or when it exits non-zero and every failing test it reports is a known failure the run declared; anything else is red.';
 const KNOWN_MATCH = 'A failing test is known when the line the runner prints for it contains a declared entry verbatim.';
+// BUG-089: a failing test in a file the change touched is never known, and its file comes only from the runner's output.
+const FILE_RULE = "Take a failing test's file only from the runner's output, the path printed on its line or on the file header above it, never from a search with Read, Grep or Glob; a `:line` or `:line:column` suffix after the printed path is not part of the path, and a failing test whose file the output does not print is never known.";
+const PATH_MATCH = 'Two paths match when, after every `\\` is turned into `/`, they are equal or one ends with `/` followed by the other; a failing test whose file this rule cannot settle is never known.';
+const QA_LIST = 'A failing test whose file matches a path `.conductor/handback/qa-change.txt` lists (`A <path>` created, `M <path>` modified by the change) is never known, even when its line contains a declared entry; if that file is absent or unreadable, no failing test is known.';
+const QA_NAMED = 'Also name each failing test that matched a declared entry but is not known because that list names its file.';
+const CODE_LIST = 'A failing test whose file matches a file you created or edited in this task is never known, even when its line contains a declared entry.';
 
 describe('role agent profiles [FEAT-012]', () => {
   it('ships exactly the ROLES plus define-review in both agents directories [FEAT-041, FEAT-034]', () => {
@@ -223,6 +229,27 @@ describe('one definition of done [BUG-074]', () => {
   });
 });
 
+describe('known failures in changed files [BUG-089]', () => {
+  it.each([TEMPLATE, MIRROR].flatMap((dir) => ['code', 'qa'].map((role) => [`${dir}/${role}.md`])))('[AC6] %s takes a failing test\'s file only from the runner output and matches paths by one rule', (rel) => {
+    expect(read(rel)).toContain(FILE_RULE);
+    expect(read(rel)).toContain(PATH_MATCH);
+  });
+
+  it('[AC6] qa never knows a failing test in a file qa-change.txt lists, knows none without it, and names each one it does not know', () => {
+    expect(profile('qa')).toContain(QA_LIST);
+    expect(profile('qa')).toContain(QA_NAMED);
+  });
+
+  it('[AC6] code never knows a failing test in a file it created or edited in its task', () => {
+    expect(profile('code')).toContain(CODE_LIST);
+  });
+
+  it('[AC7] plan carries neither rule', () => {
+    expect(profile('plan')).not.toContain(FILE_RULE);
+    expect(profile('plan')).not.toContain(PATH_MATCH);
+  });
+});
+
 // FEAT-031 AC13: FEAT-031 changes no role profile. Each value was measured from v1.37.0 with
 // `git show v1.37.0:<path>`; CI checks out no tags, so the hashes are pinned here. A later item
 // that changes a profile on purpose updates its row in the same commit.
@@ -234,12 +261,14 @@ const PROFILE_SHA256_1_37_0 = {
   audit: 'f49bad7e69bfe808d57bf9b783d0e9bf2e0c9a4ef317e9c24f994eb3b8887faa',
   // BUG-078 changed code on purpose: a fix round's scope is the files the review names, without the plan.
   // BUG-074 changed code on purpose: one definition of a green suite, shared by plan, code and qa, with the run's declared known failures.
-  code: 'b2a123b0b242653c04378fe134db9a7b7bc04963b669085a173dbe3ba8ef669e',
+  // BUG-089 changed code on purpose: a failing test in a file code created or edited is never known, and its file comes only from the runner's output.
+  code: '497513adb7e3c6c6458b808b49114018b6724c735f0e82db3435306fb2815253',
   // FEAT-047 changed plan and spec on purpose: the folder now comes from the envelope's scope.
   // BUG-074 changed plan on purpose: one definition of a green suite, shared by plan, code and qa, with the run's declared known failures.
   plan: 'b14e18a5f56a99a2d377fd367859d964ec781c6ee876b8aeba258038d30c2c6b',
   // BUG-074 changed qa on purpose: one definition of a green suite, shared by plan, code and qa, with the run's declared known failures.
-  qa: '1cd0713ea9b698fb421b2c8a61fd1eada786a9c7bc10f7806cd96d2e61cfce4f',
+  // BUG-089 changed qa on purpose: a failing test in a file qa-change.txt lists is never known, and its file comes only from the runner's output.
+  qa: '1bcbbaf0d42e5abd8c3b22ae0729118e8d948b3f07127bad1e5c990fca595af0',
   // FEAT-059 changed security on purpose: findings carry the audit's severities and the report ends in a VERDICT line. It shipped after 1.37.0, so this is its first pin.
   security: '0056234a6b1917a44cb5fedd06d2b04d8322939650bfd74a9e7dc470157f4710',
   spec: 'f3489eb5061c533b94eb349b056c7ba589a17947ec73635256281a16b5f34ba3',
