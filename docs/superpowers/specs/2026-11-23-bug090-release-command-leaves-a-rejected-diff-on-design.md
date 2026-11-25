@@ -123,6 +123,9 @@ never runs, stages or reverts anything itself.
       line must be discarded before running any project tooling, says to show each `DISCARD` command exactly as
       printed, and still says the command never commits, stages, reverts or runs anything; a parity row pins the
       wording.
+- [ ] Both rendered copies, `project-template/.agents/workflows/cc-release.md` and
+      `project-template/.agents/skills/cc-release/SKILL.md`, carry step 6's new wording, regenerated with
+      `node lib/installer/harness-commands.mjs --write`, and `tests/installer/harness-commands.test.js` stays green.
 - [ ] `CONTROL_PLANE` and `CONTROL_PLANE_NAMES` are read from `scripts/orchestrate.mjs`, not copied: the
       `orchestrate.test.js` rows that pin both lists stay unchanged and green.
 - [ ] The exported predicate returns true for a path with a non-ASCII character and for an NTFS alias of a manifest
@@ -160,6 +163,11 @@ never runs, stages or reverts anything itself.
   matcher plus the `nonAscii` and `ntfsAlias` tests (D2), without changing either list or any current caller. Its
   top level must keep reading no `release.mjs` binding (D8).
 - `.claude/commands/cc-release.md` and `project-template/.claude/commands/cc-release.md` — step 6 wording.
+- `project-template/.agents/workflows/cc-release.md` and `project-template/.agents/skills/cc-release/SKILL.md` —
+  the rendered copies of `project-template/.claude/commands/cc-release.md` (`SOURCE_DIRS` in
+  `lib/installer/harness-commands.mjs:9`). They are regenerated with `node lib/installer/harness-commands.mjs --write`
+  after step 6 changes and never edited by hand; `tests/installer/harness-commands.test.js` compares them with a fresh
+  render.
 - `tests/scripts/release.test.js` — new `[BUG-090]` rows in the `check` describe block, using the existing fixture
   helpers.
 - `tests/installer/commands-parity.test.js` — one `[BUG-090]` row on step 6's wording in both mirrors, and the release
@@ -181,9 +189,9 @@ never runs, stages or reverts anything itself.
 
 ## Complexity Estimate
 
-S — one new output block in one verb of one script, an exported predicate over an existing matcher (closing an
-import cycle that already loads safely), one sentence in two mirrored command files, and test rows in three existing
-suites.
+S — one new output block in one verb of one script, an exported predicate over an existing matcher (closing an import
+cycle that already loads safely), one sentence in two mirrored command files (plus their two regenerated renders), and
+test rows in three existing suites.
 
 ## Owner decisions
 
@@ -193,4 +201,8 @@ suites.
   judged diff and a second untracked file created after `check`, the printed commands remove `:!x` and leave the
   second file.
 - D8 (decided 2026-11-25): the `release.mjs` ↔ `orchestrate.mjs` import cycle is accepted as specified.
+- Rendered copies (decided 2026-11-25): `project-template/.agents/workflows/cc-release.md` and
+  `project-template/.agents/skills/cc-release/SKILL.md`, rendered from `cc-release.md`, are part of System Impact.
+  They are regenerated with `node lib/installer/harness-commands.mjs --write`, never edited by hand, and an
+  acceptance row pins that both carry step 6's new wording with `tests/installer/harness-commands.test.js` green.
 - The rest of the spec stands as written, including D2's alias and non-ASCII reading, D5 and D6.
