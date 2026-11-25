@@ -1692,6 +1692,51 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #312; reported by the automated security review of
   the 1.58.0 release candidate (#311).
 
+### [ ] `[BUG-093]` Antigravity Guard Accepts Unknown Arguments on read_file, write_file and edit_file
+
+- Symptom: `project-template/.agents/hooks/conductor-guard.mjs:35-47`
+  (per the issue) applies the unknown-argument rule (block any argument
+  the guard has not learned) only to `run_command`. `read_file`,
+  `write_file` and `edit_file` silently drop every argument other than
+  `Path`, `StartLine`, `EndLine`, `Content`, `Target` and
+  `Replacement`.
+- Impact per the issue: with the argument set measured on agy 1.5.15
+  there is no bypass, because the guard's Write/Edit/Read checks are
+  path-based and `Path` is validated. If a later agy release adds an
+  argument that changes the effective target (a path alias, a directory
+  flag, a multi-file edit), the guard would evaluate `Path` while agy
+  acts on something else, silently weakening Guards 1, 2 and 4.
+- Fix shape suggested by the issue: give each mapped tool an allowlist
+  of known arguments, like `RUN_COMMAND_ARGS`, and block with the
+  argument's name when an unknown one is present; add one test per
+  tool.
+- Follow-up of `[FEAT-063]`.
+- Intake of issue #316; reported by the automated security review of
+  the 1.59.0 release candidate (#315).
+
+### [ ] `[BUG-094]` Codex Guard Hook Fails Open When Codex Starts Outside the Project Root
+
+- Symptom: `project-template/.codex/hooks.json:9` (per the issue) runs
+  `node .claude/hooks/pre-tool-use.mjs` as a path relative to the
+  directory Codex was launched from, with no adapter in between.
+- Impact per the issue: if Codex is started from a subdirectory, the
+  path does not resolve and the hook cannot run; if that subdirectory
+  has its own `.claude/hooks/pre-tool-use.mjs`, that file runs instead
+  of the installed guard; if `node` is not on `PATH`, the hook cannot
+  start. In each case Guards 1-7 are silently not enforced for the
+  session. Limited to projects that opted in with `--project --codex`,
+  and the README documents the limitation, but enforcement depends on
+  how the user launches the tool rather than on the installation.
+- Fix shape suggested by the issue: anchor the command to the project
+  root (for example with a root environment variable, if Codex provides
+  one), or route it through a small adapter, like the Antigravity one,
+  that finds the project root from its own location and blocks when
+  the guard cannot run; add an installer or hook test that covers
+  launching from a subdirectory.
+- Follow-up of `[FEAT-063]`.
+- Intake of issue #314; reported by the automated security review of
+  #303.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
