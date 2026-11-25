@@ -206,6 +206,7 @@ tests/.tmp/
 !/docs/superpowers/plans/2026-11-23-feat033-test-writer-agent-build-band.md
 !/docs/superpowers/plans/2026-11-23-feat048-codex-antigravity-guards.md
 !/docs/superpowers/plans/2026-11-23-feat048-harness-commands.md
+!/docs/superpowers/plans/2026-11-25-bug093-antigravity-guard-accepts-unknown-arguments-on.md
 !/docs/superpowers/plans/2026-11-25-bug094-codex-guard-hook-fails-open-when-codex-starts.md
 !/docs/superpowers/specs/2026-06-09-bug001-cc-compact-design.md
 !/docs/superpowers/specs/2026-06-09-bug002-spec-read-budget-design.md
@@ -320,6 +321,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-11-23-feat033-test-writer-agent-build-band-design.md
 !/docs/superpowers/specs/2026-11-23-feat048-codex-antigravity-guards-design.md
 !/docs/superpowers/specs/2026-11-23-feat048-harness-commands-design.md
+!/docs/superpowers/specs/2026-11-25-bug093-antigravity-guard-accepts-unknown-arguments-on-design.md
 !/docs/superpowers/specs/2026-11-25-bug094-codex-guard-hook-fails-open-when-codex-starts-design.md
 # --- END tracked-surface block (BUG-042) ---
 
