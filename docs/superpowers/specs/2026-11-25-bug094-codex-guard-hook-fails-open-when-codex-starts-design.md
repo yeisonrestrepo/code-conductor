@@ -96,6 +96,19 @@ from a subdirectory, through every shell named in choice 6 that the CI leg has.
    entry changes owner. Callers that pass no legacy list (the Claude settings and Antigravity merges) behave as
    before. Rejected: keeping `pre-tool-use.mjs` as the fingerprint by writing that name into the bootstrap text,
    which would make the command name a file it never runs only to satisfy the matcher.
+
+   **Reporting the replace.** Codex asks for hook trust again after `.codex/hooks.json` is edited (README
+   `### Codex CLI`), so on an upgrade the guards are not enforced until the user re-trusts. The user has to be
+   told. `mergeSettingsFile` therefore returns a new status, `legacy-replaced`, when the write replaced at least one
+   host entry through a legacy fingerprint. Only a caller that passes a legacy list can get it, so the Claude
+   settings and Antigravity merges see the same statuses as today. `mergeHarnessHooks` counts it as written (like
+   `merged`) and hands the status back, so `installCodexHook` can pick its report line. On `legacy-replaced` it
+   prints, instead of the "installed" line:
+   `code-conductor: replaced the old Codex guard hook in .codex/hooks.json; Codex asks for trust again after this
+   edit, so the guards are not enforced until you re-trust the hooks in Codex with /hooks`.
+   Any other written status keeps today's "installed … trust it once in Codex with /hooks" line. Rejected: reading
+   the host file a second time in `installCodexHook` to look for the old entry. That would repeat the matcher's
+   fingerprint logic outside it, and the two copies could disagree.
 6. **Command form: `node -e "<body>"`, the body in one pair of double quotes, with a closed alphabet inside.** Which
    shell Codex runs a hook command through has not been measured. On Unix it is presumably `sh` or the user's shell.
    On Windows it may be `cmd.exe` or PowerShell. So the command is written to reach `node` as one argv element,
@@ -140,6 +153,15 @@ from a subdirectory, through every shell named in choice 6 that the CI leg has.
   and the project root, that nested layer's guard is used instead of the root's. Writing those three files already
   requires write access to the project tree, and that access can replace the root guard directly. The risk stays
   stated under Out of Scope and is pinned by the nested-layer acceptance criterion.
+- **Spec approved, with one required addition: re-trust on upgrade.** The upgrade path edits `.codex/hooks.json`,
+  and Codex asks for trust again after that edit, so the guards are not enforced until the user re-trusts. Three
+  things follow. (1) When the installer replaces the FEAT-048 entry, its report line tells the user to re-trust the
+  hooks in Codex with `/hooks` (choice 5, "Reporting the replace"). (2) The README `### Codex CLI` subsection says
+  so for upgrades. (3) An acceptance criterion covers that report line on replace.
+- **Follow-up item.** A follow-up backlog item is filed to measure, against a live Codex, whether Codex blocks a
+  hook that cannot start or that exits non-zero (the `node`-not-on-`PATH` case). This change does not do that
+  measurement (Out of Scope). The item is filed through the backlog's own process, not by this change.
+- No other changes to the spec were requested.
 
 ## Behavior
 
@@ -169,8 +191,10 @@ from a subdirectory, through every shell named in choice 6 that the CI leg has.
 - A subdirectory holds its own `.codex/hooks.json` but no `.codex/hooks/conductor-guard.mjs`: the bootstrap blocks,
   naming the folder it looked in.
 - The host's `.codex/hooks.json` already holds the FEAT-048 entry (`node .claude/hooks/pre-tool-use.mjs`): a
-  re-install replaces it in place with the bootstrap entry; no duplicate, host entries kept. A second re-install
-  reports `unchanged`.
+  re-install replaces it in place with the bootstrap entry; no duplicate, host entries kept. The installer prints
+  the replace line (choice 5): the hooks file changed, Codex will ask for trust again, and the guards are not
+  enforced until the user re-trusts the hooks with `/hooks`. A second re-install changes nothing in the file and
+  prints the usual "installed" line, not the replace line.
 - Without `--codex`, nothing under `.codex/` is written (unchanged from today).
 
 ### Error cases
@@ -214,6 +238,11 @@ Each prints a deny with a reason naming the cause, and exits 0:
 - [ ] Installer test: `--codex` installs `.codex/hooks/conductor-guard.mjs` and the bootstrap entry; a host
       `hooks.json` holding the FEAT-048 entry ends with exactly one conductor entry (the bootstrap) in the same
       position, host entries kept; a second run is unchanged; without `--codex` nothing under `.codex/` exists.
+- [ ] Installer test (re-trust on replace): when `--codex` replaces a host's FEAT-048 entry, the report contains the
+      replace line, which names `.codex/hooks.json`, says the guards are not enforced until the hooks are re-trusted,
+      and names `/hooks`. It does not contain the "installed" line. A fresh install and a second, unchanged run print
+      the "installed" line and no replace line. A merge test pins that `mergeSettingsFile` returns
+      `legacy-replaced` only when a legacy fingerprint matched, and never for a call without a legacy list.
 - [ ] Hook test: from a subdirectory holding a complete nested layer whose guard allows everything, the shipped
       command returns that nested guard's verdict (allow), pinning the residual risk of choice 2 as decided
       behavior; the same subdirectory with the nested `.codex/hooks/conductor-guard.mjs` removed yields a deny.
@@ -221,13 +250,16 @@ Each prints a deny with a reason naming the cause, and exits 0:
       fingerprint and a legacy one, or a duplicate legacy entry, ends as one entry; a call without a legacy list
       merges exactly as before.
 - [ ] The installer comment at `lib/installer/deploy.mjs:320-321` and README `### Codex CLI` describe the adapter;
-      the "launch from the project root" instruction is removed; the `node`-on-`PATH` limit stays stated.
+      the "launch from the project root" instruction is removed; the `node`-on-`PATH` limit stays stated. README
+      `### Codex CLI` also says that upgrading an install that has the old entry rewrites `.codex/hooks.json`, that
+      Codex then asks for trust again, and that the guards are not enforced until the hooks are re-trusted in
+      `/hooks`.
 - [ ] `npm test` passes; the change adds no dependency and does not touch `.claude/hooks/pre-tool-use.mjs`.
 
 ## Out of Scope
 
 - A Codex root environment variable, and measuring whether Codex blocks a hook that cannot start or exits non-zero
-  (needs a live Codex run).
+  (needs a live Codex run). The second measurement goes to the follow-up item in Owner decisions.
 - Making the hook work without `node` on `PATH` (choice 4).
 - Defending against a complete nested guard layer between the Codex start directory and the project root. Such a
   layer's guard runs instead of the root's. This is a remaining, accepted risk (Owner decisions): planting it needs
@@ -245,7 +277,10 @@ Each prints a deny with a reason naming the cause, and exits 0:
   `mergeHarnessHooks` forwards the optional legacy list; comment at 320-321 (protected surface: installer). `.codex`
   is already in `HARNESS_DIRS`, so the template copy loop needs no change.
 - `lib/installer/settings-merge.mjs` — `mergeSettingsFile`, `mergeHookTree` and `upsertEntry` take the optional
-  legacy-fingerprint map (choice 5); without it every caller behaves as today (protected surface: installer).
+  legacy-fingerprint map (choice 5), and `mergeSettingsFile` can return the new status `legacy-replaced`. Without
+  the map every caller behaves as today (protected surface: installer).
+- `lib/installer/deploy.mjs` — `mergeHarnessHooks` returns the merge status instead of a boolean, counting
+  `legacy-replaced` as written; `installCodexHook` prints the replace line on `legacy-replaced` (choice 5).
 - Tests: new `tests/hooks/codex-guard.test.js` (pattern: `tests/hooks/antigravity-guard.test.js`); additions to the
   Codex block of `tests/installer/deploy.test.js` (from line 885); `tests/installer/cli.test.js` checked for the
   report line.
