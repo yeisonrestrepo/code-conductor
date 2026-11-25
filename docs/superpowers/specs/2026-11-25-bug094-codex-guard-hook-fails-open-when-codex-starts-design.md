@@ -64,18 +64,17 @@ from a subdirectory, through every shell named in choice 6 that the CI leg has.
    subdirectory is never run on its own: it runs only when that same subdirectory also holds `.codex/hooks.json`
    and `.codex/hooks/conductor-guard.mjs`, a complete nested installation.
 
-   **Residual risk (a security-posture decision for the maintainer; recommended: accept).** A subdirectory between the hook's cwd and the root that holds all three files
+   **Residual risk (accepted by the maintainer; see Owner decisions).** A subdirectory between the hook's cwd and the root that holds all three files
    (`.codex/hooks.json`, `.codex/hooks/conductor-guard.mjs`, `.claude/hooks/pre-tool-use.mjs`), whether a vendored
    checkout that installed the conductor with `--codex` or files planted on purpose, has its guard run instead of
-   the root's. The recommendation is to accept it, because it grants nothing the attacker does not already hold: writing those files
+   the root's. It is accepted because it grants nothing the attacker does not already hold: writing those files
    needs write access inside the project tree, and with that same access one can replace
    `<root>/.claude/hooks/pre-tool-use.mjs` or `<root>/.codex/hooks/conductor-guard.mjs` directly (no guard protects
    the hook files themselves; the Claude route has the same exposure). It also cannot be removed by any anchor rule
    that needs no install-time absolute path (rejected above): from inside the tree, a planted complete layer and a
    legitimate nested project look identical. The bar does rise from one planted file (today) to three, and the
-   case is pinned by a test so the behavior is a recorded decision, not an accident. If the maintainer rejects it,
-   the only anchor-rule alternative is the outermost walk above, whose risk this spec judges worse; the spec then
-   needs another round before the plan.
+   case is pinned by a test so the behavior is a recorded decision, not an accident. The only anchor-rule
+   alternative is the outermost walk above, whose risk this spec judges worse.
 3. **Deny by output, exit 0.** The only block mechanism measured on Codex is Claude's
    `hookSpecificOutput.permissionDecision: "deny"` on stdout (FEAT-048 live check; the guard itself exits 0 on every
    path, `project-template/.claude/hooks/pre-tool-use.mjs:4`). The bootstrap and the adapter block the same way and
@@ -133,6 +132,14 @@ from a subdirectory, through every shell named in choice 6 that the CI leg has.
 
      A command that does not run as the bootstrap answers allow for that row, so the test fails. A shell missing from
      a leg is skipped by name, never passed.
+
+### Owner decisions
+
+- **Residual risk of choice 2: accepted (option a).** When a complete nested guard layer (`.codex/hooks.json`,
+  `.codex/hooks/conductor-guard.mjs` and `.claude/hooks/pre-tool-use.mjs`) sits between the Codex start directory
+  and the project root, that nested layer's guard is used instead of the root's. Writing those three files already
+  requires write access to the project tree, and that access can replace the root guard directly. The risk stays
+  stated under Out of Scope and is pinned by the nested-layer acceptance criterion.
 
 ## Behavior
 
@@ -222,6 +229,9 @@ Each prints a deny with a reason naming the cause, and exits 0:
 - A Codex root environment variable, and measuring whether Codex blocks a hook that cannot start or exits non-zero
   (needs a live Codex run).
 - Making the hook work without `node` on `PATH` (choice 4).
+- Defending against a complete nested guard layer between the Codex start directory and the project root. Such a
+  layer's guard runs instead of the root's. This is a remaining, accepted risk (Owner decisions): planting it needs
+  the same write access to the project tree that could replace the root guard directly.
 - Mapping Codex tools other than the shell (Guards 1, 2 and 4 stay "not reached", README).
 - The Antigravity adapter, the OpenCode plugin, and Codex's hook trust gate.
 - Records: the README "Known limits" `[BUG-094]` line, `CHANGELOG.md`, `VERSION`, the backlog (written at release).
