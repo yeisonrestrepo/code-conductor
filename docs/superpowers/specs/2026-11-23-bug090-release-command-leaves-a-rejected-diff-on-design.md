@@ -48,7 +48,7 @@ never runs, stages or reverts anything itself.
 | D1 | Where the warning and the command come from | `release.mjs check` prints them; the command file relays them | The paths and their git state are facts the driver already computes (`changedPaths`); a printed line is deterministic and pinned by `tests/scripts/release.test.js`, while prose asking the session to assemble a command is neither. It matches how every other `/cc-release` outcome is a driver line the command shows. |
 | D2 | What "another control-plane path" means | A path matched by `CONTROL_PLANE` or whose last segment is in `CONTROL_PLANE_NAMES` (`scripts/orchestrate.mjs`), with the same case folding as the existing matcher. The exported predicate also counts as control-plane every path with a character outside printable ASCII or a segment that `ntfsAlias` flags (`:`, `~`, a trailing dot or space), reusing those two existing tests | It is the repository's one definition of "files that run code or steer the run", set by owner decisions BUG-080/081/082/085. It already lists `package.json`, `package-lock.json`, every other package manager's manifests and lockfiles, CI files, git hook runners and `.claude/release-profile.json`. A second list in `release.mjs` would drift from it. The list's membership is not changed here. `inControlPlane` alone leaves aliases and non-ASCII names to `inSurface` (`orchestrate.mjs:1353`), so on its own it would miss `package.json.` or a look-alike spelling that a case-insensitive or NTFS filesystem resolves to the manifest. The conservative reading costs at most an extra warning line on an already rejected diff, while a miss drops the warning where it matters. |
 | D3 | Which paths the discard commands name | Every path in the judged diff (`changedPaths`: tracked changes against `HEAD` plus untracked, non-ignored files), not only the ones a failure line names | A rejected release is redone from a clean tree (`digest` refuses a dirty one with `RELEASE_TREE_DIRTY`), so the owner has to drop the whole diff anyway; naming every path yields one set of commands that leaves the tree clean. It is a superset of "the rejected files" the entry asks for. |
-| D4 | Commands per git state | Paths present in `HEAD`: `git checkout HEAD -- <paths>`. Paths in the index but not in `HEAD`: `git rm -f -- <paths>`. Untracked paths: `git clean -f -- <paths>` | `git checkout --` restores from the index and is a no-op on an untracked file, so the single form the command suggests today misses a new file, which is exactly the shape an injected out-of-scope config takes. `HEAD` as the source also undoes a staged change. Each form errors on paths of another state, hence the split. |
+| D4 | Commands per git state | Every command uses git's literal-pathspec option. Paths present in `HEAD`: `git --literal-pathspecs checkout HEAD -- <paths>`. Paths in the index but not in `HEAD`: `git --literal-pathspecs rm -f -- <paths>`. Untracked paths: `git --literal-pathspecs clean -f -- <paths>` (owner decision, below) | `git checkout --` restores from the index and is a no-op on an untracked file, so the single form the command suggests today misses a new file, which is exactly the shape an injected out-of-scope config takes. `HEAD` as the source also undoes a staged change. Each form errors on paths of another state, hence the split. Without `--literal-pathspecs`, git reads a path such as `:!x` or `*` as pathspec magic or a glob: `git clean -f -- ':!x'` would remove every untracked file except `x`, including files created after `check` ran. The option makes each printed path name exactly one file. |
 | D5 | When the warning line appears | Only when a rejected path is control-plane (D2); the `DISCARD` lines appear on every judgment failure with a non-empty diff | The entry scopes the warning to manifests and control-plane paths; a failure that names only the changelog or backlog shape leaves version files that passed `judgeJsonFile`, so the stronger wording there would be noise. The discard commands are useful on every failure. |
 | D6 | Paths a shell line cannot carry safely | A path is quoted with the existing `shellQuote`. A path containing a control character (including a newline) or a single quote is left off every command and printed on its own `DISCARD_BY_HAND` line as a JSON string | A newline in a file name would split a printed command or forge a line of `check` output, and a single quote is the one character whose POSIX escape (`'\''`) does not carry over to PowerShell. The agent can create a file name; the printed commands must not be a way to inject one. |
 | D7 | A `RELEASE_HALT` (a profile check went red after the judgment passed) | No `RELEASE_DISCARD_FIRST` and no `DISCARD` lines | The diff passed the judgment, so the tooling already ran on an accepted diff; the halt is a red check, not a rejected edit. Step 6 keeps saying the diff is left in place. |
@@ -66,9 +66,9 @@ never runs, stages or reverts anything itself.
      and `release: RELEASE_LOCATION_SHAPE: package.json <why>`;
    - `release: RELEASE_DISCARD_FIRST: the rejected diff touches .npmrc, package.json, which project tooling reads; discard the whole diff before running any package manager, test, build or hook command`
      (paths sorted, de-duplicated);
-   - `release: DISCARD git checkout HEAD -- CHANGELOG.md VERSION package-lock.json package.json`
+   - `release: DISCARD git --literal-pathspecs checkout HEAD -- CHANGELOG.md VERSION package-lock.json package.json`
      (the tracked paths of the diff, sorted, each `shellQuote`d);
-   - `release: DISCARD git clean -f -- .npmrc` (the untracked paths).
+   - `release: DISCARD git --literal-pathspecs clean -f -- .npmrc` (the untracked paths).
 3. Step 6 shows the `RELEASE:` line, the `check` output and `git diff --stat`, says that the diff must be discarded
    before running any project tooling, and shows the two `DISCARD` commands to run as printed. It runs none of them.
 
@@ -78,9 +78,9 @@ never runs, stages or reverts anything itself.
   no `RELEASE_DISCARD_FIRST` line; the `DISCARD` lines for the whole diff still print, and step 6 shows them as the way
   to discard the diff.
 - **Only `RELEASE_PROFILE_CHANGED`**: `.claude/release-profile.json` is control-plane (it holds the commands `check`
-  and `handoff` run), so the warning prints and the profile is on the `git checkout HEAD --` line.
-- **A staged new file** (in the index, not in `HEAD`): it is named on a `git rm -f --` line.
-- **A deleted tracked file**: it is in `HEAD`, so `git checkout HEAD --` restores it.
+  and `handoff` run), so the warning prints and the profile is on the `git --literal-pathspecs checkout HEAD --` line.
+- **A staged new file** (in the index, not in `HEAD`): it is named on a `git --literal-pathspecs rm -f --` line.
+- **A deleted tracked file**: it is in `HEAD`, so `git --literal-pathspecs checkout HEAD --` restores it.
 - **A path needing quotes** (a space, `$`, `;`): it appears `shellQuote`d on its command, so the printed line is safe to
   paste.
 - **A path with a control character or a single quote**: it is on no command; a
@@ -107,11 +107,13 @@ never runs, stages or reverts anything itself.
 - [ ] `check` failing on `RELEASE_PROFILE_CHANGED` alone prints the `RELEASE_DISCARD_FIRST` line.
 - [ ] `check` failing only on non-control-plane paths (`RELEASE_OUT_OF_SCOPE: notes.txt`, or a changelog shape)
       prints no `RELEASE_DISCARD_FIRST` line but prints the `DISCARD` lines.
-- [ ] The `DISCARD` lines name every path of the diff exactly once, sorted, with `git checkout HEAD --` for paths in
-      `HEAD`, `git rm -f --` for staged paths not in `HEAD`, `git clean -f --` for untracked paths, and no line for an
-      empty class.
+- [ ] The `DISCARD` lines name every path of the diff exactly once, sorted, with
+      `git --literal-pathspecs checkout HEAD --` for paths in `HEAD`, `git --literal-pathspecs rm -f --` for staged
+      paths not in `HEAD`, `git --literal-pathspecs clean -f --` for untracked paths, and no line for an empty class.
 - [ ] Running the printed `DISCARD` commands, verbatim, in the fixture repository leaves `git status --porcelain`
       empty.
+- [ ] With an untracked file named `:!x` in the judged diff and a second untracked file created after `check` ran,
+      running the printed `DISCARD` commands, verbatim, removes `:!x` and leaves the second file in place.
 - [ ] A path with a space is printed single-quoted on its command; a path with a newline or a single quote appears on
       no command and on one `DISCARD_BY_HAND` line as a JSON string.
 - [ ] `release: ok`, `RELEASE_HALT` and a judgment failure with an empty diff print no `RELEASE_DISCARD_FIRST` and no
@@ -182,3 +184,13 @@ never runs, stages or reverts anything itself.
 S — one new output block in one verb of one script, an exported predicate over an existing matcher (closing an
 import cycle that already loads safely), one sentence in two mirrored command files, and test rows in three existing
 suites.
+
+## Owner decisions
+
+- D4 (decided 2026-11-25): every `DISCARD` command carries git's literal-pathspec option:
+  `git --literal-pathspecs checkout HEAD -- <paths>`, `git --literal-pathspecs rm -f -- <paths>` and
+  `git --literal-pathspecs clean -f -- <paths>`. An acceptance row pins it: with an untracked file named `:!x` in the
+  judged diff and a second untracked file created after `check`, the printed commands remove `:!x` and leave the
+  second file.
+- D8 (decided 2026-11-25): the `release.mjs` ↔ `orchestrate.mjs` import cycle is accepted as specified.
+- The rest of the spec stands as written, including D2's alias and non-ASCII reading, D5 and D6.
