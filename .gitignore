@@ -319,6 +319,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-11-23-feat033-test-writer-agent-build-band-design.md
 !/docs/superpowers/specs/2026-11-23-feat048-codex-antigravity-guards-design.md
 !/docs/superpowers/specs/2026-11-23-feat048-harness-commands-design.md
+!/docs/superpowers/specs/2026-11-25-bug094-codex-guard-hook-fails-open-when-codex-starts-design.md
 # --- END tracked-surface block (BUG-042) ---
 
 # Kept for external writers. Both lines are redundant against the block above; each is
