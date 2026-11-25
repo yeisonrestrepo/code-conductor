@@ -1,6 +1,6 @@
 # BUG-094 — Codex guard hook fails open when Codex starts outside the project root
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-25 by the owner
 
 **Item:** `[BUG-094]` (intake of issue #314, follow-up of `[FEAT-063]`). Pillar 5: infrastructure, ecosystem and
 quality assurance.
