@@ -811,3 +811,152 @@ describe('deployProject: OpenCode plugin (FEAT-048)', () => {
     expect(existsSync(join(ROOT, 'project-template', PLUGIN_REL))).toBe(true);
   });
 });
+
+// FEAT-048 slice 2 (#97): the Antigravity guard ships inside project-template/.agents/
+// but lands only with the antigravity option; its hooks.json is merged, never replaced.
+describe('deployProject: Antigravity guard (FEAT-048)', () => {
+  const GUARD_REL = join('.agents', 'hooks', 'conductor-guard.mjs');
+  const HOOKS_REL = join('.agents', 'hooks.json');
+  const SHIPPED = '// shipped agy guard\n';
+  const OURS = { matcher: '.*', hooks: [{ type: 'command', command: 'node hooks/conductor-guard.mjs' }] };
+  const SHIPPED_HOOKS = `${JSON.stringify({ hooks: { PreToolUse: [OURS] } }, null, 2)}\n`;
+  const INSTALLED = 'code-conductor: installed the Antigravity guard at .agents/hooks/conductor-guard.mjs';
+  const hooksOf = (dir) => JSON.parse(readFileSync(join(dir, HOOKS_REL), 'utf8'));
+  beforeEach(() => {
+    mkdirSync(join(asset, 'project-template', '.agents', 'hooks'), { recursive: true });
+    writeFileSync(join(asset, 'project-template', GUARD_REL), SHIPPED);
+    writeFileSync(join(asset, 'project-template', HOOKS_REL), SHIPPED_HOOKS);
+  });
+  it('writes no .agents/ without the antigravity option', () => {
+    const out = capture();
+    deployProject(asset, home, out.opts);
+    expect(existsSync(join(home, '.agents'))).toBe(false);
+    expect(out.said.some((m) => /Antigravity/.test(m))).toBe(false);
+  });
+  it('installs the guard byte for byte and creates hooks.json with the antigravity option', () => {
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, antigravity: true });
+    expect(readFileSync(join(home, GUARD_REL), 'utf8')).toBe(SHIPPED);
+    expect(readFileSync(join(home, HOOKS_REL), 'utf8')).toBe(SHIPPED_HOOKS);
+    expect(out.said).toContain(INSTALLED);
+  });
+  it('keeps a host PreToolUse entry, adds ours once and leaves a re-run unchanged', () => {
+    const host = { matcher: 'run_command', hooks: [{ type: 'command', command: 'node mine.mjs' }] };
+    mkdirSync(join(home, '.agents'), { recursive: true });
+    writeFileSync(join(home, HOOKS_REL), JSON.stringify({ hooks: { PreToolUse: [host] } }));
+    deployProject(asset, home, { ...capture().opts, antigravity: true });
+    const first = readFileSync(join(home, HOOKS_REL), 'utf8');
+    expect(hooksOf(home).hooks.PreToolUse).toEqual([host, OURS]);
+    deployProject(asset, home, { ...capture().opts, antigravity: true });
+    expect(readFileSync(join(home, HOOKS_REL), 'utf8')).toBe(first);
+  });
+  it('backs up a malformed host hooks.json and writes the shipped one', () => {
+    mkdirSync(join(home, '.agents'), { recursive: true });
+    writeFileSync(join(home, HOOKS_REL), '{ not json');
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, antigravity: true });
+    expect(readFileSync(join(home, HOOKS_REL), 'utf8')).toBe(SHIPPED_HOOKS);
+    expect(readdirSync(join(home, '.agents')).some((n) => n.startsWith('hooks.json.') && n !== 'hooks.json')).toBe(true);
+    expect(out.warned.some((m) => /hooks\.json was not valid JSON/.test(m))).toBe(true);
+  });
+  it('keeps the host project\'s own .agents/ files', () => {
+    mkdirSync(join(home, '.agents'), { recursive: true });
+    writeFileSync(join(home, '.agents', 'other.md'), 'host');
+    deployProject(asset, home, { ...capture().opts, antigravity: true });
+    expect(readFileSync(join(home, '.agents', 'other.md'), 'utf8')).toBe('host');
+  });
+  it.skipIf(!CAN_SYMLINK)('replaces a symlinked guard path and leaves the link target untouched', () => {
+    const outside = join(home, 'outside.mjs');
+    writeFileSync(outside, '// outside\n');
+    mkdirSync(join(home, '.agents', 'hooks'), { recursive: true });
+    symlinkSync(outside, join(home, GUARD_REL));
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, antigravity: true });
+    expect(lstatSync(join(home, GUARD_REL)).isSymbolicLink()).toBe(false);
+    expect(readFileSync(join(home, GUARD_REL), 'utf8')).toBe(SHIPPED);
+    expect(readFileSync(outside, 'utf8')).toBe('// outside\n');
+  });
+  it('ships the real guard and hooks.json in the template', () => {
+    expect(existsSync(join(ROOT, 'project-template', GUARD_REL))).toBe(true);
+    expect(existsSync(join(ROOT, 'project-template', HOOKS_REL))).toBe(true);
+  });
+});
+
+// FEAT-048 slice 2 (#97): Codex sends Claude's own payload and honours its deny (measured
+// live on 0.171), so --codex only merges .codex/hooks.json pointing at the unchanged guard.
+describe('deployProject: Codex hook (FEAT-048)', () => {
+  const HOOKS_REL = join('.codex', 'hooks.json');
+  const OURS = { matcher: '.*', hooks: [{ type: 'command', command: 'node .claude/hooks/pre-tool-use.mjs' }] };
+  const SHIPPED_HOOKS = `${JSON.stringify({ hooks: { PreToolUse: [OURS] } }, null, 2)}\n`;
+  const INSTALLED = 'code-conductor: installed the Codex guard hook in .codex/hooks.json; trust it once in Codex with /hooks';
+  beforeEach(() => {
+    mkdirSync(join(asset, 'project-template', '.codex'), { recursive: true });
+    writeFileSync(join(asset, 'project-template', HOOKS_REL), SHIPPED_HOOKS);
+  });
+  it('writes no .codex/ without the codex option', () => {
+    const out = capture();
+    deployProject(asset, home, out.opts);
+    expect(existsSync(join(home, '.codex'))).toBe(false);
+    expect(out.said.some((m) => /Codex/.test(m))).toBe(false);
+  });
+  it('creates hooks.json and tells the user to trust it with the codex option', () => {
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, codex: true });
+    expect(readFileSync(join(home, HOOKS_REL), 'utf8')).toBe(SHIPPED_HOOKS);
+    expect(out.said).toContain(INSTALLED);
+  });
+  it('keeps host hooks, adds ours once and leaves a re-run unchanged', () => {
+    const host = { matcher: 'Bash', hooks: [{ type: 'command', command: 'node mine.mjs' }] };
+    mkdirSync(join(home, '.codex'), { recursive: true });
+    writeFileSync(join(home, HOOKS_REL), JSON.stringify({ hooks: { PreToolUse: [host] } }));
+    deployProject(asset, home, { ...capture().opts, codex: true });
+    const first = readFileSync(join(home, HOOKS_REL), 'utf8');
+    expect(JSON.parse(first).hooks.PreToolUse).toEqual([host, OURS]);
+    deployProject(asset, home, { ...capture().opts, codex: true });
+    expect(readFileSync(join(home, HOOKS_REL), 'utf8')).toBe(first);
+  });
+  it('ships the real hooks.json in the template, pointing at the guard', () => {
+    expect(readFileSync(join(ROOT, 'project-template', HOOKS_REL), 'utf8')).toContain('node .claude/hooks/pre-tool-use.mjs');
+  });
+});
+
+// FEAT-048 slice 3 (#97): the rendered cc-* commands land only with their harness flag.
+describe('deployProject: cc-* commands for Antigravity and Codex (FEAT-048)', () => {
+  const WORKFLOW = join('.agents', 'workflows', 'cc-spec.md');
+  const SKILL = join('.agents', 'skills', 'cc-spec', 'SKILL.md');
+  beforeEach(() => {
+    mkdirSync(join(asset, 'project-template', '.agents', 'workflows'), { recursive: true });
+    mkdirSync(join(asset, 'project-template', '.agents', 'skills', 'cc-spec'), { recursive: true });
+    writeFileSync(join(asset, 'project-template', WORKFLOW), 'workflow\n');
+    writeFileSync(join(asset, 'project-template', SKILL), 'skill\n');
+  });
+  it('installs neither folder without a flag', () => {
+    deployProject(asset, home, capture().opts);
+    expect(existsSync(join(home, '.agents'))).toBe(false);
+  });
+  it('installs only the workflows with antigravity', () => {
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, antigravity: true });
+    expect(readFileSync(join(home, WORKFLOW), 'utf8')).toBe('workflow\n');
+    expect(existsSync(join(home, '.agents', 'skills'))).toBe(false);
+    expect(out.said).toContain('code-conductor: installed the cc-* commands as Antigravity workflows in .agents/workflows/');
+  });
+  it('installs only the skills with codex', () => {
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, codex: true });
+    expect(readFileSync(join(home, SKILL), 'utf8')).toBe('skill\n');
+    expect(existsSync(join(home, '.agents', 'workflows'))).toBe(false);
+    expect(out.said).toContain('code-conductor: installed the cc-* commands as Codex skills in .agents/skills/');
+  });
+  it('keeps the host\'s own workflows and skills and overwrites ours', () => {
+    mkdirSync(join(home, '.agents', 'workflows'), { recursive: true });
+    mkdirSync(join(home, '.agents', 'skills', 'mine'), { recursive: true });
+    writeFileSync(join(home, '.agents', 'workflows', 'mine.md'), 'host');
+    writeFileSync(join(home, '.agents', 'skills', 'mine', 'SKILL.md'), 'host');
+    writeFileSync(join(home, WORKFLOW), 'stale');
+    deployProject(asset, home, { ...capture().opts, antigravity: true, codex: true });
+    expect(readFileSync(join(home, '.agents', 'workflows', 'mine.md'), 'utf8')).toBe('host');
+    expect(readFileSync(join(home, '.agents', 'skills', 'mine', 'SKILL.md'), 'utf8')).toBe('host');
+    expect(readFileSync(join(home, WORKFLOW), 'utf8')).toBe('workflow\n');
+  });
+});

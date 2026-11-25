@@ -238,6 +238,37 @@ describe('run', () => {
     expect(logs).toContain('stderr:code-conductor: --opencode needs --project; no OpenCode files were written');
     expect(logs.some(l => /unrecognized/.test(l))).toBe(false);
   });
+  it('lists --antigravity in --help (FEAT-048)', () => {
+    run(['--help'], { HOME: home }, { cwd, log });
+    expect(logs.some(l => l.startsWith('stdout:') && l.includes('[--antigravity]'))).toBe(true);
+  });
+  it('installs the Antigravity guard with --project --antigravity (FEAT-048)', () => {
+    expect(run(['--project', '--antigravity'], { HOME: home }, { cwd, log })).toBe(0);
+    expect(existsSync(join(cwd, '.agents', 'hooks', 'conductor-guard.mjs'))).toBe(true);
+    expect(existsSync(join(cwd, '.agents', 'hooks.json'))).toBe(true);
+    expect(logs.some(l => /unrecognized/.test(l))).toBe(false);
+  });
+  it('writes no .agents/ for --project alone (FEAT-048)', () => {
+    expect(run(['--project'], { HOME: home }, { cwd, log })).toBe(0);
+    expect(existsSync(join(cwd, '.agents'))).toBe(false);
+  });
+  it('warns and writes nothing for Antigravity when --antigravity comes without --project (FEAT-048)', () => {
+    expect(run(['--antigravity'], { HOME: home }, { cwd, log })).toBe(0);
+    expect(existsSync(join(cwd, '.agents'))).toBe(false);
+    expect(logs).toContain('stderr:code-conductor: --antigravity needs --project; no Antigravity files were written');
+    expect(logs.some(l => /unrecognized/.test(l))).toBe(false);
+  });
+  it('wires the Codex hook with --project --codex and lists the flag in --help (FEAT-048)', () => {
+    expect(run(['--project', '--codex'], { HOME: home }, { cwd, log })).toBe(0);
+    expect(existsSync(join(cwd, '.codex', 'hooks.json'))).toBe(true);
+    run(['--help'], { HOME: home }, { cwd, log });
+    expect(logs.some(l => l.startsWith('stdout:') && l.includes('[--codex]'))).toBe(true);
+  });
+  it('warns and writes nothing for Codex when --codex comes without --project (FEAT-048)', () => {
+    expect(run(['--codex'], { HOME: home }, { cwd, log })).toBe(0);
+    expect(existsSync(join(cwd, '.codex'))).toBe(false);
+    expect(logs).toContain('stderr:code-conductor: --codex needs --project; no Codex files were written');
+  });
   it('treats -Verbosity LEVEL exactly like --verbosity LEVEL (issue #109)', () => {
     const rc = run(['-Verbosity', 'INFO'], { HOME: home }, { cwd, log });
     expect(rc).toBe(0);

@@ -203,6 +203,8 @@ tests/.tmp/
 !/docs/superpowers/plans/2026-11-23-bug089-known-failure-substring-matching-lets-generic.md
 !/docs/superpowers/plans/2026-11-23-feat030-byte-sum-bound-for-the-conductor-cache-db.md
 !/docs/superpowers/plans/2026-11-23-feat033-test-writer-agent-build-band.md
+!/docs/superpowers/plans/2026-11-23-feat048-codex-antigravity-guards.md
+!/docs/superpowers/plans/2026-11-23-feat048-harness-commands.md
 !/docs/superpowers/specs/2026-06-09-bug001-cc-compact-design.md
 !/docs/superpowers/specs/2026-06-09-bug002-spec-read-budget-design.md
 !/docs/superpowers/specs/2026-06-11-bug006-feat018-bash-scan-guard-design.md
@@ -314,6 +316,8 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-11-23-bug090-release-command-leaves-a-rejected-diff-on-design.md
 !/docs/superpowers/specs/2026-11-23-feat030-byte-sum-bound-for-the-conductor-cache-db-design.md
 !/docs/superpowers/specs/2026-11-23-feat033-test-writer-agent-build-band-design.md
+!/docs/superpowers/specs/2026-11-23-feat048-codex-antigravity-guards-design.md
+!/docs/superpowers/specs/2026-11-23-feat048-harness-commands-design.md
 # --- END tracked-surface block (BUG-042) ---
 
 # Kept for external writers. Both lines are redundant against the block above; each is
