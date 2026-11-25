@@ -33,11 +33,12 @@ Antigravity one: it takes the project root from its own location (`<root>/.codex
 `<root>/.claude/hooks/pre-tool-use.mjs` with `process.execPath`, cwd `<root>` and `CLAUDE_PROJECT_DIR=<root>`, passes
 the guard's verdict through, and answers with Claude's deny shape whenever the guard could not run or answered
 something it cannot trust. Because the hook process may start in any directory, the `hooks.json` command does not
-name the adapter by a cwd-relative path: it is a short `node -e` bootstrap that walks up from its working directory
-to the nearest ancestor holding `.codex/hooks.json`, imports `<that>/.codex/hooks/conductor-guard.mjs`, and prints a
-deny itself when no such ancestor or no adapter exists. The installer installs the adapter as a managed file (as it
-does for Antigravity) and upgrades the FEAT-048 entry in place. A test runs the installed command through the
-platform shell from the root and from a subdirectory.
+name the adapter by a cwd-relative path: it is a short `node -e "<body>"` bootstrap (the body wrapped in one pair of
+double quotes, choice 6) that walks up from its working directory to the nearest ancestor holding
+`.codex/hooks.json`, imports `<that>/.codex/hooks/conductor-guard.mjs`, and prints a deny itself when no such
+ancestor or no adapter exists. The installer installs the adapter as a managed file (as it
+does for Antigravity) and upgrades the FEAT-048 entry in place. Tests run the installed command from the root and
+from a subdirectory, through every shell named in choice 6 that the CI leg has.
 
 ### Choices the entry leaves open
 
@@ -63,16 +64,18 @@ platform shell from the root and from a subdirectory.
    subdirectory is never run on its own: it runs only when that same subdirectory also holds `.codex/hooks.json`
    and `.codex/hooks/conductor-guard.mjs`, a complete nested installation.
 
-   **Residual risk, accepted.** A subdirectory between the hook's cwd and the root that holds all three files
+   **Residual risk (a security-posture decision for the maintainer; recommended: accept).** A subdirectory between the hook's cwd and the root that holds all three files
    (`.codex/hooks.json`, `.codex/hooks/conductor-guard.mjs`, `.claude/hooks/pre-tool-use.mjs`), whether a vendored
    checkout that installed the conductor with `--codex` or files planted on purpose, has its guard run instead of
-   the root's. This is accepted because it grants nothing the attacker does not already hold: writing those files
+   the root's. The recommendation is to accept it, because it grants nothing the attacker does not already hold: writing those files
    needs write access inside the project tree, and with that same access one can replace
    `<root>/.claude/hooks/pre-tool-use.mjs` or `<root>/.codex/hooks/conductor-guard.mjs` directly (no guard protects
    the hook files themselves; the Claude route has the same exposure). It also cannot be removed by any anchor rule
    that needs no install-time absolute path (rejected above): from inside the tree, a planted complete layer and a
    legitimate nested project look identical. The bar does rise from one planted file (today) to three, and the
-   case is pinned by a test so the behavior is a recorded decision, not an accident.
+   case is pinned by a test so the behavior is a recorded decision, not an accident. If the maintainer rejects it,
+   the only anchor-rule alternative is the outermost walk above, whose risk this spec judges worse; the spec then
+   needs another round before the plan.
 3. **Deny by output, exit 0.** The only block mechanism measured on Codex is Claude's
    `hookSpecificOutput.permissionDecision: "deny"` on stdout (FEAT-048 live check; the guard itself exits 0 on every
    path, `project-template/.claude/hooks/pre-tool-use.mjs:4`). The bootstrap and the adapter block the same way and
@@ -94,6 +97,42 @@ platform shell from the root and from a subdirectory.
    entry changes owner. Callers that pass no legacy list (the Claude settings and Antigravity merges) behave as
    before. Rejected: keeping `pre-tool-use.mjs` as the fingerprint by writing that name into the bootstrap text,
    which would make the command name a file it never runs only to satisfy the matcher.
+6. **Command form: `node -e "<body>"`, the body in one pair of double quotes, with a closed alphabet inside.** Which
+   shell Codex runs a hook command through has not been measured. On Unix it is presumably `sh` or the user's shell.
+   On Windows it may be `cmd.exe` or PowerShell. So the command is written to reach `node` as one argv element,
+   byte for byte the same, under POSIX `sh` (bash and zsh accept the same form), `cmd.exe`, Windows PowerShell 5.1
+   and PowerShell 7.
+   - **Delimiter.** The double quote is the only quote all of these treat as a quote. `cmd.exe` does not treat `'`
+     as one. Node's Windows argv parser (MSVC rules) groups only on `"`. The command starts with `node`, not with a
+     quote, so `cmd.exe /c` and `/s /c` do not strip the pair.
+   - **Inside the quotes.** The body is printable ASCII only, because PowerShell also treats typographic quotes as
+     quotes. It contains none of these characters:
+     - `"`, which ends the argument in every shell;
+     - `$` and `` ` ``, which expand or escape inside double quotes in `sh` and PowerShell;
+     - `\`, which escapes in `sh` double quotes and before `"` under MSVC rules;
+     - `%`, which `cmd.exe` expands even inside quotes;
+     - `!`, which is delayed expansion in `cmd.exe` and history expansion in an interactive bash.
+
+     JavaScript strings in the body use single quotes. Paths are built with `path.join` and `path.dirname`.
+     Negation is written without `!` (for example `===false`).
+   - **Every other character is literal between double quotes in all of these shells**: space, `(`, `)`, `;`, `&`,
+     `|`, `<`, `>`, `^`, `'`, `*`, `?`, `[`, `{`, `#`, `~`, `=`. Inside double quotes, `sh` acts only on `$`, `` ` ``
+     and `\`. `cmd.exe` stops treating space, `&`, `|`, `<`, `>`, `(`, `)` and `^` as special. PowerShell acts only
+     on `$` and `` ` ``. No further escaping is needed.
+   - **Rejected forms.** An unquoted body cannot work: JavaScript cannot call a function without `(`, which `sh`
+     parses as syntax. A single-quoted body fails open on `cmd.exe`, which passes the quotes through. If such a body
+     has no spaces, it reaches `node` as one string literal, which evaluates, prints nothing and exits 0: an allow.
+   - **A command that runs but not as the bootstrap.** Empty output means allow, so a command that reached `node`
+     mangled but still parsed would pass silently. No file the installer writes can detect that at run time,
+     because the bootstrap is what would detect it. The closed alphabet removes every mechanism above that mangles a
+     double-quoted argument. The tests close the rest:
+     - the shipped command is read from the shipped `hooks.json` and run through every shell present on the CI leg:
+       `sh -c` on Unix, and `cmd.exe /d /s /c`, `powershell -NoProfile -Command` and `pwsh -NoProfile -Command`
+       (when installed) on the Windows leg;
+     - it runs from a subdirectory, and a deny corpus row must come back as a deny.
+
+     A command that does not run as the bootstrap answers allow for that row, so the test fails. A shell missing from
+     a leg is skipped by name, never passed.
 
 ## Behavior
 
@@ -140,14 +179,24 @@ Each prints a deny with a reason naming the cause, and exits 0:
 - The installer's existing hooks-file cases (malformed JSON backed up and replaced, directory or dangling symlink
   skipped with a warning) keep their current behavior; when the hooks entry is skipped, the "installed" line is not
   printed.
+- The shell hands `node` something other than the bootstrap body, for example a quote passed through so the body
+  evaluates as a string literal. Nothing can print a deny at run time in that case, since the bootstrap is what
+  would print it. Choice 6 prevents it by construction: double-quote delimiting and a closed alphabet. The
+  shell-matrix test catches any regression, because a deny row must come back as a deny through each shell. Such a
+  command therefore never ships as an allow.
 
 ## Acceptance Criteria
 
-- [ ] `project-template/.codex/hooks.json` no longer runs a cwd-relative path to the guard; its one entry is the
-      bootstrap, which contains none of `"`, `$`, `` ` ``, `\`, `%`, `!` inside its `-e` argument (so `sh`, `cmd.exe`
-      and PowerShell pass it unchanged), and a test pins that.
+- [ ] `project-template/.codex/hooks.json` no longer runs a cwd-relative path to the guard. Its one entry is
+      the bootstrap, of the exact form `node -e "<body>"`: one pair of double quotes, nothing after the closing
+      quote. The body is printable ASCII containing none of `"`, `$`, `` ` ``, `\`, `%`, `!` (choice 6). A test pins
+      the form and the alphabet.
+- [ ] Hook test (shell matrix): from a subdirectory of a scaffolded project, the shipped command run through
+      `sh -c` (Unix legs), `cmd.exe /d /s /c` and `powershell -NoProfile -Command` (Windows leg), and
+      `pwsh -NoProfile -Command` where installed, denies a Guard 3 deny row and allows an allow row. A shell absent
+      from the leg is skipped by name, and the skip is predicted in the plan for `tools/skip-baseline.json`.
 - [ ] Hook test: in a temp project scaffolded with the guard, the adapter and the shipped `hooks.json`, the shipped
-      command run through the platform shell from the root **and from a subdirectory** gives the same allow/deny as
+      command run through the platform shell (`sh -c` on Unix, `cmd.exe /d /s /c` on Windows) from the root **and from a subdirectory** gives the same allow/deny as
       the Claude hook for every Bash row of `tests/fixtures/guard3-corpus.js` (the backlog's "launching from a
       subdirectory" test).
 - [ ] Hook test: a subdirectory holding its own `.claude/hooks/pre-tool-use.mjs` that allows everything does not
@@ -192,8 +241,8 @@ Each prints a deny with a reason naming the cause, and exits 0:
   report line.
 - `README.md` `### Codex CLI` (lines 441 and 453) and the tree lines near 601. Not the Known-limits line.
 - `.gitignore`: this spec's leaf. New `project-template/` files need no leaf (not under `/.claude/*` or `/docs/*`).
-- `tools/skip-baseline.json`: affected only if the new test skips on a CI leg (e.g. no shell); the plan predicts
-  each leg.
+- `tools/skip-baseline.json`: affected if a shell-matrix case skips on a CI leg (for example `pwsh` absent on the
+  Windows leg, or the Windows shells on Unix legs). The plan predicts each leg.
 
 ### Files Requiring Full Read (deferred to /cc-plan)
 
