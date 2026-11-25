@@ -1621,7 +1621,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #284; reported by the automated security review of
   #283.
 
-### [ ] `[BUG-090]` Release command leaves a rejected diff on package manifests without a discard-before-tooling warning
+### [X] `[BUG-090]` Release command leaves a rejected diff on package manifests without a discard-before-tooling warning
+* **DONE, shipped as `1.59.1` on 2026-11-25.** On a rejected judgment, `check` in `scripts/release.mjs` appends `discardLines` after the failure lines: one `RELEASE_DISCARD_FIRST` warning when a path named by a `RELEASE_LOCATION_SHAPE`, `RELEASE_OUT_OF_SCOPE` or `RELEASE_PROFILE_CHANGED` line is control-plane, then `DISCARD` commands for every path of the diff, sorted and split by git state (`diffStates`: `git --literal-pathspecs checkout HEAD --` for paths in `HEAD`, `git --literal-pathspecs rm -f --` for staged paths not in `HEAD`, `git --literal-pathspecs clean -f --` for untracked files), each `shellQuote`d. A path matching `byHand` (outside printable ASCII, or holding `'`, `"`, a backtick or `& | < > ^ %`) is on no command and on one `DISCARD_BY_HAND` line as an escaped JSON string. Control-plane is the new exported `isControlPlanePath` in `scripts/orchestrate.mjs` (non-ASCII, an `ntfsAlias`, or `inControlPlane`), so `CONTROL_PLANE` and `CONTROL_PLANE_NAMES` are reused unchanged; the two modules now import each other and use each other's exports only inside functions. `release: ok`, `RELEASE_HALT` and an empty-diff failure print nothing new; a `git` failure while listing the diff is `RELEASE_GIT_FAILED`. Step 6 of both `cc-release.md` copies, and the rendered Antigravity workflow and Codex skill, say to discard a diff with a `RELEASE_DISCARD_FIRST` line before any project tooling and to show the `DISCARD` commands as printed; the command still runs nothing. Pinned by `release.mjs check discards a rejected diff [BUG-090]` in `tests/scripts/release.test.js` (AC7 and AC8 added to `tools/skip-baseline.json`), `control-plane paths for the release check [BUG-090]` in `tests/scripts/orchestrate.test.js`, and the `[BUG-090 AC10]` and `[BUG-090 AC15]` rows of `tests/installer/commands-parity.test.js`. Landed from PR #318 (cc-lane-bot), intake of issue #299; the id was reserved by the triage and is owner-minted at landing. Spec: `docs/superpowers/specs/2026-11-23-bug090-release-command-leaves-a-rejected-diff-on-design.md` (approved by the owner). Plan: `docs/superpowers/plans/2026-11-23-bug090-release-command-leaves-a-rejected-diff-on.md` (approved by the owner).
 
 - Symptom: when `release.mjs check` rejects the release role's edits,
   step 6 of `/cc-release` (.claude/commands/cc-release.md:30 and its
@@ -1736,6 +1737,32 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Follow-up of `[FEAT-063]`.
 - Intake of issue #314; reported by the automated security review of
   #303.
+
+### [ ] `[BUG-095]` Release discard commands split paths containing spaces, commas or a leading @ in cmd.exe and PowerShell
+
+- Symptom: `scripts/release.mjs:676` (`byHand`) and
+  `scripts/release.mjs:699-700` (`SAFE_ARGUMENT` / `shellQuote`), per
+  the issue, decide which paths go on a printed `release: DISCARD`
+  command, and the D6 comment says that command must mean the same in
+  a POSIX shell, PowerShell and cmd.exe. Three spellings break that: a
+  path with a space is single-quoted, which cmd.exe does not honour, so
+  `'a b'` reaches git as the pathspecs `'a` and `b'`; a path with a
+  comma such as `a,b` matches `SAFE_ARGUMENT` and is printed bare, so
+  PowerShell passes `a` and `b` as separate arguments; and a path
+  segment starting with `@` is printed bare, which PowerShell treats as
+  splatting.
+- Impact per the issue: limited. `--literal-pathspecs` disables
+  pathspec magic, and `git checkout`/`git rm` abort when any pathspec
+  fails to match. In the worst case, `git rm -f` removes an unmodified
+  tracked file that was not part of the rejected diff; that file can be
+  restored from HEAD.
+- Fix shape suggested by the issue: send any path containing a space or
+  a comma, or with a segment starting with `@`, to a `DISCARD_BY_HAND`
+  line; or narrow `SAFE_ARGUMENT` and extend `byHand` to match. Add
+  `[AC8]` cases for each of these spellings.
+- Follow-up of `[BUG-090]`.
+- Intake of issue #321; reported by the automated security review of
+  the 1.59.1 release candidate (#320).
 
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
