@@ -859,7 +859,10 @@ describe('release.mjs check discards a rejected diff [BUG-090]', () => {
   const discards = (out) => lines(out).filter((l) => l.startsWith('release: DISCARD '))
   const runDiscards = (out) => {
     for (const line of discards(out)) {
-      const r = spawnSync('bash', ['-c', line.slice('release: DISCARD '.length)], { cwd: root, env: cleanGitEnv(), encoding: 'utf8' })
+      // The fixture commits with core.autocrlf=false; a Windows runner defaults it to true, and the
+      // printed git commands would then restore CRLF files that status reports as modified.
+      const env = { ...cleanGitEnv(), GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.autocrlf', GIT_CONFIG_VALUE_0: 'false' }
+      const r = spawnSync('bash', ['-c', line.slice('release: DISCARD '.length)], { cwd: root, env, encoding: 'utf8' })
       expect(r.status, `${line}: ${r.stderr}`).toBe(0)
     }
   }
