@@ -1693,7 +1693,9 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #312; reported by the automated security review of
   the 1.58.0 release candidate (#311).
 
-### [ ] `[BUG-093]` Antigravity Guard Accepts Unknown Arguments on read_file, write_file and edit_file
+### [X] `[BUG-093]` Antigravity Guard Accepts Unknown Arguments on read_file, write_file and edit_file
+* **DONE, shipped as `1.59.3` on 2026-11-25.** `MAPPED` in `project-template/.agents/hooks/conductor-guard.mjs` is now a table of `{ args, map }` per mapped tool, with the agy 1.5.15 argument lists (`read_file`: `Path`, `StartLine`, `EndLine`, `toolSummary`; `write_file`: `Path`, `Content`, `toolSummary`; `edit_file`: `Path`, `Target`, `Replacement`, `toolSummary`; `run_command` unchanged). The unknown-argument check moved out of `runCommand` into `mapToolCall`, which runs it before any mapper and blocks with the existing `not covered by the guard` reason, naming every unknown argument sorted (plural wording for several), without running the guard; `runCommand` keeps only its `CommandLine` check. The README `### Antigravity CLI` table row covers the four tools. Pinned by the `(BUG-093)` cases of `tests/hooks/antigravity-guard.test.js` (`read_file` with `Paths`, `write_file` with `Append`, `edit_file` with `AllowMultiple`, the sorted plural reason, and a recorded `read_file` carrying `toolSummary`). Landed from PR #327 (cc-lane-bot), intake of issue #316; the id was reserved by the triage and is owner-minted at landing. Spec: `docs/superpowers/specs/2026-11-25-bug093-antigravity-guard-accepts-unknown-arguments-on-design.md` (approved by independent review, round 1). Plan: `docs/superpowers/plans/2026-11-25-bug093-antigravity-guard-accepts-unknown-arguments-on.md` (approved by independent review, round 1).
+
 
 - Symptom: `project-template/.agents/hooks/conductor-guard.mjs:35-47`
   (per the issue) applies the unknown-argument rule (block any argument
