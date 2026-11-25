@@ -1765,6 +1765,27 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #321; reported by the automated security review of
   the 1.59.1 release candidate (#320).
 
+### [ ] `[BUG-096]` Codex Legacy Hook Fingerprint Substring Match Replaces User-Owned PreToolUse Entries
+
+- Symptom: `lib/installer/deploy.mjs:323` (per the issue) registers
+  `pre-tool-use.mjs` as a legacy fingerprint for the Codex
+  `PreToolUse` entry, and `lib/installer/settings-merge.mjs:41`
+  matches it as a substring of each hook command. A user-owned
+  `PreToolUse` entry in `.codex/hooks.json` whose command merely
+  contains that file name (for example
+  `node tools/my-pre-tool-use.mjs`) is treated as ours and replaced or
+  dropped on install.
+- Impact per the issue: limited to users with such a custom hook, but
+  it can silently remove a user's own guard; the only notice is the
+  generic "replaced the old Codex guard hook" message.
+- Fix shape suggested by the issue: match the exact legacy command
+  that was shipped (`node .claude/hooks/pre-tool-use.mjs`) instead of
+  a substring, and add a test that a host entry with a similar name
+  survives the merge.
+- Follow-up of `[BUG-094]`.
+- Intake of issue #325; reported by the automated security review of
+  the 1.59.2 release candidate (#324).
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
