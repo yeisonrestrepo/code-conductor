@@ -243,7 +243,7 @@ describe('release.mjs validator and surface [FEAT-035]', () => {
     }
     const imports = text.split('\n').filter((l) => /^import /.test(l))
     expect(imports.length).toBeGreaterThan(0)
-    for (const l of imports) expect(l).toMatch(/from '(node:[a-z/_]+|\.\/snap-contract\.mjs|\.\/ticket\.mjs)'/)
+    for (const l of imports) expect(l).toMatch(/from '(node:[a-z/_]+|\.\/snap-contract\.mjs|\.\/ticket\.mjs|\.\/orchestrate\.mjs)'/)
     const r = spawnSync(process.execPath, ['--input-type=module', '-e', `await import(${JSON.stringify(pathToFileURL(SCRIPT).href)})`], { encoding: 'utf8' })
     expect({ status: r.status, out: r.stdout, err: r.stderr }).toEqual({ status: 0, out: '', err: '' })
   })
@@ -776,10 +776,12 @@ describe('release.mjs check [FEAT-035]', () => {
     const r = rel(checkArgs(V, 'FEAT-001'), '')
     expect(r.status).toBe(1)
     const out = lines(r.out)
-    expect(out).toHaveLength(3)
+    expect(out).toHaveLength(5)
     expect(out[0]).toMatch(/^release: RELEASE_OUT_OF_SCOPE: notes\.txt /)
     expect(out[1]).toMatch(/^release: RELEASE_LOCATION_SHAPE: VERSION/)
     expect(out[2]).toMatch(/^release: RELEASE_RESULT_MISSING/)
+    expect(out[3]).toBe('release: DISCARD git --literal-pathspecs checkout HEAD -- BACKLOG.md CHANGELOG.md package-lock.json package.json')
+    expect(out[4]).toBe('release: DISCARD git --literal-pathspecs clean -f -- notes.txt')
     expect(r.out).not.toContain('RELEASE_HALT')
   })
 
@@ -844,6 +846,187 @@ describe('release.mjs check [FEAT-035]', () => {
     const r = rel(checkArgs(V), report(V))
     expect(r.status).toBe(1)
     expect(r.out).toContain('RELEASE_OUT_OF_SCOPE: CHANGELOG.md is outside the release surface [VERSION, package.json, package-lock.json]')
+  })
+})
+
+describe('release.mjs check discards a rejected diff [BUG-090]', () => {
+  const V = '1.1.0'
+  const SURFACE = '[VERSION, package.json, package-lock.json, CHANGELOG.md, BACKLOG.md]'
+  const release1 = () => { project(); applyRelease({ v: V, items: ['FEAT-001'] }) }
+  const ok = report(V, ['FEAT-001'])
+  const check = (text = ok) => rel(checkArgs(V, 'FEAT-001'), text)
+  const sub = (file, from, to) => put(file, read(file).replace(from, to))
+  const discards = (out) => lines(out).filter((l) => l.startsWith('release: DISCARD '))
+  const runDiscards = (out) => {
+    for (const line of discards(out)) {
+      // The fixture commits with core.autocrlf=false; a Windows runner defaults it to true, and the
+      // printed git commands would then restore CRLF files that status reports as modified.
+      const env = { ...cleanGitEnv(), GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.autocrlf', GIT_CONFIG_VALUE_0: 'false' }
+      const r = spawnSync('bash', ['-c', line.slice('release: DISCARD '.length)], { cwd: root, env, encoding: 'utf8' })
+      expect(r.status, `${line}: ${r.stderr}`).toBe(0)
+    }
+  }
+  const CP = 'which project tooling reads; discard the whole diff before running any package manager, test, build or hook command'
+
+  it('[AC1] a postinstall script in package.json and a new .npmrc print the warning and both discard commands after the failure lines', () => {
+    release1()
+    const pkg = JSON.parse(read('package.json'))
+    put('package.json', jsonText({ ...pkg, scripts: { postinstall: 'node x.js' } }))
+    put('.npmrc', 'x=1\n')
+    const r = check()
+    expect(r.status).toBe(1)
+    expect(lines(r.out)).toEqual([
+      `release: RELEASE_OUT_OF_SCOPE: .npmrc is outside the release surface ${SURFACE}`,
+      'release: RELEASE_LOCATION_SHAPE: package.json differs from HEAD in more than its version keys',
+      `release: RELEASE_DISCARD_FIRST: the rejected diff touches .npmrc, package.json, ${CP}`,
+      'release: DISCARD git --literal-pathspecs checkout HEAD -- BACKLOG.md CHANGELOG.md VERSION package-lock.json package.json',
+      'release: DISCARD git --literal-pathspecs clean -f -- .npmrc',
+    ])
+  })
+
+  it.each(['.npmrc', 'sub/package.json'])('[AC2] an out-of-scope control-plane path %s prints the warning', (p) => {
+    release1()
+    put(p, 'x\n')
+    const r = check()
+    expect(r.out).toContain(`release: RELEASE_DISCARD_FIRST: the rejected diff touches ${p}, ${CP}`)
+    expect(r.out).toContain(`release: DISCARD git --literal-pathspecs clean -f -- ${p}`)
+  })
+
+  it('[AC3] an edited profile alone prints the warning and restores the profile from HEAD', () => {
+    release1()
+    put('.claude/release-profile.json', `${read('.claude/release-profile.json')}\n`)
+    const r = check()
+    expect(r.out).toContain(`release: RELEASE_DISCARD_FIRST: the rejected diff touches .claude/release-profile.json, ${CP}`)
+    expect(r.out).toContain('release: DISCARD git --literal-pathspecs checkout HEAD -- .claude/release-profile.json BACKLOG.md CHANGELOG.md VERSION package-lock.json package.json')
+  })
+
+  it.each([
+    ['an untracked notes.txt', () => put('notes.txt', 'x\n')],
+    ['a changelog shape', () => sub('CHANGELOG.md', '- First.\n', '')],
+  ])('[AC4] a failure on %s alone prints no warning but the discard commands', (_name, edit) => {
+    release1()
+    edit()
+    const r = check()
+    expect(r.status).toBe(1)
+    expect(r.out).not.toContain('RELEASE_DISCARD_FIRST')
+    expect(discards(r.out).length).toBeGreaterThan(0)
+  })
+
+  const mixedDiff = () => {
+    release1()
+    put('docs/new.md', 'x\n')
+    git('add', 'docs/new.md')
+    put('notes.txt', 'x\n')
+    rmSync(join(root, 'src/a.js'))
+  }
+
+  it('[AC5] each path of the diff is on exactly one command, by its git state, sorted', () => {
+    mixedDiff()
+    const r = check()
+    expect(discards(r.out)).toEqual([
+      'release: DISCARD git --literal-pathspecs checkout HEAD -- BACKLOG.md CHANGELOG.md VERSION package-lock.json package.json src/a.js',
+      'release: DISCARD git --literal-pathspecs rm -f -- docs/new.md',
+      'release: DISCARD git --literal-pathspecs clean -f -- notes.txt',
+    ])
+    expect(r.out).not.toContain('RELEASE_DISCARD_FIRST')
+  })
+
+  it('[AC6] the printed commands, run verbatim, leave the work tree clean', () => {
+    mixedDiff()
+    const r = check()
+    runDiscards(r.out)
+    expect(gitOut('status', '--porcelain')).toBe('')
+  })
+
+  it.skipIf(process.platform === 'win32')('[AC7] the printed commands remove an untracked :!x and keep a file created after check', () => {
+    release1()
+    put(':!x', 'x\n')
+    const r = check()
+    expect(lines(r.out)).toContain("release: DISCARD git --literal-pathspecs clean -f -- ':!x'")
+    put('later.txt', 'x\n')
+    runDiscards(r.out)
+    expect(existsSync(join(root, ':!x'))).toBe(false)
+    expect(existsSync(join(root, 'later.txt'))).toBe(true)
+  })
+
+  it('[AC8] a path with a space is quoted and a path with a single quote is left to a DISCARD_BY_HAND line', () => {
+    release1()
+    put('my notes.txt', 'x\n')
+    put("it's.txt", 'x\n')
+    const r = check()
+    expect(r.out).toContain("release: DISCARD git --literal-pathspecs clean -f -- 'my notes.txt'")
+    expect(r.out).toContain('release: DISCARD_BY_HAND "it\'s.txt"')
+    expect(discards(r.out).some((l) => l.includes("it's.txt"))).toBe(false)
+  })
+
+  it.skipIf(process.platform === 'win32')('[AC8] a path with a newline is on no command and on one DISCARD_BY_HAND line', () => {
+    release1()
+    put('a\nb.txt', 'x\n')
+    const r = check()
+    const hand = 'release: DISCARD_BY_HAND "a\\u000ab.txt"'
+    expect(lines(r.out).filter((l) => l === hand)).toHaveLength(1)
+    expect(r.out).toContain(`release: RELEASE_DISCARD_FIRST: the rejected diff touches "a\\u000ab.txt", ${CP}`)
+    expect(discards(r.out).some((l) => l.includes('b.txt'))).toBe(false)
+  })
+
+  it('[AC8] a path with U+009B is on no command and its DISCARD_BY_HAND line escapes it as six ASCII characters', () => {
+    release1()
+    put('a\u009bb.txt', 'x\n')
+    const r = check()
+    const hand = 'release: DISCARD_BY_HAND "a\\u009bb.txt"'
+    expect(lines(r.out).filter((l) => l === hand)).toHaveLength(1)
+    expect(r.out).toContain(`release: RELEASE_DISCARD_FIRST: the rejected diff touches "a\\u009bb.txt", ${CP}`)
+    expect(discards(r.out).some((l) => l.includes('b.txt'))).toBe(false)
+    // RELEASE_OUT_OF_SCOPE keeps printing the raw path (spec, Out of Scope), so only the new lines are checked.
+    const added = r.out.split('\n').filter((l) => /^release: (RELEASE_DISCARD_FIRST|DISCARD )|^release: DISCARD_BY_HAND/.test(l))
+    expect(added.length).toBeGreaterThan(0)
+    for (const l of added) expect(l).not.toMatch(/\p{Cc}/u)
+  })
+
+  // PowerShell also closes a quote on U+2019, cmd.exe runs what follows "&", and U+202E reorders the shown line.
+  it.each([
+    ['U+2019', 'it’s.txt', '"it\\u2019s.txt"'],
+    ['&', 'a&b.txt', '"a&b.txt"'],
+    ['U+202E', 'a‮txt.b', '"a\\u202etxt.b"'],
+  ])('[AC8] a path with %s is on no command and on one DISCARD_BY_HAND line', (_name, path, json) => {
+    release1()
+    put(path, 'x\n')
+    const r = check()
+    expect(lines(r.out).filter((l) => l === `release: DISCARD_BY_HAND ${json}`)).toHaveLength(1)
+    expect(discards(r.out).some((l) => l.includes(path))).toBe(false)
+    const added = r.out.split('\n').filter((l) => /^release: (RELEASE_DISCARD_FIRST|DISCARD)/.test(l))
+    for (const l of added) expect(l).toMatch(/^[\x20-\x7e]*$/)
+  })
+
+  it.each([
+    ['release: ok', () => { release1() }, 0],
+    ['a RELEASE_HALT', () => { release1(); put('red-a', '') }, 1],
+    ['a judgment failure with an empty diff', () => { project() }, 1],
+  ])('[AC9] %s prints no warning and no discard command', (name, setup, status) => {
+    setup()
+    const r = check(name.startsWith('a judgment') ? '' : ok)
+    expect(r.status).toBe(status)
+    if (name === 'a RELEASE_HALT') expect(r.out).toContain('RELEASE_HALT')
+    expect(r.out).not.toContain('DISCARD')
+  })
+
+  it('[E1] git failing while classifying the diff is a refusal, not a partial command', () => {
+    release1()
+    writeFileSync(join(root, '.git', 'index'), 'garbage')
+    const r = check()
+    expect(r.status).toBe(2)
+    expect(r.out).toBe('')
+    expect(r.err).toMatch(/^release: RELEASE_GIT_FAILED: /)
+  })
+
+  it('[AC13] an out-of-scope path with a non-ASCII character prints the warning', () => {
+    release1()
+    put('pаckage.json', 'x\n')
+    const r = check()
+    // A look-alike spelling is outside printable ASCII, so it is escaped and left to a DISCARD_BY_HAND line.
+    expect(r.out).toContain(`release: RELEASE_DISCARD_FIRST: the rejected diff touches "p\\u0430ckage.json", ${CP}`)
+    expect(r.out).toContain('release: DISCARD_BY_HAND "p\\u0430ckage.json"')
+    expect(discards(r.out).some((l) => l.includes('pаckage.json'))).toBe(false)
   })
 })
 

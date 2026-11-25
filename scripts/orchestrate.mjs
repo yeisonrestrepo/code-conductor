@@ -1352,6 +1352,9 @@ function namesControlFile(glob) {
 }
 // No alias or non-ASCII test: surfaceTask runs inSurface first, and it escalates every alias and every non-ASCII entry.
 const inControlPlane = (entry) => reachesList(taskGlob(entry), CONTROL_PLANE) || namesControlFile(taskGlob(entry));
+// BUG-090: a path release.mjs check names in a rejected diff. Unlike inControlPlane alone, an alias or a non-ASCII
+// spelling counts too, as inSurface counts it, because a filesystem may resolve it to a manifest (spec D2).
+export const isControlPlanePath = (path) => nonAscii(path) || ntfsAlias(taskGlob(path)) || inControlPlane(path);
 
 // Owner decisions (FEAT-054, BUG-080): a plan whose task would write the run's own record, or the files that enforce
 // the guards and steer later dispatches, never passes on a delegated verdict. The write surface keeps its reason first.

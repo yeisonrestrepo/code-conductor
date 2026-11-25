@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { spawnSync } from 'node:child_process';
 import { readFileSync, mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -623,7 +624,6 @@ describe('cc-release [FEAT-035]', () => {
       'a phase command, not a run, dispatched the agent',
       'node "$S/release.mjs" check --version <version> [--items <IDs>] --date <DATE> < .conductor/handback/release.txt',
       'git diff --stat',
-      'git checkout -- <files>',
       'This command never commits, stages or reverts anything.',
       'node "$S/release.mjs" init --confirm',
       'No confirmation, no profile.',
@@ -640,6 +640,18 @@ describe('cc-release [FEAT-035]', () => {
       'Never run a command that is not a printed `STEP` line.',
       'The writeback steps print last, so the writeback runs last.',
     ]) expect(text).toContain(phrase);
+  });
+
+  it.each([...RELEASE_MIRRORS, 'project-template/.agents/workflows/cc-release.md', 'project-template/.agents/skills/cc-release/SKILL.md'])('[BUG-090 AC10] %s says to discard a rejected diff before any project tooling, with the printed commands', (rel) => {
+    const text = read(rel);
+    for (const phrase of [
+      'show each `DISCARD` command exactly as printed, for the owner to run from the project root',
+      '`DISCARD_BY_HAND`',
+      'never run them yourself',
+      'When `check` prints a `RELEASE_DISCARD_FIRST` line, say plainly that the rejected diff must be discarded before running any project tooling',
+      'This command never commits, stages or reverts anything.',
+    ]) expect(text).toContain(phrase);
+    expect(text).not.toContain('git checkout -- <files>');
   });
 });
 
@@ -658,6 +670,15 @@ describe('the release role ships [FEAT-035 O5]', () => {
     for (const rel of ['.claude/release-profile.json', 'tools', '.claude/tools']) {
       expect(existsSync(join(cwd, rel)), rel).toBe(false);
     }
+  });
+
+  it('[BUG-090 AC15] an install also gets the router and its load-time modules, and the deployed driver loads', () => {
+    for (const name of ['orchestrate', 'snap-contract', 'ticket', 'doc-locations', 'docs-sync']) {
+      expect(existsSync(join(cwd, `.claude/scripts/${name}.mjs`)), name).toBe(true);
+    }
+    const r = spawnSync(process.execPath, [join(cwd, '.claude/scripts/release.mjs')], { encoding: 'utf8' });
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/^release: RELEASE_USAGE: usage: release\.mjs /);
   });
 });
 

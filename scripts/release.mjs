@@ -10,6 +10,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { V3_CAPS, elementLength } from './snap-contract.mjs';
 import { WRITEBACK_CHANGELOG_MAX_BYTES } from './ticket.mjs';
+// BUG-090 D8: orchestrate.mjs imports this module too, so the two form a cycle; use isControlPlanePath only inside a function.
+import { isControlPlanePath } from './orchestrate.mjs';
 
 export const PROFILE_PATH = '.claude/release-profile.json';
 const PROPOSAL_PATH = '.conductor/release/profile.proposed.json';
@@ -563,7 +565,7 @@ function judgeVersionFiles(ctx) {
   for (const path of [...new Set(ctx.locations.map((l) => l.path))]) {
     const locs = ctx.locations.filter((l) => l.path === path);
     const why = locs[0].kind === 'line' ? judgeLineFile(ctx, locs[0]) : judgeJsonFile(ctx, path, locs);
-    if (why) problems.push(shape('RELEASE_LOCATION_SHAPE', `${path} ${why}`));
+    if (why) problems.push({ path, line: shape('RELEASE_LOCATION_SHAPE', `${path} ${why}`) });
   }
   return problems;
 }
@@ -634,16 +636,16 @@ function judgeClaims(ctx, block) {
   return same ? null : shape('RELEASE_CLAIMS_MISMATCH', `the entry claims [${claimed.join(',')}], --items names [${ctx.items.join(',')}]`);
 }
 
-function scopeFailures(ctx) {
-  const changed = changedPaths(ctx.root);
-  const out = changed.includes(PROFILE_PATH) ? [shape('RELEASE_PROFILE_CHANGED', `${PROFILE_PATH} differs from HEAD`)] : [];
+function scopeFailures(ctx, changed) {
+  const out = changed.includes(PROFILE_PATH) ? [{ path: PROFILE_PATH, line: shape('RELEASE_PROFILE_CHANGED', `${PROFILE_PATH} differs from HEAD`) }] : [];
   const stray = changed.filter((p) => p !== PROFILE_PATH && !ctx.surface.includes(p)).sort();
-  return [...out, ...stray.map((p) => shape('RELEASE_OUT_OF_SCOPE', `${p} is outside the release surface [${ctx.surface.join(', ')}]`))];
+  return [...out, ...stray.map((p) => ({ path: p, line: shape('RELEASE_OUT_OF_SCOPE', `${p} is outside the release surface [${ctx.surface.join(', ')}]`) }))];
 }
 
-// Every failure, in decision 13's order; none means the diff is the release.
-export function judge(ctx, reportText) {
-  const failures = [...scopeFailures(ctx), ...judgeVersionFiles(ctx)];
+// Every failure, in decision 13's order, and the paths the scope and location failures name (BUG-090); none means the diff is the release.
+export function judge(ctx, reportText, changed) {
+  const named = [...scopeFailures(ctx, changed), ...judgeVersionFiles(ctx)];
+  const failures = named.map((f) => f.line);
   let block = null;
   if (ctx.profile.changelog) {
     const result = judgeChangelog(ctx);
@@ -653,7 +655,43 @@ export function judge(ctx, reportText) {
   const backlogProblem = ctx.profile.backlog ? judgeBacklog(ctx) : null;
   if (backlogProblem) failures.push(shape('RELEASE_BACKLOG_SHAPE', backlogProblem));
   const claims = block && ctx.profile.backlog ? judgeClaims(ctx, block) : null;
-  return [...failures, ...[claims, judgeReport(ctx, reportText)].filter(Boolean)];
+  return { failures: [...failures, ...[claims, judgeReport(ctx, reportText)].filter(Boolean)], rejected: named.map((f) => f.path) };
+}
+
+// BUG-090 D4: how git drops each path of the diff: in HEAD, restore it; only in the index, remove it; untracked, delete it.
+function diffStates(root) {
+  const tracked = git(root, ['diff', '--name-status', '-z', '--no-renames', 'HEAD']);
+  const untracked = git(root, ['ls-files', '--others', '--exclude-standard', '-z']);
+  if (tracked.status !== 0 || untracked.status !== 0) fail('RELEASE_GIT_FAILED', 'git cannot list the diff against HEAD, so no discard command is printed');
+  const states = new Map(untracked.out.split('\0').filter(Boolean).map((p) => [p, 'clean']));
+  const fields = tracked.out.split('\0');
+  for (let i = 0; i + 1 < fields.length; i += 2) states.set(fields[i + 1], fields[i] === 'A' ? 'rm' : 'checkout');
+  return states;
+}
+
+const DISCARD_COMMANDS = [['checkout', 'git --literal-pathspecs checkout HEAD --'], ['rm', 'git --literal-pathspecs rm -f --'], ['clean', 'git --literal-pathspecs clean -f --']];
+// BUG-090 D6: a printed command must mean the same in a POSIX shell, PowerShell and cmd.exe. A control character
+// splits or forges a line, a bidi control makes the shown line differ from the run one, PowerShell also closes a
+// quote on U+2018-U+201B, and cmd.exe does not honour single quotes, so its metacharacters stay live.
+const byHand = (path) => /[^\x20-\x7e]|['"`&|<>^%]/.test(path);
+// Every UTF-16 unit outside printable ASCII is escaped: JSON.stringify leaves C1 (a raw U+009B drives a terminal),
+// format characters and look-alikes raw.
+const unicodeEscape = (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`;
+const jsonName = (path) => `"${path.split('').map((c) => (/[^\x20-\x7e]/.test(c) ? unicodeEscape(c) : JSON.stringify(c).slice(1, -1))).join('')}"`;
+const pathName = (path) => (byHand(path) ? jsonName(path) : path);
+
+// BUG-090: after a rejected judgment, the warning when a rejected path of the diff is control-plane, then the commands
+// that drop the whole diff. shellQuote is defined below; it is read only when this runs.
+function discardLines(root, rejected) {
+  const states = diffStates(root);
+  const paths = [...states.keys()].sort();
+  const plane = [...new Set(rejected)].filter((p) => states.has(p) && isControlPlanePath(p)).sort();
+  const out = plane.length === 0 ? [] : [shape('RELEASE_DISCARD_FIRST', `the rejected diff touches ${plane.map(pathName).join(', ')}, which project tooling reads; discard the whole diff before running any package manager, test, build or hook command`)];
+  for (const [state, command] of DISCARD_COMMANDS) {
+    const named = paths.filter((p) => states.get(p) === state && !byHand(p));
+    if (named.length > 0) out.push(`release: DISCARD ${command} ${named.map(shellQuote).join(' ')}`);
+  }
+  return [...out, ...paths.filter(byHand).map((p) => `release: DISCARD_BY_HAND ${jsonName(p)}`)];
 }
 
 // ---- handoff (D1, E3) ----
@@ -929,8 +967,8 @@ function digestVerb(root, opts) {
 
 function checkVerb(root, opts, readReport) {
   const ctx = prepare(root, opts, 'check');
-  const failures = judge(ctx, readReport());
-  if (failures.length > 0) return { code: 1, lines: failures };
+  const { failures, rejected } = judge(ctx, readReport(), changedPaths(root));
+  if (failures.length > 0) return { code: 1, lines: [...failures, ...discardLines(root, rejected)] };
   const ran = runChecks(root, ctx.profile.checks);
   const done = `release: ok ${ctx.version}${ctx.items.length > 0 ? ` items ${ctx.items.join(',')}` : ''}`;
   return ran.ok ? { code: 0, lines: [...ran.lines, done] } : { code: 1, lines: ran.lines };

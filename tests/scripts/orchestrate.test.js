@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { fakeGh, issue, pull } from '../helpers/fake-gh.js';
 import { parseSnapshotHeader } from '../../scripts/ticket.mjs';
@@ -5554,5 +5554,33 @@ describe('test-writer in the Build band [FEAT-033]', () => {
     const r = orch(['envelope', 'test-writer']);
     expect(r.status).toBe(2);
     expect(r.err).toBe('orchestrate: usage: orchestrate.mjs envelope <spec|plan|audit|qa|docs|release> [--item <label>] | --clear');
+  });
+});
+
+describe('control-plane paths for the release check [BUG-090]', () => {
+  it.each(['package.json', 'package-lock.json', '.npmrc', 'sub/package.json', 'Package.JSON', '.claude/release-profile.json', 'package.json.', 'package.json::$DATA', 'PACKAG~1.JSO', 'p\u0430ckage.json'])('[AC13] isControlPlanePath counts %s', (path) => {
+    expect(orchestrateModule.isControlPlanePath(path)).toBe(true);
+  });
+
+  it.each(['VERSION', 'CHANGELOG.md', 'AGENT-READABLE BACKLOG.md', 'notes.txt', 'src/a.js'])('[AC13] isControlPlanePath does not count %s', (path) => {
+    expect(orchestrateModule.isControlPlanePath(path)).toBe(false);
+  });
+
+  it('[AC14] release.mjs and orchestrate.mjs, run with no arguments, print their usage and exit 2', () => {
+    const release = spawnSync(process.execPath, [join(REPO_ROOT, 'scripts/release.mjs')], { encoding: 'utf8' });
+    expect(release.status).toBe(2);
+    expect(release.stderr).toMatch(/^release: RELEASE_USAGE: usage: release\.mjs /);
+    const router = spawnSync(process.execPath, [SCRIPT], { encoding: 'utf8' });
+    expect(router.status).toBe(2);
+    expect(router.stderr).toBe('orchestrate: usage: orchestrate.mjs start|install|handback|approve|hash|review|delegate|resume|envelope|end\n');
+  });
+
+  it.each([['orchestrate.mjs', 'release.mjs'], ['release.mjs', 'orchestrate.mjs']])('[AC14] importing %s first, then %s, loads both and the predicate answers', (first, second) => {
+    const urls = [first, second].map((f) => pathToFileURL(join(REPO_ROOT, 'scripts', f)).href);
+    const code = `const mods = []; for (const u of ${JSON.stringify(urls)}) mods.push(await import(u)); const o = mods.find((m) => m.isControlPlanePath); process.stdout.write(String(o.isControlPlanePath('package.json')));`;
+    const r = spawnSync(process.execPath, ['--input-type=module', '-e', code], { encoding: 'utf8' });
+    expect(r.stderr).toBe('');
+    expect(r.status).toBe(0);
+    expect(r.stdout).toBe('true');
   });
 });
