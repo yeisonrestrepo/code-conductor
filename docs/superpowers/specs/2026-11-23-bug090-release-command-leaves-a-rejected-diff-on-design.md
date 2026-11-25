@@ -1,6 +1,6 @@
 # BUG-090 — Release command leaves a rejected diff on package manifests without a discard-before-tooling warning
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-24 by the owner
 
 **Item:** `[BUG-090]` (intake of issue #299, follow-up of `[FEAT-035]`). Pillar 5: infrastructure, ecosystem and
 quality assurance.
