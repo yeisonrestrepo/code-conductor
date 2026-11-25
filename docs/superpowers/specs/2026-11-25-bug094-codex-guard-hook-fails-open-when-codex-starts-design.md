@@ -53,10 +53,26 @@ platform shell from the root and from a subdirectory.
      exactly the shadowing the issue reports; the second lets a lone planted adapter file win.
    - *A shell construct (`$(git rev-parse …)`, `%CD%`).* Not portable across the shells Codex may use on Unix and
      Windows.
+   - *Walk up to the outermost ancestor holding `.codex/hooks.json` and the adapter.* A planted nested layer would
+     lose to the root, but the walk would then trust directories above the project: a project under a shared,
+     world-writable parent (for example `/tmp/<project>`) would run whatever another user placed in
+     `/tmp/.codex/` and `/tmp/.claude/`. That turns a fail-open into code execution by someone outside the tree.
    The nearest `.codex/hooks.json` is the hooks layer closest to where Codex started, so it is the file that
    declared this command or a nested one. If that nested layer has no adapter of ours beside it, the bootstrap
-   blocks: a nested project produces a visible block, never a silent pass, and never runs a guard that a
-   `.claude/` folder in a subdirectory supplies.
+   blocks: a nested project produces a visible block, never a silent pass. A `.claude/hooks/pre-tool-use.mjs` in a
+   subdirectory is never run on its own: it runs only when that same subdirectory also holds `.codex/hooks.json`
+   and `.codex/hooks/conductor-guard.mjs`, a complete nested installation.
+
+   **Residual risk, accepted.** A subdirectory between the hook's cwd and the root that holds all three files
+   (`.codex/hooks.json`, `.codex/hooks/conductor-guard.mjs`, `.claude/hooks/pre-tool-use.mjs`), whether a vendored
+   checkout that installed the conductor with `--codex` or files planted on purpose, has its guard run instead of
+   the root's. This is accepted because it grants nothing the attacker does not already hold: writing those files
+   needs write access inside the project tree, and with that same access one can replace
+   `<root>/.claude/hooks/pre-tool-use.mjs` or `<root>/.codex/hooks/conductor-guard.mjs` directly (no guard protects
+   the hook files themselves; the Claude route has the same exposure). It also cannot be removed by any anchor rule
+   that needs no install-time absolute path (rejected above): from inside the tree, a planted complete layer and a
+   legitimate nested project look identical. The bar does rise from one planted file (today) to three, and the
+   case is pinned by a test so the behavior is a recorded decision, not an accident.
 3. **Deny by output, exit 0.** The only block mechanism measured on Codex is Claude's
    `hookSpecificOutput.permissionDecision: "deny"` on stdout (FEAT-048 live check; the guard itself exits 0 on every
    path, `project-template/.claude/hooks/pre-tool-use.mjs:4`). The bootstrap and the adapter block the same way and
@@ -65,6 +81,19 @@ platform shell from the root and from a subdirectory.
    interpreter by name; whether Codex blocks a hook that cannot start is unmeasured, and no file the installer
    writes can change it. The README Codex subsection keeps one sentence saying that without `node` on `PATH` the
    guards are not enforced. Writing an absolute interpreter path is rejected for the reason in choice 2.
+
+5. **How the installer replaces the FEAT-048 entry: a legacy fingerprint.** The Codex fingerprint becomes
+   `conductor-guard.mjs`; the bootstrap's `-e` text names that file, so the shipped entry matches it and nothing
+   else (`mergeHookTree` skips a shipped entry matching zero or several fingerprints,
+   `lib/installer/settings-merge.mjs:52`). The old entry carries only `pre-tool-use.mjs` and would not match, so the
+   new entry would be appended and the fail-open one kept. `mergeSettingsFile` therefore gains, in its existing options
+   object (beside `now`), an optional per-fingerprint list of legacy fingerprints (here `conductor-guard.mjs` → `['pre-tool-use.mjs']`), and
+   `upsertEntry` treats a host entry matching the fingerprint **or** one of its legacy fingerprints as the same
+   entry: the first such entry is replaced in place, later ones are dropped, exactly as for a duplicate today.
+   `pre-tool-use.mjs` is the substring FEAT-048 already claims as conductor-owned in `.codex/hooks.json`, so no host
+   entry changes owner. Callers that pass no legacy list (the Claude settings and Antigravity merges) behave as
+   before. Rejected: keeping `pre-tool-use.mjs` as the fingerprint by writing that name into the bootstrap text,
+   which would make the command name a file it never runs only to satisfy the matcher.
 
 ## Behavior
 
@@ -86,7 +115,11 @@ platform shell from the root and from a subdirectory.
 ### Alternative paths
 
 - Codex started at the root: same result as the shipped entry for every Guard 3 corpus row.
-- A subdirectory holds its own `.claude/hooks/pre-tool-use.mjs`: never run; the root guard judges the call.
+- A subdirectory holds its own `.claude/hooks/pre-tool-use.mjs` (no `.codex/` layer beside it): never run; the root
+  guard judges the call.
+- A subdirectory holds a complete nested layer (`.codex/hooks.json`, `.codex/hooks/conductor-guard.mjs` and
+  `.claude/hooks/pre-tool-use.mjs`) and Codex's hook cwd is inside it: that layer's guard judges the call, with
+  that subdirectory as its root (the accepted residual risk in choice 2).
 - A subdirectory holds its own `.codex/hooks.json` but no `.codex/hooks/conductor-guard.mjs`: the bootstrap blocks,
   naming the folder it looked in.
 - The host's `.codex/hooks.json` already holds the FEAT-048 entry (`node .claude/hooks/pre-tool-use.mjs`): a
@@ -125,6 +158,12 @@ Each prints a deny with a reason naming the cause, and exits 0:
 - [ ] Installer test: `--codex` installs `.codex/hooks/conductor-guard.mjs` and the bootstrap entry; a host
       `hooks.json` holding the FEAT-048 entry ends with exactly one conductor entry (the bootstrap) in the same
       position, host entries kept; a second run is unchanged; without `--codex` nothing under `.codex/` exists.
+- [ ] Hook test: from a subdirectory holding a complete nested layer whose guard allows everything, the shipped
+      command returns that nested guard's verdict (allow), pinning the residual risk of choice 2 as decided
+      behavior; the same subdirectory with the nested `.codex/hooks/conductor-guard.mjs` removed yields a deny.
+- [ ] Merge test in `tests/installer/settings-merge.test.js`: a host entry matching only a legacy fingerprint is replaced in place by the shipped entry; a host entry matching both the
+      fingerprint and a legacy one, or a duplicate legacy entry, ends as one entry; a call without a legacy list
+      merges exactly as before.
 - [ ] The installer comment at `lib/installer/deploy.mjs:320-321` and README `### Codex CLI` describe the adapter;
       the "launch from the project root" instruction is removed; the `node`-on-`PATH` limit stays stated.
 - [ ] `npm test` passes; the change adds no dependency and does not touch `.claude/hooks/pre-tool-use.mjs`.
@@ -142,11 +181,12 @@ Each prints a deny with a reason naming the cause, and exits 0:
 
 - `project-template/.codex/hooks.json` — entry replaced by the bootstrap (protected surface: hooks).
 - `project-template/.codex/hooks/conductor-guard.mjs` — new adapter (protected surface: hooks).
-- `lib/installer/deploy.mjs` — `installCodexHook` installs the adapter through `installManagedFile` before merging,
-  passes the new fingerprint, and replaces the legacy FEAT-048 entry; comment at 320-321 (protected surface:
-  installer). `.codex` is already in `HARNESS_DIRS`, so the template copy loop needs no change.
-- `lib/installer/settings-merge.mjs` — read for how a legacy entry is replaced in place (`upsertEntry` matches by
-  fingerprint substring); changed only if the plan finds no existing seam.
+- `lib/installer/deploy.mjs` — `installCodexHook` installs the adapter through `installManagedFile` before merging
+  and passes fingerprint `conductor-guard.mjs` with legacy fingerprint `pre-tool-use.mjs` (choice 5);
+  `mergeHarnessHooks` forwards the optional legacy list; comment at 320-321 (protected surface: installer). `.codex`
+  is already in `HARNESS_DIRS`, so the template copy loop needs no change.
+- `lib/installer/settings-merge.mjs` — `mergeSettingsFile`, `mergeHookTree` and `upsertEntry` take the optional
+  legacy-fingerprint map (choice 5); without it every caller behaves as today (protected surface: installer).
 - Tests: new `tests/hooks/codex-guard.test.js` (pattern: `tests/hooks/antigravity-guard.test.js`); additions to the
   Codex block of `tests/installer/deploy.test.js` (from line 885); `tests/installer/cli.test.js` checked for the
   report line.
@@ -158,12 +198,12 @@ Each prints a deny with a reason naming the cause, and exits 0:
 ### Files Requiring Full Read (deferred to /cc-plan)
 
 - `lib/installer/deploy.mjs` (403 lines; lines 239-331 for the managed-file and harness-hooks helpers)
-- `lib/installer/settings-merge.mjs` (upsert and legacy-entry replacement)
+- `lib/installer/settings-merge.mjs` (upsert, `mergeHookTree`, and every caller of `mergeSettingsFile`)
 - `project-template/.agents/hooks/conductor-guard.mjs` (101 lines; the guard-run and fail-closed helpers to mirror)
 - `tests/hooks/antigravity-guard.test.js` (scaffold and corpus parity pattern)
 - `tests/installer/deploy.test.js` (Codex block from line 885)
 
 ## Complexity Estimate
 
-M — one new adapter mirroring an existing one, a one-line bootstrap, an installer upgrade of one entry, and two test
-files, all on protected surfaces whose rituals apply.
+M — one new adapter mirroring an existing one, a one-line bootstrap, a legacy-fingerprint option in the merger, an
+installer upgrade of one entry, and two test files, all on protected surfaces whose rituals apply.
