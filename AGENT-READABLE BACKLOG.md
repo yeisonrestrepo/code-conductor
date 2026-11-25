@@ -1738,6 +1738,32 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #314; reported by the automated security review of
   #303.
 
+### [ ] `[BUG-095]` Release discard commands split paths containing spaces, commas or a leading @ in cmd.exe and PowerShell
+
+- Symptom: `scripts/release.mjs:676` (`byHand`) and
+  `scripts/release.mjs:699-700` (`SAFE_ARGUMENT` / `shellQuote`), per
+  the issue, decide which paths go on a printed `release: DISCARD`
+  command, and the D6 comment says that command must mean the same in
+  a POSIX shell, PowerShell and cmd.exe. Three spellings break that: a
+  path with a space is single-quoted, which cmd.exe does not honour, so
+  `'a b'` reaches git as the pathspecs `'a` and `b'`; a path with a
+  comma such as `a,b` matches `SAFE_ARGUMENT` and is printed bare, so
+  PowerShell passes `a` and `b` as separate arguments; and a path
+  segment starting with `@` is printed bare, which PowerShell treats as
+  splatting.
+- Impact per the issue: limited. `--literal-pathspecs` disables
+  pathspec magic, and `git checkout`/`git rm` abort when any pathspec
+  fails to match. In the worst case, `git rm -f` removes an unmodified
+  tracked file that was not part of the rejected diff; that file can be
+  restored from HEAD.
+- Fix shape suggested by the issue: send any path containing a space or
+  a comma, or with a segment starting with `@`, to a `DISCARD_BY_HAND`
+  line; or narrow `SAFE_ARGUMENT` and extend `byHand` to match. Add
+  `[AC8]` cases for each of these spellings.
+- Follow-up of `[BUG-090]`.
+- Intake of issue #321; reported by the automated security review of
+  the 1.59.1 release candidate (#320).
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
