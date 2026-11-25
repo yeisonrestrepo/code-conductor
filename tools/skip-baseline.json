@@ -172,6 +172,8 @@
     "tests/plugin/code-conductor-plugin.test.js > code-conductor personal skills dead enabledPlugins key is removed from settings.json",
     "tests/plugin/code-conductor-plugin.test.js > code-conductor personal skills old plugin cache dir is cleaned up",
     "tests/scripts/conductor-db.test.js > conductor-db corrupt-db recovery degrades to exit 0 without throwing when the db dir is read-only",
-    "tests/scripts/handoff-cycle.test.js > the checkpoint-to-resume handoff cycle survives a DB write failure at the boundary: no row, no crash, exit 0"
+    "tests/scripts/handoff-cycle.test.js > the checkpoint-to-resume handoff cycle survives a DB write failure at the boundary: no row, no crash, exit 0",
+    "tests/scripts/release.test.js > release.mjs check discards a rejected diff [BUG-090] [AC7] the printed commands remove an untracked :!x and keep a file created after check",
+    "tests/scripts/release.test.js > release.mjs check discards a rejected diff [BUG-090] [AC8] a path with a newline is on no command and on one DISCARD_BY_HAND line"
   ]
 }

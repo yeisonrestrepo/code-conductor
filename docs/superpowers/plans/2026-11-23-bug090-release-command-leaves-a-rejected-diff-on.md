@@ -208,10 +208,10 @@
 - Test: `tests/scripts/orchestrate.test.js`
 - Modify: `scripts/orchestrate.mjs`
 
-- [ ] [T-101] `tests/scripts/orchestrate.test.js`: the `pathToFileURL` import and the appended BUG-090 describe with O1-O4 (plan decision 8). Depends on T-004.
-- [ ] [T-102] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t 'BUG-090'`. Its full match set is the 18 new tests. Predicted: **17 failed | 1 passed** of the 18, every other test of the file skipped (plan decision 10). Any other split means a row or the prediction is wrong: stop and find which. Depends on T-101.
-- [ ] [T-103] `scripts/orchestrate.mjs`: the comment and `isControlPlanePath` after `inControlPlane` (plan decision 1). Depends on T-102.
-- [ ] [T-104] Green run: the T-102 command. Predicted: **18 passed** of the 18. `release.mjs` does not import `orchestrate.mjs` yet, so O3 and O4 do not exercise the cycle here; Task 2 reruns them with the cycle in place (T-208). Depends on T-103.
+- [X] [T-101] `tests/scripts/orchestrate.test.js`: the `pathToFileURL` import and the appended BUG-090 describe with O1-O4 (plan decision 8). Depends on T-004.
+- [X] [T-102] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t 'BUG-090'`. Its full match set is the 18 new tests. Predicted: **17 failed | 1 passed** of the 18, every other test of the file skipped (plan decision 10). Any other split means a row or the prediction is wrong: stop and find which. Depends on T-101.
+- [X] [T-103] `scripts/orchestrate.mjs`: the comment and `isControlPlanePath` after `inControlPlane` (plan decision 1). Depends on T-102.
+- [X] [T-104] Green run: the T-102 command. Predicted: **18 passed** of the 18. `release.mjs` does not import `orchestrate.mjs` yet, so O3 and O4 do not exercise the cycle here; Task 2 reruns them with the cycle in place (T-208). Depends on T-103.
 
 ---
 
@@ -222,15 +222,15 @@
 - Modify: `scripts/release.mjs`
 - Modify: `tools/skip-baseline.json`
 
-- [ ] [T-201] `tests/scripts/release.test.js`, row 41: the `toHaveLength(5)` change and the two `DISCARD` assertions (plan decision 6). Depends on T-104.
-- [ ] [T-202] `tests/scripts/release.test.js`: the BUG-090 describe after the `check` block, with its helpers and N1-N11, N8c included (plan decision 8). Depends on T-201.
-- [ ] [T-203] Red run: `npx vitest run tests/scripts/release.test.js`. Predicted: **15 failed | 125 passed | 1 skipped (141)** (plan decision 10). Depends on T-202.
-- [ ] [T-204] `scripts/release.mjs`: the commented `orchestrate.mjs` import (plan decision 2). Depends on T-203.
-- [ ] [T-205] `scripts/release.mjs`: `scopeFailures`, `judgeVersionFiles` and `judge` as in plan decision 3. Depends on T-204.
-- [ ] [T-206] `scripts/release.mjs`: `diffStates`, `DISCARD_COMMANDS`, `byHand`, `pathName` and `discardLines` after `judge`, and `checkVerb` (plan decisions 4 and 5). Depends on T-205.
-- [ ] [T-207] Green run: the T-203 command. Predicted: **140 passed | 1 skipped (141)**. Depends on T-206.
-- [ ] [T-208] Cycle rerun: `npx vitest run tests/scripts/orchestrate.test.js -t 'BUG-090'`. Predicted: **18 passed** of the 18, now with `release.mjs` importing `orchestrate.mjs`. Depends on T-207.
-- [ ] [T-209] `tools/skip-baseline.json`: the two `ci-windows-node24` entries of plan decision 9; then `node -e "const w=require('./tools/skip-baseline.json')['ci-windows-node24']; if (JSON.stringify(w)!==JSON.stringify([...w].sort())||w.length!==26) process.exit(1)"` exits 0. Depends on T-208.
+- [X] [T-201] `tests/scripts/release.test.js`, row 41: the `toHaveLength(5)` change and the two `DISCARD` assertions (plan decision 6). Depends on T-104.
+- [X] [T-202] `tests/scripts/release.test.js`: the BUG-090 describe after the `check` block, with its helpers and N1-N11, N8c included (plan decision 8). Depends on T-201.
+- [X] [T-203] Red run: `npx vitest run tests/scripts/release.test.js`. Predicted: **15 failed | 125 passed | 1 skipped (141)** (plan decision 10). Depends on T-202.
+- [X] [T-204] `scripts/release.mjs`: the commented `orchestrate.mjs` import (plan decision 2). Depends on T-203.
+- [X] [T-205] `scripts/release.mjs`: `scopeFailures`, `judgeVersionFiles` and `judge` as in plan decision 3. Depends on T-204.
+- [X] [T-206] `scripts/release.mjs`: `diffStates`, `DISCARD_COMMANDS`, `byHand`, `pathName` and `discardLines` after `judge`, and `checkVerb` (plan decisions 4 and 5). Depends on T-205.
+- [X] [T-207] Green run: the T-203 command. Predicted: **140 passed | 1 skipped (141)**. Depends on T-206.
+- [X] [T-208] Cycle rerun: `npx vitest run tests/scripts/orchestrate.test.js -t 'BUG-090'`. Predicted: **18 passed** of the 18, now with `release.mjs` importing `orchestrate.mjs`. Depends on T-207.
+- [X] [T-209] `tools/skip-baseline.json`: the two `ci-windows-node24` entries of plan decision 9; then `node -e "const w=require('./tools/skip-baseline.json')['ci-windows-node24']; if (JSON.stringify(w)!==JSON.stringify([...w].sort())||w.length!==26) process.exit(1)"` exits 0. Depends on T-208.
 
 ---
 
@@ -243,12 +243,12 @@
 - Modify: `project-template/.agents/workflows/cc-release.md` (regenerated)
 - Modify: `project-template/.agents/skills/cc-release/SKILL.md` (regenerated)
 
-- [ ] [T-301] `tests/installer/commands-parity.test.js`: the `spawnSync` import, the `[P2]` phrase removal (plan decision 6), P5 and P6 (plan decision 8). Depends on T-209.
-- [ ] [T-302] Red run: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: **4 failed | 112 passed (116)** (plan decision 10). Depends on T-301.
-- [ ] [T-303] `.claude/commands/cc-release.md` (Edit tool): the step 6 sentence of plan decision 7. Depends on T-302.
-- [ ] [T-304] `project-template/.claude/commands/cc-release.md`: the same edit; then `cmp` of the two copies prints nothing. Depends on T-303.
-- [ ] [T-305] Run `node lib/installer/harness-commands.mjs --write`; then `git status --short project-template/.agents` lists exactly `project-template/.agents/skills/cc-release/SKILL.md` and `project-template/.agents/workflows/cc-release.md` as modified. Any other path means a source changed: stop and find it. Depends on T-304.
-- [ ] [T-306] Green run: `npx vitest run tests/installer/commands-parity.test.js tests/installer/harness-commands.test.js`. Predicted: **161 passed (161)** (116 + 45), the byte-identical `[P1]` row, the amended `[P2]` and the render drift rows included. Depends on T-305.
+- [X] [T-301] `tests/installer/commands-parity.test.js`: the `spawnSync` import, the `[P2]` phrase removal (plan decision 6), P5 and P6 (plan decision 8). Depends on T-209.
+- [X] [T-302] Red run: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: **4 failed | 112 passed (116)** (plan decision 10). Depends on T-301.
+- [X] [T-303] `.claude/commands/cc-release.md` (Edit tool): the step 6 sentence of plan decision 7. Depends on T-302.
+- [X] [T-304] `project-template/.claude/commands/cc-release.md`: the same edit; then `cmp` of the two copies prints nothing. Depends on T-303.
+- [X] [T-305] Run `node lib/installer/harness-commands.mjs --write`; then `git status --short project-template/.agents` lists exactly `project-template/.agents/skills/cc-release/SKILL.md` and `project-template/.agents/workflows/cc-release.md` as modified. Any other path means a source changed: stop and find it. Depends on T-304.
+- [X] [T-306] Green run: `npx vitest run tests/installer/commands-parity.test.js tests/installer/harness-commands.test.js`. Predicted: **161 passed (161)** (116 + 45), the byte-identical `[P1]` row, the amended `[P2]` and the render drift rows included. Depends on T-305.
 
 ---
 
@@ -257,21 +257,21 @@
 **Files:**
 - Modify: `docs/superpowers/plans/2026-11-23-bug090-release-command-leaves-a-rejected-diff-on.md` (ticks)
 
-- [ ] [T-401] Run `npm test` (long: `orchestrate.test.js` alone takes several minutes; run it in the background if the shell times out). Predicted: exit 0, with `tests/scripts/orchestrate.test.js` at **1271 passed (1271)** (1253 + 18), `tests/scripts/release.test.js` at **140 passed | 1 skipped (141)**, `tests/installer/commands-parity.test.js` at **116 passed (116)** and `tests/installer/harness-commands.test.js` at **45 passed (45)**; the `CONTROL_PLANE` and `CONTROL_PLANE_NAMES` pins (`orchestrate.test.js:503-597`) and the U41 rows pass unchanged (AC12). A test red only for the sandbox (network, tmp permissions) is reported as ENV with its name; any other red is fixed. Depends on T-306.
-- [ ] [T-402] Scope check: `git status --short` lists exactly the ten files of the Global Constraints and this plan; no temporary file is left in the tree. `git diff --stat` shows no change to the spec, `package.json`, `package-lock.json`, `VERSION`, `CHANGELOG.md`, `AGENT-READABLE BACKLOG.md`, `README.md` or `.claude/memory/`, and `git diff scripts/orchestrate.mjs` touches no line of `CONTROL_PLANE` or `CONTROL_PLANE_NAMES`. Depends on T-401.
-- [ ] [T-403] Stage: `git add -u scripts/orchestrate.mjs scripts/release.mjs tests/scripts/orchestrate.test.js tests/scripts/release.test.js tests/installer/commands-parity.test.js .claude/commands/cc-release.md project-template/.claude/commands/cc-release.md project-template/.agents/workflows/cc-release.md project-template/.agents/skills/cc-release/SKILL.md tools/skip-baseline.json`. Depends on T-402.
-- [ ] [T-404] Stage: `git add -u docs/superpowers/plans/2026-11-23-bug090-release-command-leaves-a-rejected-diff-on.md` (carries the ticks for T-101 to T-403). Depends on T-403.
-- [ ] [T-405] Commit: `fix: print the discard commands and a discard-before-tooling warning for a rejected release diff [BUG-090]`. Depends on T-404.
+- [X] [T-401] Run `npm test` (long: `orchestrate.test.js` alone takes several minutes; run it in the background if the shell times out). Predicted: exit 0, with `tests/scripts/orchestrate.test.js` at **1271 passed (1271)** (1253 + 18), `tests/scripts/release.test.js` at **140 passed | 1 skipped (141)**, `tests/installer/commands-parity.test.js` at **116 passed (116)** and `tests/installer/harness-commands.test.js` at **45 passed (45)**; the `CONTROL_PLANE` and `CONTROL_PLANE_NAMES` pins (`orchestrate.test.js:503-597`) and the U41 rows pass unchanged (AC12). A test red only for the sandbox (network, tmp permissions) is reported as ENV with its name; any other red is fixed. Depends on T-306.
+- [X] [T-402] Scope check: `git status --short` lists exactly the ten files of the Global Constraints and this plan; no temporary file is left in the tree. `git diff --stat` shows no change to the spec, `package.json`, `package-lock.json`, `VERSION`, `CHANGELOG.md`, `AGENT-READABLE BACKLOG.md`, `README.md` or `.claude/memory/`, and `git diff scripts/orchestrate.mjs` touches no line of `CONTROL_PLANE` or `CONTROL_PLANE_NAMES`. Depends on T-401.
+- [X] [T-403] Stage: `git add -u scripts/orchestrate.mjs scripts/release.mjs tests/scripts/orchestrate.test.js tests/scripts/release.test.js tests/installer/commands-parity.test.js .claude/commands/cc-release.md project-template/.claude/commands/cc-release.md project-template/.agents/workflows/cc-release.md project-template/.agents/skills/cc-release/SKILL.md tools/skip-baseline.json`. Depends on T-402.
+- [X] [T-404] Stage: `git add -u docs/superpowers/plans/2026-11-23-bug090-release-command-leaves-a-rejected-diff-on.md` (carries the ticks for T-101 to T-403). Depends on T-403.
+- [X] [T-405] Commit: `fix: print the discard commands and a discard-before-tooling warning for a rejected release diff [BUG-090]`. Depends on T-404.
 
 ---
 
 ## Test List
 
-- [ ] [T-501] tests/scripts/release.test.js (Task 2): N1 (AC1), N2 (AC2), N3 (AC3), N4 (AC4), N5 (AC5), N6 (AC6), N7 (AC7, skipped on win32), N8a, N8b and N8c (AC8, N8b skipped on win32), N9 (AC9), N10 (spec Error cases), N11 (AC13), and row 41 as amended; every other existing `check` row unchanged (AC9).
-- [ ] [T-502] tests/scripts/orchestrate.test.js (Task 1): O1 and O2 (AC13, the predicate over manifests, a nested name, case, the profile, NTFS aliases, a short name and a non-ASCII spelling, and five paths it must not count), O3 and O4 (AC14, the cycle in every order); the `CONTROL_PLANE` / `CONTROL_PLANE_NAMES` pins unchanged (AC12).
-- [ ] [T-503] tests/installer/commands-parity.test.js (Task 3): P5 (AC10 for both mirrors, AC11 for both renders), P6 (AC15), `[P1]` byte-identical mirrors, the amended `[P2]`.
-- [ ] [T-504] tests/installer/harness-commands.test.js (Task 3, unchanged file): its render drift rows stay green after the regeneration (AC11).
-- [ ] [T-505] AC16: `dependencies` stays `{}` (T-402) and `npm test` is green (T-401). No E2E/UI test: there is no UI. CI legs: `ci-windows-node24` skips N7 and N8b, recorded in `tools/skip-baseline.json` (plan decision 9); `ci-node20` and `ci-node24` skip nothing new.
+- [X] [T-501] tests/scripts/release.test.js (Task 2): N1 (AC1), N2 (AC2), N3 (AC3), N4 (AC4), N5 (AC5), N6 (AC6), N7 (AC7, skipped on win32), N8a, N8b and N8c (AC8, N8b skipped on win32), N9 (AC9), N10 (spec Error cases), N11 (AC13), and row 41 as amended; every other existing `check` row unchanged (AC9).
+- [X] [T-502] tests/scripts/orchestrate.test.js (Task 1): O1 and O2 (AC13, the predicate over manifests, a nested name, case, the profile, NTFS aliases, a short name and a non-ASCII spelling, and five paths it must not count), O3 and O4 (AC14, the cycle in every order); the `CONTROL_PLANE` / `CONTROL_PLANE_NAMES` pins unchanged (AC12).
+- [X] [T-503] tests/installer/commands-parity.test.js (Task 3): P5 (AC10 for both mirrors, AC11 for both renders), P6 (AC15), `[P1]` byte-identical mirrors, the amended `[P2]`.
+- [X] [T-504] tests/installer/harness-commands.test.js (Task 3, unchanged file): its render drift rows stay green after the regeneration (AC11).
+- [X] [T-505] AC16: `dependencies` stays `{}` (T-402) and `npm test` is green (T-401). No E2E/UI test: there is no UI. CI legs: `ci-windows-node24` skips N7 and N8b, recorded in `tools/skip-baseline.json` (plan decision 9); `ci-node20` and `ci-node24` skip nothing new.
 
 ## Commit Order
 
