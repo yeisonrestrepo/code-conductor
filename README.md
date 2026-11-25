@@ -428,7 +428,7 @@ The plugin needs `node` on `PATH`. If the guard cannot run, the call is blocked 
 |---|---|
 | Guards 1, 2, 3 and 4 | Enforced. Guard 2's question blocks the write, because a hook cannot ask you |
 | Guards 5, 6 and 7 (band roles, orchestrator run) | Not enforced: agy does not tell the hook which agent made the call |
-| `run_command` with an argument outside `CommandLine`, `toolSummary`, `WaitMsBeforeAsync`, `BypassSandbox` and `IsDaemon` | Blocked, naming the argument |
+| `run_command`, `read_file`, `write_file` or `edit_file` with an argument outside its known set, measured on agy 1.5.15 (`run_command`: `CommandLine`, `toolSummary`, `WaitMsBeforeAsync`, `BypassSandbox`, `IsDaemon`; `read_file`: `Path`, `StartLine`, `EndLine`, `toolSummary`; `write_file`: `Path`, `Content`, `toolSummary`; `edit_file`: `Path`, `Target`, `Replacement`, `toolSummary`) | Blocked, naming the argument. If a later agy adds an argument to one of these tools, that tool's calls block until the adapter learns it |
 | Any other tool (browser, MCP, subagents, a tool a later agy adds) | Blocked: the guard cannot inspect it |
 | Guard warnings and `UserPromptSubmit` context injection | Not available |
 | `cc-*` commands | Installed as workflows in `.agents/workflows/`; run them as `/cc-spec`, `/cc-plan` and so on. They are rendered from the Claude Code commands by `lib/installer/harness-commands.mjs`, so they still name Claude Code tools and the agent uses its closest equivalent |

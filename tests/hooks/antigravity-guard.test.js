@@ -69,6 +69,11 @@ describe('Antigravity adapter: recorded calls', () => {
     expect(hook(project, readFile(project, 'big.txt'))).toMatch(/Guard 1/);
     expect(hook(project, readFile(project, 'big.txt', { StartLine: 10, EndLine: 20 }))).toBe('');
   });
+  it('passes a recorded read_file carrying toolSummary to the guard (BUG-093)', () => {
+    writeFileSync(join(project, 'big.txt'), 'line\n'.repeat(400));
+    expect(hook(project, readFile(project, 'big.txt', { toolSummary: 'read a file' }))).toMatch(/Guard 1/);
+    expect(hook(project, readFile(project, 'big.txt', { StartLine: 10, EndLine: 20, toolSummary: 'read a file' }))).toBe('');
+  });
   it('blocks a read under node_modules (Guard 4)', () => {
     expect(hook(project, readFile(project, join('node_modules', 'x', 'index.js')))).toMatch(/^Guard 4:/);
   });
@@ -86,6 +91,28 @@ describe('Antigravity adapter: fails closed', () => {
   });
   it('blocks run_command with an argument it does not know, naming it', () => {
     expect(hook(project, runCommand(project, { CommandLine: 'echo hi', Cwd: 'sub' }))).toMatch(/"Cwd"/);
+  });
+  it('blocks read_file with an argument it does not know, naming it (BUG-093)', () => {
+    writeFileSync(join(project, 'small.txt'), 'hello\n');
+    const reason = hook(project, readFile(project, 'small.txt', { Paths: [join(project, 'small.txt')] }));
+    expect(reason).toBe('code-conductor guard blocked the Antigravity tool "read_file": argument "Paths" not covered by the guard');
+  });
+  it('blocks write_file with an argument it does not know, naming it (BUG-093)', () => {
+    const args = { Path: join(project, 'fresh-append.txt'), Content: 'hello\n', toolSummary: 'write a file', Append: true };
+    const event = { cwd: project, hookEventName: 'PreToolUse', toolCall: { name: 'write_file', args } };
+    expect(hook(project, event)).toBe('code-conductor guard blocked the Antigravity tool "write_file": argument "Append" not covered by the guard');
+  });
+  it('blocks edit_file with an argument it does not know, naming it (BUG-093)', () => {
+    writeFileSync(join(project, 'note-edit.txt'), 'hello\n');
+    const args = { Path: join(project, 'note-edit.txt'), Target: 'hello', Replacement: 'bye', toolSummary: 'edit a file', AllowMultiple: true };
+    const event = { cwd: project, hookEventName: 'PreToolUse', toolCall: { name: 'edit_file', args } };
+    expect(hook(project, event)).toBe('code-conductor guard blocked the Antigravity tool "edit_file": argument "AllowMultiple" not covered by the guard');
+  });
+  it('names every unknown argument, sorted, with the plural wording (BUG-093)', () => {
+    writeFileSync(join(project, 'note-edit.txt'), 'hello\n');
+    const args = { Path: join(project, 'note-edit.txt'), Target: 'hello', Replacement: 'bye', toolSummary: 'edit a file', Paths: ['x'], AllowMultiple: true };
+    const event = { cwd: project, hookEventName: 'PreToolUse', toolCall: { name: 'edit_file', args } };
+    expect(hook(project, event)).toBe('code-conductor guard blocked the Antigravity tool "edit_file": arguments "AllowMultiple", "Paths" not covered by the guard');
   });
   it('blocks run_command whose CommandLine is not a string', () => {
     expect(hook(project, runCommand(project, { CommandLine: 5 }))).toMatch(/"CommandLine"/);

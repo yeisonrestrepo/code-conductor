@@ -80,42 +80,42 @@ None. No new test is gated by platform, and no existing skip changes; `tools/ski
   `return one('Bash', { command: a.CommandLine })`.
 - Every function stays under 30 lines; the adapter stays near its current 101 lines.
 
-- [ ] [T-001] Adapter tests, then the adapter
-  - [ ] [T-001-A] Modify `tests/hooks/antigravity-guard.test.js`, describe `Antigravity adapter: recorded calls`: add `it('passes a recorded read_file carrying toolSummary to the guard (BUG-093)')`, reusing `big.txt` (write it again with `'line\n'.repeat(400)` so the case does not depend on test order): `readFile(project, 'big.txt', { toolSummary: 'read a file' })` matches `/Guard 1/`, and `readFile(project, 'big.txt', { StartLine: 10, EndLine: 20, toolSummary: 'read a file' })` is `''`.
-  - [ ] [T-001-B] Modify the same file, describe `Antigravity adapter: fails closed`, after the existing `run_command` unknown-argument case: add four cases, each asserting the full reason with `toBe` (decision 4):
+- [X] [T-001] Adapter tests, then the adapter
+  - [X] [T-001-A] Modify `tests/hooks/antigravity-guard.test.js`, describe `Antigravity adapter: recorded calls`: add `it('passes a recorded read_file carrying toolSummary to the guard (BUG-093)')`, reusing `big.txt` (write it again with `'line\n'.repeat(400)` so the case does not depend on test order): `readFile(project, 'big.txt', { toolSummary: 'read a file' })` matches `/Guard 1/`, and `readFile(project, 'big.txt', { StartLine: 10, EndLine: 20, toolSummary: 'read a file' })` is `''`.
+  - [X] [T-001-B] Modify the same file, describe `Antigravity adapter: fails closed`, after the existing `run_command` unknown-argument case: add four cases, each asserting the full reason with `toBe` (decision 4):
     - `blocks read_file with an argument it does not know, naming it (BUG-093)`: write `small.txt` (`'hello\n'`); `readFile(project, 'small.txt', { Paths: [join(project, 'small.txt')] })` → `code-conductor guard blocked the Antigravity tool "read_file": argument "Paths" not covered by the guard`.
     - `blocks write_file with an argument it does not know, naming it (BUG-093)`: inline event `{ cwd: project, hookEventName: 'PreToolUse', toolCall: { name: 'write_file', args: { Path: join(project, 'fresh-append.txt'), Content: 'hello\n', toolSummary: 'write a file', Append: true } } }` → `... tool "write_file": argument "Append" not covered by the guard`.
     - `blocks edit_file with an argument it does not know, naming it (BUG-093)`: write `note-edit.txt` (`'hello\n'`); inline event for `edit_file` with `Path` (that file), `Target: 'hello'`, `Replacement: 'bye'`, `toolSummary: 'edit a file'`, `AllowMultiple: true` → `... tool "edit_file": argument "AllowMultiple" not covered by the guard`.
     - `names every unknown argument, sorted, with the plural wording (BUG-093)`: the same `edit_file` event with `Paths: ['x']` added before `AllowMultiple` in the object literal → `... tool "edit_file": arguments "AllowMultiple", "Paths" not covered by the guard`.
-  - [ ] [T-001-C] Run `npx vitest run tests/hooks/antigravity-guard.test.js`. Expected full match set (189 tests): the 173 Guard 3 corpus rows PASS; the 4 existing recorded-call cases PASS; the new `toolSummary` read case PASSES already (today the adapter drops `toolSummary` and maps the read unchanged); the 7 existing fail-closed cases PASS; the 4 new fail-closed cases FAIL (today the adapter drops the unknown key and the guard allows the call, so the reason is `''`). Any other result halts the task.
-  - [ ] [T-001-D] Modify `project-template/.agents/hooks/conductor-guard.mjs` per Interfaces and decisions 1-3: remove `RUN_COMMAND_ARGS`; add `unknownArgs` and `notCovered` beside `badArg`/`uncovered`; reduce `runCommand` to its `CommandLine` check and mapping; turn `MAPPED` into `{ args, map }` entries with the comment of decision 2; in `mapToolCall`, after the `args` line, block with `notCovered(tool, unknown)` when `unknownArgs(args, MAPPED[tool].args)` is non-empty, else return `MAPPED[tool].map(args, tool)`. Keep the file header (its "Fail closed" sentence is now true for every mapped tool).
-  - [ ] [T-001-E] Run `npx vitest run tests/hooks/antigravity-guard.test.js`. Expected: all 189 PASS (the existing `"Cwd"` and `"CommandLine"` cases included).
-  - [ ] [T-001-F] Run `npx vitest run tests/installer/deploy.test.js tests/installer/cli.test.js`. Expected: all PASS (they assert the adapter is copied, not its content).
-  - [ ] [T-001-G] `git add -u project-template/.agents/hooks/conductor-guard.mjs tests/hooks/antigravity-guard.test.js docs/superpowers/plans/2026-11-25-bug093-antigravity-guard-accepts-unknown-arguments-on.md`
-  - [ ] [T-001-H] `git commit -m "fix: block unknown arguments on every Antigravity tool the guard maps [BUG-093]"`
+  - [X] [T-001-C] Run `npx vitest run tests/hooks/antigravity-guard.test.js`. Expected full match set (189 tests): the 173 Guard 3 corpus rows PASS; the 4 existing recorded-call cases PASS; the new `toolSummary` read case PASSES already (today the adapter drops `toolSummary` and maps the read unchanged); the 7 existing fail-closed cases PASS; the 4 new fail-closed cases FAIL (today the adapter drops the unknown key and the guard allows the call, so the reason is `''`). Any other result halts the task.
+  - [X] [T-001-D] Modify `project-template/.agents/hooks/conductor-guard.mjs` per Interfaces and decisions 1-3: remove `RUN_COMMAND_ARGS`; add `unknownArgs` and `notCovered` beside `badArg`/`uncovered`; reduce `runCommand` to its `CommandLine` check and mapping; turn `MAPPED` into `{ args, map }` entries with the comment of decision 2; in `mapToolCall`, after the `args` line, block with `notCovered(tool, unknown)` when `unknownArgs(args, MAPPED[tool].args)` is non-empty, else return `MAPPED[tool].map(args, tool)`. Keep the file header (its "Fail closed" sentence is now true for every mapped tool).
+  - [X] [T-001-E] Run `npx vitest run tests/hooks/antigravity-guard.test.js`. Expected: all 189 PASS (the existing `"Cwd"` and `"CommandLine"` cases included).
+  - [X] [T-001-F] Run `npx vitest run tests/installer/deploy.test.js tests/installer/cli.test.js`. Expected: all PASS (they assert the adapter is copied, not its content).
+  - [X] [T-001-G] `git add -u project-template/.agents/hooks/conductor-guard.mjs tests/hooks/antigravity-guard.test.js docs/superpowers/plans/2026-11-25-bug093-antigravity-guard-accepts-unknown-arguments-on.md`
+  - [X] [T-001-H] `git commit -m "fix: block unknown arguments on every Antigravity tool the guard maps [BUG-093]"`
 
 ### Task 2: README row
 
 **Files:**
 - Modify: `README.md` (`### Antigravity CLI` table, line 431)
 
-- [ ] [T-002] Documentation
-  - [ ] [T-002-A] Replace the row at `README.md:431` with one row covering the four tools: first cell `` `run_command`, `read_file`, `write_file` or `edit_file` with an argument outside its known set, measured on agy 1.5.15 (`run_command`: `CommandLine`, `toolSummary`, `WaitMsBeforeAsync`, `BypassSandbox`, `IsDaemon`; `read_file`: `Path`, `StartLine`, `EndLine`, `toolSummary`; `write_file`: `Path`, `Content`, `toolSummary`; `edit_file`: `Path`, `Target`, `Replacement`, `toolSummary`) ``; second cell `Blocked, naming the argument. If a later agy adds an argument to one of these tools, that tool's calls block until the adapter learns it`. Do not touch the Known-limits line at 536.
-  - [ ] [T-002-B] Run `npx vitest run tests/scripts/doc-locations.test.js`. Expected: all PASS.
-  - [ ] [T-002-C] `git add -u README.md docs/superpowers/plans/2026-11-25-bug093-antigravity-guard-accepts-unknown-arguments-on.md`
-  - [ ] [T-002-D] `git commit -m "docs: list the known arguments of every Antigravity tool the guard maps [BUG-093]"`
+- [X] [T-002] Documentation
+  - [X] [T-002-A] Replace the row at `README.md:431` with one row covering the four tools: first cell `` `run_command`, `read_file`, `write_file` or `edit_file` with an argument outside its known set, measured on agy 1.5.15 (`run_command`: `CommandLine`, `toolSummary`, `WaitMsBeforeAsync`, `BypassSandbox`, `IsDaemon`; `read_file`: `Path`, `StartLine`, `EndLine`, `toolSummary`; `write_file`: `Path`, `Content`, `toolSummary`; `edit_file`: `Path`, `Target`, `Replacement`, `toolSummary`) ``; second cell `Blocked, naming the argument. If a later agy adds an argument to one of these tools, that tool's calls block until the adapter learns it`. Do not touch the Known-limits line at 536.
+  - [X] [T-002-B] Run `npx vitest run tests/scripts/doc-locations.test.js`. Expected: all PASS.
+  - [X] [T-002-C] `git add -u README.md docs/superpowers/plans/2026-11-25-bug093-antigravity-guard-accepts-unknown-arguments-on.md`
+  - [X] [T-002-D] `git commit -m "docs: list the known arguments of every Antigravity tool the guard maps [BUG-093]"`
 
 ### Task 3: closeout
 
-- [ ] [T-003] Full suite and scope check
-  - [ ] [T-003-A] Run `npm test`. Expected: exit 0, no new skips.
-  - [ ] [T-003-B] `git diff origin/main --stat` lists only: `.gitignore`, this plan, `README.md`, `project-template/.agents/hooks/conductor-guard.mjs`, `tests/hooks/antigravity-guard.test.js` (plus the spec and its leaf, already on the branch). No record, no `pre-tool-use.mjs`, no fixture, no `package.json`.
-  - [ ] [T-003-C] `git add -u docs/superpowers/plans/2026-11-25-bug093-antigravity-guard-accepts-unknown-arguments-on.md`
-  - [ ] [T-003-D] `git commit -m "docs: close out the BUG-093 plan [BUG-093]"`
+- [X] [T-003] Full suite and scope check
+  - [X] [T-003-A] Run `npm test`. Expected: exit 0, no new skips.
+  - [X] [T-003-B] `git diff origin/main --stat` lists only: `.gitignore`, this plan, `README.md`, `project-template/.agents/hooks/conductor-guard.mjs`, `tests/hooks/antigravity-guard.test.js` (plus the spec and its leaf, already on the branch). No record, no `pre-tool-use.mjs`, no fixture, no `package.json`.
+  - [X] [T-003-C] `git add -u docs/superpowers/plans/2026-11-25-bug093-antigravity-guard-accepts-unknown-arguments-on.md`
+  - [X] [T-003-D] `git commit -m "docs: close out the BUG-093 plan [BUG-093]"`
 
 ## Test list
 
-- [ ] [T-004] `tests/hooks/antigravity-guard.test.js` (Task 1): recorded `read_file` with `toolSummary`, unbounded (Guard 1) and with a line range (allowed); `read_file` with `Paths` blocked naming it; `write_file` with `Append` blocked naming it; `edit_file` with `AllowMultiple` blocked naming it; `edit_file` with `AllowMultiple` and `Paths` blocked naming both, sorted, plural; existing `run_command` `"Cwd"` and `"CommandLine"` cases and recorded calls unchanged and green.
+- [X] [T-004] `tests/hooks/antigravity-guard.test.js` (Task 1): recorded `read_file` with `toolSummary`, unbounded (Guard 1) and with a line range (allowed); `read_file` with `Paths` blocked naming it; `write_file` with `Append` blocked naming it; `edit_file` with `AllowMultiple` blocked naming it; `edit_file` with `AllowMultiple` and `Paths` blocked naming both, sorted, plural; existing `run_command` `"Cwd"` and `"CommandLine"` cases and recorded calls unchanged and green.
 
 ## Commit order
 

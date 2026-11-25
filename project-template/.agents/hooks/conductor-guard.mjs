@@ -14,21 +14,18 @@ const GUARD_TIMEOUT_MS = 60000;
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const GUARD = join(ROOT, '.claude', 'hooks', 'pre-tool-use.mjs');
 
-// Measured on agy 1.5.15. An argument outside this set may change what runs (a working
-// directory, a sandbox switch), so it blocks until the guard learns it (BUG-071 rule).
-const RUN_COMMAND_ARGS = new Set(['CommandLine', 'toolSummary', 'WaitMsBeforeAsync', 'BypassSandbox', 'IsDaemon']);
-
 const isText = (v) => typeof v === 'string' && v.length > 0;
 const one = (tool_name, tool_input) => ({ payload: { tool_name, tool_input } });
 const badArg = (tool, name, want) => ({ block: `code-conductor guard blocked the Antigravity tool "${tool}": argument "${name}" must be ${want}` });
 const uncovered = (tool) => `code-conductor guard does not cover the Antigravity tool "${tool}"; it is blocked until the guard maps it`;
 
+// toolSummary is free text every agy tool may carry.
+const unknownArgs = (a, known) => Object.keys(a).filter((k) => a[k] !== undefined && !known.has(k)).sort();
+const notCovered = (tool, names) => ({ block: `code-conductor guard blocked the Antigravity tool "${tool}": ${names.length === 1 ? 'argument' : 'arguments'} ${names.map((k) => `"${k}"`).join(', ')} not covered by the guard` });
+
 function runCommand(a, tool) {
   if (typeof a.CommandLine !== 'string') return badArg(tool, 'CommandLine', 'a string');
-  const unknown = Object.keys(a).filter((k) => a[k] !== undefined && !RUN_COMMAND_ARGS.has(k)).sort();
-  if (unknown.length === 0) return one('Bash', { command: a.CommandLine });
-  const names = unknown.map((k) => `"${k}"`).join(', ');
-  return { block: `code-conductor guard blocked the Antigravity tool "${tool}": ${unknown.length === 1 ? 'argument' : 'arguments'} ${names} not covered by the guard` };
+  return one('Bash', { command: a.CommandLine });
 }
 
 // StartLine/EndLine are 1-based and inclusive; the guard's Read takes offset and limit.
@@ -40,11 +37,20 @@ function readFile(a, tool) {
   return one('Read', input);
 }
 
+// Arguments measured on agy 1.5.15. An argument outside a tool's list may change what runs or which
+// file is touched (a working directory, a sandbox switch, a path alias), so the call blocks until the
+// guard learns it (BUG-071 rule, extended to every mapped tool by BUG-093).
 const MAPPED = {
-  run_command: runCommand,
-  read_file: readFile,
-  write_file: (a, t) => (isText(a.Path) ? one('Write', { file_path: a.Path, content: a.Content }) : badArg(t, 'Path', 'a non-empty string')),
-  edit_file: (a, t) => (isText(a.Path) ? one('Edit', { file_path: a.Path, old_string: a.Target, new_string: a.Replacement }) : badArg(t, 'Path', 'a non-empty string')),
+  run_command: { args: new Set(['CommandLine', 'toolSummary', 'WaitMsBeforeAsync', 'BypassSandbox', 'IsDaemon']), map: runCommand },
+  read_file: { args: new Set(['Path', 'StartLine', 'EndLine', 'toolSummary']), map: readFile },
+  write_file: {
+    args: new Set(['Path', 'Content', 'toolSummary']),
+    map: (a, t) => (isText(a.Path) ? one('Write', { file_path: a.Path, content: a.Content }) : badArg(t, 'Path', 'a non-empty string')),
+  },
+  edit_file: {
+    args: new Set(['Path', 'Target', 'Replacement', 'toolSummary']),
+    map: (a, t) => (isText(a.Path) ? one('Edit', { file_path: a.Path, old_string: a.Target, new_string: a.Replacement }) : badArg(t, 'Path', 'a non-empty string')),
+  },
 };
 
 export function mapToolCall(toolCall) {
@@ -52,7 +58,9 @@ export function mapToolCall(toolCall) {
   const tool = String(toolCall.name);
   if (!Object.hasOwn(MAPPED, tool)) return { block: uncovered(tool) };
   const args = toolCall.args && typeof toolCall.args === 'object' ? toolCall.args : {};
-  return MAPPED[tool](args, tool);
+  const unknown = unknownArgs(args, MAPPED[tool].args);
+  if (unknown.length > 0) return notCovered(tool, unknown);
+  return MAPPED[tool].map(args, tool);
 }
 
 // Mirrors readDecision in the OpenCode plugin: nothing allows, deny and ask block.
