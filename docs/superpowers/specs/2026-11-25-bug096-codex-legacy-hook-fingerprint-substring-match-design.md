@@ -1,6 +1,6 @@
 # BUG-096 — Codex legacy hook fingerprint substring match replaces user-owned PreToolUse entries
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-25 by independent review (round 1)
 
 **Item:** `[BUG-096]` (intake of issue #325, follow-up of `[BUG-094]`). Pillar 5: infrastructure, ecosystem and
 quality assurance.
