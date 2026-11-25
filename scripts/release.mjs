@@ -670,11 +670,14 @@ function diffStates(root) {
 }
 
 const DISCARD_COMMANDS = [['checkout', 'git --literal-pathspecs checkout HEAD --'], ['rm', 'git --literal-pathspecs rm -f --'], ['clean', 'git --literal-pathspecs clean -f --']];
-// BUG-090 D6: a control character would split or forge a printed line, and a single quote's POSIX escape is not PowerShell's.
-const byHand = (path) => /[\p{Cc}']/u.test(path);
-// JSON.stringify leaves DEL and C1 (U+007F-U+009F) raw, and a raw C1 such as U+009B (CSI) can drive a terminal.
-const controlEscape = (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`;
-const jsonName = (path) => `"${[...path].map((c) => (/\p{Cc}/u.test(c) ? controlEscape(c) : JSON.stringify(c).slice(1, -1))).join('')}"`;
+// BUG-090 D6: a printed command must mean the same in a POSIX shell, PowerShell and cmd.exe. A control character
+// splits or forges a line, a bidi control makes the shown line differ from the run one, PowerShell also closes a
+// quote on U+2018-U+201B, and cmd.exe does not honour single quotes, so its metacharacters stay live.
+const byHand = (path) => /[^\x20-\x7e]|['"`&|<>^%]/.test(path);
+// Every UTF-16 unit outside printable ASCII is escaped: JSON.stringify leaves C1 (a raw U+009B drives a terminal),
+// format characters and look-alikes raw.
+const unicodeEscape = (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`;
+const jsonName = (path) => `"${path.split('').map((c) => (/[^\x20-\x7e]/.test(c) ? unicodeEscape(c) : JSON.stringify(c).slice(1, -1))).join('')}"`;
 const pathName = (path) => (byHand(path) ? jsonName(path) : path);
 
 // BUG-090: after a rejected judgment, the warning when a rejected path of the diff is control-plane, then the commands

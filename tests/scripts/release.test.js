@@ -983,6 +983,21 @@ describe('release.mjs check discards a rejected diff [BUG-090]', () => {
     for (const l of added) expect(l).not.toMatch(/\p{Cc}/u)
   })
 
+  // PowerShell also closes a quote on U+2019, cmd.exe runs what follows "&", and U+202E reorders the shown line.
+  it.each([
+    ['U+2019', 'it’s.txt', '"it\\u2019s.txt"'],
+    ['&', 'a&b.txt', '"a&b.txt"'],
+    ['U+202E', 'a‮txt.b', '"a\\u202etxt.b"'],
+  ])('[AC8] a path with %s is on no command and on one DISCARD_BY_HAND line', (_name, path, json) => {
+    release1()
+    put(path, 'x\n')
+    const r = check()
+    expect(lines(r.out).filter((l) => l === `release: DISCARD_BY_HAND ${json}`)).toHaveLength(1)
+    expect(discards(r.out).some((l) => l.includes(path))).toBe(false)
+    const added = r.out.split('\n').filter((l) => /^release: (RELEASE_DISCARD_FIRST|DISCARD)/.test(l))
+    for (const l of added) expect(l).toMatch(/^[\x20-\x7e]*$/)
+  })
+
   it.each([
     ['release: ok', () => { release1() }, 0],
     ['a RELEASE_HALT', () => { release1(); put('red-a', '') }, 1],
@@ -1008,8 +1023,10 @@ describe('release.mjs check discards a rejected diff [BUG-090]', () => {
     release1()
     put('pаckage.json', 'x\n')
     const r = check()
-    expect(r.out).toContain(`release: RELEASE_DISCARD_FIRST: the rejected diff touches pаckage.json, ${CP}`)
-    expect(r.out).toContain("release: DISCARD git --literal-pathspecs clean -f -- 'pаckage.json'")
+    // A look-alike spelling is outside printable ASCII, so it is escaped and left to a DISCARD_BY_HAND line.
+    expect(r.out).toContain(`release: RELEASE_DISCARD_FIRST: the rejected diff touches "p\\u0430ckage.json", ${CP}`)
+    expect(r.out).toContain('release: DISCARD_BY_HAND "p\\u0430ckage.json"')
+    expect(discards(r.out).some((l) => l.includes('pаckage.json'))).toBe(false)
   })
 })
 
