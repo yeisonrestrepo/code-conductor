@@ -1,5 +1,8 @@
 {
   "ci-node20": [
+    "tests/hooks/codex-guard.test.js > Codex hook: shell matrix (BUG-094) cmd.exe /d /s /c denies a deny row and allows an allow row from a subdirectory",
+    "tests/hooks/codex-guard.test.js > Codex hook: shell matrix (BUG-094) powershell -NoProfile -Command denies a deny row and allows an allow row from a subdirectory",
+    "tests/hooks/codex-guard.test.js > Codex hook: shell matrix (BUG-094) pwsh -NoProfile -Command denies a deny row and allows an allow row from a subdirectory",
     "tests/hooks/context-guard.test.js > context-guard.ps1 — session reset (BUG-056) 'id with invalid characters — treated …'",
     "tests/hooks/context-guard.test.js > context-guard.ps1 — session reset (BUG-056) 'legacy bare count plus an id — restar…'",
     "tests/hooks/context-guard.test.js > context-guard.ps1 — session reset (BUG-056) 'malformed JSON — treated as no id'",
@@ -121,6 +124,9 @@
     "tests/unit/bash-helper.test.js > bash helper falls back to Git for Windows bash rather than skipping"
   ],
   "ci-node24": [
+    "tests/hooks/codex-guard.test.js > Codex hook: shell matrix (BUG-094) cmd.exe /d /s /c denies a deny row and allows an allow row from a subdirectory",
+    "tests/hooks/codex-guard.test.js > Codex hook: shell matrix (BUG-094) powershell -NoProfile -Command denies a deny row and allows an allow row from a subdirectory",
+    "tests/hooks/codex-guard.test.js > Codex hook: shell matrix (BUG-094) pwsh -NoProfile -Command denies a deny row and allows an allow row from a subdirectory",
     "tests/hooks/context-guard.test.js > context-guard.ps1 — session reset (BUG-056) 'id with invalid characters — treated …'",
     "tests/hooks/context-guard.test.js > context-guard.ps1 — session reset (BUG-056) 'legacy bare count plus an id — restar…'",
     "tests/hooks/context-guard.test.js > context-guard.ps1 — session reset (BUG-056) 'malformed JSON — treated as no id'",
@@ -149,6 +155,7 @@
     "tests/unit/bash-helper.test.js > bash helper falls back to Git for Windows bash rather than skipping"
   ],
   "ci-windows-node24": [
+    "tests/hooks/codex-guard.test.js > Codex hook: shell matrix (BUG-094) sh -c denies a deny row and allows an allow row from a subdirectory",
     "tests/hooks/context-guard.test.js > context-guard.sh unreadable threshold file — fallback 25",
     "tests/hooks/guard4.test.js > Guard 4 — Read blocker for node_modules/ row16: denies with PATH restricted to an empty dir",
     "tests/hooks/verbosity-remind.test.js > verbosity-remind hooks T-14: traversal cap=40 blocks verbosity.md 45 levels above; HOME fallback emits MIN",

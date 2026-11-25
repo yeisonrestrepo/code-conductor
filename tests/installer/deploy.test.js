@@ -884,14 +884,25 @@ describe('deployProject: Antigravity guard (FEAT-048)', () => {
 
 // FEAT-048 slice 2 (#97): Codex sends Claude's own payload and honours its deny (measured
 // live on 0.171), so --codex only merges .codex/hooks.json pointing at the unchanged guard.
-describe('deployProject: Codex hook (FEAT-048)', () => {
+describe('deployProject: Codex hook (FEAT-048, BUG-094)', () => {
   const HOOKS_REL = join('.codex', 'hooks.json');
-  const OURS = { matcher: '.*', hooks: [{ type: 'command', command: 'node .claude/hooks/pre-tool-use.mjs' }] };
+  const ADAPTER_REL = join('.codex', 'hooks', 'conductor-guard.mjs');
+  const SHIPPED_ADAPTER = '// shipped codex guard\n';
+  const OURS = JSON.parse(readFileSync(join(ROOT, 'project-template', HOOKS_REL), 'utf8')).hooks.PreToolUse[0];
+  const LEGACY = { matcher: '.*', hooks: [{ type: 'command', command: 'node .claude/hooks/pre-tool-use.mjs' }] };
   const SHIPPED_HOOKS = `${JSON.stringify({ hooks: { PreToolUse: [OURS] } }, null, 2)}\n`;
   const INSTALLED = 'code-conductor: installed the Codex guard hook in .codex/hooks.json; trust it once in Codex with /hooks';
+  const REPLACED = 'code-conductor: replaced the old Codex guard hook in .codex/hooks.json; Codex asks for trust again after this edit, so the guards are not enforced until you re-trust the hooks in Codex with /hooks';
+  const host = { matcher: 'Bash', hooks: [{ type: 'command', command: 'node mine.mjs' }] };
+  const host2 = { matcher: 'Read', hooks: [{ type: 'command', command: 'node mine2.mjs' }] };
+  const writeHostHooks = (entries) => {
+    mkdirSync(join(home, '.codex'), { recursive: true });
+    writeFileSync(join(home, HOOKS_REL), JSON.stringify({ hooks: { PreToolUse: entries } }));
+  };
   beforeEach(() => {
-    mkdirSync(join(asset, 'project-template', '.codex'), { recursive: true });
+    mkdirSync(join(asset, 'project-template', '.codex', 'hooks'), { recursive: true });
     writeFileSync(join(asset, 'project-template', HOOKS_REL), SHIPPED_HOOKS);
+    writeFileSync(join(asset, 'project-template', ADAPTER_REL), SHIPPED_ADAPTER);
   });
   it('writes no .codex/ without the codex option', () => {
     const out = capture();
@@ -899,24 +910,69 @@ describe('deployProject: Codex hook (FEAT-048)', () => {
     expect(existsSync(join(home, '.codex'))).toBe(false);
     expect(out.said.some((m) => /Codex/.test(m))).toBe(false);
   });
-  it('creates hooks.json and tells the user to trust it with the codex option', () => {
+  it('installs the adapter and hooks.json and tells the user to trust it with the codex option', () => {
     const out = capture();
     deployProject(asset, home, { ...out.opts, codex: true });
+    expect(readFileSync(join(home, ADAPTER_REL), 'utf8')).toBe(SHIPPED_ADAPTER);
     expect(readFileSync(join(home, HOOKS_REL), 'utf8')).toBe(SHIPPED_HOOKS);
     expect(out.said).toContain(INSTALLED);
+    expect(out.said).not.toContain(REPLACED);
   });
   it('keeps host hooks, adds ours once and leaves a re-run unchanged', () => {
-    const host = { matcher: 'Bash', hooks: [{ type: 'command', command: 'node mine.mjs' }] };
-    mkdirSync(join(home, '.codex'), { recursive: true });
-    writeFileSync(join(home, HOOKS_REL), JSON.stringify({ hooks: { PreToolUse: [host] } }));
-    deployProject(asset, home, { ...capture().opts, codex: true });
-    const first = readFileSync(join(home, HOOKS_REL), 'utf8');
-    expect(JSON.parse(first).hooks.PreToolUse).toEqual([host, OURS]);
-    deployProject(asset, home, { ...capture().opts, codex: true });
-    expect(readFileSync(join(home, HOOKS_REL), 'utf8')).toBe(first);
+    writeHostHooks([host]);
+    const first = capture();
+    deployProject(asset, home, { ...first.opts, codex: true });
+    const written = readFileSync(join(home, HOOKS_REL), 'utf8');
+    expect(JSON.parse(written).hooks.PreToolUse).toEqual([host, OURS]);
+    const second = capture();
+    deployProject(asset, home, { ...second.opts, codex: true });
+    expect(readFileSync(join(home, HOOKS_REL), 'utf8')).toBe(written);
+    for (const out of [first, second]) {
+      expect(out.said).toContain(INSTALLED);
+      expect(out.said).not.toContain(REPLACED);
+    }
   });
-  it('ships the real hooks.json in the template, pointing at the guard', () => {
-    expect(readFileSync(join(ROOT, 'project-template', HOOKS_REL), 'utf8')).toContain('node .claude/hooks/pre-tool-use.mjs');
+  it('replaces the FEAT-048 entry in place and says Codex needs a re-trust (BUG-094)', () => {
+    writeHostHooks([host, LEGACY, host2]);
+    const first = capture();
+    deployProject(asset, home, { ...first.opts, codex: true });
+    expect(JSON.parse(readFileSync(join(home, HOOKS_REL), 'utf8')).hooks.PreToolUse).toEqual([host, OURS, host2]);
+    expect(first.said).toContain(REPLACED);
+    expect(REPLACED).toContain('.codex/hooks.json');
+    expect(REPLACED).toContain('not enforced until');
+    expect(REPLACED).toContain('/hooks');
+    expect(first.said).not.toContain(INSTALLED);
+    const written = readFileSync(join(home, HOOKS_REL), 'utf8');
+    const second = capture();
+    deployProject(asset, home, { ...second.opts, codex: true });
+    expect(readFileSync(join(home, HOOKS_REL), 'utf8')).toBe(written);
+    expect(second.said).toContain(INSTALLED);
+    expect(second.said).not.toContain(REPLACED);
+  });
+  it.skipIf(!CAN_SYMLINK)('replaces a symlinked adapter path and leaves the link target untouched', () => {
+    const outside = join(home, 'outside.mjs');
+    writeFileSync(outside, '// outside\n');
+    mkdirSync(join(home, '.codex', 'hooks'), { recursive: true });
+    symlinkSync(outside, join(home, ADAPTER_REL));
+    deployProject(asset, home, { ...capture().opts, codex: true });
+    expect(lstatSync(join(home, ADAPTER_REL)).isSymbolicLink()).toBe(false);
+    expect(readFileSync(join(home, ADAPTER_REL), 'utf8')).toBe(SHIPPED_ADAPTER);
+    expect(readFileSync(outside, 'utf8')).toBe('// outside\n');
+  });
+  it('prints neither line when hooks.json is a directory', () => {
+    mkdirSync(join(home, HOOKS_REL), { recursive: true });
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, codex: true });
+    expect(out.warned.some((m) => m.includes('it is a directory'))).toBe(true);
+    expect(out.said).not.toContain(INSTALLED);
+    expect(out.said).not.toContain(REPLACED);
+  });
+  it('ships the real adapter and a hooks.json whose command is the bootstrap (BUG-094)', () => {
+    expect(existsSync(join(ROOT, 'project-template', '.codex', 'hooks', 'conductor-guard.mjs'))).toBe(true);
+    const text = readFileSync(join(ROOT, 'project-template', HOOKS_REL), 'utf8');
+    const command = JSON.parse(text).hooks.PreToolUse[0].hooks[0].command;
+    expect(command).toContain('conductor-guard.mjs');
+    expect(command.startsWith('node -e "')).toBe(true);
   });
 });
 

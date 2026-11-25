@@ -261,6 +261,8 @@ describe('run', () => {
   it('wires the Codex hook with --project --codex and lists the flag in --help (FEAT-048)', () => {
     expect(run(['--project', '--codex'], { HOME: home }, { cwd, log })).toBe(0);
     expect(existsSync(join(cwd, '.codex', 'hooks.json'))).toBe(true);
+    expect(existsSync(join(cwd, '.codex', 'hooks', 'conductor-guard.mjs'))).toBe(true);
+    expect(logs).toContain('stdout:code-conductor: installed the Codex guard hook in .codex/hooks.json; trust it once in Codex with /hooks');
     run(['--help'], { HOME: home }, { cwd, log });
     expect(logs.some(l => l.startsWith('stdout:') && l.includes('[--codex]'))).toBe(true);
   });

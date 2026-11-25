@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/pre-tool-use.mjs"
+            "command": "node -e \"const p=require('path'),f=require('fs'),u=require('url');const deny=(r)=>process.stdout.write(JSON.stringify({hookSpecificOutput:{hookEventName:'PreToolUse',permissionDecision:'deny',permissionDecisionReason:r}}));const has=(d)=>f.existsSync(p.join(d,'.codex','hooks.json'));let d=process.cwd();while(has(d)===false&&(p.dirname(d)===d)===false)d=p.dirname(d);const a=p.join(d,'.codex','hooks','conductor-guard.mjs');if(has(d)===false)deny('code-conductor: no .codex/hooks.json in '+process.cwd()+' or above; the guard did not run');else if(f.existsSync(a)===false)deny('code-conductor: no guard adapter at '+a+'; the guard did not run');else import(u.pathToFileURL(a).href).then((m)=>m.main()).catch((e)=>deny('code-conductor: the guard adapter at '+a+' could not run: '+e.message));\""
           }
         ]
       }
