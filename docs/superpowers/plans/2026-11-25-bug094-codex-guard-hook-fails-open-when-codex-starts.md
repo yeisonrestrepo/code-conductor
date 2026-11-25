@@ -72,7 +72,18 @@ the FEAT-048 entry through a legacy fingerprint, printing a re-trust line when i
    PowerShell gets the command as one argv element.
 8. **Corpus parity is byte parity.** The adapter passes the guard's output unchanged, so the corpus test asserts
    that the Codex command's stdout equals the Claude hook's stdout for the same payload, which is stronger than an
-   equal allow/deny. The Claude hook reference is `node <root>/.claude/hooks/pre-tool-use.mjs` run at `<root>`.
+   equal allow/deny. The Claude hook reference is `node <root>/.claude/hooks/pre-tool-use.mjs` run at `<root>`
+   with `CLAUDE_PROJECT_DIR=<root>` set explicitly, which is the value the adapter forces, so both sides read the
+   same allowlist. Both sides receive the same payload text, whose `cwd` is the directory the shell starts in
+   (`<root>` or `<root>/sub/deep`).
+9. **One clean environment for every spawned process.** The suite builds each child's environment with one helper,
+   `codexEnv(extra)`: a copy of `process.env` with `CLAUDE_PROJECT_DIR`, `CC_HOOK_ALLOW`, `CC_GUARD3_WARN`,
+   `CC_HOOK_DEBUG` and `CC_FLOW_OFF` deleted (the BUG-061 convention of `tests/hooks/flow-events.test.js:14-18`),
+   then `CC_FLOW_OFF=1` and `extra` applied. The shell runs (corpus, matrix, shadowing, fail-closed) use
+   `codexEnv({})`; the reference run uses `codexEnv({ CLAUDE_PROJECT_DIR: root })`. An inherited
+   `CLAUDE_PROJECT_DIR` would point the reference at another checkout's allowlist, an inherited `CC_HOOK_ALLOW` or
+   `CC_GUARD3_WARN` would reach the guard through the adapter's `...process.env` and flip deny rows, and
+   `CC_FLOW_OFF=1` keeps rows from writing flow events into the scaffold under the payload's `cwd`.
 
 ## Predicted skips per environment
 
@@ -117,7 +128,9 @@ Antigravity symlink case with the same gate is absent from every leg's baseline,
   `{ entries, legacyHit }`, where `legacyHit` is true when a replaced or dropped entry matched a legacy fingerprint
   and not `fingerprint`.
 - `mergeHookTree(hostHooks, tplHooks, fingerprints, legacyFingerprints)` returns `{ hooks, legacyHit }`.
-- Each function stays at or under 30 lines; the comments on `upsertEntry` and `mergeSettingsFile` say why a legacy
+- `upsertEntry` and `mergeHookTree` stay at or under 30 lines. `mergeSettingsFile` is already about 53 lines
+  (`settings-merge.mjs:68-120`); it gains only the option destructuring, the `legacyFingerprints` argument to
+  `mergeHookTree` and the `legacy-replaced` status branch, nothing else. The comments on `upsertEntry` and `mergeSettingsFile` say why a legacy
   fingerprint exists (an entry whose command changed so much that it no longer carries the current fingerprint).
 
 - [ ] [T-001] Merger tests, then the merger
@@ -154,9 +167,14 @@ Antigravity symlink case with the same gate is absent from every leg's baseline,
 
 **Test scaffold:** `mkdtempSync` project holding `.claude/hooks/pre-tool-use.mjs` (the template guard),
 `.claude/memory/`, `.codex/hooks.json` (the shipped template file, byte for byte), `.codex/hooks/conductor-guard.mjs`
-(the template adapter) and `sub/deep/`. The command under test is read from the scaffold's `.codex/hooks.json`
+(the template adapter) and `sub/deep/`. The two corpus describes and the shell matrix share one read-only
+scaffold built in `beforeAll`; the only file they touch is `.claude/memory/bash-scan-allowlist.txt`, which each
+row writes (or removes) before it runs, and the cases in a file run in sequence. Every shadowing and fail-closed case builds its
+own `scaffold()` and removes it in a `finally`, because each one adds, removes or replaces a file, so no result
+depends on run order. The command under test is read from the scaffold's `.codex/hooks.json`
 (`hooks.PreToolUse[0].hooks[0].command`), never retyped. Payloads are Claude's shape
-(`{ cwd, hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command } }`) on stdin. The platform shell
+(`{ cwd, hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command } }`) on stdin, with `cwd` set to the shell's start directory (decision 8). Every spawn uses `codexEnv` (decision 9).
+The platform shell
 is `sh -c` on non-Windows and `cmd.exe /d /s /c` on Windows (decision 7). Every run asserts exit status 0.
 
 - [ ] [T-002] Codex hook tests, then the adapter and the entry
