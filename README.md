@@ -438,7 +438,7 @@ The adapter needs `node` on `PATH`. If the guard cannot run, crashes or prints s
 
 ### Codex CLI
 
-`--project --codex` merges one `PreToolUse` entry (`node .claude/hooks/pre-tool-use.mjs`) into `.codex/hooks.json`, keeping any entries already there. OpenAI's [Codex CLI](https://github.com/openai/codex) sends Claude Code's own payload and honours its deny, so no adapter is needed. **Codex runs a project's hooks only after you trust them once:** open `codex` in the project and approve them in `/hooks`. Until then nothing is enforced.
+`--project --codex` installs `.codex/hooks/conductor-guard.mjs` and merges one `PreToolUse` entry into `.codex/hooks.json`, keeping any entries already there. The entry is a short `node -e` bootstrap that finds the project root from the directory Codex runs it in; the adapter then runs the project's guard and blocks the call when the guard cannot run. OpenAI's [Codex CLI](https://github.com/openai/codex) sends Claude Code's own payload and honours its deny. **Codex runs a project's hooks only after you trust them once:** open `codex` in the project and approve them in `/hooks`. Until then nothing is enforced.
 
 | On Codex CLI | Status |
 |---|---|
@@ -450,7 +450,7 @@ The adapter needs `node` on `PATH`. If the guard cannot run, crashes or prints s
 
 Checked live against Codex CLI 0.171.0: after trust, `cat *.log` was refused with `Command blocked by PreToolUse hook: BASH SCAN BLOCKED`. Editing `.codex/hooks.json` later makes Codex ask for trust again.
 
-Launch `codex` from the project root. The entry is a relative path resolved against the directory Codex runs the hook from, and there is no adapter on this route to fail closed: if `codex` is started from a subdirectory where `.claude/hooks/pre-tool-use.mjs` does not resolve, or `node` is not on `PATH`, the hook cannot run and the guards must be treated as not enforced.
+`codex` may be started from the project root or any subdirectory: the bootstrap walks up to the nearest `.codex/hooks.json`, and if that file has no adapter beside it the call is blocked. The guards are not enforced without `node` on `PATH`. Upgrading an install that has the old `node .claude/hooks/pre-tool-use.mjs` entry rewrites `.codex/hooks.json`; Codex then asks for trust again, and the guards are not enforced until you re-trust the hooks in `/hooks` (the installer says so when it replaces the entry).
 
 ### How the installer treats your CLAUDE.md
 
@@ -598,6 +598,7 @@ code-conductor/
 |   +-- .opencode/plugin/conductor-guard.js  OpenCode guard plugin, only with --opencode (FEAT-048)
 |   +-- .agents/hooks/conductor-guard.mjs    Antigravity CLI guard adapter, only with --antigravity (FEAT-048)
 |   +-- .agents/hooks.json                   Antigravity hook entry, merged, only with --antigravity
+|   +-- .codex/hooks/conductor-guard.mjs     Codex guard adapter, only with --codex (BUG-094)
 |   +-- .codex/hooks.json                    Codex hook entry, merged, only with --codex (FEAT-048)
 |   +-- .agents/workflows/cc-*.md            cc-* commands as Antigravity workflows, only with --antigravity
 |   +-- .agents/skills/cc-*/SKILL.md         cc-* commands as Codex skills, only with --codex

@@ -204,3 +204,56 @@ describe('mergeSettingsFile: symlink', () => {
     expect(read(real).hooks.PreToolUse).toHaveLength(2);
   });
 });
+
+describe('mergeSettingsFile: legacy fingerprints (BUG-094)', () => {
+  const FPS_CODEX = ['conductor-guard.mjs'];
+  const LEGACY = { 'conductor-guard.mjs': ['pre-tool-use.mjs'] };
+  const SHIPPED = { matcher: '.*', hooks: [{ type: 'command', command: 'node -e "conductor-guard.mjs"' }] };
+  const OLD = { matcher: '.*', hooks: [{ type: 'command', command: 'node .claude/hooks/pre-tool-use.mjs' }] };
+  const HOST_ENTRY2 = { matcher: '', hooks: [{ type: 'command', command: 'bash /home/me/other-hook.sh' }] };
+  const preToolUse = () => read(sp).hooks.PreToolUse;
+  const run = (hostEntries, options) => {
+    write(tpl, { hooks: { PreToolUse: [SHIPPED] } });
+    write(sp, { hooks: { PreToolUse: hostEntries } });
+    return mergeSettingsFile(tpl, sp, FPS_CODEX, options);
+  };
+
+  it('replaces a legacy-only entry in place and reports legacy-replaced', () => {
+    expect(run([HOST_ENTRY, OLD, HOST_ENTRY2], { legacyFingerprints: LEGACY })).toBe('legacy-replaced');
+    expect(preToolUse()).toEqual([HOST_ENTRY, SHIPPED, HOST_ENTRY2]);
+  });
+  it('leaves a host that is already the merged result unchanged', () => {
+    expect(run([HOST_ENTRY, SHIPPED, HOST_ENTRY2], { legacyFingerprints: LEGACY })).toBe('unchanged');
+  });
+  it('treats an entry carrying both fingerprints as the current entry', () => {
+    const both = { matcher: '.*', hooks: [{ type: 'command', command: 'node -e "conductor-guard.mjs" pre-tool-use.mjs' }] };
+    expect(run([both], { legacyFingerprints: LEGACY })).toBe('merged');
+    expect(preToolUse()).toEqual([SHIPPED]);
+  });
+  it('collapses duplicate legacy entries into one shipped entry', () => {
+    expect(run([OLD, OLD], { legacyFingerprints: LEGACY })).toBe('legacy-replaced');
+    expect(preToolUse()).toEqual([SHIPPED]);
+  });
+  it('drops a legacy entry that trails the current one', () => {
+    expect(run([SHIPPED, OLD], { legacyFingerprints: LEGACY })).toBe('legacy-replaced');
+    expect(preToolUse()).toEqual([SHIPPED]);
+  });
+  it('creates the file when the host has none', () => {
+    write(tpl, { hooks: { PreToolUse: [SHIPPED] } });
+    expect(mergeSettingsFile(tpl, sp, FPS_CODEX, { legacyFingerprints: LEGACY })).toBe('created');
+  });
+  it('keeps the legacy entry and appends ours when no legacy list is passed', () => {
+    expect(run([HOST_ENTRY, OLD, HOST_ENTRY2])).toBe('merged');
+    expect(preToolUse()).toEqual([HOST_ENTRY, OLD, HOST_ENTRY2, SHIPPED]);
+  });
+  it('writes the same bytes with an empty legacy map as without the option', () => {
+    const host = { hooks: { PreToolUse: [HOST_ENTRY] }, model: 'x' };
+    write(tpl, TPL);
+    write(sp, host);
+    mergeSettingsFile(tpl, sp, FPS);
+    const without = readFileSync(sp, 'utf8');
+    write(sp, host);
+    mergeSettingsFile(tpl, sp, FPS, { legacyFingerprints: {} });
+    expect(readFileSync(sp, 'utf8')).toBe(without);
+  });
+});
