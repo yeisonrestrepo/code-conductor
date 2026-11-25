@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.59.3] - 2026-11-25
+
+### Fixed
+- **[BUG-093]** The Antigravity guard adapter now blocks an unknown argument on every tool it maps, not only on `run_command`. `read_file`, `write_file` and `edit_file` used to drop silently every argument other than the ones they map, so a future agy argument that changed the effective target (a path alias, a directory flag, a multi-file edit) would have been checked against `Path` while agy acted elsewhere; no bypass existed with the argument set measured on agy 1.5.15. `MAPPED` in `project-template/.agents/hooks/conductor-guard.mjs` is now a table of `{ args, map }` per tool, with the agy 1.5.15 lists `read_file`: `Path`, `StartLine`, `EndLine`, `toolSummary`; `write_file`: `Path`, `Content`, `toolSummary`; `edit_file`: `Path`, `Target`, `Replacement`, `toolSummary`; and `run_command` unchanged. `mapToolCall` checks the call's argument names against its tool's list before any mapper runs and blocks with the reason `run_command` already used, `argument "<name>" not covered by the guard`, or `arguments "<a>", "<b>"` sorted for several; the guard is not run. A call carrying both an unknown argument and a bad required argument is now reported by the unknown one; both still block. If a real agy release sends a file-tool argument not on its list, that tool's calls block naming it until the list learns it. The README's Antigravity table row now covers the four tools. Pinned by the `(BUG-093)` cases of `tests/hooks/antigravity-guard.test.js` (one block per file tool, the sorted plural reason, and a recorded `read_file` carrying `toolSummary` still reaching the guard). Landed from PR #327 (cc-lane-bot), intake of issue #316.
+
 ## [1.59.2] - 2026-11-25
 
 ### Fixed
