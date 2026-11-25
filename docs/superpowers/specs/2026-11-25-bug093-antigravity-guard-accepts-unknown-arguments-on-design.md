@@ -1,6 +1,6 @@
 # BUG-093 — Antigravity guard accepts unknown arguments on read_file, write_file and edit_file
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-25 by independent review (round 1)
 
 **Item:** `[BUG-093]` (intake of issue #316, follow-up of `[FEAT-063]`). Pillar 5: infrastructure, ecosystem and
 quality assurance.
