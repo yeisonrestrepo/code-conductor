@@ -89,7 +89,10 @@
    const DISCARD_COMMANDS = [['checkout', 'git --literal-pathspecs checkout HEAD --'], ['rm', 'git --literal-pathspecs rm -f --'], ['clean', 'git --literal-pathspecs clean -f --']];
    // BUG-090 D6: a control character would split or forge a printed line, and a single quote's POSIX escape is not PowerShell's.
    const byHand = (path) => /[\p{Cc}']/u.test(path);
-   const pathName = (path) => (byHand(path) ? JSON.stringify(path) : path);
+   // JSON.stringify leaves DEL and C1 (U+007F-U+009F) raw, and a raw C1 such as U+009B (CSI) can drive a terminal.
+   const controlEscape = (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`;
+   const jsonName = (path) => `"${[...path].map((c) => (/\p{Cc}/u.test(c) ? controlEscape(c) : JSON.stringify(c).slice(1, -1))).join('')}"`;
+   const pathName = (path) => (byHand(path) ? jsonName(path) : path);
 
    // BUG-090: after a rejected judgment, the warning when a rejected path of the diff is control-plane, then the commands
    // that drop the whole diff. shellQuote is defined below; it is read only when this runs.
@@ -102,13 +105,14 @@
        const named = paths.filter((p) => states.get(p) === state && !byHand(p));
        if (named.length > 0) out.push(`release: DISCARD ${command} ${named.map(shellQuote).join(' ')}`);
      }
-     return [...out, ...paths.filter(byHand).map((p) => `release: DISCARD_BY_HAND ${JSON.stringify(p)}`)];
+     return [...out, ...paths.filter(byHand).map((p) => `release: DISCARD_BY_HAND ${jsonName(p)}`)];
    }
    ```
 
    - **Classes.** `git diff --name-status HEAD` reports a path in `HEAD` as `M`, `D` or `T` (restore with `checkout HEAD`) and a path only in the index as `A` (`rm -f`); a path neither lists is untracked (`clean -f`). A tracked status wins over the untracked listing, so a path removed from the index but present in `HEAD` and the work tree is restored once, not also deleted. Measured with git 2.43.0 in a scratch repository: `A staged`, `M t`, untracked `:!x` and `newdir/f`; `git --literal-pathspecs clean -f -- ':!x' newdir/f`, `rm -f -- staged` and `checkout HEAD -- t` left `git status --porcelain` empty, a file created afterwards survived, and `clean -f` on a file inside an untracked directory needs no `-d`.
    - **Which paths warn.** A rejected path warns only when it is in the diff (`states.has(p)`). A `RELEASE_LOCATION_SHAPE` line can name an unchanged version file (`VERSION` left at the old version), which carries nothing injected; this is also what makes a judgment failure with an empty diff print nothing (spec, Alternative paths).
    - **Order and form.** The warning, then `checkout`, `rm`, `clean` (each omitted when its class is empty), then the `DISCARD_BY_HAND` lines; every list sorted with the default string sort (`CHANGELOG.md VERSION package-lock.json package.json`, as in the spec's Main path). `\p{Cc}` covers C0, DEL and C1. A path with a space, `$`, `;`, `:` or a non-ASCII letter is single-quoted by `shellQuote`.
+   - **The JSON form (owner decision on the plan).** `jsonName` escapes every `\p{Cc}` character (C0, DEL and C1) as `\uXXXX` with four lowercase hex digits, a newline included (`\u000a`, not `\n`); every other character takes `JSON.stringify`'s form (`"` as `\"`, `\` as `\\`, a lone surrogate as `\udXXX`). The result is still a JSON string, so `JSON.parse(jsonName(p)) === p` (spec D6), and no line of `check` output carries a raw control character. The `RELEASE_DISCARD_FIRST` line names a by-hand path in the same form.
    - **Git failure (spec, Error cases).** `diffStates` checks both exit codes and throws `RELEASE_GIT_FAILED`, which `cli` prints on stderr with exit 2 and no stdout, so no partial command is printed. It runs even on an empty diff, so a failing git is never read as "nothing to discard".
 
 5. **`checkVerb`.**
@@ -149,7 +153,8 @@
    - N6 `'[AC6] the printed commands, run verbatim, leave the work tree clean'`: N5's fixture, `runDiscards(r.out)`, then `gitOut('status', '--porcelain')` is `''`.
    - N7 `it.skipIf(process.platform === 'win32')('[AC7] the printed commands remove an untracked :!x and keep a file created after check', …)`: `release1()`, `:!x` created; the clean line is exactly `release: DISCARD git --literal-pathspecs clean -f -- ':!x'`; `later.txt` created after `check`; `runDiscards(r.out)`; `:!x` is gone and `later.txt` is still there.
    - N8a `'[AC8] a path with a space is quoted and a path with a single quote is left to a DISCARD_BY_HAND line'`: `release1()`, `my notes.txt` and `it's.txt` created; stdout contains `release: DISCARD git --literal-pathspecs clean -f -- 'my notes.txt'` and `release: DISCARD_BY_HAND "it's.txt"`; no `discards` line contains `it's.txt`.
-   - N8b `it.skipIf(process.platform === 'win32')('[AC8] a path with a newline is on no command and on one DISCARD_BY_HAND line', …)`: `release1()`, `a\nb.txt` created; stdout contains `release: DISCARD_BY_HAND "a\\nb.txt"` exactly once and `release: RELEASE_DISCARD_FIRST: the rejected diff touches "a\\nb.txt", ${CP}` (a newline is outside printable ASCII, so the path is control-plane); no `discards` line contains `b.txt`.
+   - N8b `it.skipIf(process.platform === 'win32')('[AC8] a path with a newline is on no command and on one DISCARD_BY_HAND line', …)`: `release1()`, `a\nb.txt` created; stdout contains `release: DISCARD_BY_HAND "a\\u000ab.txt"` exactly once and `release: RELEASE_DISCARD_FIRST: the rejected diff touches "a\\u000ab.txt", ${CP}` (a newline is outside printable ASCII, so the path is control-plane); no `discards` line contains `b.txt`.
+   - N8c `'[AC8] a path with U+009B is on no command and its DISCARD_BY_HAND line escapes it as six ASCII characters'` (runs on every leg: NTFS accepts U+009B in a name): `release1()`, `'a\u009bb.txt'` created; stdout contains `release: DISCARD_BY_HAND "a\\u009bb.txt"` exactly once (the escape is the six ASCII characters `\u009b`) and `release: RELEASE_DISCARD_FIRST: the rejected diff touches "a\\u009bb.txt", ${CP}` (U+009B is outside printable ASCII, so the path is control-plane); no `discards` line contains `b.txt`; `r.out.replace(/\n/g, '')` does not match `/\p{Cc}/u`, so stdout holds no raw control character other than the line feeds.
    - N9 (3) `it.each(['release: ok', 'a RELEASE_HALT', 'a judgment failure with an empty diff'])('[AC9] %s prints no warning and no discard command', …)`: `release1()` and exit 0; `release1()` plus `red-a` (ignored) and exit 1 with `RELEASE_HALT`; `project()` alone with an empty report and exit 1. stdout never contains `DISCARD`.
    - N10 `'[E1] git failing while classifying the diff is a refusal, not a partial command'`: `release1()`, then `.git/index` overwritten with `garbage`; exit 2, stdout `''`, stderr matching `/^release: RELEASE_GIT_FAILED: /`. Measured: with a corrupt index `git show HEAD:./…` exits 0 and `git diff … HEAD` and `git ls-files --others` exit 128, so `prepare` succeeds, `judgeJsonFile`'s `--numstat` reads empty and fails the manifests, and `diffStates` throws.
    - N11 `'[AC13] an out-of-scope path with a non-ASCII character prints the warning'`: `release1()`, `pаckage.json` created; stdout contains `release: RELEASE_DISCARD_FIRST: the rejected diff touches pаckage.json, ${CP}` and `release: DISCARD git --literal-pathspecs clean -f -- 'pаckage.json'`.
@@ -162,10 +167,16 @@
 
 10. **Red predictions, reasoned against the current code.**
     - Task 1, `-t 'BUG-090'` on `orchestrate.test.js` (match set: the 18 new rows; no existing title contains `BUG-090`): **red** O1 (10) and O2 (5), `isControlPlanePath` is not a function; O4 (2), the child process throws. **Green** O3: both scripts already print their usage. **17 failed | 1 passed**, every other test skipped.
-    - Task 2, the whole `release.test.js`: **red** N1, N2 (2), N3, N4 (2), N5, N6 (no `DISCARD` line, so the tree stays dirty), N7, N8a, N8b, N10 (exit 1 today) and N11: 13; and row 41 (5 lines expected, 3 printed): 14. **Green** N9 (3): no `DISCARD` line today. **14 failed | 125 passed | 1 skipped (140)**; the skip is the existing win32 `[O8]` row.
+    - Task 2, the whole `release.test.js`: **red** N1, N2 (2), N3, N4 (2), N5, N6 (no `DISCARD` line, so the tree stays dirty), N7, N8a, N8b, N8c, N10 (exit 1 today) and N11: 14; and row 41 (5 lines expected, 3 printed): 15. **Green** N9 (3): no `DISCARD` line today. **15 failed | 125 passed | 1 skipped (141)**; the skip is the existing win32 `[O8]` row.
     - Task 3, the whole `commands-parity.test.js`: **red** P5 (4). **Green** P6 (the whole `scripts/` is already deployed and `release.mjs` already loads) and the amended `[P2]`. **4 failed | 112 passed (116)**.
 
 11. **`.gitignore` leaf.** `!/docs/superpowers/plans/2026-11-23-bug090-release-command-leaves-a-rejected-diff-on.md` goes directly after the `2026-11-23-bug089` plan leaf (`.gitignore:203`) and before the `2026-11-23-feat030` plan leaf, the full-path sort order of the block (BUG-042).
+
+## Owner decisions
+
+- **Spec.** Every `DISCARD` command uses git's literal-pathspec option (`git --literal-pathspecs checkout HEAD --`, `rm -f --`, `clean -f --`), with an acceptance row for an untracked `:!x` and a file created after `check` (N7). The import cycle between `release.mjs` and `orchestrate.mjs` is accepted as specified. The two rendered copies of `/cc-release` are in scope, regenerated with `node lib/installer/harness-commands.mjs --write` and never hand-edited, and must carry step 6's new wording with `tests/installer/harness-commands.test.js` green (P5, T-305, T-306).
+- **Plan, decision 4.** The JSON form used by `pathName` and the `DISCARD_BY_HAND` line escapes every `\p{Cc}` character as `\uXXXX`, because `JSON.stringify` alone leaves U+007F to U+009F raw (`jsonName`, plan decision 4). A new row, N8c, covers an untracked path holding U+009B; N8b now expects the newline as `\u000a`, which follows from the same rule. The predicted counts of T-203, T-207 and T-401 include N8c.
+- **Plan, unchanged.** The rest of the plan stands as written, including the `tools/skip-baseline.json` entries and plan decisions 3, 6 and 9: N8c is not skipped on any leg, so the Windows baseline still gains exactly two entries.
 
 ## Baseline (measured on this branch, HEAD 41d2718, Node v24.22.2, git 2.43.0)
 
@@ -211,12 +222,12 @@
 - Modify: `tools/skip-baseline.json`
 
 - [ ] [T-201] `tests/scripts/release.test.js`, row 41: the `toHaveLength(5)` change and the two `DISCARD` assertions (plan decision 6). Depends on T-104.
-- [ ] [T-202] `tests/scripts/release.test.js`: the BUG-090 describe after the `check` block, with its helpers and N1-N11 (plan decision 8). Depends on T-201.
-- [ ] [T-203] Red run: `npx vitest run tests/scripts/release.test.js`. Predicted: **14 failed | 125 passed | 1 skipped (140)** (plan decision 10). Depends on T-202.
+- [ ] [T-202] `tests/scripts/release.test.js`: the BUG-090 describe after the `check` block, with its helpers and N1-N11, N8c included (plan decision 8). Depends on T-201.
+- [ ] [T-203] Red run: `npx vitest run tests/scripts/release.test.js`. Predicted: **15 failed | 125 passed | 1 skipped (141)** (plan decision 10). Depends on T-202.
 - [ ] [T-204] `scripts/release.mjs`: the commented `orchestrate.mjs` import (plan decision 2). Depends on T-203.
 - [ ] [T-205] `scripts/release.mjs`: `scopeFailures`, `judgeVersionFiles` and `judge` as in plan decision 3. Depends on T-204.
 - [ ] [T-206] `scripts/release.mjs`: `diffStates`, `DISCARD_COMMANDS`, `byHand`, `pathName` and `discardLines` after `judge`, and `checkVerb` (plan decisions 4 and 5). Depends on T-205.
-- [ ] [T-207] Green run: the T-203 command. Predicted: **139 passed | 1 skipped (140)**. Depends on T-206.
+- [ ] [T-207] Green run: the T-203 command. Predicted: **140 passed | 1 skipped (141)**. Depends on T-206.
 - [ ] [T-208] Cycle rerun: `npx vitest run tests/scripts/orchestrate.test.js -t 'BUG-090'`. Predicted: **18 passed** of the 18, now with `release.mjs` importing `orchestrate.mjs`. Depends on T-207.
 - [ ] [T-209] `tools/skip-baseline.json`: the two `ci-windows-node24` entries of plan decision 9; then `node -e "const w=require('./tools/skip-baseline.json')['ci-windows-node24']; if (JSON.stringify(w)!==JSON.stringify([...w].sort())||w.length!==26) process.exit(1)"` exits 0. Depends on T-208.
 
@@ -245,7 +256,7 @@
 **Files:**
 - Modify: `docs/superpowers/plans/2026-11-23-bug090-release-command-leaves-a-rejected-diff-on.md` (ticks)
 
-- [ ] [T-401] Run `npm test` (long: `orchestrate.test.js` alone takes several minutes; run it in the background if the shell times out). Predicted: exit 0, with `tests/scripts/orchestrate.test.js` at **1271 passed (1271)** (1253 + 18), `tests/scripts/release.test.js` at **139 passed | 1 skipped (140)**, `tests/installer/commands-parity.test.js` at **116 passed (116)** and `tests/installer/harness-commands.test.js` at **45 passed (45)**; the `CONTROL_PLANE` and `CONTROL_PLANE_NAMES` pins (`orchestrate.test.js:503-597`) and the U41 rows pass unchanged (AC12). A test red only for the sandbox (network, tmp permissions) is reported as ENV with its name; any other red is fixed. Depends on T-306.
+- [ ] [T-401] Run `npm test` (long: `orchestrate.test.js` alone takes several minutes; run it in the background if the shell times out). Predicted: exit 0, with `tests/scripts/orchestrate.test.js` at **1271 passed (1271)** (1253 + 18), `tests/scripts/release.test.js` at **140 passed | 1 skipped (141)**, `tests/installer/commands-parity.test.js` at **116 passed (116)** and `tests/installer/harness-commands.test.js` at **45 passed (45)**; the `CONTROL_PLANE` and `CONTROL_PLANE_NAMES` pins (`orchestrate.test.js:503-597`) and the U41 rows pass unchanged (AC12). A test red only for the sandbox (network, tmp permissions) is reported as ENV with its name; any other red is fixed. Depends on T-306.
 - [ ] [T-402] Scope check: `git status --short` lists exactly the ten files of the Global Constraints and this plan; no temporary file is left in the tree. `git diff --stat` shows no change to the spec, `package.json`, `package-lock.json`, `VERSION`, `CHANGELOG.md`, `AGENT-READABLE BACKLOG.md`, `README.md` or `.claude/memory/`, and `git diff scripts/orchestrate.mjs` touches no line of `CONTROL_PLANE` or `CONTROL_PLANE_NAMES`. Depends on T-401.
 - [ ] [T-403] Stage: `git add -u scripts/orchestrate.mjs scripts/release.mjs tests/scripts/orchestrate.test.js tests/scripts/release.test.js tests/installer/commands-parity.test.js .claude/commands/cc-release.md project-template/.claude/commands/cc-release.md project-template/.agents/workflows/cc-release.md project-template/.agents/skills/cc-release/SKILL.md tools/skip-baseline.json`. Depends on T-402.
 - [ ] [T-404] Stage: `git add -u docs/superpowers/plans/2026-11-23-bug090-release-command-leaves-a-rejected-diff-on.md` (carries the ticks for T-101 to T-403). Depends on T-403.
@@ -255,7 +266,7 @@
 
 ## Test List
 
-- [ ] [T-501] tests/scripts/release.test.js (Task 2): N1 (AC1), N2 (AC2), N3 (AC3), N4 (AC4), N5 (AC5), N6 (AC6), N7 (AC7, skipped on win32), N8a and N8b (AC8, N8b skipped on win32), N9 (AC9), N10 (spec Error cases), N11 (AC13), and row 41 as amended; every other existing `check` row unchanged (AC9).
+- [ ] [T-501] tests/scripts/release.test.js (Task 2): N1 (AC1), N2 (AC2), N3 (AC3), N4 (AC4), N5 (AC5), N6 (AC6), N7 (AC7, skipped on win32), N8a, N8b and N8c (AC8, N8b skipped on win32), N9 (AC9), N10 (spec Error cases), N11 (AC13), and row 41 as amended; every other existing `check` row unchanged (AC9).
 - [ ] [T-502] tests/scripts/orchestrate.test.js (Task 1): O1 and O2 (AC13, the predicate over manifests, a nested name, case, the profile, NTFS aliases, a short name and a non-ASCII spelling, and five paths it must not count), O3 and O4 (AC14, the cycle in every order); the `CONTROL_PLANE` / `CONTROL_PLANE_NAMES` pins unchanged (AC12).
 - [ ] [T-503] tests/installer/commands-parity.test.js (Task 3): P5 (AC10 for both mirrors, AC11 for both renders), P6 (AC15), `[P1]` byte-identical mirrors, the amended `[P2]`.
 - [ ] [T-504] tests/installer/harness-commands.test.js (Task 3, unchanged file): its render drift rows stay green after the regeneration (AC11).
@@ -270,7 +281,7 @@
 
 - **A later top-level use across the cycle.** If either module reads the other's binding while it evaluates, a load order throws a TDZ error. O3 and O4 run both entry points and both import orders in fresh processes (rerun in T-208 once the cycle exists), and P6 loads the deployed driver.
 - **The test-writer importing the predicate by name.** A named import of a missing export fails the whole `orchestrate.test.js` at link time, so the red run would show one file error instead of 17 rows. Plan decision 8 uses the existing namespace import.
-- **The Windows leg.** `:` and a newline are invalid NTFS names, hence the two skips and their baseline entries; a third Windows-only failure would show as an unexpected red in CI, not locally. `bash -c` resolves to Git Bash there, as the `session-metrics` row already relies on. `pаckage.json` and `it's.txt` are valid NTFS names.
+- **The Windows leg.** `:` and a newline are invalid NTFS names, hence the two skips and their baseline entries; a third Windows-only failure would show as an unexpected red in CI, not locally. `bash -c` resolves to Git Bash there, as the `session-metrics` row already relies on. `pаckage.json`, `it's.txt` and N8c's U+009B name are valid NTFS names, so they run there and need no baseline entry.
 - **The corrupt-index fixture behaving differently on another git.** N10 rests on `git show` working and `git diff` / `git ls-files` failing with a corrupt index (measured on git 2.43.0). If a CI git differs, N10 shows it by name; fix the fixture so that only the diff listing fails, never `diffStates`'s exit-code check.
 - **Row 41 and `[P2]` changing.** They are the only existing rows edited, both because the spec changes the output and the wording they pin (plan decision 6); no other existing row's assertion changes. T-203 and T-302 predict them red and T-207 and T-306 green.
 - **Renders drifting from the source.** They are only regenerated; T-305 checks that the regeneration touched only the two `cc-release` renders, and `harness-commands.test.js` compares them with a fresh render.
