@@ -1,6 +1,6 @@
 # FEAT-062: Release Driver Support for Prerelease and Non-Semver Version Schemes
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-26 by the owner
 
 Source: the `[FEAT-062]` entry in `AGENT-READABLE BACKLOG.md` (PILLAR 3), the intake of issue #295. Its acceptance criteria are answered in "Acceptance Criteria" below, tagged `[E1]`-`[E6]`, one tag per clause of the entry, in the entry's order. It builds on `[FEAT-035]` (shipped in `1.56.0`), whose spec is `docs/superpowers/specs/2026-11-22-feat035-release-agent-ship-band-design.md`; its choices are cited as `FEAT-035 C<n>` and its amendments as `FEAT-035 A<n>`.
 
