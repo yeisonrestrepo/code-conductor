@@ -329,6 +329,7 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-11-25-bug094-codex-guard-hook-fails-open-when-codex-starts-design.md
 !/docs/superpowers/specs/2026-11-25-bug095-release-discard-commands-split-paths-containing-design.md
 !/docs/superpowers/specs/2026-11-25-bug096-codex-legacy-hook-fingerprint-substring-match-design.md
+!/docs/superpowers/specs/2026-11-26-bug092-test-surface-split-bypassable-through-the-design.md
 # --- END tracked-surface block (BUG-042) ---
 
 # Kept for external writers. Both lines are redundant against the block above; each is
