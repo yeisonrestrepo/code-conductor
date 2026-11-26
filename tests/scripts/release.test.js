@@ -938,23 +938,28 @@ describe('release.mjs check discards a rejected diff [BUG-090]', () => {
     expect(gitOut('status', '--porcelain')).toBe('')
   })
 
-  it.skipIf(process.platform === 'win32')('[AC7] the printed commands remove an untracked :!x and keep a file created after check', () => {
-    release1()
-    put(':!x', 'x\n')
+  it.skipIf(process.platform === 'win32')('[AC7] the printed commands remove an untracked :/x and keep the tracked root x and a file created after check', () => {
+    project()
+    put('x', 'x\n')
+    commit('chore: tracked x')
+    applyRelease({ v: V, items: ['FEAT-001'] })
+    put(':/x', 'x\n')
     const r = check()
-    expect(lines(r.out)).toContain("release: DISCARD git --literal-pathspecs clean -f -- ':!x'")
+    expect(lines(r.out)).toContain('release: DISCARD git --literal-pathspecs clean -f -- :/x')
     put('later.txt', 'x\n')
     runDiscards(r.out)
-    expect(existsSync(join(root, ':!x'))).toBe(false)
+    expect(existsSync(join(root, ':/x'))).toBe(false)
+    expect(read('x')).toBe('x\n')
     expect(existsSync(join(root, 'later.txt'))).toBe(true)
   })
 
-  it('[AC8] a path with a space is quoted and a path with a single quote is left to a DISCARD_BY_HAND line', () => {
+  it('[AC8] a path with a space and a path with a single quote are each left to one DISCARD_BY_HAND line', () => {
     release1()
     put('my notes.txt', 'x\n')
     put("it's.txt", 'x\n')
     const r = check()
-    expect(r.out).toContain("release: DISCARD git --literal-pathspecs clean -f -- 'my notes.txt'")
+    expect(lines(r.out).filter((l) => l === 'release: DISCARD_BY_HAND "my notes.txt"')).toHaveLength(1)
+    expect(discards(r.out).some((l) => l.includes('notes.txt'))).toBe(false)
     expect(r.out).toContain('release: DISCARD_BY_HAND "it\'s.txt"')
     expect(discards(r.out).some((l) => l.includes("it's.txt"))).toBe(false)
   })
@@ -996,6 +1001,50 @@ describe('release.mjs check discards a rejected diff [BUG-090]', () => {
     expect(discards(r.out).some((l) => l.includes(path))).toBe(false)
     const added = r.out.split('\n').filter((l) => /^release: (RELEASE_DISCARD_FIRST|DISCARD)/.test(l))
     for (const l of added) expect(l).toMatch(/^[\x20-\x7e]*$/)
+  })
+
+  it.each([
+    ['a comma', 'a,b.txt', '"a,b.txt"'],
+    ['a leading @', '@x.txt', '"@x.txt"'],
+    ['a segment starting with @', 'dir/@x.txt', '"dir/@x.txt"'],
+    ['a leading -', '-x.txt', '"-x.txt"'],
+    ['a $', 'a$b.txt', '"a$b.txt"'],
+  ])('[AC8] a path with %s is on no command and on one DISCARD_BY_HAND line (BUG-095)', (_name, path, json) => {
+    release1()
+    put(path, 'x\n')
+    const r = check()
+    expect(lines(r.out).filter((l) => l === `release: DISCARD_BY_HAND ${json}`)).toHaveLength(1)
+    expect(discards(r.out).some((l) => l.includes(path))).toBe(false)
+  })
+
+  it('[AC8] a path with @ inside a segment stays bare on its command (BUG-095)', () => {
+    release1()
+    put('a@b.txt', 'x\n')
+    const r = check()
+    expect(r.out).toContain('release: DISCARD git --literal-pathspecs clean -f -- a@b.txt')
+    expect(lines(r.out).some((l) => l.startsWith('release: DISCARD_BY_HAND') && l.includes('a@b.txt'))).toBe(false)
+  })
+
+  it('[AC8] no DISCARD command holds a quote, and every path on one is bare (BUG-095)', () => {
+    release1()
+    for (const p of ['my notes.txt', 'a,b.txt', '@x.txt', '-x.txt', 'a$b.txt', 'a@b.txt', 'k=v.txt']) put(p, 'x\n')
+    const r = check()
+    const commands = discards(r.out)
+    expect(commands.length).toBeGreaterThan(0)
+    const isBare = (w) => /^[A-Za-z0-9._/:=@+-]+$/.test(w) && !w.startsWith('-') && !w.split('/').some((s) => s.startsWith('@'))
+    for (const l of commands) {
+      expect(l).not.toMatch(/['"]/)
+      for (const w of l.split(' -- ')[1].split(' ')) expect(isBare(w)).toBe(true)
+    }
+  })
+
+  it('[AC8] a control-plane path that is not bare is named by its JSON string in the warning (BUG-095)', () => {
+    release1()
+    put('a,b/package.json', 'x\n')
+    const r = check()
+    expect(r.out).toContain(`release: RELEASE_DISCARD_FIRST: the rejected diff touches "a,b/package.json", ${CP}`)
+    expect(r.out).toContain('release: DISCARD_BY_HAND "a,b/package.json"')
+    expect(discards(r.out).some((l) => l.includes('a,b/package.json'))).toBe(false)
   })
 
   it.each([
