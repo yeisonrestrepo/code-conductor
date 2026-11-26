@@ -9,7 +9,10 @@ on:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    # 30, not 20: on windows-latest tests/scripts/orchestrate.test.js alone takes about 18 min
+    # (1081 s on main, 2026-11-26) and the whole leg 15.5 to 19.6 min, so 20 cancelled any PR
+    # that added tests to that file (PR #335). The Linux legs finish far below either value.
+    timeout-minutes: 30
     # Each leg is a coverage decision, not a version preference [BUG-048]. Node 20 is
     # engines.node's floor and the only leg on which the node:sqlite-absent degradation
     # paths run for real; Node 24 executes the persistence suites that Node 20 skips.
