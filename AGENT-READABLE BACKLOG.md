@@ -1791,6 +1791,30 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #325; reported by the automated security review of
   the 1.59.2 release candidate (#324).
 
+### [ ] `[BUG-097]` Tree fingerprint follows symlinks and opens non-regular files during hand-back
+
+- Symptom: `scripts/orchestrate.mjs:701` (`contentHash`, called from
+  `treeFingerprint` at `:715`), per the issue, hashes every changed or
+  untracked, non-ignored path with `readFileSync(join(root, path))`.
+  That call follows symbolic links and opens non-regular files.
+- Impact per the issue: a test run during a `test-writer` or `code`
+  dispatch can leave an untracked symlink to a character device or a
+  named pipe. `orchestrate.mjs handback` then either buffers up to
+  about 2 GiB before the error is turned into `absent`, or blocks
+  indefinitely on the pipe, so the hand-back never completes. A symlink
+  to a file outside the project also gets that file's sha256 recorded
+  in the run file. Limited to local availability of the orchestrator
+  command: it does not disable the split check, and it requires the
+  role's own test command to create the link.
+- Fix shape suggested by the issue: `lstat` each path before reading
+  it; hash a symlink by its target string (`readlinkSync`), record any
+  other non-regular file as a fixed marker without opening it, and cap
+  the bytes read for a regular file. Add tests for an untracked symlink
+  and a FIFO (POSIX only).
+- Follow-up of `[BUG-092]`.
+- Intake of issue #337; reported by the automated security review of
+  #335.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
