@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.59.4] - 2026-11-26
+
+### Fixed
+- **[BUG-096]** `--project --codex` no longer replaces or drops a user's own `PreToolUse` entry in `.codex/hooks.json` because its command contains `pre-tool-use.mjs`. The installer used to recognise the old `[FEAT-063]` entry by that file name as a substring, so a hook such as `node tools/my-pre-tool-use.mjs` was taken for the conductor guard, with only the generic "replaced the old Codex guard hook" notice. `mergeSettingsFile` in `lib/installer/settings-merge.mjs` now takes `legacyCommands`, a list of exact commands, in place of `legacyFingerprints`, and the new `entryHasCommand` matches a hook command by strict equality, with no trimming or case folding. `lib/installer/deploy.mjs` passes `CODEX_LEGACY_COMMANDS`, the one command the old release shipped (`node .claude/hooks/pre-tool-use.mjs`). An entry that only resembles it, or a hand-edited copy such as `node .claude/hooks/pre-tool-use.mjs --log`, is now kept, and the shipped entry is appended after it with status `merged` and the "installed" report. The exact legacy entry is still replaced in place with `legacy-replaced` and the re-trust notice. Matching on the current fingerprint `conductor-guard.mjs` is unchanged, and Claude Code settings and Antigravity pass no legacy list, so their output is byte-identical. Still open: a host command that merely contains `conductor-guard.mjs` is still taken as owned. Pinned by the `(BUG-096)` cases of `mergeSettingsFile: legacy fingerprints (BUG-094)` in `tests/installer/settings-merge.test.js` (a similar-named entry survives, an entry extending the legacy command survives, and the exact legacy entry is replaced while a similar-named one keeps its position) and the `(BUG-096)` row of `deployProject: Codex hook (FEAT-048, BUG-094)` in `tests/installer/deploy.test.js`. Landed from PR #329 (cc-lane-bot), intake of issue #325.
+
 ## [1.59.3] - 2026-11-25
 
 ### Fixed
