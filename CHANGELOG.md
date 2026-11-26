@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.59.7] - 2026-11-26
+
+### Fixed
+- **[BUG-092]** The test-surface split between `test-writer` and `code` is now checked at the hand-back, so a file changed through the recorded test command no longer gets past it. Guard 5 only gates the write tools, and both roles may run the test command, which executes the files they just wrote, so either role could change files on the other side of the split through it. On a run with a test surface, `orchestrate.mjs install` now records in the run file, as `build_tree`, a fingerprint of the work tree for each `test-writer` and `code` dispatch: the new `treeFingerprint` in `scripts/orchestrate.mjs` maps every tracked file that differs from `HEAD` and every untracked, non-ignored file outside the router's own files to the sha256 of its bytes. `handback` takes the fingerprint again after its scope check and halts `ORCH_HANDBACK_SURFACE_CROSSED`, naming the files, when a file on the other role's side of the split changed during the dispatch, whatever `ops.f` lists. A fingerprint that is missing, malformed or taken for another role, or a git that can no longer list the tree, halts `ORCH_HANDBACK_SPLIT_UNVERIFIED`; `resume` drops the fingerprint, does not revert the files, and the re-install records a fresh one. The only fail-open case is a git already unavailable at `install`, which the hand-back line reports as `; split check: unavailable (<reason>)`. Writes into ignored paths or outside the project root are not checked. Both agent profiles and their template copies, the four `cc-orchestrate` copies, the README, the wiki's band-roles page and the `[FEAT-033]` spec now say the split holds against direct writes only and describe the two halts. Pinned by `test-surface split at hand-back [BUG-092]` in `tests/scripts/orchestrate.test.js`, the `[BUG-092 AC1]` and `[BUG-092 AC2]` rows of `tests/unit/role-profiles.test.js` (with the new `code` and `test-writer` profile hashes) and `cc-orchestrate split check [BUG-092 AC5]` in `tests/installer/commands-parity.test.js`. Landed from PR #335 (cc-lane-bot), intake of issue #312.
+
+### Changed
+- The `test` job's `timeout-minutes` in `.github/workflows/test.yml` is 30 instead of 20, because `tests/scripts/orchestrate.test.js` alone takes about 18 minutes on `windows-latest` and the Windows leg was cancelled at the limit on #335. CI-only, no id. Landed from PR #336 (owner).
+
 ## [1.59.6] - 2026-11-26
 
 ### Fixed

@@ -3677,3 +3677,23 @@ Residual named by the spec and not filed: an ignored file present before `start`
 Not verified at landing: #333 reports its three touched test files green (1606 tests) in its sandbox; the full suite is not reported. CI on the release PR is the authority.
 
 Upgrade note: in a run with declared known failures, `install qa` now lists untracked ignored paths and new untracked directories, so the `change files:` count can be higher than before and a failing test under a new ignored path is no longer counted as known. Reinstalling with `--project` ships the updated `qa` profile and `cc-orchestrate` command text.
+
+## Release: 1.59.7 batch landing 2026-11-26
+
+Two PRs merged since `v1.59.6`. Existing id closed:
+
+- BUG-092 (#335 by `cc-lane-bot[bot]`, the test-surface split bypassable through the recorded test command). `scripts/orchestrate.mjs` adds `treeFingerprint` (tracked files differing from `HEAD`, or every tracked file before the first commit, plus untracked non-ignored files, router files excluded by `isRouterFile`, each mapped to its sha256 through `contentHash`, or `absent`), `buildTree`, `isTreeRecord`, `changedPaths` and `splitCheck`. `install` records `build_tree` (`{ role, files }` or `{ role, unavailable }`) for `test-writer` and `code` on a run with a test surface; `handback` runs `splitCheck` after `claimHalt` and halts `ORCH_HANDBACK_SURFACE_CROSSED` on a file changed on the other role's side of the surface, whatever `ops.f` lists, or `ORCH_HANDBACK_SPLIT_UNVERIFIED` on a missing, malformed or other-role fingerprint or a git that can no longer list the tree. `build_tree` is dropped from the recorded hand-back and by `resume`, which reverts nothing. Fail-open only for a git already unavailable at `install`: the hand-back line gains `; split check: unavailable (<reason>)` and the entry records `split_check`. Docs: `.claude/agents/code.md`, `.claude/agents/test-writer.md` and their `project-template/` copies, the four `cc-orchestrate` copies, `README.md` (outside Known limits), `.github/wiki/pages/Band-Roles-and-Agents.md` and an amendment note in the FEAT-033 spec state the split holds against direct writes only. Tests: `test-surface split at hand-back [BUG-092]` in `tests/scripts/orchestrate.test.js` (with the FEAT-033 `[R9]` and `C4 [AC4]` hand-back lines updated for the unavailable note), `[BUG-092 AC1]` / `[BUG-092 AC2]` in `tests/unit/role-profiles.test.js` with the new `code` and `test-writer` profile hashes, and `cc-orchestrate split check [BUG-092 AC5]` in `tests/installer/commands-parity.test.js`. The PR also adds the spec and plan leaves to the `.gitignore` tracked-surface block. Follow-up of `[FEAT-033]`, reported by the automated security review of the 1.58.0 release candidate (#311). Intake of issue #312. Spec approved by the owner (recorded by the lane runner); plan approved by independent review, round 1.
+
+Without an id:
+
+- #336 by `yeisonrestrepo` (owner): `timeout-minutes` of the `test` job in `.github/workflows/test.yml` raised from 20 to 30, because `tests/scripts/orchestrate.test.js` alone takes about 18 minutes on `windows-latest` and the Windows leg of #335 was cancelled at the limit. CI-only maintainer chore, recorded under `### Changed`. Splitting that file or sharding the Windows leg is named in the PR as the longer-term fix and is not filed.
+
+Nothing minted: BUG-092 was reserved by triage #312. BUG-097 (triage #337, the follow-up of BUG-092: `contentHash` follows symlinks and opens non-regular files) and FEAT-062 (triage #295) stay reserved and open, and are not touched by this release.
+
+Known limits: the BUG-092 line is removed. The BUG-097 line and every other defect line are unchanged.
+
+Residuals named by the spec and not filed: the check detects at the hand-back and does not prevent the write; writes into ignored paths or outside the project root, a test that undoes its own change before the hand-back, and a non-cooperative agent rewriting `build_tree` through the test command are out of scope.
+
+Not verified at landing: #335 reports the full suite at 4851 passed, 16 skipped, with two `tests/unit/staging-convention.test.js` failures (AC7, AC8) in its sandbox's git, as earlier lane PRs did. CI on the release PR is the authority.
+
+Upgrade note: on a run with a test surface, a `test-writer` or `code` hand-back can now halt `ORCH_HANDBACK_SURFACE_CROSSED` or `ORCH_HANDBACK_SPLIT_UNVERIFIED`; a run file written mid-dispatch by an older version halts `ORCH_HANDBACK_SPLIT_UNVERIFIED` once, and `resume` re-dispatches with a fresh fingerprint. Reinstalling with `--project` ships the updated `code` and `test-writer` profiles and `cc-orchestrate` command text.
