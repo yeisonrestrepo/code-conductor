@@ -1,6 +1,6 @@
 # BUG-097: Tree fingerprint follows symlinks and opens non-regular files during hand-back
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-26 by independent review (round 2)
 
 Source: the `[BUG-097]` entry in `AGENT-READABLE BACKLOG.md` (PILLAR 5), the intake of issue #337, a follow-up of `[BUG-092]`. The entry names a symptom, an impact and a suggested fix shape (`lstat` each path; hash a symlink by its target string; record any other non-regular file as a fixed marker without opening it; cap the bytes read for a regular file; tests for an untracked symlink and a FIFO, POSIX only). It leaves the marker format, the cap and its behavior past the cap, and the treatment of the two out-of-tree ignore files open; "Choices the entry leaves open" below names what this spec takes and why.
 
