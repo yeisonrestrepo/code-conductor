@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.59.7] - 2026-11-26
+
+### Fixed
+- **[BUG-092]** The orchestrator's test-surface split between `test-writer` (test surface only) and `code` (outside it) can no longer be bypassed through the run's recorded test command. Guard 5 only gates the write tools, so a file changed while a role ran that command used to pass unseen. On a run with a test surface, `orchestrate.mjs install` now records in the run file, for each `test-writer` and `code` dispatch, a `build_tree` fingerprint: the sha256 of every tracked file that differs from `HEAD` and every untracked, non-ignored file, router files excluded (`treeFingerprint` and `buildTree` in `scripts/orchestrate.mjs`). At `handback`, the new `splitCheck` takes the fingerprint again and halts `ORCH_HANDBACK_SURFACE_CROSSED`, naming the files, when a file on the other role's side of the split changed during the dispatch, whatever `ops.f` lists. A missing or malformed fingerprint, or a git that can no longer list the tree, halts `ORCH_HANDBACK_SPLIT_UNVERIFIED`, and `resume` drops the fingerprint and re-dispatches the role with a fresh one; it does not revert the crossed files. The only fail-open case is a git already unavailable at `install`, recorded as `split check: unavailable (<reason>)` in the hand-back line. Both agent profiles and their `project-template/` copies, the four `cc-orchestrate` copies, the README, the wiki's band-roles page and the `[FEAT-033]` spec now state that Guard 5's split holds against direct writes only and describe the two halts. Pinned by `test-surface split at hand-back [BUG-092]` in `tests/scripts/orchestrate.test.js`, the `[BUG-092 AC1]` and `[BUG-092 AC2]` rows of `tests/unit/role-profiles.test.js` (with the new `code` and `test-writer` profile hashes) and `cc-orchestrate split check [BUG-092 AC5]` in `tests/installer/commands-parity.test.js`. Landed from PR #335 (cc-lane-bot), intake of issue #312.
+
 ## [1.59.6] - 2026-11-26
 
 ### Fixed
