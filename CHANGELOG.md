@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.59.5] - 2026-11-26
+
+### Fixed
+- **[BUG-095]** The `release: DISCARD` commands that `release.mjs check` prints after a rejected judgment no longer split a path in cmd.exe or PowerShell. A path with a space used to be single-quoted, which cmd.exe keeps as part of the argument, so `'a b'` reached git as `'a` and `b'`; a path with a comma such as `a,b.txt` was printed bare, which PowerShell reads as an array; and a path segment starting with `@` was printed bare, which PowerShell reads as splatting. No quoting means the same thing in a POSIX shell, PowerShell and cmd.exe, so a printed command now carries only paths that need none: the new `bareOnCommand` in `scripts/release.mjs` accepts a path only when it matches `BARE_PATH` (`[A-Za-z0-9._/:=@+-]`), does not start with `-` (Windows PowerShell splits `-x.txt`) and has no segment starting with `@`. Every other path, a space, comma, `$`, quote, cmd.exe metacharacter, control or non-ASCII character included, is printed on its own `release: DISCARD_BY_HAND` line as an escaped JSON string, and the `RELEASE_DISCARD_FIRST` warning names such a path by that same JSON string. A path with `@` inside a segment, such as `a@b.txt`, stays on its command. `shellQuote` and the handoff steps are unchanged. Pinned by the `(BUG-095)` `[AC8]` cases of `release.mjs check discards a rejected diff [BUG-090]` in `tests/scripts/release.test.js` (a comma, a leading `@`, a segment starting with `@`, a leading `-` and a `$` each on one `DISCARD_BY_HAND` line, `a@b.txt` staying bare, no printed command holding a quote or a non-bare path, and a control-plane `a,b/package.json` named by its JSON string in the warning); the `[AC7]` case now pins `--literal-pathspecs` with an untracked `:/x` while a tracked root `x` survives, and its renamed identity is updated in `tools/skip-baseline.json`. Landed from PR #331 (cc-lane-bot), intake of issue #321.
+
 ## [1.59.4] - 2026-11-26
 
 ### Fixed
