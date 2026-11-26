@@ -3661,3 +3661,19 @@ Known limits: the BUG-095 line is removed. Every other defect line is unchanged.
 Not verified at landing: #331 reports `tests/scripts/release.test.js` green and two `tests/unit/staging-convention.test.js` failures in its sandbox's git, as earlier lane PRs did; no run from a real cmd.exe or PowerShell is reported. CI on the release PR is the authority.
 
 Upgrade note: after a rejected `release.mjs check`, a rejected path containing a space, comma, `$`, a leading `-` or a segment starting with `@` is now listed on a `release: DISCARD_BY_HAND` line instead of on a printed command; discard those paths by hand. Paths that were already bare and safe print exactly as before.
+
+## Release: 1.59.6 batch landing 2026-11-26
+
+One PR merged since `v1.59.5`. Existing id closed:
+
+- BUG-091 (#333 by `cc-lane-bot[bot]`, the known-failure change list omitting new files created under ignored paths). `changeList` in `scripts/orchestrate.mjs` adds two `git ls-files` calls, `--others --ignored --exclude-standard --directory --no-empty-directory -z` and `--others --exclude-standard --directory --no-empty-directory -z`, and lists as `A` every untracked ignored path plus every new untracked directory (an entry ending in `/`) not under `ROUTER_DIR` (`.conductor/`); `nulPaths` reads each call NUL-separated, and a non-zero status from any of the four calls keeps the `unavailable` reason. A wholly untracked directory is one `<dir>/` entry; empty ignored directories are not listed. Other ignored router files outside `.conductor/` (`orchestrator-run.json`, `band-envelope.json`, `session-snapshot.json`) are listed on purpose (spec decision 3). The `qa` profile treats a listed `<dir>/` entry as matching a failing test's file through a leading part of its path ending in `/`, in both directions, and `.claude/commands/cc-orchestrate.md`, its `project-template/` copy, `project-template/.agents/workflows/cc-orchestrate.md` and `project-template/.agents/skills/cc-orchestrate/SKILL.md` describe the wider list. Tests: `known-failure change list holds ignored paths and new directories [BUG-091]` in `tests/scripts/orchestrate.test.js` (and the base-list fixture updated for the router's ignored `.claude/memory/`), `directory entries in the qa change list [BUG-091]` in `tests/unit/role-profiles.test.js` with the new `qa` profile hash, and `cc-orchestrate qa change list [BUG-091 AC8]` in `tests/installer/commands-parity.test.js`. The PR also adds the spec and plan leaves to the `.gitignore` tracked-surface block. Follow-up of `[BUG-089]`, reported by the automated security review of #304. Intake of issue #306. Spec and plan approved by the owner (recorded by the lane runner).
+
+Nothing minted: BUG-091 was reserved by triage #306. BUG-092 (triage #312) and FEAT-062 (triage #295) stay reserved and are not touched by this release.
+
+Known limits: the BUG-091 line is removed. Every other defect line is unchanged.
+
+Residual named by the spec and not filed: an ignored file present before `start` is listed as created (git keeps no record of untracked files), which only makes fewer failures known; telling such files apart would need a snapshot at `start` (spec decision 2, Out of Scope). Refusing every known failure when `.gitignore` changed was considered and not adopted (spec decision 1).
+
+Not verified at landing: #333 reports its three touched test files green (1606 tests) in its sandbox; the full suite is not reported. CI on the release PR is the authority.
+
+Upgrade note: in a run with declared known failures, `install qa` now lists untracked ignored paths and new untracked directories, so the `change files:` count can be higher than before and a failing test under a new ignored path is no longer counted as known. Reinstalling with `--project` ships the updated `qa` profile and `cc-orchestrate` command text.
