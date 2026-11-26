@@ -3647,3 +3647,17 @@ Residual named by the spec and not filed: the current fingerprint `conductor-gua
 Not verified at landing: no live Codex session is reported by #329. #329 reports `tests/unit/staging-convention.test.js` AC7/AC8 failing in its sandbox's git (`git add -u` on an untracked path exits 0), as earlier lane PRs did. CI on the release PR is the authority.
 
 Upgrade note: reinstalling with `--project --codex` now keeps a user's own `PreToolUse` entry whose command contains `pre-tool-use.mjs` and appends the shipped entry after it; a hand-edited copy of the old conductor command is also kept beside the new entry rather than replaced. An install without `--codex` is unchanged.
+
+## Release: 1.59.5 batch landing 2026-11-26
+
+One PR merged since `v1.59.4`. Existing id closed:
+
+- BUG-095 (#331 by `cc-lane-bot[bot]`, the release discard commands splitting paths with a space, a comma or a leading `@` in cmd.exe and PowerShell). `scripts/release.mjs` adds `BARE_PATH` (`/^[A-Za-z0-9._/:=@+-]+$/`) and `bareOnCommand(path)`, which also rejects a leading `-` and any `/`-separated segment starting with `@`; `discardLines` puts only such paths on the `checkout` / `rm` / `clean` commands and every other path on one `release: DISCARD_BY_HAND` line as its escaped JSON string, and the new `pathName` names a non-bare control-plane path by that same string in `RELEASE_DISCARD_FIRST`. The old `byHand` test (printable ASCII, quotes, backtick, `& | < > ^ %`) is subsumed by the narrower allowlist, so `$` and `,` now also go by hand. `SAFE_ARGUMENT` / `shellQuote` and the handoff steps are unchanged (the handoff still quotes POSIX-style, spec Out of Scope). Tests: new `(BUG-095)` `[AC8]` cases in `release.mjs check discards a rejected diff [BUG-090]` of `tests/scripts/release.test.js` (comma, leading `@`, `@` segment, leading `-`, `$`; `a@b.txt` stays bare; no command holds a quote and every word on one is bare; the `a,b/package.json` warning), and the `[AC7]` case renamed and reworked to pin `--literal-pathspecs` with an untracked `:/x` while a tracked root `x` stays, its Windows skip identity updated in `tools/skip-baseline.json`. The PR also adds the spec and plan leaves to the `.gitignore` tracked-surface block. Follow-up of `[BUG-090]`, reported by the automated security review of the 1.59.1 release candidate (#320). Intake of issue #321. Spec and plan approved by independent review, round 1 each.
+
+Nothing minted: BUG-095 was reserved by triage #321. BUG-092 (triage #312), BUG-091 (triage #306) and FEAT-062 (triage #295) stay reserved and are not touched by this release.
+
+Known limits: the BUG-095 line is removed. Every other defect line is unchanged.
+
+Not verified at landing: #331 reports `tests/scripts/release.test.js` green and two `tests/unit/staging-convention.test.js` failures in its sandbox's git, as earlier lane PRs did; no run from a real cmd.exe or PowerShell is reported. CI on the release PR is the authority.
+
+Upgrade note: after a rejected `release.mjs check`, a rejected path containing a space, comma, `$`, a leading `-` or a segment starting with `@` is now listed on a `release: DISCARD_BY_HAND` line instead of on a printed command; discard those paths by hand. Paths that were already bare and safe print exactly as before.
