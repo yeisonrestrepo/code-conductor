@@ -1,6 +1,6 @@
 # BUG-098: Split check fingerprint diffs against the current HEAD instead of the HEAD recorded at install
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-26 by independent review (round 1)
 
 Source: the `[BUG-098]` entry in `AGENT-READABLE BACKLOG.md` (PILLAR 5), the intake of issue #341, a follow-up of `[BUG-092]`. The entry names a symptom (a moving `HEAD` and an edited `.git/info/exclude` hide files from the hand-back fingerprint), an impact (only the after-the-fact detection of `[BUG-092]` is affected; Guard 5 still denies direct writes) and a fix shape for `HEAD` (record it at install, diff against it at hand-back, treat a `HEAD` change as a crossing). It names no fix for the ignore file and no required test; "Choices the entry leaves open" below names what this spec takes and why.
 
