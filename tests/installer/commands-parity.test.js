@@ -673,6 +673,19 @@ describe('cc-release [FEAT-035]', () => {
   });
 });
 
+describe('cc-release publish channel [FEAT-062]', () => {
+  it.each([...RELEASE_MIRRORS, 'project-template/.agents/workflows/cc-release.md', 'project-template/.agents/skills/cc-release/SKILL.md'])('[E4, D1] %s names the channel in the publish confirmation, and an unverified one as declared in the profile', (rel) => {
+    const text = read(rel);
+    for (const phrase of [
+      '"this publishes to `<PUBLISH-TARGET>` and cannot be undone"',
+      'a `PUBLISH-CHANNEL` line',
+      '"this publishes to `<PUBLISH-TARGET>` on channel `<PUBLISH-CHANNEL>` and cannot be undone"',
+      'ends in `unverified`',
+      '"this publishes to `<PUBLISH-TARGET>` on channel `<channel>` as declared in the profile, not verified, and cannot be undone"',
+    ]) expect(text).toContain(phrase);
+  });
+});
+
 describe('the release role ships [FEAT-035 O5]', () => {
   let cwd;
   beforeAll(() => {

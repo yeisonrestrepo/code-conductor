@@ -210,10 +210,10 @@
 **Files:**
 - Test: `tests/scripts/release.test.js`
 
-- [ ] [T-101] `tests/scripts/release.test.js`: add `compareVersions` to the import at `:7`. Depends on T-005.
-- [ ] [T-102] `tests/scripts/release.test.js`: leave test 12 and every other existing test unmodified (plan decision 8, D2); no edit in this step, only the check that `git diff` touches no existing `it(` body. Depends on T-101.
-- [ ] [T-103] `tests/scripts/release.test.js`: the four `[FEAT-062]` `describe` blocks and their helpers (plan decisions 9 and 10), before the `// ---- H.` section comment. Depends on T-102.
-- [ ] [T-104] Red run: `npx vitest run tests/scripts/release.test.js -t 'FEAT-062'`. Its full match set is the 90 new tests (no existing title contains `FEAT-062`). Predicted: **88 failed | 2 passed**, 152 skipped (242). The two passes are the `[E1]` row with no `scheme` and the `[E6]` `compareVersions` row, both true of the shipped driver. Then `npx vitest run tests/scripts/release.test.js -t '^release.mjs init \[FEAT-035\] 12\.'`: **1 passed** (the unmodified test 12 holds before the change). Any other split means a test is wrong: fix the test, not the prediction. Depends on T-103.
+- [X] [T-101] `tests/scripts/release.test.js`: add `compareVersions` to the import at `:7`. Depends on T-005.
+- [X] [T-102] `tests/scripts/release.test.js`: leave test 12 and every other existing test unmodified (plan decision 8, D2); no edit in this step, only the check that `git diff` touches no existing `it(` body. Depends on T-101.
+- [X] [T-103] `tests/scripts/release.test.js`: the four `[FEAT-062]` `describe` blocks and their helpers (plan decisions 9 and 10), before the `// ---- H.` section comment. Depends on T-102.
+- [X] [T-104] Red run: `npx vitest run tests/scripts/release.test.js -t 'FEAT-062'`. Its full match set is the 90 new tests (no existing title contains `FEAT-062`). Predicted: **88 failed | 2 passed**, 152 skipped (242). The two passes are the `[E1]` row with no `scheme` and the `[E6]` `compareVersions` row, both true of the shipped driver. Then `npx vitest run tests/scripts/release.test.js -t '^release.mjs init \[FEAT-035\] 12\.'`: **1 passed** (the unmodified test 12 holds before the change). Any other split means a test is wrong: fix the test, not the prediction. Depends on T-103.
 
 ---
 
@@ -222,9 +222,9 @@
 **Files:**
 - Modify: `scripts/release.mjs`
 
-- [ ] [T-201] `scripts/release.mjs`: the version-scheme section, `compareVersions` with its scheme argument and `compareTriple`, and `refuseInvalidVersion` (plan decision 1). Depends on T-104.
-- [ ] [T-202] `scripts/release.mjs`: `KNOWN` gains `channel`; `checkTarget`, `checkPublishArgv`, `checkScheme`, `checkPrerelease`, `latestRisk`, `knownPublish`; `validateProfile`'s optional keys and its `checkScheme` call (plan decision 2). Depends on T-201.
-- [ ] [T-203] Run: `npx vitest run tests/scripts/release.test.js -t 'version schemes in the profile \[FEAT-062\]|validator and surface'`. Predicted: **the 32 `[FEAT-062]` profile rows and every validator-suite test pass**, nothing failed. Depends on T-202.
+- [X] [T-201] `scripts/release.mjs`: the version-scheme section, `compareVersions` with its scheme argument and `compareTriple`, and `refuseInvalidVersion` (plan decision 1). Depends on T-104.
+- [X] [T-202] `scripts/release.mjs`: `KNOWN` gains `channel`; `checkTarget`, `checkPublishArgv`, `checkScheme`, `checkPrerelease`, `latestRisk`, `knownPublish`; `validateProfile`'s optional keys and its `checkScheme` call (plan decision 2). Depends on T-201.
+- [X] [T-203] Run: `npx vitest run tests/scripts/release.test.js -t 'version schemes in the profile \[FEAT-062\]|validator and surface'`. Predicted: **the 32 `[FEAT-062]` profile rows and every validator-suite test pass**, nothing failed. Depends on T-202.
 
 ---
 
@@ -233,8 +233,8 @@
 **Files:**
 - Modify: `scripts/release.mjs`
 
-- [ ] [T-301] `scripts/release.mjs`: `CAPTURE` without `version`, `compile`'s scheme argument and `scheme` field, `parseLine`'s validation, and the scheme passed by `locationValues`, `lineLocation`, `jsonLocation`, `changelogAnchor` and `sectionOf` (plan decision 3). Depends on T-203.
-- [ ] [T-302] `scripts/release.mjs`: `prepare` and `handoffContext` through `refuseInvalidVersion` and the scheme's order; `commitLines(root, profile, version)` with `skipsPrereleases`; `digestLines` and `notesFromCommits` passing the version; `schemeLines` (plan decision 4). Depends on T-301.
+- [X] [T-301] `scripts/release.mjs`: `CAPTURE` without `version`, `compile`'s scheme argument and `scheme` field, `parseLine`'s validation, and the scheme passed by `locationValues`, `lineLocation`, `jsonLocation`, `changelogAnchor` and `sectionOf` (plan decision 3). Depends on T-203.
+- [X] [T-302] `scripts/release.mjs`: `prepare` and `handoffContext` through `refuseInvalidVersion` and the scheme's order; `commitLines(root, profile, version)` with `skipsPrereleases`; `digestLines` and `notesFromCommits` passing the version; `schemeLines` (plan decision 4). Depends on T-301.
 
 ---
 
@@ -243,7 +243,7 @@
 **Files:**
 - Modify: `scripts/release.mjs`
 
-- [ ] [T-401] `scripts/release.mjs`: `publishStep` and its use in `stepLines` (plan decision 5). Depends on T-302.
+- [X] [T-401] `scripts/release.mjs`: `publishStep` and its use in `stepLines` (plan decision 5). Depends on T-302.
 
 ---
 
@@ -252,8 +252,8 @@
 **Files:**
 - Modify: `scripts/release.mjs`
 
-- [ ] [T-501] `scripts/release.mjs`: `VERSION_TOKEN` in the three detectors, `currentPath` from `detectVersions`, `schemeEvidence`, `refuseUnsupported`, `detectScheme`, `prereleaseProposal`, the new `proposal` rows, and `initVerb`'s filtered file (plan decisions 6 and 7). Depends on T-401.
-- [ ] [T-502] Green run: `npx vitest run tests/scripts/release.test.js`. Predicted: **241 passed | 1 skipped (242)**. Depends on T-501.
+- [X] [T-501] `scripts/release.mjs`: `VERSION_TOKEN` in the three detectors, `currentPath` from `detectVersions`, `schemeEvidence`, `refuseUnsupported`, `detectScheme`, `prereleaseProposal`, the new `proposal` rows, and `initVerb`'s filtered file (plan decisions 6 and 7). Depends on T-401.
+- [X] [T-502] Green run: `npx vitest run tests/scripts/release.test.js`. Predicted: **241 passed | 1 skipped (242)**. Depends on T-501.
 
 ---
 
@@ -266,11 +266,11 @@
 - Modify: `project-template/.agents/workflows/cc-release.md`
 - Modify: `project-template/.agents/skills/cc-release/SKILL.md`
 
-- [ ] [T-601] `tests/installer/commands-parity.test.js`: the `cc-release publish channel [FEAT-062]` block of plan decision 11, after `:674`. Depends on T-502.
-- [ ] [T-602] Red run: `npx vitest run tests/installer/commands-parity.test.js -t 'FEAT-062'`. Its full match set is the 4 new rows. Predicted: **4 failed**, 124 skipped (128). Depends on T-601.
-- [ ] [T-603] `.claude/commands/cc-release.md` (Edit tool): the Handoff step 3 sentence of plan decision 11. Depends on T-602.
-- [ ] [T-604] `project-template/.claude/commands/cc-release.md`, `project-template/.agents/workflows/cc-release.md`, `project-template/.agents/skills/cc-release/SKILL.md`: the same replacement, byte-identical. Depends on T-603.
-- [ ] [T-605] Green run: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: **128 passed (128)**. Depends on T-604.
+- [X] [T-601] `tests/installer/commands-parity.test.js`: the `cc-release publish channel [FEAT-062]` block of plan decision 11, after `:674`. Depends on T-502.
+- [X] [T-602] Red run: `npx vitest run tests/installer/commands-parity.test.js -t 'FEAT-062'`. Its full match set is the 4 new rows. Predicted: **4 failed**, 124 skipped (128). Depends on T-601.
+- [X] [T-603] `.claude/commands/cc-release.md` (Edit tool): the Handoff step 3 sentence of plan decision 11. Depends on T-602.
+- [X] [T-604] `project-template/.claude/commands/cc-release.md`, `project-template/.agents/workflows/cc-release.md`, `project-template/.agents/skills/cc-release/SKILL.md`: the same replacement, byte-identical. Depends on T-603.
+- [X] [T-605] Green run: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: **128 passed (128)**. Depends on T-604.
 
 ---
 
@@ -279,24 +279,24 @@
 **Files:**
 - Modify: `docs/superpowers/plans/2026-11-26-feat062-release-driver-support-for-prerelease-and-non.md` (ticks)
 
-- [ ] [T-701] Run `npm test` (long: run it in the background if the shell times out). Predicted: exit 0, with `tests/scripts/release.test.js` at **241 passed | 1 skipped** and `tests/installer/commands-parity.test.js` at **128 passed**. A red is called ENV only if the sandbox caused it (network, tmp permissions) and its file is not one this plan touches; report it with its name. Any other red is fixed. Depends on T-605.
-- [ ] [T-702] Scope check: `git status --short` lists exactly the seven files of the Global Constraints and this plan; no temporary file is left in the tree. `git diff --stat` shows no change since Task 0 to the FEAT-062 spec, `scripts/orchestrate.mjs`, `.claude/release-profile.json`, the hooks, the installer, `.github/workflows/`, `.github/actions/` or any record. Depends on T-701.
-- [ ] [T-703] Stage: `git add -u scripts/release.mjs tests/scripts/release.test.js tests/installer/commands-parity.test.js .claude/commands/cc-release.md project-template/.claude/commands/cc-release.md project-template/.agents/workflows/cc-release.md project-template/.agents/skills/cc-release/SKILL.md` (all tracked). Depends on T-702.
-- [ ] [T-704] Stage: `git add -u docs/superpowers/plans/2026-11-26-feat062-release-driver-support-for-prerelease-and-non.md` (carries the ticks for T-101 to T-703). Depends on T-703.
-- [ ] [T-705] Commit: `feat: release driver version schemes and a prerelease publish step that never moves latest [FEAT-062]`. Depends on T-704.
+- [X] [T-701] Run `npm test` (long: run it in the background if the shell times out). Predicted: exit 0, with `tests/scripts/release.test.js` at **241 passed | 1 skipped** and `tests/installer/commands-parity.test.js` at **128 passed**. A red is called ENV only if the sandbox caused it (network, tmp permissions) and its file is not one this plan touches; report it with its name. Any other red is fixed. Depends on T-605.
+- [X] [T-702] Scope check: `git status --short` lists exactly the seven files of the Global Constraints and this plan; no temporary file is left in the tree. `git diff --stat` shows no change since Task 0 to the FEAT-062 spec, `scripts/orchestrate.mjs`, `.claude/release-profile.json`, the hooks, the installer, `.github/workflows/`, `.github/actions/` or any record. Depends on T-701.
+- [X] [T-703] Stage: `git add -u scripts/release.mjs tests/scripts/release.test.js tests/installer/commands-parity.test.js .claude/commands/cc-release.md project-template/.claude/commands/cc-release.md project-template/.agents/workflows/cc-release.md project-template/.agents/skills/cc-release/SKILL.md` (all tracked). Depends on T-702.
+- [X] [T-704] Stage: `git add -u docs/superpowers/plans/2026-11-26-feat062-release-driver-support-for-prerelease-and-non.md` (carries the ticks for T-101 to T-703). Depends on T-703.
+- [X] [T-705] Commit: `feat: release driver version schemes and a prerelease publish step that never moves latest [FEAT-062]`. Depends on T-704.
 
 ---
 
 ## Test List
 
-- [ ] [T-801] `tests/scripts/release.test.js` (Task 1), `[E1]`: the 7 valid and 13 refused profile rows (plan decision 10).
-- [ ] [T-802] `tests/scripts/release.test.js` (Task 1), `[E2]`: init tests `i1` to `i13` (15 tests), with `i7` to `i9` pinning D2's evidence and `(default)` rows; test 12 unmodified (plan decision 8).
-- [ ] [T-803] `tests/scripts/release.test.js` (Task 1), `[E3]`: 13 refusals, 6 accepted versions with their `SCHEME` line, 5 non-advances, 3 precedence chains and the equality test.
-- [ ] [T-804] `tests/scripts/release.test.js` (Task 1), `[E4]` and D1: the 5 refused and 7 accepted prerelease argvs, handoff `h1` to `h6` (7 tests), including `PUBLISH-CHANNEL next unverified`.
-- [ ] [T-805] `tests/scripts/release.test.js` (Task 1), `[E5]`: the 2 check-and-handoff rows, the 3 range rows and the null-changelog notes test.
-- [ ] [T-806] `tests/scripts/release.test.js` (Task 1), `[E6]`: the byte-identity test (plan decision 9), the default `compareVersions` row, and every existing test unmodified, test 12 included (D2).
-- [ ] [T-807] `tests/installer/commands-parity.test.js` (Task 6), `[E4]` and D1: the 4 rows over the four `cc-release` copies; the existing `[P1]` and `[O6]` rows keep the mirrors byte-identical.
-- [ ] [T-808] No E2E/UI test: there is no UI. `orchestrate.mjs envelope release` reaches the new keys only through `loadProfile`, whose validator the `[E1]` rows pin, so no orchestrate test is added. CI legs: no new test is conditionally skipped, so no leg's skipped set in `tools/skip-baseline.json` changes.
+- [X] [T-801] `tests/scripts/release.test.js` (Task 1), `[E1]`: the 7 valid and 13 refused profile rows (plan decision 10).
+- [X] [T-802] `tests/scripts/release.test.js` (Task 1), `[E2]`: init tests `i1` to `i13` (15 tests), with `i7` to `i9` pinning D2's evidence and `(default)` rows; test 12 unmodified (plan decision 8).
+- [X] [T-803] `tests/scripts/release.test.js` (Task 1), `[E3]`: 13 refusals, 6 accepted versions with their `SCHEME` line, 5 non-advances, 3 precedence chains and the equality test.
+- [X] [T-804] `tests/scripts/release.test.js` (Task 1), `[E4]` and D1: the 5 refused and 7 accepted prerelease argvs, handoff `h1` to `h6` (7 tests), including `PUBLISH-CHANNEL next unverified`.
+- [X] [T-805] `tests/scripts/release.test.js` (Task 1), `[E5]`: the 2 check-and-handoff rows, the 3 range rows and the null-changelog notes test.
+- [X] [T-806] `tests/scripts/release.test.js` (Task 1), `[E6]`: the byte-identity test (plan decision 9), the default `compareVersions` row, and every existing test unmodified, test 12 included (D2).
+- [X] [T-807] `tests/installer/commands-parity.test.js` (Task 6), `[E4]` and D1: the 4 rows over the four `cc-release` copies; the existing `[P1]` and `[O6]` rows keep the mirrors byte-identical.
+- [X] [T-808] No E2E/UI test: there is no UI. `orchestrate.mjs envelope release` reaches the new keys only through `loadProfile`, whose validator the `[E1]` rows pin, so no orchestrate test is added. CI legs: no new test is conditionally skipped, so no leg's skipped set in `tools/skip-baseline.json` changes.
 
 ## Commit Order
 
