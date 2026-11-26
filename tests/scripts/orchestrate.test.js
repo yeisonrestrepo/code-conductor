@@ -5085,7 +5085,8 @@ describe('known failures in changed files [BUG-089]', () => {
     for (const name of ['old', 'kept', 'gone']) writeFileSync(join(root, 'tests', `${name}.test.js`), 'x\n');
     fixtureCommit();
   } };
-  const SPEC_ONLY = 'A docs/specs/demo-design.md\n';
+  // BUG-091: the fixture's base list, the router's ignored .claude/memory/ and the new docs/specs/ with its spec file.
+  const BASE_LIST = 'A .claude/memory/\nA docs/specs/\nA docs/specs/demo-design.md\n';
   const withBase = (base) => ({ ...runFile(), security: { ...runFile().security, base } });
 
   it.each(['a', 'FAIL', 'tests/ab.js', '   tests/a.js   ', 'AssertionError', 'authentication_tests_for_the_store', 'autenticación', 'autenticación_de_usuarios'])(
@@ -5102,7 +5103,7 @@ describe('known failures in changed files [BUG-089]', () => {
       expect(r.out.endsWith(`; known failures: 1 ${JSON.stringify([value])}`)).toBe(true);
     });
 
-  it('[AC4] install qa lists created, modified, renamed and untracked files, sorted, leaving out deleted and ignored ones', () => {
+  it('[AC4] install qa lists created, modified, renamed, untracked and ignored files, sorted, leaving out deleted ones', () => {
     driveTo('qa', QA_RUN);
     writeFileSync(join(root, 'tests/kept.test.js'), 'y\n');
     fixtureGit('mv', 'tests/old.test.js', 'tests/new.test.js');
@@ -5111,15 +5112,15 @@ describe('known failures in changed files [BUG-089]', () => {
     writeFileSync(join(root, 'ignored.txt'), 'i\n');
     const r = orch(['install', 'qa']);
     expect(r.status).toBe(0);
-    expect(lastLine(r)).toBe(changeLine(3, 1));
-    expect(listText()).toBe('A docs/specs/demo-design.md\nA tests/a b.test.js\nM tests/kept.test.js\nA tests/new.test.js\n');
+    expect(lastLine(r)).toBe(changeLine(6, 1));
+    expect(listText()).toBe(`${BASE_LIST}A ignored.txt\nA tests/a b.test.js\nM tests/kept.test.js\nA tests/new.test.js\n`);
   });
 
   it('[AC4] install qa --check prints the change line and writes nothing', () => {
     driveTo('qa', QA_RUN);
     const r = orch(['install', 'qa', '--check']);
     expect(r.status).toBe(0);
-    expect(lastLine(r)).toBe(changeLine(1, 0));
+    expect(lastLine(r)).toBe(changeLine(3, 0));
     expect(existsSync(join(root, LIST))).toBe(false);
   });
 
@@ -5131,7 +5132,7 @@ describe('known failures in changed files [BUG-089]', () => {
     rmSync(join(root, 'tests/first.test.js'));
     writeFileSync(join(root, 'tests/second.test.js'), 'x\n');
     expect(orch(['install', 'qa']).status).toBe(0);
-    expect(listText()).toBe(`${SPEC_ONLY}A tests/second.test.js\n`);
+    expect(listText()).toBe(`${BASE_LIST}A tests/second.test.js\n`);
   });
 
   it('[AC4] a second install qa that finds the list unavailable removes the earlier file', () => {
@@ -5199,8 +5200,101 @@ describe('known failures in changed files [BUG-089]', () => {
     runFileText(JSON.stringify({ ...runFile(), known_failures: ['a'] }));
     const r = orch(['install', 'qa']);
     expect(r.status).toBe(0);
-    expect(lastLine(r)).toBe(changeLine(1, 0));
-    expect(listText()).toBe(SPEC_ONLY);
+    expect(lastLine(r)).toBe(changeLine(3, 0));
+    expect(listText()).toBe(BASE_LIST);
+  });
+});
+
+describe('known-failure change list holds ignored paths and new directories [BUG-091]', () => {
+  const KF = 'tests/contract/x.test.js > isolated store';
+  const LIST = '.conductor/handback/qa-change.txt';
+  const listText = () => readFileSync(join(root, LIST), 'utf8');
+  const lastLine = (r) => r.out.split('\n').at(-1);
+  const changeLine = (created, modified) => `change files: ${created} created, ${modified} modified (${LIST})`;
+  const BASE_LIST = 'A .claude/memory/\nA docs/specs/\nA docs/specs/demo-design.md\n';
+  // The base commit holds tracked tests and the ignore file of the BUG-089 block; tracked() force-adds a file under .conductor/.
+  const qaRun = (tracked = false) => ({ start: ['--known-failure', KF], prep: () => {
+    writeFileSync(join(root, '.gitignore'), '.conductor/\n.claude/memory/\nignored.txt\n');
+    mkdirSync(join(root, 'tests'), { recursive: true });
+    writeFileSync(join(root, 'tests', 'old.test.js'), 'x\n');
+    if (tracked) { mkdirSync(join(root, '.conductor'), { recursive: true }); writeFileSync(join(root, '.conductor', 'keep.txt'), 'k\n'); fixtureGit('add', '-f', '.conductor/keep.txt'); }
+    fixtureCommit();
+  } });
+  // Rules in .git/info/exclude: an ignore source that never shows in the diff.
+  // .git/info/ is made here, so the helper does not rely on the templates of git init.
+  const exclude = (...rules) => { mkdirSync(join(root, '.git', 'info'), { recursive: true }); writeFileSync(join(root, '.git', 'info', 'exclude'), rules.map((rule) => `${rule}\n`).join('')); };
+  const write = (rel, text = 'x\n') => { mkdirSync(dirname(join(root, rel)), { recursive: true }); writeFileSync(join(root, rel), text); };
+  const installList = () => { const r = orch(['install', 'qa']); expect(r.status).toBe(0); return { r, list: listText() }; };
+
+  it('[AC2] a file in a new ignored directory whose parent holds tracked files is listed once, as that directory', () => {
+    driveTo('qa', qaRun());
+    exclude('.tmp/');
+    write('tests/.tmp/new.test.js');
+    mkdirSync(join(root, 'tests', 'empty', '.tmp'), { recursive: true });
+    const { r, list } = installList();
+    expect(list).toBe(`${BASE_LIST}A tests/.tmp/\n`);
+    expect(lastLine(r)).toBe(changeLine(4, 0));
+  });
+
+  it('[AC2] a file in a new ignored directory whose new parent holds nothing tracked collapses into the parent', () => {
+    driveTo('qa', qaRun());
+    exclude('.tmp/');
+    write('e2e/.tmp/new.test.js');
+    const { list } = installList();
+    expect(list).toBe(`${BASE_LIST}A e2e/\n`);
+    expect(list).not.toContain('e2e/.tmp');
+  });
+
+  it('[AC2] an empty ignored directory is not listed', () => {
+    driveTo('qa', qaRun());
+    exclude('.tmp/');
+    mkdirSync(join(root, '.tmp'), { recursive: true });
+    expect(installList().list).toBe(BASE_LIST);
+  });
+
+  it.each([['ignored as a whole', false], ['holding a tracked file', true]])('[AC3] nothing at or under .conductor/ is listed with .conductor/ %s', (_name, tracked) => {
+    driveTo('qa', qaRun(tracked));
+    write('.conductor/extra/new.test.js');
+    const { list } = installList();
+    expect(list).toBe(BASE_LIST);
+    expect(list).not.toContain('.conductor');
+  });
+
+  it('[AC4] a .gitignore rule added with the test file it ignores lists both', () => {
+    driveTo('qa', qaRun());
+    writeFileSync(join(root, '.gitignore'), '.conductor/\n.claude/memory/\nignored.txt\ntests/gen.test.js\n');
+    write('tests/gen.test.js');
+    const { r, list } = installList();
+    expect(list).toBe('A .claude/memory/\nM .gitignore\nA docs/specs/\nA docs/specs/demo-design.md\nA tests/gen.test.js\n');
+    expect(lastLine(r)).toBe(changeLine(4, 1));
+  });
+
+  it('[AC5] an ignored path holding a space is listed byte for byte', () => {
+    driveTo('qa', qaRun());
+    exclude('cache dir/');
+    write('tests/cache dir/x.test.js');
+    expect(installList().list).toBe(`${BASE_LIST}A tests/cache dir/\n`);
+  });
+
+  it('[AC6] a corrupt index makes the list unavailable and removes the earlier file', () => {
+    driveTo('qa', qaRun());
+    installList();
+    writeFileSync(join(root, '.git', 'index'), 'not an index\n');
+    const r = orch(['install', 'qa']);
+    expect(r.status).toBe(0);
+    expect(lastLine(r)).toBe('change files: unavailable (git cannot compare the work tree with the base commit); no failing test is known');
+    expect(existsSync(join(root, LIST))).toBe(false);
+  });
+
+  it('[AC9] an ignored file in a new directory that also holds files no rule ignores is covered by the directory', () => {
+    driveTo('qa', qaRun());
+    exclude('*.ign.js');
+    write('newdir/a.js');
+    write('newdir/b.ign.js');
+    const { r, list } = installList();
+    expect(list).toBe(`${BASE_LIST}A newdir/\nA newdir/a.js\n`);
+    expect(list).not.toContain('b.ign.js');
+    expect(lastLine(r)).toBe(changeLine(5, 0));
   });
 });
 
