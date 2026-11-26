@@ -11,10 +11,20 @@
 ## Global Constraints
 
 - No release records: `VERSION`, the `package.json` / `package-lock.json` version, `CHANGELOG.md`, `AGENT-READABLE BACKLOG.md`, `.claude/memory/**` and the README "Known limits" lines stay untouched. `README.md` is not edited at all: no line of it describes the change list (`grep -n 'qa-change' README.md` prints nothing).
-- **Nine files change, plus this plan and its `.gitignore` leaf:** `scripts/orchestrate.mjs`, `tests/scripts/orchestrate.test.js`, `.claude/agents/qa.md`, `project-template/.claude/agents/qa.md`, `tests/unit/role-profiles.test.js`, `.claude/commands/cc-orchestrate.md`, `project-template/.claude/commands/cc-orchestrate.md`, `project-template/.agents/skills/cc-orchestrate/SKILL.md`, `project-template/.agents/workflows/cc-orchestrate.md`, `tests/installer/commands-parity.test.js` (ten paths: the spec's System Impact list).
+- **Ten files change, plus this plan and its `.gitignore` leaf:** `scripts/orchestrate.mjs`, `tests/scripts/orchestrate.test.js`, `.claude/agents/qa.md`, `project-template/.claude/agents/qa.md`, `tests/unit/role-profiles.test.js`, `.claude/commands/cc-orchestrate.md`, `project-template/.claude/commands/cc-orchestrate.md`, `project-template/.agents/skills/cc-orchestrate/SKILL.md`, `project-template/.agents/workflows/cc-orchestrate.md`, `tests/installer/commands-parity.test.js` (the spec's System Impact list).
 - Not touched: `changeNote`, `install`, `CHANGE_LIST_FILE`, `isValidRun`, `.claude/agents/code.md` and its copy (spec, Out of Scope), every other profile, the hooks, the installer, settings, workflows, dependencies.
 - Every file this plan edits after Task 0 is already tracked and none sits under an ignored directory, so each is staged with `git add -u <path>`. This plan is new in Task 0 under the ignored `docs/superpowers/plans/` (so `git add -f`) and is tracked and re-included by its leaf afterwards (so `git add -u`).
 - `.claude/` is read-only for Bash in the build sandbox: every edit under `.claude/` uses the Edit tool. The `project-template/` copies may use either.
+
+## Owner decisions (plan)
+
+Decided by the owner when approving this plan; each is applied in the place named.
+
+1. **The file count.** Global Constraints reads "Ten files change": the list holds ten paths.
+2. **`exclude()` makes `.git/info/` itself.** The helper of the new test block (decision 3) creates `.git/info/` with a recursive `mkdirSync` before it writes `exclude`, so the fixtures do not depend on the templates `git init` copies.
+3. **A shared directory name as a risk.** Identified Risks names the case where a new, non-ignored directory entry (for example a new `packages/a/tests/`) matches a known failure in another path (for example `tests/contract/x.test.js`) by a shared name: the suite stays red and `qa` names that failure.
+
+Everything else stays as audited.
 
 ## Files read in full (spec, Files Requiring Full Read)
 
@@ -98,7 +108,8 @@
      fixtureCommit();
    } });
    // Rules in .git/info/exclude: an ignore source that never shows in the diff.
-   const exclude = (...rules) => writeFileSync(join(root, '.git', 'info', 'exclude'), rules.map((rule) => `${rule}\n`).join(''));
+   // .git/info/ is made here, so the helper does not rely on the templates of git init.
+   const exclude = (...rules) => { mkdirSync(join(root, '.git', 'info'), { recursive: true }); writeFileSync(join(root, '.git', 'info', 'exclude'), rules.map((rule) => `${rule}\n`).join('')); };
    const write = (rel, text = 'x\n') => { mkdirSync(dirname(join(root, rel)), { recursive: true }); writeFileSync(join(root, rel), text); };
    const installList = () => { const r = orch(['install', 'qa']); expect(r.status).toBe(0); return { r, list: listText() }; };
    ```
@@ -281,4 +292,5 @@
 - **A runner run from inside a collapsed directory.** Its printed path holds no part of the entry, so the entry does not settle it (spec, Out of Scope); the profile sentence does not claim otherwise.
 - **The profile over the token cap.** 975 of 999 tokens measured; T-306 runs the cap row.
 - **The harness copies drifting.** No test kept them in line before; decision 7's rows pin the new phrase in all four, and T-404 compares the four Verify lines.
+- **A new directory entry matching a known failure elsewhere through a shared name.** A new, non-ignored directory such as `packages/a/tests/` is listed as `A packages/a/tests/`, and by the directory sentence it can match a known failure in another path, such as `tests/contract/x.test.js`, through the shared `tests/` part. The failure is then not known: the suite stays red and `qa` names it as matched but not known. That errs toward fewer known failures, which the profile sentence accepts (decision 4).
 - **The long suite timing out the shell.** T-501 notes the duration; a timeout is not a red.
