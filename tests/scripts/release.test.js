@@ -4,7 +4,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdir
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { ReleaseError, releaseSurface, validateProfile, windowsInvocation } from '../../scripts/release.mjs'
+import { ReleaseError, compareVersions, releaseSurface, validateProfile, windowsInvocation } from '../../scripts/release.mjs'
 import { cleanGitEnv } from '../helpers/git-env.js'
 
 vi.setConfig({ testTimeout: 120000 })
@@ -1202,6 +1202,433 @@ describe('release.mjs handoff [FEAT-035]', () => {
     expect(lines(r.out).at(-2)).toBe(`STEP 4 writeback node ${ticketPath()} writeback FEAT-001 --version ${V} --pr 7 --changelog .conductor/release/${V}/FEAT-001.md`)
     expect(read(`.conductor/release/${V}/FEAT-001.md`)).toBe('### [X] `[FEAT-001]` Alpha\n')
     expect(read(`.conductor/release/${V}/notes.md`)).toBe('- chore: release\n- feat: alpha work\n')
+  })
+})
+
+// ---- FEAT-062: version schemes and the prerelease publish step ----------------------------
+
+const GH_ARGV = ['gh', 'release', 'create', '{tag}', '--verify-tag', '--title', '{tag}', '--notes-file', '{notes}']
+const NPM_NEXT = { channel: 'next', target: 'the npm registry', argv: ['npm', 'publish', '--tag', '{channel}'] }
+const GH_PRE = { channel: 'prerelease', target: 'the GitHub Release', argv: [...GH_ARGV, '--prerelease'] }
+const SCRIPT_NEXT = { channel: 'next', target: 'the demo registry', argv: ['./scripts/publish.sh', '{channel}'] }
+const pre = (publish, counts = false) => ({ publish, countsAsLastRelease: counts })
+const withScheme = (scheme, prerelease, base = PROFILE) => ({ ...clone(base), scheme, ...(prerelease === undefined ? {} : { prerelease }) })
+const SCHEME_LIST = 'MAJOR.MINOR.PATCH, semver, pep440, numeric'
+
+describe('release.mjs version schemes in the profile [FEAT-062]', () => {
+  const VALID = [
+    ['no scheme', clone(PROFILE)],
+    ['MAJOR.MINOR.PATCH named', withScheme('MAJOR.MINOR.PATCH')],
+    ['semver with an npm prerelease step', withScheme('semver', pre(NPM_NEXT))],
+    ['pep440 with an npm prerelease step', withScheme('pep440', pre(NPM_NEXT))],
+    ['numeric without prerelease', withScheme('numeric')],
+    ['semver with no prerelease publish', withScheme('semver', pre(null))],
+    ['semver where a prerelease counts as the last release', withScheme('semver', pre(NPM_NEXT, true))],
+  ]
+
+  it.each(VALID)('[E1] validates %s', (_name, profile) => {
+    expect(validateProfile(clone(profile))).toEqual(profile)
+  })
+
+  const SCHEME_WHY = `must be one of ${SCHEME_LIST}`
+  const INVALID = [
+    ['an unknown scheme', () => ({ ...clone(PROFILE), scheme: 'calver' }), 'scheme', SCHEME_WHY],
+    ['a scheme that is an array', () => ({ ...clone(PROFILE), scheme: ['semver'] }), 'scheme', SCHEME_WHY],
+    ['semver without prerelease', () => ({ ...clone(PROFILE), scheme: 'semver' }), 'prerelease', 'required by scheme semver'],
+    ['pep440 without prerelease', () => ({ ...clone(PROFILE), scheme: 'pep440' }), 'prerelease', 'required by scheme pep440'],
+    ['numeric with prerelease', () => withScheme('numeric', pre(null)), 'prerelease', 'not allowed with scheme numeric'],
+    ['no scheme with prerelease', () => ({ ...clone(PROFILE), prerelease: pre(null) }), 'prerelease', 'not allowed with scheme MAJOR.MINOR.PATCH'],
+    ['an unknown prerelease key', () => withScheme('semver', { ...pre(null), extra: 1 }), 'prerelease.extra', 'unknown key'],
+    ['a non-boolean countsAsLastRelease', () => withScheme('semver', { publish: null, countsAsLastRelease: 'no' }), 'prerelease.countsAsLastRelease', 'must be true or false'],
+    ['a channel with a space', () => withScheme('semver', pre({ ...NPM_NEXT, channel: 'a b' })), 'prerelease.publish.channel', 'must match [A-Za-z0-9._-]+'],
+    ['a target with a placeholder', () => withScheme('semver', pre({ ...NPM_NEXT, target: 'the {tag} registry' })), 'prerelease.publish.target', 'must be a non-empty single-line string with no placeholder'],
+    ['an empty argv', () => withScheme('semver', pre({ ...NPM_NEXT, argv: [] })), 'prerelease.publish.argv', 'must be a non-empty array'],
+    ['{channel} in the stable publish argv', () => { const p = clone(PROFILE); p.publish.argv[1] = '{channel}'; return p }, 'publish.argv[1]', 'placeholder {channel} is not allowed here'],
+    ['{channel} in the tag', () => ({ ...clone(PROFILE), tag: 'v{version}{channel}' }), 'tag', 'placeholder {channel} is not allowed here'],
+  ]
+
+  it.each(INVALID)('[E1] refuses %s', (_name, build, field, why) => {
+    const e = refusal(() => validateProfile(build()))
+    expect(e).toBeInstanceOf(ReleaseError)
+    expect(e.code).toBe('RELEASE_PROFILE_INVALID')
+    expect(e.reason).toBe(`${field}: ${why}`)
+  })
+
+  const NPM_WHY = 'npm publish needs --tag {channel} or --tag <channel>'
+  const RISKY = [
+    ['npm publish alone', ['npm', 'publish'], NPM_WHY],
+    ['npm publish --tag with another name', ['npm', 'publish', '--tag', 'latest2'], NPM_WHY],
+    ['gh release create without --prerelease', GH_ARGV, 'gh release create needs --prerelease'],
+    ['gh release create with --latest', [...GH_ARGV, '--prerelease', '--latest'], 'gh release create must not carry --latest'],
+    ['gh release create with --latest=true', [...GH_ARGV, '--prerelease', '--latest=true'], 'gh release create must not carry --latest'],
+  ]
+
+  it.each(RISKY)('[E4] refuses a prerelease step that would move latest: %s', (_name, argv, why) => {
+    const e = refusal(() => validateProfile(withScheme('semver', pre({ ...NPM_NEXT, argv }))))
+    expect(e.code).toBe('RELEASE_PROFILE_INVALID')
+    expect(e.reason).toBe(`prerelease.publish.argv: ${why}`)
+  })
+
+  const SAFE = [
+    ['npm publish --tag {channel}', NPM_NEXT.argv],
+    ['npm publish --tag next', ['npm', 'publish', '--tag', 'next']],
+    ['npm publish --tag=next', ['npm', 'publish', '--tag=next']],
+    ['npm publish --tag={channel}', ['npm', 'publish', '--tag={channel}']],
+    ['gh release create with --prerelease', GH_PRE.argv],
+    ['gh release create with --prerelease and --latest=false', [...GH_PRE.argv, '--latest=false']],
+    ['another program', SCRIPT_NEXT.argv],
+  ]
+
+  it.each(SAFE)('[E4] accepts a prerelease step: %s', (_name, argv) => {
+    const profile = withScheme('semver', pre({ ...NPM_NEXT, argv }))
+    expect(validateProfile(clone(profile))).toEqual(profile)
+  })
+})
+
+describe('release.mjs digest under each scheme [FEAT-062]', () => {
+  const PRE = pre(NPM_NEXT)
+  const profileOf = (scheme) => (scheme === 'numeric' || scheme === 'MAJOR.MINOR.PATCH' ? withScheme(scheme) : withScheme(scheme, PRE))
+  const digest = (v) => rel(['digest', '--version', v, '--items', 'FEAT-001', '--date', DATE])
+  const SEMVER_FAR = 'not MAJOR.MINOR.PATCH with an optional -prerelease'
+  const PEP_NORMAL = 'not in PEP 440 normal form'
+  const NUMERIC_FAR = 'not two or more dot-separated numbers'
+
+  const REFUSED = [
+    ['semver', '1.1.0+build.5', 'build metadata is not supported'],
+    ['semver', '1.1.0-rc.01', 'prerelease identifier 01 has a leading zero'],
+    ['semver', '1.1', SEMVER_FAR],
+    ['semver', '1.1.0-', SEMVER_FAR],
+    ['pep440', '1.1.0-rc1', PEP_NORMAL],
+    ['pep440', '1.1.0RC1', PEP_NORMAL],
+    ['pep440', '1.1.0.beta1', PEP_NORMAL],
+    ['pep440', '1.02', PEP_NORMAL],
+    ['pep440', '1!1.1.0', 'an epoch is not supported'],
+    ['pep440', '1.1.0+local', 'a local version is not supported'],
+    ['numeric', '2', NUMERIC_FAR],
+    ['numeric', '2026.11-beta', NUMERIC_FAR],
+    ['MAJOR.MINOR.PATCH', '1.1.0-rc.1', null],
+  ]
+
+  it.each(REFUSED)('[E3] %s refuses %s', (scheme, version, why) => {
+    project(profileOf(scheme))
+    const text = why === null ? 'only MAJOR.MINOR.PATCH is supported' : `not a ${scheme} version: ${why}`
+    expect(digest(version)).toEqual({ status: 2, out: '', err: `release: RELEASE_VERSION_INVALID: ${version}: ${text}\n` })
+  })
+
+  const ACCEPTED = [
+    ['semver', '1.1.0-rc.1', 'prerelease'],
+    ['semver', '1.1.0', 'stable'],
+    ['pep440', '1.1.0rc1', 'prerelease'],
+    ['pep440', '1.1.0.dev1', 'prerelease'],
+    ['pep440', '1.0.0.post1', 'stable'],
+    ['numeric', '2026.11', 'stable'],
+  ]
+
+  it.each(ACCEPTED)('[E3] %s accepts %s as %s', (scheme, version, kind) => {
+    project(profileOf(scheme))
+    const r = digest(version)
+    expect(r.status).toBe(0)
+    expect(lines(r.out).slice(0, 2)).toEqual([`RELEASE ${version} FROM 1.0.0 DATE ${DATE}`, `SCHEME ${scheme} ${kind}`])
+  })
+
+  const NOT_ADVANCED = [
+    ['semver', '1.0.0-rc.1'],
+    ['pep440', '1.0'],
+    ['pep440', '1.0.0rc1'],
+    ['numeric', '1.0.0.0'],
+    ['numeric', '1.0'],
+  ]
+
+  it.each(NOT_ADVANCED)('[E3] %s refuses %s as not advancing 1.0.0', (scheme, version) => {
+    project(profileOf(scheme))
+    expect(digest(version)).toEqual({ status: 2, out: '', err: `release: RELEASE_VERSION_NOT_ADVANCED: ${version} does not advance 1.0.0\n` })
+  })
+
+  const CHAINS = [
+    ['semver', ['1.2.0-1', '1.2.0-alpha', '1.2.0-alpha.1', '1.2.0-beta', '1.2.0-rc.1', '1.2.0-rc.10', '1.2.0', '1.10.0']],
+    ['pep440', ['1.2.0.dev1', '1.2.0a1', '1.2.0b2', '1.2.0rc1', '1.2.0', '1.2.0.post1.dev1', '1.2.0.post1', '1.10']],
+    ['numeric', ['2026.9', '2026.10', '2026.10.1', '2026.11', '2027.1']],
+  ]
+
+  it.each(CHAINS)('[E3] %s precedence follows its published order', (scheme, chain) => {
+    chain.forEach((a, i) => chain.slice(i + 1).forEach((b) => {
+      expect([a, b, compareVersions(a, b, scheme)]).toEqual([a, b, -1])
+      expect([b, a, compareVersions(b, a, scheme)]).toEqual([b, a, 1])
+    }))
+  })
+
+  it('[E3] versions equal under precedence compare as 0', () => {
+    expect(compareVersions('1.2', '1.2.0', 'pep440')).toBe(0)
+    expect(compareVersions('2026.11', '2026.11.0', 'numeric')).toBe(0)
+    expect(compareVersions('2026.01', '2026.1', 'numeric')).toBe(0)
+  })
+
+  it('[E6] compareVersions without a scheme is the MAJOR.MINOR.PATCH order', () => {
+    expect(compareVersions('1.10.0', '1.9.0')).toBe(1)
+    expect(compareVersions('1.10.0', '1.9.0', 'MAJOR.MINOR.PATCH')).toBe(1)
+  })
+})
+
+describe('release.mjs init detects the scheme [FEAT-062]', () => {
+  const PROPOSAL = '.conductor/release/profile.proposed.json'
+  const pkg = (version, extra = {}) => jsonText({ name: 'demo', version, ...extra })
+  function repo(files, tags = []) {
+    fresh()
+    git('init', '-q', '-b', 'main')
+    put('.gitignore', '.conductor/\n')
+    for (const [path, text] of Object.entries(files)) put(path, text)
+    commit('chore: base')
+    for (const t of tags) git('tag', t)
+  }
+  const npmRc = () => repo({ 'package.json': pkg('1.2.0-rc.1', { scripts: { test: 'vitest run' } }), 'package-lock.json': lockText('1.2.0-rc.1') })
+  const row = (out, field) => lines(out).find((l) => l.startsWith(`PROPOSED ${field} `))
+  const schemeRow = (out) => row(out, 'scheme')
+
+  it('i1. a prerelease in package.json proposes semver and its prerelease block', () => {
+    npmRc()
+    const r = rel(['init'])
+    expect(r.status).toBe(0)
+    expect(schemeRow(r.out)).toBe('PROPOSED scheme "semver" (from package.json 1.2.0-rc.1)')
+    expect(lines(r.out).filter((l) => l.startsWith('PROPOSED ')).map((l) => l.split(' ')[1])).toEqual(['versions', 'scheme', 'changelog', 'tag', 'remote', 'mainline', 'checks', 'publish', 'prerelease'])
+    expect(row(r.out, 'prerelease')).toContain('(default)')
+    expect(proposalFile().scheme).toBe('semver')
+    expect(proposalFile().prerelease).toEqual(pre(NPM_NEXT))
+  })
+
+  it('i2. a prerelease tag proposes semver from the tag', () => {
+    initProject()
+    git('tag', 'v2.4.0-rc.1')
+    expect(schemeRow(rel(['init']).out)).toBe('PROPOSED scheme "semver" (from tag v2.4.0-rc.1)')
+  })
+
+  it('i3. a PEP 440 pre-release in pyproject.toml proposes pep440', () => {
+    repo({ 'pyproject.toml': '[project]\nname = "demo"\nversion = "1.2.0rc1"\n' })
+    const r = rel(['init'])
+    expect(schemeRow(r.out)).toBe('PROPOSED scheme "pep440" (from pyproject.toml 1.2.0rc1)')
+    expect(proposalFile().prerelease).toEqual(pre(null))
+  })
+
+  it('i4. one scheme accepting every value is not a conflict: 5.0 with a 5.1a1 tag is pep440', () => {
+    repo({ 'pyproject.toml': '[project]\nname = "demo"\nversion = "5.0"\n' }, ['5.0', '5.1a1'])
+    expect(schemeRow(rel(['init']).out)).toBe('PROPOSED scheme "pep440" (from pyproject.toml 5.0; tag 5.1a1)')
+  })
+
+  it('i5. CalVer in VERSION proposes numeric and no prerelease block', () => {
+    repo({ VERSION: '2026.11\n' }, ['v2026.09', 'v2026.10'])
+    const r = rel(['init'])
+    expect(schemeRow(r.out)).toBe('PROPOSED scheme "numeric" (from VERSION 2026.11)')
+    expect(row(r.out, 'prerelease')).toBeUndefined()
+    expect('prerelease' in proposalFile()).toBe(false)
+  })
+
+  it('i6. a CalVer tag beside a plain current version proposes numeric from the tag', () => {
+    repo({ 'package.json': pkg('1.0.0', { private: true }) }, ['v2026.10'])
+    expect(schemeRow(rel(['init']).out)).toBe('PROPOSED scheme "numeric" (from tag v2026.10)')
+  })
+
+  it('i7. plain versions show their evidence and keep FEAT-035\'s profile file', () => {
+    initProject()
+    const r = rel(['init'])
+    expect(schemeRow(r.out)).toBe('PROPOSED scheme "MAJOR.MINOR.PATCH" (from package.json 2.3.4; tag v2.3.4)')
+    expect(row(r.out, 'prerelease')).toBeUndefined()
+    expect('scheme' in proposalFile()).toBe(false)
+  })
+
+  it('i8. no evidence at all marks the default scheme (default)', () => {
+    repo({})
+    expect(schemeRow(rel(['init']).out)).toBe('PROPOSED scheme "MAJOR.MINOR.PATCH" (default)')
+  })
+
+  it('i9. a single-part tag and tags no scheme accepts are not evidence', () => {
+    initProject()
+    for (const t of ['v1', 'vnext', 'v2.0.0.Final', 'release-3']) git('tag', t)
+    const r = rel(['init'])
+    expect(schemeRow(r.out)).toBe('PROPOSED scheme "MAJOR.MINOR.PATCH" (from package.json 2.3.4; tag v2.3.4)')
+    for (const ignored of ['vnext', 'Final', 'release-3']) expect(r.out).not.toContain(ignored)
+  })
+
+  const UNSUPPORTED = [
+    ['package.json 2.0.0.Final', { 'package.json': pkg('2.0.0.Final') }, ''],
+    ['package.json 1.0.0+build', { 'package.json': pkg('1.0.0+build') }, ' (semver: build metadata is not supported; pep440: a local version is not supported)'],
+    ['VERSION 1!2.0', { VERSION: '1!2.0\n' }, ' (pep440: an epoch is not supported)'],
+  ]
+
+  it.each(UNSUPPORTED)('i10. %s refuses RELEASE_INIT_SCHEME_UNSUPPORTED and writes nothing', (what, files, near) => {
+    repo(files)
+    const r = rel(['init'])
+    expect(r).toEqual({ status: 2, out: '', err: `release: RELEASE_INIT_SCHEME_UNSUPPORTED: ${what}: fits none of ${SCHEME_LIST}${near}\n` })
+    expect(existsSync(join(root, PROPOSAL))).toBe(false)
+  })
+
+  it('i11. evidence no single scheme accepts refuses RELEASE_INIT_SCHEME_CONFLICT', () => {
+    repo({ 'package.json': pkg('1.2.0-rc.1') }, ['v1.2.0rc1'])
+    const r = rel(['init'])
+    const why = 'MAJOR.MINOR.PATCH rejects package.json 1.2.0-rc.1; semver rejects tag v1.2.0rc1; numeric rejects package.json 1.2.0-rc.1; pep440 rejects package.json 1.2.0-rc.1'
+    expect(r).toEqual({ status: 2, out: '', err: `release: RELEASE_INIT_SCHEME_CONFLICT: ${why}\n` })
+    expect(existsSync(join(root, PROPOSAL))).toBe(false)
+  })
+
+  it('i12. a workflow listening for a published release proposes a gh prerelease step', () => {
+    npmRc()
+    put('.github/workflows/pub.yml', 'on:\n  release:\n    types: [published]\n')
+    expect(rel(['init']).status).toBe(0)
+    expect(proposalFile().prerelease.publish).toEqual({ channel: 'prerelease', target: 'the GitHub Release .github/workflows/pub.yml listens for', argv: [...GH_ARGV, '--prerelease'] })
+  })
+
+  it('i13. init --confirm judges a hand-edited prerelease block like the release verbs do', () => {
+    npmRc()
+    rel(['init'])
+    const bytes = read(PROPOSAL)
+    const edited = proposalFile()
+    delete edited.prerelease
+    put(PROPOSAL, jsonText(edited))
+    const refused = rel(['init', '--confirm'])
+    expect(refused).toEqual({ status: 2, out: '', err: 'release: RELEASE_PROFILE_INVALID: prerelease: required by scheme semver\n' })
+    expect(existsSync(join(root, '.claude/release-profile.json'))).toBe(false)
+    rel(['init'])
+    expect(read(PROPOSAL)).toBe(bytes)
+    expect(rel(['init', '--confirm']).status).toBe(0)
+    expect(read('.claude/release-profile.json')).toBe(bytes)
+  })
+})
+
+describe('release.mjs prerelease publish and range [FEAT-062]', () => {
+  const HANDOFF = (v) => ['handoff', '--version', v, '--pr', '7']
+  const released = (profile, v, { items = ['FEAT-001'], changelog = true } = {}) => { project(profile); applyRelease({ v, items, changelog }); merge() }
+  const stepsOf = (v) => {
+    const sha = gitOut('rev-parse', 'HEAD')
+    return [`STEP 1 tag git tag -a v${v} -m v${v} ${sha}`, `STEP 2 push git push origin v${v}`]
+  }
+  const writeback = (n, v) => `STEP ${n} writeback node ${ticketPath()} writeback FEAT-001 --version ${v} --pr 7 --changelog .conductor/release/${v}/FEAT-001.md`
+
+  it('[E4] h1. an npm prerelease publishes under its channel and never the stable step', () => {
+    const v = '1.1.0-rc.1'
+    released(withScheme('semver', pre(NPM_NEXT)), v)
+    put('.conductor/ticket/FEAT-001.md', 'ticket\n')
+    const r = rel(HANDOFF(v))
+    expect(r.status).toBe(0)
+    expect(lines(r.out)).toEqual([
+      'CHECK alpha ok', 'CHECK beta ok', ...stepsOf(v),
+      'PUBLISH-TARGET the npm registry', 'PUBLISH-CHANNEL next', 'STEP 3 publish npm publish --tag next',
+      writeback(4, v), `release: handoff ready ${v}`,
+    ])
+    expect(r.out).not.toContain('demo-publish')
+    expect(r.out).not.toContain('unverified')
+  })
+
+  it('[E4] h2. a GitHub Release prerelease carries --prerelease and its channel', () => {
+    const v = '1.1.0-rc.1'
+    released(withScheme('semver', pre(GH_PRE)), v)
+    const r = rel(HANDOFF(v))
+    expect(r.status).toBe(0)
+    const out = lines(r.out)
+    expect(out).toContain('PUBLISH-TARGET the GitHub Release')
+    expect(out).toContain('PUBLISH-CHANNEL prerelease')
+    expect(out).toContain(`STEP 3 publish gh release create v${v} --verify-tag --title v${v} --notes-file .conductor/release/${v}/notes.md --prerelease`)
+    expect(r.out).not.toContain('unverified')
+  })
+
+  it('[E4] h3. a prerelease with no publish step prints no target, channel or publish step', () => {
+    const v = '1.1.0-rc.1'
+    released(withScheme('semver', pre(null)), v)
+    put('.conductor/ticket/FEAT-001.md', 'ticket\n')
+    const r = rel(HANDOFF(v))
+    expect(r.status).toBe(0)
+    expect(r.out).not.toContain('PUBLISH-TARGET')
+    expect(r.out).not.toContain('PUBLISH-CHANNEL')
+    expect(r.out).not.toContain(' publish ')
+    expect(lines(r.out)).toContain(writeback(3, v))
+  })
+
+  it('[E4, D1] h4. a publish program the driver does not know prints its channel as unverified', () => {
+    const v = '1.1.0-rc.1'
+    released(withScheme('semver', pre(SCRIPT_NEXT)), v)
+    const out = lines(rel(HANDOFF(v)).out)
+    expect(out).toContain('PUBLISH-TARGET the demo registry')
+    expect(out).toContain('PUBLISH-CHANNEL next unverified')
+    expect(out).toContain('STEP 3 publish ./scripts/publish.sh next')
+  })
+
+  it('[E4] h5. a stable release under a prerelease scheme prints exactly the stable step', () => {
+    released(withScheme('semver', pre(NPM_NEXT)), '1.1.0')
+    put('.conductor/ticket/FEAT-001.md', 'ticket\n')
+    const r = rel(HANDOFF('1.1.0'))
+    expect(lines(r.out)).toEqual([
+      'CHECK alpha ok', 'CHECK beta ok', ...stepsOf('1.1.0'),
+      'PUBLISH-TARGET the demo registry', 'STEP 3 publish demo-publish v1.1.0 .conductor/release/1.1.0/notes.md',
+      writeback(4, '1.1.0'), 'release: handoff ready 1.1.0',
+    ])
+    expect(r.out).not.toContain('PUBLISH-CHANNEL')
+  })
+
+  it.each([
+    ['1.0.0.post1', ['PUBLISH-TARGET the demo registry', 'STEP 3 publish demo-publish v1.0.0.post1 .conductor/release/1.0.0.post1/notes.md'], false],
+    ['1.1.0.dev1', ['PUBLISH-TARGET the npm registry', 'PUBLISH-CHANNEL next', 'STEP 3 publish npm publish --tag next'], true],
+  ])('[E4] h6. pep440 %s takes the publish step its kind decides', (v, expected, channel) => {
+    released(withScheme('pep440', pre(NPM_NEXT)), v)
+    const out = lines(rel(HANDOFF(v)).out)
+    for (const line of expected) expect(out).toContain(line)
+    expect(out.some((l) => l.startsWith('PUBLISH-CHANNEL'))).toBe(channel)
+  })
+
+  it.each([['semver', '1.1.0-rc.1'], ['pep440', '1.1.0rc1']])('[E5] %s: check passes %s and handoff tags it and takes its notes from its heading', (scheme, v) => {
+    project(withScheme(scheme, pre(NPM_NEXT)))
+    applyRelease({ v, items: ['FEAT-001'] })
+    const checked = rel(checkArgs(v, 'FEAT-001'), report(v, ['FEAT-001']))
+    expect(checked.status).toBe(0)
+    expect(lines(checked.out).at(-1)).toBe(`release: ok ${v} items FEAT-001`)
+    merge()
+    const r = rel(HANDOFF(v))
+    expect(r.status).toBe(0)
+    expect(lines(r.out)).toContain(`STEP 1 tag git tag -a v${v} -m v${v} ${gitOut('rev-parse', 'HEAD')}`)
+    expect(read(`.conductor/release/${v}/notes.md`)).toBe('### Added\n\n- **[FEAT-001]** Shipped FEAT-001.\n')
+  })
+
+  const rcThenBeta = () => {
+    git('tag', 'v1.1.0-rc.1')
+    put('src/b.js', 'export const b = 2\n')
+    commit('feat: beta work')
+  }
+  const subjects = (out) => lines(out).filter((l) => l.startsWith('COMMIT ')).map((l) => l.replace(/^COMMIT \S+ /, ''))
+
+  it.each([
+    ['a stable release skips the prerelease tag', false, '1.1.0', ['feat: beta work', 'feat: alpha work']],
+    ['a stable release counts it when the profile says so', true, '1.1.0', ['feat: beta work']],
+    ['a prerelease starts at the previous tag of any kind', false, '1.1.0-rc.2', ['feat: beta work']],
+  ])('[E5] %s', (_name, counts, v, expected) => {
+    project(withScheme('semver', pre(NPM_NEXT, counts)))
+    rcThenBeta()
+    const r = rel(['digest', '--version', v, '--items', 'FEAT-001', '--date', DATE])
+    expect(r.status).toBe(0)
+    expect(subjects(r.out)).toEqual(expected)
+  })
+
+  it('[E5] the notes of a release with no changelog use the same range', () => {
+    project(withScheme('semver', pre(NPM_NEXT), NOCLB))
+    rcThenBeta()
+    applyRelease({ v: '1.1.0', items: ['FEAT-001'], changelog: false })
+    merge()
+    expect(rel(HANDOFF('1.1.0')).status).toBe(0)
+    expect(read('.conductor/release/1.1.0/notes.md')).toBe('- chore: release\n- feat: beta work\n- feat: alpha work\n')
+  })
+
+  it('[E6] a MAJOR.MINOR.PATCH profile behaves the same with and without an explicit scheme', () => {
+    const record = (profile) => {
+      project(profile)
+      const run = (args, input) => { const r = rel(args, input); return { status: r.status, out: r.out, err: r.err } }
+      const runs = [run(['digest', '--version', '1.1.0', '--items', 'FEAT-001', '--date', DATE]), run(['digest', '--version', '1.1.0-rc.1', '--items', 'FEAT-001', '--date', DATE])]
+      applyRelease({ v: '1.1.0', items: ['FEAT-001'] })
+      runs.push(run(checkArgs('1.1.0', 'FEAT-001'), report('1.1.0', ['FEAT-001'])))
+      merge()
+      runs.push(run(HANDOFF('1.1.0')), { notes: read('.conductor/release/1.1.0/notes.md') })
+      return runs
+    }
+    const mask = (runs) => JSON.parse(JSON.stringify(runs).replace(/\b[0-9a-f]{7,40}\b/g, '<sha>'))
+    const implicit = mask(record(PROFILE))
+    const explicit = mask(record(withScheme('MAJOR.MINOR.PATCH')))
+    expect(implicit).toEqual(explicit)
+    expect(JSON.stringify(implicit)).not.toContain('SCHEME')
+    expect(implicit.map((r) => r.status)).toEqual([0, 2, 0, 0, undefined])
   })
 })
 

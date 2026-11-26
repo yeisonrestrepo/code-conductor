@@ -53,10 +53,123 @@ export function lines(text) {
 const endsWithNewline = (text) => text.endsWith('\n');
 const workText = (root, path) => { try { return readFileSync(join(root, path), 'utf8'); } catch { return null; } };
 
+// ---- version schemes (FEAT-062): a closed list, each a fixed grammar, precedence and prerelease test ----
+
+const DEFAULT_SCHEME = 'MAJOR.MINOR.PATCH';
+const SCHEME_LIST = 'MAJOR.MINOR.PATCH, semver, pep440, numeric';
+const INIT_ORDER = ['MAJOR.MINOR.PATCH', 'semver', 'numeric', 'pep440'];
+const NO_LEADING_ZERO = /^(0|[1-9]\d*)$/;
+const SEMVER_FORM = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
+const PEP440_FORM = /^(\d+(?:\.\d+)*)(?:(a|b|rc)(\d+))?(?:\.post(\d+))?(?:\.dev(\d+))?$/;
+// PEP 440's permissive spellings (without epoch and local), so a near miss is told it is not in normal form.
+const PEP440_LOOSE = /^v?\d+(?:\.\d+)*(?:[-_.]?(?:a|b|c|rc|alpha|beta|pre|preview)[-_.]?\d*)?(?:-\d+|[-_.]?(?:post|rev|r)[-_.]?\d*)?(?:[-_.]?dev[-_.]?\d*)?$/i;
+const NUMERIC_FORM = /^\d+(?:\.\d+)+$/;
+const PEP440_RANK = { a: 0, b: 1, rc: 2 };
+const near = (reason) => ({ reason, near: true });
+const far = (reason) => ({ reason, near: false });
+
+// Each parse returns { value } or { reason, near }; near marks a reason specific enough to show at --init.
+function parseTriple(text) {
+  return SEMVER.test(text) ? { value: text } : far('only MAJOR.MINOR.PATCH is supported');
+}
+
+function parseSemver(text) {
+  if (text.includes('+')) return near('build metadata is not supported');
+  const m = SEMVER_FORM.exec(text);
+  if (!m) return far('not MAJOR.MINOR.PATCH with an optional -prerelease');
+  const release = m.slice(1, 4);
+  if (release.some((n) => !NO_LEADING_ZERO.test(n))) return near('a numeric part has a leading zero');
+  const pre = m[4] === undefined ? [] : m[4].split('.');
+  const padded = pre.find((id) => /^\d+$/.test(id) && !NO_LEADING_ZERO.test(id));
+  if (padded !== undefined) return near(`prerelease identifier ${padded} has a leading zero`);
+  return { value: { release: release.map(Number), pre } };
+}
+
+function parsePep440(text) {
+  if (text.includes('!')) return near('an epoch is not supported');
+  if (text.includes('+')) return near('a local version is not supported');
+  const m = PEP440_FORM.exec(text);
+  const numbers = m ? [...m[1].split('.'), m[3], m[4], m[5]].filter((n) => n !== undefined) : [];
+  if (!m || numbers.some((n) => !NO_LEADING_ZERO.test(n))) return PEP440_LOOSE.test(text) ? near('not in PEP 440 normal form') : far('not a PEP 440 version');
+  const optional = (n) => (n === undefined ? null : Number(n));
+  const pre = m[2] === undefined ? null : [PEP440_RANK[m[2]], Number(m[3])];
+  return { value: { release: m[1].split('.').map(Number), pre, post: optional(m[4]), dev: optional(m[5]) } };
+}
+
+function parseNumeric(text) {
+  return NUMERIC_FORM.test(text) ? { value: text.split('.').map(Number) } : far('not two or more dot-separated numbers');
+}
+
+// Element by element over the longer list, a missing element reading as `pad`.
+function compareLists(x, y, pad = 0) {
+  for (let i = 0; i < Math.max(x.length, y.length); i += 1) {
+    const [a, b] = [x[i] ?? pad, y[i] ?? pad];
+    if (a !== b) return a < b ? -1 : 1;
+  }
+  return 0;
+}
+
+function compareTriple(a, b) {
+  const [x, y] = [a, b].map((v) => v.split('.').map(Number));
+  for (let i = 0; i < 3; i += 1) if (x[i] !== y[i]) return x[i] < y[i] ? -1 : 1;
+  return 0;
+}
+
+// SemVer 2.0.0 §11: numeric identifiers compare numerically and rank below alphanumeric ones, which compare in ASCII order.
+function compareIdentifiers(p, q) {
+  const [pNumeric, qNumeric] = [/^\d+$/.test(p), /^\d+$/.test(q)];
+  if (pNumeric && qNumeric) return Math.sign(Number(p) - Number(q));
+  if (pNumeric !== qNumeric) return pNumeric ? -1 : 1;
+  if (p === q) return 0;
+  return p < q ? -1 : 1;
+}
+
+function compareSemver(a, b) {
+  const [x, y] = [parseSemver(a).value, parseSemver(b).value];
+  const byRelease = compareLists(x.release, y.release);
+  if (byRelease !== 0) return byRelease;
+  if (x.pre.length === 0 || y.pre.length === 0) return Math.sign((x.pre.length === 0) - (y.pre.length === 0));
+  for (let i = 0; i < Math.min(x.pre.length, y.pre.length); i += 1) {
+    const byIdentifier = compareIdentifiers(x.pre[i], y.pre[i]);
+    if (byIdentifier !== 0) return byIdentifier;
+  }
+  return Math.sign(x.pre.length - y.pre.length);
+}
+
+// PEP 440's sort key: a dev-only release sorts below every pre-release, a post-release above its final, a dev-release below its parent.
+function pep440Key(v) {
+  const devOnly = v.pre === null && v.post === null && v.dev !== null;
+  return [v.pre ?? (devOnly ? [-Infinity] : [Infinity]), [v.post ?? -Infinity], [v.dev ?? Infinity]];
+}
+
+function comparePep440(a, b) {
+  const [x, y] = [parsePep440(a).value, parsePep440(b).value];
+  const byRelease = compareLists(x.release, y.release);
+  if (byRelease !== 0) return byRelease;
+  const [kx, ky] = [pep440Key(x), pep440Key(y)];
+  for (let i = 0; i < kx.length; i += 1) {
+    const byPart = compareLists(kx[i], ky[i]);
+    if (byPart !== 0) return byPart;
+  }
+  return 0;
+}
+
+const compareNumeric = (a, b) => compareLists(parseNumeric(a).value, parseNumeric(b).value);
+
+const SCHEMES = {
+  'MAJOR.MINOR.PATCH': { capture: '(\\d+\\.\\d+\\.\\d+)', validates: false, prereleases: false, parse: parseTriple, compare: compareTriple, isPrerelease: () => false },
+  semver: { capture: '(\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?)', validates: true, prereleases: true, parse: parseSemver, compare: compareSemver, isPrerelease: (v) => parseSemver(v).value.pre.length > 0 },
+  pep440: { capture: '(\\d+(?:\\.\\d+)*(?:(?:a|b|rc)\\d+)?(?:\\.post\\d+)?(?:\\.dev\\d+)?)', validates: true, prereleases: true, parse: parsePep440, compare: comparePep440, isPrerelease: (v) => { const p = parsePep440(v).value; return p.pre !== null || p.dev !== null; } },
+  numeric: { capture: '(\\d+(?:\\.\\d+)+)', validates: true, prereleases: false, parse: parseNumeric, compare: compareNumeric, isPrerelease: () => false },
+};
+const schemeOf = (profile) => profile.scheme ?? DEFAULT_SCHEME;
+const versionReason = (scheme, text) => SCHEMES[scheme].parse(text).reason ?? null;
+const isPrerelease = (profile, version) => SCHEMES[schemeOf(profile)].isPrerelease(version);
+
 // ---- templates ----
 
 const PLACEHOLDER = /\{([a-z]+)\}/g;
-const KNOWN = ['version', 'date', 'id', 'title', 'tag', 'notes', 'sha'];
+const KNOWN = ['version', 'date', 'id', 'title', 'tag', 'notes', 'sha', 'channel'];
 const placeholders = (text) => [...text.matchAll(PLACEHOLDER)].map((m) => m[1]);
 
 // allowed: names that may appear; limits: name -> [min, max] occurrences (default [0, 1]).
@@ -76,7 +189,7 @@ function checkTemplate(field, text, allowed, limits = {}) {
 }
 
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const CAPTURE = { version: '(\\d+\\.\\d+\\.\\d+)', date: '(\\d{4}-\\d{2}-\\d{2})', id: '([A-Za-z0-9._-]+)', title: '(.+)' };
+const CAPTURE = { date: '(\\d{4}-\\d{2}-\\d{2})', id: '([A-Za-z0-9._-]+)', title: '(.+)' };
 
 export function render(template, values) {
   return template.replace(PLACEHOLDER, (whole, name) => (values[name] === undefined ? whole : values[name]));
@@ -84,7 +197,7 @@ export function render(template, values) {
 
 // Compiles a template to a regular expression; a placeholder in `fixed` matches its literal value, every other one
 // captures. anchorEnd = false leaves the end open, for the claim token at the start of a bullet.
-export function compile(template, fixed = {}, anchorEnd = true) {
+export function compile(template, fixed = {}, anchorEnd = true, scheme = DEFAULT_SCHEME) {
   const names = [];
   let source = '';
   let last = 0;
@@ -93,16 +206,19 @@ export function compile(template, fixed = {}, anchorEnd = true) {
     last = m.index + m[0].length;
     if (fixed[m[1]] !== undefined) { source += escapeRegExp(fixed[m[1]]); continue; }
     names.push(m[1]);
-    source += CAPTURE[m[1]];
+    source += m[1] === 'version' ? SCHEMES[scheme].capture : CAPTURE[m[1]];
   }
   source += escapeRegExp(template.slice(last));
-  return { re: new RegExp(`^${source}${anchorEnd ? '$' : ''}`), source, names };
+  return { re: new RegExp(`^${source}${anchorEnd ? '$' : ''}`), source, names, scheme };
 }
 
 function parseLine(compiled, line) {
   const m = compiled.re.exec(line);
   if (!m) return null;
-  return Object.fromEntries(compiled.names.map((n, i) => [n, m[i + 1]]));
+  const found = Object.fromEntries(compiled.names.map((n, i) => [n, m[i + 1]]));
+  // FEAT-062 S7: under a validating scheme a captured value the scheme rejects is no match.
+  if (found.version !== undefined && SCHEMES[compiled.scheme].validates && versionReason(compiled.scheme, found.version) !== null) return null;
+  return found;
 }
 
 // ---- the profile validator ----
@@ -169,16 +285,62 @@ function checkChecks(list) {
   });
 }
 
+const PUBLISH_NAMES = ['tag', 'version', 'notes', 'sha'];
+
+function checkTarget(field, target) {
+  if (typeof target !== 'string' || target === '' || /[\r\n]/.test(target) || placeholders(target).length > 0) {
+    invalid(field, 'must be a non-empty single-line string with no placeholder');
+  }
+}
+
+function checkPublishArgv(field, argv, names) {
+  if (!Array.isArray(argv) || argv.length === 0) invalid(field, 'must be a non-empty array');
+  const open = Object.fromEntries(names.map((n) => [n, [0, Infinity]]));
+  argv.forEach((a, i) => checkTemplate(`${field}[${i}]`, a, names, open));
+}
+
 function checkPublish(publish) {
   if (publish === null) return;
   checkKeys('publish', publish, ['target', 'argv']);
-  const target = publish.target;
-  if (typeof target !== 'string' || target === '' || /[\r\n]/.test(target) || placeholders(target).length > 0) {
-    invalid('publish.target', 'must be a non-empty single-line string with no placeholder');
+  checkTarget('publish.target', publish.target);
+  checkPublishArgv('publish.argv', publish.argv, PUBLISH_NAMES);
+}
+
+const startsWith = (argv, ...head) => head.every((word, i) => argv[i] === word);
+const knownPublish = (argv) => startsWith(argv, 'npm', 'publish') || startsWith(argv, 'gh', 'release', 'create');
+
+// FEAT-062 S6: the reason a known publish step would move "latest", or null.
+function latestRisk(argv, channel) {
+  if (startsWith(argv, 'npm', 'publish')) {
+    const names = ['{channel}', channel];
+    const tagged = argv.some((a, i) => (a === '--tag' && names.includes(argv[i + 1])) || names.some((n) => a === `--tag=${n}`));
+    return tagged ? null : 'npm publish needs --tag {channel} or --tag <channel>';
   }
-  if (!Array.isArray(publish.argv) || publish.argv.length === 0) invalid('publish.argv', 'must be a non-empty array');
-  const open = Object.fromEntries(['tag', 'version', 'notes', 'sha'].map((n) => [n, [0, Infinity]]));
-  publish.argv.forEach((a, i) => checkTemplate(`publish.argv[${i}]`, a, ['tag', 'version', 'notes', 'sha'], open));
+  if (!startsWith(argv, 'gh', 'release', 'create')) return null;
+  if (!argv.includes('--prerelease')) return 'gh release create needs --prerelease';
+  return argv.includes('--latest') || argv.includes('--latest=true') ? 'gh release create must not carry --latest' : null;
+}
+
+function checkPrerelease(pre) {
+  checkKeys('prerelease', pre, ['publish', 'countsAsLastRelease']);
+  if (typeof pre.countsAsLastRelease !== 'boolean') invalid('prerelease.countsAsLastRelease', 'must be true or false');
+  if (pre.publish === null) return;
+  checkKeys('prerelease.publish', pre.publish, ['channel', 'target', 'argv']);
+  const { channel, target, argv } = pre.publish;
+  if (typeof channel !== 'string' || !/^[A-Za-z0-9._-]+$/.test(channel)) invalid('prerelease.publish.channel', 'must match [A-Za-z0-9._-]+');
+  checkTarget('prerelease.publish.target', target);
+  checkPublishArgv('prerelease.publish.argv', argv, [...PUBLISH_NAMES, 'channel']);
+  const risk = latestRisk(argv, channel);
+  if (risk !== null) invalid('prerelease.publish.argv', risk);
+}
+
+// FEAT-062 S1, S5: a scheme with prereleases states, in the committed profile, where a prerelease goes.
+function checkScheme(obj) {
+  if ('scheme' in obj && (typeof obj.scheme !== 'string' || !Object.hasOwn(SCHEMES, obj.scheme))) invalid('scheme', `must be one of ${SCHEME_LIST}`);
+  const scheme = schemeOf(obj);
+  if (SCHEMES[scheme].prereleases && !('prerelease' in obj)) invalid('prerelease', `required by scheme ${scheme}`);
+  if (!SCHEMES[scheme].prereleases && 'prerelease' in obj) invalid('prerelease', `not allowed with scheme ${scheme}`);
+  if ('prerelease' in obj) checkPrerelease(obj.prerelease);
 }
 
 function checkBacklog(backlog) {
@@ -209,12 +371,13 @@ function checkTagAndRefs(profile) {
 }
 
 export function validateProfile(obj) {
-  checkKeys('', obj, ['versions', 'changelog', 'tag', 'remote', 'mainline', 'checks', 'publish'], ['backlog', 'ticket']);
+  checkKeys('', obj, ['versions', 'changelog', 'tag', 'remote', 'mainline', 'checks', 'publish'], ['backlog', 'ticket', 'scheme', 'prerelease']);
   checkVersions(obj.versions);
   checkChangelog(obj.changelog);
   checkTagAndRefs(obj);
   checkChecks(obj.checks);
   checkPublish(obj.publish);
+  checkScheme(obj);
   if ('backlog' in obj) checkBacklog(obj.backlog);
   if ('ticket' in obj) {
     if (!('backlog' in obj)) invalid('ticket', 'needs a backlog binding');
@@ -296,36 +459,34 @@ export function repoRoot(cwd) {
   return r.out.trim();
 }
 
-export function compareVersions(a, b) {
-  const [x, y] = [a, b].map((v) => v.split('.').map(Number));
-  for (let i = 0; i < 3; i += 1) if (x[i] !== y[i]) return x[i] < y[i] ? -1 : 1;
-  return 0;
+export function compareVersions(a, b, scheme = DEFAULT_SCHEME) {
+  return SCHEMES[scheme].compare(a, b);
 }
 
 function keyPathValue(obj, keys) {
   return keys.reduce((node, k) => (isObject(node) && Object.hasOwn(node, k) ? node[k] : undefined), obj);
 }
 
-function lineLocation(root, entry) {
-  const compiled = compile(entry.line);
+function lineLocation(root, entry, scheme) {
+  const compiled = compile(entry.line, {}, true, scheme);
   const hits = lines(headText(root, entry.path) ?? '').map((text, i) => ({ i, m: parseLine(compiled, text) })).filter((h) => h.m);
   if (hits.length !== 1) fail('RELEASE_PROFILE_AMBIGUOUS', `${entry.path} ${entry.line} matches ${hits.length} lines at HEAD`);
   return { path: entry.path, kind: 'line', template: entry.line, index: hits[0].i, value: hits[0].m.version };
 }
 
-function jsonLocation(root, entry) {
+function jsonLocation(root, entry, scheme) {
   let parsed = null;
   try { parsed = JSON.parse(headText(root, entry.path) ?? ''); } catch { /* reported below */ }
   const value = keyPathValue(parsed, entry.json);
-  if (typeof value !== 'string' || !PLAIN_SEMVER.test(value)) {
-    fail('RELEASE_PROFILE_AMBIGUOUS', `${entry.path} ${JSON.stringify(entry.json)} holds no MAJOR.MINOR.PATCH version at HEAD`);
-  }
+  const holdsVersion = typeof value === 'string' && (scheme === DEFAULT_SCHEME ? PLAIN_SEMVER.test(value) : versionReason(scheme, value) === null);
+  if (!holdsVersion) fail('RELEASE_PROFILE_AMBIGUOUS', `${entry.path} ${JSON.stringify(entry.json)} holds no ${scheme} version at HEAD`);
   return { path: entry.path, kind: 'json', keys: entry.json, value };
 }
 
 // Each location's own HEAD value (C2); agreement between locations is the project's own check, not this driver's.
 export function locationValues(root, profile) {
-  return profile.versions.map((entry) => ('line' in entry ? lineLocation(root, entry) : jsonLocation(root, entry)));
+  const scheme = schemeOf(profile);
+  return profile.versions.map((entry) => ('line' in entry ? lineLocation(root, entry, scheme) : jsonLocation(root, entry, scheme)));
 }
 
 export function itemHeadings(root, profile, ids) {
@@ -345,7 +506,7 @@ export function itemHeadings(root, profile, ids) {
 
 // The 0-based line before which a new changelog entry goes: the first heading at HEAD, else the end.
 export function changelogAnchor(headLines, profile) {
-  const heading = compile(profile.changelog.heading);
+  const heading = compile(profile.changelog.heading, {}, true, schemeOf(profile));
   const found = headLines.findIndex((l) => parseLine(heading, l));
   return found === -1 ? headLines.length : found;
 }
@@ -363,16 +524,23 @@ export function dirtyPaths(root) {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+// FEAT-062 S12: the default scheme keeps its text; every other one names itself and the rule the version broke.
+function refuseInvalidVersion(version, scheme) {
+  const reason = versionReason(scheme, version);
+  if (reason === null) return;
+  fail('RELEASE_VERSION_INVALID', scheme === DEFAULT_SCHEME ? `${version}: ${reason}` : `${version}: not a ${scheme} version: ${reason}`);
+}
+
 // The refusals digest and check share, in decision 8's order; digest alone also refuses a dirty tree.
 export function prepare(root, opts, verb) {
   const { profile, blob } = loadProfile(root);
-  if (!SEMVER.test(opts.version)) fail('RELEASE_VERSION_INVALID', `${opts.version}: only MAJOR.MINOR.PATCH is supported`);
+  refuseInvalidVersion(opts.version, schemeOf(profile));
   if (opts.items && !profile.backlog) fail('RELEASE_ITEMS_UNBOUND', 'the profile binds no backlog; release without --items');
   if (!opts.items && profile.backlog) fail('RELEASE_USAGE', '--items is required: the profile binds a backlog');
   if (verb === 'digest') refuseDirty(root);
   const locations = locationValues(root, profile);
   const current = locations[0].value;
-  if (compareVersions(opts.version, current) <= 0) fail('RELEASE_VERSION_NOT_ADVANCED', `${opts.version} does not advance ${current}`);
+  if (compareVersions(opts.version, current, schemeOf(profile)) <= 0) fail('RELEASE_VERSION_NOT_ADVANCED', `${opts.version} does not advance ${current}`);
   const headings = profile.backlog ? itemHeadings(root, profile, opts.items) : [];
   return { root, profile, blob, version: opts.version, items: opts.items ?? [], date: opts.date ?? today(), locations, current, headings, surface: releaseSurface(profile) };
 }
@@ -470,10 +638,15 @@ export function runChecks(root, checks) {
 
 // ---- the digest ----
 
-export function commitLines(root, profile) {
-  const tag = compile(profile.tag);
-  const tags = git(root, ['tag', '--list']).out.split('\n').map((t) => ({ t, m: parseLine(tag, t) })).filter((x) => x.m);
-  tags.sort((a, b) => compareVersions(b.m.version, a.m.version));
+// FEAT-062 S8: a stable release's range skips prerelease tags unless the profile says a prerelease counts as a release.
+const skipsPrereleases = (profile, version) => Boolean(profile.prerelease) && profile.prerelease.countsAsLastRelease === false && !isPrerelease(profile, version);
+
+export function commitLines(root, profile, version) {
+  const scheme = schemeOf(profile);
+  const tag = compile(profile.tag, {}, true, scheme);
+  const skip = skipsPrereleases(profile, version);
+  const tags = git(root, ['tag', '--list']).out.split('\n').map((t) => ({ t, m: parseLine(tag, t) })).filter((x) => x.m && !(skip && isPrerelease(profile, x.m.version)));
+  tags.sort((a, b) => compareVersions(b.m.version, a.m.version, scheme));
   const range = tags.length > 0 ? `${tags[0].t}..HEAD` : 'HEAD';
   const log = git(root, ['log', '--no-show-signature', '--format=%h%x09%s', '-n', String(COMMIT_CAP), range]);
   const commits = log.out.split('\n').filter(Boolean).map((l) => ({ sha: l.slice(0, l.indexOf('\t')), subject: l.slice(l.indexOf('\t') + 1) }));
@@ -505,10 +678,18 @@ function itemLines(ctx) {
   ]);
 }
 
+// FEAT-062 S10: under a scheme other than the default, which order the advance check used and which publish path handoff takes.
+function schemeLines(ctx) {
+  const scheme = schemeOf(ctx.profile);
+  if (scheme === DEFAULT_SCHEME) return [];
+  return [`SCHEME ${scheme} ${isPrerelease(ctx.profile, ctx.version) ? 'prerelease' : 'stable'}`];
+}
+
 export function digestLines(ctx) {
-  const { commits, truncated } = commitLines(ctx.root, ctx.profile);
+  const { commits, truncated } = commitLines(ctx.root, ctx.profile, ctx.version);
   return [
     `RELEASE ${ctx.version} FROM ${ctx.current} DATE ${ctx.date}`,
+    ...schemeLines(ctx),
     `PROFILE ${ctx.blob}`,
     ...ctx.surface.map((p) => `SURFACE ${p}`),
     ...ctx.locations.map((l) => locationLine(ctx.root, l, ctx)),
@@ -706,7 +887,7 @@ const shellLine = (argv) => argv.map(shellQuote).join(' ');
 // The `<v>` section of the changelog at HEAD: after its heading to the next heading or the end, trimmed of blank lines.
 export function sectionOf(headLines, profile, version) {
   const heading = compile(profile.changelog.heading, { version });
-  const any = compile(profile.changelog.heading);
+  const any = compile(profile.changelog.heading, {}, true, schemeOf(profile));
   const start = headLines.findIndex((l) => parseLine(heading, l));
   if (start === -1) return null;
   const next = headLines.findIndex((l, i) => i > start && parseLine(any, l));
@@ -749,7 +930,7 @@ function claimedFromBacklog(ctx) {
 }
 
 function notesFromCommits(ctx) {
-  const { commits, truncated } = commitLines(ctx.root, ctx.profile);
+  const { commits, truncated } = commitLines(ctx.root, ctx.profile, ctx.version);
   const out = commits.map((c) => `- ${c.subject}\n`);
   if (truncated > 0) out.push(`- and ${truncated} earlier commits\n`);
   return out.join('');
@@ -771,7 +952,7 @@ function refuseNotOnMain(root, profile) {
 // Everything handoff decides before it runs a check or writes a file (decision 8's order).
 export function handoffContext(root, opts) {
   const { profile, blob } = loadProfile(root);
-  if (!SEMVER.test(opts.version)) fail('RELEASE_VERSION_INVALID', `${opts.version}: only MAJOR.MINOR.PATCH is supported`);
+  refuseInvalidVersion(opts.version, schemeOf(profile));
   refuseDirty(root);
   const locations = locationValues(root, profile);
   const ctx = { root, profile, blob, version: opts.version, locations, surface: releaseSurface(profile), items: [], headings: [] };
@@ -803,15 +984,25 @@ function ticketScript(root) {
   return relative(root, join(dirname(fileURLToPath(import.meta.url)), 'ticket.mjs')).replace(/\\/g, '/');
 }
 
+// FEAT-062 S9: a prerelease publishes only through prerelease.publish, and names its channel (D1: unverified when the driver cannot check it).
+function publishStep(ctx) {
+  const { profile } = ctx;
+  if (!isPrerelease(profile, ctx.version)) return profile.publish ? { step: profile.publish, channel: [] } : null;
+  const step = profile.prerelease.publish;
+  if (step === null) return null;
+  return { step, channel: [`PUBLISH-CHANNEL ${step.channel}${knownPublish(step.argv) ? '' : ' unverified'}`] };
+}
+
 export function stepLines(ctx) {
   const { profile } = ctx;
   const dir = `.conductor/release/${ctx.version}`;
   const out = [`STEP 1 tag ${shellLine(['git', 'tag', '-a', ctx.tag, '-m', ctx.tag, ctx.sha])}`, `STEP 2 push ${shellLine(['git', 'push', profile.remote, ctx.tag])}`];
   let n = 2;
-  if (profile.publish) {
-    const values = { tag: ctx.tag, version: ctx.version, notes: `${dir}/notes.md`, sha: ctx.sha };
+  const publish = publishStep(ctx);
+  if (publish) {
+    const values = { tag: ctx.tag, version: ctx.version, notes: `${dir}/notes.md`, sha: ctx.sha, channel: publish.step.channel };
     n += 1;
-    out.push(`PUBLISH-TARGET ${profile.publish.target}`, `STEP ${n} publish ${shellLine(profile.publish.argv.map((a) => render(a, values)))}`);
+    out.push(`PUBLISH-TARGET ${publish.step.target}`, ...publish.channel, `STEP ${n} publish ${shellLine(publish.step.argv.map((a) => render(a, values)))}`);
   }
   for (const c of ctx.claimed) {
     if (!c.bound) { out.push(`WRITEBACK-NONE ${c.id}`); continue; }
@@ -834,19 +1025,22 @@ export function writeHandoffFiles(ctx) {
 const readJson = (root, path) => { try { return JSON.parse(readFileSync(join(root, path), 'utf8')); } catch { return null; } };
 const readText = (root, path) => { try { return readFileSync(join(root, path), 'utf8'); } catch { return null; } };
 
+// FEAT-062 S11: a candidate version token; the schemes, not this shape, decide what it means.
+const VERSION_TOKEN = /^\d[0-9A-Za-z.+!-]*$/;
+
 function tomlLocation(root, path) {
   const text = readText(root, path);
-  const hits = text === null ? [] : lines(text).map((l) => /^version = "(\d+\.\d+\.\d+)"$/.exec(l)).filter(Boolean);
+  const hits = text === null ? [] : lines(text).map((l) => /^version = "(\d[0-9A-Za-z.+!-]*)"$/.exec(l)).filter(Boolean);
   return hits.length === 1 ? [{ entry: { path, line: 'version = "{version}"' }, value: hits[0][1] }] : [];
 }
 
 function jsonLocations(root) {
   const out = [];
   const pkg = readJson(root, 'package.json');
-  if (typeof pkg?.version === 'string' && PLAIN_SEMVER.test(pkg.version)) out.push({ entry: { path: 'package.json', json: ['version'] }, value: pkg.version });
+  if (typeof pkg?.version === 'string' && VERSION_TOKEN.test(pkg.version)) out.push({ entry: { path: 'package.json', json: ['version'] }, value: pkg.version });
   const lock = readJson(root, 'package-lock.json');
   const nested = lock?.packages?.['']?.version;
-  if (lock?.lockfileVersion >= 2 && PLAIN_SEMVER.test(lock.version ?? '') && PLAIN_SEMVER.test(nested ?? '')) {
+  if (lock?.lockfileVersion >= 2 && VERSION_TOKEN.test(lock.version ?? '') && VERSION_TOKEN.test(nested ?? '')) {
     out.push({ entry: { path: 'package-lock.json', json: ['version'] }, value: lock.version }, { entry: { path: 'package-lock.json', json: ['packages', '', 'version'] }, value: nested });
   }
   return out;
@@ -855,13 +1049,13 @@ function jsonLocations(root) {
 export function detectVersions(root) {
   const plain = readText(root, 'VERSION');
   const found = [
-    ...(plain !== null && /^\d+\.\d+\.\d+\r?\n?$/.test(plain) ? [{ entry: { path: 'VERSION', line: '{version}' }, value: plain.trim() }] : []),
+    ...(plain !== null && /^(\d[0-9A-Za-z.+!-]*)\r?\n?$/.test(plain) ? [{ entry: { path: 'VERSION', line: '{version}' }, value: plain.trim() }] : []),
     ...jsonLocations(root), ...tomlLocation(root, 'pyproject.toml'), ...tomlLocation(root, 'Cargo.toml'),
   ];
   if (new Set(found.map((f) => f.value)).size > 1) {
     fail('RELEASE_INIT_VERSIONS_DISAGREE', found.map((f) => `${f.entry.path} ${f.value}`).join(', '));
   }
-  return { versions: found.map((f) => f.entry), current: found[0]?.value ?? null };
+  return { versions: found.map((f) => f.entry), current: found[0]?.value ?? null, currentPath: found[0]?.entry.path ?? null };
 }
 
 export function detectChangelog(root, current) {
@@ -919,16 +1113,66 @@ export function detectPublish(root) {
   return { value: null, evidence: '(default)' };
 }
 
+// FEAT-062 S11: the facts that evidence the scheme: the current version, then each local tag a scheme accepts with two or more parts.
+const acceptedBy = (value) => INIT_ORDER.filter((s) => versionReason(s, value) === null);
+const releaseParts = (value) => /^\d+(?:\.\d+)*/.exec(value)[0].split('.').length;
+
+function schemeEvidence(root, current, currentPath, tagTemplate) {
+  const prefix = tagTemplate === 'v{version}' ? 'v' : '';
+  const own = current === null ? [] : [{ label: `${currentPath} ${current}`, value: current, current: true }];
+  const tags = git(root, ['tag', '--list']).out.split('\n').filter((t) => t.startsWith(prefix))
+    .map((t) => ({ label: `tag ${t}`, value: t.slice(prefix.length), current: false }))
+    .filter((e) => VERSION_TOKEN.test(e.value) && releaseParts(e.value) >= 2 && acceptedBy(e.value).length > 0);
+  return [...own, ...tags];
+}
+
+// Only the current version can make --init refuse as unsupported: every later verb validates it.
+function refuseUnsupported(evidence) {
+  const own = evidence.find((e) => e.current);
+  if (own === undefined || acceptedBy(own.value).length > 0) return;
+  const nearMisses = Object.keys(SCHEMES).map((s) => ({ s, parsed: SCHEMES[s].parse(own.value) })).filter((x) => x.parsed.near);
+  const detail = nearMisses.length === 0 ? '' : ` (${nearMisses.map((x) => `${x.s}: ${x.parsed.reason}`).join('; ')})`;
+  fail('RELEASE_INIT_SCHEME_UNSUPPORTED', `${own.label}: fits none of ${SCHEME_LIST}${detail}`);
+}
+
+// Plain versions show the evidence they hold (the current version and the first tag); (default) is for no evidence at all.
+function plainEvidence(evidence) {
+  const shown = [evidence.find((e) => e.current), evidence.find((e) => !e.current)].filter(Boolean);
+  return shown.length === 0 ? '(default)' : `(from ${shown.map((e) => e.label).join('; ')})`;
+}
+
+// The first scheme in INIT_ORDER that accepts every piece of evidence; none is a conflict, refused with the evidence.
+function detectScheme(evidence) {
+  refuseUnsupported(evidence);
+  const rejection = (s) => evidence.find((e) => versionReason(s, e.value) !== null);
+  const chosen = INIT_ORDER.find((s) => rejection(s) === undefined);
+  if (chosen === undefined) fail('RELEASE_INIT_SCHEME_CONFLICT', INIT_ORDER.map((s) => `${s} rejects ${rejection(s).label}`).join('; '));
+  if (chosen === DEFAULT_SCHEME) return { value: chosen, evidence: plainEvidence(evidence) };
+  const labels = INIT_ORDER.slice(0, INIT_ORDER.indexOf(chosen)).map((s) => rejection(s).label);
+  return { value: chosen, evidence: `(from ${[...new Set(labels)].join('; ')})` };
+}
+
+// The safe prerelease step the owner reviews before confirming: it never moves "latest" (FEAT-035 C14's pattern).
+function prereleaseProposal(publish) {
+  const policy = { countsAsLastRelease: false };
+  if (publish === null) return { publish: null, ...policy };
+  if (publish.argv[0] === 'gh') return { publish: { channel: 'prerelease', target: publish.target, argv: [...publish.argv, '--prerelease'] }, ...policy };
+  return { publish: { channel: 'next', target: publish.target, argv: ['npm', 'publish', '--tag', '{channel}'] }, ...policy };
+}
+
 // The proposal: [field, value, evidence] rows in profile order.
 export function proposal(root) {
-  const { versions, current } = detectVersions(root);
+  const { versions, current, currentPath } = detectVersions(root);
   const remote = detectRemote(root);
   const [changelog, tag, checks, publish] = [detectChangelog(root, current), detectTag(root, current), detectChecks(root), detectPublish(root)];
+  const scheme = detectScheme(schemeEvidence(root, current, currentPath, tag.value));
   return [
     ['versions', versions, versions.length > 0 ? `(from ${[...new Set(versions.map((v) => v.path))].join(', ')})` : '(default)'],
+    ['scheme', scheme.value, scheme.evidence],
     ['changelog', changelog.value, changelog.evidence], ['tag', tag.value, tag.evidence],
     ['remote', remote.remote, remote.evidence], ['mainline', remote.mainline, remote.evidence],
     ['checks', checks.value, checks.evidence], ['publish', publish.value, publish.evidence],
+    ...(SCHEMES[scheme.value].prereleases ? [['prerelease', prereleaseProposal(publish.value), '(default)']] : []),
   ];
 }
 
@@ -942,7 +1186,9 @@ function initVerb(root) {
   refuseExistingProfile(root);
   const rows = proposal(root);
   mkdirSync(join(root, '.conductor/release'), { recursive: true });
-  writeFileSync(join(root, PROPOSAL_PATH), `${JSON.stringify(Object.fromEntries(rows.map(([k, v]) => [k, v])), null, 2)}\n`);
+  // The default scheme is the absence of the key, so a plain-version project keeps FEAT-035's profile file.
+  const written = rows.filter(([k, v]) => k !== 'scheme' || v !== DEFAULT_SCHEME);
+  writeFileSync(join(root, PROPOSAL_PATH), `${JSON.stringify(Object.fromEntries(written), null, 2)}\n`);
   const shown = rows.map(([field, value, evidence]) => `PROPOSED ${field} ${JSON.stringify(value)} ${evidence}`);
   return { code: 0, lines: [...shown, `release: proposal written to ${PROPOSAL_PATH}; review it, then run init --confirm`] };
 }
