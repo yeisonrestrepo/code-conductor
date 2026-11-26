@@ -42,6 +42,10 @@ git ls-files --others --ignored --exclude-standard --directory --no-empty-direct
 - The `qa` profile gets one more matching sentence, for entries that end in `/`. A failing test's file matches such an
   entry when, after every `\` becomes `/`, the file starts with the entry or contains `/` followed by it. Existing
   matching for file entries does not change.
+- The "contains `/` followed by it" half also matches a deeper path that merely ends in the same directory name:
+  the entry `dist/` matches `pkg/a/dist/x.test.js` as well as `dist/x.test.js`. That is accepted on purpose. It
+  only ever makes fewer failures known, so the error goes the safe way (a red suite), and it keeps the rule one
+  sentence long for a profile that matches printed runner paths, which may be relative to a subfolder.
 
 ### Decisions this spec takes, and why
 
@@ -60,6 +64,12 @@ git ls-files --others --ignored --exclude-standard --directory --no-empty-direct
 3. **Only `.conductor/` is excluded**, as the entry suggests. Other router files that are ignored and untracked
    (`.claude/memory/orchestrator-run.json`, `band-envelope.json`, `session-snapshot.json`) are listed. They hold no
    tests, so listing them only adds a few lines, and an exception for each would be one more rule to keep up to date.
+   In a work tree that ignores `.claude/memory/` and tracks nothing under it, git collapses those files into one
+   `A .claude/memory/` entry (checked with git on the BUG-089 test fixture, which ignores `.claude/memory/` and
+   tracks `.claude/agents/` and `.claude/scripts/`: the call prints `.claude/memory/`, `.conductor/` and
+   `ignored.txt`). Existing tests whose exact list or count holds that entry are updated, not worked around: the
+   fixture keeps ignoring `.claude/memory/`, because dropping that rule would make the same files untracked and
+   not ignored, and they would be listed one by one instead.
 4. **The output line keeps its format.** `change files: <a> created, <m> modified (…)` now counts a directory entry
    as one created entry. The command text says the list can hold `<dir>/` entries. No new output line is added, so the
    commands-parity pins on the line stay as they are.
@@ -104,8 +114,20 @@ git ls-files --others --ignored --exclude-standard --directory --no-empty-direct
 ## Acceptance Criteria
 
 - **AC1** — In a run with a declared known failure, `install qa` lists a new untracked file that a `.gitignore` rule
-  matches as `A <path>`. The BUG-089 AC4 test that today expects `ignored.txt` to be left out expects
-  `A ignored.txt`, and its counts become `4 created, 1 modified`.
+  matches as `A <path>`, and lists the router's ignored `.claude/memory/` as `A .claude/memory/` (Decision 3). The
+  existing tests of the BUG-089 block in `tests/scripts/orchestrate.test.js` whose exact expectations change, and
+  to what:
+  - the AC4 test that today expects `ignored.txt` to be left out (`:5105`): `change files: 5 created, 1 modified`,
+    and the list `A .claude/memory/`, `A docs/specs/demo-design.md`, `A ignored.txt`, `A tests/a b.test.js`,
+    `M tests/kept.test.js`, `A tests/new.test.js`, in that order; its title stops saying ignored files are left out;
+  - the AC4 `install qa --check` test (`:5118`): `changeLine(2, 0)`;
+  - the AC4 second-install test (`:5126`): the final list is `A .claude/memory/`, `A docs/specs/demo-design.md`,
+    `A tests/second.test.js`;
+  - the AC8 short-entry install test (`:5197`): `changeLine(2, 0)` and the list `A .claude/memory/`,
+    `A docs/specs/demo-design.md`.
+  The block's `SPEC_ONLY` constant, used by the last two, becomes `A .claude/memory/\nA docs/specs/demo-design.md\n`
+  under a name that says it is the base list of the fixture. No other test in the file builds a change list: every
+  other `--known-failure` run stops before `install qa`.
 - **AC2** — A new, wholly untracked ignored directory holding a file is listed once as `A <dir>/`, and none of its
   files is listed on its own. An empty ignored directory is not listed.
 - **AC3** — Nothing at or under `.conductor/` is in the list, whether `.conductor/` is ignored as a whole or holds a
@@ -116,11 +138,13 @@ git ls-files --others --ignored --exclude-standard --directory --no-empty-direct
 - **AC6** — `changeList` treats a non-zero exit from the ignored-files call the way it treats one from the other two
   calls (one status check over all three). If the work tree's index is corrupt, which makes the `ls-files` calls
   fail, `install qa` prints the existing unavailable line and removes a list file left by an earlier `install qa`. The
-  existing BUG-089 unavailable cases (a base git cannot read) keep passing as they are.
+  existing BUG-089 unavailable cases (a null base, no security record, a base git cannot read, and the second
+  install that finds the list unavailable) keep passing as they are: none of them reaches a list.
 - **AC7** — `.claude/agents/qa.md` and `project-template/.claude/agents/qa.md` carry, byte-identical, the sentence on
   entries ending in `/`: a failing test's file matches such an entry when, after every `\` becomes `/`, it starts with
-  the entry or contains `/` followed by it. `tests/unit/role-profiles.test.js` pins the sentence and updates the
-  profile sha pins. The BUG-089 sentences pinned there are unchanged.
+  the entry or contains `/` followed by it, so `dist/` matches both `dist/x.test.js` and `pkg/a/dist/x.test.js`
+  (the sentence names that deeper match, Solution). `tests/unit/role-profiles.test.js` pins the sentence and updates
+  the profile sha pins. The BUG-089 sentences pinned there are unchanged.
 - **AC8** — Every `cc-orchestrate` mirror describes the list as the files the change created or modified plus the
   untracked ignored paths outside `.conductor/`, a wholly ignored directory being one `<dir>/` entry.
   `tests/installer/commands-parity.test.js` pins that phrase. The existing BUG-089 phrases stay.
@@ -143,8 +167,8 @@ git ls-files --others --ignored --exclude-standard --directory --no-empty-direct
 - `.claude/commands/cc-orchestrate.md` and its mirrors (`project-template/.claude/commands/cc-orchestrate.md`,
   `project-template/.agents/skills/cc-orchestrate/SKILL.md`, `project-template/.agents/workflows/cc-orchestrate.md`):
   the qa step's description of the list (`:91`).
-- Tests: `tests/scripts/orchestrate.test.js` (the BUG-089 block at `:5077`, with the AC4 expectation updated and new
-  cases), `tests/unit/role-profiles.test.js` (pins and sha), `tests/installer/commands-parity.test.js`.
+- Tests: `tests/scripts/orchestrate.test.js` (the BUG-089 block at `:5075`: the four tests AC1 names and its
+  `SPEC_ONLY` constant updated for `A .claude/memory/` and `A ignored.txt`, plus new cases), `tests/unit/role-profiles.test.js` (pins and sha), `tests/installer/commands-parity.test.js`.
 - Guard 6 and Guard 7 are unaffected: the script writes the list inside the existing write surface, and neither the
   test command nor the envelope changes.
 - These are control-plane files (the `qa` profile, the orchestrate command and script), the same surfaces BUG-089
@@ -153,7 +177,7 @@ git ls-files --others --ignored --exclude-standard --directory --no-empty-direct
 ### Files Requiring Full Read (deferred to /cc-plan)
 
 - `scripts/orchestrate.mjs`: `changeList` and `changeNote` (`:716`-`:742`).
-- `tests/scripts/orchestrate.test.js`: the BUG-089 block from `:5077`, including how its unavailable-list cases
+- `tests/scripts/orchestrate.test.js`: the BUG-089 block from `:5075`, including how its unavailable-list cases
   make git fail.
 - `.claude/agents/qa.md`: line 21.
 
