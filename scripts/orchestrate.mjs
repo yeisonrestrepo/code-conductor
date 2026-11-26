@@ -756,24 +756,48 @@ const contentHash = (abs) => { try { return createHash('sha256').update(readFile
 
 // BUG-092: the tracked files that differ from HEAD (every tracked file before the first commit) and the untracked
 // files no ignore rule hides, each mapped to the sha256 of its bytes, or to absent for a deleted one.
-function treeFingerprint(root) {
+// BUG-098: HEAD is the commit install recorded (base), not the current one, so a commit made during the dispatch hides nothing.
+function treeFingerprint(root, base) {
   const git = (args) => spawnSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 1 << 30 });
   const inside = git(['rev-parse', '--is-inside-work-tree']);
   if (inside.error) return { reason: 'git is not available' };
   if (inside.status !== 0 || inside.stdout.trim() !== 'true') return { reason: 'the project is not a git work tree' };
-  const hasHead = git(['rev-parse', '--verify', '--quiet', 'HEAD']).status === 0;
-  const tracked = git(hasHead ? ['diff', '--name-only', '--no-renames', '--relative', '-z', 'HEAD'] : ['ls-files', '-z']);
+  const tracked = git(base === null ? ['ls-files', '-z'] : ['diff', '--name-only', '--no-renames', '--relative', '-z', base, '--']);
   const others = git(['ls-files', '--others', '--exclude-standard', '-z']);
   if (tracked.status !== 0 || others.status !== 0) return { reason: 'git cannot list the changed files' };
   const paths = [...new Set([...nulPaths(tracked), ...nulPaths(others)])].filter((path) => !isRouterFile(path)).sort();
   return { files: Object.fromEntries(paths.map((path) => [path, contentHash(join(root, path))])) };
 }
 
+// BUG-098: the ignore files --exclude-standard reads outside the work tree, keyed by a fixed label, never by their path.
+const IGNORE_LABELS = ['info/exclude', 'core.excludesFile'];
+
+// BUG-098: core.excludesFile as git config prints it, else git's own default under XDG_CONFIG_HOME or HOME.
+function excludesFilePath(root, git) {
+  const set = git(['config', '--path', '--get', 'core.excludesFile']);
+  if (set.status === 0 && set.stdout.trim() !== '') return resolve(root, set.stdout.trim());
+  return join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'git', 'ignore');
+}
+
+// BUG-098: the commit HEAD names (null before the first commit) and the hash of each ignore file outside the tree;
+// the test command can move either during a dispatch without changing a path the fingerprint lists.
+function treeAnchor(root) {
+  const git = (args) => spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+  const head = git(['rev-parse', '--verify', '--quiet', 'HEAD']);
+  const exclude = git(['rev-parse', '--git-path', 'info/exclude']);
+  const excludeHash = exclude.status === 0 ? contentHash(resolve(root, exclude.stdout.trim())) : 'absent';
+  return {
+    head: head.status === 0 ? head.stdout.trim() : null,
+    ignores: { 'info/exclude': excludeHash, 'core.excludesFile': contentHash(excludesFilePath(root, git)) },
+  };
+}
+
 // BUG-092: what install records for a build role on a run with a test surface; null for every other dispatch.
 function buildTree(root, run, role) {
   if (surfaceOf(run) === undefined || (role !== 'code' && role !== 'test-writer')) return null;
-  const { files, reason } = treeFingerprint(root);
-  return files ? { role, files } : { role, unavailable: reason };
+  const anchor = treeAnchor(root);
+  const { files, reason } = treeFingerprint(root, anchor.head);
+  return files ? { role, ...anchor, files } : { role, unavailable: reason };
 }
 
 // BUG-089: every install qa rewrites the list, and removes it when it cannot be computed, so qa never reads an older one.
@@ -1197,10 +1221,23 @@ function claimHalt(env, role, expected) {
 }
 
 // BUG-092: a well-formed fingerprint names the role it was taken for and holds either files or the reason git could not list them.
+// BUG-098: a files record also holds the commit it was taken against and a hash for each out-of-tree ignore file.
+const isAnchored = (tree) => (tree.head === null || (typeof tree.head === 'string' && OBJECT_NAME.test(tree.head)))
+  && isPlainObject(tree.ignores) && IGNORE_LABELS.every((label) => typeof tree.ignores[label] === 'string');
 const isTreeRecord = (tree, role) => isPlainObject(tree) && tree.role === role
-  && (isPlainObject(tree.files) && Object.values(tree.files).every((h) => typeof h === 'string'))
+  && (isPlainObject(tree.files) && Object.values(tree.files).every((h) => typeof h === 'string') && isAnchored(tree))
     !== (typeof tree.unavailable === 'string' && tree.unavailable !== '');
 const changedPaths = (before, after) => [...new Set([...Object.keys(before), ...Object.keys(after)])].filter((p) => before[p] !== after[p]).sort();
+
+// BUG-098: no build role commits or edits an ignore file outside the tree, so a move of either is a crossing on its own.
+function anchorMoves(tree, now, role) {
+  const name = (head) => head ?? 'no commit';
+  const edited = IGNORE_LABELS.filter((label) => tree.ignores[label] !== now.ignores[label]);
+  return [
+    ...(tree.head === now.head ? [] : [`${role} moved HEAD from ${name(tree.head)} to ${name(now.head)} during its dispatch`]),
+    ...(edited.length === 0 ? [] : [`${role} changed the ignore file ${edited.join(', ')} during its dispatch`]),
+  ];
+}
 
 // BUG-092: Guard 5 sees only the write tools, so the files that changed while the role ran, its test command included,
 // are compared with the split; only a git that was already unavailable at install lets the hand-back through unchecked.
@@ -1210,12 +1247,15 @@ function splitCheck(root, run, role) {
   const tree = run.build_tree;
   if (!isTreeRecord(tree, role)) throw new Halt('ORCH_HANDBACK_SPLIT_UNVERIFIED', `no valid fingerprint of the tree recorded at install for ${role}; resume to re-dispatch it`);
   if (tree.unavailable) return { split_check: `unavailable (${tree.unavailable})` };
-  const now = treeFingerprint(root);
+  const anchor = treeAnchor(root);
+  const now = treeFingerprint(root, tree.head);
   if (!now.files) throw new Halt('ORCH_HANDBACK_SPLIT_UNVERIFIED', `git cannot list the tree (${now.reason}), so ${role}'s changes cannot be checked against the test surface; resume to re-dispatch it`);
   const crossed = changedPaths(tree.files, now.files).filter((path) => matchesSurface(path, surface) !== (role === 'test-writer'));
-  if (crossed.length === 0) return {};
   const side = role === 'test-writer' ? 'outside' : 'inside';
-  throw new Halt('ORCH_HANDBACK_SURFACE_CROSSED', `${role} changed ${crossed.join(', ')} during its dispatch, ${side} the test surface ${JSON.stringify(surface)}`);
+  const parts = anchorMoves(tree, anchor, role);
+  if (crossed.length > 0) parts.push(`${role} changed ${crossed.join(', ')} during its dispatch, ${side} the test surface ${JSON.stringify(surface)}`);
+  if (parts.length === 0) return {};
+  throw new Halt('ORCH_HANDBACK_SURFACE_CROSSED', parts.join('; '));
 }
 
 async function handback(root, sessionId, role, bytes) {

@@ -396,6 +396,8 @@ describe('cc-orchestrate split check [BUG-092 AC5]', () => {
     expect(text).toContain('`resume` does not revert them, so the owner keeps or reverts them by hand first');
     expect(text).toContain('It halts `ORCH_HANDBACK_SPLIT_UNVERIFIED` when the fingerprint `install` recorded is missing or malformed, or git can no longer list the tree; `resume` re-dispatches the role with a fresh fingerprint.');
     expect(text).toContain('; split check: unavailable (<reason>)');
+    // BUG-098: a moved HEAD or an edited out-of-tree ignore file halts the same way.
+    expect(text).toContain('It halts `ORCH_HANDBACK_SURFACE_CROSSED` too when `HEAD` moved, or `.git/info/exclude` or the `core.excludesFile` file changed, during the dispatch, since no build role commits or edits them; the owner reverts the commit or the edit by hand before `resume`.');
   });
 });
 

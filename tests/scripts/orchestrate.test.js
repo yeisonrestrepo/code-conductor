@@ -5678,6 +5678,11 @@ describe('test-surface split at hand-back [BUG-092]', () => {
   const crossed = (role, paths) => `ORCH_HANDBACK_SURFACE_CROSSED: ${role} changed ${paths} during its dispatch, ${role === 'code' ? 'inside' : 'outside'} the test surface ["tests/**"]`;
   const UNVERIFIED = 'ORCH_HANDBACK_SPLIT_UNVERIFIED: no valid fingerprint of the tree recorded at install for test-writer; resume to re-dispatch it';
   const atCode = () => { atWriter(); install('test-writer'); write('tests/a.test.js'); expect(handBack('test-writer', writerDone()).status).toBe(0); install('code'); };
+  // BUG-098: what install records beside the files; the system git config may name its own core.excludesFile, so only its shape is pinned here.
+  const anchorOf = () => ({
+    head: fixtureGit('rev-parse', 'HEAD').stdout.trim(),
+    ignores: { 'info/exclude': existsSync(join(root, '.git', 'info', 'exclude')) ? sha('.git/info/exclude') : 'absent', 'core.excludesFile': expect.stringMatching(/^(?:[0-9a-f]{64}|absent)$/) },
+  });
 
   it('[AC6] install test-writer records a fingerprint of the dirty set for its role; install --check records none', () => {
     atWriter();
@@ -5685,12 +5690,12 @@ describe('test-surface split at hand-back [BUG-092]', () => {
     expect(orch(['install', 'test-writer', '--check']).status).toBe(0);
     expect(runFile()).not.toHaveProperty('build_tree');
     install('test-writer');
-    expect(runFile().build_tree).toEqual({ role: 'test-writer', files: { [SPEC]: sha(SPEC), 'src/dirty.js': sha('src/dirty.js') } });
+    expect(runFile().build_tree).toEqual({ role: 'test-writer', ...anchorOf(), files: { [SPEC]: sha(SPEC), 'src/dirty.js': sha('src/dirty.js') } });
   });
 
   it('[AC6] install code records its own fingerprint, and install audit records none', () => {
     atCode();
-    expect(runFile().build_tree).toEqual({ role: 'code', files: { [SPEC]: sha(SPEC), 'tests/a.test.js': sha('tests/a.test.js') } });
+    expect(runFile().build_tree).toEqual({ role: 'code', ...anchorOf(), files: { [SPEC]: sha(SPEC), 'tests/a.test.js': sha('tests/a.test.js') } });
     write('src/a.js', 'a2\n');
     expect(handBack('code', codeSay(['src/a.js:M'])).status).toBe(0);
     install('audit');
@@ -5866,6 +5871,143 @@ describe('test-surface split at hand-back [BUG-092]', () => {
     install('test-writer');
     expect(runFile().build_tree.files['src/a.js']).toBe(sha('src/a.js'));
     expect(handBack('test-writer', writerDone()).status).toBe(0);
+  });
+
+  // BUG-098: the hand-back diffs against the HEAD install recorded, and a moved HEAD or an edited ignore file outside the tree is a crossing.
+  describe('HEAD and out-of-tree ignore files recorded at install [BUG-098]', () => {
+    const headSha = () => fixtureGit('rev-parse', 'HEAD').stdout.trim();
+    const commit = (...args) => expect(fixtureGit('commit', '-q', ...args).status).toBe(0);
+    const moved = (role, from, to) => `ORCH_HANDBACK_SURFACE_CROSSED: ${role} moved HEAD from ${from} to ${to} during its dispatch`;
+    const crossing = (role, paths) => crossed(role, paths).slice('ORCH_HANDBACK_SURFACE_CROSSED: '.length);
+    const ignoreEdited = (role, labels) => `${role} changed the ignore file ${labels} during its dispatch`;
+    const excludeWithRule = (rule) => write('.git/info/exclude', `${existsSync(join(root, '.git', 'info', 'exclude')) ? readFileSync(join(root, '.git', 'info', 'exclude'), 'utf8') : ''}${rule}\n`);
+
+    it('[AC2] code committing a new test file halts naming the move and the file, and records nothing', () => {
+      atCode();
+      const before = headSha();
+      write('src/a.js', 'a2\n');
+      write('tests/b.test.js');
+      fixtureGit('add', 'tests/b.test.js');
+      commit('-m', 'sneak');
+      const r = handBack('code', codeSay(['src/a.js:M']));
+      expect(r.status).toBe(1);
+      expect(r.err).toBe(`${moved('code', before, headSha())}; ${crossing('code', 'tests/b.test.js')}`);
+      expect(before).toMatch(/^[0-9a-f]{40}$/);
+      expect(runFile().handbacks.map((h) => h.role)).toEqual(['spec', 'plan', 'test-writer']);
+      expect(runFile().halt.code).toBe('ORCH_HANDBACK_SURFACE_CROSSED');
+    });
+
+    it('[AC3] test-writer committing a source change halts naming the move and the file outside the surface', () => {
+      atWriter();
+      install('test-writer');
+      const before = headSha();
+      write('tests/a.test.js');
+      write('src/a.js', 'a2\n');
+      commit('-am', 'sneak');
+      const r = handBack('test-writer', writerDone());
+      expect(r.status).toBe(1);
+      expect(r.err).toBe(`${moved('test-writer', before, headSha())}; ${crossing('test-writer', 'src/a.js')}`);
+      expect(runFile().handbacks.map((h) => h.role)).toEqual(['spec', 'plan']);
+    });
+
+    it('[AC4] code committing only a file on its own side halts naming the move and no path', () => {
+      atCode();
+      const before = headSha();
+      write('src/a.js', 'a2\n');
+      commit('-am', 'own side');
+      const r = handBack('code', codeSay(['src/a.js:M']));
+      expect(r.status).toBe(1);
+      expect(r.err).toBe(moved('code', before, headSha()));
+      expect(runFile().handbacks.map((h) => h.role)).toEqual(['spec', 'plan', 'test-writer']);
+    });
+
+    it('[AC5] code adding a rule to .git/info/exclude that hides a new test file halts naming info/exclude', () => {
+      atCode();
+      excludeWithRule('tests/hidden.test.js');
+      write('tests/hidden.test.js');
+      write('src/a.js', 'a2\n');
+      const r = handBack('code', codeSay(['src/a.js:M']));
+      expect(r.status).toBe(1);
+      expect(r.err).toBe(`ORCH_HANDBACK_SURFACE_CROSSED: ${ignoreEdited('code', 'info/exclude')}`);
+    });
+
+    it('[AC5] test-writer editing a repository-level core.excludesFile halts naming core.excludesFile', () => {
+      atWriter();
+      expect(fixtureGit('config', 'core.excludesFile', join(root, '.git', 'cc-ignore')).status).toBe(0);
+      write('.git/cc-ignore', 'coverage/\n');
+      install('test-writer');
+      expect(runFile().build_tree.ignores['core.excludesFile']).toBe(sha('.git/cc-ignore'));
+      write('.git/cc-ignore', 'coverage/\nsrc/hidden.js\n');
+      write('src/hidden.js');
+      write('tests/a.test.js');
+      const r = handBack('test-writer', writerDone());
+      expect(r.status).toBe(1);
+      expect(r.err).toBe(`ORCH_HANDBACK_SURFACE_CROSSED: ${ignoreEdited('test-writer', 'core.excludesFile')}`);
+    });
+
+    it('[AC5] a move, an ignore edit and crossed paths are named in that order', () => {
+      atWriter();
+      install('test-writer');
+      const before = headSha();
+      excludeWithRule('src/hidden.js');
+      write('src/a.js', 'a2\n');
+      commit('-am', 'sneak');
+      write('src/new.js');
+      const r = handBack('test-writer', writerDone());
+      expect(r.err).toBe(`${moved('test-writer', before, headSha())}; ${ignoreEdited('test-writer', 'info/exclude')}; ${crossing('test-writer', 'src/a.js, src/new.js')}`);
+    });
+
+    it('[AC6] with no commit at install, a first commit during the dispatch halts naming the move from no commit', () => {
+      driveTo('code', { planText: SPLIT, prep: () => { agents(['test-writer']); write('src/a.js', 'a1\n'); fixtureGit('init', '-q'); } });
+      install('test-writer');
+      expect(runFile().build_tree.head).toBeNull();
+      write('tests/a.test.js');
+      fixtureGit('add', 'tests/a.test.js');
+      commit('-m', 'first');
+      const r = handBack('test-writer', writerDone());
+      expect(r.status).toBe(1);
+      expect(r.err).toBe(moved('test-writer', 'no commit', headSha()));
+    });
+
+    it.each([
+      ['no head', (run) => { delete run.build_tree.head; }],
+      ['no ignores', (run) => { delete run.build_tree.ignores; }],
+      ['a head that is no object name', (run) => { run.build_tree.head = 'HEAD'; }],
+      ['an ignores record missing a label', (run) => { delete run.build_tree.ignores['core.excludesFile']; }],
+    ])('[AC7] a files fingerprint with %s halts unverified, and resume re-dispatches with a full one', (_name, edit) => {
+      atWriter();
+      install('test-writer');
+      patchRun(edit);
+      write('tests/a.test.js');
+      const r = handBack('test-writer', writerDone());
+      expect(r.status).toBe(1);
+      expect(r.err).toBe(UNVERIFIED);
+      expect(runFile().handbacks).toHaveLength(2);
+      expect(orch(['resume']).status).toBe(0);
+      install('test-writer');
+      expect(handBack('test-writer', writerDone()).status).toBe(0);
+    });
+
+    it('a HEAD moved and moved back is checked as an unmoved one, with BUG-092\'s message', () => {
+      atWriter();
+      install('test-writer');
+      const before = headSha();
+      write('tests/a.test.js');
+      write('src/a.js', 'a2\n');
+      commit('-am', 'sneak');
+      expect(fixtureGit('reset', '-q', '--soft', before).status).toBe(0);
+      expect(handBack('test-writer', writerDone()).err).toBe(crossed('test-writer', 'src/a.js'));
+    });
+
+    it('a recorded commit git cannot diff against halts unverified', () => {
+      atWriter();
+      install('test-writer');
+      patchRun((run) => { run.build_tree.head = '0'.repeat(40); });
+      write('tests/a.test.js');
+      const r = handBack('test-writer', writerDone());
+      expect(r.status).toBe(1);
+      expect(r.err).toBe('ORCH_HANDBACK_SPLIT_UNVERIFIED: git cannot list the tree (git cannot list the changed files), so test-writer\'s changes cannot be checked against the test surface; resume to re-dispatch it');
+    });
   });
 
   // BUG-099: the fingerprint grows with the work tree, so install checks the run file's bound before it writes anything.

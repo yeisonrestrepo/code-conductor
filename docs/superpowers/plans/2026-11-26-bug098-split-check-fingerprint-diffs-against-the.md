@@ -332,9 +332,9 @@
 **Files:**
 - Test: `tests/scripts/orchestrate.test.js`
 
-- [ ] [T-101] `tests/scripts/orchestrate.test.js`: the `anchorOf` helper after `atCode` and the two `[AC6]` expectation edits (plan decision 6). Depends on T-004.
-- [ ] [T-102] `tests/scripts/orchestrate.test.js`: the nested `describe('HEAD and out-of-tree ignore files recorded at install [BUG-098]')` of plan decision 6, before the BUG-099 comment. Depends on T-101.
-- [ ] [T-103] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t 'BUG-098|records a fingerprint of the dirty set|records its own fingerprint'`. Its full match set is the 15 tests of plan decision 9. Predicted: **14 failed | 1 passed | 1306 skipped (1321)**, the passing one the "moved and moved back" row. Depends on T-102.
+- [X] [T-101] `tests/scripts/orchestrate.test.js`: the `anchorOf` helper after `atCode` and the two `[AC6]` expectation edits (plan decision 6). Depends on T-004.
+- [X] [T-102] `tests/scripts/orchestrate.test.js`: the nested `describe('HEAD and out-of-tree ignore files recorded at install [BUG-098]')` of plan decision 6, before the BUG-099 comment. Depends on T-101.
+- [X] [T-103] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t 'BUG-098|records a fingerprint of the dirty set|records its own fingerprint'`. Its full match set is the 15 tests of plan decision 9. Predicted: **14 failed | 1 passed | 1306 skipped (1321)**, the passing one the "moved and moved back" row. Depends on T-102.
 
 ---
 
@@ -343,9 +343,9 @@
 **Files:**
 - Modify: `scripts/orchestrate.mjs`
 
-- [ ] [T-201] `scripts/orchestrate.mjs`: the `treeFingerprint` edit (plan decision 1), then `IGNORE_LABELS`, `excludesFilePath` and `treeAnchor` above `buildTree` (plan decision 2), then the `buildTree` body (plan decision 3). Depends on T-103.
-- [ ] [T-202] `scripts/orchestrate.mjs`: `isAnchored` and the `isTreeRecord` edit (plan decision 4), `anchorMoves` above `splitCheck` and the `splitCheck` edit (plan decision 5). Depends on T-201.
-- [ ] [T-203] Green run: the T-103 command. Predicted: **15 passed | 1306 skipped (1321)**. Then the whole file: `npx vitest run tests/scripts/orchestrate.test.js` (several minutes). Predicted: **1321 passed (1321)**, BUG-092's other rows and BUG-099's bound rows included (AC8). Depends on T-202.
+- [X] [T-201] `scripts/orchestrate.mjs`: the `treeFingerprint` edit (plan decision 1), then `IGNORE_LABELS`, `excludesFilePath` and `treeAnchor` above `buildTree` (plan decision 2), then the `buildTree` body (plan decision 3). Depends on T-103.
+- [X] [T-202] `scripts/orchestrate.mjs`: `isAnchored` and the `isTreeRecord` edit (plan decision 4), `anchorMoves` above `splitCheck` and the `splitCheck` edit (plan decision 5). Depends on T-201.
+- [X] [T-203] Green run: the T-103 command. Predicted: **15 passed | 1306 skipped (1321)**. Then the whole file: `npx vitest run tests/scripts/orchestrate.test.js` (several minutes). Predicted: **1321 passed (1321)**, BUG-092's other rows and BUG-099's bound rows included (AC8). Depends on T-202.
 
 ---
 
@@ -358,11 +358,11 @@
 - Modify: `project-template/.agents/skills/cc-orchestrate/SKILL.md`
 - Modify: `project-template/.agents/workflows/cc-orchestrate.md`
 
-- [ ] [T-301] `tests/installer/commands-parity.test.js`: the comment and `toContain` of plan decision 8 in the `[BUG-092 AC5]` block. Depends on T-203.
-- [ ] [T-302] Red run: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: **4 failed | 128 passed (132)**. Depends on T-301.
-- [ ] [T-303] `.claude/commands/cc-orchestrate.md` (Edit tool): the replacement of plan decision 7. Depends on T-302.
-- [ ] [T-304] `project-template/.claude/commands/cc-orchestrate.md`, `project-template/.agents/skills/cc-orchestrate/SKILL.md` and `project-template/.agents/workflows/cc-orchestrate.md`: the same replacement; then `cmp` of the two Claude Code copies prints nothing, and the `sha256sum` of each copy's halts line (`:37`, `:37`, `:41`, `:40`) prints `b369ad74…` four times. Depends on T-303.
-- [ ] [T-305] Green run: the T-302 command. Predicted: **132 passed (132)**, the byte-identical mirror row included. Depends on T-304.
+- [X] [T-301] `tests/installer/commands-parity.test.js`: the comment and `toContain` of plan decision 8 in the `[BUG-092 AC5]` block. Depends on T-203.
+- [X] [T-302] Red run: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: **4 failed | 128 passed (132)**. Depends on T-301.
+- [X] [T-303] `.claude/commands/cc-orchestrate.md` (Edit tool): the replacement of plan decision 7. Depends on T-302.
+- [X] [T-304] `project-template/.claude/commands/cc-orchestrate.md`, `project-template/.agents/skills/cc-orchestrate/SKILL.md` and `project-template/.agents/workflows/cc-orchestrate.md`: the same replacement; then `cmp` of the two Claude Code copies prints nothing, and the `sha256sum` of each copy's halts line (`:37`, `:37`, `:41`, `:40`) prints `b369ad74…` four times. Depends on T-303.
+- [X] [T-305] Green run: the T-302 command. Predicted: **132 passed (132)**, the byte-identical mirror row included. Depends on T-304.
 
 ---
 
@@ -371,7 +371,7 @@
 **Files:**
 - Modify: `README.md`
 
-- [ ] [T-401] `README.md`: the Guard 5 replacement of plan decision 8; `git diff README.md` shows one changed line, `:314`, and the `[BUG-098]` Known-limits line is unchanged. Depends on T-305.
+- [X] [T-401] `README.md`: the Guard 5 replacement of plan decision 8; `git diff README.md` shows one changed line, `:314`, and the `[BUG-098]` Known-limits line is unchanged. Depends on T-305.
 
 ---
 
@@ -380,24 +380,24 @@
 **Files:**
 - Modify: `docs/superpowers/plans/2026-11-26-bug098-split-check-fingerprint-diffs-against-the.md` (ticks)
 
-- [ ] [T-501] Run `npm test` (long: `orchestrate.test.js` alone takes several minutes; run it in the background if the shell times out). Predicted: exit 0, with `tests/scripts/orchestrate.test.js` at **1321 passed** and `tests/installer/commands-parity.test.js` at **132 passed** (AC11). Depends on T-401.
-- [ ] [T-502] Scope check: `git status --short` lists exactly the eight files of the Global Constraints and this plan; no temporary file is left in the tree. `git diff --stat` shows no change to the BUG-098 spec, the hooks, `install`, `handback`, `resume` or any record. Depends on T-501.
-- [ ] [T-503] Stage: `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js tests/installer/commands-parity.test.js .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md project-template/.agents/skills/cc-orchestrate/SKILL.md project-template/.agents/workflows/cc-orchestrate.md README.md`. Depends on T-502.
-- [ ] [T-504] Stage: `git add -u docs/superpowers/plans/2026-11-26-bug098-split-check-fingerprint-diffs-against-the.md` (carries the ticks for T-101 to T-503). Depends on T-503.
-- [ ] [T-505] Commit: `fix: diff the split check against the HEAD recorded at install and halt on a moved HEAD or ignore file [BUG-098]`. Depends on T-504.
+- [X] [T-501] Run `npm test` (long: `orchestrate.test.js` alone takes several minutes; run it in the background if the shell times out). Predicted: exit 0, with `tests/scripts/orchestrate.test.js` at **1321 passed** and `tests/installer/commands-parity.test.js` at **132 passed** (AC11). Depends on T-401.
+- [X] [T-502] Scope check: `git status --short` lists exactly the eight files of the Global Constraints and this plan; no temporary file is left in the tree. `git diff --stat` shows no change to the BUG-098 spec, the hooks, `install`, `handback`, `resume` or any record. Depends on T-501.
+- [X] [T-503] Stage: `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js tests/installer/commands-parity.test.js .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md project-template/.agents/skills/cc-orchestrate/SKILL.md project-template/.agents/workflows/cc-orchestrate.md README.md`. Depends on T-502.
+- [X] [T-504] Stage: `git add -u docs/superpowers/plans/2026-11-26-bug098-split-check-fingerprint-diffs-against-the.md` (carries the ticks for T-101 to T-503). Depends on T-503.
+- [X] [T-505] Commit: `fix: diff the split check against the HEAD recorded at install and halt on a moved HEAD or ignore file [BUG-098]`. Depends on T-504.
 
 ---
 
 ## Test List
 
-- [ ] [T-601] `tests/scripts/orchestrate.test.js` (Task 1), AC1: the two BUG-092 `[AC6]` rows extended with `head` and `ignores` through `anchorOf`.
-- [ ] [T-602] `tests/scripts/orchestrate.test.js` (Task 1), AC2-AC4: `code` committing a new test file (move and file), `test-writer` committing a source change (move and file), `code` committing only its own side (move alone).
-- [ ] [T-603] `tests/scripts/orchestrate.test.js` (Task 1), AC5: `.git/info/exclude` hiding a new test file, a repository-level `core.excludesFile` edited, and the three-part message order.
-- [ ] [T-604] `tests/scripts/orchestrate.test.js` (Task 1), AC6: no commit at install (`head: null`), a first commit during the dispatch.
-- [ ] [T-605] `tests/scripts/orchestrate.test.js` (Task 1), AC7: the four-row table of `files` records without a valid anchor, each followed by `resume` and a recorded hand-back; plus the two untagged rows (moved and moved back; a recorded commit git cannot diff against).
-- [ ] [T-606] `tests/scripts/orchestrate.test.js` (Task 2), AC8: BUG-092's other rows and BUG-099's bound rows unchanged and green in the whole-file run.
-- [ ] [T-607] `tests/installer/commands-parity.test.js` (Task 3), AC9: the four `[BUG-092 AC5]` rows with the new expectation, and the byte-identical mirror row.
-- [ ] [T-608] AC10 has no test row: no test reads the README sentence (T-401 checks it by diff). AC11: `npm test` (T-501). No E2E/UI test: there is no UI.
+- [X] [T-601] `tests/scripts/orchestrate.test.js` (Task 1), AC1: the two BUG-092 `[AC6]` rows extended with `head` and `ignores` through `anchorOf`.
+- [X] [T-602] `tests/scripts/orchestrate.test.js` (Task 1), AC2-AC4: `code` committing a new test file (move and file), `test-writer` committing a source change (move and file), `code` committing only its own side (move alone).
+- [X] [T-603] `tests/scripts/orchestrate.test.js` (Task 1), AC5: `.git/info/exclude` hiding a new test file, a repository-level `core.excludesFile` edited, and the three-part message order.
+- [X] [T-604] `tests/scripts/orchestrate.test.js` (Task 1), AC6: no commit at install (`head: null`), a first commit during the dispatch.
+- [X] [T-605] `tests/scripts/orchestrate.test.js` (Task 1), AC7: the four-row table of `files` records without a valid anchor, each followed by `resume` and a recorded hand-back; plus the two untagged rows (moved and moved back; a recorded commit git cannot diff against).
+- [X] [T-606] `tests/scripts/orchestrate.test.js` (Task 2), AC8: BUG-092's other rows and BUG-099's bound rows unchanged and green in the whole-file run.
+- [X] [T-607] `tests/installer/commands-parity.test.js` (Task 3), AC9: the four `[BUG-092 AC5]` rows with the new expectation, and the byte-identical mirror row.
+- [X] [T-608] AC10 has no test row: no test reads the README sentence (T-401 checks it by diff). AC11: `npm test` (T-501). No E2E/UI test: there is no UI.
 
 ## Commit Order
 
