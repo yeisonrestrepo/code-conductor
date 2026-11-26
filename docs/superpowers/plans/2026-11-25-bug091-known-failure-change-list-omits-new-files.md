@@ -268,16 +268,16 @@ Everything else stays as audited.
 
 ## Test List
 
-- [ ] [T-601] `tests/scripts/orchestrate.test.js` (Task 1), AC1: the four BUG-089 tests of plan decision 2 with `BASE_LIST` (`A .claude/memory/`, `A docs/specs/`, `A ignored.txt` listed).
-- [ ] [T-602] `tests/scripts/orchestrate.test.js` (Task 1), AC2: N1 (ignored directory under a tracked parent, an empty ignored directory beside it), N2 (collapse into a new parent), N3 (an empty ignored directory).
-- [ ] [T-603] `tests/scripts/orchestrate.test.js` (Task 1), AC3: the two N4 rows.
-- [ ] [T-604] `tests/scripts/orchestrate.test.js` (Task 1), AC4: N5 (`M .gitignore` and the file it ignores).
-- [ ] [T-605] `tests/scripts/orchestrate.test.js` (Task 1), AC5: N6 (a space in an ignored directory's path).
-- [ ] [T-606] `tests/scripts/orchestrate.test.js` (Task 1), AC6: N7 (corrupt index) and the unchanged BUG-089 unavailable rows (null base, no security record, unreadable base, second install).
-- [ ] [T-607] `tests/scripts/orchestrate.test.js` (Task 1), AC9: N8 (`A newdir/`, `A newdir/a.js`, no `b.ign.js`).
-- [ ] [T-608] `tests/unit/role-profiles.test.js` (Task 3), AC7: the four sentence rows, the BUG-089-rules row, the token cap and both `qa` hash rows.
-- [ ] [T-609] `tests/installer/commands-parity.test.js` (Task 4), AC8: the four new rows, the byte-identical mirror row and the BUG-089 row.
-- [ ] [T-610] AC10: `npm test` (T-501). No E2E/UI test: there is no UI. CI legs: no new test is conditionally skipped, so no leg's skipped set in `tools/skip-baseline.json` changes.
+- [X] [T-601] `tests/scripts/orchestrate.test.js` (Task 1), AC1: the four BUG-089 tests of plan decision 2 with `BASE_LIST` (`A .claude/memory/`, `A docs/specs/`, `A ignored.txt` listed).
+- [X] [T-602] `tests/scripts/orchestrate.test.js` (Task 1), AC2: N1 (ignored directory under a tracked parent, an empty ignored directory beside it), N2 (collapse into a new parent), N3 (an empty ignored directory).
+- [X] [T-603] `tests/scripts/orchestrate.test.js` (Task 1), AC3: the two N4 rows.
+- [X] [T-604] `tests/scripts/orchestrate.test.js` (Task 1), AC4: N5 (`M .gitignore` and the file it ignores).
+- [X] [T-605] `tests/scripts/orchestrate.test.js` (Task 1), AC5: N6 (a space in an ignored directory's path).
+- [X] [T-606] `tests/scripts/orchestrate.test.js` (Task 1), AC6: N7 (corrupt index) and the unchanged BUG-089 unavailable rows (null base, no security record, unreadable base, second install).
+- [X] [T-607] `tests/scripts/orchestrate.test.js` (Task 1), AC9: N8 (`A newdir/`, `A newdir/a.js`, no `b.ign.js`).
+- [X] [T-608] `tests/unit/role-profiles.test.js` (Task 3), AC7: the four sentence rows, the BUG-089-rules row, the token cap and both `qa` hash rows.
+- [X] [T-609] `tests/installer/commands-parity.test.js` (Task 4), AC8: the four new rows, the byte-identical mirror row and the BUG-089 row.
+- [X] [T-610] AC10: `npm test` (T-501). No E2E/UI test: there is no UI. CI legs: no new test is conditionally skipped, so no leg's skipped set in `tools/skip-baseline.json` changes.
 
 ## Commit Order
 
