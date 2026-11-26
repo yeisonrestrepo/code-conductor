@@ -1,6 +1,6 @@
 # BUG-099: Install writes an unbounded build_tree fingerprint to the run file
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-26 by independent review (round 1)
 
 Source: the `[BUG-099]` entry in `AGENT-READABLE BACKLOG.md` (PILLAR 5), the intake of issue #340, a follow-up of `[BUG-092]`. The entry names a symptom, an impact, two fix shapes and one required test, and leaves the choice of shape open; "Choices the entry leaves open" below names the one this spec takes and why.
 
