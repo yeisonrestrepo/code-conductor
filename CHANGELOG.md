@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.59.6] - 2026-11-26
+
+### Fixed
+- **[BUG-091]** The `qa` change list that `install qa` writes to `.conductor/handback/qa-change.txt` for a run with declared known failures now lists new files under a `.gitignore`d path. It used to come only from `git diff --name-status` and `git ls-files --others --exclude-standard`, so a failing test created in an ignored path the runner still executes, and matching a declared `--known-failure` entry, could be counted as known and the suite read green. `changeList` in `scripts/orchestrate.mjs` now adds every untracked ignored path and every new untracked directory outside `.conductor/` as `A` (`git ls-files --others [--ignored] --exclude-standard --directory --no-empty-directory -z`): a new ignored directory under a tracked parent, or a new parent holding nothing tracked, is one `<dir>/` entry, and a new directory that also holds unignored files is listed as `A <dir>/`, covering an ignored file inside it. Empty ignored directories are not listed, paths with spaces are listed byte for byte, and a failing `git` call (a corrupt index included) still makes the list unavailable. An ignored file that predates the run is listed as created, which only makes fewer failures known. The `qa` profile now treats a listed path ending in `/` as a directory entry matching a failing test's file through a leading part of its path, and both `cc-orchestrate.md` copies, the Antigravity workflow and the Codex skill describe the wider list. Pinned by `known-failure change list holds ignored paths and new directories [BUG-091]` in `tests/scripts/orchestrate.test.js`, `directory entries in the qa change list [BUG-091]` in `tests/unit/role-profiles.test.js` (with the new `qa` profile hash) and the `[BUG-091 AC8]` row of `tests/installer/commands-parity.test.js`. Landed from PR #333 (cc-lane-bot), intake of issue #306.
+
 ## [1.59.5] - 2026-11-26
 
 ### Fixed
