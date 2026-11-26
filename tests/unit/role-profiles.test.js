@@ -141,6 +141,9 @@ const PATH_MATCH = 'Two paths match when, after every `\\` is turned into `/`, t
 const QA_LIST = 'A failing test whose file matches a path `.conductor/handback/qa-change.txt` lists (`A <path>` created, `M <path>` modified by the change) is never known, even when its line contains a declared entry; if that file is absent or unreadable, no failing test is known.';
 const QA_NAMED = 'Also name each failing test that matched a declared entry but is not known because that list names its file.';
 const CODE_LIST = 'A failing test whose file matches a file you created or edited in this task is never known, even when its line contains a declared entry.';
+// BUG-091: a listed <dir>/ entry matches a failing test's file through a leading part of its path, in both directions.
+const QA_DIR = "A listed path that ends in `/` is a directory entry: a failing test's file matches it when a leading part of the file's path that ends in `/` matches the entry by that rule, so `tests/.tmp/` matches `tests/.tmp/x.test.js` and `pkg/tests/.tmp/x.test.js`, and `pkg/tests/.tmp/` matches `tests/.tmp/x.test.js` printed by a runner in `pkg/`; a match through a shared directory name is accepted, because it only makes fewer failures known.";
+const QA_DIR_SUBFOLDER = '`pkg/tests/.tmp/` matches `tests/.tmp/x.test.js` printed by a runner in `pkg/`';
 
 describe('role agent profiles [FEAT-012]', () => {
   it('ships exactly the ROLES plus define-review in both agents directories [FEAT-041, FEAT-034]', () => {
@@ -277,6 +280,22 @@ describe('known failures in changed files [BUG-089]', () => {
   });
 });
 
+describe('directory entries in the qa change list [BUG-091]', () => {
+  const ROWS = [TEMPLATE, MIRROR].map((dir) => [`${dir}/qa.md`]);
+
+  it.each(ROWS)('[AC7] %s matches a <dir>/ entry through a leading part of the path', (rel) => {
+    expect(read(rel)).toContain(QA_DIR);
+  });
+
+  it.each(ROWS)('[AC7] %s names the subfolder case, a runner printing a shorter path', (rel) => {
+    expect(read(rel)).toContain(QA_DIR_SUBFOLDER);
+  });
+
+  it('[AC7] the BUG-089 rules stay in qa as they were', () => {
+    for (const rule of [QA_LIST, FILE_RULE, PATH_MATCH, QA_NAMED]) expect(profile('qa')).toContain(rule);
+  });
+});
+
 // FEAT-031 AC13: FEAT-031 changes no role profile. Each value was measured from v1.37.0 with
 // `git show v1.37.0:<path>`; CI checks out no tags, so the hashes are pinned here. A later item
 // that changes a profile on purpose updates its row in the same commit.
@@ -296,7 +315,8 @@ const PROFILE_SHA256_1_37_0 = {
   plan: 'b14e18a5f56a99a2d377fd367859d964ec781c6ee876b8aeba258038d30c2c6b',
   // BUG-074 changed qa on purpose: one definition of a green suite, shared by plan, code and qa, with the run's declared known failures.
   // BUG-089 changed qa on purpose: a failing test in a file qa-change.txt lists is never known, and its file comes only from the runner's output.
-  qa: '1bcbbaf0d42e5abd8c3b22ae0729118e8d948b3f07127bad1e5c990fca595af0',
+  // BUG-091 changed qa on purpose: a listed path ending in / is a directory entry, matched through a leading part of a failing test's path.
+  qa: 'f4319a4ce0db973fdaa03143a5f57d00011c4d8904026b07c8528af0bbfdea20',
   // FEAT-059 changed security on purpose: findings carry the audit's severities and the report ends in a VERDICT line. It shipped after 1.37.0, so this is its first pin.
   security: '0056234a6b1917a44cb5fedd06d2b04d8322939650bfd74a9e7dc470157f4710',
   spec: 'f3489eb5061c533b94eb349b056c7ba589a17947ec73635256281a16b5f34ba3',

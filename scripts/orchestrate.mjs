@@ -713,19 +713,30 @@ function dispatchModel(run, step) {
   return step.fix === undefined ? run.models[step.role] : fixDue(run).model ?? run.models.code;
 }
 
+// BUG-091: the router's own state, the list file included, holds no test, so no path under it is listed.
+const ROUTER_DIR = '.conductor/';
+const nulPaths = (result) => result.stdout.split('\0').filter(Boolean);
+
 // BUG-089: the files the change created (A) or modified (M) against the base start recorded, sorted by path.
 // --no-renames makes a rename a delete plus a create; a deleted file holds no test that can fail, so it is left out.
+// BUG-091: an ignore rule hides a new file from the first two calls, so the untracked ignored paths and the new
+// untracked directories are listed too, a wholly untracked directory as one <dir>/ entry; git keeps no record of
+// untracked files, so one that predates the base is listed as created, which only makes fewer failures known.
 function changeList(root, security) {
   if (!isPlainObject(security)) return { reason: 'the run has no security record (started before FEAT-034)' };
   if (security.base === null) return { reason: 'the run recorded no base commit' };
   const git = (args) => spawnSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 1 << 30 });
   const diff = git(['diff', '--name-status', '--no-renames', '--relative', '-z', security.base]);
   const others = git(['ls-files', '--others', '--exclude-standard', '-z']);
-  if (diff.status !== 0 || others.status !== 0) return { reason: 'git cannot compare the work tree with the base commit' };
+  const ignored = git(['ls-files', '--others', '--ignored', '--exclude-standard', '--directory', '--no-empty-directory', '-z']);
+  const dirs = git(['ls-files', '--others', '--exclude-standard', '--directory', '--no-empty-directory', '-z']);
+  if ([diff, others, ignored, dirs].some((r) => r.status !== 0)) return { reason: 'git cannot compare the work tree with the base commit' };
   const status = new Map();
   const fields = diff.stdout.split('\0');
   for (let i = 0; i + 1 < fields.length; i += 2) if (fields[i] !== 'D') status.set(fields[i + 1], fields[i] === 'A' ? 'A' : 'M');
-  for (const path of others.stdout.split('\0').filter(Boolean)) status.set(path, 'A');
+  for (const path of nulPaths(others)) status.set(path, 'A');
+  const newDirs = nulPaths(dirs).filter((path) => path.endsWith('/'));
+  for (const path of [...nulPaths(ignored), ...newDirs]) if (!path.startsWith(ROUTER_DIR)) status.set(path, 'A');
   return { lines: [...status.keys()].sort().map((path) => `${status.get(path)} ${path}`) };
 }
 

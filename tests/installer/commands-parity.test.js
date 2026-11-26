@@ -381,6 +381,13 @@ describe('cc-orchestrate mirrors [FEAT-011 AC10]', () => {
   });
 });
 
+describe('cc-orchestrate qa change list [BUG-091 AC8]', () => {
+  const HARNESS_MIRRORS = ['project-template/.agents/skills/cc-orchestrate/SKILL.md', 'project-template/.agents/workflows/cc-orchestrate.md'];
+  it.each([...ORCH_MIRRORS, ...HARNESS_MIRRORS])('%s lists ignored paths and new directories, a wholly untracked directory as one entry', (rel) => {
+    expect(read(rel)).toContain('plus the untracked ignored paths and the new untracked directories outside `.conductor/`, a wholly untracked directory being one `<dir>/` entry');
+  });
+});
+
 describe('cc-orchestrate review loop [FEAT-041 AC5, AC6, FEAT-058]', () => {
   const text = () => read(ORCH_MIRRORS[0]);
   const has = (...phrases) => { const t = text(); for (const p of phrases) expect(t).toContain(p); };
