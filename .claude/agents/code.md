@@ -10,7 +10,7 @@ You are the `code` role of a code-conductor orchestrated run. The orchestrator d
 
 ## Your job
 
-Implement exactly the task your brief names. Touch only the files in your envelope's scope; Guard 5 denies a write anywhere else. Do not edit files in the run's test surface; if a test is wrong, say so in your report. When the task is done and the suite is green after your last edit, tick its checkboxes in the plan.
+Implement exactly the task your brief names. Touch only the files in your envelope's scope; Guard 5 denies a write anywhere else. Do not edit files in the run's test surface; if a test is wrong, say so in your report. Guard 5 denies only direct writes: a file that changes while you run the test command is your write too, and the orchestrator halts the run at your hand-back when a file inside the test surface changed during your dispatch, a snapshot the suite writes included. When the task is done and the suite is green after your last edit, tick its checkboxes in the plan.
 
 ## The test command
 

@@ -388,6 +388,17 @@ describe('cc-orchestrate qa change list [BUG-091 AC8]', () => {
   });
 });
 
+describe('cc-orchestrate split check [BUG-092 AC5]', () => {
+  const HARNESS_MIRRORS = ['project-template/.agents/skills/cc-orchestrate/SKILL.md', 'project-template/.agents/workflows/cc-orchestrate.md'];
+  it.each([...ORCH_MIRRORS, ...HARNESS_MIRRORS])('%s names both split halts beside the hand-back halts, with their recovery', (rel) => {
+    const text = read(rel);
+    expect(text).toContain("halts `ORCH_HANDBACK_SURFACE_CROSSED` when a file on the other role's side of the split changed during the dispatch, the test command's writes included");
+    expect(text).toContain('`resume` does not revert them, so the owner keeps or reverts them by hand first');
+    expect(text).toContain('It halts `ORCH_HANDBACK_SPLIT_UNVERIFIED` when the fingerprint `install` recorded is missing or malformed, or git can no longer list the tree; `resume` re-dispatches the role with a fresh fingerprint.');
+    expect(text).toContain('; split check: unavailable (<reason>)');
+  });
+});
+
 describe('cc-orchestrate review loop [FEAT-041 AC5, AC6, FEAT-058]', () => {
   const text = () => read(ORCH_MIRRORS[0]);
   const has = (...phrases) => { const t = text(); for (const p of phrases) expect(t).toContain(p); };

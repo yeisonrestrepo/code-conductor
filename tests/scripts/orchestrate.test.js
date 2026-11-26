@@ -1858,7 +1858,8 @@ describe('hand-back claims, end and approver [BUG-075]', () => {
   it('C4 [AC4] a conforming code hand-back is recorded as before', () => {
     atCode();
     const r = orch(['handback', 'code'], { input: codeSay({ f: ['src/a.js:M', 'src/a.test.js:C', `${PLAN}:M`] }) });
-    expect(r).toMatchObject({ status: 0, out: 'code handed back build_executed' });
+    // BUG-092: the fixture is no git work tree, so install recorded the split check as unavailable.
+    expect(r).toMatchObject({ status: 0, out: 'code handed back build_executed; split check: unavailable (the project is not a git work tree)' });
     expect(runFile().tasks.done).toBe(1);
     expect(runFile().halt).toBeNull();
   });
@@ -5414,7 +5415,8 @@ describe('test-writer in the Build band [FEAT-033]', () => {
     atBuild(TESTED);
     orch(['install', 'test-writer']);
     const r = handed('test-writer', writerSay(['tests/scripts/foo.test.js:C']));
-    expect(r.out).toBe('test-writer handed back build_executed');
+    // BUG-092: the fixture is no git work tree, so install recorded the split check as unavailable.
+    expect(r.out).toBe('test-writer handed back build_executed; split check: unavailable (the project is not a git work tree)');
     expect(runFile().handbacks.at(-1)).toMatchObject({ role: 'test-writer', gate: 'build_executed', task: 'Task 1' });
     expect(runFile().gate).toBe('define_approved');
     expect(runFile().tasks.done).toBe(0);
@@ -5648,6 +5650,222 @@ describe('test-writer in the Build band [FEAT-033]', () => {
     const r = orch(['envelope', 'test-writer']);
     expect(r.status).toBe(2);
     expect(r.err).toBe('orchestrate: usage: orchestrate.mjs envelope <spec|plan|audit|qa|docs|release> [--item <label>] | --clear');
+  });
+});
+
+describe('test-surface split at hand-back [BUG-092]', () => {
+  const testTask = (n, lines) => `### Task ${n}: thing ${n}\n\n**Files:**\n${lines.join('\n')}\n\n- [ ] **Step 1: do it**\n`;
+  const SPLIT = '# Demo Plan\n\n' + testTask(1, ['- Modify: `src/a.js`', '- Test: `tests/a.test.js`']) + '\n## Test List\n';
+  const LEGACY = 'not-configured (run predates FEAT-033)';
+  const write = (rel, text = 'x\n') => { mkdirSync(dirname(join(root, rel)), { recursive: true }); writeFileSync(join(root, rel), text); };
+  const patchRun = (edit) => { const run = runFile(); edit(run); runFileText(JSON.stringify(run, null, 2) + '\n'); };
+  const writerSay = (f) => `Done.\nObservation: fine.\n${handbackLine('test-writer', 'build_executed', { v: 7, f })}\n`;
+  const codeSay = (f) => `Done.\nObservation: fine.\n${handbackLine('code', 'build_executed', { f })}\n`;
+  const writerDone = () => writerSay(['tests/a.test.js:C']);
+  // The base commit holds src/a.js, src/base.js and an ignore rule for coverage/; base() adds more before the commit.
+  const atWriter = ({ git = true, base = () => {} } = {}) => driveTo('code', { planText: SPLIT, prep: () => {
+    agents(['test-writer']);
+    if (!git) return;
+    write('.gitignore', 'coverage/\n');
+    write('src/a.js', 'a1\n');
+    write('src/base.js', 'v1\n');
+    base();
+    fixtureGit('init', '-q');
+    fixtureCommit();
+  } });
+  const install = (role) => { const r = orch(['install', role]); expect(r.status).toBe(0); return r; };
+  const handBack = (role, input) => orch(['handback', role], { input });
+  const crossed = (role, paths) => `ORCH_HANDBACK_SURFACE_CROSSED: ${role} changed ${paths} during its dispatch, ${role === 'code' ? 'inside' : 'outside'} the test surface ["tests/**"]`;
+  const UNVERIFIED = 'ORCH_HANDBACK_SPLIT_UNVERIFIED: no valid fingerprint of the tree recorded at install for test-writer; resume to re-dispatch it';
+  const atCode = () => { atWriter(); install('test-writer'); write('tests/a.test.js'); expect(handBack('test-writer', writerDone()).status).toBe(0); install('code'); };
+
+  it('[AC6] install test-writer records a fingerprint of the dirty set for its role; install --check records none', () => {
+    atWriter();
+    write('src/dirty.js', 'd\n');
+    expect(orch(['install', 'test-writer', '--check']).status).toBe(0);
+    expect(runFile()).not.toHaveProperty('build_tree');
+    install('test-writer');
+    expect(runFile().build_tree).toEqual({ role: 'test-writer', files: { [SPEC]: sha(SPEC), 'src/dirty.js': sha('src/dirty.js') } });
+  });
+
+  it('[AC6] install code records its own fingerprint, and install audit records none', () => {
+    atCode();
+    expect(runFile().build_tree).toEqual({ role: 'code', files: { [SPEC]: sha(SPEC), 'tests/a.test.js': sha('tests/a.test.js') } });
+    write('src/a.js', 'a2\n');
+    expect(handBack('code', codeSay(['src/a.js:M'])).status).toBe(0);
+    install('audit');
+    expect(runFile()).not.toHaveProperty('build_tree');
+  });
+
+  it('[AC7] test-writer changing a source file it does not list halts and records nothing', () => {
+    atWriter();
+    install('test-writer');
+    write('tests/a.test.js');
+    write('src/a.js', 'a2\n');
+    const r = handBack('test-writer', writerDone());
+    expect(r.status).toBe(1);
+    expect(r.err).toBe(crossed('test-writer', 'src/a.js'));
+    expect(runFile().handbacks.map((h) => h.role)).toEqual(['spec', 'plan']);
+    expect(runFile().halt.code).toBe('ORCH_HANDBACK_SURFACE_CROSSED');
+  });
+
+  it('[AC7] test-writer with an empty ops.f still halts on a source file it created', () => {
+    atWriter();
+    install('test-writer');
+    write('src/new.js');
+    expect(handBack('test-writer', writerSay([])).err).toBe(crossed('test-writer', 'src/new.js'));
+  });
+
+  it('[AC7] code changing a test file it does not list halts and records nothing', () => {
+    atCode();
+    write('src/a.js', 'a2\n');
+    write('tests/a.test.js', 'rewritten\n');
+    const r = handBack('code', codeSay(['src/a.js:M']));
+    expect(r.status).toBe(1);
+    expect(r.err).toBe(crossed('code', 'tests/a.test.js'));
+    expect(runFile().handbacks.map((h) => h.role)).toEqual(['spec', 'plan', 'test-writer']);
+  });
+
+  it('[AC7] several crossings are named sorted and comma-separated', () => {
+    atWriter();
+    install('test-writer');
+    write('src/b.js');
+    write('lib/z.js');
+    write('src/a.js', 'a2\n');
+    expect(handBack('test-writer', writerDone()).err).toBe(crossed('test-writer', 'lib/z.js, src/a.js, src/b.js'));
+  });
+
+  it('[AC7] a fix round is checked the same way', () => {
+    driveTo('audit', { prep: () => { write('src/a.js', 'a1\n'); fixtureGit('init', '-q'); fixtureCommit(); } });
+    install('audit');
+    expect(handBack('audit', auditReport('VERDICT: RETURN', ['- [blocker] src/a.js:10 — breaks AC1'])).status).toBe(0);
+    install('code');
+    expect(runFile().build_tree.role).toBe('code');
+    write('tests/z.test.js');
+    expect(handBack('code', codeSay(['src/a.js:M'])).err).toBe(crossed('code', 'tests/z.test.js'));
+  });
+
+  it('[AC8] a dirty file modified again counts as changed, and a dirty file left alone does not', () => {
+    atWriter();
+    write('src/old.js', 'o1\n');
+    write('src/keep.js', 'k1\n');
+    install('test-writer');
+    write('src/old.js', 'o2\n');
+    expect(handBack('test-writer', writerDone()).err).toBe(crossed('test-writer', 'src/old.js'));
+  });
+
+  it.each([
+    ['reverted to HEAD', () => write('src/base.js', 'v2\n'), () => write('src/base.js', 'v1\n')],
+    ['deleted', () => {}, () => rmSync(join(root, 'src', 'base.js'))],
+  ])('[AC8] a tracked file %s during the dispatch counts as changed', (_name, before, during) => {
+    atWriter();
+    before();
+    install('test-writer');
+    during();
+    expect(handBack('test-writer', writerDone()).err).toBe(crossed('test-writer', 'src/base.js'));
+  });
+
+  it('[AC9] the router\'s files, ignored files and unlisted changes on the role\'s own side do not halt', () => {
+    atWriter();
+    install('test-writer');
+    write('tests/a.test.js');
+    write('tests/extra.test.js');
+    write('.conductor/handback/test-writer.txt', writerDone());
+    write('coverage/index.html');
+    writeFileSync(join(root, ENVELOPE_FILE), `${envelopeText()}\n`);
+    runFileText(`${JSON.stringify(runFile())}\n`);
+    const r = handBack('test-writer', writerDone());
+    expect(r.status).toBe(0);
+    expect(r.out).toBe('test-writer handed back build_executed');
+    install('code');
+    write('src/a.js', 'a2\n');
+    write('src/extra.js');
+    expect(handBack('code', codeSay(['src/a.js:M'])).out).toBe('code handed back build_executed');
+  });
+
+  it('[AC10] a run without a test surface records no fingerprint and runs no check', () => {
+    driveTo('code', { prep: () => { fixtureGit('init', '-q'); fixtureCommit(); } });
+    patchRun((run) => { delete run.test_surface; });
+    install('code');
+    expect(runFile()).not.toHaveProperty('build_tree');
+    write('tests/x.test.js');
+    expect(handBack('code', codeSay([])).out).toBe(`code handed back build_executed; test-writer=${LEGACY}`);
+  });
+
+  it('[AC10] a fingerprint unavailable at install records the hand-back with a split-check note', () => {
+    atWriter({ git: false });
+    install('test-writer');
+    expect(runFile().build_tree).toEqual({ role: 'test-writer', unavailable: 'the project is not a git work tree' });
+    write('src/a.js', 'a2\n');
+    const r = handBack('test-writer', writerDone());
+    expect(r.status).toBe(0);
+    expect(r.out).toBe('test-writer handed back build_executed; split check: unavailable (the project is not a git work tree)');
+    expect(runFile().handbacks.at(-1).split_check).toBe('unavailable (the project is not a git work tree)');
+    expect(runFile()).not.toHaveProperty('build_tree');
+  });
+
+  it.each([
+    ['that is missing', (run) => { delete run.build_tree; }],
+    ['that is not an object', (run) => { run.build_tree = 'x'; }],
+    ['taken for another role', (run) => { run.build_tree.role = 'code'; }],
+    ['holding a hash that is not a string', (run) => { run.build_tree.files[SPEC] = 1; }],
+    ['holding both files and unavailable', (run) => { run.build_tree.unavailable = 'no git'; }],
+    ['with an empty unavailable', (run) => { run.build_tree = { role: 'test-writer', unavailable: '' }; }],
+  ])('[AC11] a fingerprint %s halts unverified, and resume re-dispatches with a fresh one', (_name, edit) => {
+    atWriter();
+    install('test-writer');
+    patchRun(edit);
+    write('tests/a.test.js');
+    const r = handBack('test-writer', writerDone());
+    expect(r.status).toBe(1);
+    expect(r.err).toBe(UNVERIFIED);
+    expect(runFile().handbacks).toHaveLength(2);
+    expect(orch(['resume']).status).toBe(0);
+    install('test-writer');
+    expect(runFile().build_tree.files['tests/a.test.js']).toBe(sha('tests/a.test.js'));
+    expect(handBack('test-writer', writerDone()).status).toBe(0);
+  });
+
+  it.each([
+    ['the work tree is gone', 'the project is not a git work tree',
+      () => renameSync(join(root, '.git'), join(root, '.git-off')), () => renameSync(join(root, '.git-off'), join(root, '.git'))],
+    ['the index is corrupt', 'git cannot list the changed files',
+      () => writeFileSync(join(root, '.git', 'index'), 'not an index\n'), () => { rmSync(join(root, '.git', 'index')); fixtureGit('reset', '-q'); }],
+  ])('[AC11] a recorded fingerprint halts unverified when %s at hand-back', (_name, reason, breakGit, repair) => {
+    atWriter();
+    install('test-writer');
+    write('tests/a.test.js');
+    breakGit();
+    const r = handBack('test-writer', writerDone());
+    expect(r.status).toBe(1);
+    expect(r.err).toBe(`ORCH_HANDBACK_SPLIT_UNVERIFIED: git cannot list the tree (${reason}), so test-writer's changes cannot be checked against the test surface; resume to re-dispatch it`);
+    expect(runFile().handbacks).toHaveLength(2);
+    repair();
+    expect(orch(['resume']).status).toBe(0);
+    install('test-writer');
+    expect(handBack('test-writer', writerDone()).status).toBe(0);
+  });
+
+  it('[AC12] a recorded hand-back removes the fingerprint', () => {
+    atWriter();
+    install('test-writer');
+    write('tests/a.test.js');
+    expect(handBack('test-writer', writerDone()).status).toBe(0);
+    expect(runFile()).not.toHaveProperty('build_tree');
+  });
+
+  it('[AC12] resume drops the fingerprint, and the re-install takes the crossed file as baseline', () => {
+    atWriter();
+    install('test-writer');
+    write('tests/a.test.js');
+    write('src/a.js', 'a2\n');
+    expect(handBack('test-writer', writerDone()).err).toBe(crossed('test-writer', 'src/a.js'));
+    expect(runFile().build_tree.role).toBe('test-writer');
+    expect(orch(['resume']).status).toBe(0);
+    expect(runFile()).not.toHaveProperty('build_tree');
+    install('test-writer');
+    expect(runFile().build_tree.files['src/a.js']).toBe(sha('src/a.js'));
+    expect(handBack('test-writer', writerDone()).status).toBe(0);
   });
 });
 
