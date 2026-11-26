@@ -1815,6 +1815,50 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #337; reported by the automated security review of
   #335.
 
+### [ ] `[BUG-098]` Split check fingerprint diffs against the current HEAD instead of the HEAD recorded at install
+
+- Symptom: `treeFingerprint` in `scripts/orchestrate.mjs:755`, per the
+  issue, diffs against whatever `HEAD` is when it runs and lists
+  untracked files with `--exclude-standard`.
+- Impact per the issue: if the test command commits during a dispatch,
+  or edits `.git/info/exclude`, files that crossed the test surface
+  disappear from the second fingerprint, and
+  `ORCH_HANDBACK_SURFACE_CROSSED` never fires. Guard 5 still denies
+  direct writes, so only the after-the-fact detection added by
+  `[BUG-092]` is affected. Minor; it did not block the `1.59.7` patch.
+- Fix shape suggested by the issue: record the `HEAD` commit in
+  `build_tree` at install and diff against that commit at hand-back;
+  also treat a `HEAD` change during the dispatch as a crossing.
+- Follow-up of `[BUG-092]`.
+- Intake of issue #341; reported by the automated security review of
+  the 1.59.7 release candidate (#338).
+
+### [ ] `[BUG-099]` Install writes an unbounded build_tree fingerprint to the run file, disabling hook reads during dispatch
+
+- Symptom: `install` (`scripts/orchestrate.mjs:801`), per the issue,
+  writes the full `build_tree` fingerprint, one sha256 per changed or
+  untracked file, into `.claude/memory/orchestrator-run.json` through
+  `saveRun`, which has no size check. Only the hand-back path enforces
+  `RUN_FILE_MAX_BYTES` (`ORCH_RUN_FILE_FULL`, `:267`).
+- Impact per the issue: at roughly 110 bytes per entry, about 100k
+  changed or untracked, non-ignored files (an unignored dependency
+  directory or generated test fixtures are enough) push the run file
+  past the hooks' 10 MiB read cap. While `code` or `test-writer` runs,
+  the hooks then treat the run as unreadable: the test-surface split in
+  Guard 5 stops applying and Guard 6 only warns. The split check at
+  hand-back detects a crossing afterwards, but nothing prevents it
+  during the dispatch. The `1.59.7` release was held because of it.
+- Fix shape suggested by the issue: keep the run file bounded at
+  install, either by serializing the run and halting with
+  `ORCH_RUN_FILE_FULL` when its byte length exceeds
+  `RUN_FILE_MAX_BYTES` before `writeAtomic`, or by storing the
+  fingerprint in its own file under `.conductor/` (already excluded
+  from the fingerprint). Add a test that installs `code` over a tree
+  large enough to cross the bound.
+- Follow-up of `[BUG-092]`.
+- Intake of issue #340; reported by the automated security review of
+  the 1.59.7 release candidate (#338).
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
