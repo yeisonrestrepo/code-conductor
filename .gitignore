@@ -212,6 +212,7 @@ tests/.tmp/
 !/docs/superpowers/plans/2026-11-25-bug095-release-discard-commands-split-paths-containing.md
 !/docs/superpowers/plans/2026-11-25-bug096-codex-legacy-hook-fingerprint-substring-match.md
 !/docs/superpowers/plans/2026-11-26-bug092-test-surface-split-bypassable-through-the.md
+!/docs/superpowers/plans/2026-11-26-bug098-split-check-fingerprint-diffs-against-the.md
 !/docs/superpowers/plans/2026-11-26-bug099-install-writes-an-unbounded-build-tree.md
 !/docs/superpowers/plans/2026-11-26-feat062-release-driver-support-for-prerelease-and-non.md
 !/docs/superpowers/specs/2026-06-09-bug001-cc-compact-design.md
