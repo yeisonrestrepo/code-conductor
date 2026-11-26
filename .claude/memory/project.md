@@ -3631,3 +3631,19 @@ Known limits: the BUG-093 line is removed. Every other defect line is unchanged.
 Not verified at landing: the argument lists come from the recorded agy 1.5.15 contract and were not re-measured live (spec choice 5); if a real agy sends a file-tool argument the recording trimmed, that tool's calls block naming it until the list learns it. No live agy session is reported by #327. CI on the release PR is the authority.
 
 Upgrade note: reinstalling with `--project --antigravity` ships the updated `.agents/hooks/conductor-guard.mjs`. An agy call to `read_file`, `write_file` or `edit_file` carrying an argument outside its list is now blocked with the argument named; an install without `--antigravity` is unchanged.
+
+## Release: 1.59.4 batch landing 2026-11-26
+
+One PR merged since `v1.59.3`. Existing id closed:
+
+- BUG-096 (#329 by `cc-lane-bot[bot]`, the Codex legacy hook fingerprint matching user-owned `PreToolUse` entries by substring). `mergeSettingsFile` in `lib/installer/settings-merge.mjs` takes `legacyCommands` in place of `legacyFingerprints`; the new `entryHasCommand(entry, command)` matches a `hooks[].command` by strict equality with the same shape guards as `entryMatches`, and `upsertEntry` counts an entry as ours when it matches the current fingerprint by substring or a legacy command exactly (ownership stays entry-level, spec choice 2). `lib/installer/deploy.mjs` renames `CODEX_LEGACY_FINGERPRINTS` to `CODEX_LEGACY_COMMANDS` (`conductor-guard.mjs` → `['node .claude/hooks/pre-tool-use.mjs']`) and passes it through `mergeHarnessHooks`. A host entry such as `node tools/my-pre-tool-use.mjs`, or a near copy `node .claude/hooks/pre-tool-use.mjs --log`, is kept and the shipped entry appended (`merged`, "installed" report); the exact legacy entry is replaced in place (`legacy-replaced`, re-trust report, wording unchanged). Claude Code settings and Antigravity pass no legacy list and are byte-identical. Tests: three `(BUG-096)` cases in `mergeSettingsFile: legacy fingerprints (BUG-094)` of `tests/installer/settings-merge.test.js` (the existing BUG-094 cases moved to the new option name) and the `(BUG-096)` row of `deployProject: Codex hook (FEAT-048, BUG-094)` in `tests/installer/deploy.test.js`. The PR also adds the spec and plan leaves to the `.gitignore` tracked-surface block. Follow-up of `[BUG-094]`, reported by the automated security review of the 1.59.2 release candidate (#324). Intake of issue #325. Spec and plan approved by independent review, round 1 each.
+
+Nothing minted: BUG-096 was reserved by triage #325. BUG-095 (triage #321) stays reserved and is not touched by this release; BUG-092 (triage #312), BUG-091 (triage #306) and FEAT-062 (triage #295) likewise.
+
+Known limits: the BUG-096 line is removed. Every other defect line is unchanged.
+
+Residual named by the spec and not filed: the current fingerprint `conductor-guard.mjs` is still a substring match on `.codex/hooks.json` and `.agents/hooks.json` (and the Claude Code `settings.json` fingerprints likewise), so a host command that merely contains it is still captured as owned; narrowing it needs an ownership marker in every existing install. Entries an earlier install already removed are not restored.
+
+Not verified at landing: no live Codex session is reported by #329. #329 reports `tests/unit/staging-convention.test.js` AC7/AC8 failing in its sandbox's git (`git add -u` on an untracked path exits 0), as earlier lane PRs did. CI on the release PR is the authority.
+
+Upgrade note: reinstalling with `--project --codex` now keeps a user's own `PreToolUse` entry whose command contains `pre-tool-use.mjs` and appends the shipped entry after it; a hand-edited copy of the old conductor command is also kept beside the new entry rather than replaced. An install without `--codex` is unchanged.
