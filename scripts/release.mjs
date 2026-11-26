@@ -670,28 +670,31 @@ function diffStates(root) {
 }
 
 const DISCARD_COMMANDS = [['checkout', 'git --literal-pathspecs checkout HEAD --'], ['rm', 'git --literal-pathspecs rm -f --'], ['clean', 'git --literal-pathspecs clean -f --']];
-// BUG-090 D6: a printed command must mean the same in a POSIX shell, PowerShell and cmd.exe. A control character
-// splits or forges a line, a bidi control makes the shown line differ from the run one, PowerShell also closes a
-// quote on U+2018-U+201B, and cmd.exe does not honour single quotes, so its metacharacters stay live.
-const byHand = (path) => /[^\x20-\x7e]|['"`&|<>^%]/.test(path);
+// BUG-090 D6, BUG-095: a printed command must mean the same in a POSIX shell, PowerShell and cmd.exe, and no quoting
+// does that: cmd.exe keeps single quotes as part of the argument. So a command carries only paths that need no
+// quoting: characters every shell keeps literal in a bare word, no `,` (a PowerShell array), no segment starting with
+// `@` (PowerShell splatting) and no leading `-` (Windows PowerShell splits `-x.txt`). Every other path, a control or
+// non-ASCII character included, goes to a DISCARD_BY_HAND line.
+const BARE_PATH = /^[A-Za-z0-9._/:=@+-]+$/;
+const bareOnCommand = (path) => BARE_PATH.test(path) && !path.startsWith('-') && !path.split('/').some((s) => s.startsWith('@'));
 // Every UTF-16 unit outside printable ASCII is escaped: JSON.stringify leaves C1 (a raw U+009B drives a terminal),
 // format characters and look-alikes raw.
 const unicodeEscape = (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`;
 const jsonName = (path) => `"${path.split('').map((c) => (/[^\x20-\x7e]/.test(c) ? unicodeEscape(c) : JSON.stringify(c).slice(1, -1))).join('')}"`;
-const pathName = (path) => (byHand(path) ? jsonName(path) : path);
+const pathName = (path) => (bareOnCommand(path) ? path : jsonName(path));
 
 // BUG-090: after a rejected judgment, the warning when a rejected path of the diff is control-plane, then the commands
-// that drop the whole diff. shellQuote is defined below; it is read only when this runs.
+// that drop the whole diff.
 function discardLines(root, rejected) {
   const states = diffStates(root);
   const paths = [...states.keys()].sort();
   const plane = [...new Set(rejected)].filter((p) => states.has(p) && isControlPlanePath(p)).sort();
   const out = plane.length === 0 ? [] : [shape('RELEASE_DISCARD_FIRST', `the rejected diff touches ${plane.map(pathName).join(', ')}, which project tooling reads; discard the whole diff before running any package manager, test, build or hook command`)];
   for (const [state, command] of DISCARD_COMMANDS) {
-    const named = paths.filter((p) => states.get(p) === state && !byHand(p));
-    if (named.length > 0) out.push(`release: DISCARD ${command} ${named.map(shellQuote).join(' ')}`);
+    const named = paths.filter((p) => states.get(p) === state && bareOnCommand(p));
+    if (named.length > 0) out.push(`release: DISCARD ${command} ${named.join(' ')}`);
   }
-  return [...out, ...paths.filter(byHand).map((p) => `release: DISCARD_BY_HAND ${jsonName(p)}`)];
+  return [...out, ...paths.filter((p) => !bareOnCommand(p)).map((p) => `release: DISCARD_BY_HAND ${jsonName(p)}`)];
 }
 
 // ---- handoff (D1, E3) ----
