@@ -895,6 +895,7 @@ describe('deployProject: Codex hook (FEAT-048, BUG-094)', () => {
   const REPLACED = 'code-conductor: replaced the old Codex guard hook in .codex/hooks.json; Codex asks for trust again after this edit, so the guards are not enforced until you re-trust the hooks in Codex with /hooks';
   const host = { matcher: 'Bash', hooks: [{ type: 'command', command: 'node mine.mjs' }] };
   const host2 = { matcher: 'Read', hooks: [{ type: 'command', command: 'node mine2.mjs' }] };
+  const SIMILAR = { matcher: 'Bash', hooks: [{ type: 'command', command: 'node tools/my-pre-tool-use.mjs' }] };
   const writeHostHooks = (entries) => {
     mkdirSync(join(home, '.codex'), { recursive: true });
     writeFileSync(join(home, HOOKS_REL), JSON.stringify({ hooks: { PreToolUse: entries } }));
@@ -948,6 +949,14 @@ describe('deployProject: Codex hook (FEAT-048, BUG-094)', () => {
     expect(readFileSync(join(home, HOOKS_REL), 'utf8')).toBe(written);
     expect(second.said).toContain(INSTALLED);
     expect(second.said).not.toContain(REPLACED);
+  });
+  it('keeps a host entry whose command only contains pre-tool-use.mjs (BUG-096)', () => {
+    writeHostHooks([SIMILAR]);
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, codex: true });
+    expect(JSON.parse(readFileSync(join(home, HOOKS_REL), 'utf8')).hooks.PreToolUse).toEqual([SIMILAR, OURS]);
+    expect(out.said).toContain(INSTALLED);
+    expect(out.said).not.toContain(REPLACED);
   });
   it.skipIf(!CAN_SYMLINK)('replaces a symlinked adapter path and leaves the link target untouched', () => {
     const outside = join(home, 'outside.mjs');

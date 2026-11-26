@@ -207,10 +207,12 @@ describe('mergeSettingsFile: symlink', () => {
 
 describe('mergeSettingsFile: legacy fingerprints (BUG-094)', () => {
   const FPS_CODEX = ['conductor-guard.mjs'];
-  const LEGACY = { 'conductor-guard.mjs': ['pre-tool-use.mjs'] };
+  const LEGACY = { 'conductor-guard.mjs': ['node .claude/hooks/pre-tool-use.mjs'] };
   const SHIPPED = { matcher: '.*', hooks: [{ type: 'command', command: 'node -e "conductor-guard.mjs"' }] };
   const OLD = { matcher: '.*', hooks: [{ type: 'command', command: 'node .claude/hooks/pre-tool-use.mjs' }] };
   const HOST_ENTRY2 = { matcher: '', hooks: [{ type: 'command', command: 'bash /home/me/other-hook.sh' }] };
+  const SIMILAR = { matcher: 'Bash', hooks: [{ type: 'command', command: 'node tools/my-pre-tool-use.mjs' }] };
+  const NEAR_COPY = { matcher: '.*', hooks: [{ type: 'command', command: 'node .claude/hooks/pre-tool-use.mjs --log' }] };
   const preToolUse = () => read(sp).hooks.PreToolUse;
   const run = (hostEntries, options) => {
     write(tpl, { hooks: { PreToolUse: [SHIPPED] } });
@@ -219,28 +221,40 @@ describe('mergeSettingsFile: legacy fingerprints (BUG-094)', () => {
   };
 
   it('replaces a legacy-only entry in place and reports legacy-replaced', () => {
-    expect(run([HOST_ENTRY, OLD, HOST_ENTRY2], { legacyFingerprints: LEGACY })).toBe('legacy-replaced');
+    expect(run([HOST_ENTRY, OLD, HOST_ENTRY2], { legacyCommands: LEGACY })).toBe('legacy-replaced');
     expect(preToolUse()).toEqual([HOST_ENTRY, SHIPPED, HOST_ENTRY2]);
   });
   it('leaves a host that is already the merged result unchanged', () => {
-    expect(run([HOST_ENTRY, SHIPPED, HOST_ENTRY2], { legacyFingerprints: LEGACY })).toBe('unchanged');
+    expect(run([HOST_ENTRY, SHIPPED, HOST_ENTRY2], { legacyCommands: LEGACY })).toBe('unchanged');
   });
   it('treats an entry carrying both fingerprints as the current entry', () => {
     const both = { matcher: '.*', hooks: [{ type: 'command', command: 'node -e "conductor-guard.mjs" pre-tool-use.mjs' }] };
-    expect(run([both], { legacyFingerprints: LEGACY })).toBe('merged');
+    expect(run([both], { legacyCommands: LEGACY })).toBe('merged');
     expect(preToolUse()).toEqual([SHIPPED]);
   });
   it('collapses duplicate legacy entries into one shipped entry', () => {
-    expect(run([OLD, OLD], { legacyFingerprints: LEGACY })).toBe('legacy-replaced');
+    expect(run([OLD, OLD], { legacyCommands: LEGACY })).toBe('legacy-replaced');
     expect(preToolUse()).toEqual([SHIPPED]);
   });
   it('drops a legacy entry that trails the current one', () => {
-    expect(run([SHIPPED, OLD], { legacyFingerprints: LEGACY })).toBe('legacy-replaced');
+    expect(run([SHIPPED, OLD], { legacyCommands: LEGACY })).toBe('legacy-replaced');
     expect(preToolUse()).toEqual([SHIPPED]);
+  });
+  it('keeps a host entry whose command only contains the legacy file name (BUG-096)', () => {
+    expect(run([SIMILAR], { legacyCommands: LEGACY })).toBe('merged');
+    expect(preToolUse()).toEqual([SIMILAR, SHIPPED]);
+  });
+  it('keeps a host entry that extends the legacy command (BUG-096)', () => {
+    expect(run([NEAR_COPY], { legacyCommands: LEGACY })).toBe('merged');
+    expect(preToolUse()).toEqual([NEAR_COPY, SHIPPED]);
+  });
+  it('replaces the exact legacy entry and keeps a similar-named one in place (BUG-096)', () => {
+    expect(run([SIMILAR, OLD, HOST_ENTRY2], { legacyCommands: LEGACY })).toBe('legacy-replaced');
+    expect(preToolUse()).toEqual([SIMILAR, SHIPPED, HOST_ENTRY2]);
   });
   it('creates the file when the host has none', () => {
     write(tpl, { hooks: { PreToolUse: [SHIPPED] } });
-    expect(mergeSettingsFile(tpl, sp, FPS_CODEX, { legacyFingerprints: LEGACY })).toBe('created');
+    expect(mergeSettingsFile(tpl, sp, FPS_CODEX, { legacyCommands: LEGACY })).toBe('created');
   });
   it('keeps the legacy entry and appends ours when no legacy list is passed', () => {
     expect(run([HOST_ENTRY, OLD, HOST_ENTRY2])).toBe('merged');
@@ -253,7 +267,7 @@ describe('mergeSettingsFile: legacy fingerprints (BUG-094)', () => {
     mergeSettingsFile(tpl, sp, FPS);
     const without = readFileSync(sp, 'utf8');
     write(sp, host);
-    mergeSettingsFile(tpl, sp, FPS, { legacyFingerprints: {} });
+    mergeSettingsFile(tpl, sp, FPS, { legacyCommands: {} });
     expect(readFileSync(sp, 'utf8')).toBe(without);
   });
 });
