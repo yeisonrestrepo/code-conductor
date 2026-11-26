@@ -5867,6 +5867,87 @@ describe('test-surface split at hand-back [BUG-092]', () => {
     expect(runFile().build_tree.files['src/a.js']).toBe(sha('src/a.js'));
     expect(handBack('test-writer', writerDone()).status).toBe(0);
   });
+
+  // BUG-099: the fingerprint grows with the work tree, so install checks the run file's bound before it writes anything.
+  describe('run-file bound at install [BUG-099]', () => {
+    const ROOM = 8 * 1024;
+    const runSize = () => statSync(join(root, RUN_FILE)).size;
+    // Pads the recorded test-writer hand-back's stored SNAP until the run file is `room` bytes under the bound (over it when negative).
+    const padRun = (room) => patchRun((run) => {
+      const entry = run.handbacks.findLast((h) => h.role === 'test-writer');
+      const fill = RUN_FILE_MAX_BYTES - room - Buffer.byteLength(JSON.stringify(run, null, 2) + '\n');
+      entry.snap = entry.snap.replace('"pr":""', `"pr":"${'x'.repeat(fill)}"`);
+    });
+    const generate = (n) => { for (let i = 0; i < n; i++) write(`gen/f${String(i).padStart(3, '0')}.txt`, `${i}\n`); };
+    const writerHandedBack = () => { atWriter(); install('test-writer'); write('tests/a.test.js'); expect(handBack('test-writer', writerDone()).status).toBe(0); };
+    const FULL = /^ORCH_RUN_FILE_FULL: the run file would be (\d+) bytes with this code install, whose fingerprint lists 202 changed or untracked files, over the 8388608-byte bound that keeps it readable by the hooks; hide generated files behind an ignore rule, then resume, or end, then start$/;
+
+    it('[AC1] install code halts ORCH_RUN_FILE_FULL when its fingerprint would carry the run file past the bound', () => {
+      writerHandedBack();
+      padRun(ROOM);
+      generate(200);
+      const r = orch(['install', 'code']);
+      expect(r.status).toBe(1);
+      expect(r.err).toMatch(FULL);
+      expect(Number(r.err.match(FULL)[1])).toBeGreaterThan(RUN_FILE_MAX_BYTES);
+    });
+
+    it('[AC2] the halted install leaves the run file under the bound, without a fingerprint, and writes no envelope', () => {
+      writerHandedBack();
+      padRun(ROOM);
+      generate(200);
+      const before = runFile();
+      const envelope = envelopeText();
+      expect(orch(['install', 'code']).status).toBe(1);
+      const after = runFile();
+      expect(runSize()).toBeLessThanOrEqual(RUN_FILE_MAX_BYTES);
+      expect(after).not.toHaveProperty('build_tree');
+      expect(after.role).toBe(before.role);
+      expect(after.handbacks).toEqual(before.handbacks);
+      expect(after.halt.code).toBe('ORCH_RUN_FILE_FULL');
+      expect(envelopeText()).toBe(envelope);
+    });
+
+    it('[AC3] with the same padding and a smaller tree, install code succeeds under the bound', () => {
+      writerHandedBack();
+      padRun(ROOM);
+      generate(20);
+      install('code');
+      expect(runFile().role).toBe('code');
+      expect(Object.keys(runFile().build_tree.files)).toHaveLength(22);
+      expect(runSize()).toBeLessThanOrEqual(RUN_FILE_MAX_BYTES);
+    });
+
+    it('[AC4] an install that records no fingerprint halts on a run over the bound with the smaller-plan recovery', () => {
+      writerHandedBack();
+      install('code');
+      write('src/a.js', 'a2\n');
+      expect(handBack('code', codeSay(['src/a.js:M'])).status).toBe(0);
+      padRun(-1024);
+      const before = runFile();
+      const envelope = envelopeText();
+      const r = orch(['install', 'audit']);
+      expect(r.status).toBe(1);
+      expect(r.err).toMatch(/^ORCH_RUN_FILE_FULL: the run file would be \d+ bytes with this audit install, over the 8388608-byte bound that keeps it readable by the hooks; end, then start with a smaller plan$/);
+      expect(runFile().role).toBe(before.role);
+      expect(runFile().handbacks).toEqual(before.handbacks);
+      expect(runFile().halt.code).toBe('ORCH_RUN_FILE_FULL');
+      expect(envelopeText()).toBe(envelope);
+    });
+
+    it('[AC5] after the halt, resume and a reduced tree let the re-dispatch install and record its fingerprint', () => {
+      writerHandedBack();
+      padRun(ROOM);
+      generate(200);
+      expect(orch(['install', 'code']).err).toMatch(FULL);
+      expect(orch(['resume']).out).toMatch(/after ORCH_RUN_FILE_FULL .*; next: install test-writer/);
+      rmSync(join(root, 'gen'), { recursive: true });
+      install('test-writer');
+      expect(handBack('test-writer', writerDone()).status).toBe(0);
+      install('code');
+      expect(runFile()).toMatchObject({ role: 'code', build_tree: { role: 'code', files: { [SPEC]: sha(SPEC), 'tests/a.test.js': sha('tests/a.test.js') } } });
+    });
+  });
 });
 
 describe('control-plane paths for the release check [BUG-090]', () => {

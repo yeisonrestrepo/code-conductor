@@ -260,14 +260,24 @@ function readRun(root) {
 const serializeRun = (run) => JSON.stringify(run, null, 2) + '\n';
 const saveRun = (root, run) => writeAtomic(join(root, RUN_FILE), serializeRun(run));
 
-// BUG-079: a hand-back stores its SNAP, so it is the write that could carry the run file past the hooks' read cap.
-function saveHandedBackRun(root, run, role) {
+// BUG-079, BUG-099: the serialized run, or ORCH_RUN_FILE_FULL when it would carry the run file past the hooks' read cap.
+function boundedRunText(run, write, recovery) {
   const text = serializeRun(run);
   const bytes = Buffer.byteLength(text);
-  if (bytes > RUN_FILE_MAX_BYTES) {
-    throw new Halt('ORCH_RUN_FILE_FULL', `the run file would be ${bytes} bytes with this ${role} hand-back, over the ${RUN_FILE_MAX_BYTES}-byte bound that keeps it readable by the hooks; end, then start with a smaller plan`);
-  }
-  writeAtomic(join(root, RUN_FILE), text);
+  if (bytes <= RUN_FILE_MAX_BYTES) return text;
+  throw new Halt('ORCH_RUN_FILE_FULL', `the run file would be ${bytes} bytes with this ${write}, over the ${RUN_FILE_MAX_BYTES}-byte bound that keeps it readable by the hooks; ${recovery}`);
+}
+const SMALLER_PLAN = 'end, then start with a smaller plan';
+
+// BUG-079: a hand-back stores its SNAP, so it is the write that could carry the run file past the hooks' read cap.
+const saveHandedBackRun = (root, run, role) => writeAtomic(join(root, RUN_FILE), boundedRunText(run, `${role} hand-back`, SMALLER_PLAN));
+
+// BUG-099: the fingerprint grows with the work tree, not the plan, so its recovery is a smaller tree.
+function installedRunText(run, role) {
+  const files = run.build_tree?.files;
+  if (!isPlainObject(files)) return boundedRunText(run, `${role} install`, SMALLER_PLAN);
+  const write = `${role} install, whose fingerprint lists ${Object.keys(files).length} changed or untracked files`;
+  return boundedRunText(run, write, 'hide generated files behind an ignore rule, then resume, or end, then start');
 }
 
 // Every verb but start, resume and end drives a run that must exist, be this session's, and not be halted.
@@ -795,10 +805,12 @@ function install(root, sessionId, role, check) {
   const change = role === 'qa' ? changeNote(root, run, check) : '';
   const out = built.out.trim() + (step.fix === undefined ? '' : `\n${fixNote(run)}`) + change + (model ? `\nmodel: ${model}` : '');
   if (check) return out;
-  writeAtomic(join(root, ENVELOPE_FILE), built.out);
   const { dispatch_model: _previous, build_tree: _tree, ...kept } = run;
   const tree = buildTree(root, run, role);
-  saveRun(root, { ...kept, band: ROLE_BAND[role], role, ...(model ? { dispatch_model: model } : {}), ...(tree ? { build_tree: tree } : {}) });
+  // BUG-099: checked before either write, so a halt leaves no envelope for a dispatch that never happens.
+  const text = installedRunText({ ...kept, band: ROLE_BAND[role], role, ...(model ? { dispatch_model: model } : {}), ...(tree ? { build_tree: tree } : {}) }, role);
+  writeAtomic(join(root, ENVELOPE_FILE), built.out);
+  writeAtomic(join(root, RUN_FILE), text);
   return out;
 }
 
