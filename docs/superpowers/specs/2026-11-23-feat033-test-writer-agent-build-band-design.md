@@ -182,6 +182,7 @@ README's band-role sequence, and the wiki `Band-Roles-and-Agents.md` page, name 
 - `/cc-implement --delegate`, dispatching `test-writer` and `code` outside a run, and an ad-hoc `test-writer` envelope.
 - `test-writer` in `MODEL_ROLES` and the FEAT-053 escalation.
 - Files the test command itself writes through `Bash` (for example snapshot files); Guard 5 gates write tools, as it does for `code` today.
+  - **Amended 2026-11-26 by BUG-092:** Guard 5 still gates only the write tools, but `orchestrate.mjs handback` now compares the files that changed during each `test-writer` and `code` dispatch with the split and halts `ORCH_HANDBACK_SURFACE_CROSSED` on a crossing; see `docs/superpowers/specs/2026-11-26-bug092-test-surface-split-bypassable-through-the-design.md`.
 - Any change to `audit`, `security`, `qa`, `docs` or `release`, to `.github/workflows/`, or to the records.
 
 ## System Impact

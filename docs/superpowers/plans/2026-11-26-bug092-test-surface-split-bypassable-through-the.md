@@ -439,9 +439,9 @@
 **Files:**
 - Test: `tests/scripts/orchestrate.test.js`
 
-- [ ] [T-101] `tests/scripts/orchestrate.test.js`: the two expectation edits of plan decision 5 (`C4 [AC4]`, FEAT-033 `[R9]`), each with its comment. Depends on T-004.
-- [ ] [T-102] `tests/scripts/orchestrate.test.js`: the new `describe('test-surface split at hand-back [BUG-092]')` of plan decision 4, before the BUG-090 block. Depends on T-101.
-- [ ] [T-103] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t 'BUG-092|a conforming code hand-back is recorded as before|the writer.s hand-back is recorded for its task'`. Its full match set is the 25 tests of plan decision 11. Predicted: **22 failed | 3 passed**, 1278 skipped (1303). Any other split means a test is wrong: fix the test, not the prediction. Depends on T-102.
+- [X] [T-101] `tests/scripts/orchestrate.test.js`: the two expectation edits of plan decision 5 (`C4 [AC4]`, FEAT-033 `[R9]`), each with its comment. Depends on T-004.
+- [X] [T-102] `tests/scripts/orchestrate.test.js`: the new `describe('test-surface split at hand-back [BUG-092]')` of plan decision 4, before the BUG-090 block. Depends on T-101.
+- [X] [T-103] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t 'BUG-092|a conforming code hand-back is recorded as before|the writer.s hand-back is recorded for its task'`. Its full match set is the 25 tests of plan decision 11. Predicted: **22 failed | 3 passed**, 1278 skipped (1303). Any other split means a test is wrong: fix the test, not the prediction. Depends on T-102.
 
 ---
 
@@ -450,9 +450,9 @@
 **Files:**
 - Modify: `scripts/orchestrate.mjs`
 
-- [ ] [T-201] `scripts/orchestrate.mjs`: `isRouterFile`, `contentHash`, `treeFingerprint` and `buildTree` above `changeNote` (plan decision 1). Depends on T-103.
-- [ ] [T-202] `scripts/orchestrate.mjs`: `isTreeRecord`, `changedPaths` and `splitCheck` above `handback`, and the `install`, `handback` and `resume` edits (plan decisions 2 and 3). Depends on T-201.
-- [ ] [T-203] Green run: the T-103 command. Predicted: **25 passed**, 1278 skipped (1303). Then the whole file: `npx vitest run tests/scripts/orchestrate.test.js` (several minutes). Predicted: **1303 passed (1303)**. Depends on T-202.
+- [X] [T-201] `scripts/orchestrate.mjs`: `isRouterFile`, `contentHash`, `treeFingerprint` and `buildTree` above `changeNote` (plan decision 1). Depends on T-103.
+- [X] [T-202] `scripts/orchestrate.mjs`: `isTreeRecord`, `changedPaths` and `splitCheck` above `handback`, and the `install`, `handback` and `resume` edits (plan decisions 2 and 3). Depends on T-201.
+- [X] [T-203] Green run: the T-103 command. Predicted: **25 passed**, 1278 skipped (1303). Then the whole file: `npx vitest run tests/scripts/orchestrate.test.js` (several minutes). Predicted: **1303 passed (1303)**. Depends on T-202.
 
 ---
 
@@ -465,12 +465,12 @@
 - Modify: `project-template/.claude/agents/code.md`
 - Test: `tests/unit/role-profiles.test.js`
 
-- [ ] [T-301] `tests/unit/role-profiles.test.js`: the BUG-092 comment and three constants after `CODE_LEAVES_TESTS`, and the two `[BUG-092]` rows before the FEAT-033 `MODEL_ROLES` row (plan decision 7). Do not touch the hash rows yet. Depends on T-203.
-- [ ] [T-302] Red run: `npx vitest run tests/unit/role-profiles.test.js`. Predicted: **4 failed | 206 passed (210)** (plan decision 11). Depends on T-301.
-- [ ] [T-303] `.claude/agents/test-writer.md` and `.claude/agents/code.md` (Edit tool): the insertions of plan decision 6. Depends on T-302.
-- [ ] [T-304] `project-template/.claude/agents/test-writer.md` and `project-template/.claude/agents/code.md`: the same insertions; then `cmp` of each pair prints nothing and `sha256sum` of each file prints the hash of decision 6. A different hash means the edit differs from decision 6: fix the edit. Depends on T-303.
-- [ ] [T-305] `tests/unit/role-profiles.test.js`, `PROFILE_SHA256_1_37_0`: the two BUG-092 comment lines and the new `code` and `test-writer` hashes (plan decision 7). Depends on T-304.
-- [ ] [T-306] Green run: the T-302 command. Predicted: **210 passed (210)**, the token cap, the FEAT-033 rows and both directories' hash rows included. Depends on T-305.
+- [X] [T-301] `tests/unit/role-profiles.test.js`: the BUG-092 comment and three constants after `CODE_LEAVES_TESTS`, and the two `[BUG-092]` rows before the FEAT-033 `MODEL_ROLES` row (plan decision 7). Do not touch the hash rows yet. Depends on T-203.
+- [X] [T-302] Red run: `npx vitest run tests/unit/role-profiles.test.js`. Predicted: **4 failed | 206 passed (210)** (plan decision 11). Depends on T-301.
+- [X] [T-303] `.claude/agents/test-writer.md` and `.claude/agents/code.md` (Edit tool): the insertions of plan decision 6. Depends on T-302.
+- [X] [T-304] `project-template/.claude/agents/test-writer.md` and `project-template/.claude/agents/code.md`: the same insertions; then `cmp` of each pair prints nothing and `sha256sum` of each file prints the hash of decision 6. A different hash means the edit differs from decision 6: fix the edit. Depends on T-303.
+- [X] [T-305] `tests/unit/role-profiles.test.js`, `PROFILE_SHA256_1_37_0`: the two BUG-092 comment lines and the new `code` and `test-writer` hashes (plan decision 7). Depends on T-304.
+- [X] [T-306] Green run: the T-302 command. Predicted: **210 passed (210)**, the token cap, the FEAT-033 rows and both directories' hash rows included. Depends on T-305.
 
 ---
 
@@ -483,11 +483,11 @@
 - Modify: `project-template/.agents/workflows/cc-orchestrate.md`
 - Test: `tests/installer/commands-parity.test.js`
 
-- [ ] [T-401] `tests/installer/commands-parity.test.js`: the new block of plan decision 9. Depends on T-306.
-- [ ] [T-402] Red run: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: **4 failed | 120 passed (124)**. Depends on T-401.
-- [ ] [T-403] `.claude/commands/cc-orchestrate.md` (Edit tool): the insertion of plan decision 8. Depends on T-402.
-- [ ] [T-404] `project-template/.claude/commands/cc-orchestrate.md`, `project-template/.agents/skills/cc-orchestrate/SKILL.md` and `project-template/.agents/workflows/cc-orchestrate.md`: the same insertion; then `cmp` of the two Claude Code copies prints nothing, and the hand-back halts lines (`:37`, `:37`, `:41`, `:40`) are byte-identical. Depends on T-403.
-- [ ] [T-405] Green run: the T-402 command. Predicted: **124 passed (124)**, the byte-identical mirror row included. Depends on T-404.
+- [X] [T-401] `tests/installer/commands-parity.test.js`: the new block of plan decision 9. Depends on T-306.
+- [X] [T-402] Red run: `npx vitest run tests/installer/commands-parity.test.js`. Predicted: **4 failed | 120 passed (124)**. Depends on T-401.
+- [X] [T-403] `.claude/commands/cc-orchestrate.md` (Edit tool): the insertion of plan decision 8. Depends on T-402.
+- [X] [T-404] `project-template/.claude/commands/cc-orchestrate.md`, `project-template/.agents/skills/cc-orchestrate/SKILL.md` and `project-template/.agents/workflows/cc-orchestrate.md`: the same insertion; then `cmp` of the two Claude Code copies prints nothing, and the hand-back halts lines (`:37`, `:37`, `:41`, `:40`) are byte-identical. Depends on T-403.
+- [X] [T-405] Green run: the T-402 command. Predicted: **124 passed (124)**, the byte-identical mirror row included. Depends on T-404.
 
 ---
 
@@ -498,9 +498,9 @@
 - Modify: `.github/wiki/pages/Band-Roles-and-Agents.md`
 - Modify: `docs/superpowers/specs/2026-11-23-feat033-test-writer-agent-build-band-design.md`
 
-- [ ] [T-501] `README.md`: the Guard 5 insertion of plan decision 10; `git diff README.md` shows one changed line, `:314`. Depends on T-405.
-- [ ] [T-502] `.github/wiki/pages/Band-Roles-and-Agents.md`: the insertion of plan decision 10. Depends on T-501.
-- [ ] [T-503] `docs/superpowers/specs/2026-11-23-feat033-test-writer-agent-build-band-design.md`: the nested amendment bullet of plan decision 10; its Status line is unchanged. Depends on T-502.
+- [X] [T-501] `README.md`: the Guard 5 insertion of plan decision 10; `git diff README.md` shows one changed line, `:314`. Depends on T-405.
+- [X] [T-502] `.github/wiki/pages/Band-Roles-and-Agents.md`: the insertion of plan decision 10. Depends on T-501.
+- [X] [T-503] `docs/superpowers/specs/2026-11-23-feat033-test-writer-agent-build-band-design.md`: the nested amendment bullet of plan decision 10; its Status line is unchanged. Depends on T-502.
 
 ---
 
@@ -509,26 +509,26 @@
 **Files:**
 - Modify: `docs/superpowers/plans/2026-11-26-bug092-test-surface-split-bypassable-through-the.md` (ticks)
 
-- [ ] [T-601] Run `npm test` (long: `orchestrate.test.js` alone takes several minutes; run it in the background if the shell times out). Predicted: exit 0, with `tests/scripts/orchestrate.test.js` at **1303 passed**, `tests/unit/role-profiles.test.js` at 210 and `tests/installer/commands-parity.test.js` at 124. A red is called ENV only if the sandbox caused it (network, tmp permissions) and its file is not one this plan touches; report it with its name. Any other red is fixed. Depends on T-503.
-- [ ] [T-602] Scope check: `git status --short` lists exactly the sixteen files of the Global Constraints and this plan; no temporary file is left in the tree. `git diff --stat` shows no change to the BUG-092 spec, the hooks, `isValidRun`, `changeList`, `claimHalt`, the installer, `.github/workflows/`, `.github/actions/` or the README Known-limits lines. Depends on T-601.
-- [ ] [T-603] Stage: `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js .claude/agents/test-writer.md project-template/.claude/agents/test-writer.md .claude/agents/code.md project-template/.claude/agents/code.md tests/unit/role-profiles.test.js .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md project-template/.agents/skills/cc-orchestrate/SKILL.md project-template/.agents/workflows/cc-orchestrate.md tests/installer/commands-parity.test.js README.md .github/wiki/pages/Band-Roles-and-Agents.md docs/superpowers/specs/2026-11-23-feat033-test-writer-agent-build-band-design.md` (all tracked). Depends on T-602.
-- [ ] [T-604] Stage: `git add -u docs/superpowers/plans/2026-11-26-bug092-test-surface-split-bypassable-through-the.md` (carries the ticks for T-101 to T-603). Depends on T-603.
-- [ ] [T-605] Commit: `fix: halt a hand-back whose dispatch changed files across the test-surface split [BUG-092]`. Depends on T-604.
+- [X] [T-601] Run `npm test` (long: `orchestrate.test.js` alone takes several minutes; run it in the background if the shell times out). Predicted: exit 0, with `tests/scripts/orchestrate.test.js` at **1303 passed**, `tests/unit/role-profiles.test.js` at 210 and `tests/installer/commands-parity.test.js` at 124. A red is called ENV only if the sandbox caused it (network, tmp permissions) and its file is not one this plan touches; report it with its name. Any other red is fixed. Depends on T-503.
+- [X] [T-602] Scope check: `git status --short` lists exactly the sixteen files of the Global Constraints and this plan; no temporary file is left in the tree. `git diff --stat` shows no change to the BUG-092 spec, the hooks, `isValidRun`, `changeList`, `claimHalt`, the installer, `.github/workflows/`, `.github/actions/` or the README Known-limits lines. Depends on T-601.
+- [X] [T-603] Stage: `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js .claude/agents/test-writer.md project-template/.claude/agents/test-writer.md .claude/agents/code.md project-template/.claude/agents/code.md tests/unit/role-profiles.test.js .claude/commands/cc-orchestrate.md project-template/.claude/commands/cc-orchestrate.md project-template/.agents/skills/cc-orchestrate/SKILL.md project-template/.agents/workflows/cc-orchestrate.md tests/installer/commands-parity.test.js README.md .github/wiki/pages/Band-Roles-and-Agents.md docs/superpowers/specs/2026-11-23-feat033-test-writer-agent-build-band-design.md` (all tracked). Depends on T-602.
+- [X] [T-604] Stage: `git add -u docs/superpowers/plans/2026-11-26-bug092-test-surface-split-bypassable-through-the.md` (carries the ticks for T-101 to T-603). Depends on T-603.
+- [X] [T-605] Commit: `fix: halt a hand-back whose dispatch changed files across the test-surface split [BUG-092]`. Depends on T-604.
 
 ---
 
 ## Test List
 
-- [ ] [T-701] `tests/scripts/orchestrate.test.js` (Task 1), AC6: the two `[AC6]` rows (the dirty set recorded for `test-writer`, none at `--check`; `code` records its own, `audit` none).
-- [ ] [T-702] `tests/scripts/orchestrate.test.js` (Task 1), AC7: the five `[AC7]` rows (an unlisted source file, an empty `ops.f`, `code` and a test file, several crossings sorted, a fix round).
-- [ ] [T-703] `tests/scripts/orchestrate.test.js` (Task 1), AC8: the dirty-file row and the two-row table (reverted to `HEAD`, deleted).
-- [ ] [T-704] `tests/scripts/orchestrate.test.js` (Task 1), AC9: the router's files, an ignored file and unlisted own-side changes for both roles.
-- [ ] [T-705] `tests/scripts/orchestrate.test.js` (Task 1), AC10: the no-surface row, the unavailable-at-install row, and the edited `C4 [AC4]` and FEAT-033 `[R9]` rows (plan decision 5).
-- [ ] [T-706] `tests/scripts/orchestrate.test.js` (Task 1), AC11: the six malformed-fingerprint rows and the two git-failure rows, each followed by `resume`, a fresh fingerprint and the unchanged hand-back recorded.
-- [ ] [T-707] `tests/scripts/orchestrate.test.js` (Task 1), AC12: removal on a recorded hand-back; `resume` drops it and the re-install takes the crossed file as baseline.
-- [ ] [T-708] `tests/unit/role-profiles.test.js` (Task 3), AC1, AC2: the four `[BUG-092]` rows, the FEAT-033 rows, the token cap and the four changed hash rows.
-- [ ] [T-709] `tests/installer/commands-parity.test.js` (Task 4), AC5: the four new rows and the byte-identical mirror row.
-- [ ] [T-710] AC3, AC4 have no test row: the README, the wiki page and the FEAT-033 spec are read by no test (T-501 to T-503 check them by diff). AC13: `npm test` (T-601). No E2E/UI test: there is no UI. CI legs: no new test is conditionally skipped, so no leg's skipped set in `tools/skip-baseline.json` changes.
+- [X] [T-701] `tests/scripts/orchestrate.test.js` (Task 1), AC6: the two `[AC6]` rows (the dirty set recorded for `test-writer`, none at `--check`; `code` records its own, `audit` none).
+- [X] [T-702] `tests/scripts/orchestrate.test.js` (Task 1), AC7: the five `[AC7]` rows (an unlisted source file, an empty `ops.f`, `code` and a test file, several crossings sorted, a fix round).
+- [X] [T-703] `tests/scripts/orchestrate.test.js` (Task 1), AC8: the dirty-file row and the two-row table (reverted to `HEAD`, deleted).
+- [X] [T-704] `tests/scripts/orchestrate.test.js` (Task 1), AC9: the router's files, an ignored file and unlisted own-side changes for both roles.
+- [X] [T-705] `tests/scripts/orchestrate.test.js` (Task 1), AC10: the no-surface row, the unavailable-at-install row, and the edited `C4 [AC4]` and FEAT-033 `[R9]` rows (plan decision 5).
+- [X] [T-706] `tests/scripts/orchestrate.test.js` (Task 1), AC11: the six malformed-fingerprint rows and the two git-failure rows, each followed by `resume`, a fresh fingerprint and the unchanged hand-back recorded.
+- [X] [T-707] `tests/scripts/orchestrate.test.js` (Task 1), AC12: removal on a recorded hand-back; `resume` drops it and the re-install takes the crossed file as baseline.
+- [X] [T-708] `tests/unit/role-profiles.test.js` (Task 3), AC1, AC2: the four `[BUG-092]` rows, the FEAT-033 rows, the token cap and the four changed hash rows.
+- [X] [T-709] `tests/installer/commands-parity.test.js` (Task 4), AC5: the four new rows and the byte-identical mirror row.
+- [X] [T-710] AC3, AC4 have no test row: the README, the wiki page and the FEAT-033 spec are read by no test (T-501 to T-503 check them by diff). AC13: `npm test` (T-601). No E2E/UI test: there is no UI. CI legs: no new test is conditionally skipped, so no leg's skipped set in `tools/skip-baseline.json` changes.
 
 ## Commit Order
 

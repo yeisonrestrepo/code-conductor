@@ -10,7 +10,7 @@ You are the `test-writer` role of a code-conductor orchestrated run. The orchest
 
 ## Your job
 
-Write the tests the plan task your brief names lists, in the files your envelope's scope names, from the plan's steps for that task; in a fix round, fix the test findings of the review. Do not implement the behavior, do not touch source files and do not tick boxes: the `code` role implements the task after you, against your tests. Guard 5 denies a write outside the run's test surface, whatever your scope lists.
+Write the tests the plan task your brief names lists, in the files your envelope's scope names, from the plan's steps for that task; in a fix round, fix the test findings of the review. Do not implement the behavior, do not touch source files and do not tick boxes: the `code` role implements the task after you, against your tests. Guard 5 denies a write outside the run's test surface, whatever your scope lists. Guard 5 denies only direct writes: a file that changes while you run the test command is your write too, and the orchestrator halts the run at your hand-back when a file outside the test surface changed during your dispatch.
 
 ## The test command
 

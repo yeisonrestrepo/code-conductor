@@ -740,6 +740,32 @@ function changeList(root, security) {
   return { lines: [...status.keys()].sort().map((path) => `${status.get(path)} ${path}`) };
 }
 
+// BUG-092: the router writes its own files during every dispatch, so no fingerprint holds them.
+const isRouterFile = (path) => path.startsWith(ROUTER_DIR) || path === RUN_FILE || path === ENVELOPE_FILE;
+const contentHash = (abs) => { try { return createHash('sha256').update(readFileSync(abs)).digest('hex'); } catch { return 'absent'; } };
+
+// BUG-092: the tracked files that differ from HEAD (every tracked file before the first commit) and the untracked
+// files no ignore rule hides, each mapped to the sha256 of its bytes, or to absent for a deleted one.
+function treeFingerprint(root) {
+  const git = (args) => spawnSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 1 << 30 });
+  const inside = git(['rev-parse', '--is-inside-work-tree']);
+  if (inside.error) return { reason: 'git is not available' };
+  if (inside.status !== 0 || inside.stdout.trim() !== 'true') return { reason: 'the project is not a git work tree' };
+  const hasHead = git(['rev-parse', '--verify', '--quiet', 'HEAD']).status === 0;
+  const tracked = git(hasHead ? ['diff', '--name-only', '--no-renames', '--relative', '-z', 'HEAD'] : ['ls-files', '-z']);
+  const others = git(['ls-files', '--others', '--exclude-standard', '-z']);
+  if (tracked.status !== 0 || others.status !== 0) return { reason: 'git cannot list the changed files' };
+  const paths = [...new Set([...nulPaths(tracked), ...nulPaths(others)])].filter((path) => !isRouterFile(path)).sort();
+  return { files: Object.fromEntries(paths.map((path) => [path, contentHash(join(root, path))])) };
+}
+
+// BUG-092: what install records for a build role on a run with a test surface; null for every other dispatch.
+function buildTree(root, run, role) {
+  if (surfaceOf(run) === undefined || (role !== 'code' && role !== 'test-writer')) return null;
+  const { files, reason } = treeFingerprint(root);
+  return files ? { role, files } : { role, unavailable: reason };
+}
+
 // BUG-089: every install qa rewrites the list, and removes it when it cannot be computed, so qa never reads an older one.
 function changeNote(root, run, check) {
   if (!Array.isArray(run.known_failures) || run.known_failures.length === 0) return '';
@@ -770,8 +796,9 @@ function install(root, sessionId, role, check) {
   const out = built.out.trim() + (step.fix === undefined ? '' : `\n${fixNote(run)}`) + change + (model ? `\nmodel: ${model}` : '');
   if (check) return out;
   writeAtomic(join(root, ENVELOPE_FILE), built.out);
-  const { dispatch_model: _previous, ...kept } = run;
-  saveRun(root, { ...kept, band: ROLE_BAND[role], role, ...(model ? { dispatch_model: model } : {}) });
+  const { dispatch_model: _previous, build_tree: _tree, ...kept } = run;
+  const tree = buildTree(root, run, role);
+  saveRun(root, { ...kept, band: ROLE_BAND[role], role, ...(model ? { dispatch_model: model } : {}), ...(tree ? { build_tree: tree } : {}) });
   return out;
 }
 
@@ -1157,6 +1184,28 @@ function claimHalt(env, role, expected) {
   return new Halt('ORCH_HANDBACK_OUT_OF_SCOPE', `${role} lists ${outside} in ops.f, outside its scope ${scopeText(expected)}`);
 }
 
+// BUG-092: a well-formed fingerprint names the role it was taken for and holds either files or the reason git could not list them.
+const isTreeRecord = (tree, role) => isPlainObject(tree) && tree.role === role
+  && (isPlainObject(tree.files) && Object.values(tree.files).every((h) => typeof h === 'string'))
+    !== (typeof tree.unavailable === 'string' && tree.unavailable !== '');
+const changedPaths = (before, after) => [...new Set([...Object.keys(before), ...Object.keys(after)])].filter((p) => before[p] !== after[p]).sort();
+
+// BUG-092: Guard 5 sees only the write tools, so the files that changed while the role ran, its test command included,
+// are compared with the split; only a git that was already unavailable at install lets the hand-back through unchecked.
+function splitCheck(root, run, role) {
+  const surface = surfaceOf(run);
+  if (surface === undefined || (role !== 'code' && role !== 'test-writer')) return {};
+  const tree = run.build_tree;
+  if (!isTreeRecord(tree, role)) throw new Halt('ORCH_HANDBACK_SPLIT_UNVERIFIED', `no valid fingerprint of the tree recorded at install for ${role}; resume to re-dispatch it`);
+  if (tree.unavailable) return { split_check: `unavailable (${tree.unavailable})` };
+  const now = treeFingerprint(root);
+  if (!now.files) throw new Halt('ORCH_HANDBACK_SPLIT_UNVERIFIED', `git cannot list the tree (${now.reason}), so ${role}'s changes cannot be checked against the test surface; resume to re-dispatch it`);
+  const crossed = changedPaths(tree.files, now.files).filter((path) => matchesSurface(path, surface) !== (role === 'test-writer'));
+  if (crossed.length === 0) return {};
+  const side = role === 'test-writer' ? 'outside' : 'inside';
+  throw new Halt('ORCH_HANDBACK_SURFACE_CROSSED', `${role} changed ${crossed.join(', ')} during its dispatch, ${side} the test surface ${JSON.stringify(surface)}`);
+}
+
 async function handback(root, sessionId, role, bytes) {
   const text = bytes.toString('utf8');
   const run = liveRun(root, sessionId);
@@ -1172,15 +1221,17 @@ async function handback(root, sessionId, role, bytes) {
   }
   const claim = claimHalt(env, role, expectedScope(root, run, role));
   if (claim) throw claim;
+  const split = splitCheck(root, run, role);
   if (role === 'security') return securityHandback(root, run, env.ops.gate, text);
   const verdict = role === 'audit' ? parseVerdict(text) : null;
-  const recorded = recordHandback(run, role, env.ops.gate, verdict?.verdict, { snap });
+  const { build_tree: _tree, ...recorded } = recordHandback(run, role, env.ops.gate, verdict?.verdict, { snap, ...split });
   saveHandedBackRun(root, recorded, role);
   // Saved first, so the halt cli records lands on top of the audit entry (FEAT-060, FEAT-057).
   if (verdict && verdict.verdict !== 'APPROVE') return auditFix(root, recorded, verdict, bytes);
   const entry = recorded.handbacks.at(-1);
   const note = (entry.security === SECURITY_NOT_CONFIGURED ? `; security=${SECURITY_NOT_CONFIGURED}` : '')
-    + (entry.test_writer === TEST_WRITER_NOT_CONFIGURED ? `; test-writer=${TEST_WRITER_NOT_CONFIGURED}` : '');
+    + (entry.test_writer === TEST_WRITER_NOT_CONFIGURED ? `; test-writer=${TEST_WRITER_NOT_CONFIGURED}` : '')
+    + (entry.split_check ? `; split check: ${entry.split_check}` : '');
   return `${role} handed back ${env.ops.gate}${note}`;
 }
 
@@ -1548,8 +1599,9 @@ function resume(root, sessionId, args) {
   const dropped = run.handbacks.length - kept.length;
   const { code, reason, at } = run.halt;
   const resumes = [...(Array.isArray(run.resumes) ? run.resumes : []), { at: new Date().toISOString(), halt: { code, reason, at }, kept: records, dropped }];
+  const { build_tree: _tree, ...unfingerprinted } = run;
   const next = {
-    ...run, session_id: sessionId, role: null, halt: null, gate: resumedGate(run, tasks),
+    ...unfingerprinted, session_id: sessionId, role: null, halt: null, gate: resumedGate(run, tasks),
     handbacks: kept, tasks: { ...run.tasks, done: tasks }, review: resumedReview(run, kept), resumes,
     ...keptDelegation(run),
   };

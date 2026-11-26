@@ -115,6 +115,10 @@ const TEST_WRITER_REPORT = [
   'a v7 envelope (`"v":7`)',
 ];
 const CODE_LEAVES_TESTS = "Do not edit files in the run's test surface; if a test is wrong, say so in your report.";
+// BUG-092: the split holds against direct writes only, and the hand-back check catches what the test command changes.
+const SPLIT_LIMIT = 'Guard 5 denies only direct writes: a file that changes while you run the test command is your write too, and the orchestrator halts the run at your hand-back when a file';
+const WRITER_SPLIT = `${SPLIT_LIMIT} outside the test surface changed during your dispatch.`;
+const CODE_SPLIT = `${SPLIT_LIMIT} inside the test surface changed during your dispatch, a snapshot the suite writes included.`;
 
 // FEAT-061: who dispatches each role, as its description ends.
 const DISPATCHED_BY = {
@@ -190,6 +194,18 @@ describe('role agent profiles [FEAT-012]', () => {
 
   it.each([TEMPLATE, MIRROR])('[FEAT-033] %s/code.md leaves the test surface to test-writer', (dir) => {
     expect(read(`${dir}/code.md`)).toContain(CODE_LEAVES_TESTS);
+  });
+
+  it.each([TEMPLATE, MIRROR])('[BUG-092 AC1] %s/test-writer.md states the split\'s limit and keeps the FEAT-033 phrases', (dir) => {
+    const text = read(`${dir}/test-writer.md`);
+    expect(text).toContain(WRITER_SPLIT);
+    for (const phrase of TEST_WRITER_REPORT) expect(text).toContain(phrase);
+  });
+
+  it.each([TEMPLATE, MIRROR])('[BUG-092 AC2] %s/code.md states the split\'s limit and keeps CODE_LEAVES_TESTS', (dir) => {
+    const text = read(`${dir}/code.md`);
+    expect(text).toContain(CODE_SPLIT);
+    expect(text).toContain(CODE_LEAVES_TESTS);
   });
 
   it('[FEAT-033] test-writer is outside MODEL_ROLES and may hand back only build_executed', () => {
@@ -309,7 +325,8 @@ const PROFILE_SHA256_1_37_0 = {
   // BUG-074 changed code on purpose: one definition of a green suite, shared by plan, code and qa, with the run's declared known failures.
   // BUG-089 changed code on purpose: a failing test in a file code created or edited is never known, and its file comes only from the runner's output.
   // FEAT-033 changed code on purpose: files in the run's test surface are the test-writer's.
-  code: 'a16063d90bbb0e967069f94e0396bfd13f83835cc9cc1f31905b6c64fee35940',
+  // BUG-092 changed code on purpose: Guard 5 denies only direct writes, and the hand-back halts on a test file changed during the dispatch.
+  code: '404d460061c0be543370016f9751f5b9d13668d35016752ba996fd84931ec497',
   // FEAT-047 changed plan and spec on purpose: the folder now comes from the envelope's scope.
   // BUG-074 changed plan on purpose: one definition of a green suite, shared by plan, code and qa, with the run's declared known failures.
   plan: 'b14e18a5f56a99a2d377fd367859d964ec781c6ee876b8aeba258038d30c2c6b',
@@ -321,7 +338,8 @@ const PROFILE_SHA256_1_37_0 = {
   security: '0056234a6b1917a44cb5fedd06d2b04d8322939650bfd74a9e7dc470157f4710',
   spec: 'f3489eb5061c533b94eb349b056c7ba589a17947ec73635256281a16b5f34ba3',
   // FEAT-033 added test-writer; it shipped after 1.37.0, so this is its first pin.
-  'test-writer': '88880337c223f9c9b13ca7941a4696c06dd59fbf74b64aa583c87ba92dd88776',
+  // BUG-092 changed test-writer on purpose: Guard 5 denies only direct writes, and the hand-back halts on a source file changed during the dispatch.
+  'test-writer': '978878170c6796c2261cb0b957aeca32f0bedc9bb3e6661a23e1f38316807afe',
 };
 
 describe('profiles unchanged since 1.37.0 [FEAT-031 AC13]', () => {
