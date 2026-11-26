@@ -3617,3 +3617,17 @@ Residual named by the PR and not filed: without `node` on `PATH` the Codex guard
 Not verified at landing: the Windows shell rows (`cmd.exe`, `powershell`, `pwsh`) are skipped on Linux and first run on the Windows CI leg. No live Codex session is reported by #323. #323 reports `tests/unit/staging-convention.test.js` AC7/AC8 failing in its sandbox's git (`git add -u` on an untracked path exits 0), as earlier lane PRs did. CI on the release PR is the authority.
 
 Upgrade note: reinstalling with `--project --codex` installs `.codex/hooks/conductor-guard.mjs` and replaces the old entry in `.codex/hooks.json`; Codex then asks for trust again, and the guards are not enforced until the hooks are re-trusted in `/hooks`. An install without `--codex` is unchanged.
+
+## Release: 1.59.3 batch landing 2026-11-25
+
+One PR merged since `v1.59.2`. Existing id closed:
+
+- BUG-093 (#327 by `cc-lane-bot[bot]`, the Antigravity guard adapter accepting unknown arguments on `read_file`, `write_file` and `edit_file`). `MAPPED` in `project-template/.agents/hooks/conductor-guard.mjs` becomes a table of `{ args, map }` per tool with the agy 1.5.15 lists (`read_file`: `Path`, `StartLine`, `EndLine`, `toolSummary`; `write_file`: `Path`, `Content`, `toolSummary`; `edit_file`: `Path`, `Target`, `Replacement`, `toolSummary`; `run_command` unchanged). `mapToolCall` runs `unknownArgs(args, MAPPED[tool].args)` (keys with a non-`undefined` value outside the list, sorted) before the tool's mapper and returns `notCovered`, the reason `run_command` already used, naming each argument with singular or plural wording; `runCommand` keeps only its `CommandLine` check. Observable change beyond the fix: a call with both an unknown argument and a bad required argument now names the unknown one (spec choice 3); both block. README: the `### Antigravity CLI` table row covers the four tools. Tests: the `(BUG-093)` cases of `tests/hooks/antigravity-guard.test.js` (`read_file` with `Paths`, `write_file` with `Append`, `edit_file` with `AllowMultiple`, two unknown arguments sorted, recorded `read_file` with `toolSummary`). The PR also adds the spec and plan leaves to the `.gitignore` tracked-surface block. Follow-up of `[FEAT-063]`, reported by the automated security review of the 1.59.0 release candidate (#315). Intake of issue #316. Spec and plan approved by independent review, round 1 each.
+
+Nothing minted: BUG-093 was reserved by triage #316. BUG-096 (triage #325) and BUG-095 (triage #321) stay reserved and are not touched by this release; BUG-092 (triage #312), BUG-091 (triage #306) and FEAT-062 (triage #295) likewise.
+
+Known limits: the BUG-093 line is removed. Every other defect line is unchanged.
+
+Not verified at landing: the argument lists come from the recorded agy 1.5.15 contract and were not re-measured live (spec choice 5); if a real agy sends a file-tool argument the recording trimmed, that tool's calls block naming it until the list learns it. No live agy session is reported by #327. CI on the release PR is the authority.
+
+Upgrade note: reinstalling with `--project --antigravity` ships the updated `.agents/hooks/conductor-guard.mjs`. An agy call to `read_file`, `write_file` or `edit_file` carrying an argument outside its list is now blocked with the argument named; an install without `--antigravity` is unchanged.
