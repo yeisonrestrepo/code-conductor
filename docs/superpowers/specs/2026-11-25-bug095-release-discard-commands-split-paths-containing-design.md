@@ -1,6 +1,6 @@
 # BUG-095 — Release discard commands split paths containing spaces, commas or a leading @ in cmd.exe and PowerShell
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-25 by independent review (round 1)
 
 **Item:** `[BUG-095]` (intake of issue #321, follow-up of `[BUG-090]`). Pillar 5: infrastructure, ecosystem and
 quality assurance.
