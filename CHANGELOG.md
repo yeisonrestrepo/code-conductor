@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.59.7] - 2026-11-26
+
+### Fixed
+- **[BUG-092]** The test-surface split between `test-writer` and `code` can no longer be crossed unseen through the run's recorded test command. Guard 5 only gates the write tools, so a test that changed source files when it ran, or source that changed test files when the suite loaded it, got past the split. On a run with a test surface, `install` for either role now records a fingerprint of the work tree (`build_tree`: every tracked file that differs from `HEAD` and every untracked, non-ignored file outside the router's own files, each with the sha256 of its bytes), and `handback` takes it again: when a file on the other role's side of the split changed during the dispatch, whatever `ops.f` lists, it halts `ORCH_HANDBACK_SURFACE_CROSSED` naming the files. A missing or malformed fingerprint, or a git that can no longer list the tree, halts `ORCH_HANDBACK_SPLIT_UNVERIFIED`, and `resume` re-dispatches the role with a fresh fingerprint; `resume` does not revert the changed files. The one fail-open case is a git already unavailable at `install`, named as `; split check: unavailable (<reason>)` on the hand-back line. The change is detected at hand-back, not prevented, and writes into ignored paths or outside the project root are not seen. Both agent profiles and their template copies, the four `cc-orchestrate` copies, the README, the wiki's band-roles page and the `[FEAT-033]` spec now say the split holds against direct writes only and describe both halts. Pinned by `test-surface split at hand-back [BUG-092]` in `tests/scripts/orchestrate.test.js`, the `[BUG-092 AC1]` and `[BUG-092 AC2]` rows of `tests/unit/role-profiles.test.js` (with the new `code` and `test-writer` profile hashes) and `cc-orchestrate split check [BUG-092 AC5]` in `tests/installer/commands-parity.test.js`. Landed from PR #335 (cc-lane-bot), intake of issue #312.
+
+### Changed
+- The `test` job of `.github/workflows/test.yml` now times out at 30 minutes instead of 20, because the Windows leg's `tests/scripts/orchestrate.test.js` alone takes about 18 minutes and the leg was cancelled at the limit on #335. Maintainer CI chore with no backlog item. Landed from PR #336 (yeisonrestrepo).
+
 ## [1.59.6] - 2026-11-26
 
 ### Fixed
