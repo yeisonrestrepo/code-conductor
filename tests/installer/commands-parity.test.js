@@ -469,6 +469,11 @@ describe('cc-orchestrate review loop [FEAT-041 AC5, AC6, FEAT-058]', () => {
     has('`ORCH_RUN_FILE_FULL`', 'the hand-back is not recorded, and recovery is `end`, then `start` with a smaller plan');
   });
 
+  // BUG-099: the fingerprint makes install a write that can outgrow the bound, so every copy names its halt and both recoveries.
+  it.each([...ORCH_MIRRORS, 'project-template/.agents/skills/cc-orchestrate/SKILL.md', 'project-template/.agents/workflows/cc-orchestrate.md'])('%s names the install bound halt and both recoveries [BUG-099]', (rel) => {
+    expect(read(rel)).toContain('`install <role>` also halts `ORCH_RUN_FILE_FULL` when the run file it would write exceeds `RUN_FILE_MAX_BYTES` (8388608 bytes), and installs no envelope. When the halt names the fingerprint `install code` or `install test-writer` takes of the changed and untracked files, hide generated files behind an ignore rule (or remove them), then `resume`, or `end`, then `start`; otherwise recovery is `end`, then `start` with a smaller plan.');
+  });
+
   it('names the hand-back claim halts, the end refusal and end --abandon [BUG-075]', () => {
     has('`ORCH_HANDBACK_SCOPE_MISMATCH`', '`ORCH_HANDBACK_OUT_OF_SCOPE`', '`ORCH_END_UNVERIFIED`', '**Abandon (BUG-075).**',
       'node "$S/orchestrate.mjs" end --abandon', 'Never pass `--abandon` on your own.');
