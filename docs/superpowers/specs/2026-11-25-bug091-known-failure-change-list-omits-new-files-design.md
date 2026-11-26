@@ -1,6 +1,6 @@
 # BUG-091 — Known-failure change list omits new files created under ignored paths
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-25 by the owner
 
 **Item:** `[BUG-091]` (intake of issue #306, follow-up of `[BUG-089]`). Pillar 5: infrastructure, ecosystem and
 quality assurance.
