@@ -40,12 +40,34 @@ git ls-files --others --ignored --exclude-standard --directory --no-empty-direct
   git lists only its untracked ignored parts (checked with git: `ign/` holding tracked `ign/t.js` and untracked
   `ign/s/n.js` prints `ign/s/`). `--no-empty-directory` leaves out empty directories, which hold no tests.
 - The `qa` profile gets one more matching sentence, for entries that end in `/`. A failing test's file matches such an
-  entry when, after every `\` becomes `/`, the file starts with the entry or contains `/` followed by it. Existing
-  matching for file entries does not change.
-- The "contains `/` followed by it" half also matches a deeper path that merely ends in the same directory name:
-  the entry `dist/` matches `pkg/a/dist/x.test.js` as well as `dist/x.test.js`. That is accepted on purpose. It
-  only ever makes fewer failures known, so the error goes the safe way (a red suite), and it keeps the rule one
-  sentence long for a profile that matches printed runner paths, which may be relative to a subfolder.
+  entry when a leading part of the file's path that ends in `/` matches the entry under the existing path rule
+  (after every `\` becomes `/`, equal, or one ends with `/` followed by the other). Existing matching for file
+  entries does not change.
+- That sentence is symmetric, like the BUG-089 rule it reuses, so it holds in both directions a printed runner path
+  can differ from the listed one. Written out for an entry `D/` and a printed file `F`, it matches in three cases:
+  - `F` starts with `D/` (a leading part equals the entry): `tests/.tmp/` matches `tests/.tmp/new.test.js`;
+  - `F` contains `/` followed by `D/` (a leading part ends with `/` followed by the entry): the runner prints a
+    longer path than the list, as in `pkg/tests/.tmp/new.test.js` against `tests/.tmp/`;
+  - the entry ends with `/` followed by a leading part of `F` that ends in `/` (the entry ends with `/` followed by
+    a leading part): the runner runs in a subfolder and prints a shorter path, as in `tests/.tmp/new.test.js`
+    against `pkg/tests/.tmp/`, because `pkg/tests/.tmp/` ends with `/tests/.tmp/`.
+- The second and third cases also match paths that only share a directory name: `dist/` matches
+  `pkg/a/dist/x.test.js`, and `pkg/tests/` matches `tests/x.test.js` printed from any folder. That is accepted on
+  purpose, as it is for file entries since BUG-089. It only ever makes fewer failures known, so the error goes the
+  safe way (a red suite).
+- `--directory` stays. Without it git prints every file of an ignored directory, `node_modules/` included, so the
+  list would grow with the dependency tree on every run that declares a known failure. The symmetric sentence makes
+  the collapsed `<dir>/` entry as strict as listing each file would be, whenever the printed path reaches the
+  directory: if the BUG-089 rule would match the printed file against a file `D/rest` under the directory because
+  they are equal or the printed file ends with `/D/rest`, a leading part of the printed file is `D/` or ends with
+  `/D/`; if it would match because `D/rest` ends with `/` followed by the printed file and that file still names
+  part of `D`, a leading part of the printed file is what `D/` ends with.
+- One case stays open, and the spec names it rather than hide it: a runner whose working directory is the ignored
+  directory itself or a folder inside it prints a path with no part of `D` in it (`new.test.js` for
+  `tests/.tmp/new.test.js`). A file entry would match that path; a directory entry cannot, because nothing in the
+  printed path ties it to the directory, and treating every such path as a match would make any relative path match
+  any directory entry. It needs a test command run from inside an ignored directory that the change created; see
+  Out of Scope.
 
 ### Decisions this spec takes, and why
 
@@ -93,6 +115,15 @@ git ls-files --others --ignored --exclude-standard --directory --no-empty-direct
 
 - **A file under an ignored directory that also holds tracked files:** listed as the file (`A ign/new.test.js`) or as
   its wholly untracked subdirectory (`A ign/sub/`).
+- **A runner that prints paths relative to a subfolder:** the list holds `A pkg/tests/.tmp/` and the runner, run in
+  `pkg/`, prints `FAIL tests/.tmp/new.test.js`. The leading part `tests/.tmp/` matches the entry, because the entry
+  ends with `/tests/.tmp/`, so the failure is not known and the suite reads red.
+- **A runner that prints longer paths than the list:** the list holds `A tests/.tmp/` and the runner prints
+  `pkg/tests/.tmp/new.test.js`. The leading part `pkg/tests/.tmp/` ends with `/tests/.tmp/`, so it matches and the
+  failure is not known.
+- **A runner run from inside the collapsed directory:** the list holds `A tests/.tmp/` and the runner, run in
+  `tests/.tmp/`, prints `FAIL new.test.js`. No leading part of `new.test.js` matches the entry, so the directory
+  entry does not settle it; the failure is known only if its line contains a declared entry (Solution, Out of Scope).
 - **A single ignored file:** a new `ignored.txt` matched by a `.gitignore` line is listed as `A ignored.txt`.
 - **A `.gitignore` edit that ignores a new test file:** the list holds `M .gitignore` and the test file (or its
   directory) as `A`.
@@ -140,11 +171,20 @@ git ls-files --others --ignored --exclude-standard --directory --no-empty-direct
   fail, `install qa` prints the existing unavailable line and removes a list file left by an earlier `install qa`. The
   existing BUG-089 unavailable cases (a null base, no security record, a base git cannot read, and the second
   install that finds the list unavailable) keep passing as they are: none of them reaches a list.
+  Known limit of this test: a corrupt index makes all three calls fail together, and no fixture makes only the
+  ignored-files call fail while the other two succeed (it reads the same index and the same ignore rules as the
+  untracked call). So the test shows the unavailable path still works with three calls; it cannot show on its own
+  that the third call's status is checked. That part is checked in the code: the plan writes the status check as
+  one condition naming all three results, and the build audit reads it.
 - **AC7** — `.claude/agents/qa.md` and `project-template/.claude/agents/qa.md` carry, byte-identical, the sentence on
-  entries ending in `/`: a failing test's file matches such an entry when, after every `\` becomes `/`, it starts with
-  the entry or contains `/` followed by it, so `dist/` matches both `dist/x.test.js` and `pkg/a/dist/x.test.js`
-  (the sentence names that deeper match, Solution). `tests/unit/role-profiles.test.js` pins the sentence and updates
-  the profile sha pins. The BUG-089 sentences pinned there are unchanged.
+  entries ending in `/`: a failing test's file matches such an entry when a leading part of its path that ends in
+  `/` matches the entry under the existing path rule (equal, or one ends with `/` followed by the other, after every
+  `\` becomes `/`). The sentence names the three cases of the Solution by example: `tests/.tmp/` matches
+  `tests/.tmp/x.test.js`; `tests/.tmp/` matches `pkg/tests/.tmp/x.test.js`; and `pkg/tests/.tmp/` matches
+  `tests/.tmp/x.test.js` printed by a runner in `pkg/`. It also says such a match through a shared directory name is
+  accepted because it only makes fewer failures known. `tests/unit/role-profiles.test.js` pins the sentence, with a
+  separate assertion that the subfolder example (`pkg/tests/.tmp/` matching `tests/.tmp/x.test.js`) is in both
+  profiles, and updates the profile sha pins. The BUG-089 sentences pinned there are unchanged.
 - **AC8** — Every `cc-orchestrate` mirror describes the list as the files the change created or modified plus the
   untracked ignored paths outside `.conductor/`, a wholly ignored directory being one `<dir>/` entry.
   `tests/installer/commands-parity.test.js` pins that phrase. The existing BUG-089 phrases stay.
@@ -154,6 +194,9 @@ git ls-files --others --ignored --exclude-standard --directory --no-empty-direct
 
 - Telling ignored files the change created from ones that were there before `start` (Decision 2).
 - Refusing every known failure when `.gitignore` changed (Decision 1).
+- A test command run from inside an ignored directory the change created, whose printed paths hold no part of that
+  directory (Solution). Closing it would mean listing every file of every ignored directory, `node_modules/`
+  included.
 - Leaving out other router files (Decision 3).
 - `.claude/agents/code.md`: `code` matches against the files it created or edited itself, not against this list.
 - The README "Known limits" line for `[BUG-091]` and every other record (`CHANGELOG.md`, backlog, `VERSION`,
@@ -166,7 +209,9 @@ git ls-files --others --ignored --exclude-standard --directory --no-empty-direct
 - `.claude/agents/qa.md` and `project-template/.claude/agents/qa.md`: one added sentence after the path-match rule.
 - `.claude/commands/cc-orchestrate.md` and its mirrors (`project-template/.claude/commands/cc-orchestrate.md`,
   `project-template/.agents/skills/cc-orchestrate/SKILL.md`, `project-template/.agents/workflows/cc-orchestrate.md`):
-  the qa step's description of the list (`:91`).
+  the qa step's description of the list, in the Verify step: `.claude/commands/cc-orchestrate.md:91`,
+  `project-template/.claude/commands/cc-orchestrate.md:91`, `project-template/.agents/skills/cc-orchestrate/SKILL.md:95`
+  and `project-template/.agents/workflows/cc-orchestrate.md:94`.
 - Tests: `tests/scripts/orchestrate.test.js` (the BUG-089 block at `:5075`: the four tests AC1 names and its
   `SPEC_ONLY` constant updated for `A .claude/memory/` and `A ignored.txt`, plus new cases), `tests/unit/role-profiles.test.js` (pins and sha), `tests/installer/commands-parity.test.js`.
 - Guard 6 and Guard 7 are unaffected: the script writes the list inside the existing write surface, and neither the
