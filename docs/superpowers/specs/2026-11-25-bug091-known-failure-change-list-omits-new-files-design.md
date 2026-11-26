@@ -27,18 +27,36 @@ shows up nowhere. So this is defense in depth for the BUG-089 rule, not a way ar
 
 ## Solution
 
-`changeList` makes a third git call and lists the untracked ignored paths too:
+`changeList` makes two more git calls. The third lists the untracked ignored paths:
 
 ```
 git ls-files --others --ignored --exclude-standard --directory --no-empty-directory -z
 ```
 
-- Every entry it prints is added as `A <path>`, except `.conductor/` and anything under it. That folder holds the
-  router's own state, including the list file itself.
+The fourth lists the new untracked directories that no ignore rule matches:
+
+```
+git ls-files --others --exclude-standard --directory --no-empty-directory -z
+```
+
+- Every entry the third call prints is added as `A <path>`, and every entry ending in `/` that the fourth call
+  prints is added as `A <dir>/`. The fourth call's file entries are the ones the second call already lists, so they
+  add nothing. `.conductor/` and anything under it is left out of both. That folder holds the router's own state,
+  including the list file itself.
 - `--directory` prints a wholly untracked ignored directory as a single `<dir>/` entry (for example `node_modules/`)
   instead of every file in it, so the list stays small. A directory that also holds tracked files is never collapsed:
   git lists only its untracked ignored parts (checked with git: `ign/` holding tracked `ign/t.js` and untracked
   `ign/s/n.js` prints `ign/s/`). `--no-empty-directory` leaves out empty directories, which hold no tests.
+- The collapse goes up to the topmost wholly untracked directory, ignored or not. If the parent of an ignored
+  directory is itself new and holds nothing tracked, git prints the parent: a new `tests/` holding only the ignored
+  `tests/.tmp/new.test.js` prints `tests/`, not `tests/.tmp/` (checked with git 2.43). The entry `tests/` covers the
+  file under the directory sentence below, so the failure is still not known.
+- The fourth call closes the gap the third one leaves. In a new untracked directory that is not ignored and also
+  holds files no rule ignores, the third call prints nothing for an ignored file inside it: with `--directory`, git
+  does not descend into a directory it reports as untracked and not ignored (checked with git 2.43, the rule in
+  `.git/info/exclude`: a new `newdir/` holding `newdir/a.js` and the ignored `newdir/b.ign.js` prints nothing under
+  `--ignored`; the second call prints `newdir/a.js`; the fourth call prints `newdir/`). Listing `A newdir/` makes
+  every file under it, ignored or not, match the list.
 - The `qa` profile gets one more matching sentence, for entries that end in `/`. A failing test's file matches such an
   entry when a leading part of the file's path that ends in `/` matches the entry under the existing path rule
   (after every `\` becomes `/`, equal, or one ends with `/` followed by the other). Existing matching for file
@@ -69,6 +87,16 @@ git ls-files --others --ignored --exclude-standard --directory --no-empty-direct
   any directory entry. It needs a test command run from inside an ignored directory that the change created; see
   Out of Scope.
 
+### Owner decisions
+
+- The spec is approved with one change: the list must cover an ignored file inside a new untracked directory that is
+  not ignored and also holds files no rule ignores. With `--directory`, the ignored-files call leaves such a file out
+  (verified with git 2.43 and a rule in `.git/info/exclude`). The directories that
+  `git ls-files --others --exclude-standard --directory --no-empty-directory -z` prints are added as `A <dir>/`,
+  with an acceptance criterion (AC9) and a fixture test for that case.
+- The main path and AC2 are corrected: a wholly untracked parent directory collapses into the parent (`tests/`, not
+  `tests/.tmp/`).
+
 ### Decisions this spec takes, and why
 
 1. **The fix lists ignored paths; it does not refuse known failures whenever `.gitignore` changed.** The entry
@@ -95,7 +123,7 @@ git ls-files --others --ignored --exclude-standard --directory --no-empty-direct
 4. **The output line keeps its format.** `change files: <a> created, <m> modified (…)` now counts a directory entry
    as one created entry. The command text says the list can hold `<dir>/` entries. No new output line is added, so the
    commands-parity pins on the line stay as they are.
-5. **The new git call fails the same way the other two do.** If any of the three exits non-zero, the list is
+5. **The new git calls fail the same way the other two do.** If any of the four exits non-zero, the list is
    `unavailable (git cannot compare the work tree with the base commit)`, the old file is removed and no failing test
    is known. That is what happens today.
 
@@ -103,9 +131,9 @@ git ls-files --others --ignored --exclude-standard --directory --no-empty-direct
 
 ### Main path
 
-1. A run declares a known failure and reaches the `qa` step. The change created `tests/.tmp/new.test.js` under the
-   ignored `tests/.tmp/`, which did not exist at the base.
-2. `install qa` runs the three git calls. Its list holds `A tests/.tmp/`, together with the diff's entries and the
+1. A run declares a known failure and reaches the `qa` step. `tests/` holds tracked tests. The change created
+   `tests/.tmp/new.test.js` under the ignored `tests/.tmp/`, which did not exist at the base.
+2. `install qa` runs the four git calls. Its list holds `A tests/.tmp/`, together with the diff's entries and the
    untracked non-ignored files, sorted by path with each path listed once.
 3. The test runner prints `FAIL tests/.tmp/new.test.js > <a title containing the entry>`. `qa` matches the printed
    file against the entry `tests/.tmp/`, does not count the failure as known, names it as matched-but-not-known, and
@@ -113,6 +141,13 @@ git ls-files --others --ignored --exclude-standard --directory --no-empty-direct
 
 ### Alternative paths
 
+- **A new parent directory that holds nothing tracked:** `tests/` did not exist at the base and the change created
+  only the ignored `tests/.tmp/new.test.js`. Git collapses into the topmost wholly untracked directory, so the list
+  holds `A tests/`, not `A tests/.tmp/`. The printed `tests/.tmp/new.test.js` starts with `tests/`, so the failure is
+  not known.
+- **An ignored file in a new directory that is not ignored:** the change created `newdir/a.js` and the ignored
+  `newdir/b.ign.js`. The list holds `A newdir/` (fourth call) and `A newdir/a.js` (second call); a failing test in
+  `newdir/b.ign.js` matches `newdir/` and is not known.
 - **A file under an ignored directory that also holds tracked files:** listed as the file (`A ign/new.test.js`) or as
   its wholly untracked subdirectory (`A ign/sub/`).
 - **A runner that prints paths relative to a subfolder:** the list holds `A pkg/tests/.tmp/` and the runner, run in
@@ -130,52 +165,58 @@ git ls-files --others --ignored --exclude-standard --directory --no-empty-direct
 - **An ignored path that existed before the base:** listed as `A`; see Decision 2.
 - **`.conductor/` is ignored:** git prints `.conductor/` as one entry, and it is left out. When git prints separate
   paths under it (because some path inside is tracked), those are left out as well.
-- **A path both git calls return:** an ignored file never comes from `--exclude-standard` without `--ignored`, so the
-  two untracked calls never overlap. A path the diff already holds keeps its diff status, because the untracked
+- **A path two git calls return:** an ignored file never comes from `--exclude-standard` without `--ignored`, so the
+  ignored call never overlaps the second or the fourth. The fourth call's file entries repeat the second call's, and
+  only its `<dir>/` entries are added. A path the diff already holds keeps its diff status, because the untracked
   calls only ever add `A`. A file can't be tracked and untracked at once, so overwriting cannot happen either way.
 - **`install qa --check`:** prints the change line, writes nothing (unchanged).
 - **A run without known failures:** no git call and no list (unchanged).
 
 ### Error cases
 
-- **Any of the three git calls exits non-zero:** `change files: unavailable (git cannot compare the work tree with
+- **Any of the four git calls exits non-zero:** `change files: unavailable (git cannot compare the work tree with
   the base commit); no failing test is known`, and an existing list file is removed (unchanged message, Decision 5).
 - **No security record or no base commit:** unchanged reasons.
 
 ## Acceptance Criteria
 
 - **AC1** — In a run with a declared known failure, `install qa` lists a new untracked file that a `.gitignore` rule
-  matches as `A <path>`, and lists the router's ignored `.claude/memory/` as `A .claude/memory/` (Decision 3). The
-  existing tests of the BUG-089 block in `tests/scripts/orchestrate.test.js` whose exact expectations change, and
+  matches as `A <path>`, lists the router's ignored `.claude/memory/` as `A .claude/memory/` (Decision 3), and lists
+  the fixture's new, untracked, not-ignored `docs/specs/` as `A docs/specs/` (fourth call; `docs/` is tracked at the
+  base through `docs/plans/demo.md`, and the spec file is written after it). The existing tests of the BUG-089 block in `tests/scripts/orchestrate.test.js` whose exact expectations change, and
   to what:
-  - the AC4 test that today expects `ignored.txt` to be left out (`:5105`): `change files: 5 created, 1 modified`,
-    and the list `A .claude/memory/`, `A docs/specs/demo-design.md`, `A ignored.txt`, `A tests/a b.test.js`,
+  - the AC4 test that today expects `ignored.txt` to be left out (`:5105`): `change files: 6 created, 1 modified`,
+    and the list `A .claude/memory/`, `A docs/specs/`, `A docs/specs/demo-design.md`, `A ignored.txt`, `A tests/a b.test.js`,
     `M tests/kept.test.js`, `A tests/new.test.js`, in that order; its title stops saying ignored files are left out;
-  - the AC4 `install qa --check` test (`:5118`): `changeLine(2, 0)`;
-  - the AC4 second-install test (`:5126`): the final list is `A .claude/memory/`, `A docs/specs/demo-design.md`,
+  - the AC4 `install qa --check` test (`:5118`): `changeLine(3, 0)`;
+  - the AC4 second-install test (`:5126`): the final list is `A .claude/memory/`, `A docs/specs/`, `A docs/specs/demo-design.md`,
     `A tests/second.test.js`;
-  - the AC8 short-entry install test (`:5197`): `changeLine(2, 0)` and the list `A .claude/memory/`,
-    `A docs/specs/demo-design.md`.
-  The block's `SPEC_ONLY` constant, used by the last two, becomes `A .claude/memory/\nA docs/specs/demo-design.md\n`
+  - the AC8 short-entry install test (`:5197`): `changeLine(3, 0)` and the list `A .claude/memory/`,
+    `A docs/specs/`, `A docs/specs/demo-design.md`.
+  The block's `SPEC_ONLY` constant, used by the last two, becomes `A .claude/memory/\nA docs/specs/\nA docs/specs/demo-design.md\n`
   under a name that says it is the base list of the fixture. No other test in the file builds a change list: every
   other `--known-failure` run stops before `install qa`.
-- **AC2** — A new, wholly untracked ignored directory holding a file is listed once as `A <dir>/`, and none of its
-  files is listed on its own. An empty ignored directory is not listed.
+- **AC2** — A file in a new ignored directory is listed once, as `A <d>/` for the topmost wholly untracked directory
+  `<d>` that holds it, and none of the files under `<d>` is listed on its own. When the ignored directory's parent
+  holds tracked files, `<d>` is the ignored directory itself (`tests/.tmp/new.test.js` with a tracked
+  `tests/old.test.js` gives `A tests/.tmp/`); when the parent is new and holds nothing tracked, git collapses into
+  the parent (`tests/.tmp/new.test.js` alone in a new `tests/` gives `A tests/`, and no `tests/.tmp/` entry). A
+  fixture test pins both. An empty ignored directory is not listed.
 - **AC3** — Nothing at or under `.conductor/` is in the list, whether `.conductor/` is ignored as a whole or holds a
   tracked file.
 - **AC4** — A change that adds a `.gitignore` rule and a new test file the rule matches produces both `M .gitignore`
   and `A <that path>`.
 - **AC5** — Git's `-z` output is parsed by NUL, so an ignored path containing a space is listed byte for byte.
-- **AC6** — `changeList` treats a non-zero exit from the ignored-files call the way it treats one from the other two
-  calls (one status check over all three). If the work tree's index is corrupt, which makes the `ls-files` calls
+- **AC6** — `changeList` treats a non-zero exit from either new call the way it treats one from the other two calls
+  (one status check over all four). If the work tree's index is corrupt, which makes the `ls-files` calls
   fail, `install qa` prints the existing unavailable line and removes a list file left by an earlier `install qa`. The
   existing BUG-089 unavailable cases (a null base, no security record, a base git cannot read, and the second
   install that finds the list unavailable) keep passing as they are: none of them reaches a list.
-  Known limit of this test: a corrupt index makes all three calls fail together, and no fixture makes only the
-  ignored-files call fail while the other two succeed (it reads the same index and the same ignore rules as the
-  untracked call). So the test shows the unavailable path still works with three calls; it cannot show on its own
-  that the third call's status is checked. That part is checked in the code: the plan writes the status check as
-  one condition naming all three results, and the build audit reads it.
+  Known limit of this test: a corrupt index makes all four calls fail together, and no fixture makes only a
+  new call fail while the others succeed (both read the same index and the same ignore rules as the untracked call).
+  So the test shows the unavailable path still works with four calls; it cannot show on its own that the new calls'
+  statuses are checked. That part is checked in the code: the plan writes the status check as one condition naming
+  all four results, and the build audit reads it.
 - **AC7** — `.claude/agents/qa.md` and `project-template/.claude/agents/qa.md` carry, byte-identical, the sentence on
   entries ending in `/`: a failing test's file matches such an entry when a leading part of its path that ends in
   `/` matches the entry under the existing path rule (equal, or one ends with `/` followed by the other, after every
@@ -186,9 +227,14 @@ git ls-files --others --ignored --exclude-standard --directory --no-empty-direct
   separate assertion that the subfolder example (`pkg/tests/.tmp/` matching `tests/.tmp/x.test.js`) is in both
   profiles, and updates the profile sha pins. The BUG-089 sentences pinned there are unchanged.
 - **AC8** — Every `cc-orchestrate` mirror describes the list as the files the change created or modified plus the
-  untracked ignored paths outside `.conductor/`, a wholly ignored directory being one `<dir>/` entry.
+  untracked ignored paths and the new untracked directories outside `.conductor/`, a wholly untracked directory being
+  one `<dir>/` entry.
   `tests/installer/commands-parity.test.js` pins that phrase. The existing BUG-089 phrases stay.
-- **AC9** — `npm test` is green.
+- **AC9** — An ignored file in a new untracked directory that is not ignored and also holds files no rule ignores is
+  covered: a fixture that creates `newdir/a.js` and `newdir/b.ign.js`, with `*.ign.js` ignored, lists `A newdir/`
+  and `A newdir/a.js`, and no `newdir/b.ign.js` entry of its own. The `<dir>/` entries come from
+  `git ls-files --others --exclude-standard --directory --no-empty-directory -z`; its file entries add nothing.
+- **AC10** — `npm test` is green.
 
 ## Out of Scope
 
@@ -213,7 +259,8 @@ git ls-files --others --ignored --exclude-standard --directory --no-empty-direct
   `project-template/.claude/commands/cc-orchestrate.md:91`, `project-template/.agents/skills/cc-orchestrate/SKILL.md:95`
   and `project-template/.agents/workflows/cc-orchestrate.md:94`.
 - Tests: `tests/scripts/orchestrate.test.js` (the BUG-089 block at `:5075`: the four tests AC1 names and its
-  `SPEC_ONLY` constant updated for `A .claude/memory/` and `A ignored.txt`, plus new cases), `tests/unit/role-profiles.test.js` (pins and sha), `tests/installer/commands-parity.test.js`.
+  `SPEC_ONLY` constant updated for `A .claude/memory/`, `A docs/specs/` and `A ignored.txt`, plus new cases for AC2
+  to AC6 and AC9), `tests/unit/role-profiles.test.js` (pins and sha), `tests/installer/commands-parity.test.js`.
 - Guard 6 and Guard 7 are unaffected: the script writes the list inside the existing write surface, and neither the
   test command nor the envelope changes.
 - These are control-plane files (the `qa` profile, the orchestrate command and script), the same surfaces BUG-089
@@ -228,5 +275,5 @@ git ls-files --others --ignored --exclude-standard --directory --no-empty-direct
 
 ## Complexity Estimate
 
-S — one extra git call and one filter in `changeList`, one profile sentence and one command phrase, each with mirrors,
+S — two extra git calls and one filter in `changeList`, one profile sentence and one command phrase, each with mirrors,
 plus fixture tests in an existing block.
