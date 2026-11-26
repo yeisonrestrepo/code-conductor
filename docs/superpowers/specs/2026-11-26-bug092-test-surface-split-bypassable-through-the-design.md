@@ -1,6 +1,6 @@
 # BUG-092: Test-surface split bypassable through the recorded test command
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-26 by the owner
 
 Source: the `[BUG-092]` entry in `AGENT-READABLE BACKLOG.md` (PILLAR 5), the intake of issue #312, a follow-up of `[FEAT-033]`. The entry names a symptom, an impact and two fix shapes, (a) and (b), and leaves the choice open; "Choices the entry leaves open" below names the one this spec takes. Acceptance criteria are tagged `[A]` (fix shape a, the stated limit) and `[B]` (fix shape b, the comparison by role).
 
