@@ -4,14 +4,14 @@
 
 **Goal:** the release profile names its version scheme (`MAJOR.MINOR.PATCH` by default, or `semver`, `pep440`, `numeric`); `digest`, `check` and `handoff` validate and order versions by that scheme; a prerelease publishes only through the profile's `prerelease.publish` step, with its channel printed and, for a program the driver does not know, marked `unverified`; `--init` detects the scheme from the current version and the local tags and refuses what it cannot support; every `MAJOR.MINOR.PATCH` profile behaves byte for byte as in FEAT-035.
 
-**Spec:** `docs/superpowers/specs/2026-11-26-feat062-release-driver-support-for-prerelease-and-non-design.md` (sha256 `24d4efe256ebf7b036fe239fb4c0804fef5eb33886b1edee1c26a846b74e4893`), approved by the owner with decision D1 (an unverified prerelease publish channel is named "as declared in the profile, not verified", tested under `[E4]`) and amended in Task 0 (T-003) by decision D2 (the `MAJOR.MINOR.PATCH` init row shows its evidence; S11, the "Plain versions everywhere" path, `[E2]` and a D2 row in its Owner decisions; see Owner decisions below). Intake of issue #295, follow-up of FEAT-035.
+**Spec:** `docs/superpowers/specs/2026-11-26-feat062-release-driver-support-for-prerelease-and-non-design.md` (sha256 `24d4efe256ebf7b036fe239fb4c0804fef5eb33886b1edee1c26a846b74e4893`), approved by the owner with decision D1 (an unverified prerelease publish channel is named "as declared in the profile, not verified", tested under `[E4]`). The owner's plan decision D2 (the `MAJOR.MINOR.PATCH` init row shows its evidence; see Owner decisions below) rules over S11, the "Plain versions everywhere" path and `[E2]` of the spec where they still say that row reads `(default)` for plain versions; the spec amendment D2 asks for goes through the spec gate, not through this plan. Intake of issue #295, follow-up of FEAT-035.
 
 **Test command:** `npm test`. Filtered runs use `npx vitest run <file>` and `-t '<pattern>'`.
 
 ## Global Constraints
 
 - No release records: `VERSION`, the `package.json` / `package-lock.json` version, `CHANGELOG.md`, `AGENT-READABLE BACKLOG.md`, `.claude/memory/**` and the README "Known limits" lines stay untouched. The release rewrites them.
-- **Task 0 also amends the spec by D2** (T-003), its only change; from Task 1 on the spec is not touched.
+- **The spec is not touched by this plan.** Until the spec is amended through its own gate, D2 rules over S11, the "Plain versions everywhere" path and `[E2]` on the `MAJOR.MINOR.PATCH` init row; every other spec line stands as approved.
 - **Seven files change in the build, plus this plan and its `.gitignore` leaf:** `scripts/release.mjs`, `tests/scripts/release.test.js`, `tests/installer/commands-parity.test.js`, `.claude/commands/cc-release.md`, `project-template/.claude/commands/cc-release.md`, `project-template/.agents/workflows/cc-release.md`, `project-template/.agents/skills/cc-release/SKILL.md`, and nothing else (the spec's System Impact list, with the parity test that pins the four command copies, plan decision 11).
 - Not touched: `scripts/orchestrate.mjs` (it reaches the new keys only through `loadProfile` and `releaseSurface`), `.claude/release-profile.json` (it names no scheme), `.claude/agents/release.md`, the hooks, the SNAP contract, the installer, settings, `.github/workflows/`, `.github/actions/`, dependencies. No network is added; the driver still never publishes, only prints the step.
 - Every file this plan edits after Task 0 is already tracked and none sits under an ignored directory, so each is staged with `git add -u <path>`. This plan is new in Task 0 under the ignored `docs/superpowers/plans/` (so `git add -f`) and is tracked and re-included by its leaf afterwards (so `git add -u`).
@@ -29,7 +29,7 @@
 
 | # | Decision | Effect on this plan |
 |---|---|---|
-| D2 | Test 12 stays unmodified. When only plain versions evidence the scheme, the `MAJOR.MINOR.PATCH` row shows its evidence (the current version and, when one exists, the first tag that backs it, for example `(from package.json 2.3.4; tag v2.3.4)`), and `(default)` only when there is no evidence at all. S11, the "Plain versions everywhere" path and `[E2]` of the spec are amended to match, with a D2 row in its Owner decisions (T-003); `[E6]` stays as written; plan decision 7 (a default `scheme` is not written to the proposal file) stands | Decision 6's `DEFAULT_SCHEME` branch returns that evidence; decision 8 drops the narrowing of test 12; rows `i7`, `i8`, `i9` of decision 10, T-102, T-104, T-802, T-806 and the risks follow. The new-test count (90) and the red and green predictions are unchanged. |
+| D2 | Test 12 stays unmodified. When only plain versions evidence the scheme, the `MAJOR.MINOR.PATCH` row shows its evidence (the current version and, when one exists, the first tag that backs it, for example `(from package.json 2.3.4; tag v2.3.4)`), and `(default)` only when there is no evidence at all. D2 also asks that S11, the "Plain versions everywhere" path and `[E2]` of the spec be amended to match; that amendment goes through the spec gate, and until it lands D2 rules over those three spots; `[E6]` stays as written; plan decision 7 (a default `scheme` is not written to the proposal file) stands | Decision 6's `DEFAULT_SCHEME` branch returns that evidence; decision 8 drops the narrowing of test 12; rows `i7`, `i8`, `i9` of decision 10, T-102, T-104, T-802, T-806 and the risks follow. The new-test count (90) and the red and green predictions are unchanged. |
 
 ## Plan decisions
 
@@ -195,12 +195,11 @@
 
 **Files:**
 - Create: `docs/superpowers/plans/2026-11-26-feat062-release-driver-support-for-prerelease-and-non.md`
-- Modify: `.gitignore`, `docs/superpowers/specs/2026-11-26-feat062-release-driver-support-for-prerelease-and-non-design.md` (D2 only)
+- Modify: `.gitignore`
 
-- [X] [T-001] Create this plan file from the approved spec `c5829f48…` (amended by D2 to `6009f312…`). No dependency.
+- [X] [T-001] Create this plan file from the approved spec (the one named in the header) and the owner decisions D1 and D2. No dependency.
 - [X] [T-002] `.gitignore`: insert the leaf of plan decision 12 after the `2026-11-26-bug092` plan leaf. Depends on T-001.
-- [X] [T-003] `docs/superpowers/specs/2026-11-26-feat062-release-driver-support-for-prerelease-and-non-design.md`: apply D2. S11's `MAJOR.MINOR.PATCH` sentence shows its evidence (the current version and, when one exists, the first tag that backs it, `(from package.json 2.3.4; tag v2.3.4)`) and keeps `(default)` for no evidence; the "Plain versions everywhere" path and `[E2]` say the same with that example; Owner decisions gains the D2 row. Nothing else in the spec changes. No dependency.
-- [X] [T-004] Stage: `git add -u .gitignore docs/superpowers/specs/2026-11-26-feat062-release-driver-support-for-prerelease-and-non-design.md` (both tracked) and `git add -f docs/superpowers/plans/2026-11-26-feat062-release-driver-support-for-prerelease-and-non.md` (new, under the ignored `docs/superpowers/plans/`). Depends on T-002, T-003.
+- [X] [T-004] Stage: `git add -u .gitignore` (tracked) and `git add -f docs/superpowers/plans/2026-11-26-feat062-release-driver-support-for-prerelease-and-non.md` (new, under the ignored `docs/superpowers/plans/`). Depends on T-002.
 - [X] [T-005] Commit: `docs: plan the release driver's version schemes and prerelease publish step [FEAT-062]`. Depends on T-004.
 
 ---
@@ -280,7 +279,7 @@
 - Modify: `docs/superpowers/plans/2026-11-26-feat062-release-driver-support-for-prerelease-and-non.md` (ticks)
 
 - [ ] [T-701] Run `npm test` (long: run it in the background if the shell times out). Predicted: exit 0, with `tests/scripts/release.test.js` at **241 passed | 1 skipped** and `tests/installer/commands-parity.test.js` at **128 passed**. A red is called ENV only if the sandbox caused it (network, tmp permissions) and its file is not one this plan touches; report it with its name. Any other red is fixed. Depends on T-605.
-- [ ] [T-702] Scope check: `git status --short` lists exactly the seven files of the Global Constraints and this plan; no temporary file is left in the tree. `git diff --stat` shows no change since Task 0 to the FEAT-062 spec (its D2 amendment rode Task 0), `scripts/orchestrate.mjs`, `.claude/release-profile.json`, the hooks, the installer, `.github/workflows/`, `.github/actions/` or any record. Depends on T-701.
+- [ ] [T-702] Scope check: `git status --short` lists exactly the seven files of the Global Constraints and this plan; no temporary file is left in the tree. `git diff --stat` shows no change since Task 0 to the FEAT-062 spec, `scripts/orchestrate.mjs`, `.claude/release-profile.json`, the hooks, the installer, `.github/workflows/`, `.github/actions/` or any record. Depends on T-701.
 - [ ] [T-703] Stage: `git add -u scripts/release.mjs tests/scripts/release.test.js tests/installer/commands-parity.test.js .claude/commands/cc-release.md project-template/.claude/commands/cc-release.md project-template/.agents/workflows/cc-release.md project-template/.agents/skills/cc-release/SKILL.md` (all tracked). Depends on T-702.
 - [ ] [T-704] Stage: `git add -u docs/superpowers/plans/2026-11-26-feat062-release-driver-support-for-prerelease-and-non.md` (carries the ticks for T-101 to T-703). Depends on T-703.
 - [ ] [T-705] Commit: `feat: release driver version schemes and a prerelease publish step that never moves latest [FEAT-062]`. Depends on T-704.
@@ -300,7 +299,7 @@
 
 ## Commit Order
 
-1. Task 0 (T-005): this plan, its `.gitignore` leaf and the spec's D2 amendment (T-003).
+1. Task 0 (T-005): this plan and its `.gitignore` leaf.
 2. Task 7 (T-705): the script, both test files, the four command copies and the plan ticks for T-101 to T-703, in one commit, so no commit has a red suite. The red runs (T-104, T-602) happen in the working tree before each change. The ticks for T-704, T-705 and the Test List ride the closeout commit.
 
 ## Identified Risks
