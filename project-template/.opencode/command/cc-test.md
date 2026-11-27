@@ -2,7 +2,7 @@
 description: "(Conductor) Analyze coverage gaps and write missing tests"
 ---
 
-> code-conductor: this command was written for Claude Code. Where it names a Claude Code tool (Read, Grep, Glob, Edit, Write, Bash, Skill, Agent), use your closest equivalent. `$ARGUMENTS` and an `ARGUMENTS:` line mean the text the user gave with the command. A space was inserted after some exclamation marks and at signs so OpenCode does not run or attach them; read the text as if the space were not there.
+> code-conductor: this command was written for Claude Code. Where it names a Claude Code tool (Read, Grep, Glob, Edit, Write, Bash, Skill, Agent), use your closest equivalent. ` $ARGUMENTS ` and an `ARGUMENTS:` line mean the text the user gave with the command. A space was inserted after some exclamation marks and at signs, and between the arguments placeholder and an adjacent backtick, so OpenCode does not run or attach text; read the text as if the space were not there.
 
 
 ## Role dispatch - qa (FEAT-061)
@@ -20,7 +20,7 @@ Branch on the first stdout line:
 - **`installed:`** — no run exists, and the verb wrote `.claude/memory/band-envelope.json` for qa with the test command in it. Continue with Phase 0 and the test writing below; at "Run tests after writing them", dispatch qa instead of running the suite here.
 - **A non-zero exit, or any other first line** — print `qa not dispatched: <the verb's stderr line>` and continue with the flow below, running the suite in this session.
 
-**Dispatch:** `Agent({ subagent_type: "qa", description: "run the suite", prompt })`. The brief names the scope (`$ARGUMENTS`). It says that a phase command, not a run, dispatched the agent, and either that the envelope is installed at `.claude/memory/band-envelope.json` or, after `not-installed:`, that no envelope was installed for it. Report qa's exact exit status and summary line as the result. A red suite, a guard denial or a report without a `SNAP_HANDBACK` line is reported as it is: never rerun the suite in this session to replace qa's answer.
+**Dispatch:** `Agent({ subagent_type: "qa", description: "run the suite", prompt })`. The brief names the scope (` $ARGUMENTS `). It says that a phase command, not a run, dispatched the agent, and either that the envelope is installed at `.claude/memory/band-envelope.json` or, after `not-installed:`, that no envelope was installed for it. Report qa's exact exit status and summary line as the result. A red suite, a guard denial or a report without a `SNAP_HANDBACK` line is reported as it is: never rerun the suite in this session to replace qa's answer.
 
 **Clear:** after `installed:`, run `node "$S/orchestrate.mjs" envelope --clear` before this command ends, on whatever path it ends, also when the developer declines the run. If it refuses, report the refusal and leave the file alone: a run now owns it.
 

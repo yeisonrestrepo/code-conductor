@@ -2,7 +2,7 @@
 description: "(Conductor) Map implementation steps from an approved spec"
 ---
 
-> code-conductor: this command was written for Claude Code. Where it names a Claude Code tool (Read, Grep, Glob, Edit, Write, Bash, Skill, Agent), use your closest equivalent. `$ARGUMENTS` and an `ARGUMENTS:` line mean the text the user gave with the command. A space was inserted after some exclamation marks and at signs so OpenCode does not run or attach them; read the text as if the space were not there.
+> code-conductor: this command was written for Claude Code. Where it names a Claude Code tool (Read, Grep, Glob, Edit, Write, Bash, Skill, Agent), use your closest equivalent. ` $ARGUMENTS ` and an `ARGUMENTS:` line mean the text the user gave with the command. A space was inserted after some exclamation marks and at signs, and between the arguments placeholder and an adjacent backtick, so OpenCode does not run or attach text; read the text as if the space were not there.
 
 
 ## Phase entry - Resume Read
@@ -137,7 +137,7 @@ The test list is the handoff to the tests' author. In an orchestrated run the `t
 
 ## Delegated writing (`--delegate`, FEAT-061)
 
-Without `--delegate` in `$ARGUMENTS`, skip this section: this session writes the plan, as above. With it, the `plan` role agent writes the file under its tool mask and Guard 5's scope check. `--delegate` is a flag, not part of the spec name. The approved-spec check and the codebase mapping above still run here first.
+Without `--delegate` in ` $ARGUMENTS `, skip this section: this session writes the plan, as above. With it, the `plan` role agent writes the file under its tool mask and Guard 5's scope check. `--delegate` is a flag, not part of the spec name. The approved-spec check and the codebase mapping above still run here first.
 
 1. Install the envelope, from the project root:
 

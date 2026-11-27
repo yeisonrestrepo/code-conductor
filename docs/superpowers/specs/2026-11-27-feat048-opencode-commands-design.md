@@ -43,6 +43,7 @@ OpenCode is not installed on the measuring machine and installing it was not per
 - [ ] Every `cc-*.md` source has exactly one rendered OpenCode command, and the drift test covers it.
 - [ ] The rendered frontmatter is the source description; the body is the preamble plus the source body with only the two rewrites.
 - [ ] A test applies OpenCode v1.19.6's `SHELL_REGEX`, `FILE_REGEX` and `$N` placeholder regex to every rendered OpenCode command and finds no match (no non-empty file name), so a future source that adds one fails.
+- [ ] Review round 1: `$ARGUMENTS` next to a backtick (preamble included) is spaced apart, because OpenCode substitutes it before the shell pass and an argument ending in `!` would complete a trigger; a dot-led `@.env` or `@.` is spaced out too. A test re-checks every render with sample arguments ending in `!` and `@` substituted.
 - [ ] `--project --opencode` installs the commands; without `--opencode` nothing is written under `.opencode/`; host files with other names survive.
 - [ ] README's OpenCode section states the commands are installed and the two rewrites.
 - [ ] Zero new runtime dependencies.

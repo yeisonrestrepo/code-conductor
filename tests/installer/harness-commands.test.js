@@ -19,7 +19,8 @@ describe('renderCommand', () => {
     expect(frontmatter(skill)).toBe('---\nname: cc-hi\ndescription: "(Conductor) Say hi Use when the user asks for /cc-hi or cc-hi."');
   });
   it('adds the preamble once and keeps the source body unchanged', () => {
-    for (const text of Object.values(renderCommand('cc-hi', SOURCE))) {
+    const { workflow, skill } = renderCommand('cc-hi', SOURCE);
+    for (const text of [workflow, skill]) {
       expect(text.split(PREAMBLE)).toHaveLength(2);
       expect(text.endsWith('\nSay hi to $ARGUMENTS.\n')).toBe(true);
     }
@@ -72,6 +73,16 @@ describe('renderCommand: OpenCode command', () => {
     expect(opencode.endsWith('\nsee @ docs and {@ code x} and `@keep` and a@b\n')).toBe(true);
     expect(opencodeActs(opencode)).toEqual([]);
   });
+  it('spaces out a dot-led @name, which OpenCode also attaches', () => {
+    const { opencode } = renderCommand('cc-x', '---\ndescription: d\n---\nread @.env and @.\n');
+    expect(opencode.endsWith('\nread @ .env and @ .\n')).toBe(true);
+    expect(opencodeActs(opencode)).toEqual([]);
+  });
+  it('separates $ARGUMENTS from an adjacent backtick, preamble included', () => {
+    const { opencode } = renderCommand('cc-x', '---\ndescription: d\n---\nrun `$ARGUMENTS` now\n');
+    expect(opencode.endsWith('\nrun ` $ARGUMENTS ` now\n')).toBe(true);
+    expect(opencode).not.toMatch(/`\$ARGUMENTS|\$ARGUMENTS`/);
+  });
 });
 
 describe('rendered files stay in sync with the sources (drift)', () => {
@@ -83,6 +94,12 @@ describe('rendered files stay in sync with the sources (drift)', () => {
   });
   it.each([...rendered.keys()].filter((k) => k.startsWith('.opencode/')).map((k) => [k]))('%s gives OpenCode nothing to run, attach or substitute', (rel) => {
     expect(opencodeActs(readFileSync(join(ROOT, 'project-template', rel), 'utf8'))).toEqual([]);
+  });
+  // OpenCode substitutes $ARGUMENTS before its shell pass, so a backtick next to it plus an
+  // ordinary argument ending in `!` would form a trigger the user never typed.
+  it.each([...rendered.keys()].filter((k) => k.startsWith('.opencode/')).flatMap((k) => [[k, 'add login!'], [k, 'mail me@']]))('%s gives OpenCode nothing to run or attach after substituting %j', (rel, args) => {
+    const text = readFileSync(join(ROOT, 'project-template', rel), 'utf8').replaceAll('$ARGUMENTS', args);
+    expect(opencodeActs(text)).toEqual([]);
   });
   it.each([...rendered.keys()].map((k) => [k]))('%s matches its committed copy (run: node lib/installer/harness-commands.mjs --write)', (rel) => {
     expect(readFileSync(join(ROOT, 'project-template', rel), 'utf8')).toBe(rendered.get(rel));

@@ -2,7 +2,7 @@
 description: "(Conductor) Serialize phase state and prompt for context compaction"
 ---
 
-> code-conductor: this command was written for Claude Code. Where it names a Claude Code tool (Read, Grep, Glob, Edit, Write, Bash, Skill, Agent), use your closest equivalent. `$ARGUMENTS` and an `ARGUMENTS:` line mean the text the user gave with the command. A space was inserted after some exclamation marks and at signs so OpenCode does not run or attach them; read the text as if the space were not there.
+> code-conductor: this command was written for Claude Code. Where it names a Claude Code tool (Read, Grep, Glob, Edit, Write, Bash, Skill, Agent), use your closest equivalent. ` $ARGUMENTS ` and an `ARGUMENTS:` line mean the text the user gave with the command. A space was inserted after some exclamation marks and at signs, and between the arguments placeholder and an adjacent backtick, so OpenCode does not run or attach text; read the text as if the space were not there.
 
 
 Run `git rev-parse HEAD` to get the current commit SHA (the **full 40-char** hash — NOT `--short`, whose abbreviation length auto-scales with repo size and is unstable across growth). Lowercase and trim it; if it does not match `/^[0-9a-f]{7,40}$/`, or the command exits non-zero (non-git workspace, no commits, git absent, or permission-denied), use `"0000000"`. Wrap the call with shell `timeout` only when `command -v timeout` (or `gtimeout`) succeeds; otherwise run it unwrapped. This same value is `sys.c` and the `sessions` / `snapshots` git-hash key.

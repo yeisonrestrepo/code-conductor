@@ -2,12 +2,12 @@
 description: "(Conductor) Audit and update project documentation"
 ---
 
-> code-conductor: this command was written for Claude Code. Where it names a Claude Code tool (Read, Grep, Glob, Edit, Write, Bash, Skill, Agent), use your closest equivalent. `$ARGUMENTS` and an `ARGUMENTS:` line mean the text the user gave with the command. A space was inserted after some exclamation marks and at signs so OpenCode does not run or attach them; read the text as if the space were not there.
+> code-conductor: this command was written for Claude Code. Where it names a Claude Code tool (Read, Grep, Glob, Edit, Write, Bash, Skill, Agent), use your closest equivalent. ` $ARGUMENTS ` and an `ARGUMENTS:` line mean the text the user gave with the command. A space was inserted after some exclamation marks and at signs, and between the arguments placeholder and an adjacent backtick, so OpenCode does not run or attach text; read the text as if the space were not there.
 
 
 ## Release reconciliation - docs (FEAT-036)
 
-Without `--release <ref>` in `$ARGUMENTS`, skip this section and audit inline docs as below. With it, do not run the inline-docs audit: the `docs` role agent reconciles the user-facing documentation with that shipped release, and this session writes no documentation file.
+Without `--release <ref>` in ` $ARGUMENTS `, skip this section and audit inline docs as below. With it, do not run the inline-docs audit: the `docs` role agent reconciles the user-facing documentation with that shipped release, and this session writes no documentation file.
 
 1. Digest the release from the project root, with the work tree checked out clean at `<ref>`:
 
