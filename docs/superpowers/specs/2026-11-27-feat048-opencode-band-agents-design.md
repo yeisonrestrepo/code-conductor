@@ -28,6 +28,7 @@ The live probe was run in the scratchpad with the free `opencode/big-pickle` mod
 4. **A task prompt's `@path` is attached without a tool call.** `task.ts` passes `params.prompt` through `resolvePromptParts`, which applies `FILE_REGEX` and attaches each file it names, as a command template does (from the source). Shell triggers are not run there: `ConfigMarkdown.shell` is applied only to command templates.
 5. **`task_id` resumes any session.** With `task_id`, `task.ts` reuses that session and prompts it with `subagent_type`'s agent. The session's recorded `agent` is then not the agent running.
 6. **`plan` is a built-in OpenCode agent**, the primary Plan mode. An agent file named `plan.md` would override it.
+7. **An agent prompt is not templated.** An agent body held a `` !`node -e …` `` that writes a file, and an `@secret.txt`. The export of the child session showed only the task prompt as a text part, with no file part, and no file was written. The free model stalled, with no reply, when the agent had no tools.
 
 ## Options
 
@@ -66,7 +67,7 @@ permission:
 - **Dropped:** `name`, `tools`, `default-model` and `omitClaudeMd`. OpenCode's own `tools` key has another shape, and the model is inherited.
 - **The `conductor-` prefix** avoids overriding OpenCode's built-in `plan` (measured 6) and a host's own `code`, `docs` or `qa` agent.
 - **`AGENT_PREAMBLE`** says the agent was written for Claude Code, so it uses its closest equivalent wherever it names a Claude Code tool.
-- **Bodies are not neutralized.** OpenCode does not template an agent prompt, and no agent body holds a `` !` ``, `@path` or `$ARGUMENTS` today.
+- **Bodies are not neutralized,** because OpenCode does not template an agent prompt (measured 7). `security.md`'s ` @<range>` stays as it is.
 - **`renderAll`** adds the agent renders, and **`staleRenders`** also checks `.opencode/agent/`.
 
 **`OPENCODE_NOTE`** in every rendered command gains one sentence: a code-conductor agent the command names, such as `audit`, is the OpenCode subagent `conductor-audit`.
