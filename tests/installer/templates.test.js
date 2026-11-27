@@ -8,6 +8,8 @@ import {
   GLOBAL_SETTINGS_FINGERPRINTS, PROJECT_SETTINGS_FINGERPRINTS,
 } from '../../lib/installer/host-owned.mjs';
 import { matchingFingerprints } from '../../lib/installer/settings-merge.mjs';
+import { renderAll } from '../../lib/installer/harness-commands.mjs';
+import { CODEX_HOOK_FINGERPRINTS } from '../../lib/installer/deploy.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SKILLS = ['agent-delegation', 'code-simplifier', 'critical-review', 'memory-first', 'verbosity'];
@@ -111,7 +113,8 @@ describe('shipped asset dirs', () => {
     for (const d of ['global', 'skills', 'scripts', 'project-template']) walk(join(root, d), d);
     expect(offenders).toEqual([]);
   });
-  it('[BUG-069] ships exactly one file under project-template/.opencode/', () => {
+  // FEAT-048 slice 4 widened the pin to the rendered commands, which deploy.mjs copies with --opencode.
+  it('[BUG-069] ships only the plugin and the rendered commands under project-template/.opencode/', () => {
     const files = [];
     const walk = (dir, rel) => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -121,7 +124,8 @@ describe('shipped asset dirs', () => {
       }
     };
     walk(join(root, 'project-template', '.opencode'), '');
-    expect(files).toEqual(['plugin/conductor-guard.js']);
+    const commands = [...renderAll(root).keys()].filter((k) => k.startsWith('.opencode/')).map((k) => k.slice('.opencode/'.length));
+    expect(files.sort()).toEqual(['plugin/conductor-guard.js', ...commands].sort());
   });
 });
 
@@ -251,6 +255,7 @@ describe('settings fingerprint coverage', () => {
   const SHIPPED = [
     { rel: 'global/settings.json', fingerprints: GLOBAL_SETTINGS_FINGERPRINTS },
     { rel: 'project-template/.claude/settings.json', fingerprints: PROJECT_SETTINGS_FINGERPRINTS },
+    { rel: 'project-template/.codex/hooks.json', fingerprints: CODEX_HOOK_FINGERPRINTS },
   ];
 
   // Backward: a fingerprint that matches nothing is dead, which happens when a

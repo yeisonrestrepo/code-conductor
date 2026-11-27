@@ -1,0 +1,167 @@
+---
+description: "(Conductor) Restore full session context in a fresh Claude Code session"
+---
+
+> code-conductor: this command was written for Claude Code. Where it names a Claude Code tool (Read, Grep, Glob, Edit, Write, Bash, Skill, Agent), use your closest equivalent. ` $ARGUMENTS ` and an `ARGUMENTS:` line mean the text the user gave with the command. A space was inserted after some exclamation marks and at signs, and between the arguments placeholder and an adjacent backtick, so OpenCode does not run or attach text; read the text as if the space were not there.
+
+
+## Step 1 — Verify project initialization
+
+Check if `CLAUDE.md` exists in the current directory.
+
+- If **absent**: stop immediately and output — `"Project not initialized. Run /cc-init first."`
+- If **present but `## Project Identity` fields are all empty**: continue and include this warning at the top of the final report: `"⚠ Project identity incomplete — run /cc-init to fill it in."`
+
+## Step 2 — Read project identity
+
+Read `CLAUDE.md`. Extract:
+- **Name** (from `- **Name:**`)
+- **Description** (from `- **Description:**`)
+- **Stack** (from `- **Stack:**`)
+- **Language** (from `- **Language:**`)
+
+Use `—` for any missing fields.
+
+**Auto-fill blank command fields (BUG-015):** After reading the identity fields, check if any of `Build`, `Test`, `Lint`, `Format`, `Setup` in CLAUDE.md are still `<command>` (any case) or blank after the colon. If at least one is blank, resolve the detector by presence, the deployed copy first:
+
+```bash
+D=.claude/scripts/detect-stack.mjs; [ -f "$D" ] || D=scripts/detect-stack.mjs
+```
+
+If neither file exists, skip this step silently.
+
+1. Run `node "$D" "$PWD"` and capture the JSON output.
+2. For each blank/placeholder command field, if the JSON contains a matching key (`build`, `test`, `lint`, `format`, `setup`), replace the placeholder with the detected value using a single `Edit` call.
+3. Never overwrite a field that already contains a non-placeholder value.
+4. If all five fields are already populated, skip this step silently.
+5. If the JSON is `{}` or node exits non-zero, skip silently.
+
+Re-read the updated CLAUDE.md fields after this step so the session resume report reflects the filled values.
+
+## Step 3 — Read project memory
+
+Read `.claude/memory/project.md` with `limit: 60` and stop at its `<!-- end current state -->` line: that `## Current State` digest is the bounded summary. Never read the whole file: its history is append-only and grows with the project.
+
+Extract:
+- The `Last checkpoint:` line, then up to 3 bullets of the entry it names: Grep that heading with `-n` and Read the entry with `offset` and `limit: 60`
+- The bullets under `### Conventions` in `## Current State`
+- The bullets under `### Debt` in `## Current State`
+
+If the file has no `## Current State` section, Read it with `limit: 40` instead, then Grep `^## (Spec|Checkpoint)` with `-n`, Read the last `## Checkpoint` match with `offset` and `limit: 60` for its 3 bullets, and note `"No Current State yet: run /cc-checkpoint"` for conventions and debt.
+
+If the file is absent or has no `## Checkpoint` entry, note `"No checkpoints yet"`.
+
+## Step 4 — Read personal preferences
+
+Read `.claude/memory/personal.md`. Extract developer preferences (verbosity, shortcuts, habits).
+
+If the file is absent, skip silently.
+
+## Step 4a: Resolve the spec and plan folders
+
+If `CLAUDE.md` holds both a `- Specs:` and a `- Plans:` line, use their values as `<specs>` and `<plans>`.
+
+Otherwise resolve the location resolver by presence, the deployed copy first:
+
+```bash
+L=.claude/scripts/doc-locations.mjs; [ -f "$L" ] || L=scripts/doc-locations.mjs
+```
+
+Run `node "$L"` from the repository root and use the `specs` and `plans` strings of its exit-0 JSON.
+
+On any failure (Node unavailable, script missing, non-zero exit, output that is not JSON or lacks either string, or exactly one of the two lines recorded), use `docs/superpowers/specs` and `docs/superpowers/plans`, and append `(location fallback: <cause>)` to the summary line.
+
+## Step 5 — Find latest spec
+
+Search `<specs>` recursively (grouped documents sit in subfolders) for `*.md` files. Select the file with the most recent modification time (`mtime`). Extract its first `#` heading as a one-line summary.
+
+If the directory is absent or empty, use `none`.
+
+## Step 6 — Find latest plan
+
+Search `<plans>` recursively (grouped documents sit in subfolders) for `*.md` files. Select the file with the most recent modification time (`mtime`). Extract its first `#` heading as a one-line summary.
+
+If the directory is absent or empty, use `none`.
+
+## Step 6a: Scan active plan for in-progress and failed tasks
+
+If a plan file was found in Step 6, scan it for active-state markers:
+
+Run `Grep` with:
+- `pattern`: `\[>\]|\[!\]`
+- `path`: the plan file path found in Step 6
+- `output_mode`: `content`
+
+Collect results:
+- Lines containing `[>]` are **in-progress tasks** (execution interrupted mid-flight)
+- Lines containing `[!]` are **failed tasks** (execution halted; manual resolution required)
+
+Extract the task ID (e.g. `[T-001-A]`) from each matching line. Store counts and IDs for the report.
+
+If no `[>]` or `[!]` lines are found, skip these fields in the report.
+
+## Step 7 — Read git state
+
+Run:
+
+```bash
+git log --oneline -10
+git status --short
+git branch --show-current
+```
+
+Count the lines in the `git status --short` output — each line represents one uncommitted file. If the output is empty, the count is `"none"`.
+
+If not inside a git repository, skip silently.
+
+## Step 8 — Check for updates
+
+Read the local installed version from `~/.claude/memory/conductor-version.md`.
+
+Fetch the remote version:
+
+```bash
+curl -fsSL --max-time 5 https://raw.githubusercontent.com/yeisonrestrepo/code-conductor/main/VERSION 2>/dev/null
+```
+
+If the remote version differs from the local version, store this notice for the report:
+`"⚡ code-conductor [remote version] available — run: bash install.sh to update"`
+
+If the fetch fails or times out, skip silently. Do not stop the session.
+
+## Step 9 — Render report
+
+Output this report, populating each field from the steps above:
+
+```
+## Session Resume — [Name] · [YYYY-MM-DD]
+
+[⚠ Project identity incomplete — run /cc-init to fill it in.]  ← include only if applicable
+[⚡ code-conductor X.Y.Z available — run: bash install.sh to update]  ← include only if applicable
+
+### Active Work
+Spec:  [spec filename] — [spec title]
+Plan:  [plan filename] — [plan title]
+In-progress: [count] task(s) - [task IDs]   (include only if [>] tasks were found in Step 6a)
+Failed:      [count] task(s) - [task IDs]   (include only if [!] tasks were found in Step 6a)
+
+### Recent Commits
+[git log --oneline -10 output]
+
+### Open Changes
+Branch: [branch name]  ·  Uncommitted: [count, or "none"]
+
+### Memory Highlights
+[latest checkpoint block — 3 bullets max]
+
+### Session Preferences
+[personal.md relevant lines]
+```
+
+## Step 10 — Load stack profile
+
+Run `/cc-stack` to detect and load the matching stack profile.
+
+If `/cc-stack` cannot detect a stack or reports an error, append this line to the report:
+`"⚠ Stack could not be detected — run /cc-stack manually."`
+Do not stop the session.

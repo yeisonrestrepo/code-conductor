@@ -888,9 +888,14 @@ describe('deployProject: Codex hook (FEAT-048, BUG-094)', () => {
   const HOOKS_REL = join('.codex', 'hooks.json');
   const ADAPTER_REL = join('.codex', 'hooks', 'conductor-guard.mjs');
   const SHIPPED_ADAPTER = '// shipped codex guard\n';
-  const OURS = JSON.parse(readFileSync(join(ROOT, 'project-template', HOOKS_REL), 'utf8')).hooks.PreToolUse[0];
+  const CONTEXT_REL = join('.codex', 'hooks', 'conductor-context.mjs');
+  const SHIPPED_CONTEXT = '// shipped codex context\n';
+  const TEMPLATE_HOOKS = JSON.parse(readFileSync(join(ROOT, 'project-template', HOOKS_REL), 'utf8')).hooks;
+  const OURS = TEMPLATE_HOOKS.PreToolUse[0];
+  const OURS_CONTEXT = TEMPLATE_HOOKS.UserPromptSubmit[0];
   const LEGACY = { matcher: '.*', hooks: [{ type: 'command', command: 'node .claude/hooks/pre-tool-use.mjs' }] };
-  const SHIPPED_HOOKS = `${JSON.stringify({ hooks: { PreToolUse: [OURS] } }, null, 2)}\n`;
+  const SHIPPED_HOOKS = `${JSON.stringify({ hooks: { PreToolUse: [OURS], UserPromptSubmit: [OURS_CONTEXT] } }, null, 2)}\n`;
+  const CONTEXT_INSTALLED = 'code-conductor: installed the Codex context hooks (verbosity, context guard) in .codex/hooks.json';
   const INSTALLED = 'code-conductor: installed the Codex guard hook in .codex/hooks.json; trust it once in Codex with /hooks';
   const REPLACED = 'code-conductor: replaced the old Codex guard hook in .codex/hooks.json; Codex asks for trust again after this edit, so the guards are not enforced until you re-trust the hooks in Codex with /hooks';
   const host = { matcher: 'Bash', hooks: [{ type: 'command', command: 'node mine.mjs' }] };
@@ -904,6 +909,31 @@ describe('deployProject: Codex hook (FEAT-048, BUG-094)', () => {
     mkdirSync(join(asset, 'project-template', '.codex', 'hooks'), { recursive: true });
     writeFileSync(join(asset, 'project-template', HOOKS_REL), SHIPPED_HOOKS);
     writeFileSync(join(asset, 'project-template', ADAPTER_REL), SHIPPED_ADAPTER);
+    writeFileSync(join(asset, 'project-template', CONTEXT_REL), SHIPPED_CONTEXT);
+  });
+  it('installs the context adapter and its UserPromptSubmit entry with the codex option (FEAT-048 slice 5)', () => {
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, codex: true });
+    expect(readFileSync(join(home, CONTEXT_REL), 'utf8')).toBe(SHIPPED_CONTEXT);
+    expect(JSON.parse(readFileSync(join(home, HOOKS_REL), 'utf8')).hooks.UserPromptSubmit).toEqual([OURS_CONTEXT]);
+    expect(out.said).toContain(CONTEXT_INSTALLED);
+  });
+  it('keeps a host UserPromptSubmit entry and adds ours once across re-runs (FEAT-048 slice 5)', () => {
+    const mine = { hooks: [{ type: 'command', command: 'node my-prompt.mjs' }] };
+    mkdirSync(join(home, '.codex'), { recursive: true });
+    writeFileSync(join(home, HOOKS_REL), JSON.stringify({ hooks: { UserPromptSubmit: [mine] } }));
+    deployProject(asset, home, { ...capture().opts, codex: true });
+    const written = readFileSync(join(home, HOOKS_REL), 'utf8');
+    expect(JSON.parse(written).hooks.UserPromptSubmit).toEqual([mine, OURS_CONTEXT]);
+    deployProject(asset, home, { ...capture().opts, codex: true });
+    expect(readFileSync(join(home, HOOKS_REL), 'utf8')).toBe(written);
+  });
+  it('ships a UserPromptSubmit bootstrap that targets the context adapter and never the guard', () => {
+    const command = OURS_CONTEXT.hooks[0].command;
+    expect(command.startsWith('node -e "')).toBe(true);
+    expect(command).toContain('conductor-context.mjs');
+    expect(command).not.toContain('conductor-guard.mjs');
+    expect(existsSync(join(ROOT, 'project-template', CONTEXT_REL))).toBe(true);
   });
   it('writes no .codex/ without the codex option', () => {
     const out = capture();
@@ -1023,5 +1053,32 @@ describe('deployProject: cc-* commands for Antigravity and Codex (FEAT-048)', ()
     expect(readFileSync(join(home, '.agents', 'workflows', 'mine.md'), 'utf8')).toBe('host');
     expect(readFileSync(join(home, '.agents', 'skills', 'mine', 'SKILL.md'), 'utf8')).toBe('host');
     expect(readFileSync(join(home, WORKFLOW), 'utf8')).toBe('workflow\n');
+  });
+});
+
+// FEAT-048 slice 4 (#97): the OpenCode renders land only with --opencode.
+describe('deployProject: cc-* commands for OpenCode (FEAT-048)', () => {
+  const COMMAND = join('.opencode', 'command', 'cc-spec.md');
+  beforeEach(() => {
+    mkdirSync(join(asset, 'project-template', '.opencode', 'command'), { recursive: true });
+    writeFileSync(join(asset, 'project-template', COMMAND), 'command\n');
+  });
+  it('installs no command without the opencode option', () => {
+    deployProject(asset, home, { ...capture().opts, antigravity: true, codex: true });
+    expect(existsSync(join(home, '.opencode'))).toBe(false);
+  });
+  it('installs the commands and reports them with the opencode option', () => {
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, opencode: true });
+    expect(readFileSync(join(home, COMMAND), 'utf8')).toBe('command\n');
+    expect(out.said).toContain('code-conductor: installed the cc-* commands as OpenCode commands in .opencode/command/');
+  });
+  it('keeps the host\'s own commands and overwrites ours', () => {
+    mkdirSync(join(home, '.opencode', 'command'), { recursive: true });
+    writeFileSync(join(home, '.opencode', 'command', 'mine.md'), 'host');
+    writeFileSync(join(home, COMMAND), 'stale');
+    deployProject(asset, home, { ...capture().opts, opencode: true });
+    expect(readFileSync(join(home, '.opencode', 'command', 'mine.md'), 'utf8')).toBe('host');
+    expect(readFileSync(join(home, COMMAND), 'utf8')).toBe('command\n');
   });
 });

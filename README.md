@@ -389,9 +389,9 @@ By default, only the global core files are installed. Flags extend that:
 | `--project` / `-Project` | Also install the project template into the current directory |
 | `--no-deps` / `-NoDeps` | Accepted for compatibility with the retired shell installers; a no-op that copies agent files only and does not affect the superpowers offer or the frontend skills offer (see `--with-plugins` and `--with-frontend-skills`) |
 | `--verbosity MIN\|INFO\|VERBOSE` / `-Verbosity LEVEL` | Default response verbosity (default `MIN`). `MIN` = one sentence per response, `INFO` = bullet list, `VERBOSE` = full explanation. Re-run the installer to change it. PowerShell's `-Verbosity:INFO` form is not supported; it warns and the level stays `MIN`. |
-| `--opencode` | With `--project`, also install the OpenCode guard plugin at `.opencode/plugin/conductor-guard.js` (see [OpenCode](#opencode)). Without `--project` it warns and writes nothing for OpenCode |
+| `--opencode` | With `--project`, also install the OpenCode guard plugin at `.opencode/plugin/conductor-guard.js` and the `cc-*` commands in `.opencode/command/` (see [OpenCode](#opencode)). Without `--project` it warns and writes nothing for OpenCode |
 | `--antigravity` | With `--project`, also install the Antigravity CLI guard: `.agents/hooks/conductor-guard.mjs` and a `PreToolUse` entry merged into `.agents/hooks.json` (see [Antigravity CLI](#antigravity-cli)). Without `--project` it warns and writes nothing for Antigravity |
-| `--codex` | With `--project`, also merge a `PreToolUse` entry into `.codex/hooks.json` that runs the project's guard (see [Codex CLI](#codex-cli)). Without `--project` it warns and writes nothing for Codex |
+| `--codex` | With `--project`, also merge into `.codex/hooks.json` a `PreToolUse` entry that runs the project's guard and a `UserPromptSubmit` entry that injects the verbosity and context-guard lines (see [Codex CLI](#codex-cli)). Without `--project` it warns and writes nothing for Codex |
 | `--with-plugins` | Install the superpowers plugin without asking, through `claude plugin install superpowers@claude-plugins-official` (60 s timeout). A non-interactive run installs it only with this flag; an interactive run asks instead. If the install cannot run, the installer prints `/plugin install superpowers@claude-plugins-official` and still exits 0 |
 | `--with-frontend-skills` | With `--project` on a `frontend` or `fullstack` project, install the three frontend design skills without asking (120 s timeout per command). A non-interactive run installs them only with this flag; an interactive run asks instead (default Yes). `--with-plugins` does not imply it, nor the reverse. The outcome, the pins and the sha256 of Impeccable's installed files are recorded in `.claude/frontend-skills.json` |
 
@@ -404,9 +404,9 @@ Two cautions:
 
 ### OpenCode
 
-`--project --opencode` adds one file, `.opencode/plugin/conductor-guard.js`, an [OpenCode](https://opencode.ai) plugin. It does not copy the guard: before each `bash`, `read`, `write`, `edit`, `multiedit` or patch call it sends the call to the project's own `.claude/hooks/pre-tool-use.mjs`, in the payload Claude Code sends, and blocks the call when the guard denies it. Read-only tools pass, and every other tool is blocked, because the guard cannot inspect it. A Claude Code install without the flag is unchanged.
+`--project --opencode` adds `.opencode/plugin/conductor-guard.js`, an [OpenCode](https://opencode.ai) plugin, and the `cc-*` commands in `.opencode/command/`. It does not copy the guard: before each `bash`, `read`, `write`, `edit`, `multiedit` or patch call it sends the call to the project's own `.claude/hooks/pre-tool-use.mjs`, in the payload Claude Code sends, and blocks the call when the guard denies it. Read-only tools pass, and every other tool is blocked, because the guard cannot inspect it. A Claude Code install without the flag is unchanged.
 
-This is the first slice of `[FEAT-048]` (issue #97), and it covers enforcement only:
+This is part of `[FEAT-048]` (issue #97), and it covers enforcement and the commands:
 
 | On OpenCode | Status |
 |---|---|
@@ -417,7 +417,8 @@ This is the first slice of `[FEAT-048]` (issue #97), and it covers enforcement o
 | `bash` with an argument other than `command`, `description` or `timeout`, a working directory included | Blocked: the guard checks a command as if it runs in the project directory, so put any `cd` in the command itself |
 | `task`, `batch`, MCP and any other tool | Blocked: the guard cannot inspect them |
 | `glob`, `grep`, `list`, `webfetch`, `websearch`, `codesearch` and other read-only tools | Allowed, as on Claude Code |
-| `cc-*` commands, band agents, verbosity and context hooks | Not installed for OpenCode yet. OpenCode reads `CLAUDE.md` when there is no `AGENTS.md`, and loads `.claude/skills` |
+| `cc-*` commands | Installed in `.opencode/command/` and run as `/cc-spec`, `/cc-plan` and so on. They are rendered from the Claude Code commands by `lib/installer/harness-commands.mjs`, with one change: OpenCode runs every `` !`…` `` in a command in your shell, and attaches every `@path`, without a tool call the guard could see, so the render puts a space after each such `!` and `@`, and between `$ARGUMENTS` and an adjacent backtick, since OpenCode substitutes your arguments before its shell pass. A test fails if a rendered command still has a trigger, with or without sample arguments substituted. A complete `` !`…` `` you type in your own arguments still runs |
+| Band agents, verbosity and context hooks | Not installed for OpenCode yet. OpenCode reads `CLAUDE.md` when there is no `AGENTS.md`, and loads `.claude/skills` |
 
 The plugin needs `node` on `PATH`. If the guard cannot run, the call is blocked and the reason names the guard's path. Checked against OpenCode 1.18.33 during the proof of concept.
 
@@ -439,17 +440,18 @@ The adapter needs `node` on `PATH`. If the guard cannot run, crashes or prints s
 
 ### Codex CLI
 
-`--project --codex` installs `.codex/hooks/conductor-guard.mjs` and merges one `PreToolUse` entry into `.codex/hooks.json`, keeping any entries already there. The entry is a short `node -e` bootstrap that finds the project root from the directory Codex runs it in; the adapter then runs the project's guard and blocks the call when the guard cannot run. OpenAI's [Codex CLI](https://github.com/openai/codex) sends Claude Code's own payload and honours its deny. **Codex runs a project's hooks only after you trust them once:** open `codex` in the project and approve them in `/hooks`. Until then nothing is enforced.
+`--project --codex` installs `.codex/hooks/conductor-guard.mjs` and `.codex/hooks/conductor-context.mjs` and merges a `PreToolUse` and a `UserPromptSubmit` entry into `.codex/hooks.json`, keeping any entries already there. The entry is a short `node -e` bootstrap that finds the project root from the directory Codex runs it in; the adapter then runs the project's guard and blocks the call when the guard cannot run. OpenAI's [Codex CLI](https://github.com/openai/codex) sends Claude Code's own payload and honours its deny. **Codex runs a project's hooks only after you trust them once:** open `codex` in the project and approve them in `/hooks`. Until then nothing is enforced.
 
 | On Codex CLI | Status |
 |---|---|
 | Guard 3 on shell commands | Enforced after hook trust |
 | Guards 1, 2 and 4 | Not reached: Codex has no separate read tool, so reads go through the shell, where Guard 3 applies |
-| Guards 5, 6 and 7, guard warnings, context injection | Not available |
+| Guards 5, 6 and 7, guard warnings | Not available |
+| Context injection (verbosity line, context-guard turn warning) | Injected on every prompt after hook trust. A second entry, `UserPromptSubmit`, runs `.codex/hooks/conductor-context.mjs`, which runs the project's unchanged `.claude/hooks/verbosity-remind.sh` and `context-guard.sh` with bash (Git for Windows' bash on Windows) and hands their output to Codex as JSON, because Codex drops a plain reply that starts with `[`, the way the verbosity line does. It never blocks a prompt: with no bash, or a hook that fails, nothing is added |
 | `cc-*` commands | Installed as skills in `.agents/skills/cc-*/`; ask Codex to use `cc-spec`, `cc-plan` and so on (Codex has no project-level slash commands). Rendered from the Claude Code commands, as for Antigravity |
-| Band agents, verbosity hooks | Not installed for Codex |
+| Band agents | Not installed for Codex |
 
-Checked live against Codex CLI 0.171.0: after trust, `cat *.log` was refused with `Command blocked by PreToolUse hook: BASH SCAN BLOCKED`. Editing `.codex/hooks.json` later makes Codex ask for trust again.
+Checked live against Codex CLI 0.171.0: after trust, `cat *.log` was refused with `Command blocked by PreToolUse hook: BASH SCAN BLOCKED`. Checked live against 0.172.0: the verbosity line reached the session as `hooks.additional_context`. Editing `.codex/hooks.json` later, including by re-running the installer when it adds an entry, makes Codex ask for trust again.
 
 `codex` may be started from the project root or any subdirectory: the bootstrap walks up to the nearest `.codex/hooks.json`, and if that file has no adapter beside it the call is blocked. The guards are not enforced without `node` on `PATH`. Upgrading an install that has the old `node .claude/hooks/pre-tool-use.mjs` entry rewrites `.codex/hooks.json`; Codex then asks for trust again, and the guards are not enforced until you re-trust the hooks in `/hooks` (the installer says so when it replaces the entry).
 
@@ -532,12 +534,11 @@ The backup and temp rules keep the installer's own backups and crash-stranded te
   - Installing or updating copies `.claude/agents/{spec,plan,code,audit,security,qa,define-review}.md` over the host project's files of the same names, as it does every shipped `.claude/` asset.
   - A gate certifies protocol position and the claim its role states, never the truth of the work beyond that claim.
 - **The review loop (`1.39.0`) is process discipline.** The spec or plan envelope stays installed after its hand-back, so the role can revise. Outside a round, its writes are bounded by its tool mask, Guard 5's scope, the hash-bound `approve` (`[FEAT-056]`), and your review. Gating Guard 5 on an open round is a follow-up candidate.
-- **`[BUG-092]`, open:** Guard 5's split between `test-writer` (test surface only) and `code` (outside it) covers only Write/Edit tool calls, and both roles may run the recorded test command, which executes the files they just wrote, so either role can change files on the other side of the split through that command. Until it is fixed, treat the split as holding against direct tool writes only, and compare each Build hand-back's `ops.f` with the files the commit actually changed, by role, before accepting the band.
-- **`[BUG-097]`, open:** the hand-back tree fingerprint (`contentHash` in `scripts/orchestrate.mjs`) reads every changed or untracked path with `readFileSync`, which follows symbolic links and opens non-regular files, so an untracked symlink to a character device or a named pipe left by a role's test command can make `orchestrate.mjs handback` buffer up to about 2 GiB or block indefinitely, and a symlink to a file outside the project gets that file's sha256 recorded in the run file. It does not disable the split check. Until it is fixed, if a hand-back hangs, stop it, remove any untracked symlink or named pipe the test run left in the worktree, and run `handback` again.
-- **`[BUG-098]`, open:** the hand-back split check (`treeFingerprint` in `scripts/orchestrate.mjs`) diffs against whatever `HEAD` is when it runs and lists untracked files with `--exclude-standard`, so a test command that commits during a dispatch, or edits `.git/info/exclude`, can hide files that crossed the test surface and `ORCH_HANDBACK_SURFACE_CROSSED` never fires. Guard 5 still denies direct writes. Until it is fixed, check that `HEAD` and `.git/info/exclude` are unchanged since the dispatch began before accepting a Build hand-back.
-- **`[BUG-099]`, open:** `install` in `scripts/orchestrate.mjs` writes the full `build_tree` fingerprint, one sha256 per changed or untracked file, into the run file with no size check, so a work tree with about 100k changed or untracked, non-ignored files pushes the run file past the hooks' 10 MiB read cap and, while `code` or `test-writer` runs, Guard 5's test-surface split stops applying and Guard 6 only warns. Until it is fixed, make sure an ignore rule hides dependency directories and generated fixtures before dispatching a Build role, so `git status` stays far below that count.
 - **The `P7` false positive** described under [Guard 3, and what it learned](#guard-3-and-what-it-learned) is still live.
 - **A re-run against an untouched `project.md` prints a recovery hint it cannot prove is needed.** If you install, never write anything into `.claude/memory/project.md`, and install again, you get a line suggesting the file may have been overwritten by a pre-`1.30.0` re-run. It was not; it equals the stub because it was seeded and never edited. The check compares content and **cannot distinguish "seeded and untouched" from "clobbered"**, which is why the wording is hedged to "may have been" rather than "was". This residual is named and accepted in [`BUG-039`'s spec at `:129`](docs/superpowers/specs/2026-09-27-bug039-installer-host-owned-state-design.md), where the alternative (restoring from the host's own git history) was rejected as writing host files out of the host's history with new failure modes. A **fresh** install is silent, which the Quickstart shows.
+- **`[BUG-100]`, open:** upgrading a Codex install edits `.codex/hooks.json`, so Codex asks for hook trust again and the `PreToolUse` guard is not enforced until you re-trust it, but the installer prints only the generic "trust it once in Codex with /hooks" line. Mitigation: after any upgrade of a `--codex` install, run `/hooks` in Codex and trust the entries before working.
+- **`[BUG-101]`, open:** the OpenCode render test never substitutes an argument ending in a bare ` @`, so in `cc-spec` and `cc-plan` such an argument becomes `@"` and OpenCode tries to attach a file named `"`. Mitigation: do not end the text typed after an OpenCode `cc-spec` or `cc-plan` command with a bare `@`.
+- **`[BUG-102]`, open:** while `.claude/memory/orchestrator-run.json` exists but is unreadable (over the hooks' read cap, invalid JSON or no `session_id`), Guard 5 lets `code` write the test surface, Guard 6 only warns the main session, and a role's nested dispatch is not denied. Mitigation: the orchestrator halts at its next step when it cannot load the run; when it does, run `orchestrate.mjs end` before dispatching anything else.
 - **Three open dossiers**, which are the evidence-collection pipeline working rather than a backlog: a session denial tally, one for interleaved-artifact reports, and an intermittent commit-hook hang in the `snap-build` suite. A dossier holds specimens until a mechanism is characterized by probe; an id is minted only when the written condition is met. `[BUG-047]` is what that pipeline produces when it completes: an out-of-scope note, then a dossier, then four specimens across four sessions, then a mint, then a release.
 
 **The living artifact is [`AGENT-READABLE BACKLOG.md`](AGENT-READABLE%20BACKLOG.md).** It is not a tidy issue list. It carries amendments above the text they amend, premises that measurement later corrected, and wrong guesses recorded beside the probe that overturned them. If you are evaluating this for a team, that file is the best due-diligence read in the repository.
@@ -596,9 +597,11 @@ code-conductor/
 |   +-- CLAUDE.md
 |   +-- gitignore                  Merged into the host project's .gitignore
 |   +-- .opencode/plugin/conductor-guard.js  OpenCode guard plugin, only with --opencode (FEAT-048)
+|   +-- .opencode/command/cc-*.md            Rendered cc-* commands for OpenCode, only with --opencode
 |   +-- .agents/hooks/conductor-guard.mjs    Antigravity CLI guard adapter, only with --antigravity (FEAT-048)
 |   +-- .agents/hooks.json                   Antigravity hook entry, merged, only with --antigravity
 |   +-- .codex/hooks/conductor-guard.mjs     Codex guard adapter, only with --codex (BUG-094)
+|   +-- .codex/hooks/conductor-context.mjs   Codex context-hook adapter, only with --codex
 |   +-- .codex/hooks.json                    Codex hook entry, merged, only with --codex (FEAT-048)
 |   +-- .agents/workflows/cc-*.md            cc-* commands as Antigravity workflows, only with --antigravity
 |   +-- .agents/skills/cc-*/SKILL.md         cc-* commands as Codex skills, only with --codex

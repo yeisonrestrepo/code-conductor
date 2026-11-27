@@ -1,0 +1,24 @@
+---
+description: "(Conductor) Report token and time spend from local session logs, with recommendations"
+---
+
+> code-conductor: this command was written for Claude Code. Where it names a Claude Code tool (Read, Grep, Glob, Edit, Write, Bash, Skill, Agent), use your closest equivalent. ` $ARGUMENTS ` and an `ARGUMENTS:` line mean the text the user gave with the command. A space was inserted after some exclamation marks and at signs, and between the arguments placeholder and an adjacent backtick, so OpenCode does not run or attach text; read the text as if the space were not there.
+
+
+Read-only. This command reads Claude Code's local session logs for this project and prints one compact report. It registers no hook and writes no file.
+
+## Step 1 — Run the reader
+
+Resolve the reader by presence, the deployed copy first, and run it once:
+
+```bash
+M=.claude/scripts/session-metrics.mjs; [ -f "$M" ] || M=scripts/session-metrics.mjs; node "$M" '$ARGUMENTS'
+```
+
+If neither file exists, output `"cc-metrics: reader not found. Run the installer with --project."` and stop.
+
+## Step 2 — Relay the report
+
+Output the reader's stdout verbatim, inside one code block. Do not open, grep or summarize the log files yourself: the report already holds every number, and reading the logs would spend the tokens this command measures.
+
+Every recommendation line quotes the number it rests on. Values labelled `est` are estimates (characters / 4). A line starting `cc-metrics: no session logs at` or `cc-metrics: failed:` is the whole report: relay it and stop. From a git worktree, the project's logs live under the main checkout's directory; pass it with `--dir`.
