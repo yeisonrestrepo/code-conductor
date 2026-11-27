@@ -1082,3 +1082,69 @@ describe('deployProject: cc-* commands for OpenCode (FEAT-048)', () => {
     expect(readFileSync(join(home, COMMAND), 'utf8')).toBe('command\n');
   });
 });
+
+// FEAT-048 slice 7 (#97): the context plugin is a second managed plugin, also only with --opencode.
+describe('deployProject: OpenCode context plugin (FEAT-048)', () => {
+  const CONTEXT_REL = join('.opencode', 'plugin', 'conductor-context.js');
+  const SHIPPED = 'export const ConductorContext = 1;\n';
+  const INSTALLED = 'code-conductor: installed the OpenCode context plugin at .opencode/plugin/conductor-context.js';
+  beforeEach(() => {
+    mkdirSync(join(asset, 'project-template', '.opencode', 'plugin'), { recursive: true });
+    writeFileSync(join(asset, 'project-template', '.opencode', 'plugin', 'conductor-guard.js'), 'export const ConductorGuard = 1;\n');
+    writeFileSync(join(asset, 'project-template', CONTEXT_REL), SHIPPED);
+  });
+  it('installs no context plugin without the opencode option', () => {
+    deployProject(asset, home, { ...capture().opts, antigravity: true, codex: true });
+    expect(existsSync(join(home, '.opencode'))).toBe(false);
+  });
+  it('installs it byte for byte and reports it after the guard plugin', () => {
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, opencode: true });
+    expect(readFileSync(join(home, CONTEXT_REL), 'utf8')).toBe(SHIPPED);
+    const guardAt = out.said.indexOf('code-conductor: installed the OpenCode guard plugin at .opencode/plugin/conductor-guard.js');
+    expect(guardAt).toBeGreaterThanOrEqual(0);
+    expect(out.said.indexOf(INSTALLED)).toBe(guardAt + 1);
+  });
+  it('[BUG-069] backs up a host-edited context plugin before replacing it', () => {
+    mkdirSync(join(home, '.opencode', 'plugin'), { recursive: true });
+    writeFileSync(join(home, CONTEXT_REL), '// my edits\n');
+    deployProject(asset, home, { ...capture().opts, opencode: true });
+    const backups = readdirSync(join(home, '.opencode', 'plugin')).filter((n) => n.startsWith('conductor-context.js.installer-backup.'));
+    expect(backups).toHaveLength(1);
+    expect(readFileSync(join(home, CONTEXT_REL), 'utf8')).toBe(SHIPPED);
+  });
+  it('says nothing about a context plugin the template does not ship', () => {
+    rmSync(join(asset, 'project-template', CONTEXT_REL));
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, opencode: true });
+    expect(existsSync(join(home, CONTEXT_REL))).toBe(false);
+    expect(out.said.some((m) => /context plugin/.test(m))).toBe(false);
+  });
+});
+
+// FEAT-048 slice 6 (#97): the band agents land as OpenCode subagents only with --opencode.
+describe('deployProject: band agents for OpenCode (FEAT-048)', () => {
+  const AGENT = join('.opencode', 'agent', 'conductor-audit.md');
+  beforeEach(() => {
+    mkdirSync(join(asset, 'project-template', '.opencode', 'agent'), { recursive: true });
+    writeFileSync(join(asset, 'project-template', AGENT), 'agent\n');
+  });
+  it('installs no agent without the opencode option', () => {
+    deployProject(asset, home, { ...capture().opts, antigravity: true, codex: true });
+    expect(existsSync(join(home, '.opencode'))).toBe(false);
+  });
+  it('installs the agents and reports them with the opencode option', () => {
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, opencode: true });
+    expect(readFileSync(join(home, AGENT), 'utf8')).toBe('agent\n');
+    expect(out.said).toContain('code-conductor: installed the band agents as OpenCode subagents in .opencode/agent/');
+  });
+  it('keeps the host\'s own agents and overwrites ours', () => {
+    mkdirSync(join(home, '.opencode', 'agent'), { recursive: true });
+    writeFileSync(join(home, '.opencode', 'agent', 'plan.md'), 'host');
+    writeFileSync(join(home, AGENT), 'stale');
+    deployProject(asset, home, { ...capture().opts, opencode: true });
+    expect(readFileSync(join(home, '.opencode', 'agent', 'plan.md'), 'utf8')).toBe('host');
+    expect(readFileSync(join(home, AGENT), 'utf8')).toBe('agent\n');
+  });
+});

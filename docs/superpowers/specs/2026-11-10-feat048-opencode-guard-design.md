@@ -73,7 +73,7 @@ Nothing else in the installer changes: the global half, settings merges, `.claud
 | Surface | On OpenCode after this slice |
 |---|---|
 | Guards 1, 2, 3, 4 | Enforced through the plugin. Guard 2's `ask` blocks (choice 1) |
-| Guards 5, 6, 7 (band roles, orchestrator run, role shell) | Not enforced for subagents: `tool.execute.before` does not carry the subagent's name, so the guard sees no `agent_type` |
+| Guards 5, 6, 7 (band roles, orchestrator run, role shell) | Not enforced for subagents: `tool.execute.before` does not carry the subagent's name, so the guard sees no `agent_type` *(Amended 2026-11-27: the plugin now looks the session up with `client.session.get` and sends its agent. See `2026-11-27-feat048-opencode-band-agents-design.md`.)* |
 | Warnings (`systemMessage`) | Not shown: the plugin has no channel for an allowed call's warning |
 | `apply_patch`, `multiedit`, `task` | Mapped or blocked, see `2026-11-10-pre-1-44-hardening-design.md` (amended 2026-11-11) |
 | UserPromptSubmit context hooks (verbosity, context guard) | Not wired (follow-up slice) |

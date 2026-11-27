@@ -217,7 +217,9 @@ tests/.tmp/
 !/docs/superpowers/plans/2026-11-26-bug099-install-writes-an-unbounded-build-tree.md
 !/docs/superpowers/plans/2026-11-26-feat062-release-driver-support-for-prerelease-and-non.md
 !/docs/superpowers/plans/2026-11-27-feat048-codex-context-injection.md
+!/docs/superpowers/plans/2026-11-27-feat048-opencode-band-agents.md
 !/docs/superpowers/plans/2026-11-27-feat048-opencode-commands.md
+!/docs/superpowers/plans/2026-11-27-feat048-opencode-context-injection.md
 !/docs/superpowers/specs/2026-06-09-bug001-cc-compact-design.md
 !/docs/superpowers/specs/2026-06-09-bug002-spec-read-budget-design.md
 !/docs/superpowers/specs/2026-06-11-bug006-feat018-bash-scan-guard-design.md
@@ -342,7 +344,9 @@ tests/.tmp/
 !/docs/superpowers/specs/2026-11-26-bug099-install-writes-an-unbounded-build-tree-design.md
 !/docs/superpowers/specs/2026-11-26-feat062-release-driver-support-for-prerelease-and-non-design.md
 !/docs/superpowers/specs/2026-11-27-feat048-codex-context-injection-design.md
+!/docs/superpowers/specs/2026-11-27-feat048-opencode-band-agents-design.md
 !/docs/superpowers/specs/2026-11-27-feat048-opencode-commands-design.md
+!/docs/superpowers/specs/2026-11-27-feat048-opencode-context-injection-design.md
 # --- END tracked-surface block (BUG-042) ---
 
 # Kept for external writers. Both lines are redundant against the block above; each is
