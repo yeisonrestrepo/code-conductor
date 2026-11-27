@@ -239,11 +239,24 @@ describe('OpenCode plugin: calls are attributed to their session\'s agent', () =
     await call(dir, 'write', { filePath: join(dir, 'a.txt'), content: 'x' }, { sessionID: 'ses_primary_code' });
     expect(payloads(dir)[0]).toMatchObject({ agent_type: 'code', session_id: 'ses_primary_code' });
   });
-  it('looks each session up once', async () => {
+  it('looks a subagent session up once, and its primary root on every call', async () => {
     const lookups = [];
     const before = await hookFor(stubProject(), fakeClient(lookups));
     for (let i = 0; i < 3; i++) await callWith(before, 'bash', { command: 'git status' }, 'ses_code');
-    expect(lookups.sort()).toEqual(['ses_code', 'ses_root']);
+    expect(lookups.sort()).toEqual(['ses_code', 'ses_root', 'ses_root', 'ses_root']);
+  });
+  it('sees a primary session\'s agent change on the next call', async () => {
+    const sessions = { ses_p: { id: 'ses_p', agent: 'build' } };
+    const client = { session: { get: async ({ path: { id } }) => ({ data: sessions[id] }) } };
+    const dir = stubProject();
+    const before = await hookFor(dir, client);
+    const write = { filePath: join(dir, 'a.txt'), content: 'x' };
+    await callWith(before, 'write', write, 'ses_p');
+    sessions.ses_p = { id: 'ses_p', agent: 'conductor-code' };
+    await callWith(before, 'write', write, 'ses_p');
+    const [first, second] = payloads(dir);
+    expect(first).not.toHaveProperty('agent_type');
+    expect(second).toMatchObject({ agent_type: 'code' });
   });
 });
 

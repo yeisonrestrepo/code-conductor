@@ -173,8 +173,10 @@ function runGuard(guardPath, payload, directory) {
   });
 }
 
-// A session's agent and parent never change, so a found session is cached; a failed lookup
-// is not, so one transient error does not block the session for good.
+// task creates a subagent session with its agent and parent fixed (tool/task.ts), so only a
+// session with a parent is cached; a primary session is looked up on every call, since the
+// assumption is not checked for it. A failed lookup is never cached, so one transient error
+// does not block the session for good. The cache holds one entry per subagent session.
 function sessionLookup(client) {
   const cache = new Map();
   const canGet = Boolean(client && client.session && typeof client.session.get === 'function');
@@ -183,7 +185,7 @@ function sessionLookup(client) {
     if (!canGet || !isText(id)) return null;
     let data = null;
     try { data = (await client.session.get({ path: { id } }))?.data ?? null; } catch { data = null; }
-    if (data) cache.set(id, data);
+    if (data && data.parentID) cache.set(id, data);
     return data;
   };
 }
