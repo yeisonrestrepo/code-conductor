@@ -41,12 +41,12 @@ On Claude Code, two `UserPromptSubmit` hooks add context to every prompt: `verbo
 
 ## Acceptance Criteria
 
-- [ ] The adapter, given a Codex payload, runs both hooks and prints one JSON object whose `additionalContext` holds their output, the verbosity line included (tested with the shipped hooks in a temp project).
-- [ ] It prints nothing when no hook gives output, when a hook is missing or exits non-zero, or when stdin is not JSON; it exits 0 on every path.
-- [ ] `hooks.json` ships exactly one entry per fingerprint (`conductor-guard.mjs`, `conductor-context.mjs`), checked by the fingerprint coverage test; a re-run does not duplicate either, and host entries survive.
-- [ ] `--project --codex` installs the adapter; without the flag nothing is written.
-- [ ] Live: in a Codex session on the probe project, the verbosity line lands as `hooks.additional_context`.
-- [ ] README's Codex section states what is injected and the trust step. Zero new runtime dependencies.
+- [X] The adapter, given a Codex payload, runs both hooks and prints one JSON object whose `additionalContext` holds their output, the verbosity line included (tested with the shipped hooks in a temp project).
+- [X] It prints nothing when no hook gives output, when a hook is missing or exits non-zero, or when stdin is not JSON; it exits 0 on every path.
+- [X] `hooks.json` ships exactly one entry per fingerprint (`conductor-guard.mjs`, `conductor-context.mjs`), checked by the fingerprint coverage test; a re-run does not duplicate either, and host entries survive.
+- [X] `--project --codex` installs the adapter; without the flag nothing is written.
+- [X] Live: in a Codex session on the probe project, the verbosity line lands as `hooks.additional_context`.
+- [X] README's Codex section states what is injected and the trust step. Zero new runtime dependencies.
 
 ## Out of Scope
 
