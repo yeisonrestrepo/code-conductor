@@ -867,6 +867,12 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 * **Components Affected:** `lib/installer/harness-commands.mjs`, `lib/installer/deploy.mjs`, `project-template/.opencode/command/`, `project-template/.codex/hooks.json`, `project-template/.codex/hooks/conductor-context.mjs`, README, wiki Getting-Started, tests.
 * **Acceptance Criteria:** `[FEAT-048]`'s, for these surfaces: Claude Code installs unchanged byte for byte; translated files generated and drift-tested, with no OpenCode shell, attach or substitution trigger left in any render; the unchanged context hooks reused, never forked; zero new runtime dependencies.
 
+### [ ] `[FEAT-066]` Codex context adapter documents the Git layout in findBash and tests its win32 branch
+* **Description:** Follow-up to PR #360 (`[FEAT-065]`'s slice 5, Codex context injection; intake of issue #362). The review left two non-blocking notes on `project-template/.codex/hooks/conductor-context.mjs`: `findBash()` derives Git for Windows' `bash.exe` from `git --exec-path` plus `../../../bin/bash.exe`, which relies on Git's install layout (`<root>/mingw64/libexec/git-core`) without the code saying so; and the win32 branch of `findBash()` has no test, so a missing or unusual layout falls back silently.
+* **Impact:** The adapter fails open, so the only effect of a wrong layout is that no context is injected; naming the assumption and testing the fallback keeps that effect visible to a reviewer and pinned by the suite.
+* **Components Affected:** `project-template/.codex/hooks/conductor-context.mjs` (`findBash()`), its tests (`tests/hooks/codex-context.test.js` per `[FEAT-065]`).
+* **Acceptance Criteria:** A comment in `findBash()` states the layout assumption, the same one `tests/helpers/bash-probe.js` makes. A test covers the win32 branch: when the derived path is absent, it falls back to `bash`.
+
 ### [X] `[BUG-062]` Test Suites Ran Bash Through the WSL Launcher, Which Cannot Open Native Paths
 * **DONE, shipped as `1.43.0` on 2026-11-07.** `tests/helpers/bash.js` resolves a bash that runs a probe script by its native path; the WSL launcher fails the probe and is passed over for Git for Windows' bash on Windows, while macOS/Linux resolve the same `bash` as before. `skip-baseline.json` adds only the Windows-only fallback row on the Linux legs and widens no existing skip. Landed from PR #105 (author Luis), intake of issue #92; the id is owner-minted at landing. Spec: `docs/superpowers/specs/2026-10-24-issue92-wsl-bash-probe-design.md`. Plan: `docs/superpowers/plans/2026-10-24-issue92-wsl-bash-probe.md`.
 * **Description:** With WSL's bash launcher first on PATH, the bash-running suites failed en masse (227 failures measured) because the launcher cannot open Windows-native script paths.
@@ -1870,6 +1876,87 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Follow-up of `[BUG-092]`.
 - Intake of issue #340; reported by the automated security review of
   the 1.59.7 release candidate (#338).
+
+### [ ] `[BUG-100]` Codex upgrade does not warn that guards are off until hooks are re-trusted
+
+- Symptom: on an upgrade from 1.59.6, the installer adds a new
+  `UserPromptSubmit` entry to `.codex/hooks.json`. Per the installer's
+  own note in `lib/installer/deploy.mjs` (around `:328-330`), any edit to
+  that file makes Codex ask for hook trust again, so the existing
+  `PreToolUse` guard is not enforced until the user re-trusts the hooks
+  with `/hooks`. When the merge status is anything other than
+  `legacy-replaced` (`:338-339`), the installer prints only the generic
+  "trust it once in Codex with /hooks" message, which does not say the
+  guard is currently inactive.
+- Impact per the issue: after upgrading, a user may keep working in
+  Codex without the command guard and not realize it. The user is still
+  told to visit `/hooks`, so nothing is silently bypassed.
+- Fix shape suggested by the issue: when the merge changed an existing
+  `hooks.json` (rather than creating it), print the same explicit
+  warning as the legacy path: "the guards are not enforced until you
+  re-trust the hooks in Codex with /hooks". Add a test that covers the
+  upgrade case.
+- Follow-up of `[FEAT-065]`.
+- Intake of issue #363; reported by the automated security review of
+  the 1.60.0 release candidate (#361).
+
+### [ ] `[BUG-101]` OpenCode render test misses a bare @ before a quote after $ARGUMENTS substitution
+
+- Symptom: `tests/installer/harness-commands.test.js`, per the issue,
+  checks every `.opencode/command/cc-*.md` after substituting
+  `$ARGUMENTS` with `add login!` and `mail me@`. The second sample has a
+  word character before `@`, which OpenCode's `FILE_REGEX` lookbehind
+  (`` (?<![\w`])@ ``) ignores, so the sample never exercises the attach
+  trigger. In `cc-spec.md:50` and `cc-plan.md:50` the body has
+  `args: "$ARGUMENTS"`; an argument ending in a bare ` @` (for example
+  `fix the form @`) becomes `@"`, which matches `FILE_REGEX` with the
+  name `"`, and OpenCode then tries to attach that path outside any tool
+  call.
+- Impact per the issue: low. The text is what the user typed, and the
+  path `"` almost never exists. The gap is in the test: a future source
+  that puts a meaningful character after `$ARGUMENTS` would not be
+  caught.
+- Expected per the issue: the substitution samples include an argument
+  ending in a bare ` @`, and the render leaves no non-empty `FILE_REGEX`
+  match for it. That may need a render change, for example spacing
+  `$ARGUMENTS` apart from a following quote, decided in the spec.
+- Follow-up of `[FEAT-065]` (slice 4 of `[FEAT-048]`); part of #97.
+- Intake of issue #358; from the approving review of #357, non-blocking
+  note 1.
+
+### [ ] `[BUG-102]` Guard 5 and Guard 6 stop restricting when the run file exists but is unreadable
+
+- Symptom: `readRunFile` (`.claude/hooks/pre-tool-use.mjs:242`, and its
+  `project-template/` mirror), per the issue, returns `null` when
+  `.claude/memory/orchestrator-run.json` exists but is larger than the
+  hooks' read cap, not valid JSON, or without a `session_id`, and each
+  caller treats that as "no run": Guard 5's test-surface split
+  (`testSurfaceDenial`, `:311-314`) lets `code` write files in the test
+  surface inside its envelope scope (`test-writer` is still denied);
+  Guard 6 only warns the main session on orchestrator writes
+  (`:277-278`, `ORCH_RUN_INVALID … writes are not restricted`); and
+  Guard 6 no longer denies a role's nested `Agent` / `SendMessage`
+  dispatch (`:260-261`).
+- Impact per the issue: hardening, not a remote vulnerability. The file
+  has to be damaged or bloated from inside the run; roles cannot write
+  it through the write tools (Guard 5) or a free shell (Guard 7), so the
+  realistic path is code executed by the run's test command. Everything
+  happens on the machine running the orchestrator, no data is disclosed,
+  Guard 6 warns on each write, the orchestrator halts at its next step
+  when it cannot load the run, and Guard 5's envelope scope check does
+  not depend on the run file. The behavior predates `1.59.6`.
+- Fix shape suggested by the issue: fail closed while the run file is
+  present and unreadable. Guard 5 denies `code` and `test-writer` writes
+  with a named reason; Guard 6 denies a role's nested dispatch. Guard 6
+  for the main session needs a decision: today a stale or invalid run
+  only warns so that a crashed run cannot lock a later session out, and
+  if it becomes a denial, `orchestrate.mjs end` must stay reachable as
+  the recovery. Apply to both hook copies, with tests for an oversized
+  file, invalid JSON and a missing `session_id`.
+- Follow-up of `[BUG-099]`, whose spec left the hooks' own behavior out
+  of scope.
+- Intake of issue #356; reported by the security review of the 1.59.7
+  release candidate (#338).
 
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
