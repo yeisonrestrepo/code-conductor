@@ -6,6 +6,8 @@
 // Claude Code twin passes the hook matcher), or blocked. Anything not named is blocked:
 // OpenCode's tool set is not versioned with this guard, so an unknown tool is never trusted.
 // An unknown argument of a mapped tool is not trusted either: bash blocks any argument outside the few it knows.
+// Since FEAT-048 slice 6, task is mapped too: measured on 1.19.6, a subagent's own calls reach
+// this hook, and each call carries the agent of its session, so Guards 5, 6 and 7 apply.
 // Zero dependencies by design; node: builtins only.
 import { spawnSync } from 'node:child_process';
 import { join, resolve, sep } from 'node:path';
@@ -20,8 +22,7 @@ const READ_ONLY = new Set([
   'webfetch', 'websearch', 'codesearch', 'question', 'skill', 'invalid',
 ]);
 
-// Whether tool.execute.before fires inside a subagent is unverified, so no subagent starts.
-const TASK_REASON = 'code-conductor guard cannot inspect OpenCode subagents; "task" is blocked';
+const IDENTIFY_REASON = "code-conductor guard could not identify the OpenCode session's agent, so the call is blocked";
 const uncovered = (tool) => `code-conductor guard does not cover the OpenCode tool "${tool}"; it is blocked until the guard maps it`;
 const blocked = (tool, why) => ({ block: `code-conductor guard blocked "${tool}": ${why}` });
 const badArg = (tool, arg, want) => blocked(tool, `argument "${arg}" is missing or not ${want}`);
@@ -102,8 +103,28 @@ function bashTool(a, _d, tool) {
   return blocked(tool, `${which} ${BASH_ARG_REASON}`);
 }
 
+// The installer names the band agents conductor-<role>; the guard knows them by role.
+const AGENT_PREFIX = 'conductor-';
+const roleOf = (agent) => (agent.startsWith(AGENT_PREFIX) ? agent.slice(AGENT_PREFIX.length) : agent);
+
+// OpenCode 1.19.6 FILE_REGEX (config/markdown.ts): a task prompt's @path is attached to the
+// subagent without a tool call, so the file would bypass Guards 1 and 4.
+const OC_FILE = /(?<![\w`])@(\.?[^\s`,.]*(?:\.[^\s`,.]+)*)/g;
+const attaches = (text) => [...text.matchAll(OC_FILE)].some((m) => m[1]);
+
+// Sent as Claude Code's Agent call, so Guard 6 sees a subagent dispatching (R7). task_id
+// resumes a session whose recorded agent need not be the one it runs, so it is refused.
+function taskTool(a, _d, tool) {
+  if (!isText(a.subagent_type)) return badArg(tool, 'subagent_type', 'a non-empty string');
+  if (!isText(a.prompt)) return badArg(tool, 'prompt', 'a non-empty string');
+  if (a.task_id !== undefined) return blocked(tool, 'argument "task_id" resumes a session the guard cannot attribute to the agent it runs; start a new task instead');
+  if (attaches(a.prompt)) return blocked(tool, 'the prompt has an @ reference, which OpenCode attaches without a tool call the guard could see; name the path without the @');
+  return one('Agent', { subagent_type: roleOf(a.subagent_type), description: a.description, prompt: a.prompt });
+}
+
 // OpenCode tool name -> { payloads } for the guard, or { block } before any guard runs.
 const MAPPED = {
+  task: taskTool,
   bash: bashTool,
   read: (a, _d, t) => (isText(a.filePath) ? one('Read', { file_path: a.filePath, offset: a.offset, limit: a.limit }) : badArg(t, 'filePath', 'a non-empty string')),
   write: (a, _d, t) => (isText(a.filePath) ? one('Write', { file_path: a.filePath, content: a.content }) : badArg(t, 'filePath', 'a non-empty string')),
@@ -152,19 +173,53 @@ function runGuard(guardPath, payload, directory) {
   });
 }
 
-export const ConductorGuard = async ({ directory }) => {
+// A session's agent and parent never change, so a found session is cached; a failed lookup
+// is not, so one transient error does not block the session for good.
+function sessionLookup(client) {
+  const cache = new Map();
+  const canGet = Boolean(client && client.session && typeof client.session.get === 'function');
+  return async (id) => {
+    if (cache.has(id)) return cache.get(id);
+    if (!canGet || !isText(id)) return null;
+    let data = null;
+    try { data = (await client.session.get({ path: { id } }))?.data ?? null; } catch { data = null; }
+    if (data) cache.set(id, data);
+    return data;
+  };
+}
+
+// Claude Code sends a subagent's calls with its agent_type and the main session's id, and
+// Guard 6 keys a run on that id. OpenCode gives a subagent its own session under a parent.
+async function identify(getSession, sessionID) {
+  const own = await getSession(sessionID);
+  if (!own) return null;
+  let rootId = sessionID;
+  for (let parent = own.parentID, hops = 0; parent; hops++) {
+    const next = hops < 32 ? await getSession(parent) : null;
+    if (!next) return null;
+    rootId = parent;
+    parent = next.parentID;
+  }
+  const agent = own.agent;
+  if (!own.parentID && !(isText(agent) && agent.startsWith(AGENT_PREFIX))) return { session_id: rootId };
+  return isText(agent) ? { session_id: rootId, agent_type: roleOf(agent) } : null;
+}
+
+export const ConductorGuard = async ({ directory, client }) => {
   const guardPath = join(directory, GUARD_REL);
+  const getSession = sessionLookup(client);
   return {
     'tool.execute.before': async (input, output) => {
       const tool = String(input && input.tool);
       if (READ_ONLY.has(tool)) return;
-      if (tool === 'task') throw new Error(TASK_REASON);
       if (!Object.hasOwn(MAPPED, tool)) throw new Error(uncovered(tool));
       const mapped = MAPPED[tool]((output && output.args) || {}, directory, tool);
       if (mapped.block) throw new Error(mapped.block);
+      const who = await identify(getSession, input && input.sessionID);
+      if (!who) throw new Error(IDENTIFY_REASON);
       // One guard run per payload; the first deny or ask blocks the whole call.
       for (const p of mapped.payloads) {
-        const payload = { session_id: input.sessionID, cwd: directory, hook_event_name: 'PreToolUse', ...p };
+        const payload = { ...who, cwd: directory, hook_event_name: 'PreToolUse', ...p };
         const reason = readDecision(runGuard(guardPath, payload, directory), guardPath);
         if (reason) throw new Error(reason);
       }
