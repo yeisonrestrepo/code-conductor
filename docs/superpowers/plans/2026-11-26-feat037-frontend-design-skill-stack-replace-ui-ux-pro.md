@@ -192,6 +192,12 @@
 
 13. **`.gitignore` leaf** for this plan: `!/docs/superpowers/plans/2026-11-26-feat037-frontend-design-skill-stack-replace-ui-ux-pro.md`, inserted after the `2026-11-26-bug099-install-writes-an-unbounded-build-tree.md` plan leaf and before the `2026-11-26-feat062-…` plan leaf (sorted order).
 
+## Owner decisions
+
+Decided by the owner when approving this plan, with this change:
+
+- **A manual check against the real CLIs before the release.** Outside `npm test` (no test reaches the network, Global Constraints), Task 7 runs the built installer with network on a throwaway React project, `--project --with-frontend-skills`, and confirms what the measurements above were read from the published code: the three `installed` lines, Impeccable's hook entry in `.claude/settings*.json`, the two `skills-lock.json` entries with their pinned commits, and the `files` map in `.claude/frontend-skills.json`. If anything differs from what was measured by reading, it is fixed before the release is published.
+
 ## Baseline (measured on this branch, HEAD a584374, Node v24.22.2)
 
 - `npx vitest run tests/installer/cli.test.js`: **71 passed (71)**; `tests/installer/plugins.test.js`: **37 passed (37)**; `tests/tools/repo-invariants.test.js`: **16 passed (16)**; `tests/installer/settings-merge.test.js`: **32 passed (32)**.
@@ -299,6 +305,17 @@
 - [ ] [T-605] Stage: `git add -u docs/superpowers/plans/2026-11-26-feat037-frontend-design-skill-stack-replace-ui-ux-pro.md` (carries the ticks for T-101 to T-604). Depends on T-604.
 - [ ] [T-606] Commit: `feat: offer a pinned frontend design skill stack and sweep stale ui-ux-pro-max installs [FEAT-037]`. Depends on T-605.
 
+### Task 7: Manual check against the real CLIs (owner decision, before the release)
+
+Not part of the build session and not part of `npm test`: it needs network to the npm registry and to GitHub (the `skills` CLI clones the two pinned repositories), which the build sandbox does not have. It runs after the T-606 commit and before the release is published, on a machine with network, from a checkout of this branch. Its boxes are ticked in the commit that records the outcome; a difference from the expected output is a defect of this item and is fixed (a `fix:` commit on this branch, with its test) before the release.
+
+- [ ] [T-701] Throwaway project and home: `P=$(mktemp -d)`, `H=$(mktemp -d)`; in `$P` write `package.json` as `{"name":"cc-frontend-check","private":true,"dependencies":{"react":"^19.0.0","react-dom":"^19.0.0"}}` and an empty `src/` directory. `node <checkout>/scripts/detect-stack.mjs "$P"` prints a JSON object with `"projectType":"frontend"` (`react` gives 3, `src/` gives 1, `classifyProject`). Depends on T-606.
+- [ ] [T-702] Run the installer non-interactively: `cd "$P" && HOME="$H" USERPROFILE="$H" node <checkout>/bin/code-conductor.mjs --project --with-frontend-skills </dev/null`. Expected: exit 0 (the run also deploys the global files, hence the temp home), and stdout contains these three lines: `frontend design skill impeccable: installed (impeccable@4.11.1)`, `frontend design skill emil-design-eng: installed (64eb3deb9a5fbfa041faf783e0bc3fd635872e9c)`, `frontend design skill design-taste-frontend: installed (952435f63acece7d2fcb4b4d3c1786c1c43603e0)`; stderr has no `frontend design skill` line. Depends on T-701.
+- [ ] [T-703] Impeccable's hook: `.claude/settings.json` or `.claude/settings.local.json` in `$P` has an entry whose `command` contains `.claude/skills/impeccable/`, and the code-conductor project hooks are still there beside it. Note the event and the file it landed in (measurement 2 could not decide them by reading). Depends on T-702.
+- [ ] [T-704] `$P/skills-lock.json` has exactly two entries under `skills`, keyed `emil-design-eng` and `design-taste-frontend`, with `commit` equal to `64eb3deb9a5fbfa041faf783e0bc3fd635872e9c` and `952435f63acece7d2fcb4b4d3c1786c1c43603e0` and `installMode` `"copy"` (measurement 1); `$P/.agents/skills/` does not exist. Depends on T-702.
+- [ ] [T-705] `$P/.claude/frontend-skills.json` has `choice: "accepted"`, `reason: null`, `cli: "skills@1.9.0"`, the three entries with status `installed`, and on Impeccable's entry a `files` map whose keys are every regular file under `$P/.claude/skills/impeccable/` (relative, sorted) and whose values equal `sha256sum` of each. Depends on T-702.
+- [ ] [T-706] Re-run the T-702 command: exit 0, three `already installed` lines, the Impeccable hook entry unchanged and the `files` map unchanged. Then remove `$P` and `$H`. Depends on T-703, T-704, T-705.
+
 ---
 
 ## Test List
@@ -349,12 +366,13 @@
   - C11 `--with-frontend-skills`, `frontendSpawn` returning `{ status: 2 }`: exit 0 and three `not installed (exit 2)` lines.
   - C12 `--with-frontend-skills` produces no `ignoring unrecognized argument(s)` line.
 - [ ] [T-905] `tests/tools/repo-invariants.test.js` (Task 5): the extended ui-ux-pro-max row and the three new rows of plan decision 12 (E5 and the README criterion).
-- [ ] [T-906] No row needed: E3 is held by T-602's `dependencies` check and the existing invariant tests; the wiki page has no test and T-506 is checked by reading its diff. Full `npm test` is T-601. No UI, so no E2E row. CI legs: no new test is conditionally skipped (symlinks are junctions; the unreadable case is injected), so no leg's set in `tools/skip-baseline.json` changes.
+- [ ] [T-906] No row needed: E3 is held by T-602's `dependencies` check and the existing invariant tests; the wiki page has no test and T-506 is checked by reading its diff. Full `npm test` is T-601. No UI, so no E2E row; the end-to-end run against the real CLIs is the manual Task 7 (owner decision), outside the suite. CI legs: no new test is conditionally skipped (symlinks are junctions; the unreadable case is injected), so no leg's set in `tools/skip-baseline.json` changes.
 
 ## Commit Order
 
 1. Task 0 (T-004): this plan and its `.gitignore` leaf.
 2. Task 6 (T-606): the three modules, the four new test files, the CLI wiring, both `CLAUDE.md` mirrors with `global/CLAUDE.md`, the README, the wiki page, the invariant test and the plan ticks for T-101 to T-605 in one commit, so the two mirrors change their rows in the same commit (E5) and no commit has a red suite. The red runs (T-102, T-202, T-302, T-402, T-502) happen in the working tree before each fix. The ticks for T-606 and the Test List ride the closeout commit.
+3. Task 7 (T-701 to T-706): no code; its ticks, and any fix it forces, are committed on this branch before the release is published.
 
 ## Identified Risks
 
