@@ -391,7 +391,7 @@ By default, only the global core files are installed. Flags extend that:
 | `--verbosity MIN\|INFO\|VERBOSE` / `-Verbosity LEVEL` | Default response verbosity (default `MIN`). `MIN` = one sentence per response, `INFO` = bullet list, `VERBOSE` = full explanation. Re-run the installer to change it. PowerShell's `-Verbosity:INFO` form is not supported; it warns and the level stays `MIN`. |
 | `--opencode` | With `--project`, also install the OpenCode guard plugin at `.opencode/plugin/conductor-guard.js` and the `cc-*` commands in `.opencode/command/` (see [OpenCode](#opencode)). Without `--project` it warns and writes nothing for OpenCode |
 | `--antigravity` | With `--project`, also install the Antigravity CLI guard: `.agents/hooks/conductor-guard.mjs` and a `PreToolUse` entry merged into `.agents/hooks.json` (see [Antigravity CLI](#antigravity-cli)). Without `--project` it warns and writes nothing for Antigravity |
-| `--codex` | With `--project`, also merge a `PreToolUse` entry into `.codex/hooks.json` that runs the project's guard (see [Codex CLI](#codex-cli)). Without `--project` it warns and writes nothing for Codex |
+| `--codex` | With `--project`, also merge into `.codex/hooks.json` a `PreToolUse` entry that runs the project's guard and a `UserPromptSubmit` entry that injects the verbosity and context-guard lines (see [Codex CLI](#codex-cli)). Without `--project` it warns and writes nothing for Codex |
 | `--with-plugins` | Install the superpowers plugin without asking, through `claude plugin install superpowers@claude-plugins-official` (60 s timeout). A non-interactive run installs it only with this flag; an interactive run asks instead. If the install cannot run, the installer prints `/plugin install superpowers@claude-plugins-official` and still exits 0 |
 
 **Updating:** re-run the same install command. User-configured files are never overwritten; agent-managed files are always updated.
@@ -439,17 +439,18 @@ The adapter needs `node` on `PATH`. If the guard cannot run, crashes or prints s
 
 ### Codex CLI
 
-`--project --codex` installs `.codex/hooks/conductor-guard.mjs` and merges one `PreToolUse` entry into `.codex/hooks.json`, keeping any entries already there. The entry is a short `node -e` bootstrap that finds the project root from the directory Codex runs it in; the adapter then runs the project's guard and blocks the call when the guard cannot run. OpenAI's [Codex CLI](https://github.com/openai/codex) sends Claude Code's own payload and honours its deny. **Codex runs a project's hooks only after you trust them once:** open `codex` in the project and approve them in `/hooks`. Until then nothing is enforced.
+`--project --codex` installs `.codex/hooks/conductor-guard.mjs` and `.codex/hooks/conductor-context.mjs` and merges a `PreToolUse` and a `UserPromptSubmit` entry into `.codex/hooks.json`, keeping any entries already there. The entry is a short `node -e` bootstrap that finds the project root from the directory Codex runs it in; the adapter then runs the project's guard and blocks the call when the guard cannot run. OpenAI's [Codex CLI](https://github.com/openai/codex) sends Claude Code's own payload and honours its deny. **Codex runs a project's hooks only after you trust them once:** open `codex` in the project and approve them in `/hooks`. Until then nothing is enforced.
 
 | On Codex CLI | Status |
 |---|---|
 | Guard 3 on shell commands | Enforced after hook trust |
 | Guards 1, 2 and 4 | Not reached: Codex has no separate read tool, so reads go through the shell, where Guard 3 applies |
-| Guards 5, 6 and 7, guard warnings, context injection | Not available |
+| Guards 5, 6 and 7, guard warnings | Not available |
+| Context injection (verbosity line, context-guard turn warning) | Injected on every prompt after hook trust. A second entry, `UserPromptSubmit`, runs `.codex/hooks/conductor-context.mjs`, which runs the project's unchanged `.claude/hooks/verbosity-remind.sh` and `context-guard.sh` with bash (Git for Windows' bash on Windows) and hands their output to Codex as JSON, because Codex drops a plain reply that starts with `[`, the way the verbosity line does. It never blocks a prompt: with no bash, or a hook that fails, nothing is added |
 | `cc-*` commands | Installed as skills in `.agents/skills/cc-*/`; ask Codex to use `cc-spec`, `cc-plan` and so on (Codex has no project-level slash commands). Rendered from the Claude Code commands, as for Antigravity |
-| Band agents, verbosity hooks | Not installed for Codex |
+| Band agents | Not installed for Codex |
 
-Checked live against Codex CLI 0.171.0: after trust, `cat *.log` was refused with `Command blocked by PreToolUse hook: BASH SCAN BLOCKED`. Editing `.codex/hooks.json` later makes Codex ask for trust again.
+Checked live against Codex CLI 0.171.0: after trust, `cat *.log` was refused with `Command blocked by PreToolUse hook: BASH SCAN BLOCKED`. Checked live against 0.172.0: the verbosity line reached the session as `hooks.additional_context`. Editing `.codex/hooks.json` later, including by re-running the installer when it adds an entry, makes Codex ask for trust again.
 
 `codex` may be started from the project root or any subdirectory: the bootstrap walks up to the nearest `.codex/hooks.json`, and if that file has no adapter beside it the call is blocked. The guards are not enforced without `node` on `PATH`. Upgrading an install that has the old `node .claude/hooks/pre-tool-use.mjs` entry rewrites `.codex/hooks.json`; Codex then asks for trust again, and the guards are not enforced until you re-trust the hooks in `/hooks` (the installer says so when it replaces the entry).
 
@@ -600,6 +601,7 @@ code-conductor/
 |   +-- .agents/hooks/conductor-guard.mjs    Antigravity CLI guard adapter, only with --antigravity (FEAT-048)
 |   +-- .agents/hooks.json                   Antigravity hook entry, merged, only with --antigravity
 |   +-- .codex/hooks/conductor-guard.mjs     Codex guard adapter, only with --codex (BUG-094)
+|   +-- .codex/hooks/conductor-context.mjs   Codex context-hook adapter, only with --codex
 |   +-- .codex/hooks.json                    Codex hook entry, merged, only with --codex (FEAT-048)
 |   +-- .agents/workflows/cc-*.md            cc-* commands as Antigravity workflows, only with --antigravity
 |   +-- .agents/skills/cc-*/SKILL.md         cc-* commands as Codex skills, only with --codex
