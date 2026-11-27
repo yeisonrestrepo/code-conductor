@@ -180,6 +180,11 @@
     "tests/plugin/code-conductor-plugin.test.js > code-conductor personal skills old plugin cache dir is cleaned up",
     "tests/scripts/conductor-db.test.js > conductor-db corrupt-db recovery degrades to exit 0 without throwing when the db dir is read-only",
     "tests/scripts/handoff-cycle.test.js > the checkpoint-to-resume handoff cycle survives a DB write failure at the boundary: no row, no crash, exit 0",
+    "tests/scripts/orchestrate.test.js > test-surface split at hand-back [BUG-092] links and non-regular files in the fingerprint [BUG-097] [AC2] an untracked link to /dev/zero is recorded by its target string, and install and handback return",
+    "tests/scripts/orchestrate.test.js > test-surface split at hand-back [BUG-092] links and non-regular files in the fingerprint [BUG-097] [AC3] a link to a FIFO and a tracked file replaced by a FIFO are recorded unopened, and install code and handback code return",
+    "tests/scripts/orchestrate.test.js > test-surface split at hand-back [BUG-092] links and non-regular files in the fingerprint [BUG-097] [AC4] a FIFO and a link outside the test surface created during test-writer halt naming both",
+    "tests/scripts/orchestrate.test.js > test-surface split at hand-back [BUG-092] links and non-regular files in the fingerprint [BUG-097] [AC4] a FIFO and a link outside the test surface left unchanged during test-writer do not halt",
+    "tests/scripts/orchestrate.test.js > test-surface split at hand-back [BUG-092] links and non-regular files in the fingerprint [BUG-097] [AC7] a tracked directory replaced by a link elsewhere records its file as absent and the link by its target string",
     "tests/scripts/release.test.js > release.mjs check discards a rejected diff [BUG-090] [AC7] the printed commands remove an untracked :/x and keep the tracked root x and a file created after check",
     "tests/scripts/release.test.js > release.mjs check discards a rejected diff [BUG-090] [AC8] a path with a newline is on no command and on one DISCARD_BY_HAND line"
   ]

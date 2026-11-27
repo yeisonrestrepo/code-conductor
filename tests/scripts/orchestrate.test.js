@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, truncateSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { fakeGh, issue, pull } from '../helpers/fake-gh.js';
 import { parseSnapshotHeader } from '../../scripts/ticket.mjs';
+import { CAN_SYMLINK } from '../helpers/can-symlink.js';
 import { cleanGitEnv } from '../helpers/git-env.js';
 import * as orchestrateModule from '../../scripts/orchestrate.mjs';
 import {
@@ -6007,6 +6008,134 @@ describe('test-surface split at hand-back [BUG-092]', () => {
       const r = handBack('test-writer', writerDone());
       expect(r.status).toBe(1);
       expect(r.err).toBe('ORCH_HANDBACK_SPLIT_UNVERIFIED: git cannot list the tree (git cannot list the changed files), so test-writer\'s changes cannot be checked against the test surface; resume to re-dispatch it');
+    });
+  });
+
+  // BUG-097: a link is recorded by its target string and a non-regular file by its type, neither opened; a file over the cap by size and mtime.
+  describe('links and non-regular files in the fingerprint [BUG-097]', () => {
+    const POSIX_SYMLINK = process.platform !== 'win32' && CAN_SYMLINK;
+    // The target string as the platform reads it back, since Windows may spell an absolute target its own way.
+    const linkValue = (rel) => `symlink:${createHash('sha256').update(readlinkSync(join(root, rel))).digest('hex')}`;
+    const mkfifo = (abs) => expect(spawnSync('mkfifo', [abs]).status).toBe(0);
+    const toFifo = (rel) => { rmSync(join(root, rel)); mkfifo(join(root, rel)); };
+    const outside = (name, text) => { const abs = join(home, name); writeFileSync(abs, text); return abs; };
+
+    it.skipIf(!CAN_SYMLINK)('[AC1] an untracked link to a file outside the project is recorded by its target string, and an edit of that file is no change', () => {
+      atWriter();
+      const target = outside('outside.txt', 'secret\n');
+      symlinkSync(target, join(root, 'src', 'out-link'));
+      install('test-writer');
+      const { files } = runFile().build_tree;
+      expect(files['src/out-link']).toBe(linkValue('src/out-link'));
+      expect(Object.values(files)).not.toContain(createHash('sha256').update('secret\n').digest('hex'));
+      writeFileSync(target, 'changed\n');
+      write('tests/a.test.js');
+      expect(handBack('test-writer', writerDone()).status).toBe(0);
+    });
+
+    it.skipIf(!CAN_SYMLINK)('[AC1] repointing an untracked link outside the test surface halts naming it', () => {
+      atWriter();
+      symlinkSync(outside('one.txt', '1\n'), join(root, 'src', 'out-link'));
+      install('test-writer');
+      rmSync(join(root, 'src', 'out-link'));
+      symlinkSync(outside('two.txt', '1\n'), join(root, 'src', 'out-link'));
+      write('tests/a.test.js');
+      expect(handBack('test-writer', writerDone()).err).toBe(crossed('test-writer', 'src/out-link'));
+    });
+
+    it.skipIf(!POSIX_SYMLINK)('[AC2] an untracked link to /dev/zero is recorded by its target string, and install and handback return', () => {
+      atWriter();
+      mkdirSync(join(root, 'tests'), { recursive: true });
+      symlinkSync('/dev/zero', join(root, 'tests', 'zero'));
+      install('test-writer');
+      expect(runFile().build_tree.files['tests/zero']).toBe(linkValue('tests/zero'));
+      write('tests/a.test.js');
+      expect(handBack('test-writer', writerDone()).status).toBe(0);
+    });
+
+    it.skipIf(!POSIX_SYMLINK)('[AC3] a link to a FIFO and a tracked file replaced by a FIFO are recorded unopened, and install code and handback code return', () => {
+      atWriter({ base: () => write('src/stream', 's\n') });
+      install('test-writer');
+      write('tests/a.test.js');
+      expect(handBack('test-writer', writerDone()).status).toBe(0);
+      const pipe = join(home, 'pipe');
+      mkfifo(pipe);
+      symlinkSync(pipe, join(root, 'src', 'pipe-link'));
+      toFifo('src/stream');
+      install('code');
+      expect(runFile().build_tree.files).toMatchObject({ 'src/pipe-link': linkValue('src/pipe-link'), 'src/stream': 'special:fifo' });
+      write('src/a.js', 'a2\n');
+      expect(handBack('code', codeSay(['src/a.js:M'])).status).toBe(0);
+    });
+
+    it.skipIf(!POSIX_SYMLINK)('[AC4] a FIFO and a link outside the test surface left unchanged during test-writer do not halt', () => {
+      atWriter({ base: () => write('src/stream', 's\n') });
+      toFifo('src/stream');
+      symlinkSync('a.js', join(root, 'src', 'link'));
+      install('test-writer');
+      write('tests/a.test.js');
+      expect(handBack('test-writer', writerDone()).status).toBe(0);
+    });
+
+    it.skipIf(!POSIX_SYMLINK)('[AC4] a FIFO and a link outside the test surface created during test-writer halt naming both', () => {
+      atWriter({ base: () => write('src/stream', 's\n') });
+      install('test-writer');
+      toFifo('src/stream');
+      symlinkSync('a.js', join(root, 'src', 'link'));
+      write('tests/a.test.js');
+      const r = handBack('test-writer', writerDone());
+      expect(r.status).toBe(1);
+      expect(r.err).toBe(crossed('test-writer', 'src/link, src/stream'));
+    });
+
+    it('[AC5] a regular file over 64 MiB is recorded by its size and mtime, and a new mtime counts as a change', () => {
+      atWriter();
+      const big = join(root, 'src', 'big.bin');
+      writeFileSync(big, '');
+      truncateSync(big, 64 * 1024 * 1024 + 1);
+      utimesSync(big, 1700000000, 1700000000);
+      install('test-writer');
+      const st = statSync(big, { bigint: true });
+      expect(runFile().build_tree.files['src/big.bin']).toBe(`large:${st.size}:${st.mtimeNs}`);
+      utimesSync(big, 1700000100, 1700000100);
+      write('tests/a.test.js');
+      expect(handBack('test-writer', writerDone()).err).toBe(crossed('test-writer', 'src/big.bin'));
+    });
+
+    it.skipIf(!POSIX_SYMLINK)('[AC7] a tracked directory replaced by a link elsewhere records its file as absent and the link by its target string', () => {
+      atWriter({ base: () => write('lib/b.js', 'b1\n') });
+      const elsewhere = join(home, 'elsewhere');
+      mkdirSync(elsewhere);
+      writeFileSync(join(elsewhere, 'b.js'), 'outside\n');
+      rmSync(join(root, 'lib'), { recursive: true });
+      symlinkSync(elsewhere, join(root, 'lib'));
+      install('test-writer');
+      const { files } = runFile().build_tree;
+      expect(files).toMatchObject({ lib: linkValue('lib'), 'lib/b.js': 'absent' });
+      expect(Object.values(files)).not.toContain(createHash('sha256').update('outside\n').digest('hex'));
+    });
+
+    it.skipIf(!CAN_SYMLINK)('[AC8] a symlinked core.excludesFile is hashed by its target, so an edit of the target halts naming core.excludesFile', () => {
+      atWriter();
+      const target = outside('ignore-target', 'coverage/\n');
+      symlinkSync(target, join(root, '.git', 'cc-ignore'));
+      expect(fixtureGit('config', 'core.excludesFile', join(root, '.git', 'cc-ignore')).status).toBe(0);
+      install('test-writer');
+      expect(runFile().build_tree.ignores['core.excludesFile']).toBe(createHash('sha256').update('coverage/\n').digest('hex'));
+      writeFileSync(target, 'coverage/\nsrc/hidden.js\n');
+      write('src/hidden.js');
+      write('tests/a.test.js');
+      expect(handBack('test-writer', writerDone()).err).toBe('ORCH_HANDBACK_SURFACE_CROSSED: test-writer changed the ignore file core.excludesFile during its dispatch');
+    });
+
+    it('[AC9] reads no fingerprinted path and no ignore file with readFileSync', () => {
+      const src = readFileSync(SCRIPT, 'utf8');
+      expect(src).not.toMatch(/\bcontentHash\b/);
+      for (const name of ['treeFingerprint', 'treeAnchor', 'boundedHash', 'descriptorHash']) {
+        const start = src.indexOf(`function ${name}(`);
+        expect(start).toBeGreaterThan(-1);
+        expect(src.slice(start, src.indexOf('\n}\n', start))).not.toContain('readFileSync');
+      }
     });
   });
 

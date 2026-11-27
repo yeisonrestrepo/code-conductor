@@ -295,47 +295,47 @@ Read on this branch, HEAD `18a0d33` on top of `main` @ `010f8f2`:
 **Files:**
 - Test: `tests/scripts/orchestrate.test.js`
 
-- [ ] [T-101] `tests/scripts/orchestrate.test.js`: the `node:fs` import edit and the `CAN_SYMLINK` import of plan decision 4. Depends on T-004.
-- [ ] [T-102] `tests/scripts/orchestrate.test.js`: the nested `describe('links and non-regular files in the fingerprint [BUG-097]')` of plan decision 4, above the BUG-099 comment. Depends on T-101.
-- [ ] [T-103] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t 'BUG-097'`. Its full match set is the 10 rows of plan decision 4 and nothing else. Predicted: **9 failed | 1 passed | 1321 skipped (1331)**, the passing one AC8; four rows fail by timeout, so the run takes about two minutes. Depends on T-102.
+- [X] [T-101] `tests/scripts/orchestrate.test.js`: the `node:fs` import edit and the `CAN_SYMLINK` import of plan decision 4. Depends on T-004.
+- [X] [T-102] `tests/scripts/orchestrate.test.js`: the nested `describe('links and non-regular files in the fingerprint [BUG-097]')` of plan decision 4, above the BUG-099 comment. Depends on T-101.
+- [X] [T-103] Red run: `npx vitest run tests/scripts/orchestrate.test.js -t 'BUG-097'`. Its full match set is the 10 rows of plan decision 4 and nothing else. Predicted: **9 failed | 1 passed | 1321 skipped (1331)**, the passing one AC8; four rows fail by timeout, so the run takes about two minutes. Depends on T-102.
 
 ### Task 2: The bounded reader (green)
 
 **Files:**
 - Modify: `scripts/orchestrate.mjs`
 
-- [ ] [T-201] `scripts/orchestrate.mjs`: the import of plan decision 2, then the `contentHash` replacement of plan decision 1. Depends on T-103.
-- [ ] [T-202] `scripts/orchestrate.mjs`: the `treeFingerprint` and `treeAnchor` call sites of plan decision 3; `grep -n contentHash scripts/orchestrate.mjs` prints nothing and `node --check scripts/orchestrate.mjs` exits 0. Depends on T-201.
-- [ ] [T-203] Green run: the T-103 command. Predicted: **10 passed | 1321 skipped (1331)**. Then the whole file: `npx vitest run tests/scripts/orchestrate.test.js` (several minutes). Predicted: **1331 passed (1331)**, every BUG-092, BUG-098 and BUG-099 row included (AC6). Depends on T-202.
+- [X] [T-201] `scripts/orchestrate.mjs`: the import of plan decision 2, then the `contentHash` replacement of plan decision 1. Depends on T-103.
+- [X] [T-202] `scripts/orchestrate.mjs`: the `treeFingerprint` and `treeAnchor` call sites of plan decision 3; `grep -n contentHash scripts/orchestrate.mjs` prints nothing and `node --check scripts/orchestrate.mjs` exits 0. Depends on T-201.
+- [X] [T-203] Green run: the T-103 command. Predicted: **10 passed | 1321 skipped (1331)**. Then the whole file: `npx vitest run tests/scripts/orchestrate.test.js` (several minutes). Predicted: **1331 passed (1331)**, every BUG-092, BUG-098 and BUG-099 row included (AC6). Depends on T-202.
 
 ### Task 3: The skip baseline
 
 **Files:**
 - Modify: `tools/skip-baseline.json`
 
-- [ ] [T-301] `tools/skip-baseline.json`: the five `ci-windows-node24` lines of plan decision 5. Depends on T-203.
-- [ ] [T-302] Check: `node -e` that parses the file, that `ci-windows-node24` has 32 entries (27 + 5) with no duplicate and still sorted, and that each of the five names, after its `tests/scripts/orchestrate.test.js > test-surface split at hand-back [BUG-092] links and non-regular files in the fingerprint [BUG-097] ` prefix, is a title string in `tests/scripts/orchestrate.test.js`. Then `npx vitest run tests/tools/skip-baseline.test.js`: all pass. Depends on T-301.
+- [X] [T-301] `tools/skip-baseline.json`: the five `ci-windows-node24` lines of plan decision 5. Depends on T-203.
+- [X] [T-302] Check: `node -e` that parses the file, that `ci-windows-node24` has 32 entries (27 + 5) with no duplicate and still sorted, and that each of the five names, after its `tests/scripts/orchestrate.test.js > test-surface split at hand-back [BUG-092] links and non-regular files in the fingerprint [BUG-097] ` prefix, is a title string in `tests/scripts/orchestrate.test.js`. Then `npx vitest run tests/tools/skip-baseline.test.js`: all pass. Depends on T-301.
 
 ### Task 4: Full suite, scope check and commit
 
 **Files:**
 - Modify: `docs/superpowers/plans/2026-11-26-bug097-tree-fingerprint-follows-symlinks-and-opens-non.md` (checkboxes only)
 
-- [ ] [T-401] Run `npm test` (long: `orchestrate.test.js` alone takes several minutes; run it in the background if the shell times out). Predicted: exit 0, with `tests/scripts/orchestrate.test.js` at **1331 passed** (AC11). Depends on T-302.
-- [ ] [T-402] Scope check: `git status --short` lists exactly the three files of the Global Constraints and this plan; no temporary file is left in the tree. `git diff --stat` shows no change to the BUG-097 spec, the hooks, `splitCheck`, `buildTree` or any record. Depends on T-401.
-- [ ] [T-403] Stage: `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js tools/skip-baseline.json`. Depends on T-402.
-- [ ] [T-404] Stage: `git add -u docs/superpowers/plans/2026-11-26-bug097-tree-fingerprint-follows-symlinks-and-opens-non.md` (carries the ticks for T-101 to T-403). Depends on T-403.
-- [ ] [T-405] Commit: `fix: fingerprint links by target and non-regular files by type, and cap the bytes read [BUG-097]`. Depends on T-404.
+- [X] [T-401] Run `npm test` (long: `orchestrate.test.js` alone takes several minutes; run it in the background if the shell times out). Predicted: exit 0, with `tests/scripts/orchestrate.test.js` at **1331 passed** (AC11). Depends on T-302.
+- [X] [T-402] Scope check: `git status --short` lists exactly the three files of the Global Constraints and this plan; no temporary file is left in the tree. `git diff --stat` shows no change to the BUG-097 spec, the hooks, `splitCheck`, `buildTree` or any record. Depends on T-401.
+- [X] [T-403] Stage: `git add -u scripts/orchestrate.mjs tests/scripts/orchestrate.test.js tools/skip-baseline.json`. Depends on T-402.
+- [X] [T-404] Stage: `git add -u docs/superpowers/plans/2026-11-26-bug097-tree-fingerprint-follows-symlinks-and-opens-non.md` (carries the ticks for T-101 to T-403). Depends on T-403.
+- [X] [T-405] Commit: `fix: fingerprint links by target and non-regular files by type, and cap the bytes read [BUG-097]`. Depends on T-404.
 
 ## Test List
 
-- [ ] [T-501] `tests/scripts/orchestrate.test.js` (Task 1), AC1: an untracked link to an outside file recorded as `symlink:`, an edit of the target no change, a repoint a crossing.
-- [ ] [T-502] `tests/scripts/orchestrate.test.js` (Task 1), AC2 and AC3: a link to `/dev/zero`, a link to a FIFO and a tracked file replaced by a FIFO, with `install` and `handback` returning (POSIX).
-- [ ] [T-503] `tests/scripts/orchestrate.test.js` (Task 1), AC4: a FIFO and a link outside the surface, left unchanged and created during `test-writer` (POSIX).
-- [ ] [T-504] `tests/scripts/orchestrate.test.js` (Task 1), AC5: a sparse file over 64 MiB recorded as `large:`, a new `mtime` a crossing.
-- [ ] [T-505] `tests/scripts/orchestrate.test.js` (Task 1), AC7: a tracked directory replaced by a link (POSIX); AC8: a symlinked `core.excludesFile`; AC9: the source check.
-- [ ] [T-506] `tests/scripts/orchestrate.test.js` (Task 2), AC6: every existing BUG-092, BUG-098 and BUG-099 row unchanged and green in the whole-file run.
-- [ ] [T-507] `tools/skip-baseline.json` (Task 3), AC10: checked by T-302 here and by the CI skip gate on `ci-windows-node24`. AC11: `npm test` (T-401). No E2E/UI test: there is no UI.
+- [X] [T-501] `tests/scripts/orchestrate.test.js` (Task 1), AC1: an untracked link to an outside file recorded as `symlink:`, an edit of the target no change, a repoint a crossing.
+- [X] [T-502] `tests/scripts/orchestrate.test.js` (Task 1), AC2 and AC3: a link to `/dev/zero`, a link to a FIFO and a tracked file replaced by a FIFO, with `install` and `handback` returning (POSIX).
+- [X] [T-503] `tests/scripts/orchestrate.test.js` (Task 1), AC4: a FIFO and a link outside the surface, left unchanged and created during `test-writer` (POSIX).
+- [X] [T-504] `tests/scripts/orchestrate.test.js` (Task 1), AC5: a sparse file over 64 MiB recorded as `large:`, a new `mtime` a crossing.
+- [X] [T-505] `tests/scripts/orchestrate.test.js` (Task 1), AC7: a tracked directory replaced by a link (POSIX); AC8: a symlinked `core.excludesFile`; AC9: the source check.
+- [X] [T-506] `tests/scripts/orchestrate.test.js` (Task 2), AC6: every existing BUG-092, BUG-098 and BUG-099 row unchanged and green in the whole-file run.
+- [X] [T-507] `tools/skip-baseline.json` (Task 3), AC10: checked by T-302 here and by the CI skip gate on `ci-windows-node24`. AC11: `npm test` (T-401). No E2E/UI test: there is no UI.
 
 ## Commit Order
 
