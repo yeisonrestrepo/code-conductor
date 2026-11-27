@@ -303,7 +303,8 @@ The factory is five bands. Work enters through the Boundary band, flows Define, 
 * **Components Affected:** The role agent definitions under `.claude/agents/` and their `project-template/` mirror, `/cc-review`, `/cc-test`, `/cc-spec` and `/cc-plan` in both mirrors, the existing parity tests.
 * **Acceptance Criteria:** Each command works with and without a live run, and never alters a live run's file; the agents' descriptions stop forbidding ad-hoc use; the existing parity tests cover the new wording in both mirrors.
 
-### [ ] `[FEAT-062]` Release Driver Support for Prerelease and Non-Semver Version Schemes
+### [X] `[FEAT-062]` Release Driver Support for Prerelease and Non-Semver Version Schemes
+* **DONE, shipped as `1.60.0` on 2026-11-27.** The release profile takes `scheme`: `MAJOR.MINOR.PATCH` (default, existing profiles unchanged), `semver` (optional `-prerelease`; no build metadata or leading zeros), `pep440` (normal form with `aN`/`bN`/`rcN`, `.postN`, `.devN`; no epoch or local version) or `numeric` (two or more dot-separated numbers), each a fixed grammar and precedence in `scripts/release.mjs`, never a free-form regex. `digest` validates `<version>` against the scheme (`RELEASE_VERSION_INVALID` names it) and compares by the scheme's precedence for `RELEASE_VERSION_NOT_ADVANCED`. `/cc-release --init` detects the scheme from the current version and existing tags (`INIT_ORDER`: `MAJOR.MINOR.PATCH`, `semver`, `numeric`, `pep440`), refuses with the evidence on `RELEASE_INIT_SCHEME_UNSUPPORTED` or `RELEASE_INIT_SCHEME_CONFLICT`, shows the current version and first backing tag as the evidence for a plain version and `(default)` only when nothing evidences it; for a scheme with prereleases it proposes a `prerelease` step that never moves `latest` (npm `--tag next`, or `gh release create … --prerelease`), named in the publish confirmation, with `countsAsLastRelease: false`. The `/cc-release` copies and the Antigravity and Codex renders describe it; the design spec is amended to the `--init` evidence wording. Pinned by the four `[FEAT-062]` blocks of `tests/scripts/release.test.js` and `cc-release publish channel [FEAT-062]` in `tests/installer/commands-parity.test.js`. Landed from PR #345 (cc-lane-bot), intake of issue #295; the id was reserved by the triage and is owner-minted at landing. Spec: `docs/superpowers/specs/2026-11-26-feat062-release-driver-support-for-prerelease-and-non-design.md` (approved by the owner). Plan: `docs/superpowers/plans/2026-11-26-feat062-release-driver-support-for-prerelease-and-non.md` (approved by the owner).
 * **Description:** Intake of issues #295 and #346. It follows from the owner's ruling on `[FEAT-035]` and depends on that item landing first. The `[FEAT-035]` release role keeps every fact about how a project releases in its committed release profile (`.claude/release-profile.json`), except the version scheme: the driver accepts only `MAJOR.MINOR.PATCH` and refuses everything else with `RELEASE_VERSION_INVALID`, a limit the owner set to keep that item bounded and deferred here. Projects that version with semver prereleases (`1.2.0-rc.1`, `2.0.0-beta.3`) or other schemes (PEP 440 such as `1.2.0rc1` or `1.2.0.post1`, CalVer variants that do not fit three numeric parts) would have to change how they version before using `/cc-release`, which is the project adapting to the role. The issue proposes that the profile name the scheme, defaulting to `MAJOR.MINOR.PATCH`; it rejects comparing versions as text (`1.10.0` sorts below `1.9.0`) and a free-form regex in the profile (harder to read, and a crafted pattern gets something to exploit).
 * **Impact:** Projects that ship prereleases or use a non-semver scheme can release through the role without changing how they version, and a prerelease cannot become "latest" by accident.
 * **Components Affected:** The `[FEAT-035]` release driver (`digest`, `/cc-release --init`, the publish step) and its release profile, the tests that pin it.
@@ -858,6 +859,19 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 * **Impact:** Teams on Antigravity CLI or Codex CLI get Guard 3 (and on Antigravity Guards 1, 2 and 4) and the spec-first command set, with each loss against Claude Code documented rather than implied.
 * **Components Affected:** `bin/code-conductor.mjs`, `lib/installer/deploy.mjs`, `lib/installer/harness-commands.mjs`, `project-template/.agents/`, `project-template/.codex/hooks.json`, README, wiki Getting-Started, tests.
 * **Acceptance Criteria:** `[FEAT-048]`'s, for these two harnesses: Claude Code installs unchanged byte for byte; a measured verdict per harness on what it enforces; the adapter passes the same Guard 3 corpus as the Claude Code hook; translated files generated and drift-tested; zero new runtime dependencies.
+
+### [X] `[FEAT-065]` `cc-*` Commands on OpenCode and Context Injection on Codex CLI
+* **DONE, shipped as `1.60.0` on 2026-11-27.** Slices 4 and 5 of `[FEAT-048]`, after `[FEAT-063]`'s slices 2 and 3. **Slice 4, OpenCode commands:** `renderCommand` in `lib/installer/harness-commands.mjs` adds a third render per `cc-*` source, `project-template/.opencode/command/cc-*.md` (18 files), installed by `--project --opencode` through the same `copyRenderedCommands` step Antigravity and Codex use, and covered by stale detection and `--write`. OpenCode v1.19.6 (read from its source: `config/command.ts`, `config/markdown.ts`, `session/prompt.ts`) runs every `` !`…` `` in a template in the shell, attaches every `@path` and substitutes `$ARGUMENTS` before the model sees it, outside any tool call, so the guard plugin never sees them; the verbatim render held 6 active tokens, one a real shell run from `cc-implement`. `neutralizeForOpencode` rewrites `` !` `` → `` ! ` ``, spaces `$ARGUMENTS` off an adjacent backtick, and `@x` → `@ x` where OpenCode would attach it, and `OPENCODE_PREAMBLE` adds one line telling the model to read the text as if those spaces were not there. The `.claude/commands/` sources are unchanged, so Claude Code is unaffected. **Slice 5, Codex context injection:** `installCodexHook` in `lib/installer/deploy.mjs` also installs `project-template/.codex/hooks/conductor-context.mjs` and merges its `UserPromptSubmit` entry into `.codex/hooks.json` with `CODEX_HOOK_FINGERPRINTS` (`conductor-guard.mjs`, `conductor-context.mjs`), through a `node -e` bootstrap like the `[BUG-094]` guard's. The adapter runs the project's unchanged `verbosity-remind.sh` and `context-guard.sh` (Git for Windows' bash on Windows, as `tests/helpers/bash-probe.js` finds it, `[BUG-062]`), joins their trimmed output and replies `{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":…}}`, because Codex 0.171/0.172 parses a reply starting with `[` as JSON and dropped the plain verbosity line; it fails open on every path, as the Claude Code wiring does. README and wiki Getting-Started state the OpenCode rewrite, that text typed after a command is still substituted before OpenCode's shell pass (OpenCode's own behavior, out of scope), and the Codex hook. Pinned by `renderCommand: OpenCode command` and the OpenCode rows of `rendered files stay in sync with the sources (drift)` in `tests/installer/harness-commands.test.js` (OpenCode's three regexes over every committed command, and again after substituting `add login!` and `mail me@`), the new `tests/hooks/codex-context.test.js`, `deployProject: cc-* commands for OpenCode (FEAT-048)` and the `(FEAT-048 slice 5)` rows of `tests/installer/deploy.test.js`, and the `[BUG-069]` pin and fingerprint coverage table in `tests/installer/templates.test.js`. Live evidence reported by the PRs: Codex 0.172.0 on Windows 11 recorded the verbosity line as a `hooks.additional_context` developer message behind a trusted probe entry (the installed bootstrap was not the trusted entry); OpenCode was not run, the evidence is its v1.19.6 source plus an offline probe; not re-measured at landing. Landed from PR #357 (author Ludocius) and PR #360 (author Ludocius), part of issue #97; the id is owner-minted at landing. **Not delivered:** band agents on all three harnesses, and context injection on Antigravity (its `UserPromptSubmit` hooks did not fire in `agy -p` on 1.5.15) and OpenCode (a `chat.message` plugin hook, from source only); they stay open on #97. Specs: `docs/superpowers/specs/2026-11-27-feat048-opencode-commands-design.md`, `docs/superpowers/specs/2026-11-27-feat048-codex-context-injection-design.md`. Plans: `docs/superpowers/plans/2026-11-27-feat048-opencode-commands.md`, `docs/superpowers/plans/2026-11-27-feat048-codex-context-injection.md`.
+* **Description:** `[FEAT-048]`'s remaining acceptance criteria for two surfaces (issue [#97](https://github.com/yeisonrestrepo/code-conductor/issues/97)): the `cc-*` commands in OpenCode's layout, generated from the `.claude/` sources and drift-tested, and the verbosity and context-guard lines injected into Codex CLI prompts the way Claude Code's `UserPromptSubmit` hooks inject them.
+* **Impact:** OpenCode users get the spec-first command set without a template that runs shell text or attaches files behind the guard's back, and Codex prompts carry the same verbosity and compaction context a Claude Code prompt does.
+* **Components Affected:** `lib/installer/harness-commands.mjs`, `lib/installer/deploy.mjs`, `project-template/.opencode/command/`, `project-template/.codex/hooks.json`, `project-template/.codex/hooks/conductor-context.mjs`, README, wiki Getting-Started, tests.
+* **Acceptance Criteria:** `[FEAT-048]`'s, for these surfaces: Claude Code installs unchanged byte for byte; translated files generated and drift-tested, with no OpenCode shell, attach or substitution trigger left in any render; the unchanged context hooks reused, never forked; zero new runtime dependencies.
+
+### [ ] `[FEAT-066]` Codex context adapter documents the Git layout in findBash and tests its win32 branch
+* **Description:** Follow-up to PR #360 (`[FEAT-065]`'s slice 5, Codex context injection; intake of issue #362). The review left two non-blocking notes on `project-template/.codex/hooks/conductor-context.mjs`: `findBash()` derives Git for Windows' `bash.exe` from `git --exec-path` plus `../../../bin/bash.exe`, which relies on Git's install layout (`<root>/mingw64/libexec/git-core`) without the code saying so; and the win32 branch of `findBash()` has no test, so a missing or unusual layout falls back silently.
+* **Impact:** The adapter fails open, so the only effect of a wrong layout is that no context is injected; naming the assumption and testing the fallback keeps that effect visible to a reviewer and pinned by the suite.
+* **Components Affected:** `project-template/.codex/hooks/conductor-context.mjs` (`findBash()`), its tests (`tests/hooks/codex-context.test.js` per `[FEAT-065]`).
+* **Acceptance Criteria:** A comment in `findBash()` states the layout assumption, the same one `tests/helpers/bash-probe.js` makes. A test covers the win32 branch: when the derived path is absent, it falls back to `bash`.
 
 ### [X] `[BUG-062]` Test Suites Ran Bash Through the WSL Launcher, Which Cannot Open Native Paths
 * **DONE, shipped as `1.43.0` on 2026-11-07.** `tests/helpers/bash.js` resolves a bash that runs a probe script by its native path; the WSL launcher fails the probe and is passed over for Git for Windows' bash on Windows, while macOS/Linux resolve the same `bash` as before. `skip-baseline.json` adds only the Windows-only fallback row on the Linux legs and widens no existing skip. Landed from PR #105 (author Luis), intake of issue #92; the id is owner-minted at landing. Spec: `docs/superpowers/specs/2026-10-24-issue92-wsl-bash-probe-design.md`. Plan: `docs/superpowers/plans/2026-10-24-issue92-wsl-bash-probe.md`.
@@ -1669,7 +1683,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #306; reported by the automated security review of
   #304.
 
-### [ ] `[BUG-092]` Test-surface split bypassable through the recorded test command
+### [X] `[BUG-092]` Test-surface split bypassable through the recorded test command
+* **DONE, shipped as `1.60.0` on 2026-11-27.** Fix shape (a) plus a deterministic version of (b). On a run with a test surface, `buildTree` in `scripts/orchestrate.mjs` records in the run file's `build_tree`, at `install test-writer` and `install code`, a fingerprint of the work tree's changed and untracked, non-ignored files (router files excluded); `splitCheck` at `handback` compares it with the tree and halts `ORCH_HANDBACK_SURFACE_CROSSED`, naming the files, when a path on the other role's side of the split changed during the dispatch, whatever `ops.f` lists. A missing or malformed record, or a git that can no longer list the tree, halts `ORCH_HANDBACK_SPLIT_UNVERIFIED`; `resume` drops the record, re-dispatches with a fresh one and reverts nothing. Only a git already unavailable at `install` lets the hand-back through, recorded as `split check: unavailable (<reason>)`. Both agent profiles and their template copies, the four `cc-orchestrate` copies, the README, the wiki's Band-Roles-and-Agents page and the `[FEAT-033]` spec state that the split holds against direct writes only and describe both halts. Pinned by `test-surface split at hand-back [BUG-092]` in `tests/scripts/orchestrate.test.js`, `[BUG-092 AC1]`/`[BUG-092 AC2]` in `tests/unit/role-profiles.test.js` (new `code` and `test-writer` hashes) and `cc-orchestrate split check [BUG-092 AC5]` in `tests/installer/commands-parity.test.js`. Follow-ups `[BUG-097]`, `[BUG-098]` and `[BUG-099]` ship in the same release. Landed from PR #335 (cc-lane-bot), intake of issue #312; the id was reserved by the triage and is owner-minted at landing. Spec: `docs/superpowers/specs/2026-11-26-bug092-test-surface-split-bypassable-through-the-design.md` (approved by the owner). Plan: `docs/superpowers/plans/2026-11-26-bug092-test-surface-split-bypassable-through-the.md` (approved by independent review, round 1).
 
 - Symptom: Guard 5 (`.claude/hooks/pre-tool-use.mjs:310`,
   `testSurfaceDenial`, per the issue) stops `test-writer` from writing
@@ -1791,7 +1806,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #325; reported by the automated security review of
   the 1.59.2 release candidate (#324).
 
-### [ ] `[BUG-097]` Tree fingerprint follows symlinks and opens non-regular files during hand-back
+### [X] `[BUG-097]` Tree fingerprint follows symlinks and opens non-regular files during hand-back
+* **DONE, shipped as `1.60.0` on 2026-11-27.** `contentHash` is replaced by `boundedHash` in `scripts/orchestrate.mjs`: it `lstat`s each path and records a symbolic link as `symlink:<sha256 of its target string>` (`readlinkSync`, the target never opened), a directory, FIFO, socket or device as `special:<type>` unopened, and a regular file over `HASH_CAP` (64 MiB) as `large:<size>:<mtimeNs>` unread; any other regular file keeps its bare sha256, read by `descriptorHash` in 64 KiB chunks through a descriptor opened `O_RDONLY | O_NONBLOCK | O_NOFOLLOW`, re-checked with `fstat` and never past the cap. `parentsReal` makes a path under a linked directory `absent`. The out-of-tree ignore files (`info/exclude`, `core.excludesFile`) use the same reader with links followed, as git does. Recorded values for regular files are unchanged. Pinned by `links and non-regular files in the fingerprint [BUG-097]` in `tests/scripts/orchestrate.test.js` (outside link, `/dev/zero` and FIFO links, tracked file replaced by a FIFO, sparse file over the cap, tracked directory replaced by a link, symlinked `core.excludesFile`, and a source check that no fingerprint path is read with `readFileSync`); its POSIX-only rows are in `tools/skip-baseline.json` for the Windows leg. Landed from PR #354 (cc-lane-bot), intake of issue #337; the id was reserved by the triage and is owner-minted at landing. Spec: `docs/superpowers/specs/2026-11-26-bug097-tree-fingerprint-follows-symlinks-and-opens-non-design.md` (approved by independent review, round 2). Plan: `docs/superpowers/plans/2026-11-26-bug097-tree-fingerprint-follows-symlinks-and-opens-non.md` (approved by independent review, round 1).
 
 - Symptom: `scripts/orchestrate.mjs:701` (`contentHash`, called from
   `treeFingerprint` at `:715`), per the issue, hashes every changed or
@@ -1815,7 +1831,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #337; reported by the automated security review of
   #335.
 
-### [ ] `[BUG-098]` Split check fingerprint diffs against the current HEAD instead of the HEAD recorded at install
+### [X] `[BUG-098]` Split check fingerprint diffs against the current HEAD instead of the HEAD recorded at install
+* **DONE, shipped as `1.60.0` on 2026-11-27.** `treeAnchor` in `scripts/orchestrate.mjs` records in `build_tree`, at `install test-writer` and `install code`, the commit `HEAD` names (`null` before the first commit) and the hash of `.git/info/exclude` and of the `core.excludesFile` file (git's XDG default when unset), keyed by the labels `info/exclude` and `core.excludesFile`; `treeFingerprint` diffs against that recorded commit at hand-back instead of the current `HEAD`. `splitCheck` halts `ORCH_HANDBACK_SURFACE_CROSSED` when `HEAD` moved or either ignore file changed during the dispatch, the message naming the move, then the ignore files, then any crossed paths; crossed paths alone keep `[BUG-092]`'s message. A `files` record without a valid `head` and `ignores` halts `ORCH_HANDBACK_SPLIT_UNVERIFIED`, and `resume` re-dispatches it. The four `cc-orchestrate` copies and the README's Guard 5 paragraph describe it. Pinned by `HEAD and out-of-tree ignore files recorded at install [BUG-098]` in `tests/scripts/orchestrate.test.js` (13 rows) and the `BUG-098` sentence in `cc-orchestrate split check [BUG-092 AC5]` of `tests/installer/commands-parity.test.js`. Landed from PR #352 (cc-lane-bot), intake of issue #341; the id was reserved by the triage and is owner-minted at landing. Spec: `docs/superpowers/specs/2026-11-26-bug098-split-check-fingerprint-diffs-against-the-design.md` (approved by independent review, round 1). Plan: `docs/superpowers/plans/2026-11-26-bug098-split-check-fingerprint-diffs-against-the.md` (approved by independent review, round 1).
 
 - Symptom: `treeFingerprint` in `scripts/orchestrate.mjs:755`, per the
   issue, diffs against whatever `HEAD` is when it runs and lists
@@ -1833,7 +1850,8 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #341; reported by the automated security review of
   the 1.59.7 release candidate (#338).
 
-### [ ] `[BUG-099]` Install writes an unbounded build_tree fingerprint to the run file, disabling hook reads during dispatch
+### [X] `[BUG-099]` Install writes an unbounded build_tree fingerprint to the run file, disabling hook reads during dispatch
+* **DONE, shipped as `1.60.0` on 2026-11-27.** The first fix shape: `install` in `scripts/orchestrate.mjs` serializes the run it is about to save through `boundedRunText` and halts `ORCH_RUN_FILE_FULL` when it exceeds `RUN_FILE_MAX_BYTES` (8 MiB), before either the envelope or the run is written, so a halt leaves no envelope behind. When the halt comes from a fingerprint, the message names the would-be size, the bound and the file count, and the recovery is to hide generated files behind an ignore rule (or remove them) and `resume`, or `end` and `start`; other installs keep the smaller-plan recovery, and the hand-back message is unchanged. The four `cc-orchestrate` copies and the README's Guard 5 paragraph document the halt. Pinned by `run-file bound at install [BUG-099]` in `tests/scripts/orchestrate.test.js` (5 rows) and `names the install bound halt and both recoveries [BUG-099]` in `tests/installer/commands-parity.test.js`. Landed from PR #350 (cc-lane-bot), intake of issue #340; the id was reserved by the triage and is owner-minted at landing. Spec: `docs/superpowers/specs/2026-11-26-bug099-install-writes-an-unbounded-build-tree-design.md` (approved by independent review, round 1). Plan: `docs/superpowers/plans/2026-11-26-bug099-install-writes-an-unbounded-build-tree.md` (approved by independent review, round 1).
 
 - Symptom: `install` (`scripts/orchestrate.mjs:801`), per the issue,
   writes the full `build_tree` fingerprint, one sha256 per changed or
@@ -1858,6 +1876,87 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Follow-up of `[BUG-092]`.
 - Intake of issue #340; reported by the automated security review of
   the 1.59.7 release candidate (#338).
+
+### [ ] `[BUG-100]` Codex upgrade does not warn that guards are off until hooks are re-trusted
+
+- Symptom: on an upgrade from 1.59.6, the installer adds a new
+  `UserPromptSubmit` entry to `.codex/hooks.json`. Per the installer's
+  own note in `lib/installer/deploy.mjs` (around `:328-330`), any edit to
+  that file makes Codex ask for hook trust again, so the existing
+  `PreToolUse` guard is not enforced until the user re-trusts the hooks
+  with `/hooks`. When the merge status is anything other than
+  `legacy-replaced` (`:338-339`), the installer prints only the generic
+  "trust it once in Codex with /hooks" message, which does not say the
+  guard is currently inactive.
+- Impact per the issue: after upgrading, a user may keep working in
+  Codex without the command guard and not realize it. The user is still
+  told to visit `/hooks`, so nothing is silently bypassed.
+- Fix shape suggested by the issue: when the merge changed an existing
+  `hooks.json` (rather than creating it), print the same explicit
+  warning as the legacy path: "the guards are not enforced until you
+  re-trust the hooks in Codex with /hooks". Add a test that covers the
+  upgrade case.
+- Follow-up of `[FEAT-065]`.
+- Intake of issue #363; reported by the automated security review of
+  the 1.60.0 release candidate (#361).
+
+### [ ] `[BUG-101]` OpenCode render test misses a bare @ before a quote after $ARGUMENTS substitution
+
+- Symptom: `tests/installer/harness-commands.test.js`, per the issue,
+  checks every `.opencode/command/cc-*.md` after substituting
+  `$ARGUMENTS` with `add login!` and `mail me@`. The second sample has a
+  word character before `@`, which OpenCode's `FILE_REGEX` lookbehind
+  (`` (?<![\w`])@ ``) ignores, so the sample never exercises the attach
+  trigger. In `cc-spec.md:50` and `cc-plan.md:50` the body has
+  `args: "$ARGUMENTS"`; an argument ending in a bare ` @` (for example
+  `fix the form @`) becomes `@"`, which matches `FILE_REGEX` with the
+  name `"`, and OpenCode then tries to attach that path outside any tool
+  call.
+- Impact per the issue: low. The text is what the user typed, and the
+  path `"` almost never exists. The gap is in the test: a future source
+  that puts a meaningful character after `$ARGUMENTS` would not be
+  caught.
+- Expected per the issue: the substitution samples include an argument
+  ending in a bare ` @`, and the render leaves no non-empty `FILE_REGEX`
+  match for it. That may need a render change, for example spacing
+  `$ARGUMENTS` apart from a following quote, decided in the spec.
+- Follow-up of `[FEAT-065]` (slice 4 of `[FEAT-048]`); part of #97.
+- Intake of issue #358; from the approving review of #357, non-blocking
+  note 1.
+
+### [ ] `[BUG-102]` Guard 5 and Guard 6 stop restricting when the run file exists but is unreadable
+
+- Symptom: `readRunFile` (`.claude/hooks/pre-tool-use.mjs:242`, and its
+  `project-template/` mirror), per the issue, returns `null` when
+  `.claude/memory/orchestrator-run.json` exists but is larger than the
+  hooks' read cap, not valid JSON, or without a `session_id`, and each
+  caller treats that as "no run": Guard 5's test-surface split
+  (`testSurfaceDenial`, `:311-314`) lets `code` write files in the test
+  surface inside its envelope scope (`test-writer` is still denied);
+  Guard 6 only warns the main session on orchestrator writes
+  (`:277-278`, `ORCH_RUN_INVALID … writes are not restricted`); and
+  Guard 6 no longer denies a role's nested `Agent` / `SendMessage`
+  dispatch (`:260-261`).
+- Impact per the issue: hardening, not a remote vulnerability. The file
+  has to be damaged or bloated from inside the run; roles cannot write
+  it through the write tools (Guard 5) or a free shell (Guard 7), so the
+  realistic path is code executed by the run's test command. Everything
+  happens on the machine running the orchestrator, no data is disclosed,
+  Guard 6 warns on each write, the orchestrator halts at its next step
+  when it cannot load the run, and Guard 5's envelope scope check does
+  not depend on the run file. The behavior predates `1.59.6`.
+- Fix shape suggested by the issue: fail closed while the run file is
+  present and unreadable. Guard 5 denies `code` and `test-writer` writes
+  with a named reason; Guard 6 denies a role's nested dispatch. Guard 6
+  for the main session needs a decision: today a stale or invalid run
+  only warns so that a crashed run cannot lock a later session out, and
+  if it becomes a denial, `orchestrate.mjs end` must stay reachable as
+  the recovery. Apply to both hook copies, with tests for an oversized
+  file, invalid JSON and a missing `session_id`.
+- Follow-up of `[BUG-099]`, whose spec left the hooks' own behavior out
+  of scope.
+- Intake of issue #356; reported by the security review of the 1.59.7
+  release candidate (#338).
 
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
