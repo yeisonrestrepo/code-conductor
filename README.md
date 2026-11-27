@@ -389,7 +389,7 @@ By default, only the global core files are installed. Flags extend that:
 | `--project` / `-Project` | Also install the project template into the current directory |
 | `--no-deps` / `-NoDeps` | Accepted for compatibility with the retired shell installers; a no-op that copies agent files only and does not affect the superpowers offer (see `--with-plugins`) |
 | `--verbosity MIN\|INFO\|VERBOSE` / `-Verbosity LEVEL` | Default response verbosity (default `MIN`). `MIN` = one sentence per response, `INFO` = bullet list, `VERBOSE` = full explanation. Re-run the installer to change it. PowerShell's `-Verbosity:INFO` form is not supported; it warns and the level stays `MIN`. |
-| `--opencode` | With `--project`, also install the OpenCode guard plugin at `.opencode/plugin/conductor-guard.js` (see [OpenCode](#opencode)). Without `--project` it warns and writes nothing for OpenCode |
+| `--opencode` | With `--project`, also install the OpenCode guard plugin at `.opencode/plugin/conductor-guard.js` and the `cc-*` commands in `.opencode/command/` (see [OpenCode](#opencode)). Without `--project` it warns and writes nothing for OpenCode |
 | `--antigravity` | With `--project`, also install the Antigravity CLI guard: `.agents/hooks/conductor-guard.mjs` and a `PreToolUse` entry merged into `.agents/hooks.json` (see [Antigravity CLI](#antigravity-cli)). Without `--project` it warns and writes nothing for Antigravity |
 | `--codex` | With `--project`, also merge a `PreToolUse` entry into `.codex/hooks.json` that runs the project's guard (see [Codex CLI](#codex-cli)). Without `--project` it warns and writes nothing for Codex |
 | `--with-plugins` | Install the superpowers plugin without asking, through `claude plugin install superpowers@claude-plugins-official` (60 s timeout). A non-interactive run installs it only with this flag; an interactive run asks instead. If the install cannot run, the installer prints `/plugin install superpowers@claude-plugins-official` and still exits 0 |
@@ -403,9 +403,9 @@ Two cautions:
 
 ### OpenCode
 
-`--project --opencode` adds one file, `.opencode/plugin/conductor-guard.js`, an [OpenCode](https://opencode.ai) plugin. It does not copy the guard: before each `bash`, `read`, `write`, `edit`, `multiedit` or patch call it sends the call to the project's own `.claude/hooks/pre-tool-use.mjs`, in the payload Claude Code sends, and blocks the call when the guard denies it. Read-only tools pass, and every other tool is blocked, because the guard cannot inspect it. A Claude Code install without the flag is unchanged.
+`--project --opencode` adds `.opencode/plugin/conductor-guard.js`, an [OpenCode](https://opencode.ai) plugin, and the `cc-*` commands in `.opencode/command/`. It does not copy the guard: before each `bash`, `read`, `write`, `edit`, `multiedit` or patch call it sends the call to the project's own `.claude/hooks/pre-tool-use.mjs`, in the payload Claude Code sends, and blocks the call when the guard denies it. Read-only tools pass, and every other tool is blocked, because the guard cannot inspect it. A Claude Code install without the flag is unchanged.
 
-This is the first slice of `[FEAT-048]` (issue #97), and it covers enforcement only:
+This is part of `[FEAT-048]` (issue #97), and it covers enforcement and the commands:
 
 | On OpenCode | Status |
 |---|---|
@@ -416,7 +416,8 @@ This is the first slice of `[FEAT-048]` (issue #97), and it covers enforcement o
 | `bash` with an argument other than `command`, `description` or `timeout`, a working directory included | Blocked: the guard checks a command as if it runs in the project directory, so put any `cd` in the command itself |
 | `task`, `batch`, MCP and any other tool | Blocked: the guard cannot inspect them |
 | `glob`, `grep`, `list`, `webfetch`, `websearch`, `codesearch` and other read-only tools | Allowed, as on Claude Code |
-| `cc-*` commands, band agents, verbosity and context hooks | Not installed for OpenCode yet. OpenCode reads `CLAUDE.md` when there is no `AGENTS.md`, and loads `.claude/skills` |
+| `cc-*` commands | Installed in `.opencode/command/` and run as `/cc-spec`, `/cc-plan` and so on. They are rendered from the Claude Code commands by `lib/installer/harness-commands.mjs`, with one change: OpenCode runs every `` !`…` `` in a command in your shell, and attaches every `@path`, without a tool call the guard could see, so the render puts a space after each such `!` and `@`, and between `$ARGUMENTS` and an adjacent backtick, since OpenCode substitutes your arguments before its shell pass. A test fails if a rendered command still has a trigger, with or without sample arguments substituted. A complete `` !`…` `` you type in your own arguments still runs |
+| Band agents, verbosity and context hooks | Not installed for OpenCode yet. OpenCode reads `CLAUDE.md` when there is no `AGENTS.md`, and loads `.claude/skills` |
 
 The plugin needs `node` on `PATH`. If the guard cannot run, the call is blocked and the reason names the guard's path. Checked against OpenCode 1.18.33 during the proof of concept.
 
@@ -595,6 +596,7 @@ code-conductor/
 |   +-- CLAUDE.md
 |   +-- gitignore                  Merged into the host project's .gitignore
 |   +-- .opencode/plugin/conductor-guard.js  OpenCode guard plugin, only with --opencode (FEAT-048)
+|   +-- .opencode/command/cc-*.md            Rendered cc-* commands for OpenCode, only with --opencode
 |   +-- .agents/hooks/conductor-guard.mjs    Antigravity CLI guard adapter, only with --antigravity (FEAT-048)
 |   +-- .agents/hooks.json                   Antigravity hook entry, merged, only with --antigravity
 |   +-- .codex/hooks/conductor-guard.mjs     Codex guard adapter, only with --codex (BUG-094)

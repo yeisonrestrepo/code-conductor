@@ -1025,3 +1025,30 @@ describe('deployProject: cc-* commands for Antigravity and Codex (FEAT-048)', ()
     expect(readFileSync(join(home, WORKFLOW), 'utf8')).toBe('workflow\n');
   });
 });
+
+// FEAT-048 slice 4 (#97): the OpenCode renders land only with --opencode.
+describe('deployProject: cc-* commands for OpenCode (FEAT-048)', () => {
+  const COMMAND = join('.opencode', 'command', 'cc-spec.md');
+  beforeEach(() => {
+    mkdirSync(join(asset, 'project-template', '.opencode', 'command'), { recursive: true });
+    writeFileSync(join(asset, 'project-template', COMMAND), 'command\n');
+  });
+  it('installs no command without the opencode option', () => {
+    deployProject(asset, home, { ...capture().opts, antigravity: true, codex: true });
+    expect(existsSync(join(home, '.opencode'))).toBe(false);
+  });
+  it('installs the commands and reports them with the opencode option', () => {
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, opencode: true });
+    expect(readFileSync(join(home, COMMAND), 'utf8')).toBe('command\n');
+    expect(out.said).toContain('code-conductor: installed the cc-* commands as OpenCode commands in .opencode/command/');
+  });
+  it('keeps the host\'s own commands and overwrites ours', () => {
+    mkdirSync(join(home, '.opencode', 'command'), { recursive: true });
+    writeFileSync(join(home, '.opencode', 'command', 'mine.md'), 'host');
+    writeFileSync(join(home, COMMAND), 'stale');
+    deployProject(asset, home, { ...capture().opts, opencode: true });
+    expect(readFileSync(join(home, '.opencode', 'command', 'mine.md'), 'utf8')).toBe('host');
+    expect(readFileSync(join(home, COMMAND), 'utf8')).toBe('command\n');
+  });
+});
