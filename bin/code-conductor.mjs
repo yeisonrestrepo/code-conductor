@@ -8,8 +8,10 @@ import { verbosityHookCommand, mergeVerbosityHook } from '../lib/installer/setti
 import { healGraphifyHook } from '../lib/installer/heal.mjs';
 import { writeVerbosity, writeVersionFile } from '../lib/installer/config.mjs';
 import { offerSuperpowers, NOTICES } from '../lib/installer/plugins.mjs';
+import { offerFrontendSkills, classifyWithDetector, isOfferedType } from '../lib/installer/frontend-skills.mjs';
+import { sweepStaleUipro } from '../lib/installer/stale-uipro.mjs';
 
-const USAGE = `Usage: code-conductor [--project|-Project] [--no-deps|-NoDeps] [--verbosity|-Verbosity MIN|INFO|VERBOSE] [--opencode] [--antigravity] [--codex] [--with-plugins] [--version] [--help]`;
+const USAGE = `Usage: code-conductor [--project|-Project] [--no-deps|-NoDeps] [--verbosity|-Verbosity MIN|INFO|VERBOSE] [--opencode] [--antigravity] [--codex] [--with-plugins] [--with-frontend-skills] [--version] [--help]`;
 
 // -Verbosity is the spelling the retired install.ps1 documented. Both spellings share
 // every form (space-separated, inline `=`, missing value) and last-wins across them.
@@ -24,7 +26,7 @@ const isVerbosityFlag = (a) => VERBOSITY_FLAGS.some((f) => a === f || a.startsWi
 // is idempotent. No "conflicting flags" error is raised — last-wins is the least
 // surprising CLI convention and keeps the parser branchless.
 function parseArgs(argv) {
-  const opts = { project: false, opencode: false, antigravity: false, codex: false, noDeps: false, withPlugins: false, verbosity: undefined, verbosityGiven: false, version: false, help: false, unknown: [] };
+  const opts = { project: false, opencode: false, antigravity: false, codex: false, noDeps: false, withPlugins: false, withFrontendSkills: false, verbosity: undefined, verbosityGiven: false, version: false, help: false, unknown: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     // -Project is the spelling the retired install.ps1 documented; matched exact-case
@@ -32,7 +34,8 @@ function parseArgs(argv) {
     if (a === '--project' || a === '-Project') opts.project = true;
     // Accepted no-op since FEAT-023 removed the shell installers: recognized so callers
     // carried over from install.sh get no misleading "unrecognized" warning. It does not
-    // affect the superpowers offer, which only --with-plugins or the prompt controls.
+    // affect the superpowers offer, which only --with-plugins or the prompt controls, or the
+    // frontend skills offer.
     else if (a === '--no-deps' || a === '-NoDeps') opts.noDeps = true;
     // FEAT-048: also install the OpenCode guard plugin; meaningful only with --project.
     else if (a === '--opencode') opts.opencode = true;
@@ -43,6 +46,9 @@ function parseArgs(argv) {
     // FEAT-039: consent to install the superpowers plugin without asking; the only way a
     // non-interactive run installs it. Matched exact-case like every other flag.
     else if (a === '--with-plugins') opts.withPlugins = true;
+    // FEAT-037: consent to install the frontend design skills without asking; --with-plugins
+    // does not imply it, nor the reverse.
+    else if (a === '--with-frontend-skills') opts.withFrontendSkills = true;
     else if (isVerbosityFlag(a)) {
       opts.verbosityGiven = true;
       if (a.includes('=')) {
@@ -84,10 +90,37 @@ function offerPlugins(emit, options) {
   } catch { /* fail-open: a reporting error never changes the exit code */ }
 }
 
+// FEAT-037: the frontend design skills offer. Fail-open for the same reason as offerPlugins:
+// a failed offer is a printed line, never a changed exit code.
+function offerFrontend(emit, options) {
+  try {
+    const result = offerFrontendSkills(options);
+    for (const text of result.stdout) emit('stdout', `code-conductor: ${text}`);
+    for (const text of result.stderr) emit('stderr', `code-conductor: ${text}`);
+  } catch { /* fail-open */ }
+}
+
+// FEAT-037: the project-only extras, in order: sweep a stale ui-ux-pro-max, classify the
+// project, offer the frontend skills when it is frontend or fullstack.
+function projectExtras(emit, { cwd, home, classify, offer }) {
+  try {
+    const swept = sweepStaleUipro({ cwd, home });
+    for (const text of swept.stdout) emit('stdout', `code-conductor: ${text}`);
+    for (const text of swept.stderr) emit('stderr', `code-conductor: ${text}`);
+    const { type, error } = classify(cwd);
+    if (error) return emit('stderr', `code-conductor: could not classify the project (${error}); frontend design skills not offered`);
+    if (isOfferedType(type)) offerFrontend(emit, { cwd, ...offer });
+  } catch (e) {
+    emit('stderr', `code-conductor: could not classify the project (${e.message}); frontend design skills not offered`);
+  }
+}
+
 // log(stream, msg) is injected so tests capture output without spawning a process. The
 // plugin options (FEAT-039) let tests replace the TTY check, the prompt, the spawn, the
-// timeout and the child's env, so no test can prompt or reach a real claude.
-export function run(argv, env = process.env, { cwd = process.cwd(), log, nodeVersion = process.versions.node, isInteractive = Boolean(process.stdin.isTTY && process.stdout.isTTY), ask, spawn, pluginTimeoutMs, pluginEnv = process.env } = {}) {
+// timeout and the child's env, so no test can prompt or reach a real claude. The frontend
+// options (FEAT-037) do the same for the detector (classify) and the skills CLIs
+// (frontendSpawn, frontendTimeoutMs, frontendEnv, platform).
+export function run(argv, env = process.env, { cwd = process.cwd(), log, nodeVersion = process.versions.node, isInteractive = Boolean(process.stdin.isTTY && process.stdout.isTTY), ask, spawn, pluginTimeoutMs, pluginEnv = process.env, classify, frontendSpawn, frontendTimeoutMs, frontendEnv = process.env, platform = process.platform } = {}) {
   const emit = log || ((stream, msg) => process[stream].write(`${msg}\n`));
 
   // Hard runtime floor: refuse to run on Node < 20 with a clear message rather than
@@ -142,7 +175,11 @@ export function run(argv, env = process.env, { cwd = process.cwd(), log, nodeVer
     if (heal.status === 'removed') emit('stdout', 'code-conductor: removed the retired graphify-ast-refresh hook from settings.json (backup written beside it)');
     for (const line of heal.lines) emit('stderr', `code-conductor: ${line}`);
     writeVersionFile(home, pkgVersion(assetRoot));
-    if (opts.project) deployProject(assetRoot, cwd, { warn: (m) => emit('stderr', m), report: (m) => emit('stdout', m), home, opencode: opts.opencode, antigravity: opts.antigravity, codex: opts.codex });
+    if (opts.project) {
+      deployProject(assetRoot, cwd, { warn: (m) => emit('stderr', m), report: (m) => emit('stdout', m), home, opencode: opts.opencode, antigravity: opts.antigravity, codex: opts.codex });
+      const offer = { withFrontendSkills: opts.withFrontendSkills, isInteractive, ask, spawn: frontendSpawn, timeoutMs: frontendTimeoutMs, env: frontendEnv, platform };
+      projectExtras(emit, { cwd, home, classify: classify ?? ((dir) => classifyWithDetector(assetRoot, dir)), offer });
+    }
     offerPlugins(emit, { home, withPlugins: opts.withPlugins, isInteractive, ask, spawn, timeoutMs: pluginTimeoutMs, env: pluginEnv });
     return 0;
   } catch (err) {

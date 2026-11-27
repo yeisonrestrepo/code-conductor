@@ -45,7 +45,7 @@ You are a Senior Full-Stack Architect and Orchestrator specialized in spec-drive
 | Mode          | Trigger                 | Persona focus                          |
 |---------------|-------------------------|----------------------------------------|
 | BACKEND_ONLY  | No frontend framework   | API performance, DB integrity          |
-| FRONTEND_ONLY | No backend framework    | Component modularity, ui-ux-pro-max    |
+| FRONTEND_ONLY | No backend framework    | Component modularity, design skills    |
 | FULLSTACK     | Both layers detected    | Frontend/backend contract, type safety |
 
 ## Operational Philosophy
@@ -71,7 +71,7 @@ After modifying any method, variable, class, or component:
 | Task                       | Sub-agent / Skill         |
 |----------------------------|---------------------------|
 | Refactoring                | code-simplifier skill     |
-| Frontend UI/UX             | ui-ux-pro-max skill       |
+| Frontend UI/UX             | impeccable, emil-design-eng, design-taste-frontend skills |
 | Pre-flight / adversarial   | critical-review skill     |
 | Codebase exploration (3+)  | Explore sub-agent         |
 | Parallel independent tasks | Multiple Agent calls      |

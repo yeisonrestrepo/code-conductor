@@ -85,7 +85,7 @@ Always tag responses:
 ## Active Skills
 
 - `code-simplifier` — always active, loaded automatically
-- `ui-ux-pro-max` — activate via `/cc-stack` when frontend frameworks are detected
+- `impeccable`, `emil-design-eng`, `design-taste-frontend` — frontend design skills; `code-conductor --project` offers them on frontend projects and installs them into the project's `.claude/skills/`
 - `verbosity` — always active; reads level from `memory/verbosity.md` (default: MIN)
 - `memory-first` — always active; enforces the orchestrator lookup chain
 - `agent-delegation` — always active; governs when and how to spawn sub-agents

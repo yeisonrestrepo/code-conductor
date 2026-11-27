@@ -224,10 +224,10 @@ Decided by the owner when approving this plan, with this change:
 - Create: `lib/installer/file-digests.mjs`
 - Test: `tests/installer/file-digests.test.js`
 
-- [ ] [T-101] `tests/installer/file-digests.test.js`: the three cases of T-901. Symlinks are directory junctions (`symlinkSync(target, link, 'junction')`, as `tests/installer/file-merge.test.js:144` does), so every case runs on every CI leg and `tools/skip-baseline.json` does not change. Depends on T-004.
-- [ ] [T-102] Red run: `npx vitest run tests/installer/file-digests.test.js`. Predicted: the file fails to load (the module does not exist), **no tests** run, exit 1. Depends on T-101.
-- [ ] [T-103] `lib/installer/file-digests.mjs`: `SYMLINK`, `NOT_REGULAR` and `digestTree` (plan decision 3). Depends on T-102.
-- [ ] [T-104] Green run: the T-102 command. Predicted: **3 passed (3)**. Depends on T-103.
+- [X] [T-101] `tests/installer/file-digests.test.js`: the three cases of T-901. Symlinks are directory junctions (`symlinkSync(target, link, 'junction')`, as `tests/installer/file-merge.test.js:144` does), so every case runs on every CI leg and `tools/skip-baseline.json` does not change. Depends on T-004.
+- [X] [T-102] Red run: `npx vitest run tests/installer/file-digests.test.js`. Predicted: the file fails to load (the module does not exist), **no tests** run, exit 1. Depends on T-101.
+- [X] [T-103] `lib/installer/file-digests.mjs`: `SYMLINK`, `NOT_REGULAR` and `digestTree` (plan decision 3). Depends on T-102.
+- [X] [T-104] Green run: the T-102 command. Predicted: **3 passed (3)**. Depends on T-103.
 
 ---
 
@@ -237,11 +237,11 @@ Decided by the owner when approving this plan, with this change:
 - Create: `lib/installer/stale-uipro.mjs`
 - Test: `tests/installer/stale-uipro.test.js`
 
-- [ ] [T-201] `tests/installer/stale-uipro.test.js`: the eleven cases of T-902. Matching trees are synthetic: each test writes a small tree, builds its `known` map with `digestTree` (or by hand), and passes it; only S1 reads the shipped table. Depends on T-104.
-- [ ] [T-202] Red run: `npx vitest run tests/installer/stale-uipro.test.js`. Predicted: the file fails to load, **no tests**, exit 1. Depends on T-201.
-- [ ] [T-203] `lib/installer/stale-uipro.mjs`: `UIPRO_CLAUDE_OUTPUT` (the 31 entries of plan decision 3, with the provenance comment), `UIPRO_FLAT_HASHES`, `matchKnownVersion`, `sweepStaleUipro` and its line builders. Depends on T-202.
-- [ ] [T-204] Check the shipped table against the measurement: `node -e` that imports the module and prints the sha256 of the sorted `<hash> <path>\n` lines prints `b474d030548bdc3a092512a709cda05362ab263b735d1379418fd05629120a88`. Depends on T-203.
-- [ ] [T-205] Green run: the T-202 command. Predicted: **11 passed (11)**. Depends on T-204.
+- [X] [T-201] `tests/installer/stale-uipro.test.js`: the eleven cases of T-902. Matching trees are synthetic: each test writes a small tree, builds its `known` map with `digestTree` (or by hand), and passes it; only S1 reads the shipped table. Depends on T-104.
+- [X] [T-202] Red run: `npx vitest run tests/installer/stale-uipro.test.js`. Predicted: the file fails to load, **no tests**, exit 1. Depends on T-201.
+- [X] [T-203] `lib/installer/stale-uipro.mjs`: `UIPRO_CLAUDE_OUTPUT` (the 31 entries of plan decision 3, with the provenance comment), `UIPRO_FLAT_HASHES`, `matchKnownVersion`, `sweepStaleUipro` and its line builders. Depends on T-202.
+- [X] [T-204] Check the shipped table against the measurement: `node -e` that imports the module and prints the sha256 of the sorted `<hash> <path>\n` lines prints `b474d030548bdc3a092512a709cda05362ab263b735d1379418fd05629120a88`. Depends on T-203.
+- [X] [T-205] Green run: the T-202 command. Predicted: **11 passed (11)**. Depends on T-204.
 
 ---
 
@@ -251,12 +251,12 @@ Decided by the owner when approving this plan, with this change:
 - Create: `lib/installer/frontend-skills.mjs`
 - Test: `tests/installer/frontend-skills.test.js`
 
-- [ ] [T-301] `tests/installer/frontend-skills.test.js`: the 28 cases of T-903. The injected spawn is a stub in the `fakeSpawn` shape of `tests/installer/plugins.test.js:18-28` that records `(command, args, options)` and, per case, writes into `options.cwd` what the CLI would have written (`SKILL.md`, `skills-lock.json` entries, an Impeccable hook entry); every case passes `platform: 'linux'` (except the argv case, which is pure), `env: {}` and an explicit `nodeVersion`. Depends on T-205.
-- [ ] [T-302] Red run: `npx vitest run tests/installer/frontend-skills.test.js`. Predicted: the file fails to load, **no tests**, exit 1. Depends on T-301.
-- [ ] [T-303] `lib/installer/frontend-skills.mjs`: the constants and table of plan decision 1, `installArgs`, `commandLine`, `DISCLOSURE`, `CONSENT_PROMPT`, `acceptsAnswer`, `isOfferedType` and `classifyWithDetector` (decisions 2, 4, 5). Depends on T-302.
-- [ ] [T-304] Same file: `readChoice`, `readLock`, `hasImpeccableHook`, `surveySkill` and `verifySkill` (decisions 5.2, 6). Depends on T-303.
-- [ ] [T-305] Same file: `spawnSkill`, `classifySpawn`, the consent step, the report lines, the record writer and `offerFrontendSkills` (decisions 5, 7, 8, 9). Depends on T-304.
-- [ ] [T-306] Green run: the T-302 command. Predicted: **28 passed (28)**. Depends on T-305.
+- [X] [T-301] `tests/installer/frontend-skills.test.js`: the 28 cases of T-903. The injected spawn is a stub in the `fakeSpawn` shape of `tests/installer/plugins.test.js:18-28` that records `(command, args, options)` and, per case, writes into `options.cwd` what the CLI would have written (`SKILL.md`, `skills-lock.json` entries, an Impeccable hook entry); every case passes `platform: 'linux'` (except the argv case, which is pure), `env: {}` and an explicit `nodeVersion`. Depends on T-205.
+- [X] [T-302] Red run: `npx vitest run tests/installer/frontend-skills.test.js`. Predicted: the file fails to load, **no tests**, exit 1. Depends on T-301.
+- [X] [T-303] `lib/installer/frontend-skills.mjs`: the constants and table of plan decision 1, `installArgs`, `commandLine`, `DISCLOSURE`, `CONSENT_PROMPT`, `acceptsAnswer`, `isOfferedType` and `classifyWithDetector` (decisions 2, 4, 5). Depends on T-302.
+- [X] [T-304] Same file: `readChoice`, `readLock`, `hasImpeccableHook`, `surveySkill` and `verifySkill` (decisions 5.2, 6). Depends on T-303.
+- [X] [T-305] Same file: `spawnSkill`, `classifySpawn`, the consent step, the report lines, the record writer and `offerFrontendSkills` (decisions 5, 7, 8, 9). Depends on T-304.
+- [X] [T-306] Green run: the T-302 command. Predicted: **28 passed (28)**. Depends on T-305.
 
 ---
 
@@ -266,10 +266,10 @@ Decided by the owner when approving this plan, with this change:
 - Modify: `bin/code-conductor.mjs`
 - Test: `tests/installer/frontend-skills-cli.test.js`
 
-- [ ] [T-401] `tests/installer/frontend-skills-cli.test.js`: the twelve cases of T-904, every `run()` with an injected `classify`, `frontendSpawn`, `spawn` (superpowers, recording) and `ask` (answers `n` to the superpowers prompt; the frontend question is recognised by `CONSENT_PROMPT`). Depends on T-306.
-- [ ] [T-402] Red run: `npx vitest run tests/installer/frontend-skills-cli.test.js`. Its full match set is the twelve cases. Predicted: **7 failed | 5 passed (12)**: C2, C3, C4, C9 and C10 are green before the wiring (nothing is offered, and the settings merge already keeps a host hook); C1, C5, C6, C7, C8, C11 and C12 are red. Any other split means a test is wrong: fix the test, not the prediction. Depends on T-401.
-- [ ] [T-403] `bin/code-conductor.mjs`: imports, `USAGE`, `parseArgs`, the `run()` options and comment, `projectExtras`, `offerFrontend` and the call after `deployProject` (plan decision 10). Depends on T-402.
-- [ ] [T-404] Green run: `npx vitest run tests/installer/frontend-skills-cli.test.js tests/installer/cli.test.js tests/installer/plugins.test.js tests/installer/smoke.test.js tests/installer/settings-merge.test.js`. Predicted: all passed, with `frontend-skills-cli` at **12**, `cli` at **71**, `plugins` at **37** and `settings-merge` at **32** (unchanged). Depends on T-403.
+- [X] [T-401] `tests/installer/frontend-skills-cli.test.js`: the twelve cases of T-904, every `run()` with an injected `classify`, `frontendSpawn`, `spawn` (superpowers, recording) and `ask` (answers `n` to the superpowers prompt; the frontend question is recognised by `CONSENT_PROMPT`). Depends on T-306.
+- [X] [T-402] Red run: `npx vitest run tests/installer/frontend-skills-cli.test.js`. Its full match set is the twelve cases. Predicted: **7 failed | 5 passed (12)**: C2, C3, C4, C9 and C10 are green before the wiring (nothing is offered, and the settings merge already keeps a host hook); C1, C5, C6, C7, C8, C11 and C12 are red. Any other split means a test is wrong: fix the test, not the prediction. Depends on T-401.
+- [X] [T-403] `bin/code-conductor.mjs`: imports, `USAGE`, `parseArgs`, the `run()` options and comment, `projectExtras`, `offerFrontend` and the call after `deployProject` (plan decision 10). Depends on T-402.
+- [X] [T-404] Green run: `npx vitest run tests/installer/frontend-skills-cli.test.js tests/installer/cli.test.js tests/installer/plugins.test.js tests/installer/smoke.test.js tests/installer/settings-merge.test.js`. Predicted: all passed, with `frontend-skills-cli` at **12**, `cli` at **71**, `plugins` at **37** and `settings-merge` at **32** (unchanged). Depends on T-403.
 
 ---
 
@@ -283,13 +283,13 @@ Decided by the owner when approving this plan, with this change:
 - Modify: `.github/wiki/pages/Skills.md`
 - Test: `tests/tools/repo-invariants.test.js`
 
-- [ ] [T-501] `tests/tools/repo-invariants.test.js`: the regex extension and the three new cases of plan decision 12. Depends on T-404.
-- [ ] [T-502] Red run: `npx vitest run tests/tools/repo-invariants.test.js`. Predicted: **3 failed | 16 passed (19)**, the extended ui-ux-pro-max row among the passes (no current line says the skill is installed). Depends on T-501.
-- [ ] [T-503] `CLAUDE.md` and `project-template/CLAUDE.md`: the two rows of plan decision 11 in each. Then `grep -n 'FRONTEND_ONLY\|Frontend UI/UX' CLAUDE.md project-template/CLAUDE.md` prints four lines whose row text is pairwise identical. Depends on T-502.
-- [ ] [T-504] `global/CLAUDE.md:88`: the Active Skills line of plan decision 11. Depends on T-503.
-- [ ] [T-505] `README.md`: the Dependencies row (`:87`), the Skills entry (`:290`), the `--no-deps` row (`:390`), the new `--with-frontend-skills` row after `:395`, and the file tree (`:584`), as plan decision 11 gives them. `git diff README.md` touches no line under `## Known limits`. Depends on T-504.
-- [ ] [T-506] `.github/wiki/pages/Skills.md`: the section of plan decision 11. Depends on T-505.
-- [ ] [T-507] Green run: the T-502 command, plus `npx vitest run tests/installer/templates.test.js tests/installer/merge-md.test.js tests/unit/adopt-claude-md.test.js tests/scripts/docs-sync.test.js` (they read the `CLAUDE.md` templates). Predicted: `repo-invariants` **19 passed (19)** and the other four all passed with their counts unchanged. Depends on T-506.
+- [X] [T-501] `tests/tools/repo-invariants.test.js`: the regex extension and the three new cases of plan decision 12. Depends on T-404.
+- [X] [T-502] Red run: `npx vitest run tests/tools/repo-invariants.test.js`. Predicted: **3 failed | 16 passed (19)**, the extended ui-ux-pro-max row among the passes (no current line says the skill is installed). Depends on T-501.
+- [X] [T-503] `CLAUDE.md` and `project-template/CLAUDE.md`: the two rows of plan decision 11 in each. Then `grep -n 'FRONTEND_ONLY\|Frontend UI/UX' CLAUDE.md project-template/CLAUDE.md` prints four lines whose row text is pairwise identical. Depends on T-502.
+- [X] [T-504] `global/CLAUDE.md:88`: the Active Skills line of plan decision 11. Depends on T-503.
+- [X] [T-505] `README.md`: the Dependencies row (`:87`), the Skills entry (`:290`), the `--no-deps` row (`:390`), the new `--with-frontend-skills` row after `:395`, and the file tree (`:584`), as plan decision 11 gives them. `git diff README.md` touches no line under `## Known limits`. Depends on T-504.
+- [X] [T-506] `.github/wiki/pages/Skills.md`: the section of plan decision 11. Depends on T-505.
+- [X] [T-507] Green run: the T-502 command, plus `npx vitest run tests/installer/templates.test.js tests/installer/merge-md.test.js tests/unit/adopt-claude-md.test.js tests/scripts/docs-sync.test.js` (they read the `CLAUDE.md` templates). Predicted: `repo-invariants` **19 passed (19)** and the other four all passed with their counts unchanged. Depends on T-506.
 
 ---
 
@@ -298,12 +298,12 @@ Decided by the owner when approving this plan, with this change:
 **Files:**
 - Modify: `docs/superpowers/plans/2026-11-26-feat037-frontend-design-skill-stack-replace-ui-ux-pro.md` (ticks only)
 
-- [ ] [T-601] Run `npm test` (long: `tests/scripts/orchestrate.test.js` alone takes several minutes; run it in the background if the shell times out). Predicted: exit 0, with the four new files at 3, 11, 28 and 12 and `repo-invariants` at 19. A red counts as ENV only if the sandbox caused it (network, tmp permissions) and its file is not one this plan touches; report it by name. Any other red gets fixed. Depends on T-507.
-- [ ] [T-602] Scope check: `git status --short` lists exactly the files of the Global Constraints and this plan; no temporary file is left in the tree (no `skills-lock.json`, `.claude/frontend-skills.json` or `cc-frontend-*` directory at the repository root). `git diff --stat` shows no change to the spec, `scripts/detect-stack.mjs`, `lib/installer/plugins.mjs`, `lib/installer/heal.mjs`, `lib/installer/deploy.mjs`, `lib/installer/settings-merge.mjs`, the hooks, `package.json`, `package-lock.json`, `.github/workflows/`, `.github/actions/` or the README Known-limits lines. `node -e "console.log(JSON.stringify(require('./package.json').dependencies))"` prints `{}`. Depends on T-601.
-- [ ] [T-603] Stage the new files: `git add lib/installer/file-digests.mjs lib/installer/stale-uipro.mjs lib/installer/frontend-skills.mjs tests/installer/file-digests.test.js tests/installer/stale-uipro.test.js tests/installer/frontend-skills.test.js tests/installer/frontend-skills-cli.test.js` (new, not ignored). Depends on T-602.
-- [ ] [T-604] Stage the modified files: `git add -u bin/code-conductor.mjs CLAUDE.md project-template/CLAUDE.md global/CLAUDE.md README.md .github/wiki/pages/Skills.md tests/tools/repo-invariants.test.js` (all tracked). Depends on T-603.
-- [ ] [T-605] Stage: `git add -u docs/superpowers/plans/2026-11-26-feat037-frontend-design-skill-stack-replace-ui-ux-pro.md` (carries the ticks for T-101 to T-604). Depends on T-604.
-- [ ] [T-606] Commit: `feat: offer a pinned frontend design skill stack and sweep stale ui-ux-pro-max installs [FEAT-037]`. Depends on T-605.
+- [X] [T-601] Run `npm test` (long: `tests/scripts/orchestrate.test.js` alone takes several minutes; run it in the background if the shell times out). Predicted: exit 0, with the four new files at 3, 11, 28 and 12 and `repo-invariants` at 19. A red counts as ENV only if the sandbox caused it (network, tmp permissions) and its file is not one this plan touches; report it by name. Any other red gets fixed. Depends on T-507.
+- [X] [T-602] Scope check: `git status --short` lists exactly the files of the Global Constraints and this plan; no temporary file is left in the tree (no `skills-lock.json`, `.claude/frontend-skills.json` or `cc-frontend-*` directory at the repository root). `git diff --stat` shows no change to the spec, `scripts/detect-stack.mjs`, `lib/installer/plugins.mjs`, `lib/installer/heal.mjs`, `lib/installer/deploy.mjs`, `lib/installer/settings-merge.mjs`, the hooks, `package.json`, `package-lock.json`, `.github/workflows/`, `.github/actions/` or the README Known-limits lines. `node -e "console.log(JSON.stringify(require('./package.json').dependencies))"` prints `{}`. Depends on T-601.
+- [X] [T-603] Stage the new files: `git add lib/installer/file-digests.mjs lib/installer/stale-uipro.mjs lib/installer/frontend-skills.mjs tests/installer/file-digests.test.js tests/installer/stale-uipro.test.js tests/installer/frontend-skills.test.js tests/installer/frontend-skills-cli.test.js` (new, not ignored). Depends on T-602.
+- [X] [T-604] Stage the modified files: `git add -u bin/code-conductor.mjs CLAUDE.md project-template/CLAUDE.md global/CLAUDE.md README.md .github/wiki/pages/Skills.md tests/tools/repo-invariants.test.js` (all tracked). Depends on T-603.
+- [X] [T-605] Stage: `git add -u docs/superpowers/plans/2026-11-26-feat037-frontend-design-skill-stack-replace-ui-ux-pro.md` (carries the ticks for T-101 to T-604). Depends on T-604.
+- [X] [T-606] Commit: `feat: offer a pinned frontend design skill stack and sweep stale ui-ux-pro-max installs [FEAT-037]`. Depends on T-605.
 
 ### Task 7: Manual check against the real CLIs (owner decision, before the release)
 
@@ -320,11 +320,11 @@ Not part of the build session and not part of `npm test`: it needs network to th
 
 ## Test List
 
-- [ ] [T-901] `tests/installer/file-digests.test.js` (Task 1):
+- [X] [T-901] `tests/installer/file-digests.test.js` (Task 1):
   - D1 a tree with `b.txt`, `a/nested/c.txt` and `A.md` gives sorted `/`-separated keys (`A.md`, `a/nested/c.txt`, `b.txt`) and the sha256 of each file's bytes; empty directories are not entries.
   - D2 a junction `link` to a directory outside the tree is recorded as `'symlink'`, and no key under `link/` appears (not followed).
   - D3 with an injected `readFile` that throws `{ code: 'EACCES' }` for one path, that key is `'unreadable (EACCES)'` and the others are digests.
-- [ ] [T-902] `tests/installer/stale-uipro.test.js` (Task 2):
+- [X] [T-902] `tests/installer/stale-uipro.test.js` (Task 2):
   - S1 `UIPRO_CLAUDE_OUTPUT` has exactly the key `2.2.3`, 31 entries, every value `/^[0-9a-f]{64}$/`, `SKILL.md` = `07b87b89…` (full digest), and the sha256 of its sorted `<hash> <path>\n` lines is `b474d030…` (full digest); `UIPRO_FLAT_HASHES.size` is 0.
   - S2 a `<cwd>/.claude/skills/ui-ux-pro-max/` tree equal to an injected `known` (`{ '9.9.9': … }`) is removed, and stdout is exactly `removed stale ui-ux-pro-max skill (uipro-cli 9.9.9 content): <path>`.
   - S3 the same tree with one byte changed is left byte-identical (`digestTree` before equals after) and stderr names it with the `does not match a known install` line.
@@ -333,7 +333,7 @@ Not part of the build session and not part of `npm test`: it needs network to th
   - S8 `<home>/.claude/skills/ui-ux-pro-max.md` whose sha256 is in an injected `flatHashes` (`label: 'curl download'`) is removed with `(curl download content)`. S9 the same file with the default empty map is left and named.
   - S10 neither path exists: both arrays empty.
   - S11 an injected `rm` that throws `{ code: 'EPERM' }` on a matching tree: stderr `left ui-ux-pro-max in place (EPERM): <path>`, no throw.
-- [ ] [T-903] `tests/installer/frontend-skills.test.js` (Task 3):
+- [X] [T-903] `tests/installer/frontend-skills.test.js` (Task 3):
   - F1 pins: `IMPECCABLE_PACKAGE` matches `/^impeccable@\d+\.\d+\.\d+$/` and is `impeccable@4.11.1`; `SKILLS_CLI` matches `/^skills@\d+\.\d+\.\d+$/` and is `skills@1.9.0`; the two `skills` pins match `/^[0-9a-f]{40}$/`; names are exactly `impeccable`, `emil-design-eng`, `design-taste-frontend` in that order.
   - F2 `installArgs` gives exactly the three argv of plan decision 2; none contains `--no-hooks`, `--all` or `*`; each `skills` argv has exactly one `--skill`; `commandLine` is `npx ` plus the argv joined by spaces.
   - F3 `DISCLOSURE` contains `hook`, `even when you deny the model's own commands`, `download Impeccable's engine binary (checksum-verified) on first use`, `impeccable.style`, `signed by the vendor` and `not pinned to a commit`, and names the three pins; `CONSENT_PROMPT` is `Install the frontend design skills? [Y/n] `.
@@ -353,7 +353,7 @@ Not part of the build session and not part of `npm test`: it needs network to th
   - F17 a prior record `accepted` with Impeccable's `files` map, every `SKILL.md` present and both lock entries at their pins: no `ask`, no spawn, three `already installed` lines, and the rewritten record's Impeccable `files` equals the prior map.
   - F18a emil present with a lock entry at another commit, the others absent: emil is not spawned and reports `present at a different revision (<commit>); not changed`; the other two are installed. F18b Impeccable's `SKILL.md` present with no record → `present at a different revision (unlocked); not changed`.
   - F19 `classifyWithDetector(ROOT, dir)` on real temp fixtures: a `package.json` with `dependencies.react` plus a `src/` directory → `{ type: 'frontend' }`; `dependencies.express` plus `server/` → `backend`; an empty directory → `library`; a path that does not exist → `{ error }`. Four `it` rows.
-- [ ] [T-904] `tests/installer/frontend-skills-cli.test.js` (Task 4), every case through `run()` with a temp `home` and `cwd`:
+- [X] [T-904] `tests/installer/frontend-skills-cli.test.js` (Task 4), every case through `run()` with a temp `home` and `cwd`:
   - C1 `--project`, `classify` → `{ type: 'frontend' }`, interactive, frontend answer `''`: the frontend question is asked after `<cwd>/.claude/settings.json` exists (deploy ran first), `frontendSpawn` is called three times, exit 0.
   - C2 `classify` → `backend`, and C3 → `library`: no frontend question, no `frontendSpawn` call, no `.claude/frontend-skills.json`.
   - C4 `--with-plugins` alone, non-interactive, `frontend`: no `frontendSpawn` call.
@@ -365,8 +365,8 @@ Not part of the build session and not part of `npm test`: it needs network to th
   - C10 a global-only run (no `--project`): `classify` is never called.
   - C11 `--with-frontend-skills`, `frontendSpawn` returning `{ status: 2 }`: exit 0 and three `not installed (exit 2)` lines.
   - C12 `--with-frontend-skills` produces no `ignoring unrecognized argument(s)` line.
-- [ ] [T-905] `tests/tools/repo-invariants.test.js` (Task 5): the extended ui-ux-pro-max row and the three new rows of plan decision 12 (E5 and the README criterion).
-- [ ] [T-906] No row needed: E3 is held by T-602's `dependencies` check and the existing invariant tests; the wiki page has no test and T-506 is checked by reading its diff. Full `npm test` is T-601. No UI, so no E2E row; the end-to-end run against the real CLIs is the manual Task 7 (owner decision), outside the suite. CI legs: no new test is conditionally skipped (symlinks are junctions; the unreadable case is injected), so no leg's set in `tools/skip-baseline.json` changes.
+- [X] [T-905] `tests/tools/repo-invariants.test.js` (Task 5): the extended ui-ux-pro-max row and the three new rows of plan decision 12 (E5 and the README criterion).
+- [X] [T-906] No row needed: E3 is held by T-602's `dependencies` check and the existing invariant tests; the wiki page has no test and T-506 is checked by reading its diff. Full `npm test` is T-601. No UI, so no E2E row; the end-to-end run against the real CLIs is the manual Task 7 (owner decision), outside the suite. CI legs: no new test is conditionally skipped (symlinks are junctions; the unreadable case is injected), so no leg's set in `tools/skip-baseline.json` changes.
 
 ## Commit Order
 
