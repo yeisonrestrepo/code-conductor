@@ -3,7 +3,7 @@
 // The band router (FEAT-011). It builds, validates and installs SNAP v3 envelopes and
 // records a run's position in a host-owned run file. It never edits a tracked file, and
 // it is the only writer of the run file. Zero dependencies, node: builtins only.
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, readSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { homedir, tmpdir } from 'node:os';
@@ -752,7 +752,60 @@ function changeList(root, security) {
 
 // BUG-092: the router writes its own files during every dispatch, so no fingerprint holds them.
 const isRouterFile = (path) => path.startsWith(ROUTER_DIR) || path === RUN_FILE || path === ENVELOPE_FILE;
-const contentHash = (abs) => { try { return createHash('sha256').update(readFileSync(abs)).digest('hex'); } catch { return 'absent'; } };
+
+// BUG-097: a regular file over this many bytes is recorded by its size and mtime, unread.
+const HASH_CAP = 64 * 1024 * 1024;
+// BUG-097: O_NONBLOCK makes a FIFO swapped in after the lstat open at once; O_NOFOLLOW makes a swapped-in link fail. 0 where undefined (Windows).
+const OPEN_FOLLOW = constants.O_RDONLY | (constants.O_NONBLOCK ?? 0);
+const OPEN_NOFOLLOW = OPEN_FOLLOW | (constants.O_NOFOLLOW ?? 0);
+const specialType = (st) => (st.isDirectory() ? 'directory' : st.isFIFO() ? 'fifo' : st.isSocket() ? 'socket'
+  : st.isCharacterDevice() ? 'char-device' : st.isBlockDevice() ? 'block-device' : 'other');
+const largeValue = (st) => `large:${st.size}:${st.mtimeNs}`;
+
+// BUG-097: the sha256 of an open regular file, read in 64 KiB chunks and never past the cap, even if it grows meanwhile.
+function descriptorHash(fd) {
+  const st = fstatSync(fd, { bigint: true });
+  if (!st.isFile()) return `special:${specialType(st)}`;
+  if (st.size > HASH_CAP) return largeValue(st);
+  const hash = createHash('sha256');
+  const chunk = Buffer.allocUnsafe(64 * 1024);
+  let total = 0;
+  for (let n = readSync(fd, chunk, 0, chunk.length, null); n > 0; n = readSync(fd, chunk, 0, chunk.length, null)) {
+    total += n;
+    if (total > HASH_CAP) return largeValue(fstatSync(fd, { bigint: true }));
+    hash.update(chunk.subarray(0, n));
+  }
+  return hash.digest('hex');
+}
+
+// BUG-097: one fingerprint value; follow is true only for the ignore files, whose links git itself follows.
+function boundedHash(abs, follow) {
+  let fd;
+  try {
+    const st = follow ? statSync(abs, { bigint: true }) : lstatSync(abs, { bigint: true });
+    if (st.isSymbolicLink()) return `symlink:${createHash('sha256').update(readlinkSync(abs, { encoding: 'buffer' })).digest('hex')}`;
+    if (!st.isFile()) return `special:${specialType(st)}`;
+    if (st.size > HASH_CAP) return largeValue(st);
+    fd = openSync(abs, follow ? OPEN_FOLLOW : OPEN_NOFOLLOW);
+    return descriptorHash(fd);
+  } catch {
+    return 'absent';
+  } finally {
+    if (fd !== undefined) try { closeSync(fd); } catch { /* the value is already decided */ }
+  }
+}
+
+// BUG-097: each directory between root and path must be a real directory, or lstat would follow a linked parent out of the tree.
+function parentsReal(root, path, cache) {
+  const parts = path.split('/').slice(0, -1);
+  for (let i = 1; i <= parts.length; i++) {
+    const dir = parts.slice(0, i).join('/');
+    if (!cache.has(dir)) cache.set(dir, isRealDirectory(join(root, dir)));
+    if (!cache.get(dir)) return false;
+  }
+  return true;
+}
+const isRealDirectory = (abs) => { try { return lstatSync(abs).isDirectory(); } catch { return false; } };
 
 // BUG-092: the tracked files that differ from HEAD (every tracked file before the first commit) and the untracked
 // files no ignore rule hides, each mapped to the sha256 of its bytes, or to absent for a deleted one.
@@ -766,7 +819,10 @@ function treeFingerprint(root, base) {
   const others = git(['ls-files', '--others', '--exclude-standard', '-z']);
   if (tracked.status !== 0 || others.status !== 0) return { reason: 'git cannot list the changed files' };
   const paths = [...new Set([...nulPaths(tracked), ...nulPaths(others)])].filter((path) => !isRouterFile(path)).sort();
-  return { files: Object.fromEntries(paths.map((path) => [path, contentHash(join(root, path))])) };
+  // BUG-097: no value is read through a link: a path under a linked directory is absent, and a link is its target string.
+  const parents = new Map();
+  const value = (path) => (parentsReal(root, path, parents) ? boundedHash(join(root, path), false) : 'absent');
+  return { files: Object.fromEntries(paths.map((path) => [path, value(path)])) };
 }
 
 // BUG-098: the ignore files --exclude-standard reads outside the work tree, keyed by a fixed label, never by their path.
@@ -785,10 +841,10 @@ function treeAnchor(root) {
   const git = (args) => spawnSync('git', args, { cwd: root, encoding: 'utf8' });
   const head = git(['rev-parse', '--verify', '--quiet', 'HEAD']);
   const exclude = git(['rev-parse', '--git-path', 'info/exclude']);
-  const excludeHash = exclude.status === 0 ? contentHash(resolve(root, exclude.stdout.trim())) : 'absent';
+  const excludeHash = exclude.status === 0 ? boundedHash(resolve(root, exclude.stdout.trim()), true) : 'absent';
   return {
     head: head.status === 0 ? head.stdout.trim() : null,
-    ignores: { 'info/exclude': excludeHash, 'core.excludesFile': contentHash(excludesFilePath(root, git)) },
+    ignores: { 'info/exclude': excludeHash, 'core.excludesFile': boundedHash(excludesFilePath(root, git), true) },
   };
 }
 
