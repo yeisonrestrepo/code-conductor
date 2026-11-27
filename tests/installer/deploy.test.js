@@ -1082,3 +1082,30 @@ describe('deployProject: cc-* commands for OpenCode (FEAT-048)', () => {
     expect(readFileSync(join(home, COMMAND), 'utf8')).toBe('command\n');
   });
 });
+
+// FEAT-048 slice 6 (#97): the band agents land as OpenCode subagents only with --opencode.
+describe('deployProject: band agents for OpenCode (FEAT-048)', () => {
+  const AGENT = join('.opencode', 'agent', 'conductor-audit.md');
+  beforeEach(() => {
+    mkdirSync(join(asset, 'project-template', '.opencode', 'agent'), { recursive: true });
+    writeFileSync(join(asset, 'project-template', AGENT), 'agent\n');
+  });
+  it('installs no agent without the opencode option', () => {
+    deployProject(asset, home, { ...capture().opts, antigravity: true, codex: true });
+    expect(existsSync(join(home, '.opencode'))).toBe(false);
+  });
+  it('installs the agents and reports them with the opencode option', () => {
+    const out = capture();
+    deployProject(asset, home, { ...out.opts, opencode: true });
+    expect(readFileSync(join(home, AGENT), 'utf8')).toBe('agent\n');
+    expect(out.said).toContain('code-conductor: installed the band agents as OpenCode subagents in .opencode/agent/');
+  });
+  it('keeps the host\'s own agents and overwrites ours', () => {
+    mkdirSync(join(home, '.opencode', 'agent'), { recursive: true });
+    writeFileSync(join(home, '.opencode', 'agent', 'plan.md'), 'host');
+    writeFileSync(join(home, AGENT), 'stale');
+    deployProject(asset, home, { ...capture().opts, opencode: true });
+    expect(readFileSync(join(home, '.opencode', 'agent', 'plan.md'), 'utf8')).toBe('host');
+    expect(readFileSync(join(home, AGENT), 'utf8')).toBe('agent\n');
+  });
+});

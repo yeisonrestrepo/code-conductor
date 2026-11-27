@@ -113,8 +113,8 @@ describe('shipped asset dirs', () => {
     for (const d of ['global', 'skills', 'scripts', 'project-template']) walk(join(root, d), d);
     expect(offenders).toEqual([]);
   });
-  // FEAT-048 slice 4 widened the pin to the rendered commands, which deploy.mjs copies with --opencode.
-  it('[BUG-069] ships only the plugin and the rendered commands under project-template/.opencode/', () => {
+  // FEAT-048 slices 4 and 6 widened the pin to the rendered commands and agents, which deploy.mjs copies with --opencode.
+  it('[BUG-069] ships only the plugin and the rendered commands and agents under project-template/.opencode/', () => {
     const files = [];
     const walk = (dir, rel) => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
