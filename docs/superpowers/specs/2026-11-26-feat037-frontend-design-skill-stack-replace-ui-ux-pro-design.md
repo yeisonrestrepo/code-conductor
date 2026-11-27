@@ -1,6 +1,6 @@
 # FEAT-037: Frontend design skill stack (replace ui-ux-pro-max)
 
-**Status:** Draft (pending independent review)
+**Status:** Approved 2026-11-26 by the owner
 
 Backlog entry: `AGENT-READABLE BACKLOG.md`, `[FEAT-037]` (issue #147). This spec answers that entry's acceptance criteria. Where the entry leaves a choice open, or where the tree contradicts the entry, the spec names the choice and the reason.
 
