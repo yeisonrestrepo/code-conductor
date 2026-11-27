@@ -1958,6 +1958,45 @@ After `[BUG-044]` and `[BUG-042]`, unless a third specimen forces the queue. Two
 - Intake of issue #356; reported by the security review of the 1.59.7
   release candidate (#338).
 
+### [ ] `[BUG-103]` OpenCode renders of Edit-only roles gain write capability through the edit permission
+
+- Symptom: `lib/installer/harness-commands.mjs:27`, per the issue, maps
+  both `Write` and `Edit` to OpenCode's `edit` permission, and that
+  permission also covers OpenCode's write, patch and multiedit tools.
+  The `docs` and `release` agents list only `Edit` in Claude Code, so
+  they cannot create files there; their OpenCode renders
+  (`conductor-docs`, `conductor-release`) can. Outside a run there is no
+  band envelope, so Guard 5 does not narrow them.
+- Impact per the issue: bounded. Guards 1–4 still apply, and the main
+  session can already write. It still widens the role's capability
+  without a recorded decision.
+- Fix shape suggested by the issue: record the widening in the spec, or
+  have the guard deny `Write` payloads whose `agent_type` is a role
+  without `Write` in its source `tools`.
+- Intake of issue #367; reported by the automated security review of
+  #365.
+
+### [ ] `[BUG-104]` OpenCode guard task tool forwards arguments outside a closed set
+
+- Symptom: `taskTool`
+  (`project-template/.opencode/plugin/conductor-guard.js:117`), per the
+  issue, validates `subagent_type`, `prompt` and `task_id`, and forwards
+  the call without looking at any other argument. `bashTool` blocks any
+  argument outside a closed set, because OpenCode's tool schemas are not
+  versioned with this guard (`[BUG-071]`). `task_id` already showed that
+  one extra `task` argument can change which agent a call is attributed
+  to, so a future OpenCode argument (for example one that attaches files
+  or picks a session or model) would reach the subagent unchecked.
+- Impact per the issue: limited today; no such argument is known on
+  OpenCode 1.19.6.
+- Fix shape suggested by the issue: allow only `subagent_type`,
+  `prompt`, `description` (plus any measured, harmless field such as
+  `command`), block every other defined argument with a clear reason,
+  and add a test.
+- Follow-up of `[BUG-071]`.
+- Intake of issue #366; reported by the automated security review of
+  #365.
+
 ### DOSSIER (unfiled, no id yet): Session Denial Tally and Uncharacterized Shapes
 
 **Not an item, and deliberately not part of the heredoc dossier above.** Grouping is by mechanism, and a P5 shape has no established mechanism yet, so it is held here rather than filed next to a family it may not belong to. **No mechanism claim is made for anything in this section**, per the standing rule that a mechanism is claimed only after a probe.
