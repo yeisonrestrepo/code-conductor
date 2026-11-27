@@ -113,8 +113,9 @@ describe('shipped asset dirs', () => {
     for (const d of ['global', 'skills', 'scripts', 'project-template']) walk(join(root, d), d);
     expect(offenders).toEqual([]);
   });
-  // FEAT-048 slice 4 widened the pin to the rendered commands, which deploy.mjs copies with --opencode.
-  it('[BUG-069] ships only the plugin and the rendered commands under project-template/.opencode/', () => {
+  // FEAT-048 slices 4, 6 and 7 widened the pin to the rendered commands and agents and the
+  // context plugin, which deploy.mjs installs with --opencode.
+  it('[BUG-069] ships only the two plugins and the rendered commands and agents under project-template/.opencode/', () => {
     const files = [];
     const walk = (dir, rel) => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -125,7 +126,7 @@ describe('shipped asset dirs', () => {
     };
     walk(join(root, 'project-template', '.opencode'), '');
     const commands = [...renderAll(root).keys()].filter((k) => k.startsWith('.opencode/')).map((k) => k.slice('.opencode/'.length));
-    expect(files.sort()).toEqual(['plugin/conductor-guard.js', ...commands].sort());
+    expect(files.sort()).toEqual(['plugin/conductor-context.js', 'plugin/conductor-guard.js', ...commands].sort());
   });
 });
 

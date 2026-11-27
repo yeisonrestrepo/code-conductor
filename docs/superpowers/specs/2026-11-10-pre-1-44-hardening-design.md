@@ -100,7 +100,7 @@ There is also a gap in the release flow. The maintainer's release PRs are opened
 ## Choices this spec makes (owner decision)
 
 1. **Fail closed for unknown OpenCode tools, including MCP tools.** A user who wires MCP servers into OpenCode with `--opencode` installed sees those tools blocked, with a reason that names them. The alternative, letting unknown tools through as the Claude Code matcher does, is what made the patch tool a bypass. Claude Code's tool set is known and versioned with the hook; OpenCode's is not.
-2. **`task` is blocked.** Whether `tool.execute.before` fires for tool calls inside an OpenCode subagent could not be verified (Pre-flight). A guard that cannot see a subagent's writes must not let the subagent start. OpenCode users lose subagents until a live run proves the hook sees them.
+2. **`task` is blocked.** Whether `tool.execute.before` fires for tool calls inside an OpenCode subagent could not be verified (Pre-flight). A guard that cannot see a subagent's writes must not let the subagent start. OpenCode users lose subagents until a live run proves the hook sees them. *(Amended 2026-11-27: a live run on OpenCode 1.19.6 showed the hook firing for a subagent's own calls, so `task` is now sent to the guard, and each call carries its session's agent. See `2026-11-27-feat048-opencode-band-agents-design.md`.)*
 3. **Only the documented 1.x argument names are mapped.** Current OpenCode documentation shows renamed tools and arguments (`shell`, `path`, `subagent`). They are not mapped, because nothing has verified them against a running OpenCode, and the FEAT-048 spec leaves the V2 plugin API out of scope. Under the fail-closed rule, a renamed tool is blocked, and a mapped tool with renamed arguments is blocked for the missing argument. Neither passes silently.
 4. **The release exemption keys on author identity, narrowed by branch and backed by the `release-branches` ruleset**, whose bypass list holds only the App (verified possible on this user-owned repository; see Pre-flight). This amends FEAT-045 Ruling 2 ("never exempts a branch name"). A branch name alone exempts nothing.
 5. **`pull_request_target` for the records guard.** This amends FEAT-045 Ruling 4 ("runs on `pull_request`"); see Pre-flight.
@@ -149,8 +149,8 @@ There is also a gap in the release flow. The maintainer's release PRs are opened
 ## Out of Scope
 
 - OpenCode V2 tool and argument names (`shell`, `path`, `subagent`) and the V2 plugin API. They are blocked by AC4 and AC6, and get mapped in a follow-up after a live run.
-- Re-enabling `task` once a live run shows hooks firing inside subagents.
-- Guards 5, 6 and 7 attribution for OpenCode subagents (FEAT-048 known limit).
+- Re-enabling `task` once a live run shows hooks firing inside subagents. *(Done 2026-11-27, FEAT-048 slice 6.)*
+- Guards 5, 6 and 7 attribution for OpenCode subagents (FEAT-048 known limit). *(Done 2026-11-27, FEAT-048 slice 6.)*
 - Splitting `publish.yml` so dev dependencies never share a job with the OIDC credential, and the `vitest` major upgrade. That is a separate BUG, because the code is already released.
 - The fallback in `cc-resume`, `cc-orchestrate` and `cc-metrics` that runs `node scripts/<x>.mjs` from the working project. It was reported privately and is fixed separately.
 - Any change to `pre-tool-use.mjs`.

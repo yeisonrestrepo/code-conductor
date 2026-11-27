@@ -25,20 +25,45 @@ function scaffold() {
   return dir;
 }
 
-async function hookFor(directory) {
-  const hooks = await plugin.ConductorGuard({ directory, worktree: directory });
+// OpenCode's client.session.get, as measured on 1.19.6: a task subagent's session carries
+// its agent's name and its parent's id; a primary session carries no parentID.
+const SESSIONS = {
+  ses_test: { id: 'ses_test', agent: 'build' },
+  ses_root: { id: 'ses_root', agent: 'build' },
+  ses_audit: { id: 'ses_audit', agent: 'conductor-audit', parentID: 'ses_root' },
+  ses_code: { id: 'ses_code', agent: 'conductor-code', parentID: 'ses_root' },
+  ses_general: { id: 'ses_general', agent: 'general', parentID: 'ses_root' },
+  ses_deep: { id: 'ses_deep', agent: 'conductor-qa', parentID: 'ses_general' },
+  ses_noagent: { id: 'ses_noagent', parentID: 'ses_root' },
+  ses_primary_code: { id: 'ses_primary_code', agent: 'conductor-code' },
+};
+function fakeClient(lookups = []) {
+  return {
+    session: {
+      get: async ({ path: { id } }) => {
+        lookups.push(id);
+        return SESSIONS[id] ? { data: SESSIONS[id] } : { error: { name: 'NotFoundError' } };
+      },
+    },
+  };
+}
+
+async function hookFor(directory, client = fakeClient()) {
+  const hooks = await plugin.ConductorGuard({ directory, worktree: directory, client });
   return hooks['tool.execute.before'];
 }
 
 // Resolves to the block reason, or '' when the call is let through.
-async function call(directory, tool, args) {
-  const before = await hookFor(directory);
+async function callWith(before, tool, args, sessionID = 'ses_test') {
   try {
-    await before({ tool, sessionID: 'ses_test', callID: 'call_test' }, { args });
+    await before({ tool, sessionID, callID: 'call_test' }, { args });
     return '';
   } catch (e) {
     return e.message;
   }
+}
+async function call(directory, tool, args, { sessionID, client } = {}) {
+  return callWith(await hookFor(directory, client), tool, args, sessionID);
 }
 
 function setAllowlist(entries) {
@@ -152,12 +177,131 @@ afterAll(() => { for (const d of stubs) rmSync(d, { recursive: true, force: true
 const UNCOVERED = /code-conductor guard does not cover the OpenCode tool/;
 const NOT_RUN = /code-conductor guard could not run/;
 
-describe('OpenCode plugin: fails closed on what it cannot inspect', () => {
-  it('blocks task, since subagents cannot be inspected (AC3)', async () => {
-    const reason = await call(bare, 'task', { description: 'd', prompt: 'p', subagent_type: 'general' });
-    expect(reason).toMatch(/cannot inspect OpenCode subagents; "task" is blocked/);
-    expect(reason).not.toMatch(NOT_RUN);
+// FEAT-048 slice 6: measured on 1.19.6, tool.execute.before fires for a task subagent's own
+// calls, so task is sent to the guard as Agent and every call carries its session's agent.
+const IDENTIFY = /code-conductor guard could not identify the OpenCode session's agent/;
+
+describe('OpenCode plugin: task is sent to the guard as Agent (AC3)', () => {
+  it('maps a task from the primary session, without the conductor- prefix and with no agent_type', async () => {
+    const dir = stubProject();
+    expect(await call(dir, 'task', { description: 'd', prompt: 'review it', subagent_type: 'conductor-audit' })).toBe('');
+    const [p] = payloads(dir);
+    expect(p).toMatchObject({ tool_name: 'Agent', session_id: 'ses_test', tool_input: { subagent_type: 'audit', description: 'd', prompt: 'review it' } });
+    expect(p).not.toHaveProperty('agent_type');
+    expect(payloads(dir)).toHaveLength(1);
   });
+  it('keeps the name of an agent that is not code-conductor\'s', async () => {
+    const dir = stubProject();
+    await call(dir, 'task', { description: 'd', prompt: 'p', subagent_type: 'general' });
+    expect(payloads(dir)[0].tool_input.subagent_type).toBe('general');
+  });
+  it('carries the calling subagent as agent_type and the root session as session_id', async () => {
+    const dir = stubProject();
+    await call(dir, 'task', { description: 'd', prompt: 'p', subagent_type: 'general' }, { sessionID: 'ses_code' });
+    expect(payloads(dir)[0]).toMatchObject({ agent_type: 'code', session_id: 'ses_root' });
+  });
+  it('walks every parent to the root session', async () => {
+    const dir = stubProject();
+    await call(dir, 'write', { filePath: join(dir, 'a.txt'), content: 'x' }, { sessionID: 'ses_deep' });
+    expect(payloads(dir)[0]).toMatchObject({ agent_type: 'qa', session_id: 'ses_root' });
+  });
+});
+
+describe('OpenCode plugin: task arguments the guard cannot attribute or see (AC4)', () => {
+  const cases = [
+    ['task_id, which resumes a session under another agent', { description: 'd', prompt: 'p', subagent_type: 'conductor-code', task_id: 'ses_root' }, /task_id/],
+    ['an @path in the prompt, which OpenCode attaches without a tool call', { description: 'd', prompt: 'read @node_modules/x/index.js', subagent_type: 'general' }, /@ reference/],
+    ['a dot-led @path', { description: 'd', prompt: 'see @.env', subagent_type: 'general' }, /@ reference/],
+    ['no subagent_type', { description: 'd', prompt: 'p' }, /subagent_type/],
+    ['an empty prompt', { description: 'd', prompt: '', subagent_type: 'general' }, /prompt/],
+  ];
+  it.each(cases)('blocks %s without spawning the guard', async (_label, args, why) => {
+    const dir = stubProject();
+    const reason = await call(dir, 'task', args);
+    expect(reason).toMatch(/code-conductor guard blocked "task"/);
+    expect(reason).toMatch(why);
+    expect(payloads(dir)).toEqual([]);
+  });
+  it('lets an e-mail-like or code-span @ through', async () => {
+    const dir = stubProject();
+    expect(await call(dir, 'task', { description: 'd', prompt: 'mail a@b about `@keep`', subagent_type: 'general' })).toBe('');
+  });
+});
+
+describe('OpenCode plugin: calls are attributed to their session\'s agent', () => {
+  it('sends a subagent\'s write with its role as agent_type', async () => {
+    const dir = stubProject();
+    await call(dir, 'write', { filePath: join(dir, 'a.txt'), content: 'x' }, { sessionID: 'ses_audit' });
+    expect(payloads(dir)[0]).toMatchObject({ tool_name: 'Write', agent_type: 'audit', session_id: 'ses_root' });
+  });
+  it('treats a primary session running a conductor agent as that role', async () => {
+    const dir = stubProject();
+    await call(dir, 'write', { filePath: join(dir, 'a.txt'), content: 'x' }, { sessionID: 'ses_primary_code' });
+    expect(payloads(dir)[0]).toMatchObject({ agent_type: 'code', session_id: 'ses_primary_code' });
+  });
+  it('looks a subagent session up once, and its primary root on every call', async () => {
+    const lookups = [];
+    const before = await hookFor(stubProject(), fakeClient(lookups));
+    for (let i = 0; i < 3; i++) await callWith(before, 'bash', { command: 'git status' }, 'ses_code');
+    expect(lookups.sort()).toEqual(['ses_code', 'ses_root', 'ses_root', 'ses_root']);
+  });
+  it('sees a primary session\'s agent change on the next call', async () => {
+    const sessions = { ses_p: { id: 'ses_p', agent: 'build' } };
+    const client = { session: { get: async ({ path: { id } }) => ({ data: sessions[id] }) } };
+    const dir = stubProject();
+    const before = await hookFor(dir, client);
+    const write = { filePath: join(dir, 'a.txt'), content: 'x' };
+    await callWith(before, 'write', write, 'ses_p');
+    sessions.ses_p = { id: 'ses_p', agent: 'conductor-code' };
+    await callWith(before, 'write', write, 'ses_p');
+    const [first, second] = payloads(dir);
+    expect(first).not.toHaveProperty('agent_type');
+    expect(second).toMatchObject({ agent_type: 'code' });
+  });
+});
+
+describe('OpenCode plugin: band role shells through the real guard (AC5)', () => {
+  it('denies audit any shell (Guard 7)', async () => {
+    expect(await call(project, 'bash', { command: 'git status' }, { sessionID: 'ses_audit' })).toMatch(/Guard 7: ROLE_SHELL_DENIED/);
+  });
+  it('denies code a shell when no run records its test command (Guard 7)', async () => {
+    expect(await call(project, 'bash', { command: 'git status' }, { sessionID: 'ses_code' })).toMatch(/Guard 7: ROLE_SHELL_UNRESOLVED/);
+  });
+  it('lets the primary session run the same command', async () => {
+    setAllowlist([]);
+    expect(await call(project, 'bash', { command: 'git status' })).toBe('');
+  });
+});
+
+describe('OpenCode plugin: fails closed when the session cannot be identified (AC6)', () => {
+  const throwing = { session: { get: async () => { throw new Error('offline'); } } };
+  const empty = { session: { get: async () => ({}) } };
+  it.each([
+    ['an unknown session', { sessionID: 'ses_missing' }],
+    ['a subagent session with no agent', { sessionID: 'ses_noagent' }],
+    ['a lookup that throws', { client: throwing }],
+    ['a lookup with no data', { client: empty }],
+    ['no client', { client: null }],
+  ])('blocks a mapped call for %s without spawning the guard', async (_label, opts) => {
+    const dir = stubProject();
+    expect(await call(dir, 'bash', { command: 'git status' }, opts)).toMatch(IDENTIFY);
+    expect(payloads(dir)).toEqual([]);
+  });
+  it('still lets read-only tools through with no client', async () => {
+    expect(await call(bare, 'grep', { pattern: 'x' }, { client: null })).toBe('');
+  });
+  it('does not cache a failed lookup', async () => {
+    let fail = true;
+    const flaky = { session: { get: async ({ path: { id } }) => (fail ? {} : { data: SESSIONS[id] }) } };
+    const dir = stubProject();
+    const before = await hookFor(dir, flaky);
+    expect(await callWith(before, 'bash', { command: 'git status' })).toMatch(IDENTIFY);
+    fail = false;
+    expect(await callWith(before, 'bash', { command: 'git status' })).toBe('');
+  });
+});
+
+describe('OpenCode plugin: fails closed on what it cannot inspect', () => {
   it('blocks batch and unknown tools without spawning the guard (AC4)', async () => {
     for (const tool of ['batch', 'some_mcp_tool', 'shell', 'subagent', 'execute']) {
       const reason = await call(bare, tool, {});

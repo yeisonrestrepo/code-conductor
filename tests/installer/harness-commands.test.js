@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { OPENCODE_PREAMBLE, PREAMBLE, SOURCE_DIRS, renderAll, renderCommand, staleRenders } from '../../lib/installer/harness-commands.mjs';
+import { AGENT_PREAMBLE, AGENT_SOURCE_DIR, OPENCODE_PREAMBLE, PREAMBLE, SOURCE_DIRS, renderAgent, renderAll, renderCommand, staleRenders } from '../../lib/installer/harness-commands.mjs';
 
 // FEAT-048 slice 3 (#97): agy workflows and Codex skills are rendered from the cc-* sources.
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -87,17 +87,24 @@ describe('renderCommand: OpenCode command', () => {
 
 describe('rendered files stay in sync with the sources (drift)', () => {
   const rendered = renderAll(ROOT);
-  it('renders one workflow, one skill and one OpenCode command per cc-* source', () => {
+  it('renders one workflow, one skill and one OpenCode command per cc-* source, and one OpenCode agent per band agent', () => {
     const sources = SOURCE_DIRS.flatMap((d) => readdirSync(join(ROOT, d)).filter((f) => /^cc-.*\.md$/.test(f)));
-    expect(rendered.size).toBe(sources.length * 3);
+    const agents = readdirSync(join(ROOT, AGENT_SOURCE_DIR)).filter((f) => f.endsWith('.md'));
+    expect(agents.length).toBeGreaterThan(0);
+    expect(rendered.size).toBe(sources.length * 3 + agents.length);
     expect([...rendered.keys()].filter((k) => k.startsWith('.opencode/command/'))).toHaveLength(sources.length);
+    expect([...rendered.keys()].filter((k) => k.startsWith('.opencode/agent/')).sort())
+      .toEqual(agents.map((f) => `.opencode/agent/conductor-${f}`).sort());
   });
-  it.each([...rendered.keys()].filter((k) => k.startsWith('.opencode/')).map((k) => [k]))('%s gives OpenCode nothing to run, attach or substitute', (rel) => {
+  // Commands only: OpenCode does not template an agent prompt. Measured on 1.19.6, an agent
+  // body's !`...` did not run and its @file was not attached (FEAT-048 slice 6).
+  const commands = [...rendered.keys()].filter((k) => k.startsWith('.opencode/command/'));
+  it.each(commands.map((k) => [k]))('%s gives OpenCode nothing to run, attach or substitute', (rel) => {
     expect(opencodeActs(readFileSync(join(ROOT, 'project-template', rel), 'utf8'))).toEqual([]);
   });
   // OpenCode substitutes $ARGUMENTS before its shell pass, so a backtick next to it plus an
   // ordinary argument ending in `!` would form a trigger the user never typed.
-  it.each([...rendered.keys()].filter((k) => k.startsWith('.opencode/')).flatMap((k) => [[k, 'add login!'], [k, 'mail me@']]))('%s gives OpenCode nothing to run or attach after substituting %j', (rel, args) => {
+  it.each(commands.flatMap((k) => [[k, 'add login!'], [k, 'mail me@']]))('%s gives OpenCode nothing to run or attach after substituting %j', (rel, args) => {
     const text = readFileSync(join(ROOT, 'project-template', rel), 'utf8').replaceAll('$ARGUMENTS', args);
     expect(opencodeActs(text)).toEqual([]);
   });
@@ -106,5 +113,42 @@ describe('rendered files stay in sync with the sources (drift)', () => {
   });
   it('leaves no stale cc-* render behind', () => {
     expect(staleRenders(ROOT, rendered)).toEqual([]);
+  });
+  it('every OpenCode command maps the agent names it may dispatch to their OpenCode names', () => {
+    for (const [rel, text] of rendered) {
+      if (rel.startsWith('.opencode/command/')) expect(text).toContain('is the OpenCode subagent conductor-audit');
+    }
+  });
+});
+
+// FEAT-048 slice 6 (#97): band agents become OpenCode subagents. "*": deny first, so every
+// tool the source does not list (task, webfetch, todowrite...) is denied, measured on 1.19.6.
+const AGENT = (tools) => `---\nname: audit\ndescription: Review it.\ntools: ${tools}\ndefault-model: opus\nomitClaudeMd: true\n---\n\nYou are audit.\n`;
+const agentFrontmatter = (text) => text.split('\n---\n')[0];
+
+describe('renderAgent', () => {
+  it('renders a read-only agent as a subagent that denies everything but read, grep and glob', () => {
+    expect(agentFrontmatter(renderAgent('audit', AGENT('Read, Grep, Glob')))).toBe(
+      '---\ndescription: "Review it."\nmode: subagent\npermission:\n  "*": deny\n  read: allow\n  grep: allow\n  glob: allow',
+    );
+  });
+  it('allows edit for Write or Edit and bash for Bash', () => {
+    const fm = agentFrontmatter(renderAgent('code', AGENT('Read, Grep, Glob, Write, Edit, Bash')));
+    expect(fm.split('\n').slice(4)).toEqual(['  "*": deny', '  read: allow', '  grep: allow', '  glob: allow', '  edit: allow', '  bash: allow']);
+  });
+  it('drops the Claude Code-only keys and keeps the body after the preamble', () => {
+    const text = renderAgent('audit', AGENT('Read'));
+    expect(text).not.toMatch(/^(name|tools|default-model|omitClaudeMd):/m);
+    expect(text.split(AGENT_PREAMBLE)).toHaveLength(2);
+    expect(text.endsWith('\n\nYou are audit.\n')).toBe(true);
+  });
+  it('throws naming the agent and the tool when a tool has no OpenCode mapping', () => {
+    expect(() => renderAgent('odd', AGENT('Read, WebFetch'))).toThrow('odd: tool "WebFetch" has no OpenCode permission mapping');
+  });
+  it('throws when the agent lists no tools', () => {
+    expect(() => renderAgent('odd', '---\ndescription: d\n---\nbody\n')).toThrow('odd: missing frontmatter tools');
+  });
+  it('renders a CRLF source like its LF form', () => {
+    expect(renderAgent('audit', AGENT('Read').replace(/\n/g, '\r\n'))).toBe(renderAgent('audit', AGENT('Read')));
   });
 });
