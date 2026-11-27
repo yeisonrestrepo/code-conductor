@@ -10,6 +10,16 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const p=require('path'),f=require('fs'),u=require('url');const has=(d)=>f.existsSync(p.join(d,'.codex','hooks.json'));let d=process.cwd();while(has(d)===false&&(p.dirname(d)===d)===false)d=p.dirname(d);const a=p.join(d,'.codex','hooks','conductor-context.mjs');if(f.existsSync(a))import(u.pathToFileURL(a).href).then((m)=>m.main()).catch(()=>{});\""
+          }
+        ]
+      }
     ]
   }
 }

@@ -9,6 +9,7 @@ import {
 } from '../../lib/installer/host-owned.mjs';
 import { matchingFingerprints } from '../../lib/installer/settings-merge.mjs';
 import { renderAll } from '../../lib/installer/harness-commands.mjs';
+import { CODEX_HOOK_FINGERPRINTS } from '../../lib/installer/deploy.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SKILLS = ['agent-delegation', 'code-simplifier', 'critical-review', 'memory-first', 'verbosity'];
@@ -254,6 +255,7 @@ describe('settings fingerprint coverage', () => {
   const SHIPPED = [
     { rel: 'global/settings.json', fingerprints: GLOBAL_SETTINGS_FINGERPRINTS },
     { rel: 'project-template/.claude/settings.json', fingerprints: PROJECT_SETTINGS_FINGERPRINTS },
+    { rel: 'project-template/.codex/hooks.json', fingerprints: CODEX_HOOK_FINGERPRINTS },
   ];
 
   // Backward: a fingerprint that matches nothing is dead, which happens when a
