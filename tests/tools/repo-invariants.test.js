@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -146,7 +146,39 @@ describe('this repository, at every commit', () => {
   // GitHub. No shipped code has done so since the curl download was replaced and later
   // dropped; FEAT-037 owns its replacement. The claim, not the name, is what is barred.
   it('claims no automatic install of ui-ux-pro-max, which no shipped code performs', () => {
-    expect(read('README.md')).not.toMatch(/nextlevelbuilder|downloads it (directly )?from GitHub|activated automatically for frontend/i);
+    expect(read('README.md')).not.toMatch(/nextlevelbuilder|downloads it (directly )?from GitHub|activated automatically for frontend|installs ui-ux-pro-max|ui-ux-pro-max (skill )?is installed/i);
+  });
+
+  // FEAT-037: the delegation rows are the one place the CLAUDE.md templates name the design
+  // skills, and the two mirrors must change together (E5).
+  it('both CLAUDE.md mirrors name the frontend design skills in the same rows [FEAT-037]', () => {
+    const FRONTEND_ONLY = '| FRONTEND_ONLY | No backend framework    | Component modularity, design skills    |';
+    const DELEGATION = '| Frontend UI/UX             | impeccable, emil-design-eng, design-taste-frontend skills |';
+    for (const file of ['CLAUDE.md', 'project-template/CLAUDE.md']) {
+      const lines = read(file).replace(/\r\n/g, '\n').split('\n');
+      expect(lines.filter((l) => l.startsWith('| FRONTEND_ONLY |')), file).toEqual([FRONTEND_ONLY]);
+      expect(lines.filter((l) => l.startsWith('| Frontend UI/UX')), file).toEqual([DELEGATION]);
+    }
+  });
+
+  it('no shipped template names ui-ux-pro-max [FEAT-037]', () => {
+    const filesUnder = (dir) => readdirSync(join(ROOT, dir), { withFileTypes: true })
+      .flatMap((e) => (e.isDirectory() ? filesUnder(join(dir, e.name)) : [join(dir, e.name)]));
+    const shipped = ['CLAUDE.md', ...['global', 'project-template', 'skills'].flatMap(filesUnder)];
+    expect(shipped.filter((rel) => read(rel).includes('ui-ux-pro-max'))).toEqual([]);
+    expect(section(read('global/CLAUDE.md'), 'Active Skills')).toContain('`impeccable`');
+  });
+
+  it('the README describes the offered frontend design skills [FEAT-037]', () => {
+    const readme = read('README.md');
+    const quickstart = section(readme, 'Quickstart');
+    for (const needle of ['--with-frontend-skills', 'impeccable@4.11.1', 'skills@1.9.0', '64eb3deb9a5fbfa041faf783e0bc3fd635872e9c', '952435f63acece7d2fcb4b4d3c1786c1c43603e0', 'default Yes']) {
+      expect(quickstart).toContain(needle);
+    }
+    expect(quickstart).not.toContain('| ui-ux-pro-max skill |');
+    expect(quickstart.split('\n').find((l) => l.startsWith('| Frontend design skills:'))).not.toMatch(/opt-in/i);
+    const skills = section(readme, 'Skills');
+    for (const needle of ["even when you deny the model's own commands", 'impeccable.style', 'byte for byte']) expect(skills).toContain(needle);
   });
 
   // 1.34.4, BUG-049 AC13: the README names the oldest release that neither overwrites nor

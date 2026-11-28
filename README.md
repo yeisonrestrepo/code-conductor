@@ -84,7 +84,7 @@ code-conductor assumes these are already in place; the installer does not set th
 | Claude Code | The environment every command, skill and hook here runs inside | See [Anthropic's Claude Code docs](https://code.claude.com/docs) |
 | **superpowers plugin** | `/cc-spec` (`brainstorming`), `/cc-plan` (`writing-plans`), and `/cc-debug`, `/cc-refactor`, `/cc-review`, `/cc-test` (all four via `subagent-driven-development`) | The installer offers it: an interactive run asks first (default No), and a non-interactive run installs it only with `--with-plugins`. If it cannot install it, it prints the manual fallback and still succeeds: run `/plugin install superpowers@claude-plugins-official` inside Claude Code, then `/reload-plugins`, **before** using these commands; without it, their `Skill(...)` calls fail |
 | GitHub CLI (`gh`), authenticated | Only `/cc-orchestrate --ticket` and `ticket.mjs writeback`. code-conductor holds no credential; `gh` owns authentication | Install GitHub CLI, then run `gh auth login` |
-| ui-ux-pro-max skill | Nothing: retired guidance | No shipped code downloads, installs, or activates it. Its replacement is filed as `[FEAT-037]` |
+| Frontend design skills: `impeccable`, `emil-design-eng`, `design-taste-frontend` | Frontend UI/UX work on a project the stack detector classifies as `frontend` or `fullstack` (the delegation row in `CLAUDE.md`) | `code-conductor --project` offers them: an interactive run asks first (default Yes), and a non-interactive run installs them only with `--with-frontend-skills`. Impeccable comes from `npx impeccable@4.11.1 install` with its design hook; the other two from `npx skills@1.9.0 add`, pinned to commits `64eb3deb9a5fbfa041faf783e0bc3fd635872e9c` and `952435f63acece7d2fcb4b4d3c1786c1c43603e0` in `skills-lock.json`. If an install cannot run, the installer prints the manual command and still succeeds |
 
 ---
 
@@ -287,7 +287,7 @@ Skills extend agent behavior for cross-cutting concerns that apply regardless of
 
 - **memory-first (always active).** Before reading any file, Claude walks a lookup chain and stops at the first step that answers: (1) memory, both `.claude/memory/project.md` and `~/.claude/memory/personal.md`; (2) Grep/Glob; (3) a targeted read, last resort, always with `offset` + `limit`, at most 150 lines.
 - **agent-delegation (always active).** Keeps the main context clean. Sub-agents handle exploration and parallel work and return a summary of at most 200 words; raw file contents and intermediate data never enter the main context.
-- **ui-ux-pro-max (retired guidance, pending `[FEAT-037]`).** Earlier releases described this skill as installed from GitHub and switched on when `/cc-stack` detects a frontend stack. No shipped code does either. The `CLAUDE.md` templates still name it; `[FEAT-037]` replaces it with a frontend design skill stack, and this entry changes when that ships.
+- **Frontend design skills (offered on frontend projects).** `code-conductor --project` offers three third-party skills when the project classifies as `frontend` or `fullstack`: Impeccable (`impeccable@4.11.1`, the lead design skill, with its design hook), `emil-design-eng` (`emilkowalski/skill`) and `design-taste-frontend` (`Leonxlnx/taste-skill`), the last two through `skills@1.9.0` and pinned to a commit in `skills-lock.json`. They are third-party code and run with the agent's permissions. Impeccable's hook runs on the agent's edits even when you deny the model's own commands and can download Impeccable's engine binary (checksum-verified) on first use; the Impeccable skill fetches visual directions from `impeccable.style` when a new design starts, and its skill content is signed by the vendor and not pinned to a commit, so the installer records the sha256 of each installed file in `.claude/frontend-skills.json`. The installer turns the CLIs' telemetry off (`DISABLE_TELEMETRY`, `DO_NOT_TRACK`). A `ui-ux-pro-max` copy left by the retired shell installers is removed only when it matches the `uipro-cli` 2.2.3 output byte for byte; any other copy stays and is named in the report.
 
 ---
 
@@ -387,12 +387,13 @@ By default, only the global core files are installed. Flags extend that:
 | Flag | Description |
 |---|---|
 | `--project` / `-Project` | Also install the project template into the current directory |
-| `--no-deps` / `-NoDeps` | Accepted for compatibility with the retired shell installers; a no-op that copies agent files only and does not affect the superpowers offer (see `--with-plugins`) |
+| `--no-deps` / `-NoDeps` | Accepted for compatibility with the retired shell installers; a no-op that copies agent files only and does not affect the superpowers offer or the frontend skills offer (see `--with-plugins` and `--with-frontend-skills`) |
 | `--verbosity MIN\|INFO\|VERBOSE` / `-Verbosity LEVEL` | Default response verbosity (default `MIN`). `MIN` = one sentence per response, `INFO` = bullet list, `VERBOSE` = full explanation. Re-run the installer to change it. PowerShell's `-Verbosity:INFO` form is not supported; it warns and the level stays `MIN`. |
 | `--opencode` | With `--project`, also install the OpenCode guard plugin at `.opencode/plugin/conductor-guard.js`, the context plugin at `.opencode/plugin/conductor-context.js`, the `cc-*` commands in `.opencode/command/` and the band agents in `.opencode/agent/` (see [OpenCode](#opencode)). Without `--project` it warns and writes nothing for OpenCode |
 | `--antigravity` | With `--project`, also install the Antigravity CLI guard: `.agents/hooks/conductor-guard.mjs` and a `PreToolUse` entry merged into `.agents/hooks.json` (see [Antigravity CLI](#antigravity-cli)). Without `--project` it warns and writes nothing for Antigravity |
 | `--codex` | With `--project`, also merge into `.codex/hooks.json` a `PreToolUse` entry that runs the project's guard and a `UserPromptSubmit` entry that injects the verbosity and context-guard lines (see [Codex CLI](#codex-cli)). Without `--project` it warns and writes nothing for Codex |
 | `--with-plugins` | Install the superpowers plugin without asking, through `claude plugin install superpowers@claude-plugins-official` (60 s timeout). A non-interactive run installs it only with this flag; an interactive run asks instead. If the install cannot run, the installer prints `/plugin install superpowers@claude-plugins-official` and still exits 0 |
+| `--with-frontend-skills` | With `--project` on a `frontend` or `fullstack` project, install the three frontend design skills without asking (120 s timeout per command). A non-interactive run installs them only with this flag; an interactive run asks instead (default Yes). `--with-plugins` does not imply it, nor the reverse. The outcome, the pins and the sha256 of Impeccable's installed files are recorded in `.claude/frontend-skills.json` |
 
 **Updating:** re-run the same install command. User-configured files are never overwritten; agent-managed files are always updated.
 
@@ -586,7 +587,7 @@ code-conductor/
 +-- README.md
 +-- VERSION
 +-- bin/code-conductor.mjs         npm CLI entry (npx @yeison.restrepo.r/code-conductor)
-+-- lib/installer/                 CLI modules (env, deploy, settings, merges, heal)
++-- lib/installer/                 CLI modules (env, deploy, settings, merges, heal, plugins, frontend-skills, stale-uipro, file-digests)
 +-- global/
 |   +-- CLAUDE.md                  Global agent behavior (all projects)
 |   +-- settings.json
