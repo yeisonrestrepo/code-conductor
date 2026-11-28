@@ -21,7 +21,7 @@ function run(argv, { classify = asType('frontend'), frontendSpawn = exited(0), i
     return question.endsWith(CONSENT_PROMPT) ? frontendAnswer : 'n';
   };
   const spawn = (...args) => { superpowersSpawns.push(args); return { status: 1 }; };
-  return runCli(argv, { HOME: home }, { cwd, log, isInteractive, ask, spawn, classify, frontendSpawn, platform: 'linux', ...rest });
+  return runCli(argv, { HOME: home }, { cwd, log, isInteractive, ask, spawn, classify, frontendSpawn, platform: 'linux', nodeVersion: '24.0.0', ...rest });
 }
 
 beforeEach(() => {
@@ -119,5 +119,12 @@ describe('the frontend skills offer through run()', () => {
   it('C12 recognises --with-frontend-skills', () => {
     run(['--project', '--with-frontend-skills']);
     expect(stderrLines().some((l) => l.includes('ignoring unrecognized argument(s)'))).toBe(false);
+  });
+
+  it('C13 hands the running Node version to the offer, so a Node below the floor skips the skills CLI', () => {
+    const rc = run(['--project', '--with-frontend-skills'], { nodeVersion: '20.11.0' });
+    expect(rc).toBe(0);
+    expect(stderrLines().filter((l) => l.includes('needs Node >= 22.20'))).toHaveLength(2);
+    expect(frontendSpawns).toHaveLength(1);
   });
 });

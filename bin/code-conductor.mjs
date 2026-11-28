@@ -177,7 +177,7 @@ export function run(argv, env = process.env, { cwd = process.cwd(), log, nodeVer
     writeVersionFile(home, pkgVersion(assetRoot));
     if (opts.project) {
       deployProject(assetRoot, cwd, { warn: (m) => emit('stderr', m), report: (m) => emit('stdout', m), home, opencode: opts.opencode, antigravity: opts.antigravity, codex: opts.codex });
-      const offer = { withFrontendSkills: opts.withFrontendSkills, isInteractive, ask, spawn: frontendSpawn, timeoutMs: frontendTimeoutMs, env: frontendEnv, platform };
+      const offer = { withFrontendSkills: opts.withFrontendSkills, isInteractive, ask, spawn: frontendSpawn, timeoutMs: frontendTimeoutMs, env: frontendEnv, platform, nodeVersion };
       projectExtras(emit, { cwd, home, classify: classify ?? ((dir) => classifyWithDetector(assetRoot, dir)), offer });
     }
     offerPlugins(emit, { home, withPlugins: opts.withPlugins, isInteractive, ask, spawn, timeoutMs: pluginTimeoutMs, env: pluginEnv });
